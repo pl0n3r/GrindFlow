@@ -37,13 +37,12 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `ui/laravel-visual-shell`.
-- La PR debe pasar `GrindFlow CI / validate`, PHPUnit, Pint/Larastan, SonarQube
-  Cloud y CodeRabbit antes de marcarse VALIDATED IN CODE.
+- Estado actual: **VALIDATED IN CODE** en `ui/laravel-visual-shell`.
+- `GrindFlow CI / validate`, PHPUnit, Pint/Larastan y el gate browser aplicable pasaron.
 - El gate `browser` se selecciona por cambios en `resources/`, pero sigue
   siendo placeholder; pruebas end-to-end reales son la siguiente mejora.
-- El reporter de Sonar ya esta en `main`; esta PR debe demostrar que crea o
-  actualiza el comentario detallado despues del check nativo de Sonar.
+- El reporter de Sonar fue validado end-to-end en esta PR: creo el comentario
+  **SonarQube Cloud · Full PR details** con Quality Gate, condiciones, issues y hotspots.
 - No se requiere migracion de base de datos para este cambio visual.
 
 ## Qué sigue
@@ -60,7 +59,7 @@ siguiente deploy.
   produccion contra PostgreSQL runtime.
 - **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required
   status check de `main`.
-- **P1 — UI:** shell visual IMPLEMENTED; pendiente de CI/review/deploy.
+- **P1 — UI:** shell visual VALIDATED IN CODE; pendiente de merge/deploy.
 - **P1 — Browser tests:** sustituir placeholder por pruebas reales de
   landing/login/dashboard.
 - **P1 — Media Vault / ingesta:** migrar modelos, S3, uploads y deduplicacion.
