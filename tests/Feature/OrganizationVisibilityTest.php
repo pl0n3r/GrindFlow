@@ -28,6 +28,8 @@ class OrganizationVisibilityTest extends TestCase
         $this->actingAs($user)
             ->get('/dashboard')
             ->assertOk()
+            ->assertSee('Overview')
+            ->assertSee('Tenant isolation active')
             ->assertSee('Visible Organization')
             ->assertDontSee('Foreign Organization');
 

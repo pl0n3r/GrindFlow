@@ -11,36 +11,46 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se corrigio el permiso del workflow `Sonar PR Details` para publicar y
-  actualizar comentarios en pull requests.
-- El reporter conserva `issues: write` y ahora solicita tambien
-  `pull-requests: write`.
-- Los errores HTTP del reporter incluyen `X-Accepted-GitHub-Permissions`
-  cuando GitHub lo devuelve, para diagnosticar permisos sin adivinar.
-- La PR visual #10 sigue siendo la prueba end-to-end del comentario extendido.
+- Se implemento el primer **shell visual Laravel** de GrindFlow.
+- La portada publica dejo de ser el placeholder de fundacion y ahora presenta
+  una landing oscura, responsive y coherente con la identidad techno de GrindFlow.
+- `/login` usa el mismo sistema visual con formulario accesible y estados de error.
+- `/dashboard` incorpora sidebar, navegacion base, metricas de foundation,
+  organizaciones visibles y estado de aislamiento tenant.
+- Se creo un sistema visual propio en `public/css/grindflow.css` sin depender
+  del build Node/Next legado.
+- Se agrego el componente Blade reutilizable `<x-brand />`.
+- Se agregaron pruebas de render para landing/login y se reforzo el test del dashboard.
+- Esta PR es la primera prueba end-to-end del reporter **SonarQube Cloud · Full PR details**
+  que ya existe en `main`.
 
 ## Archivos modificados en este deploy
 
-- `.github/workflows/sonar-pr-details.yml` — permiso de escritura de PR.
-- `scripts/sonar-pr-comment.py` — diagnostico de permisos aceptados.
-- `README.md` — snapshot operativo estilo BRVTAL.
+- `public/css/grindflow.css` — tokens, layout, responsive, estados y componentes visuales.
+- `resources/views/welcome.blade.php` — landing publica.
+- `resources/views/auth/login.blade.php` — experiencia de acceso.
+- `resources/views/dashboard.blade.php` — shell autenticado y organizaciones.
+- `resources/views/components/brand.blade.php` — marca reutilizable.
+- `tests/Feature/VisualShellTest.php` — regresiones de landing/login.
+- `tests/Feature/OrganizationVisibilityTest.php` — regresion visual basica del dashboard.
+- `docs/REQUIREMENTS.md` — requisito GF-NFR-005.
 
 ## Validación
 
-- La primera prueba real del reporter se disparo correctamente al terminar Sonar
-  en la PR #10.
-- La lectura de Sonar funciono; el fallo observado fue GitHub HTTP 403 al crear
-  el comentario con el token del workflow.
-- Esta correccion debe pasar `GrindFlow CI / validate`, SonarQube Cloud y
-  CodeRabbit antes de fusionarse.
-- Tras el merge se forzara una nueva ejecucion de Sonar en la PR #10 para
-  verificar que aparece **SonarQube Cloud · Full PR details**.
+- Estado actual: **IMPLEMENTED** en `ui/laravel-visual-shell`.
+- La PR debe pasar `GrindFlow CI / validate`, PHPUnit, Pint/Larastan, SonarQube
+  Cloud y CodeRabbit antes de marcarse VALIDATED IN CODE.
+- El gate `browser` se selecciona por cambios en `resources/`, pero sigue
+  siendo placeholder; pruebas end-to-end reales son la siguiente mejora.
+- El reporter de Sonar ya esta en `main`; esta PR debe demostrar que crea o
+  actualiza el comentario detallado despues del check nativo de Sonar.
+- No se requiere migracion de base de datos para este cambio visual.
 
 ## Qué sigue
 
-- Fusionar este hotfix.
-- Reejecutar Sonar sobre la PR visual #10 y confirmar el comentario detallado.
-- Terminar y desplegar el shell visual Laravel.
+- Validar y fusionar el shell visual.
+- Desplegarlo en Hostinger para que el cambio sea visible en `grindflow.com.co`.
+- Sustituir el gate browser placeholder por pruebas reales de landing/login/dashboard.
 
 ## Panorama general pendiente
 
@@ -50,7 +60,7 @@ siguiente deploy.
   produccion contra PostgreSQL runtime.
 - **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required
   status check de `main`.
-- **P1 — UI:** PR #10 implementa el shell visual; pendiente de CI/review/deploy.
+- **P1 — UI:** shell visual IMPLEMENTED; pendiente de CI/review/deploy.
 - **P1 — Browser tests:** sustituir placeholder por pruebas reales de
   landing/login/dashboard.
 - **P1 — Media Vault / ingesta:** migrar modelos, S3, uploads y deduplicacion.
