@@ -43,15 +43,14 @@ siguiente deploy.
 - PR #30: run #126 completo en verde.
 - SonarQube Cloud del PR #30: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - La primera captura del bridge llego a **ready**, pero el handoff de metadata
-  quedo incompleto; este hotfix todavia debe pasar CI antes de merge.
-- Este PR es tambien una prueba real del selector optimizado: al tocar solo el
-  workflow diagnostico y README, los gates pesados deben quedar `skipped` y
-  solo `fast` + `validate` deben ser necesarios.
+  quedo incompleto; este hotfix corrige ese detalle.
+- El run #128 demostro el selector optimizado en una PR real: `fast` y `validate`
+  terminaron verdes, mientras `php-quality`, `tests`, `database`, `browser` y
+  `legacy` quedaron correctamente `skipped`.
 
 ## Qué sigue
 
-- Pasar el CI selectivo de este hotfix y confirmar los skips esperados.
-- Fusionar el hotfix.
+- Fusionar este hotfix ya validado por CI selectivo.
 - Volver a comentar `/production-diagnostics` en el issue #31.
 - Recuperar el artifact por GitHub y leer los incidentes desde el chat, sin SSH.
 - Reejecutar Production Smoke despues del deploy de Hostinger y cerrar el HTTP 500.
@@ -62,8 +61,8 @@ siguiente deploy.
   hotfix de cache fusionado, pendiente confirmacion real en Hostinger.
 - **P0 — Produccion / Diagnostics bridge:** captura real llega a ready; pendiente
   corregir/validar metadata y leer el primer artifact desde el conector.
-- **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE; este hotfix debe
-  demostrar por primera vez el ahorro real mediante skips selectivos.
+- **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE y confirmado en el
+  run #128 con cinco gates pesados omitidos correctamente.
 - **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
   Dashboard/System vuelvan a estar operativos.
 - **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
