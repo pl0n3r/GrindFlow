@@ -18,7 +18,7 @@ class DirectMediaUpload
     private const HARD_MAX_BYTES = 2_147_483_648;
 
     /**
-     * @return array{url: string, headers: array<string, string>, upload_token: string, expires_at: string}
+     * @return array<string, mixed>
      */
     public function createIntent(
         Organization $organization,
@@ -67,16 +67,32 @@ class DirectMediaUpload
             JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
         ));
 
-        /** @var array{url: string, headers: array<string, string>} $upload */
         $upload = Storage::disk($disk)->temporaryUploadUrl(
             $storageKey,
             $expiresAt,
             ['ContentType' => $mimeType],
         );
 
+        $url = $upload['url'] ?? null;
+        $headers = $upload['headers'] ?? null;
+
+        if (is_string($url) === false || is_array($headers) === false) {
+            throw new RuntimeException('Unable to create a direct upload URL.');
+        }
+
+        $normalizedHeaders = [];
+
+        foreach ($headers as $name => $value) {
+            if (is_string($name) === false || is_scalar($value) === false) {
+                throw new RuntimeException('Direct upload returned an unsupported header value.');
+            }
+
+            $normalizedHeaders[$name] = (string) $value;
+        }
+
         return [
-            'url' => $upload['url'],
-            'headers' => $upload['headers'],
+            'url' => $url,
+            'headers' => $normalizedHeaders,
             'upload_token' => $token,
             'expires_at' => $expiresAt->utc()->toIso8601String(),
         ];
