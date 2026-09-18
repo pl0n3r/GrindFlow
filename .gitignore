@@ -1,9 +1,18 @@
-# dependencias
+# PHP / Laravel
+/vendor/
+.phpunit.cache/
+.phpunit.result.cache
+/public/storage
+/storage/*.key
+/storage/logs/*.log
+/bootstrap/cache/*.php
+
+# dependencias Node
 node_modules/
 .pnp
 .pnp.js
 
-# build de next
+# build de Next
 .next/
 out/
 build/
