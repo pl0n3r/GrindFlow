@@ -90,7 +90,7 @@ Background jobs and integration failures must be diagnosable without logging
 credentials or sensitive payloads.
 
 ### GF-NFR-005 — Visual shell
-**Status:** implemented
+**Status:** validated-in-code
 
 The Laravel application provides a consistent responsive visual shell for the
 public landing page, authentication and authenticated dashboard.
