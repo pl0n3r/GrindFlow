@@ -115,6 +115,8 @@ A Laravel 13 application using PHP 8.5 and PostgreSQL can install, boot and pass
 the fast/test CI gates.
 
 ### GF-MIG-002 — Identity and organizations
+**Status:** validated-in-code
+
 Authentication, roles and organization isolation are migrated and covered by
 negative cross-tenant tests before dependent modules move.
 

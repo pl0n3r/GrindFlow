@@ -19,7 +19,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 - **Stack objetivo:** PHP 8.5 + Laravel 13 + Blade/Livewire + Tailwind + PostgreSQL.
 - **Fundacion Laravel (GF-MIG-001):** **VALIDATED IN CODE** y fusionada a `main`.
 - **Produccion:** la fundacion Laravel ya responde en `https://www.grindflow.com.co/`.
-- **Identidad y multi-tenancy (GF-MIG-002):** **EN CURSO** en la PR #4.
+- **Identidad y multi-tenancy (GF-MIG-002):** **VALIDATED IN CODE** en la PR #4; pendiente de merge/deploy.
 - **Legado Next.js/TypeScript:** se conserva como referencia funcional hasta alcanzar paridad.
 - **CI:** GrindFlow CI, SonarQube Cloud y CodeRabbit estan integrados.
 
@@ -27,7 +27,7 @@ Contexto durable en `AGENTS.md` y `docs/`.
 
 | Prioridad | Frente | Estado | Siguiente compuerta / criterio de salida | Referencia |
 |---|---|---|---|---|
-| **P0** | Cerrar identidad y aislamiento multi-tenant | EN CURSO | Resolver hallazgos validos de review, CI + PostgreSQL RLS + Sonar verdes, squash merge y CI exacto de `main` | GF-MIG-002, GF-FR-001, GF-SEC-002/003, PR #4 |
+| **P0** | Cerrar identidad y aislamiento multi-tenant | VALIDATED IN CODE | Squash merge, CI exacto de `main`, despliegue y validacion de login/dashboard contra PostgreSQL runtime | GF-MIG-002, GF-FR-001, GF-SEC-002/003, PR #4 |
 | **P0** | Contrato PostgreSQL de produccion | PENDIENTE | Separar rol de migraciones y rol runtime; runtime sin superuser/BYPASSRLS/ownership; conectar entorno y validar RLS real | `docs/IDENTITY-TENANCY.md` |
 | **P0** | Despliegue reproducible en Hostinger | PARCIALMENTE DESPLEGADO | Documentar/automatizar `composer install`, caches, variables, migraciones seguras y smoke test post-deploy | GF-SEC-004 |
 | **P0** | Proteger `main` | PENDIENTE | Exigir `GrindFlow CI / validate` como status check estable antes de merge | GF-NFR-003 |
