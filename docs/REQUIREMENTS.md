@@ -63,6 +63,9 @@ vault with traceable source metadata.
   tied to actor + organization; callbacks validate state before provider I/O and
   persist exchanged access/refresh tokens only through the encrypted connection
   manager.
+- Google Drive adapter tests cover media-only listing normalization, page-token
+  continuation, pre-download authorization, idempotent staged handoff, safe
+  rate-limit/auth failures and zero real provider credentials.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
