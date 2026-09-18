@@ -81,7 +81,7 @@ vault with traceable source metadata.
   files do not enter staging.
 
 ### GF-FR-003 — Media processing
-**Status:** implemented
+**Status:** validated-in-code
 
 **Statement:** Media can be processed through deterministic background jobs.
 
