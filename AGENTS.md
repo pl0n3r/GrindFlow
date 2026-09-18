@@ -26,6 +26,32 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
 
+### Regla de ingesta persistente del Vault
+
+- Toda ingesta asincrona o proveniente de un conector debe crear o reutilizar un
+  registro tenant-owned de `media_ingestions` antes de procesar bytes.
+- La idempotencia se define por organizacion + SHA-256 de `source_type\0source_ref`.
+  Un retry del mismo source no crea trabajo logico adicional.
+- `source_ref` debe ser estable y, cuando el proveedor lo permita, incluir una
+  version/etag/revision para distinguir contenido nuevo del mismo objeto remoto.
+- Ningun worker infiere la organizacion desde filename, carpeta o texto ambiguo.
+  El tenant debe estar resuelto y autorizado antes de encolar.
+- Los jobs de ingesta implementan `OrganizationAwareJob`, restauran
+  `TenantContext` y revalidan que el actor siga teniendo rol de gestion al
+  momento de ejecutar.
+- Los errores persistidos en `media_ingestions.last_error` son codigos seguros y
+  acotados. Mensajes crudos de proveedor, URLs firmadas, tokens o payloads
+  sensibles pertenecen a Diagnostics, nunca a la fila de ingesta.
+- Los metadatos de origen pueden conservar IDs, etags y datos de trazabilidad,
+  pero nunca credenciales, access tokens, refresh tokens ni secrets.
+- Un source staged solo se borra tras ingesta exitosa cuando
+  `delete_source_after_ingest=true`; una referencia remota/original nunca se
+  elimina por defecto.
+- Dos sources distintos con bytes iguales deben converger al mismo `media_blob`
+  tenant-scoped y conservar assets separados/traceables.
+- La tabla de ingestas puede desplegarse antes que sus consumidores. Ninguna ruta
+  actual debe depender de ella hasta que la migracion este aplicada en produccion.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
