@@ -133,6 +133,7 @@ class DiagnosticLog
         }
 
         $user = $request->user();
+        $userId = $user?->getAuthIdentifier();
         $tenantContext = app(TenantContext::class);
 
         return [
@@ -140,9 +141,7 @@ class DiagnosticLog
             'method' => $request->method(),
             'path' => '/'.ltrim($request->path(), '/'),
             'route' => $request->route()?->getName(),
-            'user_id' => is_object($user) && method_exists($user, 'getAuthIdentifier')
-                ? (string) $user->getAuthIdentifier()
-                : null,
+            'user_id' => $userId !== null ? (string) $userId : null,
             'organization_id' => $tenantContext->organizationId(),
         ];
     }
@@ -160,7 +159,7 @@ class DiagnosticLog
             $call = trim(
                 (string) ($frame['class'] ?? '')
                 .(string) ($frame['type'] ?? '')
-                .(string) ($frame['function'] ?? ''),
+                .(string) $frame['function'],
             );
 
             $frames[] = [
