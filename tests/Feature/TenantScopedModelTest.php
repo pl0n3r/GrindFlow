@@ -3,13 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
-use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Membership;
 use App\Models\Organization;
+use App\Models\TenantModel;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -118,9 +117,8 @@ class TenantScopedModelTest extends TestCase
     }
 }
 
-class TenantScopeRecord extends Model
+class TenantScopeRecord extends TenantModel
 {
-    use BelongsToOrganization;
 
     protected $table = 'tenant_scope_records';
 
