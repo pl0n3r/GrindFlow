@@ -11,64 +11,60 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- El refresh automatico de Dropbox de PR #50 quedo **VALIDATED IN CODE** y fue
-  fusionado a `main` como `734c975127771e089c07f66171475b835322834b`.
-- Se implemento el siguiente slice P1: conexion inicial Dropbox mediante OAuth
-  authorization code con acceso offline.
-- El inicio OAuth vive dentro del contexto de organizacion y exige un rol que
-  pueda administrarla.
-- El `state` es aleatorio, se conserva server-side solo como hash SHA-256 y se
-  liga a usuario, organizacion y tiempo de emision.
-- El callback valida `state` antes de cualquier request a Dropbox, es de un solo
-  uso y restaura `TenantContext` desde el estado validado.
-- El callback no acepta `organization_id` del query string como autoridad.
-- El intercambio inicial exige access token + refresh token y los persiste solo
-  mediante `MediaConnectionManager`, cifrados con el AAD tenant/provider.
-- El Vault muestra la accion Connect Dropbox solo cuando OAuth esta configurado
-  y la tabla `media_connections` ya existe.
-- Antes de esa migracion operacional, el UI falla cerrado y no ofrece una
-  conexion que no pueda persistirse.
-- Provider denial, state invalido, respuestas malformadas y fallos de red no
-  persisten bodies, codes, state ni secretos.
-- CI usa HTTP fakes; no se llaman APIs Dropbox reales ni se toca produccion.
-- La migracion `media_connections` y la configuracion real de la app Dropbox
-  siguen siendo acciones operacionales pendientes.
+- El OAuth connect inicial de Dropbox de PR #52 quedo **VALIDATED IN CODE** y fue
+  fusionado a `main` como `fee2e17b583e6fd397def1f68b246da6848263e8`.
+- Se implemento el siguiente slice P1: adaptador de ingesta Google Drive sobre
+  Drive API v3, sin credenciales reales ni conexion OAuth todavia.
+- Google Drive lista paginas de archivos y normaliza solo blobs descargables de
+  imagen/video con tamaño conocido.
+- Los documentos nativos de Google Workspace se omiten porque requieren export,
+  no descarga blob con `alt=media`.
+- Los bytes remotos se descargan por stream con `files.get?alt=media`.
+- `nextPageToken` se trata solo como continuacion de pagina de una consulta,
+  nunca como cursor incremental durable entre scans.
+- Se extrajo `ConnectorMediaStager` para compartir entre Dropbox y Google Drive
+  autorizacion tenant, limites, idempotencia, staging, cleanup y handoff.
+- Dropbox fue refactorizado para usar ese stager comun sin cambiar su contrato.
+- Google Drive usa source type `google_drive` y source refs versionados por
+  file ID + md5Checksum o modifiedTime.
+- HTTP 401 pide reconexion; HTTP 429 expone solo Retry-After acotado; bodies del
+  proveedor no se propagan como errores.
+- CI usa HTTP/storage/queue fakes; no se toca Google Drive real ni produccion.
+- OAuth, refresh y tracking incremental mediante Changes API quedan para slices
+  posteriores.
+- La migracion `media_connections` y configuracion real de proveedores siguen
+  siendo acciones operacionales pendientes.
 - Object storage #40 sigue siendo un bloqueo externo independiente.
 
 ## Archivos modificados en este deploy
 
-- `app/Http/Controllers/Connections/DropboxConnectionController.php` — inicio y callback OAuth tenant-safe.
-- `app/Services/Media/Connections/DropboxOAuthClient.php` — authorize URL + authorization-code exchange.
-- `app/Services/Media/Connections/DropboxAuthorizationTokens.php` — DTO del intercambio inicial.
-- `app/Services/Media/Connectors/MediaConnectorException.php` — error seguro de OAuth exchange.
-- `app/Http/Controllers/Vault/VaultController.php` — readiness de conexiones cloud.
-- `resources/views/vault/index.blade.php` — accion Connect Dropbox fail-closed.
-- `routes/web.php` — rutas authorize/callback con throttling.
-- `config/grindflow.php` y `.env.example` — TTL acotado del state OAuth.
-- `tests/Feature/DropboxOAuthConnectionTest.php` — state, callback, cifrado, replay, denial y permisos.
+- `app/Services/Media/Connectors/ConnectorMediaStager.php` — staging e idempotencia compartidos.
+- `app/Services/Media/Connectors/DropboxMediaAdapter.php` — reutiliza el stager comun.
+- `app/Services/Media/Connectors/GoogleDriveMediaAdapter.php` — list/download Drive v3.
+- `tests/Feature/GoogleDriveMediaAdapterTest.php` — listing, paginacion, staging y errores seguros.
 - `docs/MEDIA-CONNECTORS.md`, `docs/REQUIREMENTS.md` y `AGENTS.md` — contrato durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual del OAuth connect slice: **VALIDATED IN CODE**.
-- El head funcional `c866e3278e3e818711c648f4f68bf3c01094e430` paso `fast`,
-  `tests`, `php-quality`, `browser` y `GrindFlow CI / validate`.
-- SonarQube Cloud reporto Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
-- Refresh automatico + conexiones cifradas + scheduler: **VALIDATED IN CODE**.
+- Estado actual del Google Drive adapter slice: **IMPLEMENTED**, pendiente de
+  `GrindFlow CI / validate`.
+- Dropbox adapter + conexiones cifradas + scheduler + token refresh + OAuth
+  connect: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
-- No se llama a Dropbox real ni se escriben credenciales reales.
+- No se llama a Google/Dropbox real ni se escriben credenciales reales.
 - Produccion no se modifica desde CI.
 - No se declara DEPLOYED ni VALIDATED IN PRODUCTION.
 
 ## Qué sigue
 
+- Pasar php-quality, PHPUnit, browser y `GrindFlow CI / validate`; resolver
+  SonarQube/CodeRabbit si reportan hallazgos y fusionar por squash.
 - Mantener pendiente la migracion operacional de `media_connections` hasta
   aprobacion explicita.
-- Configurar la app real de Dropbox solo mediante accion operacional protegida:
-  app key/secret y redirect exacto `/connections/dropbox/callback`.
-- Despues continuar Google Drive sobre el mismo contrato de conexiones cifradas.
+- Despues implementar Google OAuth offline + refresh sobre la misma capa cifrada.
+- Luego integrar scans Google Drive con Changes API para cursor incremental
+  durable, sin reutilizar `nextPageToken` entre scans.
 
 ## Panorama general pendiente
 
@@ -78,9 +74,9 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox adapter + conexiones cifradas +
-  scheduler + token refresh + OAuth connect VALIDATED IN CODE; pendiente
-  migracion/configuracion de produccion y Google Drive.
+- **P1 — Media Vault / ingesta:** Dropbox end-to-end VALIDATED IN CODE; Google
+  Drive adapter IMPLEMENTED; pendientes validacion del adapter, OAuth/refresh,
+  Changes API y configuracion/migracion de produccion.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** scan scheduling VALIDATED IN CODE; pipeline
   de procesamiento general sigue pendiente.
