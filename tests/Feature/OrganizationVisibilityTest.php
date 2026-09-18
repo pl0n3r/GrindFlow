@@ -30,8 +30,10 @@ class OrganizationVisibilityTest extends TestCase
             ->assertOk()
             ->assertSee('Overview')
             ->assertSee('Tenant isolation active')
+            ->assertSee('Laravel + MariaDB integrity')
             ->assertSee('Visible Organization')
-            ->assertDontSee('Foreign Organization');
+            ->assertDontSee('Foreign Organization')
+            ->assertDontSee('PostgreSQL boundary');
 
         $this->assertDatabaseHas('organizations', ['id' => $foreign->id]);
     }
