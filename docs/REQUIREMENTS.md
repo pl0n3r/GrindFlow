@@ -59,6 +59,10 @@ vault with traceable source metadata.
 - Expiring Dropbox access tokens refresh from encrypted refresh tokens before
   provider listing; invalid grants require reconnect and refresh 429 responses
   defer without consuming failure budget.
+- Dropbox initial authorization uses a session-bound, single-use state nonce
+  tied to actor + organization; callbacks validate state before provider I/O and
+  persist exchanged access/refresh tokens only through the encrypted connection
+  manager.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
