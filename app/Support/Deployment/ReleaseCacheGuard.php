@@ -98,6 +98,7 @@ class ReleaseCacheGuard
 
             if (is_file($path) === false) {
                 hash_update($hash, '[missing]');
+
                 continue;
             }
 
