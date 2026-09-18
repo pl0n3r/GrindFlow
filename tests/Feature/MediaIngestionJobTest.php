@@ -14,6 +14,7 @@ use App\Queue\Middleware\UseOrganizationContext;
 use App\Services\Media\FilesystemMediaIngestor;
 use App\Services\Media\MediaIngestionCoordinator;
 use App\Services\Media\MediaIngestionException;
+use App\Services\Media\MediaProcessingCoordinator;
 use App\Services\Media\StagedMediaSource;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -351,7 +352,10 @@ class MediaIngestionJobTest extends TestCase
 
         app(UseOrganizationContext::class)->handle(
             $job,
-            fn () => $job->handle(app(FilesystemMediaIngestor::class)),
+            fn () => $job->handle(
+                app(FilesystemMediaIngestor::class),
+                app(MediaProcessingCoordinator::class),
+            ),
         );
     }
 

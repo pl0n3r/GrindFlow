@@ -17,6 +17,10 @@ class DirectMediaUpload
 {
     private const HARD_MAX_BYTES = 2_147_483_648;
 
+    public function __construct(
+        private readonly MediaProcessingCoordinator $processing,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -182,7 +186,7 @@ class DirectMediaUpload
             ->oldest('created_at')
             ->first();
 
-        return MediaAsset::query()->create([
+        $asset = MediaAsset::query()->create([
             'media_blob_id' => $blob->getKey(),
             'duplicate_of' => $canonicalAsset?->getKey(),
             'ingested_by_user_id' => $actor->getKey(),
@@ -197,6 +201,8 @@ class DirectMediaUpload
                 'verified_sha256' => true,
             ],
         ]);
+
+        return $this->processing->queue($asset, $actor);
     }
 
     public function available(): bool
