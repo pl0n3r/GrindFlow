@@ -11,40 +11,45 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se corrigio el copy visible que todavia hablaba de PostgreSQL/RLS despues del pivot a MariaDB.
-- Login y dashboard ahora describen el aislamiento Laravel + integridad MariaDB.
-- Se eliminaron referencias visuales a `RLS enabled`, `PostgreSQL boundary` y
-  `PostgreSQL runtime`.
-- Se reforzaron las pruebas de login/dashboard para impedir que ese copy legado reaparezca.
+- Se extendio el browser smoke a un flujo autenticado real sin Selenium/Playwright.
+- CI crea una SQLite desechable, aplica migraciones y siembra un usuario,
+  organizacion y membership E2E solo en entorno testing/local.
+- Chrome obtiene CSRF y cookie de sesion reales desde Laravel, envia el login
+  desde una pagina temporal same-origin y termina en `/dashboard`.
+- El dashboard autenticado debe mostrar el usuario y la organizacion E2E.
+- La clave E2E se genera aleatoriamente en cada run y no se guarda en el repo.
+- No se agrega ninguna ruta/backdoor E2E a la aplicacion.
 
 ## Archivos modificados en este deploy
 
-- `resources/views/auth/login.blade.php` — copy de aislamiento actualizado.
-- `resources/views/dashboard.blade.php` — metrica y estado MariaDB.
-- `tests/Feature/VisualShellTest.php` — regresion de copy del login.
-- `tests/Feature/OrganizationVisibilityTest.php` — regresion de copy del dashboard.
+- `database/seeders/E2eSeeder.php` — dataset E2E protegido por environment guard.
+- `scripts/browser-smoke.sh` — login real y dashboard autenticado con Chrome.
+- `.github/workflows/grindflow-ci.yml` — migracion/seed E2E en SQLite desechable.
+- `docs/PRUEBAS.md` — contrato de browser autenticado.
+- `docs/REQUIREMENTS.md` — verificacion E2E de GF-NFR-005.
 - `README.md` — snapshot operativo.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** en `fix/mariadb-frontend-copy`.
-- PHPUnit, Pint/Larastan, browser, SonarQube Cloud y `GrindFlow CI / validate` pasaron.
-- No cambia esquema, datos ni configuracion de produccion.
+- Estado actual: **VALIDATED IN CODE** en `test/authenticated-browser-e2e`.
+- Browser autenticado, MariaDB, PHPUnit, Pint/Larastan, SonarQube Cloud y `GrindFlow CI / validate` pasaron.
+- El seeder rechaza ejecucion fuera de `local`/`testing`.
+- La prueba no toca MariaDB de produccion ni Hostinger.
 
 ## Qué sigue
 
-- Validar y fusionar esta correccion visual.
-- Continuar en paralelo con browser autenticado E2E.
-- Configurar MariaDB real de Hostinger antes de migraciones de produccion.
+- Validar y fusionar el browser autenticado.
+- Continuar con deploy/validacion de produccion en Hostinger.
+- Mantener el browser gate como contrato base para los nuevos modulos visuales.
 
 ## Panorama general pendiente
 
-- **P0 — MariaDB:** VALIDATED IN CODE; falta deploy/validacion de produccion.
-- **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta validacion de produccion.
-- **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required.
-- **P1 — UI:** copy MariaDB VALIDATED IN CODE; pendiente de merge/exact-main CI.
-- **P1 — Browser tests:** smoke invitado VALIDATED IN CODE.
-- **P1 — Browser autenticado:** en desarrollo paralelo.
+- **P0 — MariaDB:** VALIDATED IN CODE; falta produccion.
+- **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta produccion.
+- **P0 — Branch protection:** required `GrindFlow CI / validate` pendiente.
+- **P1 — UI:** shell visual y copy MariaDB VALIDATED IN CODE.
+- **P1 — Browser invitado:** VALIDATED IN CODE.
+- **P1 — Browser autenticado:** VALIDATED IN CODE; pendiente de merge/exact-main CI.
 - **P1 — Media Vault / ingesta:** pendiente.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P2 — Integraciones / distribucion:** pendiente.

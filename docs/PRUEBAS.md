@@ -48,7 +48,9 @@ usa Chrome/Chromium headless real para comprobar:
 
 - landing `/`;
 - login `/login`;
-- redirect del dashboard invitado a `/login`.
+- redirect del dashboard invitado a `/login`;
+- login real con CSRF/session;
+- dashboard autenticado con usuario, organizacion y membership E2E desechables.
 
 Los cambios en `resources/`, `app/Livewire/`, `app/Http/`,
 `routes/web.php`, el script del smoke y el propio workflow activan este gate.
@@ -68,7 +70,7 @@ Laravel/MariaDB antes de retirar la implementacion anterior.
 
 ## Lo que sigue pendiente
 
-- El browser smoke cubre invitado; falta cobertura autenticada del dashboard con datos E2E desechables.
+- El browser smoke cubre invitado y dashboard autenticado; faltan flujos interactivos profundos de los modulos que aun no se han migrado.
 - Las integraciones externas aun necesitan smoke tests contra servicios reales.
 - Los modulos de ingesta, procesamiento, scheduling, distribucion, trafico y
   finanzas deben obtener cobertura Laravel al migrarse.

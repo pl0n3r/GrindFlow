@@ -85,7 +85,103 @@ capture_page() {
     assert_contains "$dom" "$expected"
   done
 
-  printf 'PASS %-16s %s\n' "$name" "$path"
+  printf 'PASS %-20s %s\n' "$name" "$path"
+}
+
+capture_authenticated_dashboard() {
+  : "${E2E_USER_EMAIL:?E2E_USER_EMAIL is required}"
+  : "${E2E_USER_PASSWORD:?E2E_USER_PASSWORD is required}"
+  : "${E2E_USER_NAME:?E2E_USER_NAME is required}"
+  : "${E2E_ORG_NAME:?E2E_ORG_NAME is required}"
+
+  local profile
+  profile="$(mktemp -d)"
+
+  local login_page="public/__grindflow_e2e_login.html"
+  local dom="$ARTIFACT_DIR/dashboard-authenticated.html"
+
+  cleanup_auth() {
+    rm -f "$login_page"
+    rm -rf "$profile"
+  }
+  trap cleanup_auth RETURN
+
+  python3 - "$login_page" <<'PY'
+import html
+import json
+import os
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1])
+email = json.dumps(os.environ["E2E_USER_EMAIL"])
+password = json.dumps(os.environ["E2E_USER_PASSWORD"])
+
+target.write_text(
+    f"""<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>GrindFlow E2E Login</title></head>
+<body>
+<p id="status">Authenticating…</p>
+<script>
+(async () => {{
+  const loginResponse = await fetch('/login', {{credentials: 'include'}});
+  const loginHtml = await loginResponse.text();
+  const parsed = new DOMParser().parseFromString(loginHtml, 'text/html');
+  const token = parsed.querySelector('input[name="_token"]')?.value;
+
+  if (!token) {{
+    document.getElementById('status').textContent = 'ERROR: CSRF token missing';
+    return;
+  }}
+
+  const body = new URLSearchParams({{
+    _token: token,
+    email: {email},
+    password: {password}
+  }});
+
+  const response = await fetch('/login', {{
+    method: 'POST',
+    credentials: 'include',
+    headers: {{'Content-Type': 'application/x-www-form-urlencoded'}},
+    body,
+    redirect: 'follow'
+  }});
+
+  if (!response.ok) {{
+    document.getElementById('status').textContent = 'ERROR: login request failed';
+    return;
+  }}
+
+  window.location.assign('/dashboard');
+}})();
+</script>
+</body>
+</html>
+""",
+    encoding="utf-8",
+)
+PY
+
+  "$CHROME" \
+    --headless=new \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --hide-scrollbars \
+    --window-size=1440,1000 \
+    --virtual-time-budget=6000 \
+    --user-data-dir="$profile" \
+    --dump-dom \
+    "$BASE_URL/__grindflow_e2e_login.html" > "$dom"
+
+  assert_contains "$dom" "Overview"
+  assert_contains "$dom" "$E2E_USER_NAME"
+  assert_contains "$dom" "$E2E_ORG_NAME"
+  assert_contains "$dom" "Tenant isolation active"
+
+  printf 'PASS %-20s %s\n' "dashboard-auth" "/dashboard"
 }
 
 capture_page \
@@ -129,5 +225,7 @@ capture_page \
   "/dashboard" \
   "Bienvenido." \
   "Entrar al workspace"
+
+capture_authenticated_dashboard
 
 echo "Real browser smoke tests passed."
