@@ -12,9 +12,9 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟡 **BRVTAL delivery parity** | preflight + fan-out + dashboard exacto |
+| Work line | 🟢 **BRVTAL delivery parity** | CI completo VALIDATED IN CODE |
 | Base exacta | ✅ **main** | `c074f0195247d80ee15005196dbb4abf628a2795` · media processing foundation #58 |
-| Cambio | ⚡ **CI lead-time** | elimina serializacion de gates pesados detras de `fast` |
+| Cambio | ⚡ **CI lead-time** | full matrix #215: ~86 s; fan-out confirmado en paralelo |
 | Produccion | 🔒 **separada** | Production Smoke autenticado sigue independiente del source CI |
 | Migraciones | ✅ **ninguna** | cambio exclusivo de delivery/tooling |
 
@@ -92,11 +92,11 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED**, pendiente del primer run completo del CI nuevo.
-- El cambio del workflow fuerza la matriz completa: php-quality, PHPUnit, MariaDB, browser y legacy.
-- SonarQube Cloud y CodeRabbit deben revisarse sobre el mismo head previsto para merge.
-- No se toca produccion ni se ejecutan migraciones desde este PR.
-- Tras squash merge se exige nuevamente `GrindFlow CI / validate` sobre el SHA real de `main`.
+- Estado actual: **VALIDATED IN CODE** sobre el head funcional `7aeccf5386c967a6a329467ccf5421c29b0e9f2b`.
+- GrindFlow CI #215 paso preflight, fast, php-quality, PHPUnit, MariaDB, browser, legacy y validate; full matrix ~86 s.
+- SonarQube Cloud: Quality Gate OK, 0 issues, 0 Security Hotspots y 0.0% duplicacion en codigo nuevo.
+- CodeRabbit full review fue solicitado sobre el head estable; cualquier hallazgo accionable debe resolverse antes del merge.
+- Produccion/migraciones no se tocan; tras squash merge se exige CI exacto de `main`.
 
 ## Qué sigue
 
