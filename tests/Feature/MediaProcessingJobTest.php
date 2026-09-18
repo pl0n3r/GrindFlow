@@ -203,6 +203,11 @@ class MediaProcessingJobTest extends TestCase
 
                 $this->assertSame('completed', $processing['status']);
                 $this->assertSame(1, $processing['attempts']);
+                $this->assertSame(
+                    MediaAssetProcessor::FFPROBE_VERSION,
+                    $processing['version'],
+                );
+                $this->assertSame('probe_v3', $processing['profile']);
                 $this->assertSame('ffprobe', $processing['technical_probe']);
                 $this->assertSame(12.5, $technical['duration_seconds']);
                 $this->assertSame('h264', $technical['video']['codec']);
@@ -213,6 +218,85 @@ class MediaProcessingJobTest extends TestCase
                 $this->assertSame(2, $technical['audio']['channels']);
             },
         );
+    }
+
+    public function test_enabling_ffprobe_reprocesses_completed_disabled_asset(): void
+    {
+        Queue::fake();
+
+        [$user, $organization, $asset] = $this->asset(
+            payload: 'ffprobe-transition-bytes',
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => app(MediaProcessingCoordinator::class)->queue(
+                MediaAsset::query()->findOrFail($asset->getKey()),
+                $user,
+            ),
+        );
+
+        $disabledJob = $this->job($asset, $user, $organization);
+        $this->runJob($disabledJob);
+
+        config([
+            'grindflow.media.ffprobe.enabled' => true,
+            'grindflow.media.ffprobe.binary' => 'ffprobe',
+            'grindflow.media.ffprobe.timeout_seconds' => 15,
+        ]);
+
+        Process::fake([
+            '*' => Process::result(output: json_encode([
+                'streams' => [[
+                    'codec_type' => 'video',
+                    'codec_name' => 'h264',
+                    'width' => 640,
+                    'height' => 360,
+                ]],
+                'format' => [
+                    'duration' => '3.5',
+                    'format_name' => 'mov,mp4',
+                ],
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => app(MediaProcessingCoordinator::class)->queue(
+                MediaAsset::query()->findOrFail($asset->getKey()),
+                $user,
+            ),
+        );
+
+        $ffprobeJob = $this->job($asset, $user, $organization);
+        $this->runJob($ffprobeJob);
+        $this->runJob($ffprobeJob);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($asset): void {
+                $processing = MediaAsset::query()
+                    ->findOrFail($asset->getKey())
+                    ->metadata['processing'];
+
+                $this->assertSame(
+                    MediaAssetProcessor::FFPROBE_VERSION,
+                    $processing['version'],
+                );
+                $this->assertSame('probe_v3', $processing['profile']);
+                $this->assertSame('ffprobe', $processing['technical_probe']);
+                $this->assertSame(1, $processing['attempts']);
+                $this->assertSame(
+                    3.5,
+                    $processing['technical_metadata']['duration_seconds'],
+                );
+            },
+        );
+
+        Queue::assertPushed(ProcessMediaAsset::class, 2);
     }
 
     public function test_failed_processing_is_observable_and_can_retry_without_new_asset(): void
@@ -371,7 +455,7 @@ class MediaProcessingJobTest extends TestCase
             (string) $asset->getKey(),
             (string) $organization->getKey(),
             (string) $user->getKey(),
-            MediaAssetProcessor::VERSION,
+            app(MediaAssetProcessor::class)->currentVersion(),
         );
     }
 

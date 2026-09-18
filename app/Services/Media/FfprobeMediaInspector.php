@@ -109,6 +109,12 @@ class FfprobeMediaInspector
             throw MediaProcessingException::probeInvalidOutput();
         }
 
+        foreach ($streams as $stream) {
+            if (is_array($stream) === false) {
+                throw MediaProcessingException::probeInvalidOutput();
+            }
+        }
+
         $video = $this->firstStream($streams, 'video');
         $audio = $this->firstStream($streams, 'audio');
 

@@ -99,8 +99,11 @@ vault with traceable source metadata.
 - A completed processor version is a no-op on retry.
 - Missing objects, size mismatch and unsupported MIME produce bounded safe error
   codes and can be retried without creating another asset.
-- The `probe_v2` processor preserves deterministic object/size/MIME checks and
-  can enrich canonical media with feature-gated `ffprobe` metadata.
+- Processor version 2 preserves deterministic object/size/MIME checks with
+  technical probing disabled; version 3 adds feature-gated `ffprobe` metadata.
+- The queued processor version fixes the processing mode for the lifetime of
+  each job, so mixed worker configuration cannot change a job's result and
+  enabling `ffprobe` reprocesses assets completed under version 2.
 - `ffprobe` is disabled by default with fail-closed boolean parsing, has a
   bounded timeout, requests only allowlisted fields via `-show_entries`, and
   rejects missing/non-array stream or format sections before persistence.

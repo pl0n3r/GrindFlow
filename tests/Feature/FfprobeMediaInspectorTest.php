@@ -175,6 +175,35 @@ class FfprobeMediaInspectorTest extends TestCase
         }
     }
 
+    public function test_malformed_ffprobe_stream_entry_returns_safe_error(): void
+    {
+        Process::fake([
+            '*' => Process::result(output: json_encode([
+                'streams' => [null],
+                'format' => [],
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        [$user, $organization, $blob] = $this->blob();
+
+        try {
+            app(TenantContext::class)->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                fn (): array => app(FfprobeMediaInspector::class)->inspect(
+                    MediaBlob::query()->findOrFail($blob->getKey()),
+                ),
+            );
+
+            $this->fail('Expected malformed stream entry to fail safely.');
+        } catch (MediaProcessingException $exception) {
+            $this->assertSame(
+                'processing_probe_invalid_output',
+                $exception->getMessage(),
+            );
+        }
+    }
+
     public function test_failed_ffprobe_process_returns_safe_error_without_stderr(): void
     {
         Process::fake([

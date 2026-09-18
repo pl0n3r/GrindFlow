@@ -12,7 +12,7 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN CODE · CI #228 |
+| Work line | 🟠 **GF-FR-003 · ffprobe metadata** | final CodeRabbit fixes IMPLEMENTED; revalidation pending |
 | Base exacta | ✅ **main** | `62499a5963218db53239c54a5c302caf79e38324` |
 | Produccion actual | ✅ **smoke verde** | Production Smoke #31 sobre la base exacta |
 | Migraciones | ✅ **0 pendientes** | no hay cambios de schema en este slice |
@@ -71,11 +71,11 @@ flowchart LR
 ## Qué se hizo
 
 - Porta el slice útil del PR #59 sobre la arquitectura actual de GF-FR-003.
-- Eleva el procesador determinista a `probe_v2` sin cambiar su contrato idempotente.
+- Separa el procesamiento por version: v2 sin ffprobe y v3 con ffprobe, manteniendo idempotencia determinista.
 - Añade `FfprobeMediaInspector` detrás de un feature gate apagado por defecto.
 - Copia el objeto a un temporal, hace `fflush` y ejecuta `ffprobe` con timeout acotado.
 - Limita `ffprobe` con `-show_entries` y persiste solo metadata técnica allowlisted: duración, formato, streams, codecs, resolución y audio básico.
-- Rechaza JSON sin secciones `streams`/`format`, descarta tags arbitrarios y no persiste stderr ni payloads crudos.
+- Rechaza JSON sin secciones `streams`/`format` y entries malformadas; descarta tags arbitrarios y no persiste stderr ni payloads crudos.
 - El feature flag usa parsing fail-closed; fallo, salida inválida y timeout se mapean a códigos seguros y acotados.
 - Añade cobertura del inspector, incluido un fallo con stderr sensible que no se propaga.
 
@@ -94,7 +94,7 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** tras corregir los hallazgos de CodeRabbit en el head funcional `c0325c0d70db87be3e9133189e53af939a6233b5`.
+- Estado actual: **IMPLEMENTED** tras cerrar los hallazgos finales de CodeRabbit; revalidacion completa pendiente.
 - GrindFlow CI #228 pasó fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate.
 - SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots sobre el PR actualizado.
 - Las pruebas usan Laravel Process fakes y bloquean procesos no simulados.
@@ -113,7 +113,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Media processing | `probe_v2` + ffprobe hardening VALIDATED IN CODE |
+| **NOW** | Media processing | v2 disabled + v3 ffprobe hardening IMPLEMENTED |
 | **NEXT** | Derivados | thumbnails/previews/normalización con FFmpeg |
 | **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
 | **BLOCKED / EXTERNAL** | Hosting / storage | ffprobe real y S3-compatible requieren configuración externa |

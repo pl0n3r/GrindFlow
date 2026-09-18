@@ -110,7 +110,10 @@ class ProcessMediaAsset implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
         ]);
 
         try {
-            $result = $processor->process($asset->refresh()->load('blob'));
+            $result = $processor->process(
+                $asset->refresh()->load('blob'),
+                $this->processorVersion,
+            );
         } catch (MediaProcessingException $exception) {
             $this->markFailed($asset, $attempts, $exception->getMessage());
 

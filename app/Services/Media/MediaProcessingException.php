@@ -40,4 +40,9 @@ class MediaProcessingException extends RuntimeException
     {
         return new self('processing_probe_timed_out');
     }
+
+    public static function invalidProcessorVersion(): self
+    {
+        return new self('processing_invalid_processor_version');
+    }
 }
