@@ -47,6 +47,20 @@ class MediaConnectionScheduler
                 continue;
             }
 
+            $claimed = MediaConnection::query()
+                ->withoutGlobalScope(TenantScope::class)
+                ->whereKey($connection->getKey())
+                ->where('status', MediaConnection::STATUS_ACTIVE)
+                ->where('next_scan_at', '<=', now())
+                ->update([
+                    'next_scan_at' => now()->addMinutes(10),
+                    'updated_at' => now(),
+                ]);
+
+            if ($claimed !== 1) {
+                continue;
+            }
+
             ScanMediaConnection::dispatch(
                 (string) $connection->getKey(),
                 (string) $connection->organization_id,
