@@ -39,11 +39,10 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED**, pendiente de validacion automatizada.
-- GF-MIG-001 y GF-MIG-002 se degradan temporalmente de VALIDATED IN CODE a
-  IMPLEMENTED porque la evidencia anterior pertenecia al target PostgreSQL/RLS.
-- La PR debe pasar MariaDB migrations, tests negativos, PHPUnit, Pint/Larastan,
-  SonarQube Cloud, CodeRabbit y `GrindFlow CI / validate`.
+- Estado actual: **VALIDATED IN CODE** sobre MariaDB.
+- GF-MIG-001 y GF-MIG-002 quedaron revalidados sobre MariaDB.
+- MariaDB 11.4 migrations, tests negativos, PHPUnit, Pint/Larastan,
+  SonarQube Cloud y `GrindFlow CI / validate` pasaron.
 - No se ha ejecutado ninguna migracion ni cambio destructivo en produccion.
 - PostgreSQL/Supabase permanece solo como legado temporal mientras sus modulos se migran.
 
@@ -56,10 +55,10 @@ siguiente deploy.
 
 ## Panorama general pendiente
 
-- **P0 — MariaDB:** IMPLEMENTED; pendiente de CI/review antes de merge.
+- **P0 — MariaDB:** VALIDATED IN CODE; pendiente de merge y exact-main CI.
 - **P0 — Produccion / DB:** crear/configurar MariaDB Hostinger y validar
   migraciones sin automatizarlas.
-- **P0 — Identidad / tenancy:** revalidacion pendiente sobre MariaDB.
+- **P0 — Identidad / tenancy:** VALIDATED IN CODE sobre MariaDB; falta deploy/validacion de produccion.
 - **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required
   status check de `main`.
 - **P1 — UI:** shell visual VALIDATED IN CODE; pendiente de deploy Hostinger.
