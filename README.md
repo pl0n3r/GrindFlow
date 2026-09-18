@@ -12,7 +12,7 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **Production Smoke 403 diagnostics** | smoke endurecido; PR/CI pendientes |
+| Work line | 🟢 **Production Smoke 403 diagnostics** | PR #61 VALIDATED IN CODE |
 | Base exacta | ✅ **main** | `aa9d3b0fd634b9b49834638d5014a29ab5feb4c5` |
 | CI de main | ✅ **verde** | run #217 completo sobre el SHA exacto |
 | Migraciones | ✅ **0 pendientes** | bridge #35397783306: `pending_before=1`, `pending_after=0` |
@@ -75,18 +75,18 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en la rama `fix/production-smoke-403-diagnostics`.
-- Base: `aa9d3b0fd634b9b49834638d5014a29ab5feb4c5`.
+- Estado actual: **VALIDATED IN CODE** sobre el head funcional `b99d59916d7466340b8096eb96dedcd60f244232`.
+- GrindFlow CI #218: `preflight`, `fast[contracts]` y `validate` en success.
+- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots.
 - La migracion de produccion ya esta aplicada y reporta cero pendientes.
 - El rerun anterior del Production Smoke fallo 15/15 veces por HTTP 403 antes de llegar a las comprobaciones autenticadas.
-- Este cambio no modifica esquema, datos, autenticacion ni reglas tenant.
-- Antes del merge se exige `preflight + fast[contracts]`, revision externa aplicable y recheck del SHA de `main`.
+- CodeRabbit full review fue solicitado; mientras siga procesando no se afirma aprobacion y cualquier hallazgo accionable debe resolverse.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Validar el smoke endurecido en PR y usar su artefacto para identificar la capa exacta que devuelve 403. |
+| **NOW** | Revalidar el head documental, hacer squash merge y ejecutar CI + Production Smoke sobre el SHA exacto de `main`. |
 | **NEXT** | Si el User-Agent resuelve el bloqueo, merge + Production Smoke sobre el SHA exacto; si no, usar headers/body seguros para aislar WAF/hosting. |
 | **BLOCKED / EXTERNAL** | Acceso directo al panel/WAF de Hostinger no esta disponible desde este conector; object storage real sigue operacional. |
 | **LATER** | Continuar GF-FR-003 con derivados/probe multimedia/FFmpeg y despues P2. |
