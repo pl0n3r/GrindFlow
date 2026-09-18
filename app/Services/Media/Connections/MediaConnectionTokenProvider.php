@@ -46,31 +46,27 @@ class MediaConnectionTokenProvider
             $context,
         );
 
-        $refreshed = match ($connection->provider) {
-            MediaConnection::PROVIDER_DROPBOX => $this->dropboxOAuth->refresh($refreshToken),
-            MediaConnection::PROVIDER_GOOGLE_DRIVE => $this->googleOAuth->refresh($refreshToken),
-            default => throw MediaConnectorException::requestFailed(),
-        };
-
-        $updated = match ($connection->provider) {
-            MediaConnection::PROVIDER_DROPBOX => $this->connections->replaceDropboxTokens(
+        if ($connection->provider === MediaConnection::PROVIDER_DROPBOX) {
+            $refreshed = $this->dropboxOAuth->refresh($refreshToken);
+            $updated = $this->connections->replaceDropboxTokens(
                 $connection,
                 $actor,
                 $refreshed->accessToken,
                 null,
                 now()->addSeconds($refreshed->expiresInSeconds),
                 $refreshed->scopes === [] ? null : $refreshed->scopes,
-            ),
-            MediaConnection::PROVIDER_GOOGLE_DRIVE => $this->connections->replaceGoogleDriveTokens(
+            );
+        } else {
+            $refreshed = $this->googleOAuth->refresh($refreshToken);
+            $updated = $this->connections->replaceGoogleDriveTokens(
                 $connection,
                 $actor,
                 $refreshed->accessToken,
                 null,
                 now()->addSeconds($refreshed->expiresInSeconds),
                 $refreshed->scopes === [] ? null : $refreshed->scopes,
-            ),
-            default => throw MediaConnectorException::requestFailed(),
-        };
+            );
+        }
 
         return $this->cipher->decrypt(
             $updated->access_ciphertext,
