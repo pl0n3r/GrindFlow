@@ -51,8 +51,8 @@ class MediaProcessingIntegrityTest extends TestCase
 
         Queue::assertPushed(
             VerifyMediaAssetIntegrity::class,
-            fn (VerifyMediaAssetIntegrity $job): bool =>
-                $job->assetId === (string) $canonical->getKey(),
+            fn (VerifyMediaAssetIntegrity $job): bool => $job->assetId
+                === (string) $canonical->getKey(),
         );
         Queue::assertPushed(VerifyMediaAssetIntegrity::class, 1);
 
@@ -144,8 +144,14 @@ class MediaProcessingIntegrityTest extends TestCase
 
         $job = $this->queuedJob($user, $organization, $asset);
 
-        $fresh = $this->fresh($user, $organization, $asset);
-        $blob = $fresh->blob()->firstOrFail();
+        $blob = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): MediaBlob => MediaAsset::query()
+                ->findOrFail($asset->getKey())
+                ->blob()
+                ->firstOrFail(),
+        );
 
         Storage::disk('local')->put(
             $blob->storage_key,
