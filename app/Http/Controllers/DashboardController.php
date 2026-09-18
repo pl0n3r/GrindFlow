@@ -21,7 +21,6 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'organizations' => $organizations,
-            'isPlatformAdmin' => $user->isPlatformAdmin(),
         ]);
     }
 }
