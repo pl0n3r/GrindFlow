@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
@@ -22,7 +23,7 @@ class LaravelFoundationTest extends TestCase
 
     public function test_livewire_is_installed(): void
     {
-        $this->assertTrue(class_exists(\Livewire\Livewire::class));
+        $this->assertTrue(class_exists(Livewire::class));
     }
 
     #[Group('database')]
