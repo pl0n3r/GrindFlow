@@ -157,7 +157,13 @@ class GoogleDriveIncrementalScanTest extends TestCase
             $fresh->next_scan_at->isAfter(now()->addMinutes(29)),
         );
 
-        $this->assertSame(2, MediaIngestion::query()->count());
+        $ingestionCount = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): int => MediaIngestion::query()->count(),
+        );
+
+        $this->assertSame(2, $ingestionCount);
         Queue::assertPushed(IngestMediaObject::class, 2);
 
         $startIndex = $this->requestIndex(
