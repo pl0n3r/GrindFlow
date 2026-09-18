@@ -81,12 +81,31 @@ vault with traceable source metadata.
   files do not enter staging.
 
 ### GF-FR-003 — Media processing
+**Status:** implemented
+
 **Statement:** Media can be processed through deterministic background jobs.
 
 **Acceptance criteria:**
 - Jobs are idempotent.
 - Failures expose actionable state.
 - Retries do not duplicate final artifacts.
+- Every newly ingested canonical asset is queued for the current integrity
+  processor regardless of whether it entered through quick upload, direct
+  upload or a cloud connector.
+- Duplicate assets reuse the canonical asset's processing state and never queue
+  a second integrity read for identical bytes.
+- Integrity processing streams the stored blob, recomputes SHA-256 and byte
+  count, and fails closed when either differs from the persisted blob record.
+- Processing lifecycle is durable in `MediaAsset.metadata.processing` with
+  queued/processing/completed/failed state, attempts and safe error codes.
+- A completed processor version is a no-op on retry.
+
+**Verification:**
+- Feature tests cover canonical convergence, duplicate queue suppression,
+  successful byte/hash verification, completed-job retry safety, corruption
+  failure state and pre-queue authorization rejection.
+- Existing upload/connector suites verify automatic handoff from ingestion to
+  processing.
 
 ### GF-FR-004 — Scheduling
 **Statement:** Authorized users can schedule eligible content for configured
