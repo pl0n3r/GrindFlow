@@ -42,7 +42,7 @@ mkdir -p storage/framework/cache/data storage/framework/sessions storage/framewo
 chmod -R ug+rwX storage bootstrap/cache
 
 printf 'Laravel bootstrap check...\n'
-"$PHP_BIN" artisan about --only=environment,cache,drivers >/dev/null
+"$PHP_BIN" artisan about >/dev/null
 
 if [[ -n "$SMOKE_URL" ]]; then
   command -v curl >/dev/null 2>&1 || fail "curl is required for SMOKE_URL checks."
