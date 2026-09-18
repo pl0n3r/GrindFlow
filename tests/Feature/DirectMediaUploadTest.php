@@ -43,7 +43,7 @@ class DirectMediaUploadTest extends TestCase
 
         Storage::shouldReceive('disk')
             ->once()
-            ->with('s3')
+            ->with('media')
             ->andReturn($disk);
 
         $this->actingAs($user)
@@ -224,11 +224,11 @@ class DirectMediaUploadTest extends TestCase
     private function configureDirectStorage(): void
     {
         config([
-            'grindflow.media.direct_upload_disk' => 's3',
-            'filesystems.disks.s3.driver' => 's3',
-            'filesystems.disks.s3.key' => 'test-key',
-            'filesystems.disks.s3.secret' => 'test-secret',
-            'filesystems.disks.s3.bucket' => 'test-bucket',
+            'grindflow.media.direct_upload_disk' => 'media',
+            'filesystems.disks.media.driver' => 's3',
+            'filesystems.disks.media.key' => 'test-key',
+            'filesystems.disks.media.secret' => 'test-secret',
+            'filesystems.disks.media.bucket' => 'test-bucket',
         ]);
     }
 

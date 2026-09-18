@@ -11,65 +11,53 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se agrego la siguiente etapa del Media Vault: **direct-to-storage upload** para
-  archivos grandes sin pasar los bytes por PHP.
-- Laravel genera una URL temporal mediante el filesystem S3-compatible y un token
-  cifrado ligado a tenant, usuario, storage key, filename, MIME, tamaño y expiracion.
-- El browser sube directamente al storage con progreso visible.
-- Al finalizar, GrindFlow verifica que el objeto exista, comprueba el tamaño y
-  calcula SHA-256 leyendo el objeto por stream antes de registrarlo.
-- La deduplicacion conserva el comportamiento existente: una sola copia de bytes,
-  assets duplicados trazables.
-- El direct upload tiene limite duro de 2 GiB y TTL configurable entre 5 y 60 min.
-- Quick upload de 8 MB permanece como fallback.
-- Si S3-compatible storage no tiene credenciales, Vault no falla: muestra el
-  direct upload como no configurado y mantiene quick upload disponible.
-- Production Smoke reutiliza la misma sesion y el mismo GET de Vault para validar
-  tambien que la capacidad Direct upload esta presente, sin request E2E adicional.
+- Se agrego un disk Laravel dedicado `media` para object storage del Vault.
+- La resolucion de credenciales permite migracion progresiva:
+  `MEDIA_STORAGE_*` -> `AWS_*` -> `R2_*` legado.
+- Direct upload usa ahora `MEDIA_DIRECT_UPLOAD_DISK=media` por defecto.
+- El cambio permite reutilizar una configuracion R2 ya existente sin copiar
+  secretos al repositorio ni acoplar el dominio Media Vault a Cloudflare.
+- Se documento que browser direct upload necesita CORS para
+  `https://www.grindflow.com.co` y metodo PUT.
 - No hay migracion de base de datos en este cambio.
+- El direct-to-storage upload de PR #37 ya esta fusionado a `main`; este cambio
+  solo completa su capa de configuracion compatible.
 
 ## Archivos modificados en este deploy
 
-- `app/Services/Media/DirectMediaUpload.php` — presign, token, verificacion SHA-256 y deduplicacion.
-- `app/Http/Controllers/Vault/DirectUploadController.php` — endpoints JSON create/complete.
-- `app/Http/Requests/Vault/CreateDirectUploadRequest.php` — autorizacion, MIME y limites.
-- `app/Http/Requests/Vault/CompleteDirectUploadRequest.php` — finalizacion autenticada.
-- `app/Http/Controllers/Vault/VaultController.php` — expone capacidad/config segura a la vista.
-- `resources/views/vault/index.blade.php` — experiencia Direct upload + progreso y fallback.
-- `public/css/grindflow.css` — progreso y estados de upload.
-- `routes/web.php` — rutas tenant-scoped y throttled.
-- `config/grindflow.php` y `.env.example` — disk, TTL y limite del direct upload.
-- `tests/Feature/DirectMediaUploadTest.php` — tenant boundary, presign y deduplicacion.
-- `scripts/production-smoke.sh` — valida Direct upload dentro del mismo recorrido Vault.
-- `AGENTS.md` — contrato durable de direct uploads.
+- `config/filesystems.php` — nuevo disk `media` S3-compatible con fallbacks.
+- `config/grindflow.php` — direct upload usa `media` por defecto.
+- `.env.example` — variables `MEDIA_STORAGE_*` preferidas.
+- `tests/Feature/DirectMediaUploadTest.php` — valida uso del disk dedicado.
+- `docs/MEDIA-STORAGE.md` — configuracion, CORS y contrato operativo.
+- `AGENTS.md` — regla durable de compatibilidad de object storage.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE**.
-- PR #37 paso `fast`, `php-quality`, `tests`, `browser` y `validate`; `database`
-  y `legacy` quedaron correctamente `skipped` por el selector de CI.
-- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- La feature usa `temporaryUploadUrl` del filesystem Laravel con disk S3-compatible.
-- No se agregaron secretos al repositorio ni se exponen credenciales permanentes al browser.
-- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** hasta que el merge sea
-  sincronizado por Hostinger y Production Smoke pase sobre ese commit.
-- La disponibilidad real del upload grande depende de configurar object storage
-  en el entorno de produccion; su ausencia no rompe el Vault.
+- Estado actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- No se agregan ni rotan secretos.
+- El fallback a `R2_*` es temporal durante la migracion Laravel.
+- El bucket permanece privado; CORS habilita el navegador pero no vuelve publico
+  el contenido.
+- No se ejecuta una subida real en produccion sin aprobacion explicita.
 
 ## Qué sigue
 
-- Fusionar PR #37 y dejar que Hostinger sincronice `main`.
-- Dejar que Production Smoke reutilice la sesion E2E para validar Dashboard,
-  System, schema, Vault y presencia de Direct upload en una sola pasada.
-- Si object storage aun no esta configurado, preparar su configuracion por UI/env
-  sin almacenar secretos en GitHub.
+- Pasar CI/Sonar y fusionar.
+- Dejar que Hostinger sincronice `main`.
+- Usar la misma sesion E2E para comprobar Dashboard/System/Vault sin requests
+  redundantes.
+- Si object storage ya tiene credenciales y CORS, realizar una prueba real de
+  direct upload solo con aprobacion explicita.
 
 ## Panorama general pendiente
 
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
-- **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente deploy y
-  configuracion real de object storage.
+- **P1 — Media Vault / object storage:** compatibility layer IMPLEMENTED;
+  pendiente VALIDATED IN CODE y configuracion efectiva del entorno.
+- **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente validacion
+  real contra object storage y CORS.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN PRODUCTION; faltan
   conectores, jobs y parity completa GF-FR-002.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
