@@ -152,9 +152,17 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   y errores seguros; un completed de la misma version es no-op.
 - Fallar el dispatch del processor debe dejar dispatch_failed, nunca queued
   eternamente. Un retry puede volver a encolar sin crear otro asset.
-- probe_v1 solo valida storage/tamano/MIME y registra metadata deterministica.
-  FFmpeg/transcoding/artifacts se agregan detras de este contrato, no dentro de
-  la ingesta.
+- probe_v2 valida storage/tamano/MIME y puede enriquecer metadata tecnica con
+  ffprobe solo si MEDIA_FFPROBE_ENABLED=true. Por defecto queda apagado para no
+  romper entornos donde el binario no exista.
+- ffprobe se ejecuta mediante Laravel Process con argumentos array y timeout
+  acotado. Solo se persisten campos tecnicos whitelisted; tags arbitrarios,
+  EXIF, stdout/stderr crudos y rutas temporales nunca entran a metadata.
+- Inspeccionar con ffprobe NO equivale a sanitizar. El gate de publicacion sigue
+  bloqueado hasta que un processor posterior elimine metadata sensible/EXIF y
+  deje una evidencia de sanitizacion verificable.
+- FFmpeg/transcoding/artifacts se agregan detras de ProcessMediaAsset, no dentro
+  de la ingesta.
 
 ### Regla de direct uploads del Vault
 
