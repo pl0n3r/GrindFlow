@@ -57,7 +57,10 @@ siguiente deploy.
 
 ## Validación
 
-- Estado del cambio actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado del cambio actual: **VALIDATED IN CODE**.
+- PR #28 paso `fast`, `php-quality`, `tests`, `database`, `browser`, `legacy` y
+  `GrindFlow CI / validate` en el run #106.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - El schema nuevo exige migracion de produccion despues del merge; no se declara
   **DEPLOYED** ni **VALIDATED IN PRODUCTION** antes de esa accion.
 - La migracion de produccion sera una accion explicita desde `Admin > System`,
@@ -67,8 +70,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar PHP quality, PHPUnit, MariaDB, browser, legacy y `validate`.
-- Fusionar solo si los gates aplicables quedan verdes.
+- Fusionar PR #28 y dejar que Hostinger sincronice `main`.
 - En produccion, aplicar la migracion desde `Admin > System` si el contador es
   mayor que cero.
 - Leer el issue automatico de Production Smoke si aparece un fallo y corregirlo
