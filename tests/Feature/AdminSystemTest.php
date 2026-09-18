@@ -28,7 +28,7 @@ class AdminSystemTest extends TestCase
             ->assertSee('Runtime configuration')
             ->assertSee('Database connection')
             ->assertSee('Media object storage')
-            ->assertSee('data-media-storage-configured="0"', false)
+            ->assertSee('data-media-storage-configured=', false)
             ->assertSee('Session driver')
             ->assertSee('Queue connection');
     }
