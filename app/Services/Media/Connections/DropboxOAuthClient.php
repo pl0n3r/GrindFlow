@@ -43,7 +43,7 @@ class DropboxOAuthClient
         }
 
         $accessToken = $payload['access_token'] ?? null;
-        $expiresIn = $payload['expires_in'] ?? 14_400;
+        $expiresIn = $payload['expires_in'] ?? null;
 
         if (
             is_string($accessToken) === false
@@ -97,7 +97,7 @@ class DropboxOAuthClient
     {
         $header = $response->header('Retry-After');
 
-        if (is_string($header) === false || ctype_digit($header) === false) {
+        if ($header === '' || ctype_digit($header) === false) {
             return null;
         }
 
