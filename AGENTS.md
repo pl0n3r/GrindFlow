@@ -144,6 +144,17 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - MediaConnectionTokenProvider es provider-aware: refresca Dropbox o Google
   segun provider, conserva refresh token si el proveedor no devuelve uno nuevo
   y el refresh nunca altera status/next_scan_at de la conexion.
+- Todo asset canonico entra al procesamiento por MediaProcessingCoordinator;
+  manual, direct y cloud no crean pipelines paralelos. Los duplicados no
+  procesan nuevamente los mismos bytes.
+- ProcessMediaAsset es idempotente por organization + asset + processor version.
+  Estado de procesamiento vive en metadata.processing con version/status/attempts
+  y errores seguros; un completed de la misma version es no-op.
+- Fallar el dispatch del processor debe dejar dispatch_failed, nunca queued
+  eternamente. Un retry puede volver a encolar sin crear otro asset.
+- probe_v1 solo valida storage/tamano/MIME y registra metadata deterministica.
+  FFmpeg/transcoding/artifacts se agregan detras de este contrato, no dentro de
+  la ingesta.
 
 ### Regla de direct uploads del Vault
 
