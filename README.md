@@ -46,7 +46,10 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del refresh slice: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado actual del refresh slice: **VALIDATED IN CODE**.
+- `fast`, `tests`, `php-quality`, `browser` y `GrindFlow CI / validate` pasaron sobre el head del slice.
+- SonarQube reporto Quality Gate **OK**, 0 issues y 0 Security Hotspots durante la validacion del PR.
+- CodeRabbit no dejo review threads abiertos.
 - La capa base de conexiones/scheduler: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
 - No se llama a Dropbox real ni se escriben credenciales reales.
@@ -55,9 +58,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit y `validate`; gates adicionales solo si el selector
-  determina que aplican.
-- Resolver Sonar/CodeRabbit y fusionar.
+- Fusionar el refresh automatico despues del ultimo gate del PR.
 - Mantener pendiente la migracion operacional de `media_connections` hasta
   aprobacion explicita.
 - Despues portar el callback OAuth inicial con state/CSRF y conexion tenant-safe,
@@ -72,8 +73,8 @@ siguiente deploy.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox adapter + conexiones cifradas +
-  scheduler VALIDATED IN CODE; token refresh IMPLEMENTED; pendiente callback
-  OAuth, migracion de produccion y Google Drive.
+  scheduler + token refresh VALIDATED IN CODE; pendiente callback OAuth,
+  migracion de produccion y Google Drive.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** scan scheduling VALIDATED IN CODE; pipeline
   de procesamiento general sigue pendiente.
