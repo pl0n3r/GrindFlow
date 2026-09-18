@@ -33,7 +33,6 @@ class AdminSystemTest extends TestCase
             ->assertSee('Queue connection');
     }
 
-
     public function test_system_status_reports_media_storage_ready_without_exposing_secrets(): void
     {
         config([
