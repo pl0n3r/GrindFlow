@@ -27,7 +27,7 @@ class DirectMediaUpload
         string $mimeType,
         int $byteSize,
     ): array {
-        if (! $this->available()) {
+        if ($this->available() === false) {
             throw ValidationException::withMessages([
                 'media' => 'Direct upload storage is not configured.',
             ]);
@@ -98,7 +98,7 @@ class DirectMediaUpload
 
         $filesystem = Storage::disk($disk);
 
-        if (! $filesystem->exists($storageKey)) {
+        if ($filesystem->exists($storageKey) === false) {
             throw ValidationException::withMessages([
                 'upload_token' => 'The uploaded object was not found.',
             ]);
@@ -141,7 +141,7 @@ class DirectMediaUpload
                 $sha256,
             );
 
-            if ($storageKey !== $finalKey && ! $filesystem->move($storageKey, $finalKey)) {
+            if ($storageKey !== $finalKey && $filesystem->move($storageKey, $finalKey) === false) {
                 throw new RuntimeException('Unable to promote the uploaded object into the media vault.');
             }
 
@@ -188,7 +188,7 @@ class DirectMediaUpload
         $disk = $this->disk();
         $config = config('filesystems.disks.'.$disk);
 
-        if (! is_array($config) || ($config['driver'] ?? null) !== 's3') {
+        if (is_array($config) === false || ($config['driver'] ?? null) !== 's3') {
             return false;
         }
 
@@ -233,7 +233,7 @@ class DirectMediaUpload
             ]);
         }
 
-        if (! is_array($payload) || ($payload['v'] ?? null) !== 1) {
+        if (is_array($payload) === false || ($payload['v'] ?? null) !== 1) {
             throw ValidationException::withMessages([
                 'upload_token' => 'The upload token version is invalid.',
             ]);
@@ -270,7 +270,7 @@ class DirectMediaUpload
             && (int) ($payload['byte_size'] ?? 0) > 0
             && (int) ($payload['byte_size'] ?? 0) <= $this->maxBytes();
 
-        if (! $valid) {
+        if ($valid === false) {
             throw ValidationException::withMessages([
                 'upload_token' => 'The upload token does not match the current tenant or has expired.',
             ]);
