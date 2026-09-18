@@ -32,7 +32,7 @@ class ReleaseCacheGuard
     {
         $storageFramework = $this->storagePath('framework');
 
-        if (! is_dir($storageFramework) && ! mkdir($storageFramework, 0775, true) && ! is_dir($storageFramework)) {
+        if (is_dir($storageFramework) === false && mkdir($storageFramework, 0775, true) === false && is_dir($storageFramework) === false) {
             throw new RuntimeException('Unable to create Laravel framework storage directory.');
         }
 
@@ -46,7 +46,7 @@ class ReleaseCacheGuard
         }
 
         try {
-            if (! flock($lock, LOCK_EX)) {
+            if (flock($lock, LOCK_EX) === false) {
                 throw new RuntimeException('Unable to acquire deployment cache lock.');
             }
 
@@ -68,7 +68,7 @@ class ReleaseCacheGuard
                 throw new RuntimeException('Unable to write deployment cache marker.');
             }
 
-            if (! rename($temporaryMarker, $markerPath)) {
+            if (rename($temporaryMarker, $markerPath) === false) {
                 if (is_file($temporaryMarker)) {
                     unlink($temporaryMarker);
                 }
@@ -126,7 +126,7 @@ class ReleaseCacheGuard
     private function clearBootstrapCaches(): void
     {
         foreach (glob($this->basePath('bootstrap/cache/*.php')) ?: [] as $path) {
-            if (is_file($path) && ! unlink($path)) {
+            if (is_file($path) && unlink($path) === false) {
                 throw new RuntimeException('Unable to clear a Laravel bootstrap cache file.');
             }
         }
