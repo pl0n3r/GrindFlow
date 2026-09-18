@@ -13,15 +13,20 @@ siguiente deploy.
 
 - Se implemento un sistema de diagnostico de aplicacion para que los errores
   HTTP 5xx dejen informacion util en vez de quedar como un simple "500".
-- Laravel ahora persiste su log tecnico en archivos diarios de
+- Laravel persiste su log tecnico en archivos diarios de
   `storage/logs/laravel-*.log` ademas de STDERR.
 - Cada 5xx genera un `incident_id` y una entrada JSONL sanitizada con excepcion,
   mensaje, ubicacion, contexto tenant y trace sin argumentos.
 - Se agregaron `/admin/diagnostics` y `/admin/diagnostics.json`, restringidos a
   administradores de plataforma.
 - La pagina 500 muestra el incident ID sin revelar detalles tecnicos.
-- El production smoke imprime los incidentes recientes en GitHub Actions cuando
-  falla Dashboard o System, permitiendo que los agentes los lean sin SSH.
+- El production smoke imprime los incidentes recientes cuando falla Dashboard o
+  System.
+- El reporter de produccion crea o actualiza el issue automatico
+  `[AUTO] Production Smoke Failure` con el diagnostico sanitizado para que los
+  agentes puedan leerlo directamente desde GitHub.
+- Si falta el secret E2E, mantiene visible
+  `[AUTO] Production Smoke Not Configured` en vez de aparentar una validacion.
 - El diagnostico no registra request bodies, cookies, headers, passwords,
   tokens, API keys ni secretos de conexion.
 
@@ -38,41 +43,42 @@ siguiente deploy.
 - `scripts/production-smoke.sh` — lectura automatica de diagnosticos al fallar.
 - `tests/Feature/DiagnosticsTest.php` — cobertura de sanitizacion y permisos.
 - `public/css/grindflow.css` — UI de Diagnostics/error.
-- `.gitignore` — exclusión de todos los logs runtime.
+- `.github/workflows/production-smoke.yml` — handoff automatico de fallos a GitHub Issues.
+- `.gitignore` — exclusion de todos los logs runtime.
 - `docs/DIAGNOSTICS.md` y `AGENTS.md` — contrato operativo durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado del cambio actual: **VALIDATED IN CODE**.
-- PR #21 paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y
-  `GrindFlow CI / validate`; `database` no aplico por alcance.
-- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- PR #21 se fusiono a `main` como `33cd7bc972c6c46c96d82f7dfa316903db1019ac`.
-- El exact-main CI del commit `33cd7bc972c6c46c96d82f7dfa316903db1019ac`
-  paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y `validate`.
-- `GrindFlow Production Smoke` run #2 arranco para ese commit, pero el smoke
-  autenticado fue omitido porque falta `PRODUCTION_E2E_PASSWORD` en GitHub Actions.
+- Diagnostics base, PR #21: **VALIDATED IN CODE** y fusionado a `main` como
+  `33cd7bc972c6c46c96d82f7dfa316903db1019ac`.
+- El exact-main CI de PR #21 paso `fast`, `php-quality`, `tests`, `browser`,
+  `legacy` y `validate`.
+- SonarQube Cloud de PR #21: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- Production Smoke run #2 confirmo que el smoke autenticado esta omitido porque
+  falta `PRODUCTION_E2E_PASSWORD` en GitHub Actions.
+- Reporter de incidentes a GitHub: **IMPLEMENTED**, pendiente de fusion del PR #23
+  y exact-main CI.
 - El dashboard de produccion ha presentado un HTTP 500; no se atribuye aun una
   causa sin evidencia del nuevo diagnostico.
-- No se declara **VALIDATED IN PRODUCTION** para Diagnostics hasta observar el
-  flujo real en Hostinger.
+- No se declara **VALIDATED IN PRODUCTION** hasta observar el flujo real en Hostinger.
 
 ## Qué sigue
 
-- Configurar una sola vez `PRODUCTION_E2E_PASSWORD` en GitHub Actions para activar
-  el smoke autenticado de produccion sin usar SSH.
-- Dejar que Hostinger sincronice `main` y detectar el 500 del dashboard para leer su
-  `incident_id`, excepcion y trace desde GitHub Actions/Admin Diagnostics.
-- Corregir la causa concreta del 500 con evidencia, no por ensayo y error.
+- Fusionar y validar el reporter de incidentes a GitHub.
+- Configurar una sola vez `PRODUCTION_E2E_PASSWORD` en GitHub Actions para
+  activar el smoke autenticado sin usar SSH.
+- Dejar que Hostinger sincronice `main`, reproducir/detectar el 500 y leer su
+  `incident_id`, excepcion y trace desde el issue automatico o Admin Diagnostics.
+- Corregir la causa concreta del 500 con evidencia.
 - Retomar Media Vault / ingesta despues de estabilizar produccion.
 
 ## Panorama general pendiente
 
 - **P0 — Produccion / dashboard:** HTTP 500 observado; pendiente capturar la causa
   exacta con Diagnostics despues del deploy.
-- **P0 — Produccion / smoke:** configurar/confirmar el secret E2E de GitHub para
-  que el smoke autenticado pueda ejecutarse de extremo a extremo.
+- **P0 — Produccion / smoke:** reporter automatico implementado; falta el secret
+  E2E de GitHub para ejecutar el smoke autenticado extremo a extremo.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente produccion.
 - **P1 — UI:** shell visual y System admin VALIDATED IN CODE.
