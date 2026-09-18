@@ -23,8 +23,11 @@ siguiente deploy.
 - Los tests negativos de PostgreSQL intentan cruces entre tenants y
   auto-escalacion de rol.
 - Se corrigieron los hallazgos validos de CodeRabbit de GF-MIG-002.
-- Se anadio un contrato de deploy reproducible para Hostinger en la PR #7,
-  incluyendo script seguro, documentacion y smoke test opcional de `/up`.
+- Se anadio un contrato de deploy reproducible para Hostinger, incluyendo script
+  seguro, documentacion y smoke test opcional de `/up`.
+- Se genero y versiono `composer.lock` con Composer real sobre PHP 8.5.
+- `composer.json` ahora fija PHP `^8.5` y Composer resuelve contra PHP 8.5.0.
+- GrindFlow CI exige `composer.lock` cuando existe `composer.json`.
 - El deploy automatico **no ejecuta migraciones de produccion**.
 
 ## Archivos modificados en este deploy
@@ -47,7 +50,9 @@ Cambio operativo actualmente en PR #7:
 - `scripts/deploy-hostinger.sh` — preparacion reproducible del deploy Laravel.
 - `docs/DEPLOY-HOSTINGER.md` — contrato operativo de Hostinger.
 - `docs/DESPLIEGUE.md` — marcado como guia historica del legado.
-- `.github/workflows/grindflow-ci.yml` — validacion de sintaxis del script de deploy.
+- `.github/workflows/grindflow-ci.yml` — valida el deploy y exige `composer.lock`.
+- `composer.json` — contrato de plataforma PHP 8.5.
+- `composer.lock` — resolucion reproducible de dependencias PHP.
 
 ## Validación
 
@@ -61,6 +66,7 @@ Cambio operativo actualmente en PR #7:
   1 issue no bloqueante pendiente de inspeccion manual en SonarCloud.
 - Produccion confirmo anteriormente que Apache + PHP 8.5 + Laravel arrancan en
   `grindflow.com.co`.
+- El lock fue generado en GitHub Actions usando PHP 8.5 y paso `composer validate --strict`.
 - GF-MIG-002 todavia **NO** esta VALIDATED IN PRODUCTION: falta conectar y
   verificar PostgreSQL con un rol runtime real y comprobar login/dashboard.
 - CI verde significa **VALIDATED IN CODE**, no validacion de produccion.
@@ -74,7 +80,6 @@ Cambio operativo actualmente en PR #7:
 - **P0:** desplegar GF-MIG-002 y validar login/dashboard + aislamiento tenant en
   produccion.
 - **P0:** proteger `main` exigiendo `GrindFlow CI / validate` antes de merge.
-- **P0:** versionar `composer.lock` y asegurar instalaciones PHP reproducibles.
 - Despues iniciar el **P1 Shell visual Laravel** y sustituir el placeholder del
   gate browser por pruebas end-to-end reales.
 
@@ -88,7 +93,8 @@ Cambio operativo actualmente en PR #7:
   produccion.
 - **P0 — Branch protection:** `main` sigue sin proteccion obligatoria; configurar
   `GrindFlow CI / validate` como required status check.
-- **P0 — Dependencias PHP:** versionar y exigir `composer.lock`.
+- **P0 — Dependencias PHP:** `composer.lock` generado sobre PHP 8.5 y exigido
+  por CI; el siguiente deploy debe instalar exactamente ese lock.
 - **P1 — UI:** shell Blade/Livewire + Tailwind, navegacion, responsive,
   accesibilidad y estados base.
 - **P1 — Browser tests:** reemplazar placeholder por Dusk o Playwright y cubrir
