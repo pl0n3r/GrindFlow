@@ -242,8 +242,15 @@ class DirectMediaUpload
     {
         try {
             $decoded = Crypt::decryptString($uploadToken);
+        } catch (DecryptException) {
+            throw ValidationException::withMessages([
+                'upload_token' => 'The upload token is invalid.',
+            ]);
+        }
+
+        try {
             $payload = json_decode($decoded, true, flags: JSON_THROW_ON_ERROR);
-        } catch (DecryptException | \JsonException) {
+        } catch (\JsonException) {
             throw ValidationException::withMessages([
                 'upload_token' => 'The upload token is invalid.',
             ]);
