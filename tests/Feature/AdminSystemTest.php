@@ -18,7 +18,11 @@ class AdminSystemTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('admin.system'))
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee(route('admin.system'));
+
+        $this->get(route('admin.system'))
             ->assertOk()
             ->assertSee('System')
             ->assertSee('Runtime configuration')
