@@ -19,7 +19,7 @@ operations across multiple accounts and platforms.
 | Framework | Laravel 13 |
 | UI | Blade + Livewire |
 | Styling | Tailwind CSS |
-| Database | PostgreSQL |
+| Database | MariaDB through Laravel `mysql` driver |
 | Background work | Laravel Queues |
 | Scheduling | Laravel Scheduler |
 | Object storage | S3-compatible storage |
@@ -32,7 +32,7 @@ operations across multiple accounts and platforms.
 ## 3. Architecture
 
 GrindFlow is a **modular monolith**. The default is one Laravel application,
-one PostgreSQL database and explicit modules inside the application.
+one MariaDB database and explicit modules inside the application.
 
 Do not introduce microservices, a separate SPA, a second authentication system,
 or duplicated APIs unless a measured constraint requires them.
@@ -66,9 +66,13 @@ Suggested domain boundaries:
 
 ## 5. Data model principles
 
-- Every tenant-owned record carries an explicit organization relationship.
+- Every tenant-owned record carries an explicit `organization_id`.
+- Tenant-owned Laravel models use the project tenant scope and fail closed when
+  no organization context is active.
 - Cross-tenant access is covered by negative tests.
-- PostgreSQL constraints/indexes protect invariants that must survive application bugs.
+- MariaDB foreign keys, unique indexes, ENUMs and targeted triggers protect
+  structural invariants that should survive application bugs.
+- Authorization decisions remain server-side in Laravel Policies/services.
 - Credentials and secrets use application-level authenticated encryption.
 - Audit-relevant state changes should be attributable to an actor/job and time.
 - Background jobs store enough identity/idempotency metadata to be safely retried.
@@ -86,12 +90,19 @@ Suggested domain boundaries:
 Every deploy-bound PR must pass the applicable subset of GrindFlow CI.
 The stable merge boundary is always `GrindFlow CI / validate`.
 
+The database gate runs MariaDB and is authoritative for MariaDB-specific
+migrations/invariants. SQLite is only a fast-test convenience.
+
 SonarQube Cloud and CodeRabbit add independent signals. They do not replace the
 project's executable tests.
 
 ## 8. Migration rule
 
-The current TypeScript/Next.js implementation is a functional reference during
-migration. Features move module-by-module. A module is not removed from the
-legacy implementation until its Laravel replacement is **VALIDATED IN CODE** and
-the migration requirement for that module is satisfied.
+The current TypeScript/Next.js/Supabase implementation is a functional reference
+during migration. PostgreSQL-specific mechanisms such as RLS are legacy
+implementation details and are not copied into Laravel when MariaDB requires a
+different mechanism to preserve the same invariant.
+
+Features move module-by-module. A module is not removed from the legacy
+implementation until its Laravel replacement is **VALIDATED IN CODE** and the
+migration requirement for that module is satisfied.
