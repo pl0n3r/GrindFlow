@@ -24,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
             $refreshed = app(ReleaseCacheGuard::class)->refreshIfNeeded();
 
             if ($refreshed && function_exists('opcache_reset')) {
-                @opcache_reset();
+                opcache_reset();
             }
         }
 
