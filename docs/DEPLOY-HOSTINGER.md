@@ -83,21 +83,28 @@ DB_CHARSET=utf8mb4
 DB_COLLATION=utf8mb4_unicode_ci
 ```
 
-Las migraciones se mantienen fuera del deploy automatico. Antes de ejecutar una
-migracion en produccion:
+Las migraciones se mantienen fuera del deploy automatico. El camino operativo
+preferido no requiere SSH:
 
-1. revisar `php artisan migrate:status`;
-2. confirmar backup/recovery aplicable;
-3. usar el rol de migraciones/owner;
-4. ejecutar explicitamente:
+1. iniciar sesion como administrador de plataforma;
+2. abrir `Admin > System`;
+3. revisar el contador **Pending migrations**;
+4. confirmar que el cambio fue validado por CI y que existe recovery/backup
+   aplicable;
+5. pulsar **Run pending migrations** una sola vez;
+6. confirmar que el contador vuelve a cero y dejar que Production Smoke valide
+   las rutas autenticadas.
+
+La accion usa CSRF, requiere `platform_role=admin` y toma un lock local para
+evitar dos ejecuciones simultaneas. GitHub Actions y Production Smoke nunca
+ejecutan migraciones de produccion.
+
+SSH queda como ruta de recuperacion si la interfaz administrativa no puede
+arrancar. En ese caso, el comando explicito sigue siendo:
 
 ```bash
 /opt/alt/php85/usr/bin/php artisan migrate --force
 ```
-
-5. confirmar que `.env` usa `DB_CONNECTION=mysql` y las credenciales de la
-   base MariaDB asignada al sitio;
-6. reconstruir config cache y validar login/tenant isolation.
 
 GF-MIG-002 no se considera VALIDATED IN PRODUCTION hasta comprobar el flujo real
 contra la MariaDB de Hostinger.
