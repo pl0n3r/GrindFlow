@@ -3,7 +3,8 @@
 ## Goal
 
 Move GrindFlow from Next.js/TypeScript/Supabase-oriented application code to a
-Laravel modular monolith while preserving validated behavior and PostgreSQL data.
+Laravel modular monolith using **MariaDB** as the production relational database,
+while preserving validated behavior and migratable legacy data.
 
 ## Strategy
 
@@ -18,7 +19,7 @@ This is a strangler-style module migration, not a blind rewrite.
 
 ### Phase 1 — Laravel foundation
 - PHP 8.5 / Laravel 13.
-- PostgreSQL connection.
+- MariaDB through Laravel's `mysql` driver.
 - Blade + Livewire + Tailwind.
 - Pest/PHPUnit.
 - Pint and PHPStan/Larastan.
@@ -29,7 +30,9 @@ This is a strangler-style module migration, not a blind rewrite.
 - Users.
 - Organizations.
 - Memberships/roles.
+- TenantContext and tenant-aware model scopes.
 - Policies/gates.
+- MariaDB structural constraints/triggers.
 - Negative cross-tenant tests.
 
 This phase blocks dependent module migration.
@@ -63,6 +66,7 @@ This phase blocks dependent module migration.
 Only after parity is validated:
 - remove Next.js app code;
 - remove TypeScript-only tests/tooling;
+- remove Supabase/PostgreSQL application dependencies;
 - remove Node runtime dependencies that are no longer required;
 - remove the `legacy` CI job.
 
