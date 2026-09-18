@@ -125,8 +125,10 @@ class MediaProcessingJobTest extends TestCase
 
                 $this->assertSame('completed', $processing['status']);
                 $this->assertSame(1, $processing['attempts']);
-                $this->assertSame('probe_v1', $processing['profile']);
+                $this->assertSame('probe_v2', $processing['profile']);
                 $this->assertSame('video', $processing['media_kind']);
+                $this->assertSame('disabled', $processing['technical_probe']);
+                $this->assertNull($processing['technical_metadata']);
                 $this->assertSame('video/mp4', $processing['mime_type']);
                 $this->assertSame(
                     MediaAssetProcessor::VERSION,
