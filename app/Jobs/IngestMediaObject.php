@@ -87,10 +87,7 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
         return $this->idempotency;
     }
 
-    public function handle(
-        FilesystemMediaIngestor $ingestor,
-        MediaProcessingCoordinator $processing,
-    ): void
+    public function handle(FilesystemMediaIngestor $ingestor): void
     {
         $actor = User::query()->findOrFail($this->actor);
 
@@ -133,7 +130,8 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
             'last_error' => null,
         ])->save();
 
-        $processing->queueIntegrity($asset, $actor);
+        app(MediaProcessingCoordinator::class)
+            ->queueIntegrity($asset, $actor);
     }
 
     private function markFailed(MediaIngestion $ingestion, string $safeError): void
