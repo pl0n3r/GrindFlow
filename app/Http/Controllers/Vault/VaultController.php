@@ -30,6 +30,7 @@ class VaultController extends Controller
             ->get();
 
         $assetCount = MediaAsset::query()->count();
+        $blobCount = MediaBlob::query()->count();
         $duplicateCount = MediaAsset::query()
             ->where('status', MediaAsset::STATUS_DUPLICATE)
             ->count();
@@ -39,6 +40,7 @@ class VaultController extends Controller
             'organization' => $organization,
             'assets' => $assets,
             'assetCount' => $assetCount,
+            'blobCount' => $blobCount,
             'duplicateCount' => $duplicateCount,
             'storageBytes' => $storageBytes,
             'canUpload' => $user->canManageOrganization($organization),
