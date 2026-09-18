@@ -13,6 +13,7 @@ cookie_jar="$workdir/cookies.txt"
 login_html="$workdir/login.html"
 dashboard_html="$workdir/dashboard.html"
 system_html="$workdir/system.html"
+diagnostics_json="$workdir/diagnostics.json"
 
 cleanup() {
   rm -rf "$workdir"
@@ -57,6 +58,52 @@ assert_contains() {
   fi
 }
 
+print_diagnostics() {
+  local diagnostic_status
+
+  diagnostic_status="$(curl --silent --show-error --max-time 20     --cookie "$cookie_jar"     --output "$diagnostics_json"     --write-out '%{http_code}'     "$BASE_URL/admin/diagnostics.json" || true)"
+
+  printf '\n---- GrindFlow application diagnostics ----\n' >&2
+
+  if [[ "$diagnostic_status" != "200" ]]; then
+    printf 'Diagnostics endpoint unavailable: HTTP %s\n' "$diagnostic_status" >&2
+    printf '%s\n' '-------------------------------------------' >&2
+    return 0
+  fi
+
+  python3 - "$diagnostics_json" >&2 <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+
+entries = payload.get("entries", [])[:5]
+
+if not entries:
+    print("No recorded 5xx incidents.")
+else:
+    for entry in entries:
+        request = entry.get("request", {})
+        print(
+            f"[{entry.get('timestamp', '?')}] "
+            f"incident={entry.get('incident_id', '?')} "
+            f"HTTP={entry.get('status', '?')} "
+            f"{request.get('method', '?')} {request.get('path', '?')}"
+        )
+        print(f"  {entry.get('exception', 'Exception')}: {entry.get('message', '')}")
+        print(f"  at {entry.get('location', '?')}")
+        for frame in entry.get("trace", [])[:6]:
+            print(
+                f"    {frame.get('file', '?')}:{frame.get('line', '?')} "
+                f"{frame.get('call', '')}"
+            )
+        print()
+PY
+
+  printf '%s\n' '-------------------------------------------' >&2
+}
+
 run_smoke() {
   rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html"
 
@@ -83,22 +130,38 @@ run_smoke() {
 
   if [[ "$dashboard_status" != "200" ]]; then
     printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2
+    print_diagnostics
     return 1
   fi
 
-  assert_contains "$dashboard_html" "Overview"
-  assert_contains "$dashboard_html" "Tenant isolation active"
+  if ! assert_contains "$dashboard_html" "Overview"; then
+    print_diagnostics
+    return 1
+  fi
+
+  if ! assert_contains "$dashboard_html" "Tenant isolation active"; then
+    print_diagnostics
+    return 1
+  fi
 
   local system_status
   system_status="$(curl --silent --show-error --max-time 20     --cookie "$cookie_jar"     --output "$system_html"     --write-out '%{http_code}'     "$BASE_URL/admin/system")"
 
   if [[ "$system_status" != "200" ]]; then
     printf 'ERROR: admin system page returned HTTP %s\n' "$system_status" >&2
+    print_diagnostics
     return 1
   fi
 
-  assert_contains "$system_html" "Runtime configuration"
-  assert_contains "$system_html" "Database connection"
+  if ! assert_contains "$system_html" "Runtime configuration"; then
+    print_diagnostics
+    return 1
+  fi
+
+  if ! assert_contains "$system_html" "Database connection"; then
+    print_diagnostics
+    return 1
+  fi
 
   printf 'PASS production smoke: /up, /login, /dashboard, /admin/system\n'
 }
