@@ -121,6 +121,16 @@
                         {{ $pendingMigrations === 0 ? 'Schema current' : 'Operator action required' }}
                     </div>
                 </article>
+
+                <article class="gf-metric">
+                    <div class="gf-metric__label">Media storage</div>
+                    <div class="gf-metric__value">
+                        {{ $mediaStorageConfigured ? 'Ready' : 'Setup required' }}
+                    </div>
+                    <div class="gf-metric__meta">
+                        {{ strtoupper($mediaStorageDriver) }} · {{ $mediaStorageDisk }}
+                    </div>
+                </article>
             </section>
 
             <section class="gf-panel">
@@ -150,6 +160,22 @@
                                     data-pending-migrations="{{ $pendingMigrations === null ? 'unknown' : $pendingMigrations }}"
                                 >
                                     {{ $pendingMigrations === null ? 'Unknown' : $pendingMigrations }}
+                                </span>
+                            </div>
+                        </article>
+
+                        <article class="gf-system-item">
+                            <div class="gf-system-item__label">Media object storage</div>
+                            <div class="gf-system-item__row">
+                                <span>
+                                    {{ strtoupper($mediaStorageDriver) }} ·
+                                    {{ number_format($mediaStorageMaxBytes / 1073741824, 1) }} GiB max
+                                </span>
+                                <span
+                                    class="gf-state {{ $mediaStorageConfigured ? 'gf-state--ok' : 'gf-state--neutral' }}"
+                                    data-media-storage-configured="{{ $mediaStorageConfigured ? '1' : '0' }}"
+                                >
+                                    {{ $mediaStorageConfigured ? 'Configured' : 'Setup required' }}
                                 </span>
                             </div>
                         </article>
