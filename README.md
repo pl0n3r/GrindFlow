@@ -27,8 +27,8 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `fix/mariadb-frontend-copy`.
-- Pendiente de PHPUnit, Pint/Larastan, browser, SonarQube Cloud y `GrindFlow CI / validate`.
+- Estado actual: **VALIDATED IN CODE** en `fix/mariadb-frontend-copy`.
+- PHPUnit, Pint/Larastan, browser, SonarQube Cloud y `GrindFlow CI / validate` pasaron.
 - No cambia esquema, datos ni configuracion de produccion.
 
 ## Qué sigue
@@ -42,7 +42,7 @@ siguiente deploy.
 - **P0 — MariaDB:** VALIDATED IN CODE; falta deploy/validacion de produccion.
 - **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta validacion de produccion.
 - **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required.
-- **P1 — UI:** copy MariaDB IMPLEMENTED; pendiente de CI/review.
+- **P1 — UI:** copy MariaDB VALIDATED IN CODE; pendiente de merge/exact-main CI.
 - **P1 — Browser tests:** smoke invitado VALIDATED IN CODE.
 - **P1 — Browser autenticado:** en desarrollo paralelo.
 - **P1 — Media Vault / ingesta:** pendiente.
