@@ -12,12 +12,15 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 
 require __DIR__.'/../vendor/autoload.php';
 
-$cacheGuard = new ReleaseCacheGuard(
-    dirname(__DIR__),
-    dirname(__DIR__).'/storage',
-);
+$cacheGuard = new ReleaseCacheGuard();
 
-if ($cacheGuard->refreshIfNeeded() && function_exists('opcache_reset')) {
+if (
+    $cacheGuard->refreshIfNeeded(
+        dirname(__DIR__),
+        dirname(__DIR__).'/storage',
+    )
+    && function_exists('opcache_reset')
+) {
     opcache_reset();
 }
 
