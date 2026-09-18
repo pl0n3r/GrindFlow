@@ -6,6 +6,7 @@ use App\Models\MediaAsset;
 use App\Models\MediaBlob;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Media\Processing\MediaProcessingCoordinator;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
@@ -16,6 +17,10 @@ use RuntimeException;
 class DirectMediaUpload
 {
     private const HARD_MAX_BYTES = 2_147_483_648;
+
+    public function __construct(
+        private readonly MediaProcessingCoordinator $processing,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -182,7 +187,7 @@ class DirectMediaUpload
             ->oldest('created_at')
             ->first();
 
-        return MediaAsset::query()->create([
+        $asset = MediaAsset::query()->create([
             'media_blob_id' => $blob->getKey(),
             'duplicate_of' => $canonicalAsset?->getKey(),
             'ingested_by_user_id' => $actor->getKey(),
@@ -197,6 +202,10 @@ class DirectMediaUpload
                 'verified_sha256' => true,
             ],
         ]);
+
+        $this->processing->queueIntegrity($asset, $actor);
+
+        return $asset;
     }
 
     public function available(): bool
