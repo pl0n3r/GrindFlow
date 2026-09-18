@@ -133,3 +133,29 @@ session-bound browser flow:
 The callback route is stable at /connections/dropbox/callback and must be
 registered against the production APP_URL in the Dropbox app console. CI uses
 provider fakes and makes no real Dropbox API call.
+
+
+## Google Drive adapter
+
+`GoogleDriveMediaAdapter` is the first Google Drive ingestion slice. It uses
+Drive API v3 directly with provider fakes in CI.
+
+Current behavior:
+
+- `files.list` pages the user's Drive corpus with a bounded page size
+- optional root folder IDs are applied as a parent filter
+- only downloadable image/video blob files with a positive size are normalized
+- Google Workspace-native documents are intentionally skipped because they
+  require export semantics instead of blob `alt=media` download
+- blob bytes download through `files.get?alt=media`
+- provider page tokens are pagination tokens only; they are not treated as a
+  durable incremental-change cursor
+- staging, source idempotency, byte limits, tenant authorization and cleanup are
+  delegated to the shared `ConnectorMediaStager`
+- source type is `google_drive` and the source ref is versioned from Drive file
+  ID plus md5Checksum when present, otherwise modifiedTime
+- HTTP 401 requests reconnect, HTTP 429 returns bounded Retry-After, and raw
+  provider bodies are never propagated
+
+OAuth connection, refresh and scheduled change tracking for Google Drive remain
+separate follow-up slices. The adapter itself does not persist credentials.
