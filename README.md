@@ -51,8 +51,11 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del OAuth connect slice: **IMPLEMENTED**, pendiente de
-  `GrindFlow CI / validate`.
+- Estado actual del OAuth connect slice: **VALIDATED IN CODE**.
+- El head funcional `c866e3278e3e818711c648f4f68bf3c01094e430` paso `fast`,
+  `tests`, `php-quality`, `browser` y `GrindFlow CI / validate`.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
 - Refresh automatico + conexiones cifradas + scheduler: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
 - No se llama a Dropbox real ni se escriben credenciales reales.
@@ -61,8 +64,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit, browser y `GrindFlow CI / validate`; resolver
-  SonarQube/CodeRabbit si reportan hallazgos y fusionar por squash.
 - Mantener pendiente la migracion operacional de `media_connections` hasta
   aprobacion explicita.
 - Configurar la app real de Dropbox solo mediante accion operacional protegida:
@@ -78,9 +79,8 @@ siguiente deploy.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox adapter + conexiones cifradas +
-  scheduler + token refresh VALIDATED IN CODE; OAuth connect IMPLEMENTED;
-  pendiente validacion del slice, migracion/configuracion de produccion y
-  Google Drive.
+  scheduler + token refresh + OAuth connect VALIDATED IN CODE; pendiente
+  migracion/configuracion de produccion y Google Drive.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** scan scheduling VALIDATED IN CODE; pipeline
   de procesamiento general sigue pendiente.
