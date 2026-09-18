@@ -29,7 +29,7 @@ and role.
 reads and writes.
 
 ### GF-FR-002 — Media ingestion
-**Status:** implemented
+**Status:** validated-in-code
 
 **Statement:** Authorized users can ingest supported media into the organization
 vault with traceable source metadata.
