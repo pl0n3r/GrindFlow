@@ -52,6 +52,18 @@ class VaultController extends Controller
                 ->where('provider', MediaConnection::PROVIDER_DROPBOX)
                 ->count()
             : 0;
+        $googleOAuthConfigured = (string) config(
+            'grindflow.connectors.google_drive.client_id',
+            '',
+        ) !== '' && (string) config(
+            'grindflow.connectors.google_drive.client_secret',
+            '',
+        ) !== '';
+        $googleConnectionCount = $connectionsReady
+            ? MediaConnection::query()
+                ->where('provider', MediaConnection::PROVIDER_GOOGLE_DRIVE)
+                ->count()
+            : 0;
 
         return view('vault.index', [
             'organization' => $organization,
@@ -66,6 +78,10 @@ class VaultController extends Controller
                 && $connectionsReady
                 && $dropboxOAuthConfigured,
             'dropboxConnectionCount' => $dropboxConnectionCount,
+            'googleDriveConnectAvailable' => $canUpload
+                && $connectionsReady
+                && $googleOAuthConfigured,
+            'googleDriveConnectionCount' => $googleConnectionCount,
             'mediaConnectionsReady' => $connectionsReady,
             'directUploadMaxBytes' => $directUploads->maxBytes(),
         ]);
