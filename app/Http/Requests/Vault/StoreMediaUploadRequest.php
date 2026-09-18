@@ -18,6 +18,9 @@ class StoreMediaUploadRequest extends FormRequest
             && $user->canManageOrganization($organization);
     }
 
+    /**
+     * @return array<string, list<string>>
+     */
     public function rules(): array
     {
         /** @var array<int, string> $mimetypes */
