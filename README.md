@@ -26,6 +26,14 @@ siguiente deploy.
 - Production Smoke tambien deja de copiar el diagnostico al cuerpo del issue
   publico. En fallo sube `production-smoke-diagnostics-<run_id>` por 3 dias.
 - CI valida la sintaxis del nuevo fetcher antes de permitir merge.
+- `GrindFlow CI` ahora selecciona `php-quality`, PHPUnit, MariaDB, browser y
+  legado segun paths; cambios de docs/automatizacion ya cubiertos por `fast`
+  dejan de arrancar runners pesados innecesarios.
+- Un cambio al propio `grindflow-ci.yml` o un `workflow_dispatch` fuerza todos
+  los gates para impedir falsos verdes del selector.
+- Los cuatro jobs PHP reutilizan cache de descargas Composer por `composer.lock`;
+  el legado conserva cache npm y usa `npm ci --prefer-offline --no-audit --no-fund`.
+- Todos los jobs pesados tienen timeouts explicitos.
 - El archivo privado `storage/logs/diagnostics-*.jsonl` sigue sin exponerse de
   forma directa.
 
@@ -34,14 +42,14 @@ siguiente deploy.
 - `scripts/fetch-production-diagnostics.sh` — login E2E, lectura y sanitizacion.
 - `.github/workflows/production-diagnostics.yml` — bridge activado por comentario autorizado.
 - `.github/workflows/production-smoke.yml` — diagnosticos de fallo como artifact corto.
-- `.github/workflows/grindflow-ci.yml` — valida el nuevo script.
+- `.github/workflows/grindflow-ci.yml` — selector de gates, caches, timeouts y validacion del nuevo script.
 - `docs/DIAGNOSTICS.md` — contrato y flujo completo del bridge.
 - `AGENTS.md` — regla durable para "revisa el log de produccion".
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado del bridge actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado del bridge y optimizacion CI: **IMPLEMENTED**, pendiente del nuevo `GrindFlow CI / validate`.
 - El hotfix anterior si esta **VALIDATED IN CODE** y fusionado a `main`; produccion
   todavia necesita confirmar que el deploy de Hostinger recibio ese commit.
 - El bridge no ejecuta comandos SSH, migraciones ni operaciones destructivas.
@@ -49,7 +57,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar CI/Sonar del bridge y fusionarlo.
+- Pasar el CI completo forzado por el cambio del propio workflow y Sonar.
 - Crear el issue durable `[AUTO] Production Diagnostics Bridge`.
 - Lanzar la primera peticion real con `/production-diagnostics`.
 - Recuperar el artifact desde GitHub y comprobar que puedo leer el error de
@@ -62,6 +70,8 @@ siguiente deploy.
   hotfix fusionado, pendiente confirmacion real en Hostinger.
 - **P0 — Produccion / Diagnostics bridge:** IMPLEMENTED; pendiente CI, merge y
   primera captura end-to-end.
+- **P0 — CI:** selector/caches/timeouts IMPLEMENTED; pendiente validar el run
+  completo forzado y medir la siguiente PR de docs/Laravel/legacy para comprobar skips.
 - **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
   Dashboard/System vuelvan a estar operativos.
 - **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
