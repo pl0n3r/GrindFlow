@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
 
 class DropboxOAuthClient
 {
-    private const TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token';
+    private const TOKEN_URL = 'https://api.dropbox.com/oauth2/token';
 
     public function refresh(string $refreshToken): RefreshedAccessToken
     {
