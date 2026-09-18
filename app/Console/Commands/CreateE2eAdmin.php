@@ -41,7 +41,7 @@ class CreateE2eAdmin extends Command
                 'slug' => 'e2e-admin-workspace',
             ]);
             $organization->name = 'E2E Admin Workspace';
-            $organization->type = OrganizationType::Studio;
+            $organization->type = OrganizationType::Studio->value;
             $organization->save();
 
             Membership::query()->updateOrCreate(
