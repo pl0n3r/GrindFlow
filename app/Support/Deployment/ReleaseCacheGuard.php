@@ -22,8 +22,7 @@ class ReleaseCacheGuard
     public function __construct(
         private readonly ?string $basePathOverride = null,
         private readonly ?string $storagePathOverride = null,
-    ) {
-    }
+    ) {}
 
     /**
      * Clear stale Laravel caches once when deployment-sensitive source changes.
