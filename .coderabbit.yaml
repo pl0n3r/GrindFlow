@@ -8,7 +8,7 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    auto_incremental_review: true
+    auto_incremental_review: false
     base_branches:
       - main
   path_filters:
@@ -55,14 +55,21 @@ reviews:
         cross-tenant access, not merely prove happy-path reads.
     - path: ".github/workflows/**"
       instructions: |
-        Preserve the stable GrindFlow CI / validate aggregate. Keep changed-file-aware
-        gates free of false negatives. Do not duplicate SonarQube Cloud automatic
-        analysis with a second scanner unless automatic analysis is intentionally
-        disabled first.
+        Preserve the stable GrindFlow CI / validate aggregate. Heavy gates should fan
+        out from the short preflight planner instead of serializing behind fast. Keep
+        changed-file-aware gate selection free of false negatives, require selected
+        gates to succeed, and keep exact-main validation after squash merge. Do not
+        duplicate SonarQube Cloud automatic analysis with a second scanner unless
+        automatic analysis is intentionally disabled first.
     - path: "docs/**"
       instructions: |
         Keep requirements traceable and durable. Product behavior belongs in the spec
         or requirements docs; transient delivery state does not.
+    - path: "README.md"
+      instructions: |
+        README is an exact current-deploy development dashboard, not cumulative history.
+        The Git delta, selected gate plan and changed-file list must match the PR diff.
+        Keep CI, deploy and production validation as separate evidence states.
 knowledge_base:
   code_guidelines:
     enabled: true

@@ -1,96 +1,120 @@
 # GrindFlow — Último deploy
 
-[![GrindFlow CI](https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg)](https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml)
+<p align="center">
+  <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
+  <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
+  <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
+</p>
 
-Este README cubre **solo el deploy/estado operativo actual** y se reemplaza en el
-siguiente deploy.
+> **Development dashboard** · snapshot profesional de **solo el deploy actual**. CI, deploy y validacion en produccion son evidencias distintas.
 
-> **Regla permanente del proyecto:** cada deploy debe dejar aqui el snapshot
-> exacto de lo que cambio y un panorama general actualizado de lo pendiente,
-> ordenado por prioridad.
+## Estado del deploy
+
+| Señal | Estado actual | Evidencia |
+| --- | --- | --- |
+| Work line | 🟢 **BRVTAL delivery parity** | CI completo VALIDATED IN CODE |
+| Base exacta | ✅ **main** | `c074f0195247d80ee15005196dbb4abf628a2795` · media processing foundation #58 |
+| Cambio | ⚡ **CI lead-time** | full matrix #215: ~86 s; fan-out confirmado en paralelo |
+| Produccion | 🔒 **separada** | Production Smoke autenticado sigue independiente del source CI |
+| Migraciones | ✅ **ninguna** | cambio exclusivo de delivery/tooling |
+
+## Huella del cambio
+
+<!-- grindflow:git-delta -->
+
+| Archivos | Inserciones | Eliminaciones | Neto |
+| ---: | ---: | ---: | ---: |
+| **8** | **+889** | **−306** | **+583** |
+
+La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
+
+## Calidad y entrega
+
+<!-- grindflow:gate-plan -->
+
+| Control | Estado / contrato |
+| --- | --- |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| GrindFlow CI | `validate` exige success real para cada gate seleccionado |
+| Sonar | Automatic Analysis + comentario estable **SonarQube Cloud · Full PR details** |
+| CodeRabbit | incremental desactivado; full review sobre el head estable |
+| Exact-main | CI vuelve a validar el SHA exacto despues del squash merge |
+| Produccion | Production Smoke es independiente y no convierte CI verde en VALIDATED IN PRODUCTION |
+
+## Flujo de entrega
+
+```mermaid
+flowchart LR
+    A["PR + snapshot exacto"] --> P["preflight"]
+    P --> F["fast contracts"]
+    P --> Q["php-quality"]
+    P --> T["PHPUnit"]
+    P --> D["MariaDB"]
+    P --> B["browser"]
+    P --> L["legacy"]
+    A --> S["Sonar"]
+    A --> C["CodeRabbit full review"]
+    F --> V["validate"]
+    Q --> V
+    T --> V
+    D --> V
+    B --> V
+    L --> V
+    S --> H["head estable"]
+    C --> H
+    V --> H
+    H --> M["Squash merge"]
+    M --> X["CI del SHA exacto de main"]
+    M --> R["Production Smoke"]
+```
 
 ## Qué se hizo
 
-- Google Drive Changes API de PR #55 quedo **VALIDATED IN CODE** y fue fusionado
-  a `main` como `8f2544e47a7da0d17881de70a83feed7e548d412`.
-- Se inicio el siguiente bloque P1: foundation del pipeline general de
-  procesamiento de media.
-- Se agrego `ProcessMediaAsset`, job tenant-aware, ShouldBeUnique e idempotente
-  por organization + asset + processor version.
-- `MediaProcessingCoordinator` es el unico handoff al processing pipeline.
-  Manual upload, direct upload y cloud/job ingestion convergen en el mismo
-  contrato.
-- Los assets duplicados no programan otra pasada sobre los mismos bytes.
-- El estado de procesamiento vive en `metadata.processing` con version,
-  status, attempts y `last_error` seguro; no requiere migracion nueva.
-- Un processor ya completado en la misma version es no-op en retries.
-- Fallos de dispatch quedan como `dispatch_failed`, evitando assets
-  eternamente `queued` y permitiendo volver a encolar.
-- `probe_v1` valida que el blob exista, que el objeto exista en storage, que el
-  tamaño coincida y que el MIME sea image/video.
-- El resultado deterministico guarda media kind, MIME, byte size y SHA-256.
-- Fallos esperados usan codigos seguros como `processing_object_missing`,
-  `processing_size_mismatch` y `processing_unsupported_mime`.
-- Este slice no transcodifica ni crea derivados todavia. FFmpeg entra despues,
-  detras de este contrato, para no mezclar procesamiento con ingesta.
-- Se agregaron pruebas de idempotencia, duplicate-skip, estado observable,
-  failure/retry y handoff de cloud ingestion.
-- No se toca produccion y no hay migracion nueva.
+- Relee el `main` actual de BRVTAL y porta su optimizacion de delivery a GrindFlow.
+- Separa `preflight` del `fast`: el primero calcula scope y los gates pesados salen en paralelo inmediatamente.
+- Centraliza el clasificador de paths en `scripts/ci-scope.sh` con contrato ejecutable.
+- `validate` distingue un skip intencional de un gate seleccionado que no ejecuto correctamente.
+- Convierte README en dashboard machine-checked con archivos, inserciones, eliminaciones, neto y gate plan exactos.
+- Desactiva CodeRabbit incremental para evitar revisiones solapadas durante pushes intermedios.
+- Conserva el reporter Sonar existente de GrindFlow, que ya publica detalles completos en GitHub.
+- No copia el deploy observer de BRVTAL: GrindFlow no expone aun un marcador publico seguro del SHA desplegado y ya posee Production Smoke autenticado.
 
 ## Archivos modificados en este deploy
 
-- `app/Jobs/ProcessMediaAsset.php` — job idempotente tenant-aware.
-- `app/Services/Media/MediaAssetProcessor.php` — processor deterministico `probe_v1`.
-- `app/Services/Media/MediaProcessingCoordinator.php` — handoff unico al pipeline.
-- `app/Services/Media/MediaProcessingException.php` — errores seguros.
-- `app/Services/Media/MediaIngestor.php` — manual upload encola processing.
-- `app/Services/Media/DirectMediaUpload.php` — direct upload encola processing.
-- `app/Jobs/IngestMediaObject.php` — cloud ingestion entrega el asset al processor
-  y reintenta el handoff si la ingesta ya habia terminado.
-- `tests/Feature/MediaProcessingJobTest.php` — processing lifecycle.
-- `tests/Feature/MediaIngestionJobTest.php` — adapta el handoff cloud.
-- `docs/REQUIREMENTS.md` y `AGENTS.md` — contrato durable.
-- `README.md` — snapshot operativo actualizado.
+- `.coderabbit.yaml` — revision solo sobre heads estables.
+- `.github/workflows/grindflow-ci.yml` — preflight, fan-out concurrente y validate estricto.
+- `AGENTS.md` — reglas durables de CI, dashboard, Git writes y CodeRabbit.
+- `README.md` — dashboard exacto de desarrollo.
+- `docs/DEVELOPMENT-MODEL.md` — topologia y ciclo de entrega actualizado.
+- `scripts/ci-scope-contract.sh` — regresiones del clasificador.
+- `scripts/ci-scope.sh` — clasificador reusable de changed files.
+- `scripts/readme-dashboard.py` — validador exacto del snapshot.
 
 ## Validación
 
-- Estado actual del media processing foundation: **VALIDATED IN CODE**.
-- El head funcional `6a14193306dfa68e8b699cfc7f264580bce6fe36` paso
-  `fast`, `tests`, `php-quality`, MariaDB y `GrindFlow CI / validate`;
-  browser/legacy fueron correctamente omitidos por no aplicar al diff.
-- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
-  0.0% duplicacion en codigo nuevo.
-- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
-- GF-FR-003 queda **VALIDATED IN CODE** en su primera capa.
-- Dropbox + Google ingestion/scheduling: **VALIDATED IN CODE**.
-- No hay migracion nueva.
-- Produccion no se modifica desde CI.
-- No se declara DEPLOYED ni VALIDATED IN PRODUCTION.
+- Estado actual: **VALIDATED IN CODE** sobre el head funcional `7aeccf5386c967a6a329467ccf5421c29b0e9f2b`.
+- GrindFlow CI #215 paso preflight, fast, php-quality, PHPUnit, MariaDB, browser, legacy y validate; full matrix ~86 s.
+- SonarQube Cloud: Quality Gate OK, 0 issues, 0 Security Hotspots y 0.0% duplicacion en codigo nuevo.
+- CodeRabbit full review fue solicitado sobre el head estable; cualquier hallazgo accionable debe resolverse antes del merge.
+- Produccion/migraciones no se tocan; tras squash merge se exige CI exacto de `main`.
 
 ## Qué sigue
 
-- Despues añadir el primer processor real de derivados, probablemente probe
-  multimedia/FFmpeg y sanitizacion, manteniendo `ProcessMediaAsset` como contrato.
-- Mantener pendiente object storage real, migracion de `media_connections` y
-  configuración Google/Dropbox de produccion hasta aprobacion explicita.
+| Lane | Trabajo |
+| --- | --- |
+| **NOW** | Abrir PR del CI nuevo, pasar matriz completa, Sonar y full review de CodeRabbit; medir el critical path. |
+| **NEXT** | Continuar GF-FR-003 con derivados/probe multimedia/FFmpeg detras de `ProcessMediaAsset`. |
+| **BLOCKED / EXTERNAL** | Branch protection sigue requiriendo configuracion GitHub fuera del conector actual; object storage/credenciales reales siguen operacionales. |
+| **LATER** | P2 distribucion, trafico/atribucion y finanzas despues de cerrar P1. |
 
 ## Panorama general pendiente
 
-- **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`;
-  bloqueado porque el conector actual no expone branch protection.
-- **P1 — Media Vault / object storage:** readiness VALIDATED IN PRODUCTION;
-  produccion reporta setup pendiente en #40.
-- **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
-  contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
-  Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
-- **P1 — Procesamiento / scheduling:** cloud scheduling + processing foundation
-  VALIDATED IN CODE; derivados/FFmpeg pendientes.
-- **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
-- **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
-- **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
-- **P2 — Integraciones / distribucion:** pendiente.
-- **P2 — Trafico / atribucion:** pendiente.
-- **P2 — Finanzas:** pendiente.
-- **P3 — Retiro legado:** solo con paridad Laravel.
-- **P3 — Simplificacion CI:** retirar `legacy` despues de GF-MIG-004.
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | Delivery / CI | portar y medir mejoras BRVTAL |
+| **NEXT** | Media processing | foundation VALIDATED IN CODE; derivados/FFmpeg pendientes |
+| **NEXT** | Media Vault produccion | Dropbox/Google VALIDATED IN CODE; configuracion real pendiente |
+| **BLOCKED / EXTERNAL** | Branch protection / storage | requiere controles externos de GitHub/hosting |
+| **LATER** | Operacion | queues, scheduler, retries y backups |
+| **LATER** | Legacy retirement | solo tras GF-MIG-003 / GF-MIG-004 |
+| **LATER** | Producto P2 | distribucion, atribucion y finanzas |

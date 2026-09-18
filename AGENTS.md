@@ -22,6 +22,7 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Analisis, inspeccion de codigo, preparacion de pruebas, revision de gates y tareas sobre modulos independientes pueden ejecutarse en paralelo.
 - Mientras un gate externo corre, se debe aprovechar el tiempo avanzando trabajo independiente en vez de quedar inactivo.
 - Los merges a `main` son siempre **serializados**. Antes de cada merge hay que volver a comprobar el SHA actual de `main`, el SHA de la rama/PR y los gates aplicables.
+- Cuando varias escrituras Git forman un mismo cambio logico y las APIs Git de bajo nivel estan disponibles, se prefieren blobs/tree/commit + un solo fast-forward de la rama. Evitar tormentas de commits archivo-por-archivo que reinicien CI, Sonar o la revision externa innecesariamente.
 - Escrituras sobre el mismo archivo, ramas dependientes, cambios sobre el mismo esquema/estado compartido y secuencias que dependan unas de otras deben permanecer serializadas.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
@@ -215,64 +216,94 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 
 ### Regla de eficiencia CI
 
-- `GrindFlow CI / validate` conserva su nombre estable y agrega resultados de
-  gates selectivos; los jobs omitidos por no aplicar cuentan como `skipped`,
-  nunca como validacion ejecutada.
-- Cambiar `.github/workflows/grindflow-ci.yml` o lanzar `workflow_dispatch`
-  fuerza todos los gates disponibles para validar el propio CI.
-- Cambios de documentacion/README/AGENTS y scripts ya cubiertos por validacion de
-  sintaxis no deben arrancar PHPUnit, browser, MariaDB o legado salvo que tambien
-  toquen rutas de codigo asociadas.
-- `php-quality`, `tests`, `database`, `browser` y `legacy` se seleccionan
-  por paths conservadores. Si existe duda sobre impacto funcional se prefiere
-  ejecutar el gate, no omitirlo.
+- `GrindFlow CI / validate` conserva su nombre estable como unica compuerta
+  agregada para branch protection.
+- Cada PR y push exacto a `main` empieza con un `preflight` corto que calcula
+  el diff y ejecuta el clasificador reusable `scripts/ci-scope.sh`.
+- `fast`, `php-quality`, `tests`, `database`, `browser` y `legacy`
+  salen directamente de `preflight` cuando aplican. Ningun gate pesado espera a
+  que termine otro gate independiente.
+- `fast` siempre existe despues de preflight y protege contratos operativos,
+  sintaxis de automatizacion y el dashboard README exacto; no instala Composer ni
+  Node por defecto.
+- Un gate seleccionado debe terminar en `success`. Un gate no seleccionado
+  puede aparecer como `skipped`; `validate` no trata un skip seleccionado como
+  verde.
+- Cambiar `.github/workflows/grindflow-ci.yml`, `scripts/ci-scope.sh`,
+  `scripts/ci-scope-contract.sh` o `scripts/readme-dashboard.py`, o lanzar
+  `workflow_dispatch`, fuerza la matriz completa para validar el propio CI.
+- Cambios de documentacion/README/AGENTS no arrancan PHPUnit, browser, MariaDB ni
+  legado salvo que tambien toquen codigo asociado.
+- El clasificador es conservador: una ruta desconocida activa todos los gates
+  pesados antes de arriesgar un falso negativo.
 - Composer usa cache de descargas indexada por `composer.lock`; npm mantiene
   cache por `package-lock.json`. El cache acelera instalaciones pero no sustituye
   `composer install` ni `npm ci`.
-- Todos los jobs pesados tienen timeout explicito para evitar runners colgados.
+- Todos los jobs pesados tienen timeout explicito.
+- PR y exact-main usan la misma seleccion por diff; el merge squash vuelve a
+  validar el SHA real de `main`.
 - Optimizar CI nunca significa reducir cobertura necesaria ni saltarse la
   validacion exacta de cambios sensibles a base, navegador o legado.
 
 ### Regla del README estilo BRVTAL
 
-El `README.md` de GrindFlow sigue el mismo modelo operativo de BRVTAL: es una
-**foto del ultimo deploy/estado operativo**, no el manual durable del producto.
+El `README.md` de GrindFlow es un **development dashboard de solo el deploy
+actual**, no el manual durable ni un changelog acumulativo.
 
-Debe conservar siempre, y en este orden, estas secciones:
+Debe conservar, en este orden:
 
 1. `# GrindFlow — Último deploy`
-2. badge de `GrindFlow CI`
-3. aviso de que el README cubre solo el deploy/estado actual
-4. regla permanente del snapshot
-5. `## Qué se hizo`
-6. `## Archivos modificados en este deploy`
-7. `## Validación`
-8. `## Qué sigue`
-9. `## Panorama general pendiente`
+2. badges vivos de GrindFlow CI, Sonar Quality Gate y Production Smoke
+3. `## Estado del deploy`
+4. `## Huella del cambio`
+5. `## Calidad y entrega`
+6. `## Flujo de entrega`
+7. `## Qué se hizo`
+8. `## Archivos modificados en este deploy`
+9. `## Validación`
+10. `## Qué sigue`
+11. `## Panorama general pendiente`
 
 Reglas:
 
-- Cada deploy o cambio de estado operativo relevante **reemplaza el snapshot**
-  anterior del README en vez de acumular una cronologia infinita.
-- `Qué se hizo` describe hechos del cambio actual, no planes.
-- `Archivos modificados en este deploy` enumera los archivos relevantes y su
-  motivo, sin convertir el README en un diff completo.
-- `Validación` registra SHA, CI, SonarQube Cloud, CodeRabbit y cualquier
-  validacion de produccion realmente realizada.
-- CI verde solo permite **VALIDATED IN CODE**. No se escribe DEPLOYED ni
-  VALIDATED IN PRODUCTION sin evidencia real.
-- `Qué sigue` contiene solo el siguiente frente accionable.
-- `Panorama general pendiente` conserva el backlog completo visible y ordenado
-  por **P0, P1, P2 y P3**.
-- Todo trabajo nuevo relevante debe aparecer en ese panorama con su prioridad.
-- Todo agente debe leer el README al iniciar una sesion, despues de este
-  `AGENTS.md`.
+- `scripts/readme-dashboard.py` es la fuente canonica para verificar contra el
+  base/head exacto el numero de archivos, inserciones, eliminaciones, neto, lista
+  de archivos y plan de gates.
+- `<!-- grindflow:git-delta -->` y `<!-- grindflow:gate-plan -->` son bloques
+  machine-validated; no se mantienen por intuicion.
+- La lista de archivos debe coincidir **exactamente** con el diff del PR.
+- El dashboard debe permanecer por debajo de 8 KB.
+- `Estado del deploy` separa work line, base exacta, fase y evidencia operativa.
+- `Calidad y entrega` diferencia CI, Sonar, CodeRabbit, exact-main y produccion.
+- `Flujo de entrega` conserva un Mermaid que haga visible el fan-out desde
+  preflight y la validacion exact-main tras squash merge.
+- `Qué sigue` y `Panorama general pendiente` deben hacer visibles
+  **NOW**, **NEXT**, **BLOCKED / EXTERNAL** y **LATER**.
+- Cada deploy o cambio de estado operativo relevante reemplaza el snapshot
+  anterior en vez de acumular historia.
+- CI verde solo permite **VALIDATED IN CODE**. Production Smoke o evidencia
+  equivalente es necesaria para afirmar **VALIDATED IN PRODUCTION**.
+- Un badge o marker de deploy no sustituye validacion funcional.
 - Las especificaciones, requisitos, arquitectura y decisiones durables viven en
-  `AGENTS.md` y `docs/`, no se duplican permanentemente en el README.
+  `AGENTS.md` y `docs/`.
 - Si README, codigo, CI y requisitos se contradicen, prevalece la evidencia mas
   fuerte y el README se corrige en la misma PR.
 - Migraciones de produccion, acciones destructivas y cambios de secretos nunca
   se presentan como realizados si solo fueron validados en codigo.
+
+### Regla de CodeRabbit sobre heads estables
+
+- `.coderabbit.yaml` mantiene `auto_review.enabled=true` y
+  `auto_incremental_review=false`.
+- La implementacion y correcciones deterministicas se estabilizan primero; luego
+  CI/Sonar y un unico `@coderabbitai full review` se inspeccionan en paralelo
+  sobre el mismo SHA previsto para merge.
+- Si un hallazgo obliga a cambiar codigo, se crea un nuevo head logico, se
+  revalidan los gates afectados y se vuelve a pedir full review sobre ese SHA.
+- Nunca se afirma que CodeRabbit paso cuando solo esta procesando.
+- Una demora indefinida del reviewer externo, sin finding/thread accionable y con
+  CI/Sonar canonicos verdes, se documenta como reviewer pendiente; no se inventa
+  una aprobacion.
 
 ### Regla de visibilidad de SonarQube Cloud
 
