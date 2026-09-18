@@ -44,10 +44,13 @@ siguiente deploy.
 
 ## Validación
 
-- Estado del cambio actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado del cambio actual: **VALIDATED IN CODE**.
+- PR #21 paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y
+  `GrindFlow CI / validate`; `database` no aplico por alcance.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - El dashboard de produccion ha presentado un HTTP 500; no se atribuye aun una
   causa sin evidencia del nuevo diagnostico.
-- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** para este cambio
+- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** para Diagnostics
   hasta que Hostinger reciba el merge y se observe el flujo real.
 
 ## Qué sigue
@@ -65,7 +68,7 @@ siguiente deploy.
 - **P0 — Produccion / smoke:** configurar/confirmar el secret E2E de GitHub para
   que el smoke autenticado pueda ejecutarse de extremo a extremo.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
-- **P1 — Diagnosticos:** IMPLEMENTED; pendiente VALIDATED IN CODE y produccion.
+- **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente produccion.
 - **P1 — UI:** shell visual y System admin VALIDATED IN CODE.
 - **P1 — Media Vault / ingesta:** pendiente de migracion Laravel.
 - **P1 — Procesamiento / scheduling:** pendiente.
