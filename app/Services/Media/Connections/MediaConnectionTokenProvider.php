@@ -65,8 +65,14 @@ class MediaConnectionTokenProvider
 
     private function needsRefresh(MediaConnection $connection): bool
     {
-        if ($connection->token_expires_at === null) {
+        $expiresAt = $connection->getAttribute('token_expires_at');
+
+        if ($expiresAt === null) {
             return false;
+        }
+
+        if ($expiresAt instanceof \DateTimeInterface === false) {
+            throw MediaConnectorException::requestFailed();
         }
 
         $margin = max(60, min(
@@ -77,7 +83,7 @@ class MediaConnectionTokenProvider
             3600,
         ));
 
-        return $connection->token_expires_at->timestamp
-            <= now()->addSeconds($margin)->timestamp;
+        return $expiresAt->getTimestamp()
+            <= now()->addSeconds($margin)->getTimestamp();
     }
 }
