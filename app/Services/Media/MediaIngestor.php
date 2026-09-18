@@ -5,6 +5,7 @@ namespace App\Services\Media;
 use App\Models\MediaAsset;
 use App\Models\MediaBlob;
 use App\Models\User;
+use App\Services\Media\Processing\MediaProcessingCoordinator;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
@@ -13,6 +14,10 @@ use RuntimeException;
 
 class MediaIngestor
 {
+    public function __construct(
+        private readonly MediaProcessingCoordinator $processing,
+    ) {}
+
     public function ingest(UploadedFile $file, User $actor): MediaAsset
     {
         $organizationId = app(TenantContext::class)->organizationId();
@@ -88,7 +93,7 @@ class MediaIngestor
             ->oldest('created_at')
             ->first();
 
-        return MediaAsset::query()->create([
+        $asset = MediaAsset::query()->create([
             'media_blob_id' => $blob->getKey(),
             'duplicate_of' => $canonicalAsset?->getKey(),
             'ingested_by_user_id' => $actor->getKey(),
@@ -102,5 +107,9 @@ class MediaIngestor
                 'original_extension' => $file->getClientOriginalExtension(),
             ],
         ]);
+
+        $this->processing->queueIntegrity($asset, $actor);
+
+        return $asset;
     }
 }
