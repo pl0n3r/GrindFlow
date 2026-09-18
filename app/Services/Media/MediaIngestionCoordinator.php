@@ -35,6 +35,12 @@ class MediaIngestionCoordinator
             );
         }
 
+        if ($actor->canManageOrganization($organizationId) === false) {
+            throw new AuthorizationException(
+                'The user cannot manage media ingestion for this organization.',
+            );
+        }
+
         $idempotencyKey = hash(
             'sha256',
             $sourceType."\0".$sourceRef,
@@ -71,6 +77,12 @@ class MediaIngestionCoordinator
 
     public function retry(MediaIngestion $ingestion, User $actor): MediaIngestion
     {
+        if ($actor->canManageOrganization((string) $ingestion->organization_id) === false) {
+            throw new AuthorizationException(
+                'The user cannot retry media ingestion for this organization.',
+            );
+        }
+
         if ($ingestion->status === MediaIngestion::STATUS_COMPLETED) {
             return $ingestion;
         }
