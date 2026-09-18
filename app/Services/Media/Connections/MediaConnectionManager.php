@@ -4,27 +4,46 @@ namespace App\Services\Media\Connections;
 
 use App\Models\MediaConnection;
 use App\Models\User;
+use App\Support\Security\SecretCipher;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use InvalidArgumentException;
 
 class MediaConnectionManager
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly SecretCipher $cipher,
+    ) {}
 
+    /**
+     * @param  list<string>  $scopes
+     */
     public function connectDropbox(
         User $actor,
         string $accessToken,
         string $label = 'Dropbox',
         ?string $rootPath = null,
         ?int $scanIntervalMinutes = null,
+        ?string $refreshToken = null,
+        ?\DateTimeInterface $tokenExpiresAt = null,
+        array $scopes = [],
+        ?string $accountIdentifier = null,
     ): MediaConnection {
         $organizationId = $this->organizationId($actor);
         $this->assertText($accessToken, 16_384, 'Dropbox access token');
         $this->assertText($label, 191, 'Connection label');
 
+        if ($refreshToken !== null) {
+            $this->assertText($refreshToken, 16_384, 'Dropbox refresh token');
+        }
+
         if ($rootPath !== null) {
             $this->assertText($rootPath, 1024, 'Dropbox root path');
+        }
+
+        if ($accountIdentifier !== null) {
+            $this->assertText($accountIdentifier, 191, 'Account identifier');
         }
 
         $connection = new MediaConnection;
@@ -32,15 +51,18 @@ class MediaConnectionManager
             'authorized_by_user_id' => $actor->getKey(),
             'provider' => MediaConnection::PROVIDER_DROPBOX,
             'label' => $label,
-            'credentials' => [
-                'access_token' => $accessToken,
-            ],
+            'account_identifier' => $accountIdentifier,
             'root_path' => $rootPath,
             'status' => MediaConnection::STATUS_ACTIVE,
             'scan_interval_minutes' => $this->interval($scanIntervalMinutes),
             'next_scan_at' => now(),
             'last_error' => null,
             'consecutive_failures' => 0,
+            'scopes' => array_values(array_filter(
+                $scopes,
+                static fn (mixed $scope): bool => is_string($scope) && $scope !== '',
+            )),
+            'token_expires_at' => $tokenExpiresAt,
         ]);
         $connection->save();
 
@@ -48,26 +70,45 @@ class MediaConnectionManager
             throw new AuthorizationException('Connection tenant mismatch.');
         }
 
-        return $connection;
+        $context = $connection->cryptoContext();
+
+        $connection->forceFill([
+            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
+            'refresh_ciphertext' => $refreshToken === null
+                ? null
+                : $this->cipher->encrypt($refreshToken, $context),
+        ])->save();
+
+        return $connection->refresh();
     }
 
-    public function replaceDropboxAccessToken(
+    public function replaceDropboxTokens(
         MediaConnection $connection,
         User $actor,
         string $accessToken,
+        ?string $refreshToken = null,
+        ?\DateTimeInterface $tokenExpiresAt = null,
     ): MediaConnection {
         $this->assertConnectionAccess($connection, $actor);
         $this->assertText($accessToken, 16_384, 'Dropbox access token');
+
+        if ($refreshToken !== null) {
+            $this->assertText($refreshToken, 16_384, 'Dropbox refresh token');
+        }
 
         if ($connection->provider !== MediaConnection::PROVIDER_DROPBOX) {
             throw new InvalidArgumentException('Only Dropbox token rotation is supported.');
         }
 
+        $context = $connection->cryptoContext();
+
         $connection->forceFill([
             'authorized_by_user_id' => $actor->getKey(),
-            'credentials' => [
-                'access_token' => $accessToken,
-            ],
+            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
+            'refresh_ciphertext' => $refreshToken === null
+                ? $connection->refresh_ciphertext
+                : $this->cipher->encrypt($refreshToken, $context),
+            'token_expires_at' => $tokenExpiresAt,
             'status' => MediaConnection::STATUS_ACTIVE,
             'next_scan_at' => now(),
             'last_error' => null,
