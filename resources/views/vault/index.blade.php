@@ -135,6 +135,38 @@
             </section>
 
             @if ($canUpload)
+                <section class="gf-panel gf-panel--spaced" data-cloud-connections>
+                    <header class="gf-panel__head">
+                        <h2>Cloud sources</h2>
+                        <span class="gf-appbar__meta">
+                            {{ $dropboxConnectionCount > 0 ? $dropboxConnectionCount.' Dropbox connected' : 'Dropbox ready for OAuth' }}
+                        </span>
+                    </header>
+
+                    <div class="gf-panel__body">
+                        <div class="gf-upload__footer">
+                            <p>
+                                Conecta Dropbox con OAuth para importar media sin guardar
+                                credenciales en texto plano. Los tokens quedan cifrados por
+                                organizacion y los scans usan cursores reanudables.
+                            </p>
+
+                            @if ($dropboxConnectAvailable)
+                                <a
+                                    class="gf-button gf-button--primary"
+                                    href="{{ route('organizations.connections.dropbox.authorize', ['organizationId' => $organization->id]) }}"
+                                >
+                                    {{ $dropboxConnectionCount > 0 ? 'Connect another Dropbox' : 'Connect Dropbox' }}
+                                </a>
+                            @else
+                                <span class="gf-button gf-button--ghost" aria-disabled="true">
+                                    {{ $mediaConnectionsReady ? 'Dropbox OAuth setup required' : 'Media Connections migration required' }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                </section>
+
                 <section
                     id="vault-upload"
                     class="gf-panel gf-panel--spaced"
