@@ -56,6 +56,11 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   cierre la paridad de Media Vault.
 - Browser direct upload exige CORS en el bucket para el origin de produccion y
   metodo PUT. CORS nunca sustituye la autorizacion tenant ni la URL prefirmada.
+- Admin > System expone solo readiness sanitizado del media storage: disk, driver,
+  limite y si esta configurado. Nunca muestra key, secret, bucket ni endpoint.
+- Production Smoke reutiliza ese mismo GET de System y emite `MEDIA_STORAGE_READY`
+  sin hacer un request adicional. Si esta en 0, GitHub mantiene el issue
+  `[AUTO] Media Storage Not Configured`; si pasa a 1, lo cierra automaticamente.
 
 ### Regla de pruebas E2E eficientes
 
