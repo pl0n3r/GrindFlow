@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\DiagnosticsController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
@@ -18,6 +19,10 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
         ->name('dashboard');
     Route::get('/admin/system', SystemController::class)
         ->name('admin.system');
+    Route::get('/admin/diagnostics', [DiagnosticsController::class, 'index'])
+        ->name('admin.diagnostics');
+    Route::get('/admin/diagnostics.json', [DiagnosticsController::class, 'json'])
+        ->name('admin.diagnostics.json');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
 });
