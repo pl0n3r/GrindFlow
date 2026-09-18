@@ -13,6 +13,10 @@ flujo antiguo basado en Next.js/Docker sigue documentado en
 - `.env` y secretos viven solo en el servidor.
 - Un deploy de codigo **no ejecuta migraciones de produccion automaticamente**.
 - Merge, deploy y validacion en produccion son estados distintos.
+- El Redeploy de Git en hPanel actualiza archivos, pero no se asume que ejecute
+  comandos Artisan o Composer del repositorio.
+- GrindFlow invalida automaticamente caches Laravel cuando detecta cambios en
+  rutas/config/bootstrap/composer mediante `ReleaseCacheGuard`.
 
 ## Primer arranque
 
@@ -54,6 +58,10 @@ Para incluir un smoke test HTTP del health endpoint:
 ```bash
 SMOKE_URL="https://www.grindflow.com.co" bash scripts/deploy-hostinger.sh
 ```
+
+Cuando hay acceso operativo para ejecutarlo, el script sigue siendo la
+preparacion completa recomendada. Si el deploy ocurre solo mediante Git/hPanel,
+`ReleaseCacheGuard` evita que queden rutas/config/vistas de una revision anterior.
 
 El script:
 
