@@ -11,7 +11,8 @@ El canal por defecto escribe en STDERR y en un log diario:
 
 `storage/logs/laravel-YYYY-MM-DD.log`
 
-Este es el log interno completo de Laravel. No se expone por HTTP.
+Este es el log interno completo de Laravel. No se expone por HTTP ni se publica
+en GitHub.
 
 ### GrindFlow Diagnostics
 
@@ -28,7 +29,7 @@ La entrada incluye:
 - mensaje sanitizado;
 - archivo y linea;
 - metodo, ruta y nombre de ruta;
-- user ID y organization ID cuando estan disponibles;
+- user ID y organization ID cuando estan disponibles en el archivo privado;
 - trace de archivos/lineas/llamadas sin argumentos.
 
 No se guardan request bodies, cookies, headers, passwords, tokens, API keys ni
@@ -42,10 +43,44 @@ esta limitada a los 50 incidentes mas recientes.
 Solo un usuario con `platform_role=admin` puede abrir:
 
 - `/admin/diagnostics` para la vista humana;
-- `/admin/diagnostics.json` para consumo automatizado.
+- `/admin/diagnostics.json` para consumo automatizado autenticado.
 
-El JSON existe para que el smoke de produccion pueda adjuntar contexto util a
-GitHub Actions cuando una ruta autenticada falla.
+El JSON es la fuente del smoke y del puente de diagnosticos. Nunca se expone el
+archivo JSONL crudo.
+
+## Puente on-demand para agentes
+
+Existe un issue durable llamado:
+
+`[AUTO] Production Diagnostics Bridge`
+
+Un operador/agente autorizado puede escribir exactamente:
+
+`/production-diagnostics`
+
+El workflow `GrindFlow Production Diagnostics`:
+
+1. valida que el comentario provenga de OWNER, MEMBER o COLLABORATOR;
+2. inicia sesion con la cuenta sintetica E2E mediante el secret de GitHub;
+3. consulta `/admin/diagnostics.json`;
+4. elimina user ID, organization ID, emails, IPs, UUIDs secundarios y tokens
+   largos del payload de handoff;
+5. conserva incident ID, excepcion, mensaje sanitizado, ruta, ubicacion y trace;
+6. sube un artifact `production-diagnostics-<run_id>` con retencion de 3 dias;
+7. publica en el issue solo el run ID y el nombre del artifact, nunca el payload.
+
+Esto permite que un agente con acceso a GitHub recupere el artifact y haga debug
+sin SSH y sin copiar manualmente archivos desde Hostinger.
+
+## Production Smoke
+
+Cuando el smoke de produccion falla, su salida diagnostica tambien se conserva
+como artifact corto:
+
+`production-smoke-diagnostics-<run_id>`
+
+El issue `[AUTO] Production Smoke Failure` contiene solo el enlace/run y nombre
+del artifact. El payload no debe copiarse al cuerpo de un issue publico.
 
 ## Incident ID
 
@@ -54,12 +89,13 @@ fallo exacto en Diagnostics sin mostrar detalles tecnicos al usuario final.
 
 ## Flujo de depuracion
 
-1. Revisar el job `GrindFlow Production Smoke`.
-2. Si una ruta autenticada falla, leer los incidentes que el job imprime desde
-   `/admin/diagnostics.json`.
-3. Correlacionar por incident ID y revisar excepcion, ubicacion y trace.
-4. Usar el panel `Admin > Diagnostics` si hace falta inspeccion adicional.
-5. Recurrir al log tecnico de Laravel o SSH solo si la informacion sanitizada no
+1. Revisar `[AUTO] Production Smoke Failure` si existe.
+2. Si se necesita una lectura fresca, comentar `/production-diagnostics` en el
+   bridge.
+3. Recuperar el artifact corto del run indicado.
+4. Correlacionar por incident ID y revisar excepcion, ubicacion, ruta y trace.
+5. Usar `Admin > Diagnostics` si hace falta inspeccion humana adicional.
+6. Recurrir al log tecnico de Laravel o SSH solo si la informacion sanitizada no
    alcanza para aislar la causa.
 
 El objetivo es que los errores de produccion lleguen con contexto util, no con
