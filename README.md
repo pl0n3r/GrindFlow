@@ -11,62 +11,55 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Google Drive OAuth/refresh de PR #54 quedo **VALIDATED IN CODE** y fue
-  fusionado a `main` como `8047af4e40cf0629050cc0ed6c8b66f9f9c1b2a0`.
-- Se implemento el siguiente slice P1: Google Drive Changes API con scans
+- Google Drive OAuth/refresh de PR #54 quedo **VALIDATED IN CODE** y fue fusionado
+  a `main` como `8047af4e40cf0629050cc0ed6c8b66f9f9c1b2a0`.
+- Se implemento el siguiente slice P1: Google Drive Changes API + scans
   incrementales durables.
-- El scanner captura `changes.getStartPageToken` **antes** del listado inicial
-  `files.list`, cerrando la ventana donde un cambio durante el bootstrap podria
-  perderse.
-- `media_connections.cursor` reutiliza su campo TEXT existente y guarda JSON
-  versionado con modo `bootstrap` o `changes`; no hay migracion nueva.
-- Durante bootstrap, `files.list.nextPageToken` solo continua la paginacion del
-  listado inicial y nunca se trata como cursor incremental.
-- Al terminar el bootstrap, el scanner cambia al start token capturado y consume
-  `changes.list`.
-- Mientras Changes API entrega `nextPageToken`, ese token se persiste tras cada
-  pagina procesada; al final se guarda `newStartPageToken` para el siguiente scan.
-- El page budget es compartido entre bootstrap y changes. Si se agota, la
-  conexion reanuda en un minuto desde el cursor exacto sin reiniciar el listado.
-- Cambios removed, archivos trashed, no descargables o que no sean imagen/video
-  se omiten.
-- Las conexiones con root folder aplican tambien a Changes API el mismo filtro
-  de parent directo usado por el bootstrap.
-- Nuevas conexiones Google Drive nacen `active` y con `next_scan_at`; ya pueden
-  entrar al scheduler.
-- El refresh de tokens ahora conserva `status` y `next_scan_at` para Dropbox y
-  Google en vez de alterar el lifecycle de la conexion.
-- Vault informa que Google usa bootstrap + Changes API con cursor durable.
-- Se agregaron pruebas del endpoint start-page-token, paginacion de cambios,
-  filtro de cambios, avance a newStartPageToken, orden start-token-before-bootstrap
-  y reanudacion por page budget.
-- CI sigue usando HTTP/storage/queue fakes; no se toca Google Drive real ni
-  produccion.
+- El primer scan captura `changes.getStartPageToken` **antes** de comenzar el
+  baseline con `files.list`, cerrando la ventana donde cambios concurrentes
+  podrian perderse durante un Drive grande.
+- El cursor de Google Drive ahora es JSON versionado con dos fases:
+  `bootstrap` y `changes`.
+- Los `nextPageToken` de `files.list` quedan confinados al bootstrap y nunca se
+  reutilizan como cursor incremental.
+- Durante Changes API, cada `nextPageToken` se persiste despues de procesar la
+  pagina; al agotar el feed se guarda `newStartPageToken`.
+- El presupuesto de paginas es compartido entre baseline y changes. Si se agota,
+  el scan conserva el cursor exacto y se reprograma para un minuto despues.
+- Changes API ignora archivos removidos, enviados a papelera, no descargables o
+  que no sean imagen/video.
+- Las conexiones Google Drive ahora nacen `active` con `next_scan_at` y pueden
+  entrar al scheduler igual que Dropbox.
+- El refresh de tokens conserva el lifecycle existente de la conexion, evitando
+  pausar o reactivar accidentalmente un provider durante una rotacion.
+- Vault informa que Google Drive usa bootstrap inicial + Changes API.
+- Se agregaron pruebas de bootstrap, orden start-token-before-baseline,
+  transición a Changes, `newStartPageToken`, page-budget continuation y
+  scheduler activo.
+- CI sigue usando HTTP/storage/queue fakes; no se llama Google Drive real ni se
+  toca produccion.
+- La migracion `media_connections`, credenciales reales, redirect de Google y
+  verificacion del scope `drive.readonly` siguen siendo acciones operacionales.
 
 ## Archivos modificados en este deploy
 
-- `app/Services/Media/Connectors/GoogleDriveChangeListing.php` — resultado de pagina Changes API.
-- `app/Services/Media/Connections/GoogleDriveScanCursor.php` — cursor JSON versionado.
-- `app/Services/Media/Connectors/GoogleDriveMediaAdapter.php` — getStartPageToken + changes.list.
-- `app/Services/Media/Connections/MediaConnectionScanner.php` — bootstrap + incremental Google.
-- `app/Services/Media/Connections/MediaConnectionManager.php` — scheduling Google activo y refresh lifecycle-safe.
-- `resources/views/vault/index.blade.php` — estado incremental Google visible.
-- `tests/Feature/GoogleDriveMediaAdapterTest.php` — contrato HTTP Changes API.
-- `tests/Feature/GoogleDriveIncrementalScanTest.php` — scanner durable end-to-end.
-- `tests/Feature/GoogleDriveOAuthConnectionTest.php` — expectativas de conexion activa.
-- `docs/MEDIA-CONNECTORS.md`, `docs/REQUIREMENTS.md` y `AGENTS.md` — reglas durables.
+- `app/Services/Media/Connectors/GoogleDriveChangeListing.php` — resultado seguro de Changes API.
+- `app/Services/Media/Connections/GoogleDriveScanCursor.php` — cursor versionado bootstrap/changes.
+- `app/Services/Media/Connectors/GoogleDriveMediaAdapter.php` — start token + changes.list.
+- `app/Services/Media/Connections/MediaConnectionScanner.php` — baseline + incremental scans.
+- `app/Services/Media/Connections/MediaConnectionManager.php` — Google activo/scheduled y lifecycle preservado.
+- `tests/Feature/GoogleDriveChangesScanTest.php` — lifecycle incremental completo.
+- `tests/Feature/GoogleDriveOAuthConnectionTest.php` — expectativas active/scheduled.
+- `resources/views/vault/index.blade.php` — estado visible del scan incremental.
+- `docs/MEDIA-CONNECTORS.md`, `docs/REQUIREMENTS.md` y `AGENTS.md` — contrato durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual del Google Drive Changes API slice: **VALIDATED IN CODE**.
-- El head funcional `889ecb2089ad1603b6018aff6a470049ee868185` paso
-  `fast`, `tests`, `php-quality`, browser y `GrindFlow CI / validate`;
-  MariaDB/legacy fueron correctamente omitidos por no aplicar al diff.
-- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
-  0.0% duplicacion en codigo nuevo.
-- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
-- Google adapter + OAuth/refresh + Dropbox end-to-end: **VALIDATED IN CODE**.
+- Estado actual del Google Drive Changes API slice: **IMPLEMENTED**, pendiente de
+  `GrindFlow CI / validate`, SonarQube y CodeRabbit.
+- Google Drive adapter + OAuth/refresh + Dropbox end-to-end:
+  **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
 - No se usan credenciales Google reales.
 - Produccion no se modifica desde CI.
@@ -74,12 +67,14 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Mantener pendiente la migracion operacional de `media_connections` y la
-  configuracion Google real hasta aprobacion explicita.
-- Registrar el redirect exacto `/connections/google-drive/callback` y completar
-  verificacion/compliance del scope `drive.readonly` como accion operacional.
-- Despues avanzar al siguiente bloque P1 del pipeline general de procesamiento u
-  observabilidad operativa, segun el backlog vigente.
+- Pasar fast, PHPUnit, php-quality, MariaDB, browser y `GrindFlow CI / validate`.
+- Resolver SonarQube/CodeRabbit sin silenciar hallazgos y fusionar por squash.
+- Mantener pendiente la migracion operacional de `media_connections` hasta
+  aprobacion explicita.
+- Registrar el redirect exacto `/connections/google-drive/callback`, configurar
+  credenciales reales y completar verificacion/compliance de `drive.readonly`.
+- Despues validar el primer scan contra una cuenta Google Drive real en un entorno
+  controlado antes de declarar produccion lista.
 
 ## Panorama general pendiente
 
@@ -89,11 +84,12 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
-  Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
+- **P1 — Media Vault / ingesta:** Dropbox end-to-end + Google adapter +
+  OAuth/refresh VALIDATED IN CODE; Changes API IMPLEMENTED; pendientes
+  validacion de este slice y configuracion/migracion/prueba real de produccion.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
-- **P1 — Procesamiento / scheduling:** Dropbox + Google incremental scheduling
-  VALIDATED IN CODE; pipeline general sigue pendiente.
+- **P1 — Procesamiento / scheduling:** Dropbox scheduling VALIDATED IN CODE;
+  Google incremental scheduling IMPLEMENTED, pendiente validacion.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
 - **P2 — Integraciones / distribucion:** pendiente.
