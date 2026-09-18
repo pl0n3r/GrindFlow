@@ -12,7 +12,7 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-003 · ffprobe metadata** | review fixes IMPLEMENTED · revalidación pendiente |
+| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN CODE · CI #228 |
 | Base exacta | ✅ **main** | `62499a5963218db53239c54a5c302caf79e38324` |
 | Produccion actual | ✅ **smoke verde** | Production Smoke #31 sobre la base exacta |
 | Migraciones | ✅ **0 pendientes** | no hay cambios de schema en este slice |
@@ -94,9 +94,9 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **REVALIDATION PENDING** tras corregir los hallazgos de CodeRabbit en el head funcional `c0325c0d70db87be3e9133189e53af939a6233b5`.
-- CI #221 validó la versión previa; el head con fixes de review exige una matriz completa nueva antes del merge.
-- CodeRabbit reportó 5 hallazgos accionables; todos están corregidos y pendientes de re-review.
+- Estado actual: **VALIDATED IN CODE** tras corregir los hallazgos de CodeRabbit en el head funcional `c0325c0d70db87be3e9133189e53af939a6233b5`.
+- GrindFlow CI #228 pasó fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate.
+- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots sobre el PR actualizado.
 - Las pruebas usan Laravel Process fakes y bloquean procesos no simulados.
 - Antes del merge se exige matriz completa, Sonar, revisión externa aplicable y recheck de `main`.
 
@@ -113,7 +113,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Media processing | `probe_v2` + ffprobe hardening implementado; revalidación pendiente |
+| **NOW** | Media processing | `probe_v2` + ffprobe hardening VALIDATED IN CODE |
 | **NEXT** | Derivados | thumbnails/previews/normalización con FFmpeg |
 | **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
 | **BLOCKED / EXTERNAL** | Hosting / storage | ffprobe real y S3-compatible requieren configuración externa |
