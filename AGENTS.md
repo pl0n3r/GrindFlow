@@ -52,6 +52,22 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - La tabla de ingestas puede desplegarse antes que sus consumidores. Ninguna ruta
   actual debe depender de ella hasta que la migracion este aplicada en produccion.
 
+### Regla de handoff de fuentes de media
+
+- Todo conector nuevo que ya tenga un objeto staged debe entregar su trabajo al
+  pipeline mediante `StagedMediaSource` + `MediaIngestionCoordinator::queueSource`.
+- Los conectores no crean `media_blobs`, `media_assets` ni jobs de ingesta por
+  su cuenta; esa logica permanece centralizada para conservar idempotencia,
+  deduplicacion, tenant isolation y retries.
+- El `source_ref` debe ser estable y versionado cuando el proveedor exponga una
+  revision/etag; el idempotency key se deriva de `source_type + source_ref`.
+- El DTO rechaza campos vacios, longitudes fuera del schema y byte sizes no
+  positivos antes de tocar la cola o la base.
+- Metadata especifica del proveedor viaja como JSON trazable, sin credenciales,
+  tokens ni secretos.
+- `deleteAfterIngest` solo se activa para objetos staged temporales que puedan
+  eliminarse despues de una ingesta confirmada.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
