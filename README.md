@@ -42,15 +42,17 @@ siguiente deploy.
 - Schema de produccion: **CURRENT**, confirmado `1 -> 0`.
 - Production Smoke: **RECOVERED**, issue #44 cerrado automaticamente.
 - Media ingestion jobs base: **VALIDATED IN CODE**.
-- Estado del handoff generico: **IMPLEMENTED**, pendiente de
-  `GrindFlow CI / validate`.
+- Estado del handoff generico: **VALIDATED IN CODE**.
+- PR #46 paso `fast`, `php-quality`, `tests` y `validate`; `database`, `browser`
+  y `legacy` quedaron correctamente `skipped` por el selector de CI.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - No hay migracion nueva en este PR.
 - No hay llamadas a APIs externas, secretos ni escrituras de contenido en
   produccion.
 
 ## Qué sigue
 
-- Pasar CI/Sonar del handoff y fusionarlo.
+- Fusionar PR #46 y dejar que exact-main CI/Production Smoke confirmen el estado.
 - Implementar el primer adaptador real sobre `StagedMediaSource`, sin duplicar
   logica de tenant/idempotencia/deduplicacion.
 - Mantener object storage #40 como bloqueo externo independiente.
@@ -63,8 +65,8 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** jobs VALIDATED IN CODE y schema current en
-  produccion; handoff generico IMPLEMENTED; pendientes adaptadores reales.
+- **P1 — Media Vault / ingesta:** jobs y handoff generico VALIDATED IN CODE;
+  schema current en produccion; pendientes adaptadores reales.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
