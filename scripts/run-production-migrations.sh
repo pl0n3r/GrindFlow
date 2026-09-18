@@ -51,6 +51,10 @@ with open(output_path, "w", encoding="utf-8") as handle:
 PY
 }
 
+curl_read() {
+  curl     --fail     --silent     --show-error     --retry 4     --retry-all-errors     --retry-delay 2     --connect-timeout 10     --max-time 30     "$@"
+}
+
 extract_login_csrf() {
   python3 - "$login_html" <<'PY'
 from html.parser import HTMLParser
@@ -159,11 +163,23 @@ print(parser.token)
 PY
 }
 
-curl   --fail   --silent   --show-error   --max-time 20   --cookie-jar "$cookie_jar"   "$BASE_URL/login" > "$login_html"
+if ! curl_read   --cookie-jar "$cookie_jar"   "$BASE_URL/login" > "$login_html"; then
+  write_result false unknown unknown "Login page was unreachable after bounded retries."
+  printf 'ERROR: production login page is unreachable.\n' >&2
+  exit 1
+fi
 
-login_token="$(extract_login_csrf)"
+if ! login_token="$(extract_login_csrf)"; then
+  write_result false unknown unknown "Unable to read the login CSRF token."
+  printf 'ERROR: login CSRF token is unavailable.\n' >&2
+  exit 1
+fi
 
-login_status="$(curl   --silent   --show-error   --max-time 20   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$login_token"   --data-urlencode "email=$E2E_USER_EMAIL"   --data-urlencode "password=$E2E_USER_PASSWORD"   "$BASE_URL/login")"
+if ! login_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 30   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$login_token"   --data-urlencode "email=$E2E_USER_EMAIL"   --data-urlencode "password=$E2E_USER_PASSWORD"   "$BASE_URL/login")"; then
+  write_result false unknown unknown "Synthetic production login request failed."
+  printf 'ERROR: synthetic production login request failed.\n' >&2
+  exit 1
+fi
 
 case "$login_status" in
   302|303) ;;
@@ -174,7 +190,11 @@ case "$login_status" in
     ;;
 esac
 
-system_status="$(curl   --silent   --show-error   --max-time 20   --cookie "$cookie_jar"   --output "$system_before"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"
+if ! system_status="$(curl_read   --cookie "$cookie_jar"   --output "$system_before"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"; then
+  write_result false unknown unknown "Admin System was unreachable after bounded retries."
+  printf 'ERROR: Admin System is unreachable.\n' >&2
+  exit 1
+fi
 
 if [[ "$system_status" != "200" ]]; then
   write_result false unknown unknown "Admin System is unavailable."
@@ -200,38 +220,55 @@ if [[ "$pending_before" != "$EXPECTED_PENDING" ]]; then
   exit 1
 fi
 
-migration_token="$(extract_migration_csrf "$system_before")"
+if ! migration_token="$(extract_migration_csrf "$system_before")"; then
+  write_result false "$pending_before" unknown "Unable to read the migration CSRF token."
+  printf 'ERROR: migration CSRF token is unavailable.\n' >&2
+  exit 1
+fi
 
-migration_status="$(curl   --silent   --show-error   --max-time 90   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$migration_token"   "$BASE_URL/admin/system/migrations")"
+set +e
+migration_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 120   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$migration_token"   "$BASE_URL/admin/system/migrations")"
+migration_exit=$?
+set -e
 
-case "$migration_status" in
-  302|303) ;;
-  *)
-    write_result false "$pending_before" unknown "Migration endpoint did not return a successful redirect."
-    printf 'ERROR: migration endpoint returned HTTP %s.\n' "$migration_status" >&2
-    exit 1
-    ;;
-esac
-
-system_after_status="$(curl   --silent   --show-error   --max-time 20   --cookie "$cookie_jar"   --output "$system_after"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"
+# Never retry the migration POST. If its response was lost, verify the schema
+# state below before deciding whether the operation succeeded.
+if ! system_after_status="$(curl_read   --cookie "$cookie_jar"   --output "$system_after"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"; then
+  write_result false "$pending_before" unknown "Migration request finished, but post-migration verification was unreachable."
+  printf 'ERROR: post-migration Admin System is unreachable.\n' >&2
+  exit 1
+fi
 
 if [[ "$system_after_status" != "200" ]]; then
-  write_result false "$pending_before" unknown "Migration ran, but post-migration verification could not load Admin System."
+  write_result false "$pending_before" unknown "Migration request finished, but post-migration verification could not load Admin System."
   printf 'ERROR: post-migration Admin System returned HTTP %s.\n' "$system_after_status" >&2
   exit 1
 fi
 
 if ! pending_after="$(extract_pending_count "$system_after")"; then
-  write_result false "$pending_before" unknown "Migration ran, but pending migration count could not be verified."
+  write_result false "$pending_before" unknown "Migration request finished, but pending migration count could not be verified."
   printf 'ERROR: post-migration pending count is unavailable.\n' >&2
   exit 1
 fi
 
-if [[ "$pending_after" != "0" ]]; then
-  write_result false "$pending_before" "$pending_after" "Migration endpoint completed, but pending migrations remain."
-  printf 'ERROR: %s migration(s) remain pending after execution.\n' "$pending_after" >&2
+if [[ "$pending_after" == "0" ]]; then
+  if (( migration_exit != 0 )); then
+    printf 'WARN: migration response was interrupted, but schema verification reached zero pending migrations.\n' >&2
+  elif [[ "$migration_status" != "302" && "$migration_status" != "303" ]]; then
+    printf 'WARN: migration endpoint returned HTTP %s, but schema verification reached zero pending migrations.\n' "$migration_status" >&2
+  fi
+
+  write_result true "$pending_before" "$pending_after" "Approved production migration completed and schema is current."
+  printf 'PASS: production migrations %s -> %s.\n' "$pending_before" "$pending_after"
+  exit 0
+fi
+
+if (( migration_exit != 0 )); then
+  write_result false "$pending_before" "$pending_after" "Migration request failed or timed out and pending migrations remain."
+  printf 'ERROR: migration request failed with curl exit %s; %s migration(s) remain pending.\n'     "$migration_exit" "$pending_after" >&2
   exit 1
 fi
 
-write_result true "$pending_before" "$pending_after" "Approved production migration completed and schema is current."
-printf 'PASS: production migrations %s -> %s.\n' "$pending_before" "$pending_after"
+write_result false "$pending_before" "$pending_after" "Migration endpoint completed, but pending migrations remain."
+printf 'ERROR: migration endpoint returned HTTP %s and %s migration(s) remain pending.\n'   "$migration_status" "$pending_after" >&2
+exit 1

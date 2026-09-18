@@ -213,6 +213,10 @@ Reglas:
 - El bridge de migracion debe abortar sin cambios si produccion no reporta
   exactamente una migracion pendiente. Un pending count distinto exige revision
   humana antes de ampliar la aprobacion.
+- El bridge puede reintentar GETs de preflight/verificacion ante fallos transitorios
+  de red, pero **nunca reintenta automaticamente el POST de migracion**. Si la
+  respuesta del POST se pierde, debe verificar el pending count antes de decidir
+  si la migracion termino.
 - CI, Production Smoke y el bridge de Diagnostics nunca ejecutan migraciones.
   El bridge de migracion es una accion operacional separada y serializada.
 - Si falta el secret `PRODUCTION_E2E_PASSWORD`, el workflow debe mantener visible
