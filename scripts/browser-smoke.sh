@@ -50,12 +50,33 @@ capture_page() {
 
   local profile
   profile="$(mktemp -d)"
+
   local dom="$ARTIFACT_DIR/$name.html"
   local screenshot="$ARTIFACT_DIR/$name.png"
 
-  "$CHROME"     --headless=new     --no-sandbox     --disable-dev-shm-usage     --disable-gpu     --hide-scrollbars     --window-size=1440,1000     --virtual-time-budget=2500     --user-data-dir="$profile"     --dump-dom     "$BASE_URL$path" > "$dom"
+  "$CHROME" \
+    --headless=new \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --hide-scrollbars \
+    --window-size=1440,1000 \
+    --virtual-time-budget=2500 \
+    --user-data-dir="$profile" \
+    --dump-dom \
+    "$BASE_URL$path" > "$dom"
 
-  "$CHROME"     --headless=new     --no-sandbox     --disable-dev-shm-usage     --disable-gpu     --hide-scrollbars     --window-size=1440,1000     --virtual-time-budget=2500     --user-data-dir="$profile"     --screenshot="$screenshot"     "$BASE_URL$path" >/dev/null 2>&1
+  "$CHROME" \
+    --headless=new \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --hide-scrollbars \
+    --window-size=1440,1000 \
+    --virtual-time-budget=2500 \
+    --user-data-dir="$profile" \
+    --screenshot="$screenshot" \
+    "$BASE_URL$path" >/dev/null 2>&1
 
   rm -rf "$profile"
 
@@ -64,15 +85,32 @@ capture_page() {
     assert_contains "$dom" "$expected"
   done
 
-  printf 'PASS %-12s %s\n' "$name" "$path"
+  printf 'PASS %-16s %s\n' "$name" "$path"
 }
 
-capture_page   "landing"   "/"   "Control operativo"   "Laravel core online"   "css/grindflow.css"
+capture_page \
+  "landing" \
+  "/" \
+  "Control operativo" \
+  "Laravel core online" \
+  "css/grindflow.css"
 
-capture_page   "login"   "/login"   "Bienvenido."   "Entrar al workspace"   "css/grindflow.css"
+capture_page \
+  "login" \
+  "/login" \
+  "Bienvenido." \
+  "Entrar al workspace" \
+  "css/grindflow.css"
 
 headers="$ARTIFACT_DIR/dashboard-guest-headers.txt"
-curl   --silent   --show-error   --max-redirs 0   --dump-header "$headers"   --output /dev/null   "$BASE_URL/dashboard" || true
+
+curl \
+  --silent \
+  --show-error \
+  --max-redirs 0 \
+  --dump-header "$headers" \
+  --output /dev/null \
+  "$BASE_URL/dashboard" || true
 
 if ! grep -Eq '^HTTP/.* 30[12378]' "$headers"; then
   echo "ERROR: guest dashboard request did not redirect." >&2
@@ -80,21 +118,16 @@ if ! grep -Eq '^HTTP/.* 30[12378]' "$headers"; then
   exit 1
 fi
 
-if ! grep -Eiq '^location:[[:space:]]+.*/login[[:space:]]*
+if ! grep -Eiq '^location:[[:space:]]+.*/login[[:space:]]*$' "$headers"; then
   echo "ERROR: guest dashboard redirect did not target /login." >&2
   cat "$headers" >&2
   exit 1
 fi
 
-capture_page   "dashboard-guest"   "/dashboard"   "Bienvenido."   "Entrar al workspace"
-
-echo "Real browser smoke tests passed."
- "$headers"; then
-  echo "ERROR: guest dashboard redirect did not target /login." >&2
-  cat "$headers" >&2
-  exit 1
-fi
-
-capture_page   "dashboard-guest"   "/dashboard"   "Bienvenido."   "Entrar al workspace"
+capture_page \
+  "dashboard-guest" \
+  "/dashboard" \
+  "Bienvenido." \
+  "Entrar al workspace"
 
 echo "Real browser smoke tests passed."
