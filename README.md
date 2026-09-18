@@ -11,48 +11,63 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se extendio el browser smoke a un flujo autenticado real sin Selenium/Playwright.
-- CI crea una SQLite desechable, aplica migraciones y siembra un usuario,
-  organizacion y membership E2E solo en entorno testing/local.
-- Chrome obtiene CSRF y cookie de sesion reales desde Laravel, envia el login
-  desde una pagina temporal same-origin y termina en `/dashboard`.
-- El dashboard autenticado debe mostrar el usuario y la organizacion E2E.
-- La clave E2E se genera aleatoriamente en cada run y no se guarda en el repo.
-- No se agrega ninguna ruta/backdoor E2E a la aplicacion.
+- El browser smoke autenticado quedo fusionado en `main`.
+- Chrome valida landing, login, redirect invitado y dashboard autenticado con
+  CSRF/session reales.
+- CI crea identidad E2E desechable y una organizacion temporal sin rutas de bypass.
+- MariaDB 11.4 sigue siendo el gate autoritativo para migraciones/invariantes.
+- El frontend ya no muestra copy PostgreSQL/RLS del stack legado.
+- El exact-main CI del commit `2de0d26334bc6c7346627adf1705de9a144df330`
+  paso completo, incluido `GrindFlow CI / validate`.
+- SonarQube Cloud paso con 0 issues y 0 Security Hotspots en la entrega.
+- No hay PRs abiertas.
 
 ## Archivos modificados en este deploy
 
-- `database/seeders/E2eSeeder.php` — dataset E2E protegido por environment guard.
-- `scripts/browser-smoke.sh` — login real y dashboard autenticado con Chrome.
-- `.github/workflows/grindflow-ci.yml` — migracion/seed E2E en SQLite desechable.
+- `database/seeders/E2eSeeder.php` — identidad/organizacion E2E protegidas por entorno.
+- `scripts/browser-smoke.sh` — login real y dashboard autenticado.
+- `.github/workflows/grindflow-ci.yml` — seed y migracion E2E desechables.
+- `resources/views/auth/login.blade.php` — copy MariaDB.
+- `resources/views/dashboard.blade.php` — copy MariaDB.
 - `docs/PRUEBAS.md` — contrato de browser autenticado.
-- `docs/REQUIREMENTS.md` — verificacion E2E de GF-NFR-005.
-- `README.md` — snapshot operativo.
+- `docs/REQUIREMENTS.md` — verificacion de GF-NFR-005.
+- `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** en `test/authenticated-browser-e2e`.
-- Browser autenticado, MariaDB, PHPUnit, Pint/Larastan, SonarQube Cloud y `GrindFlow CI / validate` pasaron.
-- El seeder rechaza ejecucion fuera de `local`/`testing`.
-- La prueba no toca MariaDB de produccion ni Hostinger.
+- Estado actual: **VALIDATED IN CODE**.
+- Exact-main: `2de0d26334bc6c7346627adf1705de9a144df330`.
+- `fast`, `php-quality`, `tests`, `database`, `browser`, `legacy` y
+  `validate`: verdes.
+- SonarQube Cloud: Quality Gate verde, 0 issues, 0 Security Hotspots.
+- No se ejecuto ninguna migracion destructiva ni accion contra produccion.
+- El dominio publico no pudo verificarse desde el verificador disponible, por lo
+  que no se marca DEPLOYED ni VALIDATED IN PRODUCTION.
 
 ## Qué sigue
 
-- Validar y fusionar el browser autenticado.
-- Continuar con deploy/validacion de produccion en Hostinger.
-- Mantener el browser gate como contrato base para los nuevos modulos visuales.
+- Configurar manualmente branch protection/ruleset para exigir
+  `GrindFlow CI / validate` en `main`.
+- Preparar el siguiente modulo Laravel: Media Vault / ingesta generica con
+  aislamiento tenant y paridad trazable.
+- Validar el deploy Hostinger y MariaDB de produccion solo con evidencia real.
 
 ## Panorama general pendiente
 
-- **P0 — MariaDB:** VALIDATED IN CODE; falta produccion.
-- **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta produccion.
-- **P0 — Branch protection:** required `GrindFlow CI / validate` pendiente.
+- **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`;
+  la conexion actual permite leer la configuracion pero no modificarla.
+- **P0 — Produccion / DB:** configurar/validar MariaDB real en Hostinger.
+- **P0 — Deploy:** confirmar que Hostinger recibio el `main` Laravel y validar
+  landing/login/dashboard en produccion.
+- **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta validacion en produccion.
 - **P1 — UI:** shell visual y copy MariaDB VALIDATED IN CODE.
 - **P1 — Browser invitado:** VALIDATED IN CODE.
-- **P1 — Browser autenticado:** VALIDATED IN CODE; pendiente de merge/exact-main CI.
-- **P1 — Media Vault / ingesta:** pendiente.
+- **P1 — Browser autenticado:** VALIDATED IN CODE y fusionado.
+- **P1 — Media Vault / ingesta:** pendiente de migracion Laravel.
 - **P1 — Procesamiento / scheduling:** pendiente.
+- **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P2 — Integraciones / distribucion:** pendiente.
 - **P2 — Trafico / atribucion:** pendiente.
 - **P2 — Finanzas:** pendiente.
 - **P3 — Retiro legado:** solo con paridad Laravel.
+- **P3 — Simplificacion CI:** retirar `legacy` despues de GF-MIG-004.
