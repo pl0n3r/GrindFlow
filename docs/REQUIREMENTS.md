@@ -104,8 +104,9 @@ public landing page, authentication and authenticated dashboard.
 
 **Verification:** Laravel feature tests assert the main visual routes render
 their expected shell and the shared stylesheet exists. The CI browser gate also
-boots Laravel and opens landing, login and the guest dashboard flow in a real
-headless Chrome instance.
+boots Laravel and verifies landing, login, guest dashboard redirect and an
+authenticated dashboard session in a real headless Chrome instance with
+disposable E2E identity data.
 
 
 ## Security requirements
