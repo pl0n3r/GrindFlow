@@ -51,7 +51,9 @@ siguiente deploy.
 
 ## Validación
 
-- Diagnostics base (PR #21): **VALIDATED IN CODE** y fusionado a `main`.
+- Diagnostics base (PR #21): **VALIDATED IN CODE** y fusionado a `main` como `33cd7bc972c6c46c96d82f7dfa316903db1019ac`.
+- El CI exacto de `main` para ese merge paso correctamente.
+- Production Smoke run #2 confirmo que el smoke autenticado sigue bloqueado porque falta el secret `PRODUCTION_E2E_PASSWORD`.
 - Reporter de incidentes a GitHub: **IMPLEMENTED**, pendiente de CI del PR actual.
 - PR #21 paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y
   `GrindFlow CI / validate`; `database` no aplico por alcance.
