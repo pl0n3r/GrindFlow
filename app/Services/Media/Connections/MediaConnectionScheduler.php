@@ -6,11 +6,16 @@ use App\Jobs\ScanMediaConnection;
 use App\Models\MediaConnection;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
 class MediaConnectionScheduler
 {
     public function dispatchDue(): int
     {
+        if (Schema::hasTable('media_connections') === false) {
+            return 0;
+        }
+
         $batchSize = max(1, min(
             (int) config('grindflow.media.connector_scan_batch_size', 20),
             100,
