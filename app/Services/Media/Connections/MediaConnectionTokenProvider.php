@@ -117,10 +117,8 @@ class MediaConnectionTokenProvider
     private function refreshMarginConfigKey(MediaConnection $connection): string
     {
         return match ($connection->provider) {
-            MediaConnection::PROVIDER_DROPBOX =>
-                'grindflow.connectors.dropbox.refresh_margin_seconds',
-            MediaConnection::PROVIDER_GOOGLE_DRIVE =>
-                'grindflow.connectors.google_drive.refresh_margin_seconds',
+            MediaConnection::PROVIDER_DROPBOX => 'grindflow.connectors.dropbox.refresh_margin_seconds',
+            MediaConnection::PROVIDER_GOOGLE_DRIVE => 'grindflow.connectors.google_drive.refresh_margin_seconds',
             default => throw MediaConnectorException::requestFailed(),
         };
     }
