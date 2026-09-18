@@ -11,75 +11,66 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Google Drive OAuth/refresh de PR #54 quedo **VALIDATED IN CODE** y fue
-  fusionado a `main` como `8047af4e40cf0629050cc0ed6c8b66f9f9c1b2a0`.
-- Se implemento el siguiente slice P1: Google Drive Changes API con scans
-  incrementales durables.
-- El scanner captura `changes.getStartPageToken` **antes** del listado inicial
-  `files.list`, cerrando la ventana donde un cambio durante el bootstrap podria
-  perderse.
-- `media_connections.cursor` reutiliza su campo TEXT existente y guarda JSON
-  versionado con modo `bootstrap` o `changes`; no hay migracion nueva.
-- Durante bootstrap, `files.list.nextPageToken` solo continua la paginacion del
-  listado inicial y nunca se trata como cursor incremental.
-- Al terminar el bootstrap, el scanner cambia al start token capturado y consume
-  `changes.list`.
-- Mientras Changes API entrega `nextPageToken`, ese token se persiste tras cada
-  pagina procesada; al final se guarda `newStartPageToken` para el siguiente scan.
-- El page budget es compartido entre bootstrap y changes. Si se agota, la
-  conexion reanuda en un minuto desde el cursor exacto sin reiniciar el listado.
-- Cambios removed, archivos trashed, no descargables o que no sean imagen/video
-  se omiten.
-- Las conexiones con root folder aplican tambien a Changes API el mismo filtro
-  de parent directo usado por el bootstrap.
-- Nuevas conexiones Google Drive nacen `active` y con `next_scan_at`; ya pueden
-  entrar al scheduler.
-- El refresh de tokens ahora conserva `status` y `next_scan_at` para Dropbox y
-  Google en vez de alterar el lifecycle de la conexion.
-- Vault informa que Google usa bootstrap + Changes API con cursor durable.
-- Se agregaron pruebas del endpoint start-page-token, paginacion de cambios,
-  filtro de cambios, avance a newStartPageToken, orden start-token-before-bootstrap
-  y reanudacion por page budget.
-- CI sigue usando HTTP/storage/queue fakes; no se toca Google Drive real ni
-  produccion.
+- Google Drive Changes API de PR #55 quedo **VALIDATED IN CODE** y fue fusionado
+  a `main` como `8f2544e47a7da0d17881de70a83feed7e548d412`.
+- Se inicio el siguiente bloque P1: foundation del pipeline general de
+  procesamiento de media.
+- Se agrego `ProcessMediaAsset`, job tenant-aware, ShouldBeUnique e idempotente
+  por organization + asset + processor version.
+- `MediaProcessingCoordinator` es el unico handoff al processing pipeline.
+  Manual upload, direct upload y cloud/job ingestion convergen en el mismo
+  contrato.
+- Los assets duplicados no programan otra pasada sobre los mismos bytes.
+- El estado de procesamiento vive en `metadata.processing` con version,
+  status, attempts y `last_error` seguro; no requiere migracion nueva.
+- Un processor ya completado en la misma version es no-op en retries.
+- Fallos de dispatch quedan como `dispatch_failed`, evitando assets
+  eternamente `queued` y permitiendo volver a encolar.
+- `probe_v1` valida que el blob exista, que el objeto exista en storage, que el
+  tamaño coincida y que el MIME sea image/video.
+- El resultado deterministico guarda media kind, MIME, byte size y SHA-256.
+- Fallos esperados usan codigos seguros como `processing_object_missing`,
+  `processing_size_mismatch` y `processing_unsupported_mime`.
+- Este slice no transcodifica ni crea derivados todavia. FFmpeg entra despues,
+  detras de este contrato, para no mezclar procesamiento con ingesta.
+- Se agregaron pruebas de idempotencia, duplicate-skip, estado observable,
+  failure/retry y handoff de cloud ingestion.
+- No se toca produccion y no hay migracion nueva.
 
 ## Archivos modificados en este deploy
 
-- `app/Services/Media/Connectors/GoogleDriveChangeListing.php` — resultado de pagina Changes API.
-- `app/Services/Media/Connections/GoogleDriveScanCursor.php` — cursor JSON versionado.
-- `app/Services/Media/Connectors/GoogleDriveMediaAdapter.php` — getStartPageToken + changes.list.
-- `app/Services/Media/Connections/MediaConnectionScanner.php` — bootstrap + incremental Google.
-- `app/Services/Media/Connections/MediaConnectionManager.php` — scheduling Google activo y refresh lifecycle-safe.
-- `resources/views/vault/index.blade.php` — estado incremental Google visible.
-- `tests/Feature/GoogleDriveMediaAdapterTest.php` — contrato HTTP Changes API.
-- `tests/Feature/GoogleDriveIncrementalScanTest.php` — scanner durable end-to-end.
-- `tests/Feature/GoogleDriveOAuthConnectionTest.php` — expectativas de conexion activa.
-- `docs/MEDIA-CONNECTORS.md`, `docs/REQUIREMENTS.md` y `AGENTS.md` — reglas durables.
+- `app/Jobs/ProcessMediaAsset.php` — job idempotente tenant-aware.
+- `app/Services/Media/MediaAssetProcessor.php` — processor deterministico `probe_v1`.
+- `app/Services/Media/MediaProcessingCoordinator.php` — handoff unico al pipeline.
+- `app/Services/Media/MediaProcessingException.php` — errores seguros.
+- `app/Services/Media/MediaIngestor.php` — manual upload encola processing.
+- `app/Services/Media/DirectMediaUpload.php` — direct upload encola processing.
+- `app/Jobs/IngestMediaObject.php` — cloud ingestion entrega el asset al processor
+  y reintenta el handoff si la ingesta ya habia terminado.
+- `tests/Feature/MediaProcessingJobTest.php` — processing lifecycle.
+- `tests/Feature/MediaIngestionJobTest.php` — adapta el handoff cloud.
+- `docs/REQUIREMENTS.md` y `AGENTS.md` — contrato durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual del Google Drive Changes API slice: **VALIDATED IN CODE**.
-- El head funcional `889ecb2089ad1603b6018aff6a470049ee868185` paso
-  `fast`, `tests`, `php-quality`, browser y `GrindFlow CI / validate`;
-  MariaDB/legacy fueron correctamente omitidos por no aplicar al diff.
-- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
-  0.0% duplicacion en codigo nuevo.
-- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
-- Google adapter + OAuth/refresh + Dropbox end-to-end: **VALIDATED IN CODE**.
-- No hay migracion nueva en este slice.
-- No se usan credenciales Google reales.
+- Estado actual del media processing foundation: **IMPLEMENTED**, pendiente de
+  `GrindFlow CI / validate`, SonarQube y CodeRabbit.
+- GF-FR-003 queda implementado en su primera capa, todavia no
+  VALIDATED IN CODE.
+- Dropbox + Google ingestion/scheduling: **VALIDATED IN CODE**.
+- No hay migracion nueva.
 - Produccion no se modifica desde CI.
 - No se declara DEPLOYED ni VALIDATED IN PRODUCTION.
 
 ## Qué sigue
 
-- Mantener pendiente la migracion operacional de `media_connections` y la
-  configuracion Google real hasta aprobacion explicita.
-- Registrar el redirect exacto `/connections/google-drive/callback` y completar
-  verificacion/compliance del scope `drive.readonly` como accion operacional.
-- Despues avanzar al siguiente bloque P1 del pipeline general de procesamiento u
-  observabilidad operativa, segun el backlog vigente.
+- Pasar fast, PHPUnit, php-quality, MariaDB, browser y `GrindFlow CI / validate`.
+- Resolver SonarQube/CodeRabbit sin silenciar hallazgos y fusionar por squash.
+- Despues añadir el primer processor real de derivados, probablemente probe
+  multimedia/FFmpeg y sanitizacion, manteniendo `ProcessMediaAsset` como contrato.
+- Mantener pendiente object storage real, migracion de `media_connections` y
+  configuración Google/Dropbox de produccion hasta aprobacion explicita.
 
 ## Panorama general pendiente
 
@@ -91,9 +82,9 @@ siguiente deploy.
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
   Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
+- **P1 — Procesamiento / scheduling:** cloud scheduling VALIDATED IN CODE;
+  processing foundation IMPLEMENTED; derivados/FFmpeg pendientes.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
-- **P1 — Procesamiento / scheduling:** Dropbox + Google incremental scheduling
-  VALIDATED IN CODE; pipeline general sigue pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
 - **P2 — Integraciones / distribucion:** pendiente.
