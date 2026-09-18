@@ -11,66 +11,59 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Google Drive Changes API de PR #55 quedo **VALIDATED IN CODE** y fue fusionado
-  a `main` como `8f2544e47a7da0d17881de70a83feed7e548d412`.
-- Se inicio el siguiente bloque P1: foundation del pipeline general de
-  procesamiento de media.
-- Se agrego `ProcessMediaAsset`, job tenant-aware, ShouldBeUnique e idempotente
-  por organization + asset + processor version.
-- `MediaProcessingCoordinator` es el unico handoff al processing pipeline.
-  Manual upload, direct upload y cloud/job ingestion convergen en el mismo
-  contrato.
-- Los assets duplicados no programan otra pasada sobre los mismos bytes.
-- El estado de procesamiento vive en `metadata.processing` con version,
-  status, attempts y `last_error` seguro; no requiere migracion nueva.
-- Un processor ya completado en la misma version es no-op en retries.
-- Fallos de dispatch quedan como `dispatch_failed`, evitando assets
-  eternamente `queued` y permitiendo volver a encolar.
-- `probe_v1` valida que el blob exista, que el objeto exista en storage, que el
-  tamaño coincida y que el MIME sea image/video.
-- El resultado deterministico guarda media kind, MIME, byte size y SHA-256.
-- Fallos esperados usan codigos seguros como `processing_object_missing`,
-  `processing_size_mismatch` y `processing_unsupported_mime`.
-- Este slice no transcodifica ni crea derivados todavia. FFmpeg entra despues,
-  detras de este contrato, para no mezclar procesamiento con ingesta.
-- Se agregaron pruebas de idempotencia, duplicate-skip, estado observable,
-  failure/retry y handoff de cloud ingestion.
-- No se toca produccion y no hay migracion nueva.
+- El media processing foundation de PR #58 quedo **VALIDATED IN CODE** y fue
+  fusionado a `main` como `c074f0195247d80ee15005196dbb4abf628a2795`.
+- Se implemento el siguiente slice P1: inspeccion tecnica opcional con
+  **ffprobe** dentro de `ProcessMediaAsset`.
+- `MediaAssetProcessor::VERSION` pasa a 2 y el perfil pasa a `probe_v2`.
+- ffprobe queda feature-gated con `MEDIA_FFPROBE_ENABLED=false` por defecto.
+  Un hosting sin FFmpeg/ffprobe no rompe uploads ni processing base.
+- Cuando se habilita, `FfprobeMediaInspector` copia el blob desde Flysystem a
+  un temporal local y ejecuta ffprobe mediante Laravel Process.
+- El comando usa argumentos array, nunca shell concatenado, y timeout acotado.
+- Solo se normalizan campos tecnicos permitidos: duration, format name, stream
+  count, video codec/dimensiones y audio codec/sample-rate/channels.
+- Tags arbitrarios del contenedor, EXIF, stderr, stdout crudo y rutas temporales
+  no se guardan en `MediaAsset.metadata`.
+- Errores de probe se reducen a codigos seguros:
+  `processing_probe_failed`, `processing_probe_invalid_output` y
+  `processing_probe_timed_out`.
+- Si ffprobe esta deshabilitado, `probe_v2` conserva el procesamiento base y
+  registra `technical_probe=disabled` + `technical_metadata=null`.
+- Este slice **no sanitiza EXIF ni desbloquea publicacion**. La sanitizacion
+  sigue siendo un processor posterior obligatorio.
+- CI usa `Process::fake`; no necesita FFmpeg real ni toca produccion.
+- No hay migracion nueva.
 
 ## Archivos modificados en este deploy
 
-- `app/Jobs/ProcessMediaAsset.php` — job idempotente tenant-aware.
-- `app/Services/Media/MediaAssetProcessor.php` — processor deterministico `probe_v1`.
-- `app/Services/Media/MediaProcessingCoordinator.php` — handoff unico al pipeline.
-- `app/Services/Media/MediaProcessingException.php` — errores seguros.
-- `app/Services/Media/MediaIngestor.php` — manual upload encola processing.
-- `app/Services/Media/DirectMediaUpload.php` — direct upload encola processing.
-- `app/Jobs/IngestMediaObject.php` — cloud ingestion entrega el asset al processor
-  y reintenta el handoff si la ingesta ya habia terminado.
-- `tests/Feature/MediaProcessingJobTest.php` — processing lifecycle.
-- `tests/Feature/MediaIngestionJobTest.php` — adapta el handoff cloud.
-- `docs/REQUIREMENTS.md` y `AGENTS.md` — contrato durable.
+- `app/Services/Media/FfprobeMediaInspector.php` — inspeccion ffprobe bounded.
+- `app/Services/Media/MediaAssetProcessor.php` — `probe_v2` + metadata tecnica opcional.
+- `app/Services/Media/MediaProcessingException.php` — fallos seguros del probe.
+- `config/grindflow.php` — feature flag, binary y timeout.
+- `.env.example` — variables MEDIA_FFPROBE_*.
+- `tests/Feature/FfprobeMediaInspectorTest.php` — normalizacion y JSON invalido.
+- `tests/Feature/MediaProcessingJobTest.php` — contrato default-safe de `probe_v2`.
+- `docs/REQUIREMENTS.md` y `AGENTS.md` — privacidad, gating y contrato durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual del media processing foundation: **VALIDATED IN CODE**.
-- El head funcional `6a14193306dfa68e8b699cfc7f264580bce6fe36` paso
-  `fast`, `tests`, `php-quality`, MariaDB y `GrindFlow CI / validate`;
-  browser/legacy fueron correctamente omitidos por no aplicar al diff.
-- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
-  0.0% duplicacion en codigo nuevo.
-- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
-- GF-FR-003 queda **VALIDATED IN CODE** en su primera capa.
+- Estado actual del ffprobe metadata slice: **IMPLEMENTED**, pendiente de
+  `GrindFlow CI / validate`, SonarQube y CodeRabbit.
+- Processing foundation: **VALIDATED IN CODE**.
 - Dropbox + Google ingestion/scheduling: **VALIDATED IN CODE**.
+- No se ejecuta ffprobe real en CI.
 - No hay migracion nueva.
 - Produccion no se modifica desde CI.
 - No se declara DEPLOYED ni VALIDATED IN PRODUCTION.
 
 ## Qué sigue
 
-- Despues añadir el primer processor real de derivados, probablemente probe
-  multimedia/FFmpeg y sanitizacion, manteniendo `ProcessMediaAsset` como contrato.
+- Pasar fast, PHPUnit, php-quality, MariaDB y `GrindFlow CI / validate`.
+- Resolver SonarQube/CodeRabbit sin silenciar hallazgos y fusionar por squash.
+- Despues implementar sanitizacion EXIF/metadata sensible como processor
+  verificable antes de cualquier gate de publicacion.
 - Mantener pendiente object storage real, migracion de `media_connections` y
   configuración Google/Dropbox de produccion hasta aprobacion explicita.
 
@@ -84,8 +77,8 @@ siguiente deploy.
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
   Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
-- **P1 — Procesamiento / scheduling:** cloud scheduling + processing foundation
-  VALIDATED IN CODE; derivados/FFmpeg pendientes.
+- **P1 — Procesamiento / scheduling:** processing foundation VALIDATED IN CODE;
+  ffprobe metadata IMPLEMENTED; sanitizacion/derivados pendientes.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
