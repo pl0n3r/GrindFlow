@@ -145,6 +145,29 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   segun provider, conserva refresh token si el proveedor no devuelve uno nuevo
   y el refresh nunca altera status/next_scan_at de la conexion.
 
+### Regla de Media Processing
+
+- Todo asset canonico nuevo entra al processor `integrity_v1` despues de la
+  ingesta, independientemente de si vino de quick upload, direct upload o
+  conector cloud.
+- Los assets duplicados NO procesan los mismos bytes otra vez: el coordinator
+  resuelve `duplicate_of` y usa siempre el asset canonico.
+- Mientras exista una migracion operacional pendiente en produccion, este primer
+  slice no agrega otra tabla. El lifecycle durable vive en
+  `MediaAsset.metadata.processing.integrity_v1`.
+- `integrity_v1` verifica el blob por stream contra SHA-256 + byte_size ya
+  persistidos. Una divergencia falla cerrado con
+  `processing_integrity_mismatch`.
+- Estados permitidos del processor: queued, processing, completed, failed. Cada
+  intento persiste contador y solo errores seguros; nunca bytes ni bodies del
+  storage.
+- Un processor completado es no-op en retry. El job es unico por
+  organizacion + processor version + asset canonico.
+- El nombre del processor lleva version a proposito. Cambiar el algoritmo exige
+  una nueva key, no reinterpretar silenciosamente estados completed existentes.
+- Transcoding, sanitizacion de metadata, thumbnails y watermarking son processors
+  posteriores; no se declaran implementados por este gate.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
