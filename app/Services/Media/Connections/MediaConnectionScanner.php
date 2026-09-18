@@ -45,7 +45,7 @@ class MediaConnectionScanner
     {
         $ciphertext = $connection->access_ciphertext;
 
-        if (is_string($ciphertext) === false || $ciphertext === '') {
+        if ($ciphertext === '') {
             $this->needsReconnect($connection, 'connection_credentials_missing');
 
             return;
