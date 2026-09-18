@@ -11,65 +11,65 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se diagnostico el HTTP 500 persistente del Dashboard mediante Production Smoke.
-- El smoke autenticado confirmo 15 respuestas HTTP 500 consecutivas en
-  `/dashboard`.
-- El mismo smoke confirmo que `/admin/diagnostics.json` seguia devolviendo 404
-  despues de un Redeploy de Hostinger, aunque esa ruta existe en `main`.
-- La causa operativa mas probable es cache Laravel persistente durante el deploy
-  Git de hPanel: el redeploy actualiza archivos, pero no ejecuta
-  `scripts/deploy-hostinger.sh` ni limpia automaticamente route/config/view cache.
-- Se agrego `ReleaseCacheGuard`, que calcula un fingerprint de rutas,
-  configuracion, bootstrap y `composer.lock`.
-- En produccion, cuando ese fingerprint cambia, GrindFlow invalida una sola vez
-  `bootstrap/cache/*.php`, vistas compiladas y OPcache. Usa lock y marker en
-  `storage/framework` para no repetir el trabajo.
-- El primer request posterior a un Git deploy puede hacer la limpieza. Production
-  Smoke comienza por `/up`, por lo que el propio smoke puede activar la
-  reparacion antes de probar login y Dashboard.
-- No se ejecutan migraciones ni operaciones destructivas como parte de esta
-  reparacion.
+- El hotfix de cache Laravel para Hostinger fue fusionado a `main` como
+  `18affd37191ed0a7f7ee8599fb4049ffc5841542`.
+- Se agrego un puente on-demand para que los agentes puedan leer diagnosticos de
+  produccion desde GitHub sin SSH ni descarga manual desde hPanel.
+- El comando operativo sera `/production-diagnostics` dentro del issue durable
+  `[AUTO] Production Diagnostics Bridge`.
+- El workflow autentica la cuenta E2E, consulta `/admin/diagnostics.json`,
+  reduce el payload a datos de debug y elimina user ID, organization ID, emails,
+  IPs, UUIDs secundarios y tokens largos.
+- El resultado se guarda como artifact corto
+  `production-diagnostics-<run_id>` durante 3 dias. El issue solo recibe el run
+  ID y nombre del artifact.
+- Production Smoke tambien deja de copiar el diagnostico al cuerpo del issue
+  publico. En fallo sube `production-smoke-diagnostics-<run_id>` por 3 dias.
+- CI valida la sintaxis del nuevo fetcher antes de permitir merge.
+- El archivo privado `storage/logs/diagnostics-*.jsonl` sigue sin exponerse de
+  forma directa.
 
 ## Archivos modificados en este deploy
 
-- `app/Support/Deployment/ReleaseCacheGuard.php` — fingerprint, lock, invalidacion y marker.
-- `app/Providers/AppServiceProvider.php` — activa la reparacion solo en production.
-- `tests/Unit/ReleaseCacheGuardTest.php` — valida limpieza one-shot y cambio de fingerprint.
-- `docs/DEPLOY-HOSTINGER.md` — documenta el comportamiento de Git deploy y cache guard.
-- `AGENTS.md` — regla durable para despliegues Laravel en Hostinger.
+- `scripts/fetch-production-diagnostics.sh` — login E2E, lectura y sanitizacion.
+- `.github/workflows/production-diagnostics.yml` — bridge activado por comentario autorizado.
+- `.github/workflows/production-smoke.yml` — diagnosticos de fallo como artifact corto.
+- `.github/workflows/grindflow-ci.yml` — valida el nuevo script.
+- `docs/DIAGNOSTICS.md` — contrato y flujo completo del bridge.
+- `AGENTS.md` — regla durable para "revisa el log de produccion".
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado del cambio actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
-- Produccion sigue en fallo antes de este hotfix:
-  `/dashboard = 500`, `/admin/diagnostics.json = 404`.
-- Issue automatico activo: `#27 [AUTO] Production Smoke Failure`.
-- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** hasta que el smoke
-  autenticado cierre automaticamente el issue #27.
+- Estado del bridge actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- El hotfix anterior si esta **VALIDATED IN CODE** y fusionado a `main`; produccion
+  todavia necesita confirmar que el deploy de Hostinger recibio ese commit.
+- El bridge no ejecuta comandos SSH, migraciones ni operaciones destructivas.
+- El payload diagnostico no se publica en issues; solo artifacts de retencion corta.
 
 ## Qué sigue
 
-- Pasar CI/Sonar/CodeRabbit del hotfix.
-- Fusionar el hotfix a `main`.
-- Dejar que Hostinger sincronice el cambio.
-- Reejecutar Production Smoke. Si el cache guard funciona, Diagnostics debe
-  dejar de responder 404 y el Dashboard debe pasar o entregar el incidente real.
-- Solo despues retomar migraciones/Vault en produccion.
+- Pasar CI/Sonar del bridge y fusionarlo.
+- Crear el issue durable `[AUTO] Production Diagnostics Bridge`.
+- Lanzar la primera peticion real con `/production-diagnostics`.
+- Recuperar el artifact desde GitHub y comprobar que puedo leer el error de
+  produccion directamente desde el chat.
+- Con esa evidencia, cerrar el HTTP 500 actual y luego retomar Vault/schema.
 
 ## Panorama general pendiente
 
-- **P0 — Produccion / Dashboard:** HTTP 500 confirmado por smoke; hotfix de cache
-  Laravel IMPLEMENTED, pendiente VALIDATED IN CODE y produccion.
-- **P0 — Produccion / deploy:** asegurar que Git deploy no deje route/config/view
-  cache de una revision anterior.
+- **P0 — Produccion / Dashboard:** HTTP 500 con causa de route cache identificada;
+  hotfix fusionado, pendiente confirmacion real en Hostinger.
+- **P0 — Produccion / Diagnostics bridge:** IMPLEMENTED; pendiente CI, merge y
+  primera captura end-to-end.
 - **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
   Dashboard/System vuelvan a estar operativos.
 - **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN CODE; pendiente produccion
   y siguientes fases de upload/conectores/jobs.
-- **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente disponibilidad real tras limpiar caches.
+- **P1 — Diagnosticos:** log de aplicacion y panel VALIDATED IN CODE; bridge on-demand
+  pendiente validacion.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
