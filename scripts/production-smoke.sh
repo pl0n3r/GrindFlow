@@ -221,6 +221,11 @@ run_smoke() {
     return 1
   fi
 
+  if ! assert_contains "$vault_html" "Direct upload"; then
+    print_diagnostics
+    return 1
+  fi
+
   printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s\n' "$vault_path"
 }
 
