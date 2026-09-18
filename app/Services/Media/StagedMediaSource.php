@@ -20,14 +20,14 @@ final readonly class StagedMediaSource
         public bool $deleteAfterIngest = false,
         public array $metadata = [],
     ) {
-        $this->assertLength($sourceType, 64, 'sourceType');
-        $this->assertLength($sourceRef, 1024, 'sourceRef');
-        $this->assertLength($sourceDisk, 64, 'sourceDisk');
-        $this->assertLength($sourceKey, 1024, 'sourceKey');
-        $this->assertLength($originalFilename, 512, 'originalFilename');
+        self::assertLength($sourceType, 64, 'sourceType');
+        self::assertLength($sourceRef, 1024, 'sourceRef');
+        self::assertLength($sourceDisk, 64, 'sourceDisk');
+        self::assertLength($sourceKey, 1024, 'sourceKey');
+        self::assertLength($originalFilename, 512, 'originalFilename');
 
         if ($mimeType !== null) {
-            $this->assertLength($mimeType, 191, 'mimeType');
+            self::assertLength($mimeType, 191, 'mimeType');
         }
 
         if ($byteSize !== null && $byteSize < 1) {
@@ -37,13 +37,26 @@ final readonly class StagedMediaSource
 
     public function idempotencyKey(): string
     {
-        return hash(
-            'sha256',
-            $this->sourceType."\0".$this->sourceRef,
+        return self::idempotencyKeyFor(
+            $this->sourceType,
+            $this->sourceRef,
         );
     }
 
-    private function assertLength(
+    public static function idempotencyKeyFor(
+        string $sourceType,
+        string $sourceRef,
+    ): string {
+        self::assertLength($sourceType, 64, 'sourceType');
+        self::assertLength($sourceRef, 1024, 'sourceRef');
+
+        return hash(
+            'sha256',
+            $sourceType."\0".$sourceRef,
+        );
+    }
+
+    private static function assertLength(
         string $value,
         int $maxLength,
         string $field,

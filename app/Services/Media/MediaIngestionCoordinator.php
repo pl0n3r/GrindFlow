@@ -47,19 +47,7 @@ class MediaIngestionCoordinator
         User $actor,
         StagedMediaSource $source,
     ): MediaIngestion {
-        $organizationId = $this->tenantContext->organizationId();
-
-        if ($organizationId === null) {
-            throw new AuthorizationException(
-                'Tenant context is required to queue media ingestion.',
-            );
-        }
-
-        if ($actor->canManageOrganization($organizationId) === false) {
-            throw new AuthorizationException(
-                'The user cannot manage media ingestion for this organization.',
-            );
-        }
+        $organizationId = $this->authorizedOrganizationId($actor);
 
         $idempotencyKey = $source->idempotencyKey();
 
@@ -90,6 +78,23 @@ class MediaIngestionCoordinator
         }
 
         return $ingestion;
+    }
+
+    public function findExistingSource(
+        User $actor,
+        string $sourceType,
+        string $sourceRef,
+    ): ?MediaIngestion {
+        $organizationId = $this->authorizedOrganizationId($actor);
+        $idempotencyKey = StagedMediaSource::idempotencyKeyFor(
+            $sourceType,
+            $sourceRef,
+        );
+
+        return MediaIngestion::query()
+            ->where('organization_id', $organizationId)
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
     }
 
     public function retry(MediaIngestion $ingestion, User $actor): MediaIngestion
@@ -130,5 +135,24 @@ class MediaIngestionCoordinator
         );
 
         return $ingestion->refresh();
+    }
+
+    private function authorizedOrganizationId(User $actor): string
+    {
+        $organizationId = $this->tenantContext->organizationId();
+
+        if ($organizationId === null) {
+            throw new AuthorizationException(
+                'Tenant context is required to queue media ingestion.',
+            );
+        }
+
+        if ($actor->canManageOrganization($organizationId) === false) {
+            throw new AuthorizationException(
+                'The user cannot manage media ingestion for this organization.',
+            );
+        }
+
+        return $organizationId;
     }
 }

@@ -61,7 +61,7 @@ class FilesystemMediaIngestor
                 throw MediaIngestionException::sizeMismatch();
             }
 
-            $mimeType = $this->resolveMimeType($ingestion);
+            $mimeType = $this->resolveMimeType($ingestion, $temporary);
 
             if ($this->mimeAllowed($mimeType) === false) {
                 throw MediaIngestionException::unsupportedMime();
@@ -140,13 +140,45 @@ class FilesystemMediaIngestor
         }
     }
 
-    private function resolveMimeType(MediaIngestion $ingestion): ?string
-    {
-        $detected = Storage::disk($ingestion->source_disk)
+    /**
+     * @param  resource  $temporary
+     */
+    private function resolveMimeType(
+        MediaIngestion $ingestion,
+        $temporary,
+    ): ?string {
+        $metadata = stream_get_meta_data($temporary);
+        $temporaryPath = $metadata['uri'] ?? null;
+
+        if (is_string($temporaryPath) && $temporaryPath !== '') {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+            if ($finfo !== false) {
+                try {
+                    $detected = finfo_file($finfo, $temporaryPath);
+
+                    if (
+                        is_string($detected)
+                        && $detected !== ''
+                        && $detected !== 'application/octet-stream'
+                    ) {
+                        return $detected;
+                    }
+                } finally {
+                    finfo_close($finfo);
+                }
+            }
+        }
+
+        $storedMime = Storage::disk($ingestion->source_disk)
             ->mimeType($ingestion->source_key);
 
-        if (is_string($detected) && $detected !== '') {
-            return $detected;
+        if (
+            is_string($storedMime)
+            && $storedMime !== ''
+            && $storedMime !== 'application/octet-stream'
+        ) {
+            return $storedMime;
         }
 
         return $ingestion->mime_type;

@@ -11,50 +11,59 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- La migracion `media_ingestions` fue aplicada de forma explicita mediante el
-  bridge operacional endurecido.
-- El artifact del run `35352163050` confirmo `pending migrations 1 -> 0`.
-- Production Smoke se recupero sobre `85d3b60e4bd25abdfa63eea537ae2aa15fd98e0c`
-  y cerro automaticamente el incidente #44.
-- En paralelo se implemento el handoff generico para futuros conectores de
-  ingesta.
-- `StagedMediaSource` encapsula source type/ref, disk/key, filename, MIME, size,
-  cleanup y metadata del proveedor.
-- `MediaIngestionCoordinator::queueSource` concentra idempotencia, autorizacion,
-  persistencia y dispatch.
-- El metodo `queue` existente se conserva y delega al mismo camino, por lo que
-  manual/direct/connector ingestion no divergen en reglas de tenant o dedup.
-- El DTO valida limites del schema antes de tocar base o cola.
-- Tests nuevos prueban idempotencia del handoff, metadata trazable y rechazo
-  temprano de inputs invalidos.
+- Se implemento el primer adaptador Laravel real sobre el handoff de ingesta:
+  **Dropbox media adapter**.
+- El adapter lista archivos remotos, normaliza metadata y puede descargar un
+  objeto remoto por stream hacia staging sin cargarlo completo en memoria.
+- La identidad logica de source combina file id + version del proveedor
+  (content hash o modified timestamp), por lo que repetir la misma version
+  reutiliza la ingesta existente y evita una segunda descarga.
+- Tenant y rol se validan antes del request de descarga.
+- Los staging keys son UUID tenant-scoped y nunca contienen el filename remoto.
+- Access tokens son input transitorio y no se guardan en DB, metadata, source refs
+  ni errores.
+- HTTP 401/429 y otros fallos se convierten en codigos seguros sin propagar bodies
+  crudos del proveedor.
+- El limite inicial de archivos de conector queda en 2 GiB para el perfil actual.
+- La deteccion MIME del pipeline staged ahora prioriza los bytes reales del
+  archivo temporal mediante Fileinfo, evitando confiar solo en metadata remota.
+- No se llama a Dropbox real en CI: toda la cobertura usa Laravel HTTP fakes.
+- Schema de produccion sigue current y Production Smoke recuperado desde la
+  migracion anterior.
 
 ## Archivos modificados en este deploy
 
-- `app/Services/Media/StagedMediaSource.php` — value object del handoff.
-- `app/Services/Media/MediaIngestionCoordinator.php` — `queueSource` compartido.
-- `tests/Feature/MediaIngestionJobTest.php` — cobertura del contrato generico.
-- `docs/REQUIREMENTS.md` — verificacion GF-FR-002 ampliada.
-- `AGENTS.md` — regla durable para conectores futuros.
+- `app/Services/Media/Connectors/DropboxMediaAdapter.php` — listado, streaming y staging.
+- `app/Services/Media/Connectors/RemoteMediaFile.php` — archivo remoto normalizado.
+- `app/Services/Media/Connectors/RemoteMediaListing.php` — resultado de listado normalizado.
+- `app/Services/Media/Connectors/MediaConnectorException.php` — errores seguros.
+- `app/Services/Media/StagedMediaSource.php` — idempotency key reutilizable.
+- `app/Services/Media/MediaIngestionCoordinator.php` — lookup idempotente previo a descarga.
+- `app/Services/Media/FilesystemMediaIngestor.php` — MIME por contenido para staged media.
+- `tests/Feature/DropboxMediaAdapterTest.php` — listado, auth, staging, reuse y errores.
+- `config/grindflow.php` y `.env.example` — staging disk y limite de conectores.
+- `docs/MEDIA-CONNECTORS.md` — contrato del adapter.
+- `docs/REQUIREMENTS.md` y `AGENTS.md` — verificacion/reglas durables.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Schema de produccion: **CURRENT**, confirmado `1 -> 0`.
-- Production Smoke: **RECOVERED**, issue #44 cerrado automaticamente.
-- Media ingestion jobs base: **VALIDATED IN CODE**.
-- Estado del handoff generico: **VALIDATED IN CODE**.
-- PR #46 paso `fast`, `php-quality`, `tests` y `validate`; `database`, `browser`
+- Estado actual: **VALIDATED IN CODE**.
+- PR #47 paso `fast`, `php-quality`, `tests`, `browser` y `validate`; `database`
   y `legacy` quedaron correctamente `skipped` por el selector de CI.
 - SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- No hay migracion nueva en este PR.
-- No hay llamadas a APIs externas, secretos ni escrituras de contenido en
-  produccion.
+- GF-FR-002 base, persistent jobs y staged handoff permanecen **VALIDATED IN CODE**.
+- No hay migracion de base de datos en este cambio.
+- No hay llamadas reales a Dropbox, secretos nuevos ni escrituras de contenido
+  en produccion.
+- La integracion real de OAuth/credenciales y scans programados sigue fuera de
+  este slice.
 
 ## Qué sigue
 
-- Fusionar PR #46 y dejar que exact-main CI/Production Smoke confirmen el estado.
-- Implementar el primer adaptador real sobre `StagedMediaSource`, sin duplicar
-  logica de tenant/idempotencia/deduplicacion.
+- Fusionar PR #47 y dejar que exact-main CI confirme el estado.
+- Luego portar la capa de conexion/credenciales cifradas y scheduler de scans,
+  reutilizando este adapter sin duplicar ingesta.
 - Mantener object storage #40 como bloqueo externo independiente.
 
 ## Panorama general pendiente
@@ -65,8 +74,8 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** jobs y handoff generico VALIDATED IN CODE;
-  schema current en produccion; pendientes adaptadores reales.
+- **P1 — Media Vault / ingesta:** jobs + handoff + adapter Dropbox VALIDATED IN
+  CODE; faltan credenciales/OAuth, scans y Google Drive.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
