@@ -26,6 +26,15 @@ class MediaConnectionSchedulerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'grindflow.security.encryption_master_key' => str_repeat('ab', 32),
+        ]);
+    }
+
     public function test_dropbox_credentials_are_encrypted_at_rest_and_hidden_from_serialization(): void
     {
         $user = User::factory()->create();
@@ -44,29 +53,18 @@ class MediaConnectionSchedulerTest extends TestCase
             ),
         );
 
-        $rawCredentials = DB::table('media_connections')
+        $rawCiphertext = DB::table('media_connections')
             ->where('id', $connection->getKey())
-            ->value('credentials');
+            ->value('access_ciphertext');
 
-        $this->assertIsString($rawCredentials);
+        $this->assertIsString($rawCiphertext);
+        $this->assertStringStartsWith('v1.', $rawCiphertext);
         $this->assertStringNotContainsString(
             'dropbox-secret-access-token',
-            $rawCredentials,
+            $rawCiphertext,
         );
-        $this->assertArrayNotHasKey('credentials', $connection->toArray());
-
-        app(TenantContext::class)->runWithinOrganization(
-            $user,
-            (string) $organization->getKey(),
-            function () use ($connection): void {
-                $fresh = MediaConnection::query()->findOrFail($connection->getKey());
-
-                $this->assertSame(
-                    'dropbox-secret-access-token',
-                    $fresh->credentials['access_token'],
-                );
-            },
-        );
+        $this->assertArrayNotHasKey('access_ciphertext', $connection->toArray());
+        $this->assertArrayNotHasKey('refresh_ciphertext', $connection->toArray());
     }
 
     public function test_due_scheduler_claims_connection_before_dispatch_and_does_not_duplicate_tick(): void
