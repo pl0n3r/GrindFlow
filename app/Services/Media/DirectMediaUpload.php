@@ -266,7 +266,7 @@ class DirectMediaUpload
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function assertTokenContext(
         array $payload,
