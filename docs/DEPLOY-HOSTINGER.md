@@ -67,6 +67,22 @@ El script:
 
 ## Base de datos
 
+Hostinger Web/Cloud usa MariaDB. GrindFlow se conecta mediante el driver Laravel
+`mysql` y el puerto habitual 3306.
+
+Variables esperadas:
+
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=...
+DB_PORT=3306
+DB_DATABASE=...
+DB_USERNAME=...
+DB_PASSWORD=...
+DB_CHARSET=utf8mb4
+DB_COLLATION=utf8mb4_unicode_ci
+```
+
 Las migraciones se mantienen fuera del deploy automatico. Antes de ejecutar una
 migracion en produccion:
 
@@ -79,12 +95,12 @@ migracion en produccion:
 /opt/alt/php85/usr/bin/php artisan migrate --force
 ```
 
-5. volver a configurar la aplicacion con el rol runtime sin superuser,
-   `BYPASSRLS` ni ownership de las tablas protegidas;
+5. confirmar que `.env` usa `DB_CONNECTION=mysql` y las credenciales de la
+   base MariaDB asignada al sitio;
 6. reconstruir config cache y validar login/tenant isolation.
 
 GF-MIG-002 no se considera VALIDATED IN PRODUCTION hasta comprobar el flujo real
-con el rol runtime de PostgreSQL.
+contra la MariaDB de Hostinger.
 
 ## Rollback de codigo
 
@@ -103,4 +119,4 @@ curl -f https://www.grindflow.com.co/up
 ```
 
 El endpoint `/up` prueba que Laravel puede arrancar. No prueba por si solo
-autenticacion, PostgreSQL, RLS ni comportamiento multi-tenant.
+autenticacion, MariaDB ni comportamiento multi-tenant.
