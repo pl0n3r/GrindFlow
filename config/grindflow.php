@@ -3,7 +3,7 @@
 return [
     'media' => [
         'disk' => env('MEDIA_DISK', env('FILESYSTEM_DISK', 'local')),
-        'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 's3'),
+        'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 'media'),
         'direct_upload_max_bytes' => (int) env(
             'MEDIA_DIRECT_UPLOAD_MAX_BYTES',
             2_147_483_648,
