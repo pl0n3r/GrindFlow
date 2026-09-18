@@ -119,7 +119,6 @@ class TenantScopedModelTest extends TestCase
 
 class TenantScopeRecord extends TenantModel
 {
-
     protected $table = 'tenant_scope_records';
 
     public $timestamps = false;
