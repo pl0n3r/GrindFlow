@@ -46,7 +46,10 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado actual: **VALIDATED IN CODE**.
+- PR #37 paso `fast`, `php-quality`, `tests`, `browser` y `validate`; `database`
+  y `legacy` quedaron correctamente `skipped` por el selector de CI.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - La feature usa `temporaryUploadUrl` del filesystem Laravel con disk S3-compatible.
 - No se agregaron secretos al repositorio ni se exponen credenciales permanentes al browser.
 - No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** hasta que el merge sea
@@ -56,9 +59,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit, browser y `validate`; database/legacy solo si el
-  selector determina que aplican.
-- Fusionar si los gates quedan verdes.
+- Fusionar PR #37 y dejar que Hostinger sincronice `main`.
 - Dejar que Production Smoke reutilice la sesion E2E para validar Dashboard,
   System, schema, Vault y presencia de Direct upload en una sola pasada.
 - Si object storage aun no esta configurado, preparar su configuracion por UI/env
@@ -67,8 +68,8 @@ siguiente deploy.
 ## Panorama general pendiente
 
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
-- **P1 — Media Vault / direct upload:** IMPLEMENTED; pendiente VALIDATED IN CODE,
-  deploy y configuracion real de object storage.
+- **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente deploy y
+  configuracion real de object storage.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN PRODUCTION; faltan
   conectores, jobs y parity completa GF-FR-002.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
