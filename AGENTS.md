@@ -15,6 +15,17 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 6. Seguir rama enfocada -> implementacion -> pruebas -> PR -> CI/revision -> squash merge -> CI exacto en main.
 7. No confundir IMPLEMENTED, VALIDATED IN CODE, DEPLOYED y VALIDATED IN PRODUCTION.
 
+### Regla de paralelizacion
+
+- **Paralelizar todo lo que sea realmente independiente** cuando reduzca el tiempo total de entrega.
+- Se permiten hasta **4 lineas de trabajo concurrentes** si no comparten archivos, estado mutable, migraciones dependientes ni alcance de revision.
+- Analisis, inspeccion de codigo, preparacion de pruebas, revision de gates y tareas sobre modulos independientes pueden ejecutarse en paralelo.
+- Mientras un gate externo corre, se debe aprovechar el tiempo avanzando trabajo independiente en vez de quedar inactivo.
+- Los merges a `main` son siempre **serializados**. Antes de cada merge hay que volver a comprobar el SHA actual de `main`, el SHA de la rama/PR y los gates aplicables.
+- Escrituras sobre el mismo archivo, ramas dependientes, cambios sobre el mismo esquema/estado compartido y secuencias que dependan unas de otras deben permanecer serializadas.
+- Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
+- La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
+
 ### Cambio de arquitectura aprobado — 17 de septiembre de 2026
 
 GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
