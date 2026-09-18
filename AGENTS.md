@@ -26,19 +26,46 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
 
-### Regla del estado general y prioridades
+### Regla del README estilo BRVTAL
 
-El `README.md` debe contener siempre una seccion **Estado general y prioridades**
-que funcione como tablero operativo del proyecto.
+El `README.md` de GrindFlow sigue el mismo modelo operativo de BRVTAL: es una
+**foto del ultimo deploy/estado operativo**, no el manual durable del producto.
 
-- Todo agente debe leer esa seccion al iniciar una sesion, despues del contexto durable.
-- Toda PR que inicie, complete, bloquee, desbloquee o repriorice trabajo debe actualizar la fila correspondiente del README en la misma PR.
-- Todo trabajo nuevo relevante debe aparecer en el tablero con prioridad **P0, P1, P2 o P3**, estado, criterio de salida y referencia a requisito/PR cuando exista.
-- **P0** significa bloqueo de seguridad, integridad de datos, despliegue o base arquitectonica; se resuelve antes de trabajo dependiente de menor prioridad.
-- Se puede avanzar P1/P2 en paralelo con un P0 solo si el trabajo es realmente independiente y respeta la regla de paralelizacion.
-- No se marca un frente como VALIDATED IN CODE, DEPLOYED o VALIDATED IN PRODUCTION sin evidencia correspondiente. CI verde solo permite VALIDATED IN CODE cuando cubre las compuertas aplicables.
-- Si el README contradice codigo/tests/requisitos ya fusionados, prevalece la fuente mas fuerte y el README debe corregirse inmediatamente.
-- Las secciones historicas del legado no determinan la prioridad actual. La tabla superior del README es la referencia operativa.
+Debe conservar siempre, y en este orden, estas secciones:
+
+1. `# GrindFlow — Último deploy`
+2. badge de `GrindFlow CI`
+3. aviso de que el README cubre solo el deploy/estado actual
+4. regla permanente del snapshot
+5. `## Qué se hizo`
+6. `## Archivos modificados en este deploy`
+7. `## Validación`
+8. `## Qué sigue`
+9. `## Panorama general pendiente`
+
+Reglas:
+
+- Cada deploy o cambio de estado operativo relevante **reemplaza el snapshot**
+  anterior del README en vez de acumular una cronologia infinita.
+- `Qué se hizo` describe hechos del cambio actual, no planes.
+- `Archivos modificados en este deploy` enumera los archivos relevantes y su
+  motivo, sin convertir el README en un diff completo.
+- `Validación` registra SHA, CI, SonarQube Cloud, CodeRabbit y cualquier
+  validacion de produccion realmente realizada.
+- CI verde solo permite **VALIDATED IN CODE**. No se escribe DEPLOYED ni
+  VALIDATED IN PRODUCTION sin evidencia real.
+- `Qué sigue` contiene solo el siguiente frente accionable.
+- `Panorama general pendiente` conserva el backlog completo visible y ordenado
+  por **P0, P1, P2 y P3**.
+- Todo trabajo nuevo relevante debe aparecer en ese panorama con su prioridad.
+- Todo agente debe leer el README al iniciar una sesion, despues de este
+  `AGENTS.md`.
+- Las especificaciones, requisitos, arquitectura y decisiones durables viven en
+  `AGENTS.md` y `docs/`, no se duplican permanentemente en el README.
+- Si README, codigo, CI y requisitos se contradicen, prevalece la evidencia mas
+  fuerte y el README se corrige en la misma PR.
+- Migraciones de produccion, acciones destructivas y cambios de secretos nunca
+  se presentan como realizados si solo fueron validados en codigo.
 
 ### Cambio de arquitectura aprobado — 17 de septiembre de 2026
 
