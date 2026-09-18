@@ -121,6 +121,14 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   codes, state y tokens no se guardan en logs, Diagnostics ni metadata.
 - El redirect URI se deriva de la ruta Laravel + APP_URL. Produccion debe
   registrar exactamente /connections/dropbox/callback en la consola de Dropbox.
+- Todo proveedor que descargue media reutiliza ConnectorMediaStager para
+  autorizacion tenant, idempotencia, limites, staging, cleanup y handoff; los
+  adaptadores no duplican esa logica.
+- Google Drive v3 normaliza solo blobs de imagen/video descargables. Los
+  documentos nativos de Workspace requieren export y no entran por alt=media.
+- nextPageToken de Drive es solo cursor de paginacion de una consulta activa;
+  no se persiste como cursor incremental entre scans. El incremental durable
+  debe implementarse con el contrato de Changes API en un slice posterior.
 
 ### Regla de direct uploads del Vault
 
