@@ -44,6 +44,7 @@ siguiente deploy.
 - `app/Services/Media/Connections/OAuthAuthorizationTokens.php` — DTO OAuth comun.
 - `app/Services/Media/Connections/OAuthPendingState.php` — state OAuth server-side.
 - `app/Services/Media/Connections/OAuthConnectionCoordinator.php` — flujo browser comun.
+- `app/Services/Media/Connections/OAuthTokenEndpointClient.php` — exchange/refresh/parsing/error policy comun.
 - `app/Services/Media/Connections/GoogleOAuthClient.php` — authorize/code exchange/refresh Google.
 - `app/Http/Controllers/Connections/GoogleDriveConnectionController.php` — rutas Google OAuth.
 - `app/Http/Controllers/Connections/DropboxConnectionController.php` — reutiliza coordinador comun.
@@ -59,8 +60,13 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del Google Drive OAuth/refresh slice: **IMPLEMENTED**, pendiente
-  de `GrindFlow CI / validate`.
+- Estado actual del Google Drive OAuth/refresh slice: **VALIDATED IN CODE**.
+- El head funcional `382715720963c413aa977bf66020dcab6365f67d` paso
+  `fast`, `tests`, `php-quality`, MariaDB, browser y
+  `GrindFlow CI / validate`.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
+  0.0% duplicacion en codigo nuevo despues de extraer `OAuthTokenEndpointClient`.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
 - Google Drive adapter + Dropbox end-to-end: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
 - No se usan credenciales Google reales.
@@ -69,8 +75,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit, browser y `GrindFlow CI / validate`; resolver
-  SonarQube/CodeRabbit si reportan hallazgos y fusionar por squash.
 - Mantener pendiente la migracion operacional de `media_connections` hasta
   aprobacion explicita.
 - Registrar el redirect exacto `/connections/google-drive/callback` y completar
@@ -86,9 +90,9 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox end-to-end + Google adapter VALIDATED IN
-  CODE; Google OAuth/refresh IMPLEMENTED; pendientes validacion de este slice,
-  Changes API y configuracion/migracion de produccion.
+- **P1 — Media Vault / ingesta:** Dropbox end-to-end + Google adapter +
+  Google OAuth/refresh VALIDATED IN CODE; pendientes Changes API y
+  configuracion/migracion de produccion.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** scan scheduling Dropbox VALIDATED IN CODE;
   Google incremental scheduling pendiente.
