@@ -49,9 +49,14 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del ffprobe metadata slice: **IMPLEMENTED**, pendiente de
-  `GrindFlow CI / validate`, SonarQube y CodeRabbit.
-- Processing foundation: **VALIDATED IN CODE**.
+- Estado actual del ffprobe metadata slice: **VALIDATED IN CODE**.
+- El head funcional `ea9dfcff05362e8e1f95dc7551a170d9eefa0795` paso
+  `fast`, `tests`, `php-quality`, browser y `GrindFlow CI / validate`;
+  MariaDB/legacy fueron correctamente omitidos por no aplicar al diff.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
+  0.0% duplicacion en codigo nuevo.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
+- Processing foundation + ffprobe metadata: **VALIDATED IN CODE**.
 - Dropbox + Google ingestion/scheduling: **VALIDATED IN CODE**.
 - No se ejecuta ffprobe real en CI.
 - No hay migracion nueva.
@@ -60,8 +65,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar fast, PHPUnit, php-quality, MariaDB y `GrindFlow CI / validate`.
-- Resolver SonarQube/CodeRabbit sin silenciar hallazgos y fusionar por squash.
 - Despues implementar sanitizacion EXIF/metadata sensible como processor
   verificable antes de cualquier gate de publicacion.
 - Mantener pendiente object storage real, migracion de `media_connections` y
@@ -77,8 +80,8 @@ siguiente deploy.
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
   Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
-- **P1 — Procesamiento / scheduling:** processing foundation VALIDATED IN CODE;
-  ffprobe metadata IMPLEMENTED; sanitizacion/derivados pendientes.
+- **P1 — Procesamiento / scheduling:** processing foundation + ffprobe metadata
+  VALIDATED IN CODE; sanitizacion/derivados pendientes.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
