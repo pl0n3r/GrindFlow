@@ -67,6 +67,16 @@ Reglas:
 - Migraciones de produccion, acciones destructivas y cambios de secretos nunca
   se presentan como realizados si solo fueron validados en codigo.
 
+### Regla de visibilidad de SonarQube Cloud
+
+- SonarQube Cloud conserva **Automatic Analysis** como unica fuente de analisis; no se agrega un segundo scanner mientras siga habilitado.
+- Cada check completado de `SonarCloud Code Analysis` asociado a una PR debe reflejarse en un comentario estable **SonarQube Cloud · Full PR details**.
+- Ese comentario se actualiza en vez de crear ruido con comentarios duplicados.
+- Los agentes y revisores no deben concluir que "Sonar no tiene detalles" mirando solo el endpoint/check de GitHub. Deben consultar primero el comentario sincronizado y, si hace falta, el dashboard de Sonar enlazado alli.
+- El comentario debe incluir Quality Gate, condiciones, todos los issues accesibles por API, Security Hotspots, archivo/linea, regla, estado e impactos cuando Sonar los exponga.
+- Si la API de Sonar exige autenticacion, el workflow debe explicitar que falta el secreto `SONAR_TOKEN`; nunca imprimir el valor del token.
+- Un fallo del reporter no sustituye ni altera el Quality Gate nativo de Sonar. El reporter es una capa de observabilidad, no un segundo analizador.
+
 ### Cambio de arquitectura aprobado — 17 de septiembre de 2026
 
 GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application

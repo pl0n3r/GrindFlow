@@ -55,6 +55,19 @@ contains `.sonarcloud.properties` only for scope/exclusions.
 
 Do not add a second Sonar scanner in CI while automatic analysis is enabled.
 
+The `Sonar PR Details` workflow listens for the completed external Sonar check,
+queries the SonarQube Cloud Web API and creates or updates one stable PR comment
+with the Quality Gate, conditions, issues and Security Hotspots. It exists
+because GitHub's check endpoint does not always expose every Sonar detail.
+
+The reporter derives the project key from Sonar's native check URL and can use
+an optional repository secret named `SONAR_TOKEN`. Public projects may work
+without it; if Sonar returns 401/403, configure that secret with read access.
+The token is never written to comments or logs.
+
+The native Sonar Quality Gate remains authoritative. The reporter is an
+observability mirror and must not be treated as a replacement scanner or gate.
+
 ## CodeRabbit
 
 CodeRabbit auto-reviews PRs against `main`. It starts as advisory:

@@ -11,106 +11,63 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se sustituyo la base Next.js/TypeScript por una fundacion Laravel 13 sobre PHP 8.5.
-- Hostinger ya sirve Laravel correctamente desde `public_html` mediante los
-  `.htaccess` de la raiz y de `public/`.
-- La aplicacion confirmo arranque real en `https://www.grindflow.com.co/` con
-  la pantalla `Laravel foundation operational.`.
-- GF-MIG-002 (identidad y aislamiento multi-tenant) quedo **VALIDATED IN CODE**
-  y fusionado a `main`.
-- GF-MIG-002 incluye login/logout, roles, organizaciones, memberships,
-  autorizacion Laravel y Row Level Security en PostgreSQL.
-- Los tests negativos de PostgreSQL intentan cruces entre tenants y
-  auto-escalacion de rol.
-- Se corrigieron los hallazgos validos de CodeRabbit de GF-MIG-002.
-- Se anadio un contrato de deploy reproducible para Hostinger, incluyendo script
-  seguro, documentacion y smoke test opcional de `/up`.
-- Se genero y versiono `composer.lock` con Composer real sobre PHP 8.5.
-- `composer.json` ahora fija PHP `^8.5` y Composer resuelve contra PHP 8.5.0.
-- GrindFlow CI exige `composer.lock` cuando existe `composer.json`.
-- El deploy automatico **no ejecuta migraciones de produccion**.
+- Se agrego un reporter de SonarQube Cloud para PRs sin duplicar el analisis automatico.
+- Cuando finaliza `SonarCloud Code Analysis`, GrindFlow consulta la Web API de
+  Sonar y crea o actualiza un unico comentario **SonarQube Cloud · Full PR details**.
+- El comentario refleja Quality Gate, condiciones, issues, Security Hotspots,
+  archivo/linea, regla, estado e impactos disponibles.
+- El reporter obtiene automaticamente el project key desde el check nativo de Sonar.
+- Si la API requiere autenticacion, soporta el secreto opcional `SONAR_TOKEN`.
+- GrindFlow CI compila el script Python para evitar que una regresion de sintaxis
+  rompa silenciosamente el reporter.
+- El frontend visual Laravel sigue desarrollandose en paralelo sobre
+  `ui/laravel-visual-shell`.
 
 ## Archivos modificados en este deploy
 
-Ultimo cambio funcional ya integrado en `main`:
-
-- `app/Contracts/OrganizationAwareJob.php` — contrato tenant-aware e idempotencia.
-- `app/Http/Requests/Auth/LoginRequest.php` — autenticacion, normalizacion y rate limit.
-- `app/Models/User.php`, `Organization.php`, `Membership.php` — identidad y tenancy.
-- `app/Support/Tenancy/TenantContext.php` — contexto PostgreSQL por usuario.
-- `app/Policies/` — autorizacion de organizaciones y memberships.
-- `database/migrations/2026_09_18_000100_create_identity_tables.php` — tablas de identidad.
-- `database/migrations/2026_09_18_000200_enable_identity_rls.php` — RLS e invariantes.
-- `tests/Feature/AuthenticationTest.php` — login, logout y lockout.
-- `tests/Feature/TenancyRlsTest.php` — aislamiento PostgreSQL real.
-- `README.md` y `docs/REQUIREMENTS.md` — trazabilidad del estado.
-
-Cambio operativo actualmente en PR #7:
-
-- `scripts/deploy-hostinger.sh` — preparacion reproducible del deploy Laravel.
-- `docs/DEPLOY-HOSTINGER.md` — contrato operativo de Hostinger.
-- `docs/DESPLIEGUE.md` — marcado como guia historica del legado.
-- `.github/workflows/grindflow-ci.yml` — valida el deploy y exige `composer.lock`.
-- `composer.json` — contrato de plataforma PHP 8.5.
-- `composer.lock` — resolucion reproducible de dependencias PHP.
+- `.github/workflows/sonar-pr-details.yml` — reacciona al check externo de Sonar.
+- `scripts/sonar-pr-comment.py` — consulta Sonar y mantiene el comentario de PR.
+- `.github/workflows/grindflow-ci.yml` — valida sintaxis del reporter.
+- `AGENTS.md` — obliga a revisar el comentario sincronizado antes de concluir
+  que Sonar no expone detalles.
+- `docs/DEVELOPMENT-MODEL.md` — documenta el mirror de observabilidad.
 
 ## Validación
 
-- GF-MIG-002 fue fusionado en `main` como
-  `f3b6ecc397d1076ee33968f5f033bdc35f9885f0`.
-- Ese SHA exacto paso **GrindFlow CI / validate**.
-- El gate de PostgreSQL 16 paso las pruebas sensibles de RLS.
-- PHPUnit, Pint y Larastan pasaron.
-- CodeRabbit quedo sin review threads abiertos en la PR #4.
-- SonarQube Cloud dejo el **Quality Gate verde** y 0 Security Hotspots; mantiene
-  1 issue no bloqueante pendiente de inspeccion manual en SonarCloud.
-- Produccion confirmo anteriormente que Apache + PHP 8.5 + Laravel arrancan en
-  `grindflow.com.co`.
-- El lock fue generado en GitHub Actions usando PHP 8.5 y paso `composer validate --strict`.
-- GF-MIG-002 todavia **NO** esta VALIDATED IN PRODUCTION: falta conectar y
-  verificar PostgreSQL con un rol runtime real y comprobar login/dashboard.
-- CI verde significa **VALIDATED IN CODE**, no validacion de produccion.
-- No se ejecutan migraciones de produccion automaticamente.
+- El reporter usa `check_run: completed`, que se ejecuta en el contexto de la
+  rama por defecto y no ejecuta codigo de la PR.
+- El workflow solo actua cuando la app del check es `sonarqubecloud` y el check
+  se llama `SonarCloud Code Analysis`.
+- El proyecto Sonar detectado actualmente es `drpipe1098-commits_GrindFlow`.
+- La PR de esta entrega debe pasar `GrindFlow CI / validate`, SonarQube Cloud y
+  CodeRabbit antes del merge.
+- La primera prueba end-to-end del comentario se realizara con la siguiente PR
+  visual una vez este workflow exista en `main`.
+- El Quality Gate nativo de Sonar sigue siendo la fuente autoritativa.
 
 ## Qué sigue
 
-- **P0:** cerrar PR #7 y validar el deploy reproducible de Hostinger.
-- **P0:** definir y aplicar el contrato PostgreSQL de produccion con rol de
-  migraciones separado del rol runtime.
-- **P0:** desplegar GF-MIG-002 y validar login/dashboard + aislamiento tenant en
-  produccion.
-- **P0:** proteger `main` exigiendo `GrindFlow CI / validate` antes de merge.
-- Despues iniciar el **P1 Shell visual Laravel** y sustituir el placeholder del
-  gate browser por pruebas end-to-end reales.
+- Fusionar esta mejora de observabilidad.
+- Abrir la PR del **P1 Shell visual Laravel** y usarla como primera validacion real
+  del comentario Sonar sincronizado.
+- Continuar despues con browser tests reales para login/dashboard.
 
 ## Panorama general pendiente
 
 - **P0 — Produccion / DB:** separar rol owner/migraciones y rol runtime sin
   superuser, `BYPASSRLS` ni ownership sobre tablas protegidas.
-- **P0 — Deploy:** PR #7 implementa el flujo reproducible; falta validarlo en
-  Hostinger real con smoke test.
 - **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta deploy y validacion de
-  produccion.
-- **P0 — Branch protection:** `main` sigue sin proteccion obligatoria; configurar
-  `GrindFlow CI / validate` como required status check.
-- **P0 — Dependencias PHP:** `composer.lock` generado sobre PHP 8.5 y exigido
-  por CI; el siguiente deploy debe instalar exactamente ese lock.
-- **P1 — UI:** shell Blade/Livewire + Tailwind, navegacion, responsive,
-  accesibilidad y estados base.
-- **P1 — Browser tests:** reemplazar placeholder por Dusk o Playwright y cubrir
-  login/dashboard.
-- **P1 — Media Vault / ingesta:** migrar modelos, almacenamiento S3, uploads,
-  deduplicacion y conectores.
-- **P1 — Procesamiento / scheduling:** migrar jobs idempotentes, pipeline de
-  medios, scheduler y reglas.
+  produccion contra PostgreSQL runtime.
+- **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required
+  status check de `main`.
+- **P1 — UI:** shell visual Blade/Livewire en desarrollo.
+- **P1 — Browser tests:** sustituir el placeholder por pruebas reales de
+  landing/login/dashboard.
+- **P1 — Media Vault / ingesta:** migrar modelos, S3, uploads y deduplicacion.
+- **P1 — Procesamiento / scheduling:** jobs idempotentes, pipeline y scheduler.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
-- **P2 — Integraciones / distribucion:** migrar destinos, credenciales y
-  publicacion con backoff/idempotencia.
+- **P2 — Integraciones / distribucion:** migrar destinos y publicacion.
 - **P2 — Trafico / atribucion:** enlaces, eventos y agregacion.
 - **P2 — Finanzas:** libro y vistas por rol con aislamiento tenant.
-- **P2 — Servicios reales:** smoke tests controlados de almacenamiento y
-  conectores.
-- **P3 — Retiro legado:** borrar Next.js/TypeScript solo cuando exista paridad
-  Laravel VALIDATED IN CODE.
-- **P3 — Simplificacion CI:** retirar el gate `legacy` y dependencias Node
-  despues de GF-MIG-004.
+- **P3 — Retiro legado:** borrar Next.js/TypeScript solo con paridad Laravel.
+- **P3 — Simplificacion CI:** retirar `legacy` despues de GF-MIG-004.
