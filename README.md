@@ -52,10 +52,15 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del slice: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado actual del slice: **VALIDATED IN CODE**.
+- PR #48 paso `fast`, `php-quality`, `tests`, `database`, `browser` y
+  `validate`; `legacy` quedo correctamente `skipped`.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- CodeRabbit sigue siendo asesor; no habia review threads abiertos al merge.
+- PR #48 fue fusionado a `main` como
+  `36be1814193b3feb6e7b7cdb7b0e6b96159756a6`.
 - PR #47 Dropbox adapter: **VALIDATED IN CODE**.
-- Este slice incluye una migracion MariaDB aditiva, por lo que debe pasar database
-  gate antes de merge.
+- La migracion MariaDB aditiva paso el database gate real.
 - No se llama a Dropbox real, no se escriben credenciales reales y no se toca
   produccion desde CI.
 - No se declara DEPLOYED ni VALIDATED IN PRODUCTION hasta merge + migracion
@@ -63,10 +68,8 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit, MariaDB y `validate`; browser/legacy solo si el
-  selector determina que aplican.
-- Resolver cualquier finding vigente de Sonar/CodeRabbit y fusionar.
-- Dejar que Production Smoke detecte la migracion pendiente, sin ejecutarla.
+- Dar tiempo al deploy de Hostinger y usar un nuevo Production Smoke para
+  detectar la migracion pendiente, sin ejecutarla.
 - Aplicar la migracion mediante el bridge OWNER-only solo con aprobacion
   operacional explicita.
 - Despues portar OAuth/refresh de Dropbox sobre esta capa, sin duplicar storage,
@@ -80,9 +83,9 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox adapter VALIDATED IN CODE; conexiones
-  cifradas + scheduler IMPLEMENTED, pendiente CI/migracion; despues OAuth/refresh
-  y Google Drive.
+- **P1 — Media Vault / ingesta:** Dropbox adapter + conexiones cifradas +
+  scheduler VALIDATED IN CODE; pendiente migracion explicita; despues
+  OAuth/refresh y Google Drive.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** media scan scheduling IMPLEMENTED en este
   slice; pipeline de procesamiento general sigue pendiente.
