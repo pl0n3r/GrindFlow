@@ -50,6 +50,12 @@ vault with traceable source metadata.
 - Dropbox adapter tests cover listing normalization, pre-download authorization,
   stable source reuse, streamed staging and safe provider failures without real
   API credentials.
+- Connector credentials are encrypted at rest with versioned AES-256-GCM and
+  tenant/provider-bound authenticated context.
+- Scheduled scans revalidate actor authorization, persist cursors, claim due
+  connections before dispatch and remain retry-safe.
+- HTTP 401 transitions a connection to reconnect-required while HTTP 429 defers
+  work without consuming the persistent failure budget.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
