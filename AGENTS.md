@@ -126,18 +126,24 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   adaptadores no duplican esa logica.
 - Google Drive v3 normaliza solo blobs de imagen/video descargables. Los
   documentos nativos de Workspace requieren export y no entran por alt=media.
-- nextPageToken de Drive es solo cursor de paginacion de una consulta activa;
-  no se persiste como cursor incremental entre scans. El incremental durable
-  debe implementarse con el contrato de Changes API en un slice posterior.
+- En Google Drive, `files.list.nextPageToken` solo continua el bootstrap y
+  nunca se usa como cursor incremental. El cursor durable viene exclusivamente
+  de Changes API.
+- El bootstrap Google captura y persiste `changes.getStartPageToken` ANTES de
+  iniciar `files.list`; asi ningun cambio ocurrido durante el listado inicial
+  queda fuera del feed incremental.
+- `media_connections.cursor` guarda JSON versionado para Google con modo
+  `bootstrap` o `changes`. Cada pagina procesada persiste su siguiente token
+  antes de continuar; al final de Changes se guarda `newStartPageToken`.
 - Dropbox y Google Drive comparten OAuthPendingState +
   OAuthConnectionCoordinator. Ningun proveedor nuevo duplica validacion de
   state, binding actor/organizacion, replay protection o errores del callback.
-- Google Drive OAuth usa access_type=offline, prompt=consent y
-  drive.readonly. Las conexiones Google nacen paused y next_scan_at=null hasta
-  que Changes API habilite un cursor incremental durable.
+- Google Drive OAuth usa access_type=offline, prompt=consent y drive.readonly.
+  Las conexiones Google nacen active y se programan igual que Dropbox; su
+  scanner decide bootstrap vs Changes segun el cursor durable.
 - MediaConnectionTokenProvider es provider-aware: refresca Dropbox o Google
   segun provider, conserva refresh token si el proveedor no devuelve uno nuevo
-  y nunca cambia una conexion Google pausada a active durante un refresh.
+  y el refresh nunca altera status/next_scan_at de la conexion.
 
 ### Regla de direct uploads del Vault
 
