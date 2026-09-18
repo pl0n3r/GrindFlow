@@ -26,6 +26,26 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
 
+### Regla de eficiencia CI
+
+- `GrindFlow CI / validate` conserva su nombre estable y agrega resultados de
+  gates selectivos; los jobs omitidos por no aplicar cuentan como `skipped`,
+  nunca como validacion ejecutada.
+- Cambiar `.github/workflows/grindflow-ci.yml` o lanzar `workflow_dispatch`
+  fuerza todos los gates disponibles para validar el propio CI.
+- Cambios de documentacion/README/AGENTS y scripts ya cubiertos por validacion de
+  sintaxis no deben arrancar PHPUnit, browser, MariaDB o legado salvo que tambien
+  toquen rutas de codigo asociadas.
+- `php-quality`, `tests`, `database`, `browser` y `legacy` se seleccionan
+  por paths conservadores. Si existe duda sobre impacto funcional se prefiere
+  ejecutar el gate, no omitirlo.
+- Composer usa cache de descargas indexada por `composer.lock`; npm mantiene
+  cache por `package-lock.json`. El cache acelera instalaciones pero no sustituye
+  `composer install` ni `npm ci`.
+- Todos los jobs pesados tienen timeout explicito para evitar runners colgados.
+- Optimizar CI nunca significa reducir cobertura necesaria ni saltarse la
+  validacion exacta de cambios sensibles a base, navegador o legado.
+
 ### Regla del README estilo BRVTAL
 
 El `README.md` de GrindFlow sigue el mismo modelo operativo de BRVTAL: es una
