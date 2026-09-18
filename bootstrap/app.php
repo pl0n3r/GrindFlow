@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ApplyTenantUserContext;
+use App\Http\Middleware\ResolveOrganizationContext;
 use App\Support\Diagnostics\DiagnosticLog;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant.user' => ApplyTenantUserContext::class,
+            'tenant.organization' => ResolveOrganizationContext::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
