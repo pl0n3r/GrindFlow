@@ -33,7 +33,7 @@ class DropboxOAuthClient
     public function exchangeAuthorizationCode(
         string $code,
         string $redirectUri,
-    ): DropboxAuthorizationTokens {
+    ): OAuthAuthorizationTokens {
         [$appKey, $appSecret] = $this->credentials();
 
         if ($code === '' || $redirectUri === '') {
@@ -79,7 +79,7 @@ class DropboxOAuthClient
 
         $accountIdentifier = $payload['account_id'] ?? null;
 
-        return new DropboxAuthorizationTokens(
+        return new OAuthAuthorizationTokens(
             $accessToken,
             $refreshToken,
             $this->boundedExpiry($expiresIn),
