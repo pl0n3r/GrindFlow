@@ -47,6 +47,9 @@ vault with traceable source metadata.
   failure state and two different source refs converging to one blob.
 - Future connectors target the shared `StagedMediaSource` handoff instead of
   duplicating blob/asset/job orchestration.
+- Dropbox adapter tests cover listing normalization, pre-download authorization,
+  stable source reuse, streamed staging and safe provider failures without real
+  API credentials.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
