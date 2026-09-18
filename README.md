@@ -32,9 +32,8 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `ci/real-browser-smoke`.
-- Pendiente de volver a pasar browser, `GrindFlow CI / validate`, SonarQube Cloud
-  y revision de CodeRabbit sobre este head rebasado.
+- Estado actual: **VALIDATED IN CODE** en `ci/real-browser-smoke`.
+- Browser real, `GrindFlow CI / validate` y SonarQube Cloud pasaron sobre el head rebasado.
 - MariaDB 11.4, GF-MIG-001 y GF-MIG-002 permanecen VALIDATED IN CODE.
 - No se ejecutan migraciones ni acciones contra produccion.
 
@@ -51,7 +50,7 @@ siguiente deploy.
 - **P0 — Identidad / tenancy:** VALIDATED IN CODE sobre MariaDB; falta validacion de produccion.
 - **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required status check de `main`.
 - **P1 — UI:** shell visual VALIDATED IN CODE; pendiente de deploy Hostinger.
-- **P1 — Browser tests:** smoke invitado IMPLEMENTED; pendiente de CI/review.
+- **P1 — Browser tests:** smoke invitado VALIDATED IN CODE; pendiente de merge/exact-main CI.
 - **P1 — Browser autenticado:** crear datos E2E desechables y cubrir login/dashboard real.
 - **P1 — Media Vault / ingesta:** migrar modelos, S3, uploads y deduplicacion.
 - **P1 — Procesamiento / scheduling:** jobs idempotentes, pipeline y scheduler.
