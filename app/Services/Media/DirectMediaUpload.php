@@ -130,7 +130,7 @@ class DirectMediaUpload
 
         $stream = $filesystem->readStream($storageKey);
 
-        if ($stream === false) {
+        if ($stream === null) {
             throw new RuntimeException('Unable to open the uploaded object for integrity verification.');
         }
 
