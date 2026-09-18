@@ -67,6 +67,18 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   tokens ni secretos.
 - `deleteAfterIngest` solo se activa para objetos staged temporales que puedan
   eliminarse despues de una ingesta confirmada.
+- Los adaptadores de proveedor reciben access tokens solo como input transitorio.
+  Nunca los persisten en source refs, metadata, errores, logs o Diagnostics.
+- Un adaptador debe autorizar tenant/actor **antes** de descargar bytes remotos.
+  Si la misma source/version ya tiene una ingesta, debe reutilizarla sin volver a
+  descargar.
+- Los bytes remotos se escriben por stream en `MEDIA_STAGING_DISK`; los staging
+  keys usan UUID y nunca nombres remotos. Si enqueue falla, el staging nuevo se
+  limpia en best-effort.
+- Errores de proveedor se normalizan a codigos seguros. Un 401 pide reconexion;
+  un 429 conserva un Retry-After acotado; nunca se guarda el body crudo.
+- La validacion MIME de ingestas staged prioriza deteccion por contenido desde el
+  archivo temporal. Metadata del proveedor/storage es solo fallback.
 
 ### Regla de direct uploads del Vault
 
