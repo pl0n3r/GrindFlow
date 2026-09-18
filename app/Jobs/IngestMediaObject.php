@@ -90,8 +90,7 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
     public function handle(
         FilesystemMediaIngestor $ingestor,
         MediaProcessingCoordinator $processing,
-    ): void
-    {
+    ): void {
         $actor = User::query()->findOrFail($this->actor);
 
         if ($actor->canManageOrganization($this->organization) === false) {
