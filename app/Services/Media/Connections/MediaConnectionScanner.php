@@ -6,11 +6,16 @@ use App\Models\MediaConnection;
 use App\Models\User;
 use App\Services\Media\Connectors\DropboxMediaAdapter;
 use App\Services\Media\Connectors\MediaConnectorException;
+use App\Support\Security\SecretCipher;
+use App\Support\Security\SecretCryptoException;
 use InvalidArgumentException;
 
 class MediaConnectionScanner
 {
-    public function __construct(private readonly DropboxMediaAdapter $dropbox) {}
+    public function __construct(
+        private readonly DropboxMediaAdapter $dropbox,
+        private readonly SecretCipher $cipher,
+    ) {}
 
     public function scan(MediaConnection $connection, User $actor): void
     {
@@ -29,6 +34,8 @@ class MediaConnectionScanner
                 MediaConnection::PROVIDER_DROPBOX => $this->scanDropbox($connection, $actor),
                 default => throw new InvalidArgumentException('Unsupported media connection provider.'),
             };
+        } catch (SecretCryptoException) {
+            $this->needsReconnect($connection, 'connection_credentials_unreadable');
         } catch (MediaConnectorException $exception) {
             $this->handleConnectorFailure($connection, $exception);
         }
@@ -36,17 +43,18 @@ class MediaConnectionScanner
 
     private function scanDropbox(MediaConnection $connection, User $actor): void
     {
-        $credentials = $connection->credentials;
-        $accessToken = is_array($credentials)
-            && is_string($credentials['access_token'] ?? null)
-            ? $credentials['access_token']
-            : '';
+        $ciphertext = $connection->access_ciphertext;
 
-        if ($accessToken === '') {
+        if (is_string($ciphertext) === false || $ciphertext === '') {
             $this->needsReconnect($connection, 'connection_credentials_missing');
 
             return;
         }
+
+        $accessToken = $this->cipher->decrypt(
+            $ciphertext,
+            $connection->cryptoContext(),
+        );
 
         $cursor = is_string($connection->cursor) && $connection->cursor !== ''
             ? $connection->cursor
