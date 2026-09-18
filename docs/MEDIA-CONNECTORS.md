@@ -148,8 +148,8 @@ Current behavior:
 - Google Workspace-native documents are intentionally skipped because they
   require export semantics instead of blob `alt=media` download
 - blob bytes download through `files.get?alt=media`
-- provider page tokens are pagination tokens only; they are not treated as a
-  durable incremental-change cursor
+- `files.list` page tokens are bootstrap-pagination tokens only and are never
+  treated as durable incremental-change cursors
 - staging, source idempotency, byte limits, tenant authorization and cleanup are
   delegated to the shared `ConnectorMediaStager`
 - source type is `google_drive` and the source ref is versioned from Drive file
@@ -157,8 +157,8 @@ Current behavior:
 - HTTP 401 requests reconnect, HTTP 429 returns bounded Retry-After, and raw
   provider bodies are never propagated
 
-OAuth connection, refresh and scheduled change tracking for Google Drive remain
-separate follow-up slices. The adapter itself does not persist credentials.
+OAuth connection, refresh and scheduled change tracking are implemented in the
+connection layer. The adapter itself still does not persist credentials.
 
 
 ## Google Drive OAuth and refresh
@@ -182,8 +182,34 @@ Authorization-code exchange and refresh use
 only through `MediaConnectionManager` and remain bound to the
 organization/provider AAD.
 
-Google Drive connections are created in `paused` state with no
-`next_scan_at`. This is deliberate: scheduled Drive scans must not start until
-the Changes API slice establishes a durable incremental cursor. Token refresh is
-already provider-aware and preserves the encrypted refresh token when Google's
-refresh response omits one.
+Google Drive connections are created active with `next_scan_at` scheduled.
+Token refresh is provider-aware, preserves the existing lifecycle state and
+retains the encrypted refresh token when Google's refresh response omits one.
+
+## Google Drive incremental scans
+
+Drive scans use two cursor phases stored in the existing `media_connections.cursor`
+TEXT field as versioned JSON.
+
+1. **Bootstrap:** call `changes.getStartPageToken` first and persist that token
+   before listing current media with `files.list`.
+2. Continue any `files.list.nextPageToken` only inside the bootstrap phase.
+3. When the current file listing finishes, transition to the previously captured
+   Changes token.
+4. Poll `changes.list`. While `nextPageToken` exists, persist it after each
+   processed page.
+5. At the end of the feed, persist `newStartPageToken` for the next scheduled
+   scan.
+
+Capturing the Changes start token before the baseline file listing closes the
+race where a file could change while the bootstrap is still paging. Replaying a
+page after a worker crash is safe because the shared stager is idempotent by
+provider file/version.
+
+Removed, trashed, non-downloadable and non-image/video changes are ignored.
+Optional root-folder connections apply the same direct-parent filter to change
+payloads that the bootstrap listing uses.
+
+The shared page budget applies across bootstrap and Changes pages. When it is
+exhausted, the exact durable cursor is kept and the connection is rescheduled
+for one minute later instead of restarting the scan.

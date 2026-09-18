@@ -133,6 +133,148 @@ class GoogleDriveMediaAdapterTest extends TestCase
         });
     }
 
+    public function test_start_page_token_uses_drive_changes_endpoint(): void
+    {
+        Http::fake([
+            'https://www.googleapis.com/drive/v3/changes/startPageToken*' => Http::response([
+                'startPageToken' => 'start-token-100',
+            ]),
+        ]);
+
+        $token = app(GoogleDriveMediaAdapter::class)
+            ->startPageToken('google-access-token');
+
+        $this->assertSame('start-token-100', $token);
+
+        Http::assertSent(function (Request $request): bool {
+            return str_starts_with(
+                $request->url(),
+                'https://www.googleapis.com/drive/v3/changes/startPageToken?',
+            )
+                && $request->hasHeader(
+                    'Authorization',
+                    'Bearer google-access-token',
+                );
+        });
+    }
+
+    public function test_list_changes_normalizes_current_media_and_preserves_next_page_token(): void
+    {
+        Http::fake([
+            'https://www.googleapis.com/drive/v3/changes*' => Http::response([
+                'changes' => [
+                    [
+                        'fileId' => 'removed-1',
+                        'removed' => true,
+                    ],
+                    [
+                        'fileId' => 'trashed-1',
+                        'removed' => false,
+                        'file' => [
+                            'id' => 'trashed-1',
+                            'name' => 'trashed.mp4',
+                            'mimeType' => 'video/mp4',
+                            'size' => '100',
+                            'modifiedTime' => '2026-09-18T14:00:00Z',
+                            'parents' => ['folder-123'],
+                            'trashed' => true,
+                            'capabilities' => ['canDownload' => true],
+                        ],
+                    ],
+                    [
+                        'fileId' => 'outside-1',
+                        'removed' => false,
+                        'file' => [
+                            'id' => 'outside-1',
+                            'name' => 'outside.mp4',
+                            'mimeType' => 'video/mp4',
+                            'size' => '100',
+                            'modifiedTime' => '2026-09-18T14:00:00Z',
+                            'parents' => ['other-folder'],
+                            'trashed' => false,
+                            'capabilities' => ['canDownload' => true],
+                        ],
+                    ],
+                    [
+                        'fileId' => 'file-99',
+                        'removed' => false,
+                        'file' => [
+                            'id' => 'file-99',
+                            'name' => 'changed.mp4',
+                            'mimeType' => 'video/mp4',
+                            'size' => '4096',
+                            'modifiedTime' => '2026-09-18T14:30:00Z',
+                            'md5Checksum' => 'changed-md5',
+                            'parents' => ['folder-123'],
+                            'trashed' => false,
+                            'capabilities' => ['canDownload' => true],
+                        ],
+                    ],
+                ],
+                'nextPageToken' => 'changes-page-2',
+            ]),
+        ]);
+
+        $listing = app(GoogleDriveMediaAdapter::class)->listChanges(
+            'google-access-token',
+            'changes-page-1',
+            'folder-123',
+        );
+
+        $this->assertCount(1, $listing->files);
+        $this->assertTrue($listing->hasMore());
+        $this->assertSame('changes-page-2', $listing->nextPageToken);
+        $this->assertNull($listing->newStartPageToken);
+        $this->assertSame('file-99', $listing->files[0]->id);
+        $this->assertSame('changed-md5', $listing->files[0]->checksum);
+
+        Http::assertSent(function (Request $request): bool {
+            if (
+                str_starts_with(
+                    $request->url(),
+                    'https://www.googleapis.com/drive/v3/changes?',
+                ) === false
+            ) {
+                return false;
+            }
+
+            $query = parse_url($request->url(), PHP_URL_QUERY);
+
+            if (is_string($query) === false) {
+                return false;
+            }
+
+            parse_str($query, $values);
+
+            return ($values['pageToken'] ?? null) === 'changes-page-1'
+                && ($values['pageSize'] ?? null) === '500'
+                && ($values['spaces'] ?? null) === 'drive'
+                && ($values['includeRemoved'] ?? null) === '1';
+        });
+    }
+
+    public function test_list_changes_returns_new_start_page_token_at_feed_end(): void
+    {
+        Http::fake([
+            'https://www.googleapis.com/drive/v3/changes*' => Http::response([
+                'changes' => [],
+                'newStartPageToken' => 'changes-start-300',
+            ]),
+        ]);
+
+        $listing = app(GoogleDriveMediaAdapter::class)->listChanges(
+            'google-access-token',
+            'changes-start-200',
+        );
+
+        $this->assertFalse($listing->hasMore());
+        $this->assertNull($listing->nextPageToken);
+        $this->assertSame(
+            'changes-start-300',
+            $listing->newStartPageToken,
+        );
+    }
+
     public function test_stage_and_queue_downloads_blob_once_and_reuses_existing_source(): void
     {
         Queue::fake();

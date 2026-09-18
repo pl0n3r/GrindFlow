@@ -181,8 +181,8 @@
 
                         @if ($googleDriveConnectionCount > 0)
                             <p class="gf-media-meta">
-                                Google Drive queda conectado y cifrado, pero sus scans permanecen
-                                pausados hasta habilitar Changes API en el siguiente slice.
+                                Google Drive usa un bootstrap inicial y luego Changes API para
+                                continuar scans incrementales con cursor durable.
                             </p>
                         @endif
                     </div>

@@ -70,7 +70,7 @@ class MediaConnectionManager
             $tokenExpiresAt,
             $scopes,
             $accountIdentifier,
-            false,
+            true,
         );
     }
 
@@ -93,7 +93,6 @@ class MediaConnectionManager
             $refreshToken,
             $tokenExpiresAt,
             $scopes,
-            true,
         );
     }
 
@@ -116,7 +115,6 @@ class MediaConnectionManager
             $refreshToken,
             $tokenExpiresAt,
             $scopes,
-            false,
         );
     }
 
@@ -135,12 +133,6 @@ class MediaConnectionManager
     public function resume(MediaConnection $connection, User $actor): MediaConnection
     {
         $this->assertConnectionAccess($connection, $actor);
-
-        if ($connection->provider === MediaConnection::PROVIDER_GOOGLE_DRIVE) {
-            throw new InvalidArgumentException(
-                'Google Drive scheduling requires Changes API support first.',
-            );
-        }
 
         $connection->forceFill([
             'authorized_by_user_id' => $actor->getKey(),
@@ -232,7 +224,6 @@ class MediaConnectionManager
         ?string $refreshToken,
         ?\DateTimeInterface $tokenExpiresAt,
         ?array $scopes,
-        bool $activate,
     ): MediaConnection {
         $this->assertConnectionAccess($connection, $actor);
         $this->assertText($accessToken, 16_384, 'Access token');
@@ -257,10 +248,8 @@ class MediaConnectionManager
             'scopes' => $scopes === null
                 ? $connection->scopes
                 : $this->normalizedScopes($scopes),
-            'status' => $activate
-                ? MediaConnection::STATUS_ACTIVE
-                : MediaConnection::STATUS_PAUSED,
-            'next_scan_at' => $activate ? now() : null,
+            'status' => $connection->status,
+            'next_scan_at' => $connection->next_scan_at,
             'last_error' => null,
             'consecutive_failures' => 0,
         ])->save();

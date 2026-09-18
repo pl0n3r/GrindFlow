@@ -93,7 +93,7 @@ class GoogleDriveOAuthConnectionTest extends TestCase
         );
     }
 
-    public function test_callback_creates_encrypted_paused_google_drive_connection(): void
+    public function test_callback_creates_encrypted_active_google_drive_connection(): void
     {
         [$user, $organization] = $this->manager();
         $state = $this->startAuthorization($user, $organization);
@@ -130,8 +130,8 @@ class GoogleDriveOAuthConnectionTest extends TestCase
                     MediaConnection::PROVIDER_GOOGLE_DRIVE,
                     $connection->provider,
                 );
-                $this->assertSame(MediaConnection::STATUS_PAUSED, $connection->status);
-                $this->assertNull($connection->next_scan_at);
+                $this->assertSame(MediaConnection::STATUS_ACTIVE, $connection->status);
+                $this->assertNotNull($connection->next_scan_at);
                 $this->assertSame([
                     'https://www.googleapis.com/auth/drive.readonly',
                 ], $connection->scopes);
@@ -168,7 +168,7 @@ class GoogleDriveOAuthConnectionTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_expiring_google_access_token_refreshes_and_remains_paused(): void
+    public function test_expiring_google_access_token_refreshes_and_remains_active(): void
     {
         [$user, $organization] = $this->manager();
 
@@ -213,8 +213,8 @@ class GoogleDriveOAuthConnectionTest extends TestCase
             function () use ($connection): void {
                 $fresh = MediaConnection::query()->findOrFail($connection->getKey());
 
-                $this->assertSame(MediaConnection::STATUS_PAUSED, $fresh->status);
-                $this->assertNull($fresh->next_scan_at);
+                $this->assertSame(MediaConnection::STATUS_ACTIVE, $fresh->status);
+                $this->assertNotNull($fresh->next_scan_at);
                 $this->assertSame([
                     'https://www.googleapis.com/auth/drive.readonly',
                 ], $fresh->scopes);
