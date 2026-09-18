@@ -109,6 +109,8 @@ production content.
 ## Migration requirements
 
 ### GF-MIG-001 — Laravel foundation
+**Status:** validated-in-code
+
 A Laravel 13 application using PHP 8.5 and PostgreSQL can install, boot and pass
 the fast/test CI gates.
 
