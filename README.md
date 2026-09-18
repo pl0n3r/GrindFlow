@@ -31,8 +31,8 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `test/authenticated-browser-e2e`.
-- Pendiente de browser, PHPUnit, Pint/Larastan, SonarQube Cloud y `GrindFlow CI / validate`.
+- Estado actual: **VALIDATED IN CODE** en `test/authenticated-browser-e2e`.
+- Browser autenticado, MariaDB, PHPUnit, Pint/Larastan, SonarQube Cloud y `GrindFlow CI / validate` pasaron.
 - El seeder rechaza ejecucion fuera de `local`/`testing`.
 - La prueba no toca MariaDB de produccion ni Hostinger.
 
@@ -49,7 +49,7 @@ siguiente deploy.
 - **P0 — Branch protection:** required `GrindFlow CI / validate` pendiente.
 - **P1 — UI:** shell visual y copy MariaDB VALIDATED IN CODE.
 - **P1 — Browser invitado:** VALIDATED IN CODE.
-- **P1 — Browser autenticado:** IMPLEMENTED; pendiente de CI/review.
+- **P1 — Browser autenticado:** VALIDATED IN CODE; pendiente de merge/exact-main CI.
 - **P1 — Media Vault / ingesta:** pendiente.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P2 — Integraciones / distribucion:** pendiente.
