@@ -99,6 +99,10 @@ Reglas:
   exista; no debe aparentar que produccion fue validada.
 - Para depurar produccion: primero revisar Production Smoke y Diagnostics,
   despues logs internos si siguen haciendo falta; SSH queda como ultimo recurso.
+- En Hostinger Web/Cloud, un Redeploy de Git no se considera equivalente a ejecutar
+  `scripts/deploy-hostinger.sh`. GrindFlow debe tolerar deploys Git-only sin dejar
+  route/config/view cache de una revision anterior. `ReleaseCacheGuard` es parte
+  del contrato operativo y no se elimina sin reemplazo equivalente validado.
 - Las migraciones de produccion nunca las ejecuta CI ni el smoke. El camino
   preferido para el operador es `Admin > System > Run pending migrations`;
   requiere admin, CSRF y ejecucion explicita. SSH es solo fallback de recuperacion.
