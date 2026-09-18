@@ -21,6 +21,7 @@ class MediaConnection extends TenantModel
         'authorized_by_user_id',
         'provider',
         'label',
+        'account_identifier',
         'cursor',
         'root_path',
         'status',
@@ -29,21 +30,24 @@ class MediaConnection extends TenantModel
         'last_scan_at',
         'consecutive_failures',
         'last_error',
+        'scopes',
         'metadata',
     ];
 
     protected $hidden = [
-        'credentials',
+        'access_ciphertext',
+        'refresh_ciphertext',
     ];
 
     protected function casts(): array
     {
         return [
-            'credentials' => 'encrypted:array',
+            'token_expires_at' => 'datetime',
             'next_scan_at' => 'datetime',
             'last_scan_at' => 'datetime',
             'scan_interval_minutes' => 'integer',
             'consecutive_failures' => 'integer',
+            'scopes' => 'array',
             'metadata' => 'array',
         ];
     }
@@ -54,5 +58,14 @@ class MediaConnection extends TenantModel
     public function authorizedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'authorized_by_user_id');
+    }
+
+    public function cryptoContext(): string
+    {
+        return sprintf(
+            'grindflow:cloud:%s:%s',
+            (string) $this->organization_id,
+            $this->provider,
+        );
     }
 }
