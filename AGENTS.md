@@ -26,6 +26,20 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
 
+### Regla del estado general y prioridades
+
+El `README.md` debe contener siempre una seccion **Estado general y prioridades**
+que funcione como tablero operativo del proyecto.
+
+- Todo agente debe leer esa seccion al iniciar una sesion, despues del contexto durable.
+- Toda PR que inicie, complete, bloquee, desbloquee o repriorice trabajo debe actualizar la fila correspondiente del README en la misma PR.
+- Todo trabajo nuevo relevante debe aparecer en el tablero con prioridad **P0, P1, P2 o P3**, estado, criterio de salida y referencia a requisito/PR cuando exista.
+- **P0** significa bloqueo de seguridad, integridad de datos, despliegue o base arquitectonica; se resuelve antes de trabajo dependiente de menor prioridad.
+- Se puede avanzar P1/P2 en paralelo con un P0 solo si el trabajo es realmente independiente y respeta la regla de paralelizacion.
+- No se marca un frente como VALIDATED IN CODE, DEPLOYED o VALIDATED IN PRODUCTION sin evidencia correspondiente. CI verde solo permite VALIDATED IN CODE cuando cubre las compuertas aplicables.
+- Si el README contradice codigo/tests/requisitos ya fusionados, prevalece la fuente mas fuerte y el README debe corregirse inmediatamente.
+- Las secciones historicas del legado no determinan la prioridad actual. La tabla superior del README es la referencia operativa.
+
 ### Cambio de arquitectura aprobado — 17 de septiembre de 2026
 
 GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
