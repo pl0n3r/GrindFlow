@@ -43,6 +43,8 @@
                     <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
                     <span class="gf-navitem__text">Analytics</span>
                 </span>
+
+                <x-admin-system-link />
             </nav>
 
             <div class="gf-sidebar__bottom">
