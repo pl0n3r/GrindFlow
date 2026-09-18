@@ -80,7 +80,6 @@ class MediaIngestionCoordinator
         return $ingestion;
     }
 
-
     public function findExistingSource(
         User $actor,
         string $sourceType,
