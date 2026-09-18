@@ -5,7 +5,6 @@ namespace App\Services\Media\Connectors;
 use App\Models\MediaIngestion;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use JsonException;
 
@@ -17,6 +16,7 @@ class DropboxMediaAdapter
 
     public function __construct(
         private readonly ConnectorMediaStager $stager,
+        private readonly ConnectorHttpPolicy $httpPolicy,
     ) {}
 
     public function listInitial(
@@ -76,7 +76,7 @@ class DropboxMediaAdapter
         string $path,
         array $payload,
     ): RemoteMediaListing {
-        $this->assertAccessToken($accessToken);
+        $this->httpPolicy->assertAccessToken($accessToken);
 
         try {
             $response = Http::withToken($accessToken)
@@ -88,7 +88,7 @@ class DropboxMediaAdapter
             throw MediaConnectorException::requestFailed();
         }
 
-        $this->assertSuccessful($response);
+        $this->httpPolicy->assertSuccessful($response);
 
         $data = $response->json();
 
@@ -184,7 +184,7 @@ class DropboxMediaAdapter
             throw MediaConnectorException::downloadFailed();
         }
 
-        $this->assertAccessToken($accessToken);
+        $this->httpPolicy->assertAccessToken($accessToken);
 
         try {
             $response = Http::withOptions([
@@ -201,51 +201,8 @@ class DropboxMediaAdapter
             throw MediaConnectorException::downloadFailed();
         }
 
-        $this->assertSuccessful($response, true);
+        $this->httpPolicy->assertSuccessful($response, true);
 
-        $stream = $response->toPsrResponse()
-            ->getBody()
-            ->detach();
-
-        if (is_resource($stream) === false) {
-            throw MediaConnectorException::downloadFailed();
-        }
-
-        return $stream;
-    }
-
-    private function assertSuccessful(
-        Response $response,
-        bool $download = false,
-    ): void {
-        if ($response->successful()) {
-            return;
-        }
-
-        if ($response->status() === 401) {
-            throw MediaConnectorException::unauthorized();
-        }
-
-        if ($response->status() === 429) {
-            $retryAfter = $response->header('Retry-After');
-            $retryAfterSeconds = is_numeric($retryAfter)
-                ? max(1, min((int) $retryAfter, 3600))
-                : null;
-
-            throw MediaConnectorException::rateLimited(
-                $retryAfterSeconds,
-            );
-        }
-
-        throw $download
-            ? MediaConnectorException::downloadFailed()
-            : MediaConnectorException::requestFailed();
-    }
-
-    private function assertAccessToken(string $accessToken): void
-    {
-        if ($accessToken === '') {
-            throw MediaConnectorException::unauthorized();
-        }
+        return $this->httpPolicy->detachStream($response);
     }
 }
