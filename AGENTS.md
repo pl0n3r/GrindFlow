@@ -50,6 +50,12 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   mismo GET de Vault ya existente, sin una recarga o request E2E adicional.
 - Las pruebas de upload que escriban bytes en produccion requieren una accion
   explicitamente aprobada. El smoke normal permanece de solo lectura.
+- El disk Laravel preferido para direct upload es `media`. Su orden temporal de
+  configuracion es `MEDIA_STORAGE_*` -> `AWS_*` -> `R2_*` legado. El fallback
+  R2 existe solo para facilitar la migracion y puede retirarse cuando GF-MIG-003
+  cierre la paridad de Media Vault.
+- Browser direct upload exige CORS en el bucket para el origin de produccion y
+  metodo PUT. CORS nunca sustituye la autorizacion tenant ni la URL prefirmada.
 
 ### Regla de pruebas E2E eficientes
 
