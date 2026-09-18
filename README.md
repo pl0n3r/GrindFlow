@@ -11,6 +11,14 @@ siguiente deploy.
 
 ## Qué se hizo
 
+- Se endurecio el bridge de migraciones despues de un timeout transitorio del
+  preflight contra produccion.
+- Los GETs de login/System ahora tienen retries acotados y timeouts explicitos.
+- El POST que ejecuta migraciones **nunca** se reintenta automaticamente.
+- Si se pierde la respuesta del POST, el runner verifica el pending count antes
+  de declarar exito o fallo.
+- El artifact de fallo anterior confirmo que no se ejecuto ninguna migracion:
+  el timeout ocurrio antes de cargar el login y el resultado quedo sin pending count.
 - Se paso al siguiente frente accionable de P1: **Media Vault / ingesta**.
 - Se agrego `media_ingestions`, estado persistente tenant-owned para trabajos de
   ingesta con idempotencia por source.
@@ -31,6 +39,10 @@ siguiente deploy.
 
 ## Archivos modificados en este deploy
 
+- `scripts/run-production-migrations.sh` — preflight tolerante a red y verificacion post-POST.
+- `.github/workflows/production-migration.yml` — status seguro y fallo consistente.
+- `AGENTS.md` — contrato durable: retries de lectura si, POST de migracion no.
+- `README.md` — snapshot operativo actualizado.
 - `database/migrations/2026_09_18_090000_create_media_ingestions_table.php` —
   estado persistente, idempotencia y FK tenant-aware.
 - `app/Models/MediaIngestion.php` — modelo tenant-owned y estados.
@@ -46,7 +58,11 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE**.
+- Estado del hotfix: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- La migracion `media_ingestions` sigue pendiente en produccion.
+- El intento operacional anterior no hizo cambios: fallo por timeout de red antes
+  del login, confirmado en el run `35351726840`.
+- Media ingestion base permanece **VALIDATED IN CODE**.
 - PR #42 fue fusionado a `main` como `a2262a00307db6fddadd453a5887307a0afa3e8e`.
 - GrindFlow CI run #155 termino verde en `fast`, `php-quality`, `tests`, `database` y `validate`; `browser` y `legacy` quedaron correctamente `skipped`.
 - SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
@@ -59,11 +75,11 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Dejar que Production Smoke detecte la migracion pendiente sin ejecutarla.
-- Aplicar la migracion solo mediante la accion operacional explicita ya aprobada
-  para migraciones, no desde CI.
-- Despues, avanzar el adaptador generico que permita a futuros conectores staged
-  alimentar este mismo pipeline sin duplicar logica.
+- Pasar CI del hotfix y fusionarlo.
+- Reintentar la migracion aprobada mediante el bridge endurecido.
+- Confirmar pending migrations `1 -> 0` y dejar que Production Smoke cierre #44.
+- En paralelo, continuar el handoff generico para que futuros conectores staged
+  alimenten el mismo pipeline sin duplicar logica.
 
 ## Panorama general pendiente
 
