@@ -5,7 +5,6 @@ namespace App\Services\Media\Connectors;
 use App\Models\MediaIngestion;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class GoogleDriveMediaAdapter
@@ -14,6 +13,7 @@ class GoogleDriveMediaAdapter
 
     public function __construct(
         private readonly ConnectorMediaStager $stager,
+        private readonly ConnectorHttpPolicy $httpPolicy,
     ) {}
 
     public function listInitial(
@@ -32,7 +32,7 @@ class GoogleDriveMediaAdapter
         ?string $pageToken = null,
         ?string $rootFolderId = null,
     ): RemoteMediaListing {
-        $this->assertAccessToken($accessToken);
+        $this->httpPolicy->assertAccessToken($accessToken);
 
         if ($pageToken === '') {
             throw MediaConnectorException::requestFailed();
@@ -51,7 +51,7 @@ class GoogleDriveMediaAdapter
             throw MediaConnectorException::requestFailed();
         }
 
-        $this->assertSuccessful($response);
+        $this->httpPolicy->assertSuccessful($response);
 
         $data = $response->json();
 
@@ -196,7 +196,7 @@ class GoogleDriveMediaAdapter
         string $accessToken,
         string $fileId,
     ) {
-        $this->assertAccessToken($accessToken);
+        $this->httpPolicy->assertAccessToken($accessToken);
 
         try {
             $response = Http::withOptions([
@@ -216,51 +216,8 @@ class GoogleDriveMediaAdapter
             throw MediaConnectorException::downloadFailed();
         }
 
-        $this->assertSuccessful($response, true);
+        $this->httpPolicy->assertSuccessful($response, true);
 
-        $stream = $response->toPsrResponse()
-            ->getBody()
-            ->detach();
-
-        if (is_resource($stream) === false) {
-            throw MediaConnectorException::downloadFailed();
-        }
-
-        return $stream;
-    }
-
-    private function assertSuccessful(
-        Response $response,
-        bool $download = false,
-    ): void {
-        if ($response->successful()) {
-            return;
-        }
-
-        if ($response->status() === 401) {
-            throw MediaConnectorException::unauthorized();
-        }
-
-        if ($response->status() === 429) {
-            $retryAfter = $response->header('Retry-After');
-            $retryAfterSeconds = is_numeric($retryAfter)
-                ? max(1, min((int) $retryAfter, 3600))
-                : null;
-
-            throw MediaConnectorException::rateLimited(
-                $retryAfterSeconds,
-            );
-        }
-
-        throw $download
-            ? MediaConnectorException::downloadFailed()
-            : MediaConnectorException::requestFailed();
-    }
-
-    private function assertAccessToken(string $accessToken): void
-    {
-        if ($accessToken === '') {
-            throw MediaConnectorException::unauthorized();
-        }
+        return $this->httpPolicy->detachStream($response);
     }
 }
