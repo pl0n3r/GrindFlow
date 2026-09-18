@@ -1,5 +1,9 @@
 # Despliegue en VPS propio
 
+> **Documento del legado TypeScript/Next.js.** El despliegue Laravel actual en
+> Hostinger se documenta en `docs/DEPLOY-HOSTINGER.md`. Este archivo se conserva
+> durante la migracion para referencia funcional del stack anterior.
+
 El destino es un servidor propio (Hetzner u otro) con contenedores. Se descarto
 Vercel por dos razones concretas: sus terminos prohiben contenido adulto, y
 FFmpeg sobre video largo no cabe en los limites de ejecucion de una funcion
