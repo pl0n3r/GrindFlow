@@ -80,6 +80,34 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - La validacion MIME de ingestas staged prioriza deteccion por contenido desde el
   archivo temporal. Metadata del proveedor/storage es solo fallback.
 
+### Regla de conexiones y scans de media
+
+- Las credenciales persistentes de conectores viven solo en `media_connections`
+  como ciphertext versionado AES-256-GCM. El formato `v1.<iv>.<tag>.<ciphertext>`
+  usa `ENCRYPTION_MASTER_KEY`, no `APP_KEY`.
+- El AAD criptografico de cada secreto es
+  `grindflow:cloud:<organization_id>:<provider>`. Copiar un ciphertext a otro
+  tenant/proveedor debe hacer fallar el descifrado.
+- Solo `MediaConnectionManager` cifra o rota access/refresh tokens. Nunca se
+  guardan tokens en metadata, cursor, errores, logs, Diagnostics ni serializacion
+  del modelo.
+- El scheduler puede omitir `TenantScope` unicamente para descubrir conexiones
+  vencidas globalmente. Antes de dispatch debe revalidar actor + tenant y reclamar
+  atomica/logicamente la fila actualizando `next_scan_at`.
+- Cada scan ejecuta un `OrganizationAwareJob`, restaura `TenantContext` y
+  vuelve a comprobar que el actor siga autorizado.
+- HTTP 401 o credenciales ilegibles pasan la conexion a `needs_reconnect`.
+  HTTP 429 solo difiere `next_scan_at`; no consume el contador de fallos.
+- Los fallos transitorios distintos de 429 usan backoff acotado y solo persisten
+  codigos seguros. Nunca se persiste el body crudo del proveedor.
+- Los scans guardan el cursor mas reciente. Si alcanzan el presupuesto de paginas
+  reanudan pronto desde ese cursor en vez de reiniciar el arbol remoto.
+- El scheduler debe ser seguro durante deploy-before-migration: si
+  `media_connections` aun no existe, el tick devuelve cero sin romper la app.
+- OAuth handshake y refresh automatico de tokens se implementan en un slice
+  separado. Tener refresh token/expiry persistidos no autoriza inventar un flujo
+  de refresh incompleto.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
