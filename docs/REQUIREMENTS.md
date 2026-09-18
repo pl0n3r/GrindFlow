@@ -56,6 +56,9 @@ vault with traceable source metadata.
   connections before dispatch and remain retry-safe.
 - HTTP 401 transitions a connection to reconnect-required while HTTP 429 defers
   work without consuming the persistent failure budget.
+- Expiring Dropbox access tokens refresh from encrypted refresh tokens before
+  provider listing; invalid grants require reconnect and refresh 429 responses
+  defer without consuming failure budget.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
