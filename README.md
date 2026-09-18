@@ -11,6 +11,10 @@ siguiente deploy.
 
 ## Qué se hizo
 
+- Nueva regla operativa: el usuario E2E debe reutilizarse para cubrir el maximo
+  de validaciones posibles por sesion, evitando logins, recargas, esperas y runs
+  redundantes cuando no aporten evidencia nueva.
+
 - PR #30 fue fusionado a `main` como
   `8024c1ad8c02398ead148e33b928631a24d70541`.
 - `GrindFlow CI` quedo optimizado con seleccion de gates por paths,
@@ -40,6 +44,9 @@ siguiente deploy.
   tablas existentes.
 
 ## Archivos modificados en este deploy
+
+- `AGENTS.md` — regla durable de pruebas E2E eficientes y reutilizacion de sesion.
+- `README.md` — snapshot operativo de la nueva regla.
 
 - `.github/workflows/production-diagnostics.yml` — corrige Run ID/artifact en el comentario del bridge.
 - `.github/workflows/production-migration.yml` — accion OWNER-only para una migracion aprobada.
