@@ -56,6 +56,11 @@ siguiente deploy.
 
 ## Validación
 
+- Migracion de produccion validada mediante artifact del run `35312181673`:
+  `pending_before=1`, `pending_after=0`, `ok=true`.
+- Production Smoke autentico la cuenta E2E, valido Dashboard/System/Vault con
+  schema al dia y cerro automaticamente el incidente #27.
+
 - CI optimizado y bridge base: **VALIDATED IN CODE**.
 - PR #30: run #126 completo en verde.
 - SonarQube Cloud del PR #30: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
@@ -66,6 +71,10 @@ siguiente deploy.
   `legacy` quedaron correctamente `skipped`.
 
 ## Qué sigue
+
+- Retomar Media Vault sobre schema ya aplicado en produccion.
+- Reutilizar la misma sesion E2E para agrupar validaciones de solo lectura y
+  evitar logins/runs/esperas redundantes.
 
 - Validar y fusionar el bridge operacional de migracion.
 - Crear el issue durable `[AUTO] Production Migration Bridge`.
@@ -80,9 +89,10 @@ siguiente deploy.
   corregir/validar metadata y leer el primer artifact desde el conector.
 - **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE y confirmado en el
   run #128 con cinco gates pesados omitidos correctamente.
-- **P0 — Produccion / schema:** migracion Vault revisada como aditiva; bridge
-  OWNER-only IMPLEMENTED, pendiente CI/merge/ejecucion y verificacion 1 -> 0.
-- **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
+- **P0 — Produccion / schema:** RESUELTO. Bridge OWNER-only ejecuto la migracion
+  aprobada y verifico pending migrations `1 -> 0`.
+- **P0 — Produccion / smoke:** RESUELTO para el estado actual. Production Smoke
+  recupero en `beb5ad1e4961bb6ae9a72d018f4a6f448c8ffe67` y cerro automaticamente el issue #27.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN CODE; pendiente produccion
   y siguientes fases de upload/conectores/jobs.
