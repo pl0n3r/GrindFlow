@@ -12,11 +12,11 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟢 **BRVTAL delivery parity** | CI completo VALIDATED IN CODE |
-| Base exacta | ✅ **main** | `c074f0195247d80ee15005196dbb4abf628a2795` · media processing foundation #58 |
-| Cambio | ⚡ **CI lead-time** | full matrix #215: ~86 s; fan-out confirmado en paralelo |
-| Produccion | 🔒 **separada** | Production Smoke autenticado sigue independiente del source CI |
-| Migraciones | ✅ **ninguna** | cambio exclusivo de delivery/tooling |
+| Work line | 🟠 **Production Smoke 403 diagnostics** | smoke endurecido; PR/CI pendientes |
+| Base exacta | ✅ **main** | `aa9d3b0fd634b9b49834638d5014a29ab5feb4c5` |
+| CI de main | ✅ **verde** | run #217 completo sobre el SHA exacto |
+| Migraciones | ✅ **0 pendientes** | bridge #35397783306: `pending_before=1`, `pending_after=0` |
+| Produccion | 🟠 **no validada aun** | rerun del smoke llega a HTTP 403 en `/up` y `/login` |
 
 ## Huella del cambio
 
@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+889** | **−306** | **+583** |
+| **2** | **+__ADD__** | **−__DEL__** | **__NET__** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -34,12 +34,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| Gates seleccionados | **preflight · fast[contracts]** |
 | GrindFlow CI | `validate` exige success real para cada gate seleccionado |
-| Sonar | Automatic Analysis + comentario estable **SonarQube Cloud · Full PR details** |
-| CodeRabbit | incremental desactivado; full review sobre el head estable |
+| Sonar | reporter estable de detalles completos del PR cuando aplica |
+| CodeRabbit | revision full sobre el head estable |
 | Exact-main | CI vuelve a validar el SHA exacto despues del squash merge |
-| Produccion | Production Smoke es independiente y no convierte CI verde en VALIDATED IN PRODUCTION |
+| Produccion | Production Smoke sigue separado del source CI |
 
 ## Flujo de entrega
 
@@ -47,19 +47,9 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 flowchart LR
     A["PR + snapshot exacto"] --> P["preflight"]
     P --> F["fast contracts"]
-    P --> Q["php-quality"]
-    P --> T["PHPUnit"]
-    P --> D["MariaDB"]
-    P --> B["browser"]
-    P --> L["legacy"]
     A --> S["Sonar"]
     A --> C["CodeRabbit full review"]
     F --> V["validate"]
-    Q --> V
-    T --> V
-    D --> V
-    B --> V
-    L --> V
     S --> H["head estable"]
     C --> H
     V --> H
@@ -70,51 +60,45 @@ flowchart LR
 
 ## Qué se hizo
 
-- Relee el `main` actual de BRVTAL y porta su optimizacion de delivery a GrindFlow.
-- Separa `preflight` del `fast`: el primero calcula scope y los gates pesados salen en paralelo inmediatamente.
-- Centraliza el clasificador de paths en `scripts/ci-scope.sh` con contrato ejecutable.
-- `validate` distingue un skip intencional de un gate seleccionado que no ejecuto correctamente.
-- Convierte README en dashboard machine-checked con archivos, inserciones, eliminaciones, neto y gate plan exactos.
-- Desactiva CodeRabbit incremental para evitar revisiones solapadas durante pushes intermedios.
-- Conserva el reporter Sonar existente de GrindFlow, que ya publica detalles completos en GitHub.
-- No copia el deploy observer de BRVTAL: GrindFlow no expone aun un marcador publico seguro del SHA desplegado y ya posee Production Smoke autenticado.
+- Confirma que la migracion de produccion termino con cero pendientes.
+- Separa los incidentes Laravel historicos del bloqueo HTTP 403 actual.
+- Centraliza todas las llamadas HTTP del smoke en `curl_common`.
+- Usa un User-Agent compatible con navegador e identificable como `GrindFlowProductionSmoke/1.0`.
+- Hace fail-fast en `/up` y en el GET de `/login` en vez de continuar con errores encadenados.
+- Cuando falla un endpoint publico, conserva solo headers seguros y una muestra corta del body en el artefacto privado de diagnostico.
+- Mantiene fuera del issue publico cookies, credenciales y payloads sensibles.
 
 ## Archivos modificados en este deploy
 
-- `.coderabbit.yaml` — revision solo sobre heads estables.
-- `.github/workflows/grindflow-ci.yml` — preflight, fan-out concurrente y validate estricto.
-- `AGENTS.md` — reglas durables de CI, dashboard, Git writes y CodeRabbit.
-- `README.md` — dashboard exacto de desarrollo.
-- `docs/DEVELOPMENT-MODEL.md` — topologia y ciclo de entrega actualizado.
-- `scripts/ci-scope-contract.sh` — regresiones del clasificador.
-- `scripts/ci-scope.sh` — clasificador reusable de changed files.
-- `scripts/readme-dashboard.py` — validador exacto del snapshot.
+- `README.md` — snapshot exacto del diagnostico y delivery actual.
+- `scripts/production-smoke.sh` — requests consistentes, fail-fast y diagnostico HTTP seguro.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** sobre el head funcional `7aeccf5386c967a6a329467ccf5421c29b0e9f2b`.
-- GrindFlow CI #215 paso preflight, fast, php-quality, PHPUnit, MariaDB, browser, legacy y validate; full matrix ~86 s.
-- SonarQube Cloud: Quality Gate OK, 0 issues, 0 Security Hotspots y 0.0% duplicacion en codigo nuevo.
-- CodeRabbit full review fue solicitado sobre el head estable; cualquier hallazgo accionable debe resolverse antes del merge.
-- Produccion/migraciones no se tocan; tras squash merge se exige CI exacto de `main`.
+- Estado actual: **IMPLEMENTED** en la rama `fix/production-smoke-403-diagnostics`.
+- Base: `aa9d3b0fd634b9b49834638d5014a29ab5feb4c5`.
+- La migracion de produccion ya esta aplicada y reporta cero pendientes.
+- El rerun anterior del Production Smoke fallo 15/15 veces por HTTP 403 antes de llegar a las comprobaciones autenticadas.
+- Este cambio no modifica esquema, datos, autenticacion ni reglas tenant.
+- Antes del merge se exige `preflight + fast[contracts]`, revision externa aplicable y recheck del SHA de `main`.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR del CI nuevo, pasar matriz completa, Sonar y full review de CodeRabbit; medir el critical path. |
-| **NEXT** | Continuar GF-FR-003 con derivados/probe multimedia/FFmpeg detras de `ProcessMediaAsset`. |
-| **BLOCKED / EXTERNAL** | Branch protection sigue requiriendo configuracion GitHub fuera del conector actual; object storage/credenciales reales siguen operacionales. |
-| **LATER** | P2 distribucion, trafico/atribucion y finanzas despues de cerrar P1. |
+| **NOW** | Validar el smoke endurecido en PR y usar su artefacto para identificar la capa exacta que devuelve 403. |
+| **NEXT** | Si el User-Agent resuelve el bloqueo, merge + Production Smoke sobre el SHA exacto; si no, usar headers/body seguros para aislar WAF/hosting. |
+| **BLOCKED / EXTERNAL** | Acceso directo al panel/WAF de Hostinger no esta disponible desde este conector; object storage real sigue operacional. |
+| **LATER** | Continuar GF-FR-003 con derivados/probe multimedia/FFmpeg y despues P2. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Delivery / CI | portar y medir mejoras BRVTAL |
+| **NOW** | Production Smoke | diagnostico 403 endurecido |
 | **NEXT** | Media processing | foundation VALIDATED IN CODE; derivados/FFmpeg pendientes |
-| **NEXT** | Media Vault produccion | Dropbox/Google VALIDATED IN CODE; configuracion real pendiente |
-| **BLOCKED / EXTERNAL** | Branch protection / storage | requiere controles externos de GitHub/hosting |
+| **NEXT** | Media Vault produccion | migraciones al dia; smoke de produccion pendiente |
+| **BLOCKED / EXTERNAL** | Hosting / storage | WAF/acceso y object storage requieren evidencia/configuracion externa |
 | **LATER** | Operacion | queues, scheduler, retries y backups |
 | **LATER** | Legacy retirement | solo tras GF-MIG-003 / GF-MIG-004 |
 | **LATER** | Producto P2 | distribucion, atribucion y finanzas |
