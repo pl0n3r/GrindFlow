@@ -26,6 +26,27 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
 
+### Regla de pruebas E2E eficientes
+
+- Usar el usuario sintetico E2E existente para validar **todo lo razonable** en
+  produccion cuando la prueba sea de solo lectura o tenga un efecto controlado y
+  reversible ya aprobado.
+- Agrupar validaciones E2E en la misma sesion autenticada siempre que sea posible
+  para evitar logins repetidos, recargas, esperas y nuevos runs innecesarios.
+- Antes de pedir una prueba manual al operador, intentar primero cubrirla con el
+  usuario E2E, Production Smoke o el bridge diagnostico existente.
+- No agregar una recarga, retry, browser pass o espera adicional si la misma
+  evidencia puede obtenerse dentro de un flujo E2E que ya esta activo.
+- Las pruebas E2E no deben mutar datos de produccion salvo que esa mutacion sea
+  la accion explicitamente aprobada que se esta validando. Migraciones,
+  eliminaciones, publicaciones y operaciones destructivas siguen requiriendo
+  aprobacion separada.
+- Una prueba E2E eficiente puede comprobar en una sola pasada salud, login,
+  Dashboard, System, pending migrations, Diagnostics y Vault cuando esas rutas
+  ya forman parte del alcance del cambio.
+- Optimizar E2E significa maximizar evidencia por sesion, **no** reducir cobertura
+  ni esconder fallos mediante retries excesivos.
+
 ### Regla de eficiencia CI
 
 - `GrindFlow CI / validate` conserva su nombre estable y agrega resultados de
