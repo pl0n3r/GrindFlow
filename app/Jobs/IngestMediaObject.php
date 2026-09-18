@@ -4,12 +4,14 @@ namespace App\Jobs;
 
 use App\Contracts\OrganizationAwareJob;
 use App\Models\MediaIngestion;
+use App\Models\User;
 use App\Queue\Middleware\UseOrganizationContext;
 use App\Services\Media\FilesystemMediaIngestor;
 use App\Services\Media\MediaIngestionException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -73,6 +75,14 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
 
     public function handle(FilesystemMediaIngestor $ingestor): void
     {
+        $actor = User::query()->findOrFail($this->actor);
+
+        if ($actor->canManageOrganization($this->organization) === false) {
+            throw new AuthorizationException(
+                'The user can no longer manage media ingestion for this organization.',
+            );
+        }
+
         $ingestion = MediaIngestion::query()->findOrFail($this->ingestionId);
 
         if ($ingestion->status === MediaIngestion::STATUS_COMPLETED) {
