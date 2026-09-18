@@ -49,7 +49,11 @@ siguiente deploy.
 
 ## Validación
 
-- Estado del bridge y optimizacion CI: **IMPLEMENTED**, pendiente del nuevo `GrindFlow CI / validate`.
+- Estado del bridge y optimizacion CI: **VALIDATED IN CODE**.
+- El run #125 de `GrindFlow CI` forzo todos los gates por tratarse de un cambio al
+  propio workflow y termino verde: `fast`, `php-quality`, `tests`, `database`,
+  `browser`, `legacy` y `validate`.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - El hotfix anterior si esta **VALIDATED IN CODE** y fusionado a `main`; produccion
   todavia necesita confirmar que el deploy de Hostinger recibio ese commit.
 - El bridge no ejecuta comandos SSH, migraciones ni operaciones destructivas.
@@ -57,7 +61,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar el CI completo forzado por el cambio del propio workflow y Sonar.
+- Fusionar PR #30 y dejar que el exact-main CI vuelva a comprobar el selector.
 - Crear el issue durable `[AUTO] Production Diagnostics Bridge`.
 - Lanzar la primera peticion real con `/production-diagnostics`.
 - Recuperar el artifact desde GitHub y comprobar que puedo leer el error de
@@ -68,10 +72,10 @@ siguiente deploy.
 
 - **P0 — Produccion / Dashboard:** HTTP 500 con causa de route cache identificada;
   hotfix fusionado, pendiente confirmacion real en Hostinger.
-- **P0 — Produccion / Diagnostics bridge:** IMPLEMENTED; pendiente CI, merge y
+- **P0 — Produccion / Diagnostics bridge:** VALIDATED IN CODE; pendiente merge y
   primera captura end-to-end.
-- **P0 — CI:** selector/caches/timeouts IMPLEMENTED; pendiente validar el run
-  completo forzado y medir la siguiente PR de docs/Laravel/legacy para comprobar skips.
+- **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE; pendiente confirmar el
+  comportamiento selectivo en las siguientes PRs reales de docs/Laravel/legacy.
 - **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
   Dashboard/System vuelvan a estar operativos.
 - **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
