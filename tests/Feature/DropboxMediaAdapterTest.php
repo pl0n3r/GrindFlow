@@ -134,8 +134,93 @@ class DropboxMediaAdapterTest extends TestCase
 
         Storage::disk('media')->assertExists($first->source_key);
 
-        Http::assertSentCount(1);
-        Queue::assertPushed(IngestMediaObject::class, 1);
+        $otherUser = User::factory()->create();
+        $otherOrganization = Organization::factory()->create();
+
+        $this->membership($otherUser, $otherOrganization, UserRole::Studio);
+
+        $third = app(TenantContext::class)->runWithinOrganization(
+            $otherUser,
+            (string) $otherOrganization->getKey(),
+            fn () => app(DropboxMediaAdapter::class)
+                ->stageAndQueue($otherUser, 'access-token-value', $file),
+        );
+
+        $this->assertNotSame($first->getKey(), $third->getKey());
+        $this->assertSame(
+            (string) $otherOrganization->getKey(),
+            (string) $third->organization_id,
+        );
+        $this->assertStringStartsWith(
+            'organizations/'.$otherOrganization->getKey().'/staging/connectors/dropbox/',
+            $third->source_key,
+        );
+        Storage::disk('media')->assertExists($third->source_key);
+
+        Http::assertSentCount(2);
+        Queue::assertPushed(IngestMediaObject::class, 2);
+    }
+
+    public function test_listing_with_more_results_requires_a_cursor(): void
+    {
+        Http::fake([
+            'https://api.dropboxapi.com/2/files/list_folder' => Http::response([
+                'entries' => [],
+                'has_more' => true,
+            ], 200),
+        ]);
+
+        $this->expectException(MediaConnectorException::class);
+        $this->expectExceptionMessage('connector_request_failed');
+
+        app(DropboxMediaAdapter::class)->listInitial('access-token-value');
+    }
+
+    public function test_download_larger_than_declared_size_is_not_queued(): void
+    {
+        Queue::fake();
+        Storage::fake('media');
+
+        config([
+            'grindflow.media.staging_disk' => 'media',
+            'grindflow.media.connector_max_bytes' => 1024,
+        ]);
+
+        Http::fake([
+            'https://content.dropboxapi.com/2/files/download' => Http::response(
+                'response-bytes-longer-than-declared',
+                200,
+            ),
+        ]);
+
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        $file = new RemoteMediaFile(
+            id: 'id:size-mismatch',
+            name: 'size-mismatch.mp4',
+            path: '/size-mismatch.mp4',
+            sizeBytes: 4,
+            modifiedAt: '2026-09-18T12:30:00Z',
+        );
+
+        try {
+            app(TenantContext::class)->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                fn () => app(DropboxMediaAdapter::class)
+                    ->stageAndQueue($user, 'access-token-value', $file),
+            );
+
+            $this->fail('Expected the declared size mismatch to fail.');
+        } catch (MediaConnectorException $exception) {
+            $this->assertSame('connector_staging_failed', $exception->getMessage());
+        }
+
+        Queue::assertNothingPushed();
+        Storage::disk('media')->assertDirectoryEmpty('organizations');
     }
 
     public function test_unauthorized_provider_response_is_safe_and_requests_reconnect(): void
