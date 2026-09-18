@@ -213,6 +213,23 @@ class DirectMediaUpload
             && filled($config['bucket'] ?? null);
     }
 
+    /**
+     * @return array{configured: bool, disk: string, driver: string}
+     */
+    public function status(): array
+    {
+        $disk = $this->disk();
+        $config = config('filesystems.disks.'.$disk);
+
+        return [
+            'configured' => $this->available(),
+            'disk' => $disk,
+            'driver' => is_array($config) && is_string($config['driver'] ?? null)
+                ? $config['driver']
+                : 'unknown',
+        ];
+    }
+
     public function maxBytes(): int
     {
         $configured = (int) config(
