@@ -3,7 +3,6 @@
 namespace App\Support\Deployment;
 
 use RuntimeException;
-use Throwable;
 
 class ReleaseCacheGuard
 {
