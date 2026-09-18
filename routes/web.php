@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DiagnosticsController;
+use App\Http\Controllers\Admin\RunMigrationsController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
@@ -30,6 +31,8 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
 
     Route::get('/admin/system', SystemController::class)
         ->name('admin.system');
+    Route::post('/admin/system/migrations', RunMigrationsController::class)
+        ->name('admin.system.migrate');
     Route::get('/admin/diagnostics', [DiagnosticsController::class, 'index'])
         ->name('admin.diagnostics');
     Route::get('/admin/diagnostics.json', [DiagnosticsController::class, 'json'])
