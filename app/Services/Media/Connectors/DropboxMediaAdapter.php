@@ -8,6 +8,7 @@ use App\Services\Media\MediaIngestionCoordinator;
 use App\Services\Media\StagedMediaSource;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -106,19 +107,27 @@ class DropboxMediaAdapter
         $stream = $this->downloadStream($accessToken, $file->id);
 
         try {
-            $stored = Storage::disk($disk)->put($storageKey, $stream);
+            try {
+                $stored = Storage::disk($disk)->put($storageKey, $stream);
+            } catch (Throwable) {
+                throw MediaConnectorException::stagingFailed();
+            }
         } finally {
             fclose($stream);
         }
 
         if ($stored === false) {
-            Storage::disk($disk)->delete($storageKey);
+            $this->deleteStaged($disk, $storageKey);
 
             throw MediaConnectorException::stagingFailed();
         }
 
         try {
-            $stagedSize = Storage::disk($disk)->size($storageKey);
+            try {
+                $stagedSize = Storage::disk($disk)->size($storageKey);
+            } catch (Throwable) {
+                throw MediaConnectorException::stagingFailed();
+            }
 
             if ($stagedSize !== $file->sizeBytes) {
                 throw MediaConnectorException::stagingFailed();
@@ -145,12 +154,12 @@ class DropboxMediaAdapter
             $ingestion = $this->coordinator->queueSource($actor, $source);
 
             if ($ingestion->source_key !== $storageKey) {
-                Storage::disk($disk)->delete($storageKey);
+                $this->deleteStaged($disk, $storageKey);
             }
 
             return $ingestion;
         } catch (Throwable $exception) {
-            Storage::disk($disk)->delete($storageKey);
+            $this->deleteStaged($disk, $storageKey);
 
             throw $exception;
         }
@@ -161,11 +170,17 @@ class DropboxMediaAdapter
         string $path,
         array $payload,
     ): RemoteMediaListing {
-        $response = Http::withToken($accessToken)
-            ->acceptJson()
-            ->connectTimeout(10)
-            ->timeout(30)
-            ->post(self::API_BASE.$path, $payload);
+        $this->assertAccessToken($accessToken);
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->acceptJson()
+                ->connectTimeout(10)
+                ->timeout(30)
+                ->post(self::API_BASE.$path, $payload);
+        } catch (ConnectionException) {
+            throw MediaConnectorException::requestFailed();
+        }
 
         $this->assertSuccessful($response);
 
@@ -258,16 +273,22 @@ class DropboxMediaAdapter
             throw MediaConnectorException::downloadFailed();
         }
 
-        $response = Http::withOptions([
-            'stream' => true,
-            'connect_timeout' => 10,
-            'timeout' => 300,
-        ])
-            ->withToken($accessToken)
-            ->withHeaders([
-                'Dropbox-API-Arg' => $argument,
+        $this->assertAccessToken($accessToken);
+
+        try {
+            $response = Http::withOptions([
+                'stream' => true,
+                'connect_timeout' => 10,
+                'timeout' => 300,
             ])
-            ->post(self::CONTENT_BASE.'/files/download');
+                ->withToken($accessToken)
+                ->withHeaders([
+                    'Dropbox-API-Arg' => $argument,
+                ])
+                ->post(self::CONTENT_BASE.'/files/download');
+        } catch (ConnectionException) {
+            throw MediaConnectorException::downloadFailed();
+        }
 
         $this->assertSuccessful($response, true);
 
@@ -308,6 +329,22 @@ class DropboxMediaAdapter
         throw $download
             ? MediaConnectorException::downloadFailed()
             : MediaConnectorException::requestFailed();
+    }
+
+    private function assertAccessToken(string $accessToken): void
+    {
+        if ($accessToken === '') {
+            throw MediaConnectorException::unauthorized();
+        }
+    }
+
+    private function deleteStaged(string $disk, string $storageKey): void
+    {
+        try {
+            Storage::disk($disk)->delete($storageKey);
+        } catch (Throwable) {
+            // Cleanup is best-effort. The original safe connector error wins.
+        }
     }
 
     private function sourceRef(RemoteMediaFile $file): string
