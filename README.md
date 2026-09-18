@@ -27,8 +27,6 @@ siguiente deploy.
 - `database/seeders/E2eSeeder.php` — identidad/organizacion E2E protegidas por entorno.
 - `scripts/browser-smoke.sh` — login real y dashboard autenticado.
 - `.github/workflows/grindflow-ci.yml` — seed y migracion E2E desechables.
-- `resources/views/auth/login.blade.php` — copy MariaDB.
-- `resources/views/dashboard.blade.php` — copy MariaDB.
 - `docs/PRUEBAS.md` — contrato de browser autenticado.
 - `docs/REQUIREMENTS.md` — verificacion de GF-NFR-005.
 - `README.md` — snapshot operativo actualizado.
