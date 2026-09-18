@@ -77,7 +77,19 @@ class MediaIngestionCoordinator
 
     public function retry(MediaIngestion $ingestion, User $actor): MediaIngestion
     {
-        if ($actor->canManageOrganization((string) $ingestion->organization_id) === false) {
+        $organizationId = $this->tenantContext->organizationId();
+        $ingestionOrganizationId = (string) $ingestion->organization_id;
+
+        if (
+            $organizationId === null
+            || hash_equals($ingestionOrganizationId, $organizationId) === false
+        ) {
+            throw new AuthorizationException(
+                'The active tenant does not match this media ingestion.',
+            );
+        }
+
+        if ($actor->canManageOrganization($ingestionOrganizationId) === false) {
             throw new AuthorizationException(
                 'The user cannot retry media ingestion for this organization.',
             );
@@ -95,7 +107,7 @@ class MediaIngestionCoordinator
 
         IngestMediaObject::dispatch(
             (string) $ingestion->getKey(),
-            (string) $ingestion->organization_id,
+            $ingestionOrganizationId,
             (string) $actor->getKey(),
             $ingestion->idempotency_key,
         );
