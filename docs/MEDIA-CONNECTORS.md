@@ -58,14 +58,48 @@ Provider error bodies are never propagated as application error messages.
 - oversized remote object -> `connector_file_too_large`
 - staging write/size failure -> `connector_staging_failed`
 
-The adapter does not automatically retry mutations or provider downloads. A
-future scheduler/job layer owns retry policy.
+The adapter does not retry provider mutations by itself. Retry/defer policy is
+owned by the connection scheduler.
+
+## Encrypted connections and scheduled scans
+
+`media_connections` is tenant-owned persistent state for connector scans.
+
+Access and refresh tokens are encrypted before insert with the same versioned
+AES-256-GCM contract used by the legacy implementation:
+
+`v1.<iv>.<tag>.<ciphertext>`
+
+The encryption key comes from `ENCRYPTION_MASTER_KEY`. Authenticated additional
+data is `grindflow:cloud:<organization_id>:<provider>`, so ciphertext copied
+between tenants/providers cannot be decrypted.
+
+The model hides ciphertext fields from serialization. Tokens are decrypted only
+inside scan execution and are passed to the provider adapter as transient input.
+
+`grindflow:dispatch-media-scans` discovers due active connections and dispatches
+tenant-aware `ScanMediaConnection` jobs. The Laravel scheduler invokes that
+command every five minutes. A row is claimed before dispatch by moving
+`next_scan_at`, preventing a second scheduler tick from dispatching the same
+due connection.
+
+Dropbox scans persist the latest cursor and use a bounded page budget. A scan
+that reaches the budget resumes shortly from the last cursor.
+
+Failure policy:
+
+- HTTP 401 or unreadable credentials -> `needs_reconnect`
+- HTTP 429 -> defer by bounded Retry-After without increasing failure count
+- other safe connector failures -> bounded exponential backoff
+- actor no longer authorized -> `needs_reconnect` before provider I/O
+
+The scheduler safely returns zero when the `media_connections` table has not
+yet been migrated, allowing Git deploy to precede the explicit production
+migration.
 
 ## Current boundary
 
-This adapter is **code-level integration only**. It does not yet own OAuth,
-encrypted credential persistence, connection management or scheduled scans.
-Those layers must provide a valid access token and an already-authorized tenant
-context.
-
-No real Dropbox API call is required by CI; tests use Laravel HTTP fakes.
+Encrypted persistence, connection lifecycle and scheduled cursor scans are now
+implemented. OAuth authorization callbacks and automatic refresh-token exchange
+remain a separate slice; CI still uses provider fakes and makes no real Dropbox
+API call.
