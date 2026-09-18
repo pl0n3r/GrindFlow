@@ -165,6 +165,9 @@ class DropboxMediaAdapter
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     private function listingRequest(
         string $accessToken,
         string $path,
