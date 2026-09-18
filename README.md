@@ -31,10 +31,20 @@ siguiente deploy.
   tocar el payload ni exponer el log privado.
 - El payload diagnostico sigue viviendo solo en artifacts de 3 dias; los issues
   publicos reciben exclusivamente metadata del run.
+- Se agrego un bridge operacional de migraciones de produccion, separado de CI
+  y Smoke. Solo OWNER puede activarlo con `/production-migrate 1`.
+- El runner consulta primero `Admin > System` y **se niega a ejecutar** si el
+  pending count no es exactamente 1. Si es 0, termina como no-op seguro.
+- La migracion pendiente actual del Vault fue revisada: `up()` solo crea
+  `media_blobs` y `media_assets` con indices/foreign keys; no elimina ni altera
+  tablas existentes.
 
 ## Archivos modificados en este deploy
 
 - `.github/workflows/production-diagnostics.yml` — corrige Run ID/artifact en el comentario del bridge.
+- `.github/workflows/production-migration.yml` — accion OWNER-only para una migracion aprobada.
+- `scripts/run-production-migrations.sh` — login admin, precheck de pending count, POST CSRF y verificacion post-migracion.
+- `.github/workflows/grindflow-ci.yml` — valida sintaxis del runner operacional.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
@@ -50,10 +60,10 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Fusionar este hotfix ya validado por CI selectivo.
-- Volver a comentar `/production-diagnostics` en el issue #31.
-- Recuperar el artifact por GitHub y leer los incidentes desde el chat, sin SSH.
-- Reejecutar Production Smoke despues del deploy de Hostinger y cerrar el HTTP 500.
+- Validar y fusionar el bridge operacional de migracion.
+- Crear el issue durable `[AUTO] Production Migration Bridge`.
+- Ejecutar una sola migracion aprobada con `/production-migrate 1`.
+- Reejecutar Production Smoke y verificar Dashboard/System/Vault extremo a extremo.
 
 ## Panorama general pendiente
 
@@ -63,8 +73,8 @@ siguiente deploy.
   corregir/validar metadata y leer el primer artifact desde el conector.
 - **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE y confirmado en el
   run #128 con cinco gates pesados omitidos correctamente.
-- **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
-  Dashboard/System vuelvan a estar operativos.
+- **P0 — Produccion / schema:** migracion Vault revisada como aditiva; bridge
+  OWNER-only IMPLEMENTED, pendiente CI/merge/ejecucion y verificacion 1 -> 0.
 - **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN CODE; pendiente produccion

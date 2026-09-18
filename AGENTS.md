@@ -122,6 +122,16 @@ Reglas:
   `production-diagnostics-<run_id>` con retencion de 3 dias.
 - Para una peticion "revisa el log de produccion", el agente debe usar primero
   ese bridge, recuperar el artifact por GitHub y correlacionar incident IDs.
+- Las migraciones de produccion siguen siendo una accion explicita de operador.
+  El issue durable `[AUTO] Production Migration Bridge` acepta exactamente
+  `/production-migrate 1` solo de OWNER. El workflow autentica la cuenta E2E y
+  usa el mismo endpoint protegido de `Admin > System`; nunca recibe credenciales
+  directas de base de datos.
+- El bridge de migracion debe abortar sin cambios si produccion no reporta
+  exactamente una migracion pendiente. Un pending count distinto exige revision
+  humana antes de ampliar la aprobacion.
+- CI, Production Smoke y el bridge de Diagnostics nunca ejecutan migraciones.
+  El bridge de migracion es una accion operacional separada y serializada.
 - Si falta el secret `PRODUCTION_E2E_PASSWORD`, el workflow debe mantener visible
   el issue `[AUTO] Production Smoke Not Configured` hasta que la configuracion
   exista; no debe aparentar que produccion fue validada.
