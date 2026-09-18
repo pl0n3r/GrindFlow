@@ -25,13 +25,13 @@
 
                 <p>
                     Accede al workspace de tu organizacion. El aislamiento multi-tenant
-                    se valida tanto en Laravel como en PostgreSQL.
+                    se aplica en Laravel y se respalda con integridad en MariaDB.
                 </p>
             </div>
 
             <div class="gf-footer">
-                <span>Identity layer / GF-MIG-002</span>
-                <span>RLS enabled</span>
+                <span>Tenant isolation / GF-MIG-002</span>
+                <span>MariaDB active</span>
             </div>
         </section>
 
