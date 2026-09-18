@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
 </head>
 <body>
+    @php
+        $vaultRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.vault.index');
+        $systemRouteAvailable = \Illuminate\Support\Facades\Route::has('admin.system');
+        $diagnosticsRouteAvailable = \Illuminate\Support\Facades\Route::has('admin.diagnostics');
+    @endphp
+
     <div class="gf-grid" aria-hidden="true"></div>
 
     <div class="gf-app">
@@ -22,7 +28,7 @@
                     <span class="gf-navitem__text">Overview</span>
                 </a>
 
-                @if ($organizations->isNotEmpty())
+                @if ($organizations->isNotEmpty() && $vaultRouteAvailable)
                     <a
                         class="gf-navitem"
                         href="{{ route('organizations.vault.index', ['organizationId' => $organizations->first()->id]) }}"
@@ -57,15 +63,29 @@
                 @if (auth()->user()?->isPlatformAdmin())
                     <span class="gf-sidebar__label">Admin</span>
 
-                    <a class="gf-navitem" href="{{ route('admin.system') }}">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
-                        <span class="gf-navitem__text">System</span>
-                    </a>
+                    @if ($systemRouteAvailable)
+                        <a class="gf-navitem" href="{{ route('admin.system') }}">
+                            <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
+                            <span class="gf-navitem__text">System</span>
+                        </a>
+                    @else
+                        <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                            <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
+                            <span class="gf-navitem__text">System</span>
+                        </span>
+                    @endif
 
-                    <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
-                        <span class="gf-navitem__icon" aria-hidden="true">!</span>
-                        <span class="gf-navitem__text">Diagnostics</span>
-                    </a>
+                    @if ($diagnosticsRouteAvailable)
+                        <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
+                            <span class="gf-navitem__icon" aria-hidden="true">!</span>
+                            <span class="gf-navitem__text">Diagnostics</span>
+                        </a>
+                    @else
+                        <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                            <span class="gf-navitem__icon" aria-hidden="true">!</span>
+                            <span class="gf-navitem__text">Diagnostics</span>
+                        </span>
+                    @endif
                 @endif
             </nav>
 
@@ -148,17 +168,26 @@
                     @else
                         <div class="gf-org-grid">
                             @foreach ($organizations as $organization)
-                                <a
-                                    class="gf-org gf-org--link"
-                                    href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
-                                    data-organization-id="{{ $organization->id }}"
-                                >
-                                    <div>
-                                        <h3 class="gf-org__name">{{ $organization->name }}</h3>
-                                        <div class="gf-org__id">{{ $organization->id }}</div>
-                                    </div>
-                                    <span class="gf-org__action">Open Vault →</span>
-                                </a>
+                                @if ($vaultRouteAvailable)
+                                    <a
+                                        class="gf-org gf-org--link"
+                                        href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
+                                        data-organization-id="{{ $organization->id }}"
+                                    >
+                                        <div>
+                                            <h3 class="gf-org__name">{{ $organization->name }}</h3>
+                                            <div class="gf-org__id">{{ $organization->id }}</div>
+                                        </div>
+                                        <span class="gf-org__action">Open Vault →</span>
+                                    </a>
+                                @else
+                                    <article class="gf-org" data-organization-id="{{ $organization->id }}">
+                                        <div>
+                                            <h3 class="gf-org__name">{{ $organization->name }}</h3>
+                                            <div class="gf-org__id">{{ $organization->id }}</div>
+                                        </div>
+                                    </article>
+                                @endif
                             @endforeach
                         </div>
                     @endif
