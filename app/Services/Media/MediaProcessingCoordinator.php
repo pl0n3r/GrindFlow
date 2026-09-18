@@ -7,6 +7,7 @@ use App\Models\MediaAsset;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
+use Throwable;
 
 class MediaProcessingCoordinator
 {
@@ -63,12 +64,26 @@ class MediaProcessingCoordinator
 
         $asset->forceFill(['metadata' => $metadata])->save();
 
-        ProcessMediaAsset::dispatch(
-            (string) $asset->getKey(),
-            $organizationId,
-            (string) $actor->getKey(),
-            MediaAssetProcessor::VERSION,
-        );
+        try {
+            ProcessMediaAsset::dispatch(
+                (string) $asset->getKey(),
+                $organizationId,
+                (string) $actor->getKey(),
+                MediaAssetProcessor::VERSION,
+            );
+        } catch (Throwable $exception) {
+            $metadata = $this->metadata($asset);
+            $metadata['processing'] = [
+                'version' => MediaAssetProcessor::VERSION,
+                'status' => 'dispatch_failed',
+                'attempts' => (int) ($processing['attempts'] ?? 0),
+                'last_error' => 'processing_dispatch_failed',
+            ];
+
+            $asset->forceFill(['metadata' => $metadata])->save();
+
+            throw $exception;
+        }
 
         return $asset->refresh();
     }
