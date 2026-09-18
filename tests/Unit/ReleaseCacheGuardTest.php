@@ -41,7 +41,7 @@ class ReleaseCacheGuardTest extends TestCase
         file_put_contents($this->root.'/bootstrap/cache/config.php', '<?php // stale config cache');
         file_put_contents($this->root.'/storage/framework/views/compiled.php', '<?php // stale view');
 
-        $guard = new ReleaseCacheGuard();
+        $guard = new ReleaseCacheGuard;
 
         $this->assertTrue(
             $guard->refreshIfNeeded(
@@ -96,7 +96,7 @@ class ReleaseCacheGuardTest extends TestCase
 
     private function deleteTree(string $path): void
     {
-        if (! is_dir($path)) {
+        if (is_dir($path) === false) {
             return;
         }
 
