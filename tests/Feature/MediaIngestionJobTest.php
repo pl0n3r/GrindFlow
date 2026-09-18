@@ -76,7 +76,6 @@ class MediaIngestionJobTest extends TestCase
         Queue::assertPushed(IngestMediaObject::class, 1);
     }
 
-
     public function test_staged_source_handoff_is_the_shared_connector_boundary(): void
     {
         Queue::fake();
