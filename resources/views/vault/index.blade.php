@@ -139,31 +139,52 @@
                     <header class="gf-panel__head">
                         <h2>Cloud sources</h2>
                         <span class="gf-appbar__meta">
-                            {{ $dropboxConnectionCount > 0 ? $dropboxConnectionCount.' Dropbox connected' : 'Dropbox ready for OAuth' }}
+                            {{ $dropboxConnectionCount + $googleDriveConnectionCount }} connected
                         </span>
                     </header>
 
                     <div class="gf-panel__body">
                         <div class="gf-upload__footer">
                             <p>
-                                Conecta Dropbox con OAuth para importar media sin guardar
-                                credenciales en texto plano. Los tokens quedan cifrados por
-                                organizacion y los scans usan cursores reanudables.
+                                Conecta proveedores con OAuth sin guardar credenciales en texto
+                                plano. Los tokens quedan cifrados por organizacion y proveedor.
                             </p>
 
-                            @if ($dropboxConnectAvailable)
-                                <a
-                                    class="gf-button gf-button--primary"
-                                    href="{{ route('organizations.connections.dropbox.authorize', ['organizationId' => $organization->id]) }}"
-                                >
-                                    {{ $dropboxConnectionCount > 0 ? 'Connect another Dropbox' : 'Connect Dropbox' }}
-                                </a>
-                            @else
-                                <span class="gf-button gf-button--ghost" aria-disabled="true">
-                                    {{ $mediaConnectionsReady ? 'Dropbox OAuth setup required' : 'Media Connections migration required' }}
-                                </span>
-                            @endif
+                            <div>
+                                @if ($dropboxConnectAvailable)
+                                    <a
+                                        class="gf-button gf-button--primary"
+                                        href="{{ route('organizations.connections.dropbox.authorize', ['organizationId' => $organization->id]) }}"
+                                    >
+                                        {{ $dropboxConnectionCount > 0 ? 'Connect another Dropbox' : 'Connect Dropbox' }}
+                                    </a>
+                                @else
+                                    <span class="gf-button gf-button--ghost" aria-disabled="true">
+                                        {{ $mediaConnectionsReady ? 'Dropbox OAuth setup required' : 'Media Connections migration required' }}
+                                    </span>
+                                @endif
+
+                                @if ($googleDriveConnectAvailable)
+                                    <a
+                                        class="gf-button gf-button--primary"
+                                        href="{{ route('organizations.connections.google-drive.authorize', ['organizationId' => $organization->id]) }}"
+                                    >
+                                        {{ $googleDriveConnectionCount > 0 ? 'Connect another Google Drive' : 'Connect Google Drive' }}
+                                    </a>
+                                @else
+                                    <span class="gf-button gf-button--ghost" aria-disabled="true">
+                                        {{ $mediaConnectionsReady ? 'Google OAuth setup required' : 'Media Connections migration required' }}
+                                    </span>
+                                @endif
+                            </div>
                         </div>
+
+                        @if ($googleDriveConnectionCount > 0)
+                            <p class="gf-media-meta">
+                                Google Drive queda conectado y cifrado, pero sus scans permanecen
+                                pausados hasta habilitar Changes API en el siguiente slice.
+                            </p>
+                        @endif
                     </div>
                 </section>
 

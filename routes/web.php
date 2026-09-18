@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\RunMigrationsController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Connections\DropboxConnectionController;
+use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
@@ -38,11 +39,17 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::get('/connections/dropbox/authorize', [DropboxConnectionController::class, 'authorize'])
                 ->middleware('throttle:10,1')
                 ->name('organizations.connections.dropbox.authorize');
+            Route::get('/connections/google-drive/authorize', [GoogleDriveConnectionController::class, 'authorize'])
+                ->middleware('throttle:10,1')
+                ->name('organizations.connections.google-drive.authorize');
         });
 
     Route::get('/connections/dropbox/callback', [DropboxConnectionController::class, 'callback'])
         ->middleware('throttle:20,1')
         ->name('connections.dropbox.callback');
+    Route::get('/connections/google-drive/callback', [GoogleDriveConnectionController::class, 'callback'])
+        ->middleware('throttle:20,1')
+        ->name('connections.google-drive.callback');
 
     Route::get('/admin/system', SystemController::class)
         ->name('admin.system');

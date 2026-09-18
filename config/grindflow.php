@@ -18,6 +18,18 @@ return [
                 600,
             ),
         ],
+        'google_drive' => [
+            'client_id' => env('GOOGLE_CLIENT_ID'),
+            'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+            'refresh_margin_seconds' => (int) env(
+                'GOOGLE_REFRESH_MARGIN_SECONDS',
+                300,
+            ),
+            'oauth_state_ttl_seconds' => (int) env(
+                'GOOGLE_OAUTH_STATE_TTL_SECONDS',
+                600,
+            ),
+        ],
     ],
 
     'media' => [

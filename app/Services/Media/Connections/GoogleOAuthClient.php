@@ -4,11 +4,13 @@ namespace App\Services\Media\Connections;
 
 use App\Services\Media\Connectors\MediaConnectorException;
 
-class DropboxOAuthClient
+class GoogleOAuthClient
 {
-    private const AUTHORIZE_URL = 'https://www.dropbox.com/oauth2/authorize';
+    private const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
-    private const TOKEN_URL = 'https://api.dropbox.com/oauth2/token';
+    private const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+
+    private const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
     public function __construct(
         private readonly OAuthTokenEndpointClient $tokens,
@@ -16,18 +18,21 @@ class DropboxOAuthClient
 
     public function authorizationUrl(string $redirectUri, string $state): string
     {
-        $appKey = $this->appKey();
+        $clientId = $this->clientId();
 
         if ($redirectUri === '' || $state === '') {
             throw MediaConnectorException::oauthExchangeFailed();
         }
 
         return self::AUTHORIZE_URL.'?'.http_build_query([
-            'client_id' => $appKey,
+            'client_id' => $clientId,
             'response_type' => 'code',
             'redirect_uri' => $redirectUri,
             'state' => $state,
-            'token_access_type' => 'offline',
+            'scope' => self::DRIVE_READONLY_SCOPE,
+            'access_type' => 'offline',
+            'prompt' => 'consent',
+            'include_granted_scopes' => 'true',
         ], '', '&', PHP_QUERY_RFC3986);
     }
 
@@ -35,27 +40,26 @@ class DropboxOAuthClient
         string $code,
         string $redirectUri,
     ): OAuthAuthorizationTokens {
-        [$appKey, $appSecret] = $this->credentials();
+        [$clientId, $clientSecret] = $this->credentials();
 
         return $this->tokens->exchangeAuthorizationCode(
             self::TOKEN_URL,
-            $appKey,
-            $appSecret,
+            $clientId,
+            $clientSecret,
             $code,
             $redirectUri,
-            null,
-            'account_id',
+            self::DRIVE_READONLY_SCOPE,
         );
     }
 
     public function refresh(string $refreshToken): RefreshedAccessToken
     {
-        [$appKey, $appSecret] = $this->credentials();
+        [$clientId, $clientSecret] = $this->credentials();
 
         return $this->tokens->refresh(
             self::TOKEN_URL,
-            $appKey,
-            $appSecret,
+            $clientId,
+            $clientSecret,
             $refreshToken,
         );
     }
@@ -65,24 +69,30 @@ class DropboxOAuthClient
      */
     private function credentials(): array
     {
-        $appKey = $this->appKey();
-        $appSecret = (string) config('grindflow.connectors.dropbox.app_secret', '');
+        $clientId = $this->clientId();
+        $clientSecret = (string) config(
+            'grindflow.connectors.google_drive.client_secret',
+            '',
+        );
 
-        if ($appSecret === '') {
+        if ($clientSecret === '') {
             throw MediaConnectorException::oauthNotConfigured();
         }
 
-        return [$appKey, $appSecret];
+        return [$clientId, $clientSecret];
     }
 
-    private function appKey(): string
+    private function clientId(): string
     {
-        $appKey = (string) config('grindflow.connectors.dropbox.app_key', '');
+        $clientId = (string) config(
+            'grindflow.connectors.google_drive.client_id',
+            '',
+        );
 
-        if ($appKey === '') {
+        if ($clientId === '') {
             throw MediaConnectorException::oauthNotConfigured();
         }
 
-        return $appKey;
+        return $clientId;
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Services\Media\Connections;
 
-final readonly class DropboxAuthorizationTokens
+final readonly class OAuthAuthorizationTokens
 {
     /**
      * @param  list<string>  $scopes

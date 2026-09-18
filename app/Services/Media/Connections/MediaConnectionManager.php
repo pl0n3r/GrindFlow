@@ -30,57 +30,48 @@ class MediaConnectionManager
         array $scopes = [],
         ?string $accountIdentifier = null,
     ): MediaConnection {
-        $organizationId = $this->organizationId($actor);
-        $this->assertText($accessToken, 16_384, 'Dropbox access token');
-        $this->assertText($label, 191, 'Connection label');
-
-        if ($refreshToken !== null) {
-            $this->assertText($refreshToken, 16_384, 'Dropbox refresh token');
-        }
-
-        if ($rootPath !== null) {
-            $this->assertText($rootPath, 1024, 'Dropbox root path');
-        }
-
-        if ($accountIdentifier !== null) {
-            $this->assertText($accountIdentifier, 191, 'Account identifier');
-        }
-
-        $context = sprintf(
-            'grindflow:cloud:%s:%s',
-            $organizationId,
+        return $this->connectProvider(
+            $actor,
             MediaConnection::PROVIDER_DROPBOX,
+            $accessToken,
+            $label,
+            $rootPath,
+            $scanIntervalMinutes,
+            $refreshToken,
+            $tokenExpiresAt,
+            $scopes,
+            $accountIdentifier,
+            true,
         );
+    }
 
-        $connection = new MediaConnection;
-        $connection->forceFill([
-            'authorized_by_user_id' => $actor->getKey(),
-            'provider' => MediaConnection::PROVIDER_DROPBOX,
-            'label' => $label,
-            'account_identifier' => $accountIdentifier,
-            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
-            'refresh_ciphertext' => $refreshToken === null
-                ? null
-                : $this->cipher->encrypt($refreshToken, $context),
-            'token_expires_at' => $tokenExpiresAt,
-            'scopes' => array_values(array_filter(
-                $scopes,
-                static fn (string $scope): bool => $scope !== '',
-            )),
-            'root_path' => $rootPath,
-            'status' => MediaConnection::STATUS_ACTIVE,
-            'scan_interval_minutes' => $this->interval($scanIntervalMinutes),
-            'next_scan_at' => now(),
-            'last_error' => null,
-            'consecutive_failures' => 0,
-        ]);
-        $connection->save();
-
-        if ((string) $connection->organization_id !== $organizationId) {
-            throw new AuthorizationException('Connection tenant mismatch.');
-        }
-
-        return $connection->refresh();
+    /**
+     * @param  list<string>  $scopes
+     */
+    public function connectGoogleDrive(
+        User $actor,
+        string $accessToken,
+        string $label = 'Google Drive',
+        ?string $rootPath = null,
+        ?int $scanIntervalMinutes = null,
+        ?string $refreshToken = null,
+        ?\DateTimeInterface $tokenExpiresAt = null,
+        array $scopes = [],
+        ?string $accountIdentifier = null,
+    ): MediaConnection {
+        return $this->connectProvider(
+            $actor,
+            MediaConnection::PROVIDER_GOOGLE_DRIVE,
+            $accessToken,
+            $label,
+            $rootPath,
+            $scanIntervalMinutes,
+            $refreshToken,
+            $tokenExpiresAt,
+            $scopes,
+            $accountIdentifier,
+            false,
+        );
     }
 
     /**
@@ -94,39 +85,39 @@ class MediaConnectionManager
         ?\DateTimeInterface $tokenExpiresAt = null,
         ?array $scopes = null,
     ): MediaConnection {
-        $this->assertConnectionAccess($connection, $actor);
-        $this->assertText($accessToken, 16_384, 'Dropbox access token');
+        return $this->replaceProviderTokens(
+            $connection,
+            $actor,
+            MediaConnection::PROVIDER_DROPBOX,
+            $accessToken,
+            $refreshToken,
+            $tokenExpiresAt,
+            $scopes,
+            true,
+        );
+    }
 
-        if ($refreshToken !== null) {
-            $this->assertText($refreshToken, 16_384, 'Dropbox refresh token');
-        }
-
-        if ($connection->provider !== MediaConnection::PROVIDER_DROPBOX) {
-            throw new InvalidArgumentException('Only Dropbox token rotation is supported.');
-        }
-
-        $context = $connection->cryptoContext();
-
-        $connection->forceFill([
-            'authorized_by_user_id' => $actor->getKey(),
-            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
-            'refresh_ciphertext' => $refreshToken === null
-                ? $connection->refresh_ciphertext
-                : $this->cipher->encrypt($refreshToken, $context),
-            'token_expires_at' => $tokenExpiresAt,
-            'scopes' => $scopes === null
-                ? $connection->scopes
-                : array_values(array_filter(
-                    $scopes,
-                    static fn (string $scope): bool => $scope !== '',
-                )),
-            'status' => MediaConnection::STATUS_ACTIVE,
-            'next_scan_at' => now(),
-            'last_error' => null,
-            'consecutive_failures' => 0,
-        ])->save();
-
-        return $connection->refresh();
+    /**
+     * @param  list<string>|null  $scopes
+     */
+    public function replaceGoogleDriveTokens(
+        MediaConnection $connection,
+        User $actor,
+        string $accessToken,
+        ?string $refreshToken = null,
+        ?\DateTimeInterface $tokenExpiresAt = null,
+        ?array $scopes = null,
+    ): MediaConnection {
+        return $this->replaceProviderTokens(
+            $connection,
+            $actor,
+            MediaConnection::PROVIDER_GOOGLE_DRIVE,
+            $accessToken,
+            $refreshToken,
+            $tokenExpiresAt,
+            $scopes,
+            false,
+        );
     }
 
     public function pause(MediaConnection $connection, User $actor): MediaConnection
@@ -145,11 +136,133 @@ class MediaConnectionManager
     {
         $this->assertConnectionAccess($connection, $actor);
 
+        if ($connection->provider === MediaConnection::PROVIDER_GOOGLE_DRIVE) {
+            throw new InvalidArgumentException(
+                'Google Drive scheduling requires Changes API support first.',
+            );
+        }
+
         $connection->forceFill([
             'authorized_by_user_id' => $actor->getKey(),
             'status' => MediaConnection::STATUS_ACTIVE,
             'next_scan_at' => now(),
             'last_error' => null,
+        ])->save();
+
+        return $connection->refresh();
+    }
+
+    /**
+     * @param  list<string>  $scopes
+     */
+    private function connectProvider(
+        User $actor,
+        string $provider,
+        string $accessToken,
+        string $label,
+        ?string $rootPath,
+        ?int $scanIntervalMinutes,
+        ?string $refreshToken,
+        ?\DateTimeInterface $tokenExpiresAt,
+        array $scopes,
+        ?string $accountIdentifier,
+        bool $scheduleImmediately,
+    ): MediaConnection {
+        $organizationId = $this->organizationId($actor);
+        $this->assertText($accessToken, 16_384, 'Access token');
+        $this->assertText($label, 191, 'Connection label');
+        $this->assertProvider($provider);
+
+        if ($refreshToken !== null) {
+            $this->assertText($refreshToken, 16_384, 'Refresh token');
+        }
+
+        if ($rootPath !== null) {
+            $this->assertText($rootPath, 1024, 'Provider root path');
+        }
+
+        if ($accountIdentifier !== null) {
+            $this->assertText($accountIdentifier, 191, 'Account identifier');
+        }
+
+        $context = sprintf(
+            'grindflow:cloud:%s:%s',
+            $organizationId,
+            $provider,
+        );
+
+        $connection = new MediaConnection;
+        $connection->forceFill([
+            'authorized_by_user_id' => $actor->getKey(),
+            'provider' => $provider,
+            'label' => $label,
+            'account_identifier' => $accountIdentifier,
+            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
+            'refresh_ciphertext' => $refreshToken === null
+                ? null
+                : $this->cipher->encrypt($refreshToken, $context),
+            'token_expires_at' => $tokenExpiresAt,
+            'scopes' => $this->normalizedScopes($scopes),
+            'root_path' => $rootPath,
+            'status' => $scheduleImmediately
+                ? MediaConnection::STATUS_ACTIVE
+                : MediaConnection::STATUS_PAUSED,
+            'scan_interval_minutes' => $this->interval($scanIntervalMinutes),
+            'next_scan_at' => $scheduleImmediately ? now() : null,
+            'last_error' => null,
+            'consecutive_failures' => 0,
+        ]);
+        $connection->save();
+
+        if ((string) $connection->organization_id !== $organizationId) {
+            throw new AuthorizationException('Connection tenant mismatch.');
+        }
+
+        return $connection->refresh();
+    }
+
+    /**
+     * @param  list<string>|null  $scopes
+     */
+    private function replaceProviderTokens(
+        MediaConnection $connection,
+        User $actor,
+        string $provider,
+        string $accessToken,
+        ?string $refreshToken,
+        ?\DateTimeInterface $tokenExpiresAt,
+        ?array $scopes,
+        bool $activate,
+    ): MediaConnection {
+        $this->assertConnectionAccess($connection, $actor);
+        $this->assertText($accessToken, 16_384, 'Access token');
+
+        if ($refreshToken !== null) {
+            $this->assertText($refreshToken, 16_384, 'Refresh token');
+        }
+
+        if ($connection->provider !== $provider) {
+            throw new InvalidArgumentException('Connection provider mismatch.');
+        }
+
+        $context = $connection->cryptoContext();
+
+        $connection->forceFill([
+            'authorized_by_user_id' => $actor->getKey(),
+            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
+            'refresh_ciphertext' => $refreshToken === null
+                ? $connection->refresh_ciphertext
+                : $this->cipher->encrypt($refreshToken, $context),
+            'token_expires_at' => $tokenExpiresAt,
+            'scopes' => $scopes === null
+                ? $connection->scopes
+                : $this->normalizedScopes($scopes),
+            'status' => $activate
+                ? MediaConnection::STATUS_ACTIVE
+                : MediaConnection::STATUS_PAUSED,
+            'next_scan_at' => $activate ? now() : null,
+            'last_error' => null,
+            'consecutive_failures' => 0,
         ])->save();
 
         return $connection->refresh();
@@ -185,6 +298,18 @@ class MediaConnectionManager
         }
     }
 
+    private function assertProvider(string $provider): void
+    {
+        if (
+            in_array($provider, [
+                MediaConnection::PROVIDER_DROPBOX,
+                MediaConnection::PROVIDER_GOOGLE_DRIVE,
+            ], true) === false
+        ) {
+            throw new InvalidArgumentException('Unsupported media connection provider.');
+        }
+    }
+
     private function interval(?int $minutes): int
     {
         $configured = $minutes ?? (int) config(
@@ -193,6 +318,18 @@ class MediaConnectionManager
         );
 
         return max(5, min($configured, 1440));
+    }
+
+    /**
+     * @param  list<string>  $scopes
+     * @return list<string>
+     */
+    private function normalizedScopes(array $scopes): array
+    {
+        return array_values(array_filter(
+            $scopes,
+            static fn (string $scope): bool => $scope !== '',
+        ));
     }
 
     private function assertText(

@@ -12,6 +12,7 @@ class MediaConnectionTokenProvider
     public function __construct(
         private readonly SecretCipher $cipher,
         private readonly DropboxOAuthClient $dropboxOAuth,
+        private readonly GoogleOAuthClient $googleOAuth,
         private readonly MediaConnectionManager $connections,
     ) {}
 
@@ -19,9 +20,7 @@ class MediaConnectionTokenProvider
         MediaConnection $connection,
         User $actor,
     ): string {
-        if ($connection->provider !== MediaConnection::PROVIDER_DROPBOX) {
-            throw MediaConnectorException::requestFailed();
-        }
+        $this->assertSupportedProvider($connection);
 
         $accessCiphertext = $connection->access_ciphertext;
 
@@ -46,21 +45,45 @@ class MediaConnectionTokenProvider
             $refreshCiphertext,
             $context,
         );
-        $refreshed = $this->dropboxOAuth->refresh($refreshToken);
 
-        $updated = $this->connections->replaceDropboxTokens(
-            $connection,
-            $actor,
-            $refreshed->accessToken,
-            null,
-            now()->addSeconds($refreshed->expiresInSeconds),
-            $refreshed->scopes === [] ? null : $refreshed->scopes,
-        );
+        if ($connection->provider === MediaConnection::PROVIDER_DROPBOX) {
+            $refreshed = $this->dropboxOAuth->refresh($refreshToken);
+            $updated = $this->connections->replaceDropboxTokens(
+                $connection,
+                $actor,
+                $refreshed->accessToken,
+                null,
+                now()->addSeconds($refreshed->expiresInSeconds),
+                $refreshed->scopes === [] ? null : $refreshed->scopes,
+            );
+        } else {
+            $refreshed = $this->googleOAuth->refresh($refreshToken);
+            $updated = $this->connections->replaceGoogleDriveTokens(
+                $connection,
+                $actor,
+                $refreshed->accessToken,
+                null,
+                now()->addSeconds($refreshed->expiresInSeconds),
+                $refreshed->scopes === [] ? null : $refreshed->scopes,
+            );
+        }
 
         return $this->cipher->decrypt(
             $updated->access_ciphertext,
             $updated->cryptoContext(),
         );
+    }
+
+    private function assertSupportedProvider(MediaConnection $connection): void
+    {
+        if (
+            in_array($connection->provider, [
+                MediaConnection::PROVIDER_DROPBOX,
+                MediaConnection::PROVIDER_GOOGLE_DRIVE,
+            ], true) === false
+        ) {
+            throw MediaConnectorException::requestFailed();
+        }
     }
 
     private function needsRefresh(MediaConnection $connection): bool
@@ -77,7 +100,7 @@ class MediaConnectionTokenProvider
 
         $margin = max(60, min(
             (int) config(
-                'grindflow.connectors.dropbox.refresh_margin_seconds',
+                $this->refreshMarginConfigKey($connection),
                 300,
             ),
             3600,
@@ -85,5 +108,14 @@ class MediaConnectionTokenProvider
 
         return $expiresAt->getTimestamp()
             <= now()->addSeconds($margin)->getTimestamp();
+    }
+
+    private function refreshMarginConfigKey(MediaConnection $connection): string
+    {
+        return match ($connection->provider) {
+            MediaConnection::PROVIDER_DROPBOX => 'grindflow.connectors.dropbox.refresh_margin_seconds',
+            MediaConnection::PROVIDER_GOOGLE_DRIVE => 'grindflow.connectors.google_drive.refresh_margin_seconds',
+            default => throw MediaConnectorException::requestFailed(),
+        };
     }
 }
