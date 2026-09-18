@@ -107,13 +107,19 @@ class DropboxMediaAdapter
         $stream = $this->downloadStream($accessToken, $file->id);
 
         try {
+            $limitedStream = $this->copyWithinLimit($stream);
+        } finally {
+            fclose($stream);
+        }
+
+        try {
             try {
-                $stored = Storage::disk($disk)->put($storageKey, $stream);
+                $stored = Storage::disk($disk)->put($storageKey, $limitedStream);
             } catch (Throwable) {
                 throw MediaConnectorException::stagingFailed();
             }
         } finally {
-            fclose($stream);
+            fclose($limitedStream);
         }
 
         if ($stored === false) {
@@ -213,14 +219,19 @@ class DropboxMediaAdapter
             }
         }
 
+        $hasMore = (bool) ($data['has_more'] ?? false);
         $cursor = is_string($data['cursor'] ?? null)
             ? $data['cursor']
             : null;
 
+        if ($hasMore && ($cursor === null || $cursor === '')) {
+            throw MediaConnectorException::requestFailed();
+        }
+
         return new RemoteMediaListing(
             files: $files,
             cursor: $cursor,
-            hasMore: (bool) ($data['has_more'] ?? false),
+            hasMore: $hasMore,
         );
     }
 
@@ -304,6 +315,43 @@ class DropboxMediaAdapter
         }
 
         return $stream;
+    }
+
+    /**
+     * @param  resource  $stream
+     * @return resource
+     */
+    private function copyWithinLimit($stream)
+    {
+        $limitedStream = fopen('php://temp', 'w+b');
+
+        if ($limitedStream === false) {
+            throw MediaConnectorException::stagingFailed();
+        }
+
+        try {
+            $copied = stream_copy_to_stream(
+                $stream,
+                $limitedStream,
+                $this->maxBytes() + 1,
+            );
+
+            if ($copied === false) {
+                throw MediaConnectorException::downloadFailed();
+            }
+
+            if ($copied > $this->maxBytes()) {
+                throw MediaConnectorException::fileTooLarge();
+            }
+
+            rewind($limitedStream);
+
+            return $limitedStream;
+        } catch (Throwable $exception) {
+            fclose($limitedStream);
+
+            throw $exception;
+        }
     }
 
     private function assertSuccessful(
