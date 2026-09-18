@@ -11,58 +11,47 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se inicio un cambio de arquitectura P0: Laravel pasa de PostgreSQL a **MariaDB**.
-- Laravel usa ahora el driver `mysql`, puerto 3306 y `utf8mb4_unicode_ci`.
-- Se retiro el middleware/contexto basado en variables de sesion PostgreSQL.
-- `TenantContext` ahora vive en la aplicacion y se registra como singleton.
-- Se agregaron `TenantScope` y `BelongsToOrganization` para que modelos
-  tenant-owned fallen cerrado sin organizacion activa.
-- Se retiro la migracion RLS/PLpgSQL y se reemplazo por constraints compatibles
-  con MariaDB y un trigger de identidad inmutable para memberships.
-- El gate `database` de CI ahora levanta MariaDB 11.4 y usa `pdo_mysql`.
-- La PR #12 del browser smoke queda pausada hasta que este pivot vuelva a quedar
-  VALIDATED IN CODE.
+- Se reemplazo el browser gate placeholder por un smoke test con **Chrome headless real**.
+- CI levanta Laravel, espera `/up` y comprueba landing, login y el redirect del
+  dashboard invitado.
+- El selector del gate incluye cambios en `app/Http/` para no omitir regresiones
+  introducidas por controladores.
+- En fallo se conservan DOM, screenshots y `browser-server.log` como artefactos.
+- Las Actions nuevas del browser job quedan fijadas a SHA completo.
+- El test conserva SQLite desechable para HTTP/renderizado; el gate de base sigue
+  usando MariaDB 11.4 como motor autoritativo.
+- El pivot MariaDB permanece **VALIDATED IN CODE** en `main`.
 
 ## Archivos modificados en este deploy
 
-- `config/database.php` y `.env.example` — MariaDB/`mysql` como target.
-- `app/Support/Tenancy/TenantContext.php` — contexto tenant sin dependencias PostgreSQL.
-- `app/Models/Scopes/TenantScope.php` — scope global fail-closed.
-- `app/Models/Concerns/BelongsToOrganization.php` — contrato tenant-owned.
-- `app/Http/Middleware/ApplyTenantUserContext.php` — actor context.
-- `database/migrations/2026_09_18_000100_create_identity_tables.php` — ENUMs MariaDB.
-- `database/migrations/2026_09_18_000200_enforce_identity_integrity.php` — trigger estructural.
-- `tests/Feature/MariaDbIntegrityTest.php` — invariantes MariaDB.
-- `tests/Feature/TenantScopedModelTest.php` — aislamiento tenant en Laravel.
-- `.github/workflows/grindflow-ci.yml` — servicio MariaDB 11.4.
-- `AGENTS.md` y `docs/` — arquitectura durable actualizada.
+- `scripts/browser-smoke.sh` — smoke E2E con Chrome/Chromium y validacion robusta del redirect.
+- `.github/workflows/grindflow-ci.yml` — browser gate real, selector HTTP y artefactos.
+- `docs/PRUEBAS.md` — contrato browser integrado con MariaDB CI.
+- `docs/REQUIREMENTS.md` — verificacion browser de GF-NFR-005.
+- `README.md` — snapshot operativo.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** sobre MariaDB.
-- GF-MIG-001 y GF-MIG-002 quedaron revalidados sobre MariaDB.
-- MariaDB 11.4 migrations, tests negativos, PHPUnit, Pint/Larastan,
-  SonarQube Cloud y `GrindFlow CI / validate` pasaron.
-- No se ha ejecutado ninguna migracion ni cambio destructivo en produccion.
-- PostgreSQL/Supabase permanece solo como legado temporal mientras sus modulos se migran.
+- Estado actual: **VALIDATED IN CODE** en `ci/real-browser-smoke`.
+- Browser real, `GrindFlow CI / validate` y SonarQube Cloud pasaron sobre el head rebasado.
+- MariaDB 11.4, GF-MIG-001 y GF-MIG-002 permanecen VALIDATED IN CODE.
+- No se ejecutan migraciones ni acciones contra produccion.
 
 ## Qué sigue
 
-- Validar y fusionar el pivot MariaDB.
-- Rebasar PR #12 sobre el nuevo `main` y continuar browser smoke.
-- Crear/configurar la base MariaDB real de Hostinger y ejecutar migraciones solo
-  despues de validar credenciales, backup/recovery y estado del esquema.
+- Validar y fusionar el browser smoke real.
+- Preparar un usuario/dataset E2E desechable para cubrir el dashboard autenticado.
+- Configurar MariaDB real en Hostinger antes de ejecutar migraciones de produccion.
 
 ## Panorama general pendiente
 
-- **P0 — MariaDB:** VALIDATED IN CODE; pendiente de merge y exact-main CI.
-- **P0 — Produccion / DB:** crear/configurar MariaDB Hostinger y validar
-  migraciones sin automatizarlas.
-- **P0 — Identidad / tenancy:** VALIDATED IN CODE sobre MariaDB; falta deploy/validacion de produccion.
-- **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required
-  status check de `main`.
+- **P0 — MariaDB:** VALIDATED IN CODE y fusionado; falta deploy/validacion de produccion.
+- **P0 — Produccion / DB:** crear/configurar MariaDB Hostinger y validar migraciones manuales.
+- **P0 — Identidad / tenancy:** VALIDATED IN CODE sobre MariaDB; falta validacion de produccion.
+- **P0 — Branch protection:** configurar `GrindFlow CI / validate` como required status check de `main`.
 - **P1 — UI:** shell visual VALIDATED IN CODE; pendiente de deploy Hostinger.
-- **P1 — Browser tests:** PR #12 pausada hasta terminar el pivot MariaDB.
+- **P1 — Browser tests:** smoke invitado VALIDATED IN CODE; pendiente de merge/exact-main CI.
+- **P1 — Browser autenticado:** crear datos E2E desechables y cubrir login/dashboard real.
 - **P1 — Media Vault / ingesta:** migrar modelos, S3, uploads y deduplicacion.
 - **P1 — Procesamiento / scheduling:** jobs idempotentes, pipeline y scheduler.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
