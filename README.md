@@ -7,9 +7,58 @@ ingresos.
 
 Contexto durable en `AGENTS.md` y `docs/`.
 
+## Estado general y prioridades
+
+> **Fuente de verdad operativa del trabajo pendiente.** Esta tabla debe mantenerse
+> actualizada cuando una PR cambie el estado, el alcance, un bloqueo o la prioridad
+> de cualquier frente. Los detalles durables viven en `AGENTS.md`,
+> `docs/REQUIREMENTS.md` y `docs/MIGRATION-LARAVEL.md`.
+
+### Estado actual
+
+- **Stack objetivo:** PHP 8.5 + Laravel 13 + Blade/Livewire + Tailwind + PostgreSQL.
+- **Fundacion Laravel (GF-MIG-001):** **VALIDATED IN CODE** y fusionada a `main`.
+- **Produccion:** la fundacion Laravel ya responde en `https://www.grindflow.com.co/`.
+- **Identidad y multi-tenancy (GF-MIG-002):** **EN CURSO** en la PR #4.
+- **Legado Next.js/TypeScript:** se conserva como referencia funcional hasta alcanzar paridad.
+- **CI:** GrindFlow CI, SonarQube Cloud y CodeRabbit estan integrados.
+
+### Prioridades
+
+| Prioridad | Frente | Estado | Siguiente compuerta / criterio de salida | Referencia |
+|---|---|---|---|---|
+| **P0** | Cerrar identidad y aislamiento multi-tenant | EN CURSO | Resolver hallazgos validos de review, CI + PostgreSQL RLS + Sonar verdes, squash merge y CI exacto de `main` | GF-MIG-002, GF-FR-001, GF-SEC-002/003, PR #4 |
+| **P0** | Contrato PostgreSQL de produccion | PENDIENTE | Separar rol de migraciones y rol runtime; runtime sin superuser/BYPASSRLS/ownership; conectar entorno y validar RLS real | `docs/IDENTITY-TENANCY.md` |
+| **P0** | Despliegue reproducible en Hostinger | PARCIALMENTE DESPLEGADO | Documentar/automatizar `composer install`, caches, variables, migraciones seguras y smoke test post-deploy | GF-SEC-004 |
+| **P0** | Proteger `main` | PENDIENTE | Exigir `GrindFlow CI / validate` como status check estable antes de merge | GF-NFR-003 |
+| **P0** | Fijar dependencias PHP | PENDIENTE | Versionar `composer.lock` y validar instalaciones reproducibles en CI/produccion | GF-NFR-001/002 |
+| **P1** | Shell visual Laravel | PENDIENTE | Layout Blade/Livewire, navegacion, Tailwind, responsive, accesibilidad y estados base | GF-NFR-001 |
+| **P1** | Tests de navegador reales | PENDIENTE | Sustituir el placeholder del gate `browser` por Dusk o Playwright y cubrir login/dashboard | GF-NFR-002 |
+| **P1** | Migrar Media Vault e ingesta | PENDIENTE | Modelos Laravel, S3, uploads, deduplicacion, conectores y jobs con paridad comprobada | GF-MIG-003, GF-FR-002 |
+| **P1** | Migrar procesamiento y programacion | PENDIENTE | Jobs idempotentes, validaciones, scheduler y regresiones equivalentes al legado | GF-MIG-003, GF-FR-003/004 |
+| **P1** | Observabilidad y operacion de queues/scheduler | PENDIENTE | Logs accionables sin secretos, supervision de jobs, retries y fallos diagnosticables | GF-NFR-004 |
+| **P1** | Backups y recuperacion | PENDIENTE | Politica de backup de DB/objetos y procedimiento de restauracion probado | Riesgo operativo |
+| **P2** | Migrar integraciones y distribucion | PENDIENTE | Credenciales, jobs, idempotencia, retries/backoff y contratos de integracion validados | GF-MIG-003, GF-FR-005 |
+| **P2** | Migrar trafico y atribucion | PENDIENTE | Enlaces rastreados, agregacion y privacidad equivalentes al comportamiento requerido | GF-MIG-003, GF-FR-006 |
+| **P2** | Migrar finanzas | PENDIENTE | Registros y vistas por rol con aislamiento tenant | GF-MIG-003, GF-FR-007 |
+| **P2** | Validaciones contra servicios reales | PENDIENTE | Smoke tests controlados de almacenamiento/conectores y registro de resultados | Definition of Done |
+| **P3** | Retirar el legado Node/Next/TypeScript | BLOQUEADO POR PARIDAD | Todos los modulos requeridos en Laravel deben estar VALIDATED IN CODE antes de borrar el legado | GF-MIG-004 |
+| **P3** | Simplificar CI post-migracion | BLOQUEADO POR GF-MIG-004 | Eliminar gate `legacy` y dependencias Node que ya no sean necesarias | GF-MIG-004 |
+
+### Convencion de prioridad
+
+- **P0:** bloqueo de seguridad, datos, despliegue o base arquitectonica. Se atiende antes de abrir trabajo dependiente.
+- **P1:** siguiente entrega funcional necesaria para avanzar la migracion.
+- **P2:** paridad funcional posterior y endurecimiento no bloqueante.
+- **P3:** limpieza/optimizacion que depende de completar la migracion.
+
+Los estados de entrega siguen siendo distintos: **IMPLEMENTED**, **VALIDATED IN CODE**,
+**DEPLOYED** y **VALIDATED IN PRODUCTION**. Un CI verde no equivale por si solo a
+validacion en produccion.
+
 ---
 
-## Estado: Sprint 3, Fase 6 — Motor de publicacion
+## Estado del legado TypeScript — referencia funcional
 
 Lo que existe y esta verificado:
 
@@ -128,7 +177,10 @@ workers/node.Dockerfile  Imagen de los workers de Node (ingesta y publicacion)
 docker-compose.yml       Orquestacion para VPS propio
 ```
 
-## Siguiente entrega
+## Backlog del legado previo a la migracion
+
+> Referencia historica. **No define el orden de trabajo actual**; la prioridad vigente esta en `Estado general y prioridades` al inicio de este README.
+
 
 1. **Identidad visual y estetica** (requerimiento nuevo): logo, iconografia,
    sistema de color, tipografia y estilo de componentes. Conviene antes de las
