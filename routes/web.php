@@ -12,7 +12,7 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 });
 
-Route::middleware(['auth', 'rls'])->group(function (): void {
+Route::middleware(['auth', 'tenant.user'])->group(function (): void {
     Route::get('/dashboard', DashboardController::class)
         ->name('dashboard');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])

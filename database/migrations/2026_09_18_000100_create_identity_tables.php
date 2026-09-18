@@ -14,7 +14,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestampTz('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('platform_role', 20)->default('model');
+            $table->enum('platform_role', ['admin', 'studio', 'model', 'editor'])
+                ->default('model');
             $table->rememberToken();
             $table->timestampsTz();
         });
@@ -23,7 +24,8 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('name', 120);
             $table->string('slug', 50)->unique();
-            $table->string('type', 20)->default('independent');
+            $table->enum('type', ['studio', 'independent'])
+                ->default('independent');
             $table->timestampsTz();
         });
 
@@ -35,7 +37,7 @@ return new class extends Migration
             $table->foreignUuid('user_id')
                 ->constrained()
                 ->cascadeOnDelete();
-            $table->string('role', 20);
+            $table->enum('role', ['admin', 'studio', 'model', 'editor']);
             $table->timestampsTz();
 
             $table->unique(['organization_id', 'user_id']);

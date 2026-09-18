@@ -128,14 +128,19 @@ production content.
 ### GF-MIG-001 — Laravel foundation
 **Status:** validated-in-code
 
-A Laravel 13 application using PHP 8.5 and PostgreSQL can install, boot and pass
-the fast/test CI gates.
+A Laravel 13 application using PHP 8.5 and MariaDB can install, boot and pass
+the fast/test/database CI gates.
+
+The MariaDB target is validated by the real MariaDB CI database gate.
 
 ### GF-MIG-002 — Identity and organizations
 **Status:** validated-in-code
 
-Authentication, roles and organization isolation are migrated and covered by
-negative cross-tenant tests before dependent modules move.
+Authentication, roles and organization isolation are migrated to the MariaDB
+target and covered by negative cross-tenant tests before dependent modules move.
+
+The MariaDB tenant-isolation contract is validated by negative application
+tests plus MariaDB-specific integrity tests.
 
 ### GF-MIG-003 — Module parity
 Each legacy module receives a parity checklist and targeted regression tests
