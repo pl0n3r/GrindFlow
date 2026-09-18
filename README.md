@@ -59,8 +59,13 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del Google Drive Changes API slice: **IMPLEMENTED**, pendiente de
-  `GrindFlow CI / validate`.
+- Estado actual del Google Drive Changes API slice: **VALIDATED IN CODE**.
+- El head funcional `889ecb2089ad1603b6018aff6a470049ee868185` paso
+  `fast`, `tests`, `php-quality`, browser y `GrindFlow CI / validate`;
+  MariaDB/legacy fueron correctamente omitidos por no aplicar al diff.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
+  0.0% duplicacion en codigo nuevo.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
 - Google adapter + OAuth/refresh + Dropbox end-to-end: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
 - No se usan credenciales Google reales.
@@ -69,9 +74,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar fast, PHPUnit, php-quality, MariaDB, browser y
-  `GrindFlow CI / validate`; resolver SonarQube/CodeRabbit si reportan hallazgos.
-- Fusionar este slice por squash cuando el head exacto quede verde.
 - Mantener pendiente la migracion operacional de `media_connections` y la
   configuracion Google real hasta aprobacion explicita.
 - Registrar el redirect exacto `/connections/google-drive/callback` y completar
@@ -87,12 +89,11 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh
-  VALIDATED IN CODE; Changes API IMPLEMENTED; pendientes validacion de este slice
-  y configuracion/migracion de produccion.
+- **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
+  Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
-- **P1 — Procesamiento / scheduling:** Dropbox scheduling VALIDATED IN CODE;
-  Google incremental scheduling IMPLEMENTED; pipeline general sigue pendiente.
+- **P1 — Procesamiento / scheduling:** Dropbox + Google incremental scheduling
+  VALIDATED IN CODE; pipeline general sigue pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
 - **P2 — Integraciones / distribucion:** pendiente.
