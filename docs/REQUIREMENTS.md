@@ -99,9 +99,17 @@ vault with traceable source metadata.
 - A completed processor version is a no-op on retry.
 - Missing objects, size mismatch and unsupported MIME produce bounded safe error
   codes and can be retried without creating another asset.
-- The initial `probe_v1` processor validates object existence/size and records
-  deterministic media kind, MIME, byte size and SHA-256 metadata. FFmpeg-derived
-  artifacts remain a later slice behind this contract.
+- The base processor validates object existence/size and records deterministic
+  media kind, MIME, byte size and SHA-256 metadata.
+- `probe_v2` can optionally invoke ffprobe through Laravel Process when
+  `MEDIA_FFPROBE_ENABLED=true`; it persists only whitelisted technical fields
+  (duration, format, stream count, codecs, dimensions, sample rate/channels).
+- ffprobe commands use argument arrays, bounded timeouts and safe failure codes;
+  arbitrary container tags, EXIF, stderr and raw process output are never
+  persisted.
+- ffprobe inspection does not satisfy the sanitization/publication gate.
+  Metadata stripping/transcoding and derived artifacts remain later processor
+  slices behind the same ProcessMediaAsset contract.
 
 ### GF-FR-004 — Scheduling
 **Statement:** Authorized users can schedule eligible content for configured
