@@ -11,82 +11,65 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se inicio la migracion Laravel de **Media Vault / ingesta**.
-- Se agregaron `media_blobs` y `media_assets` como modelos tenant-owned,
-  con UUID, metadata, SHA-256, origen y trazabilidad de duplicados.
-- Los bytes usan una clave deterministica por organizacion + SHA-256: dos
-  ingestas con el mismo contenido conservan dos registros, pero comparten un
-  unico blob.
-- Se agrego middleware reutilizable de contexto de organizacion para rutas
-  `/organizations/{organizationId}/...`, fallando cerrado ante organizaciones
-  no autorizadas.
-- El dashboard ya abre el Vault de cada organizacion y el Vault tiene UI visible
-  para listado, metricas y carga manual de imagen/video.
-- La carga inicial acepta JPEG, PNG, WebP, GIF, MP4, MOV y WebM. El formulario
-  tradicional queda limitado temporalmente a 8 MB; archivos grandes iran por
-  direct-to-S3/multipart en la siguiente iteracion. Admin/studio pueden cargar;
-  miembros sin permiso de gestion solo pueden consultar.
-- `Admin > System` ahora muestra migraciones pendientes y permite ejecutar
-  **Run pending migrations** como accion explicita de administrador, sin SSH.
-- CI y Production Smoke nunca ejecutan migraciones de produccion.
-- Production Smoke ahora exige schema al dia y valida tambien el primer Vault
-  visible de la cuenta E2E, sin mutar contenido real.
-- El secret E2E de GitHub ya fue reconocido por la automatizacion: el issue
-  `[AUTO] Production Smoke Not Configured` se cerro automaticamente.
+- Se diagnostico el HTTP 500 persistente del Dashboard mediante Production Smoke.
+- El smoke autenticado confirmo 15 respuestas HTTP 500 consecutivas en
+  `/dashboard`.
+- El mismo smoke confirmo que `/admin/diagnostics.json` seguia devolviendo 404
+  despues de un Redeploy de Hostinger, aunque esa ruta existe en `main`.
+- La causa operativa mas probable es cache Laravel persistente durante el deploy
+  Git de hPanel: el redeploy actualiza archivos, pero no ejecuta
+  `scripts/deploy-hostinger.sh` ni limpia automaticamente route/config/view cache.
+- Se agrego `ReleaseCacheGuard`, que calcula un fingerprint de rutas,
+  configuracion, bootstrap y `composer.lock`.
+- En produccion, cuando ese fingerprint cambia, GrindFlow invalida una sola vez
+  `bootstrap/cache/*.php`, vistas compiladas y OPcache. Usa lock y marker en
+  `storage/framework` para no repetir el trabajo.
+- El primer request posterior a un Git deploy puede hacer la limpieza. Production
+  Smoke comienza por `/up`, por lo que el propio smoke puede activar la
+  reparacion antes de probar login y Dashboard.
+- No se ejecutan migraciones ni operaciones destructivas como parte de esta
+  reparacion.
 
 ## Archivos modificados en este deploy
 
-- `database/migrations/2026_09_18_050000_create_media_vault_tables.php` — schema Vault.
-- `app/Models/MediaBlob.php` y `app/Models/MediaAsset.php` — dominio tenant-aware.
-- `app/Http/Middleware/ResolveOrganizationContext.php` — resolucion de tenant por URL.
-- `app/Services/Media/MediaIngestor.php` — hashing, storage y deduplicacion.
-- `app/Http/Controllers/Vault/VaultController.php` — listado y carga manual.
-- `app/Http/Requests/Vault/StoreMediaUploadRequest.php` — autorizacion y validacion.
-- `resources/views/vault/index.blade.php` — primera UI funcional del Vault.
-- `resources/views/dashboard.blade.php` — acceso visual por organizacion.
-- `app/Http/Controllers/Admin/SystemController.php` — estado de migraciones.
-- `app/Http/Controllers/Admin/RunMigrationsController.php` — migracion explicita sin SSH.
-- `resources/views/admin/system.blade.php` — control de schema desde Admin.
-- `routes/web.php` y `bootstrap/app.php` — rutas/middleware.
-- `config/grindflow.php` y `.env.example` — configuracion de storage/upload.
-- `tests/Feature/MediaVaultTest.php` y `tests/Feature/AdminMigrationTest.php` — cobertura.
-- `scripts/production-smoke.sh` — schema + Vault en produccion.
-- `public/css/grindflow.css` — componentes visuales del Vault.
-- `docs/DEPLOY-HOSTINGER.md` y `AGENTS.md` — flujo operativo sin SSH rutinario.
+- `app/Support/Deployment/ReleaseCacheGuard.php` — fingerprint, lock, invalidacion y marker.
+- `app/Providers/AppServiceProvider.php` — activa la reparacion solo en production.
+- `tests/Unit/ReleaseCacheGuardTest.php` — valida limpieza one-shot y cambio de fingerprint.
+- `docs/DEPLOY-HOSTINGER.md` — documenta el comportamiento de Git deploy y cache guard.
+- `AGENTS.md` — regla durable para despliegues Laravel en Hostinger.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado del cambio actual: **VALIDATED IN CODE**.
-- PR #28 paso `fast`, `php-quality`, `tests`, `database`, `browser`, `legacy` y
-  `GrindFlow CI / validate` en el run #106.
-- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- El schema nuevo exige migracion de produccion despues del merge; no se declara
-  **DEPLOYED** ni **VALIDATED IN PRODUCTION** antes de esa accion.
-- La migracion de produccion sera una accion explicita desde `Admin > System`,
-  no una mutacion automatica de CI.
-- La validacion de produccion debe demostrar login E2E, schema con cero
-  migraciones pendientes, Dashboard, System y Vault sin errores 5xx.
+- Estado del cambio actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Produccion sigue en fallo antes de este hotfix:
+  `/dashboard = 500`, `/admin/diagnostics.json = 404`.
+- Issue automatico activo: `#27 [AUTO] Production Smoke Failure`.
+- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** hasta que el smoke
+  autenticado cierre automaticamente el issue #27.
 
 ## Qué sigue
 
-- Fusionar PR #28 y dejar que Hostinger sincronice `main`.
-- En produccion, aplicar la migracion desde `Admin > System` si el contador es
-  mayor que cero.
-- Leer el issue automatico de Production Smoke si aparece un fallo y corregirlo
-  con Diagnostics, sin pedir pruebas manuales pantalla por pantalla.
-- Despues, evolucionar la carga del Vault a direct-to-S3/multipart resumable e
-  iniciar conectores de ingesta.
+- Pasar CI/Sonar/CodeRabbit del hotfix.
+- Fusionar el hotfix a `main`.
+- Dejar que Hostinger sincronice el cambio.
+- Reejecutar Production Smoke. Si el cache guard funciona, Diagnostics debe
+  dejar de responder 404 y el Dashboard debe pasar o entregar el incidente real.
+- Solo despues retomar migraciones/Vault en produccion.
 
 ## Panorama general pendiente
 
-- **P0 — Produccion / schema:** aplicar la nueva migracion del Vault desde Admin
-  despues del deploy y exigir cero pendientes.
-- **P0 — Produccion / smoke:** confirmar Dashboard/System/Vault extremo a extremo.
+- **P0 — Produccion / Dashboard:** HTTP 500 confirmado por smoke; hotfix de cache
+  Laravel IMPLEMENTED, pendiente VALIDATED IN CODE y produccion.
+- **P0 — Produccion / deploy:** asegurar que Git deploy no deje route/config/view
+  cache de una revision anterior.
+- **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
+  Dashboard/System vuelvan a estar operativos.
+- **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
-- **P1 — Media Vault / ingesta:** foundation IMPLEMENTED; faltan upload
-  direct-to-S3 resumable, conectores, jobs y parity completa GF-FR-002.
-- **P1 — Diagnosticos:** VALIDATED IN CODE; mantener validacion continua en produccion.
+- **P1 — Media Vault / ingesta:** foundation VALIDATED IN CODE; pendiente produccion
+  y siguientes fases de upload/conectores/jobs.
+- **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente disponibilidad real tras limpiar caches.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
