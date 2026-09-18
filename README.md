@@ -48,15 +48,21 @@ siguiente deploy.
 - PR #21 paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y
   `GrindFlow CI / validate`; `database` no aplico por alcance.
 - SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- PR #21 se fusiono a `main` como `33cd7bc972c6c46c96d82f7dfa316903db1019ac`.
+- El exact-main CI del commit `33cd7bc972c6c46c96d82f7dfa316903db1019ac`
+  paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y `validate`.
+- `GrindFlow Production Smoke` run #2 arranco para ese commit, pero el smoke
+  autenticado fue omitido porque falta `PRODUCTION_E2E_PASSWORD` en GitHub Actions.
 - El dashboard de produccion ha presentado un HTTP 500; no se atribuye aun una
   causa sin evidencia del nuevo diagnostico.
-- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** para Diagnostics
-  hasta que Hostinger reciba el merge y se observe el flujo real.
+- No se declara **VALIDATED IN PRODUCTION** para Diagnostics hasta observar el
+  flujo real en Hostinger.
 
 ## Qué sigue
 
-- Pasar CI/Sonar, fusionar y dejar que Hostinger despliegue el sistema diagnostico.
-- Reproducir o detectar automaticamente el 500 del dashboard y leer su
+- Configurar una sola vez `PRODUCTION_E2E_PASSWORD` en GitHub Actions para activar
+  el smoke autenticado de produccion sin usar SSH.
+- Dejar que Hostinger sincronice `main` y detectar el 500 del dashboard para leer su
   `incident_id`, excepcion y trace desde GitHub Actions/Admin Diagnostics.
 - Corregir la causa concreta del 500 con evidencia, no por ensayo y error.
 - Retomar Media Vault / ingesta despues de estabilizar produccion.
