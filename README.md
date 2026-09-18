@@ -55,8 +55,9 @@ siguiente deploy.
 - El exact-main CI de PR #21 paso `fast`, `php-quality`, `tests`, `browser`,
   `legacy` y `validate`.
 - SonarQube Cloud de PR #21: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- Production Smoke run #2 confirmo que el smoke autenticado esta omitido porque
-  falta `PRODUCTION_E2E_PASSWORD` en GitHub Actions.
+- Production Smoke run #2 habia confirmado que faltaba `PRODUCTION_E2E_PASSWORD`.
+- El operador ya reporto el secret como configurado; esta entrega fuerza una nueva
+  ejecucion automatica para confirmarlo y validar las rutas autenticadas.
 - Reporter de incidentes a GitHub: **IMPLEMENTED**, pendiente de fusion del PR #23
   y exact-main CI.
 - El dashboard de produccion ha presentado un HTTP 500; no se atribuye aun una
@@ -66,8 +67,8 @@ siguiente deploy.
 ## Qué sigue
 
 - Fusionar y validar el reporter de incidentes a GitHub.
-- Configurar una sola vez `PRODUCTION_E2E_PASSWORD` en GitHub Actions para
-  activar el smoke autenticado sin usar SSH.
+- Confirmar automaticamente en el siguiente push a `main` que `PRODUCTION_E2E_PASSWORD`
+  ya esta disponible y ejecutar el smoke autenticado sin usar SSH.
 - Dejar que Hostinger sincronice `main`, reproducir/detectar el 500 y leer su
   `incident_id`, excepcion y trace desde el issue automatico o Admin Diagnostics.
 - Corregir la causa concreta del 500 con evidencia.
@@ -77,8 +78,8 @@ siguiente deploy.
 
 - **P0 — Produccion / dashboard:** HTTP 500 observado; pendiente capturar la causa
   exacta con Diagnostics despues del deploy.
-- **P0 — Produccion / smoke:** reporter automatico implementado; falta el secret
-  E2E de GitHub para ejecutar el smoke autenticado extremo a extremo.
+- **P0 — Produccion / smoke:** reporter automatico implementado; el operador ya
+  configuro el secret E2E y queda pendiente confirmacion automatica extremo a extremo.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente produccion.
 - **P1 — UI:** shell visual y System admin VALIDATED IN CODE.
