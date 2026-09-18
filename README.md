@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+699** | **−43** | **+656** |
+| **12** | **+865** | **−54** | **+811** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -83,13 +83,15 @@ flowchart LR
 
 - `.env.example` — feature gate, binario y timeout de ffprobe.
 - `README.md` — snapshot exacto del slice actual.
-- `app/Services/Media/FfprobeMediaInspector.php` — inspección técnica normalizada.
-- `app/Services/Media/MediaAssetProcessor.php` — `probe_v2` y metadata técnica opcional.
-- `app/Services/Media/MediaProcessingException.php` — errores seguros del probe.
-- `config/grindflow.php` — configuración ffprobe.
+- `app/Jobs/ProcessMediaAsset.php` — ejecuta exactamente la version de procesador encolada.
+- `app/Services/Media/FfprobeMediaInspector.php` — inspección técnica normalizada y validación estricta.
+- `app/Services/Media/MediaAssetProcessor.php` — v2 sin ffprobe y v3 con ffprobe.
+- `app/Services/Media/MediaProcessingCoordinator.php` — selecciona version por modo y separa idempotencia/reintentos.
+- `app/Services/Media/MediaProcessingException.php` — errores seguros del probe/version.
+- `config/grindflow.php` — configuración ffprobe fail-closed.
 - `docs/REQUIREMENTS.md` — verificación actualizada de GF-FR-003.
-- `tests/Feature/FfprobeMediaInspectorTest.php` — normalización y fallos seguros.
-- `tests/Feature/MediaProcessingJobTest.php` — contrato v2 con feature gate desactivado.
+- `tests/Feature/FfprobeMediaInspectorTest.php` — normalización, malformed entries y fallos seguros.
+- `tests/Feature/MediaProcessingJobTest.php` — idempotencia y transición v2 → v3.
 - `tests/secrets.test.ts` — manipulación AES-GCM determinista para eliminar un flake Base64URL.
 
 ## Validación
