@@ -8,6 +8,7 @@ use App\Models\MediaAsset;
 use App\Models\MediaBlob;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Media\DirectMediaUpload;
 use App\Services\Media\MediaIngestor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Illuminate\View\View;
 
 class VaultController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, DirectMediaUpload $directUploads): View
     {
         $organization = $this->organization($request);
 
@@ -44,6 +45,8 @@ class VaultController extends Controller
             'duplicateCount' => $duplicateCount,
             'storageBytes' => $storageBytes,
             'canUpload' => $user->canManageOrganization($organization),
+            'directUploadAvailable' => $directUploads->available(),
+            'directUploadMaxBytes' => $directUploads->maxBytes(),
         ]);
     }
 

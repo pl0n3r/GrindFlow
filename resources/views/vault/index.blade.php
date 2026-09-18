@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#070a12">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Vault · {{ $organization->name }} · GrindFlow</title>
     <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
 </head>
@@ -134,10 +135,83 @@
             </section>
 
             @if ($canUpload)
-                <section id="vault-upload" class="gf-panel gf-panel--spaced">
+                <section
+                    id="vault-upload"
+                    class="gf-panel gf-panel--spaced"
+                    data-direct-upload-capability="{{ $directUploadAvailable ? 'ready' : 'unavailable' }}"
+                >
                     <header class="gf-panel__head">
-                        <h2>Ingest media</h2>
-                        <span class="gf-appbar__meta">manual upload · foundation</span>
+                        <h2>Direct upload</h2>
+                        <span class="gf-appbar__meta">
+                            {{ $directUploadAvailable ? 'direct to object storage' : 'storage setup required' }}
+                        </span>
+                    </header>
+
+                    <div class="gf-panel__body">
+                        @if ($directUploadAvailable)
+                            <form
+                                class="gf-upload"
+                                data-direct-upload-form
+                                data-intent-url="{{ route('organizations.vault.direct.create', ['organizationId' => $organization->id]) }}"
+                                data-complete-url="{{ route('organizations.vault.direct.complete', ['organizationId' => $organization->id]) }}"
+                                data-max-bytes="{{ $directUploadMaxBytes }}"
+                            >
+                                <label class="gf-upload__drop">
+                                    <span class="gf-upload__icon" aria-hidden="true">⇧</span>
+                                    <span>
+                                        <strong>Sube archivos grandes directo al storage</strong>
+                                        <small>
+                                            JPEG, PNG, WebP, GIF, MP4, MOV o WebM ·
+                                            max {{ number_format($directUploadMaxBytes / 1073741824, 1) }} GB
+                                        </small>
+                                    </span>
+                                    <input
+                                        type="file"
+                                        name="media"
+                                        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+                                        required
+                                        data-direct-upload-file
+                                    >
+                                </label>
+
+                                <div class="gf-upload__progress" data-direct-upload-progress-wrap hidden>
+                                    <div class="gf-upload__progress-head">
+                                        <span data-direct-upload-status>Preparando upload...</span>
+                                        <span data-direct-upload-percent>0%</span>
+                                    </div>
+                                    <progress max="100" value="0" data-direct-upload-progress></progress>
+                                </div>
+
+                                <div class="gf-upload__footer">
+                                    <p>
+                                        El navegador envia los bytes directo al storage.
+                                        GrindFlow verifica tamaño y SHA-256 antes de registrar el asset.
+                                    </p>
+                                    <button class="gf-button gf-button--primary" type="submit">
+                                        Direct upload
+                                    </button>
+                                </div>
+                            </form>
+                        @else
+                            <div class="gf-empty gf-empty--compact">
+                                <div>
+                                    <div class="gf-empty__icon" aria-hidden="true">⇧</div>
+                                    <h3>Direct upload aun no esta configurado.</h3>
+                                    <p>
+                                        El Vault sigue disponible con quick upload. Cuando el storage
+                                        S3-compatible tenga credenciales, esta misma pantalla habilita
+                                        uploads grandes sin pasar los bytes por PHP.
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
+                <section class="gf-panel gf-panel--spaced">
+                    <header class="gf-panel__head">
+                        <h2>Quick upload</h2>
+                        <span class="gf-appbar__meta">through application · max 8 MB</span>
                     </header>
 
                     <div class="gf-panel__body">
@@ -168,11 +242,11 @@
 
                             <div class="gf-upload__footer">
                                 <p>
-                                    Los bytes iguales comparten un unico blob. Cada ingesta
-                                    conserva su propio registro y referencia al original.
+                                    Ideal para archivos pequeños. Los bytes iguales comparten un unico
+                                    blob y cada ingesta conserva su propio registro.
                                 </p>
                                 <button class="gf-button gf-button--primary" type="submit">
-                                    Upload
+                                    Quick upload
                                 </button>
                             </div>
                         </form>
@@ -243,5 +317,180 @@
             </section>
         </main>
     </div>
+
+    @if ($canUpload && $directUploadAvailable)
+        <script>
+            (() => {
+                const form = document.querySelector('[data-direct-upload-form]');
+
+                if (!form) {
+                    return;
+                }
+
+                const fileInput = form.querySelector('[data-direct-upload-file]');
+                const button = form.querySelector('button[type="submit"]');
+                const progressWrap = form.querySelector('[data-direct-upload-progress-wrap]');
+                const progress = form.querySelector('[data-direct-upload-progress]');
+                const progressPercent = form.querySelector('[data-direct-upload-percent]');
+                const status = form.querySelector('[data-direct-upload-status]');
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+                const maxBytes = Number(form.dataset.maxBytes ?? 0);
+
+                const setStatus = (message) => {
+                    status.textContent = message;
+                };
+
+                const setProgress = (value) => {
+                    const percent = Math.max(0, Math.min(100, Math.round(value)));
+                    progress.value = percent;
+                    progressPercent.textContent = percent + '%';
+                };
+
+                const responseMessage = async (response) => {
+                    try {
+                        const payload = await response.json();
+
+                        if (payload?.message) {
+                            return payload.message;
+                        }
+
+                        const firstError = Object.values(payload?.errors ?? {})[0];
+
+                        if (Array.isArray(firstError) && firstError[0]) {
+                            return firstError[0];
+                        }
+                    } catch (error) {
+                        // Keep the generic message below.
+                    }
+
+                    return 'No fue posible completar el upload.';
+                };
+
+                const putDirect = (intent, file) => new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', intent.url, true);
+
+                    let hasContentType = false;
+
+                    Object.entries(intent.headers ?? {}).forEach(([name, value]) => {
+                        if (name.toLowerCase() === 'content-type') {
+                            hasContentType = true;
+                        }
+
+                        xhr.setRequestHeader(name, String(value));
+                    });
+
+                    if (!hasContentType && file.type) {
+                        xhr.setRequestHeader('Content-Type', file.type);
+                    }
+
+                    xhr.upload.addEventListener('progress', (event) => {
+                        if (event.lengthComputable && event.total > 0) {
+                            setProgress((event.loaded / event.total) * 100);
+                        }
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            setProgress(100);
+                            resolve();
+                            return;
+                        }
+
+                        reject(new Error('Object storage returned HTTP ' + xhr.status + '.'));
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        reject(new Error('No fue posible conectar con object storage.'));
+                    });
+
+                    xhr.send(file);
+                });
+
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+
+                    const file = fileInput.files?.[0];
+
+                    if (!file) {
+                        return;
+                    }
+
+                    if (maxBytes > 0 && file.size > maxBytes) {
+                        progressWrap.hidden = false;
+                        setStatus('El archivo supera el limite de direct upload.');
+                        setProgress(0);
+                        return;
+                    }
+
+                    button.disabled = true;
+                    fileInput.disabled = true;
+                    progressWrap.hidden = false;
+                    setProgress(0);
+                    setStatus('Solicitando URL segura...');
+
+                    try {
+                        const intentResponse = await fetch(form.dataset.intentUrl, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrf,
+                            },
+                            body: JSON.stringify({
+                                filename: file.name,
+                                mime_type: file.type,
+                                byte_size: file.size,
+                            }),
+                        });
+
+                        if (!intentResponse.ok) {
+                            throw new Error(await responseMessage(intentResponse));
+                        }
+
+                        const intent = await intentResponse.json();
+
+                        setStatus('Subiendo directo al storage...');
+                        await putDirect(intent, file);
+
+                        setStatus('Verificando integridad SHA-256...');
+
+                        const completeResponse = await fetch(form.dataset.completeUrl, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrf,
+                            },
+                            body: JSON.stringify({
+                                upload_token: intent.upload_token,
+                            }),
+                        });
+
+                        if (!completeResponse.ok) {
+                            throw new Error(await responseMessage(completeResponse));
+                        }
+
+                        const completed = await completeResponse.json();
+
+                        setStatus(completed.message ?? 'Upload completado.');
+                        setProgress(100);
+
+                        window.setTimeout(() => {
+                            window.location.reload();
+                        }, 650);
+                    } catch (error) {
+                        setStatus(error instanceof Error ? error.message : 'No fue posible completar el upload.');
+                    } finally {
+                        button.disabled = false;
+                        fileInput.disabled = false;
+                    }
+                });
+            })();
+        </script>
+    @endif
+
 </body>
 </html>

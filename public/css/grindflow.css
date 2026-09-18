@@ -1409,3 +1409,59 @@ a {
     padding-inline: 8px;
   }
 }
+
+
+.gf-empty--compact {
+  min-height: 180px;
+}
+
+.gf-upload__progress {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(56, 232, 255, 0.16);
+  border-radius: 14px;
+  padding: 13px 14px;
+  background: rgba(56, 232, 255, 0.035);
+}
+
+.gf-upload__progress[hidden] {
+  display: none;
+}
+
+.gf-upload__progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--gf-muted);
+  font-size: 11px;
+}
+
+.gf-upload__progress progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.gf-upload__progress progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.gf-upload__progress progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gf-cyan), #9a7cff);
+}
+
+.gf-upload__progress progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gf-cyan), #9a7cff);
+}
+
+.gf-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
