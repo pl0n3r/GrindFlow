@@ -84,13 +84,17 @@ class DropboxMediaAdapterTest extends TestCase
 
         $bytes = 'connector-staged-bytes';
 
-        Http::fake([
-            'https://content.dropboxapi.com/2/files/download' => Http::response(
-                $bytes,
-                200,
-                ['Content-Type' => 'application/octet-stream'],
-            ),
-        ]);
+        Http::fake(function (Request $request) use ($bytes) {
+            if ($request->url() === 'https://content.dropboxapi.com/2/files/download') {
+                return Http::response(
+                    $bytes,
+                    200,
+                    ['Content-Type' => 'application/octet-stream'],
+                );
+            }
+
+            return Http::response(status: 404);
+        });
 
         $user = User::factory()->create();
         $organization = Organization::factory()->create();
