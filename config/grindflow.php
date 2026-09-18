@@ -9,6 +9,18 @@ return [
             'MEDIA_CONNECTOR_MAX_BYTES',
             2_147_483_648,
         ),
+        'connector_scan_interval_minutes' => (int) env(
+            'MEDIA_CONNECTOR_SCAN_INTERVAL_MINUTES',
+            15,
+        ),
+        'connector_scan_batch_size' => (int) env(
+            'MEDIA_CONNECTOR_SCAN_BATCH_SIZE',
+            20,
+        ),
+        'connector_scan_page_budget' => (int) env(
+            'MEDIA_CONNECTOR_SCAN_PAGE_BUDGET',
+            20,
+        ),
         'direct_upload_max_bytes' => (int) env(
             'MEDIA_DIRECT_UPLOAD_MAX_BYTES',
             2_147_483_648,
