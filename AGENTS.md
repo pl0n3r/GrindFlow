@@ -104,9 +104,15 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   reanudan pronto desde ese cursor en vez de reiniciar el arbol remoto.
 - El scheduler debe ser seguro durante deploy-before-migration: si
   `media_connections` aun no existe, el tick devuelve cero sin romper la app.
-- OAuth handshake y refresh automatico de tokens se implementan en un slice
-  separado. Tener refresh token/expiry persistidos no autoriza inventar un flujo
-  de refresh incompleto.
+- El refresh automatico de Dropbox ocurre solo cuando `token_expires_at` entra
+  en el margen configurado. El refresh token se descifra solo en memoria y el
+  access token nuevo se cifra inmediatamente con el mismo AAD tenant/provider.
+- Un `invalid_grant` o ausencia de refresh token cambia la conexion a
+  `needs_reconnect`; un 429 de refresh solo difiere el scan y no consume failure
+  budget.
+- El callback OAuth y el intercambio inicial de authorization code siguen en un
+  slice separado. El refresh implementado no sustituye CSRF/state validation del
+  flujo de conexion inicial.
 
 ### Regla de direct uploads del Vault
 

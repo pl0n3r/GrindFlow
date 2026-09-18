@@ -99,7 +99,22 @@ migration.
 
 ## Current boundary
 
-Encrypted persistence, connection lifecycle and scheduled cursor scans are now
-implemented. OAuth authorization callbacks and automatic refresh-token exchange
-remain a separate slice; CI still uses provider fakes and makes no real Dropbox
-API call.
+Encrypted persistence, connection lifecycle, scheduled cursor scans and
+automatic Dropbox access-token refresh are implemented.
+
+When `token_expires_at` enters the configured refresh margin, the scanner
+decrypts the tenant-bound refresh token only in memory and exchanges it at
+Dropbox's token endpoint. The replacement access token is immediately re-encrypted
+with the same AAD. Dropbox does not normally return a replacement refresh token,
+so the existing encrypted refresh token is retained.
+
+Refresh failures follow the same safe policy as scans:
+
+- invalid/revoked refresh grant -> `connector_refresh_rejected` and reconnect
+- missing refresh token -> `connector_refresh_unavailable` and reconnect
+- HTTP 429 -> defer by bounded Retry-After without spending failure budget
+- missing app configuration -> `connector_oauth_not_configured`
+- malformed/network/provider failure -> safe request-failed code
+
+OAuth authorization callbacks and initial code exchange remain a separate slice.
+CI uses provider fakes and makes no real Dropbox API call.

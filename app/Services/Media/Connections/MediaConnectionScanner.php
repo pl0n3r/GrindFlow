@@ -6,7 +6,6 @@ use App\Models\MediaConnection;
 use App\Models\User;
 use App\Services\Media\Connectors\DropboxMediaAdapter;
 use App\Services\Media\Connectors\MediaConnectorException;
-use App\Support\Security\SecretCipher;
 use App\Support\Security\SecretCryptoException;
 use InvalidArgumentException;
 
@@ -14,7 +13,7 @@ class MediaConnectionScanner
 {
     public function __construct(
         private readonly DropboxMediaAdapter $dropbox,
-        private readonly SecretCipher $cipher,
+        private readonly MediaConnectionTokenProvider $tokens,
     ) {}
 
     public function scan(MediaConnection $connection, User $actor): void
@@ -43,17 +42,9 @@ class MediaConnectionScanner
 
     private function scanDropbox(MediaConnection $connection, User $actor): void
     {
-        $ciphertext = $connection->access_ciphertext;
-
-        if ($ciphertext === '') {
-            $this->needsReconnect($connection, 'connection_credentials_missing');
-
-            return;
-        }
-
-        $accessToken = $this->cipher->decrypt(
-            $ciphertext,
-            $connection->cryptoContext(),
+        $accessToken = $this->tokens->accessToken(
+            $connection,
+            $actor,
         );
 
         $cursor = is_string($connection->cursor) && $connection->cursor !== ''

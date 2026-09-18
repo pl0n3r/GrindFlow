@@ -5,6 +5,17 @@ return [
         'encryption_master_key' => env('ENCRYPTION_MASTER_KEY'),
     ],
 
+    'connectors' => [
+        'dropbox' => [
+            'app_key' => env('DROPBOX_APP_KEY'),
+            'app_secret' => env('DROPBOX_APP_SECRET'),
+            'refresh_margin_seconds' => (int) env(
+                'DROPBOX_REFRESH_MARGIN_SECONDS',
+                300,
+            ),
+        ],
+    ],
+
     'media' => [
         'disk' => env('MEDIA_DISK', env('FILESYSTEM_DISK', 'local')),
         'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 'media'),
