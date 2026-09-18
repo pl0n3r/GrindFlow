@@ -4,7 +4,7 @@
 .phpunit.result.cache
 /public/storage
 /storage/*.key
-/storage/logs/*.log
+/storage/logs/*
 /bootstrap/cache/*.php
 
 # dependencias Node

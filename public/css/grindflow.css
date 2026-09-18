@@ -1084,3 +1084,136 @@ a {
     flex-direction: column;
   }
 }
+
+
+/* Diagnostics */
+.gf-diagnostics {
+  display: grid;
+  gap: 12px;
+}
+
+.gf-diagnostic {
+  overflow: hidden;
+  border: 1px solid var(--gf-line);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+}
+
+.gf-diagnostic__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.gf-diagnostic__summary::-webkit-details-marker {
+  display: none;
+}
+
+.gf-diagnostic__title {
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.gf-diagnostic__meta {
+  margin-top: 5px;
+  color: var(--gf-muted);
+  font-size: 11px;
+}
+
+.gf-diagnostic__id {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--gf-cyan);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gf-diagnostic__body {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid var(--gf-line);
+  padding: 16px;
+}
+
+.gf-diagnostic__code {
+  overflow: auto;
+  max-height: 280px;
+  margin: 8px 0 0;
+  border: 1px solid var(--gf-line);
+  border-radius: 12px;
+  padding: 12px;
+  color: #d9e4f5;
+  background: rgba(4,7,13,0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.gf-error-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.gf-error-card {
+  width: min(620px, 100%);
+}
+
+.gf-error-card h1 {
+  margin: 20px 0 10px;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  letter-spacing: -0.055em;
+}
+
+.gf-error-card p {
+  color: var(--gf-muted);
+  line-height: 1.7;
+}
+
+.gf-incident {
+  display: grid;
+  gap: 7px;
+  margin: 22px 0;
+  border: 1px solid rgba(255,107,136,0.22);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255,107,136,0.06);
+}
+
+.gf-incident span {
+  color: var(--gf-muted);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gf-incident code {
+  overflow-wrap: anywhere;
+  color: #ffc2cf;
+}
+
+.gf-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 680px) {
+  .gf-diagnostic__summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .gf-diagnostic__id {
+    max-width: 100%;
+  }
+}

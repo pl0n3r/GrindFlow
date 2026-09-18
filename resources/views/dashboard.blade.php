@@ -51,6 +51,11 @@
                         <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
                         <span class="gf-navitem__text">System</span>
                     </a>
+
+                    <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
+                        <span class="gf-navitem__icon" aria-hidden="true">!</span>
+                        <span class="gf-navitem__text">Diagnostics</span>
+                    </a>
                 @endif
             </nav>
 
