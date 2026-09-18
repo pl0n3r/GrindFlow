@@ -81,12 +81,27 @@ vault with traceable source metadata.
   files do not enter staging.
 
 ### GF-FR-003 — Media processing
+**Status:** implemented
+
 **Statement:** Media can be processed through deterministic background jobs.
 
 **Acceptance criteria:**
 - Jobs are idempotent.
 - Failures expose actionable state.
 - Retries do not duplicate final artifacts.
+
+**Verification:**
+- Canonical assets from manual, direct and queued/cloud ingestion are handed to
+  the same `ProcessMediaAsset` queue contract.
+- Duplicate assets do not schedule a second processing pass for identical bytes.
+- Processing state lives in asset metadata with processor version, status,
+  attempts and safe `last_error`; raw exception messages/payloads are not stored.
+- A completed processor version is a no-op on retry.
+- Missing objects, size mismatch and unsupported MIME produce bounded safe error
+  codes and can be retried without creating another asset.
+- The initial `probe_v1` processor validates object existence/size and records
+  deterministic media kind, MIME, byte size and SHA-256 metadata. FFmpeg-derived
+  artifacts remain a later slice behind this contract.
 
 ### GF-FR-004 — Scheduling
 **Statement:** Authorized users can schedule eligible content for configured
