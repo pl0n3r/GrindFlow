@@ -36,6 +36,14 @@ return [
         'disk' => env('MEDIA_DISK', env('FILESYSTEM_DISK', 'local')),
         'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 'media'),
         'staging_disk' => env('MEDIA_STAGING_DISK', 'media'),
+        'ffprobe' => [
+            'enabled' => (bool) env('MEDIA_FFPROBE_ENABLED', false),
+            'binary' => env('MEDIA_FFPROBE_BINARY', 'ffprobe'),
+            'timeout_seconds' => (int) env(
+                'MEDIA_FFPROBE_TIMEOUT_SECONDS',
+                30,
+            ),
+        ],
         'connector_max_bytes' => (int) env(
             'MEDIA_CONNECTOR_MAX_BYTES',
             2_147_483_648,

@@ -99,9 +99,14 @@ vault with traceable source metadata.
 - A completed processor version is a no-op on retry.
 - Missing objects, size mismatch and unsupported MIME produce bounded safe error
   codes and can be retried without creating another asset.
-- The initial `probe_v1` processor validates object existence/size and records
-  deterministic media kind, MIME, byte size and SHA-256 metadata. FFmpeg-derived
-  artifacts remain a later slice behind this contract.
+- The `probe_v2` processor preserves deterministic object/size/MIME checks and
+  can enrich canonical media with feature-gated `ffprobe` metadata.
+- `ffprobe` is disabled by default, has a bounded timeout and persists only a
+  whitelist of technical fields; arbitrary tags, stderr and provider payloads
+  are never copied into asset metadata or safe processing errors.
+- Invalid output, process failure and timeout map to bounded processing error
+  codes and remain retry-safe. FFmpeg-derived artifacts remain a later slice
+  behind this contract.
 
 ### GF-FR-004 — Scheduling
 **Statement:** Authorized users can schedule eligible content for configured

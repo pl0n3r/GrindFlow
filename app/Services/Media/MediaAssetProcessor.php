@@ -8,7 +8,11 @@ use Illuminate\Support\Facades\Storage;
 
 class MediaAssetProcessor
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
+
+    public function __construct(
+        private readonly FfprobeMediaInspector $ffprobe,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -43,13 +47,21 @@ class MediaAssetProcessor
             throw MediaProcessingException::unsupportedMime();
         }
 
+        $ffprobeEnabled = $this->ffprobe->enabled();
+
         return [
             'version' => self::VERSION,
-            'profile' => 'probe_v1',
+            'profile' => 'probe_v2',
             'media_kind' => $kind,
             'mime_type' => $mimeType,
             'byte_size' => $blob->byte_size,
             'sha256' => $blob->sha256,
+            'technical_probe' => $ffprobeEnabled
+                ? 'ffprobe'
+                : 'disabled',
+            'technical_metadata' => $ffprobeEnabled
+                ? $this->ffprobe->inspect($blob)
+                : null,
         ];
     }
 
