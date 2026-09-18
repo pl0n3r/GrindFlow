@@ -21,7 +21,13 @@ siguiente deploy.
   administradores de plataforma.
 - La pagina 500 muestra el incident ID sin revelar detalles tecnicos.
 - El production smoke imprime los incidentes recientes en GitHub Actions cuando
-  falla Dashboard o System, permitiendo que los agentes los lean sin SSH.
+  falla Dashboard o System.
+- Los fallos de produccion se publican ademas en el issue automatico
+  `[AUTO] Production Smoke Failure`, para que los agentes puedan leer el
+  diagnostico desde GitHub sin depender de SSH ni de inspeccionar Actions a mano.
+- Si falta el secret E2E, el workflow deja visible el issue automatico
+  `[AUTO] Production Smoke Not Configured` en vez de dar una falsa sensacion de
+  validacion.
 - El diagnostico no registra request bodies, cookies, headers, passwords,
   tokens, API keys ni secretos de conexion.
 
@@ -38,13 +44,15 @@ siguiente deploy.
 - `scripts/production-smoke.sh` — lectura automatica de diagnosticos al fallar.
 - `tests/Feature/DiagnosticsTest.php` — cobertura de sanitizacion y permisos.
 - `public/css/grindflow.css` — UI de Diagnostics/error.
+- `.github/workflows/production-smoke.yml` — handoff automatico de diagnosticos a issues.
 - `.gitignore` — exclusión de todos los logs runtime.
 - `docs/DIAGNOSTICS.md` y `AGENTS.md` — contrato operativo durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado del cambio actual: **VALIDATED IN CODE**.
+- Diagnostics base (PR #21): **VALIDATED IN CODE** y fusionado a `main`.
+- Reporter de incidentes a GitHub: **IMPLEMENTED**, pendiente de CI del PR actual.
 - PR #21 paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y
   `GrindFlow CI / validate`; `database` no aplico por alcance.
 - SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
@@ -55,7 +63,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar CI/Sonar, fusionar y dejar que Hostinger despliegue el sistema diagnostico.
+- Pasar CI/Sonar del reporter, fusionarlo y dejar que Hostinger despliegue el sistema diagnostico.
 - Reproducir o detectar automaticamente el 500 del dashboard y leer su
   `incident_id`, excepcion y trace desde GitHub Actions/Admin Diagnostics.
 - Corregir la causa concreta del 500 con evidencia, no por ensayo y error.
@@ -65,8 +73,8 @@ siguiente deploy.
 
 - **P0 — Produccion / dashboard:** HTTP 500 observado; pendiente capturar la causa
   exacta con Diagnostics despues del deploy.
-- **P0 — Produccion / smoke:** configurar/confirmar el secret E2E de GitHub para
-  que el smoke autenticado pueda ejecutarse de extremo a extremo.
+- **P0 — Produccion / smoke:** el workflow ya hace handoff de fallos a issues;
+  falta confirmar/configurar el secret E2E de GitHub para ejecutarlo extremo a extremo.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente produccion.
 - **P1 — UI:** shell visual y System admin VALIDATED IN CODE.
