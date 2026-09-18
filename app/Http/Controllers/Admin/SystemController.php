@@ -17,8 +17,7 @@ class SystemController extends Controller
         Request $request,
         Migrator $migrator,
         DirectMediaUpload $directUploads,
-    ): View
-    {
+    ): View {
         $user = $request->user();
 
         abort_unless(
