@@ -26,6 +26,31 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
 - La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
 
+### Regla de direct uploads del Vault
+
+- Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
+  tenant-bound y sube directamente al storage S3-compatible.
+- La URL temporal nunca expone credenciales permanentes y expira en un maximo de
+  60 minutos. El token de finalizacion va cifrado y queda ligado a organizacion,
+  usuario, disk, key, nombre, MIME, tamaño y expiracion.
+- El storage key de staging usa UUID y nunca incorpora el filename del usuario.
+- Finalizar un direct upload exige que el objeto exista y tenga exactamente el
+  tamaño aprobado. GrindFlow vuelve a leer el objeto por stream para calcular
+  SHA-256 antes de crear el blob/asset.
+- La deduplicacion sigue siendo por SHA-256 dentro del tenant: un duplicado
+  conserva su fila de asset y elimina la segunda copia de bytes.
+- El limite duro inicial del direct upload es 2 GiB aunque una variable de entorno
+  intente configurarlo por encima.
+- El quick upload por PHP se conserva como fallback de archivos pequeños con su
+  limite fijo de 8 MB.
+- Si object storage no esta configurado, el Vault debe seguir renderizando y
+  mostrar el direct upload como no disponible; nunca romper Dashboard/Vault por
+  ausencia de credenciales.
+- Production Smoke valida la presencia de la capacidad Direct upload usando el
+  mismo GET de Vault ya existente, sin una recarga o request E2E adicional.
+- Las pruebas de upload que escriban bytes en produccion requieren una accion
+  explicitamente aprobada. El smoke normal permanece de solo lectura.
+
 ### Regla de pruebas E2E eficientes
 
 - Usar el usuario sintetico E2E existente para validar **todo lo razonable** en
