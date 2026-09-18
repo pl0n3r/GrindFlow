@@ -27,7 +27,6 @@ siguiente deploy.
 
 - `app/Http/Controllers/Admin/SystemController.php` — estado read-only del runtime.
 - `resources/views/admin/system.blade.php` — nueva pantalla administrativa.
-- `resources/views/components/admin-system-link.blade.php` — navegacion admin.
 - `resources/views/dashboard.blade.php` — acceso condicional a System.
 - `routes/web.php` — ruta protegida `/admin/system`.
 - `public/css/grindflow.css` — componentes visuales de estado.
