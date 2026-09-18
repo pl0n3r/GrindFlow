@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'security' => [
+        'encryption_master_key' => env('ENCRYPTION_MASTER_KEY'),
+    ],
+
     'media' => [
         'disk' => env('MEDIA_DISK', env('FILESYSTEM_DISK', 'local')),
         'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 'media'),
