@@ -19,24 +19,27 @@ class ReleaseCacheGuard
         'routes/web.php',
     ];
 
-    public function __construct(
-        private readonly ?string $basePathOverride = null,
-        private readonly ?string $storagePathOverride = null,
-    ) {}
-
     /**
      * Clear stale Laravel caches once when deployment-sensitive source changes.
      */
-    public function refreshIfNeeded(): bool
-    {
-        $storageFramework = $this->storagePath('framework');
+    public function refreshIfNeeded(
+        ?string $basePathOverride = null,
+        ?string $storagePathOverride = null,
+    ): bool {
+        $basePath = $basePathOverride ?? base_path();
+        $storagePath = $storagePathOverride ?? storage_path();
+        $storageFramework = $this->join($storagePath, 'framework');
 
-        if (is_dir($storageFramework) === false && mkdir($storageFramework, 0775, true) === false && is_dir($storageFramework) === false) {
+        if (
+            is_dir($storageFramework) === false
+            && mkdir($storageFramework, 0775, true) === false
+            && is_dir($storageFramework) === false
+        ) {
             throw new RuntimeException('Unable to create Laravel framework storage directory.');
         }
 
-        $lockPath = $storageFramework.'/grindflow-release.lock';
-        $markerPath = $storageFramework.'/grindflow-release.sha256';
+        $lockPath = $this->join($storageFramework, 'grindflow-release.lock');
+        $markerPath = $this->join($storageFramework, 'grindflow-release.sha256');
 
         $lock = fopen($lockPath, 'c+');
 
@@ -49,7 +52,7 @@ class ReleaseCacheGuard
                 throw new RuntimeException('Unable to acquire deployment cache lock.');
             }
 
-            $fingerprint = $this->fingerprint();
+            $fingerprint = $this->fingerprint($basePath);
             $current = is_file($markerPath)
                 ? trim((string) file_get_contents($markerPath))
                 : null;
@@ -58,8 +61,8 @@ class ReleaseCacheGuard
                 return false;
             }
 
-            $this->clearBootstrapCaches();
-            $this->clearCompiledViews();
+            $this->clearBootstrapCaches($basePath);
+            $this->clearCompiledViews($storagePath);
 
             $temporaryMarker = $markerPath.'.tmp';
 
@@ -84,12 +87,12 @@ class ReleaseCacheGuard
         }
     }
 
-    private function fingerprint(): string
+    private function fingerprint(string $basePath): string
     {
         $hash = hash_init('sha256');
 
         foreach (self::FINGERPRINT_PATHS as $relativePath) {
-            $path = $this->basePath($relativePath);
+            $path = $this->join($basePath, $relativePath);
 
             hash_update($hash, $relativePath."\0");
 
@@ -107,7 +110,7 @@ class ReleaseCacheGuard
             hash_update($hash, $contents);
         }
 
-        foreach (glob($this->basePath('config/*.php')) ?: [] as $configPath) {
+        foreach (glob($this->join($basePath, 'config/*.php')) ?: [] as $configPath) {
             hash_update($hash, basename($configPath)."\0");
 
             $contents = file_get_contents($configPath);
@@ -122,39 +125,26 @@ class ReleaseCacheGuard
         return hash_final($hash);
     }
 
-    private function clearBootstrapCaches(): void
+    private function clearBootstrapCaches(string $basePath): void
     {
-        foreach (glob($this->basePath('bootstrap/cache/*.php')) ?: [] as $path) {
+        foreach (glob($this->join($basePath, 'bootstrap/cache/*.php')) ?: [] as $path) {
             if (is_file($path) && unlink($path) === false) {
                 throw new RuntimeException('Unable to clear a Laravel bootstrap cache file.');
             }
         }
     }
 
-    private function clearCompiledViews(): void
+    private function clearCompiledViews(string $storagePath): void
     {
-        foreach (glob($this->storagePath('framework/views/*.php')) ?: [] as $path) {
+        foreach (glob($this->join($storagePath, 'framework/views/*.php')) ?: [] as $path) {
             if (is_file($path) && unlink($path) === false) {
                 throw new RuntimeException('Unable to clear a compiled Laravel view.');
             }
         }
     }
 
-    private function basePath(string $path = ''): string
+    private function join(string $base, string $path): string
     {
-        $base = $this->basePathOverride ?? base_path();
-
-        return $path === ''
-            ? $base
-            : rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
-    }
-
-    private function storagePath(string $path = ''): string
-    {
-        $base = $this->storagePathOverride ?? storage_path();
-
-        return $path === ''
-            ? $base
-            : rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
+        return rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
     }
 }
