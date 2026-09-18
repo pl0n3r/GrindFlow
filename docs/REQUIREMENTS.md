@@ -66,6 +66,13 @@ vault with traceable source metadata.
 - Google Drive adapter tests cover media-only listing normalization, page-token
   continuation, pre-download authorization, idempotent staged handoff, safe
   rate-limit/auth failures and zero real provider credentials.
+- Google Drive initial authorization uses the shared single-use OAuth state
+  coordinator, requests offline access, encrypts access/refresh tokens at rest,
+  and keeps new Drive connections paused until durable Changes API scheduling
+  exists.
+- Expiring Google Drive access tokens refresh through the provider-aware token
+  service while preserving scopes and the existing encrypted refresh token when
+  Google does not return a replacement.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
