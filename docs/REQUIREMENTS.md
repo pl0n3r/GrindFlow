@@ -45,6 +45,8 @@ vault with traceable source metadata.
 - Queue jobs revalidate organization membership and management authorization.
 - Feature tests cover duplicate source enqueue, staged-object ingestion, safe
   failure state and two different source refs converging to one blob.
+- Future connectors target the shared `StagedMediaSource` handoff instead of
+  duplicating blob/asset/job orchestration.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
