@@ -7,6 +7,9 @@ E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-admin@grindflow.test}"
 
 ATTEMPTS="${ATTEMPTS:-12}"
 WAIT_SECONDS="${WAIT_SECONDS:-20}"
+CURL_BIN="${CURL_BIN:-curl}"
+SMOKE_USER_AGENT="${SMOKE_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0 Safari/537.36 GrindFlowProductionSmoke/1.0}"
+SMOKE_ACCEPT="${SMOKE_ACCEPT:-text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8}"
 
 workdir="$(mktemp -d)"
 cookie_jar="$workdir/cookies.txt"
@@ -15,11 +18,53 @@ dashboard_html="$workdir/dashboard.html"
 system_html="$workdir/system.html"
 vault_html="$workdir/vault.html"
 diagnostics_json="$workdir/diagnostics.json"
+up_body="$workdir/up.body"
+up_headers="$workdir/up.headers"
+login_headers="$workdir/login.headers"
 
 cleanup() {
   rm -rf "$workdir"
 }
 trap cleanup EXIT
+
+curl_common() {
+  "$CURL_BIN" \
+    --silent \
+    --show-error \
+    --max-time 20 \
+    --user-agent "$SMOKE_USER_AGENT" \
+    --header "Accept: $SMOKE_ACCEPT" \
+    --header "Accept-Language: en-US,en;q=0.8" \
+    "$@"
+}
+
+print_http_failure() {
+  local label="$1"
+  local status="$2"
+  local headers_file="$3"
+  local body_file="$4"
+
+  printf 'ERROR: %s returned HTTP %s\n' "$label" "$status" >&2
+
+  if [[ -s "$headers_file" ]]; then
+    printf '%s\n' '---- safe response headers ----' >&2
+    grep -iE '^(server|content-type|content-length|location|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
+  fi
+
+  if [[ -s "$body_file" ]]; then
+    python3 - "$body_file" >&2 <<'PY'
+import sys
+
+with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+    snippet = " ".join(handle.read(4096).split())[:500]
+
+if snippet:
+    print(f"Body snippet: {snippet}")
+PY
+  fi
+
+  printf '%s\n' '-------------------------------' >&2
+}
 
 extract_csrf() {
   python3 - "$login_html" <<'PY'
@@ -99,7 +144,7 @@ assert_contains() {
 print_diagnostics() {
   local diagnostic_status
 
-  diagnostic_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$diagnostics_json"     --write-out '%{http_code}'     "$BASE_URL/admin/diagnostics.json" || true)"
+  diagnostic_status="$(curl_common     --cookie "$cookie_jar"     --output "$diagnostics_json"     --write-out '%{http_code}'     "$BASE_URL/admin/diagnostics.json" || true)"
 
   printf '\n---- GrindFlow application diagnostics ----\n' >&2
 
@@ -143,17 +188,50 @@ PY
 }
 
 run_smoke() {
-  rm -f     "$cookie_jar"     "$login_html"     "$dashboard_html"     "$system_html"     "$vault_html"     "$diagnostics_json"
+  rm -f \
+    "$cookie_jar" \
+    "$login_html" \
+    "$dashboard_html" \
+    "$system_html" \
+    "$vault_html" \
+    "$diagnostics_json" \
+    "$up_body" \
+    "$up_headers" \
+    "$login_headers"
 
-  curl     --fail     --silent     --show-error     --max-time 20     "$BASE_URL/up" >/dev/null
+  local up_status
+  up_status="$(curl_common \
+    --output "$up_body" \
+    --dump-header "$up_headers" \
+    --write-out '%{http_code}' \
+    "$BASE_URL/up" || true)"
 
-  curl     --fail     --silent     --show-error     --max-time 20     --cookie-jar "$cookie_jar"     "$BASE_URL/login" > "$login_html"
+  if [[ "$up_status" != "200" ]]; then
+    print_http_failure "health endpoint /up" "$up_status" "$up_headers" "$up_body"
+    return 1
+  fi
+
+  local login_page_status
+  login_page_status="$(curl_common \
+    --cookie-jar "$cookie_jar" \
+    --output "$login_html" \
+    --dump-header "$login_headers" \
+    --write-out '%{http_code}' \
+    "$BASE_URL/login" || true)"
+
+  if [[ "$login_page_status" != "200" ]]; then
+    print_http_failure "login page GET /login" "$login_page_status" "$login_headers" "$login_html"
+    return 1
+  fi
 
   local token
-  token="$(extract_csrf)"
+  if ! token="$(extract_csrf)"; then
+    printf 'ERROR: login page did not expose a CSRF token.\n' >&2
+    return 1
+  fi
 
   local login_status
-  login_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --cookie-jar "$cookie_jar"     --output /dev/null     --write-out '%{http_code}'     --request POST     --data-urlencode "_token=$token"     --data-urlencode "email=$E2E_USER_EMAIL"     --data-urlencode "password=$E2E_USER_PASSWORD"     "$BASE_URL/login")"
+  login_status="$(curl_common     --cookie "$cookie_jar"     --cookie-jar "$cookie_jar"     --output /dev/null     --write-out '%{http_code}'     --request POST     --data-urlencode "_token=$token"     --data-urlencode "email=$E2E_USER_EMAIL"     --data-urlencode "password=$E2E_USER_PASSWORD"     "$BASE_URL/login")"
 
   case "$login_status" in
     302|303) ;;
@@ -164,7 +242,7 @@ run_smoke() {
   esac
 
   local dashboard_status
-  dashboard_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$dashboard_html"     --write-out '%{http_code}'     "$BASE_URL/dashboard")"
+  dashboard_status="$(curl_common     --cookie "$cookie_jar"     --output "$dashboard_html"     --write-out '%{http_code}'     "$BASE_URL/dashboard")"
 
   if [[ "$dashboard_status" != "200" ]]; then
     printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2
@@ -183,7 +261,7 @@ run_smoke() {
   fi
 
   local system_status
-  system_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$system_html"     --write-out '%{http_code}'     "$BASE_URL/admin/system")"
+  system_status="$(curl_common     --cookie "$cookie_jar"     --output "$system_html"     --write-out '%{http_code}'     "$BASE_URL/admin/system")"
 
   if [[ "$system_status" != "200" ]]; then
     printf 'ERROR: admin system page returned HTTP %s\n' "$system_status" >&2
@@ -215,7 +293,7 @@ run_smoke() {
   fi
 
   local vault_status
-  vault_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$vault_html"     --write-out '%{http_code}'     "$BASE_URL$vault_path")"
+  vault_status="$(curl_common     --cookie "$cookie_jar"     --output "$vault_html"     --write-out '%{http_code}'     "$BASE_URL$vault_path")"
 
   if [[ "$vault_status" != "200" ]]; then
     printf 'ERROR: organization Vault returned HTTP %s\n' "$vault_status" >&2
