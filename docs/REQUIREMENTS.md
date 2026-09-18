@@ -68,11 +68,17 @@ vault with traceable source metadata.
   rate-limit/auth failures and zero real provider credentials.
 - Google Drive initial authorization uses the shared single-use OAuth state
   coordinator, requests offline access, encrypts access/refresh tokens at rest,
-  and keeps new Drive connections paused until durable Changes API scheduling
-  exists.
+  and schedules the connection for incremental scanning.
 - Expiring Google Drive access tokens refresh through the provider-aware token
   service while preserving scopes and the existing encrypted refresh token when
   Google does not return a replacement.
+- Google Drive scans capture `changes.getStartPageToken` before the baseline
+  `files.list`, persist versioned bootstrap/change cursor state after each
+  processed page, and advance to `newStartPageToken` only after the current
+  change feed is exhausted.
+- Google Drive page-budget continuation resumes from the persisted file/change
+  page token without restarting the baseline scan; removed/trashed/unsupported
+  files do not enter staging.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
