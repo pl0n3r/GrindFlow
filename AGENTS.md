@@ -81,8 +81,8 @@ Reglas:
 
 GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
 code hacia un **monolito modular Laravel**. El stack objetivo es PHP 8.5 +
-Laravel 13 + Blade/Livewire + Tailwind + PostgreSQL + Laravel Queues/Scheduler +
-almacenamiento S3-compatible.
+Laravel 13 + Blade/Livewire + Tailwind + MariaDB (driver `mysql`) + Laravel
+Queues/Scheduler + almacenamiento S3-compatible.
 
 El codigo TypeScript actual es referencia funcional temporal. No se elimina un
 modulo legado hasta que su reemplazo Laravel tenga paridad trazable y este
@@ -110,10 +110,10 @@ preguntar.
 
 | Tema | Decision |
 |---|---|
-| Stack objetivo | PHP 8.5, Laravel 13, Blade + Livewire, Tailwind, PostgreSQL, almacenamiento S3-compatible |
-| Despliegue | VPS propio con contenedores (Docker). Supabase sigue aportando base y Auth. Se descarto Vercel: ToS de contenido adulto y limites de FFmpeg |
-| Multi-tenancy | `organizations` + `memberships`, RLS por `organization_id` |
-| Cola | Tabla en Postgres con `FOR UPDATE SKIP LOCKED` |
+| Stack objetivo | PHP 8.5, Laravel 13, Blade + Livewire, Tailwind, MariaDB mediante el driver `mysql`, almacenamiento S3-compatible |
+| Despliegue | Hostinger Web/Cloud para Laravel. MariaDB es la base nativa del hosting. El legado Supabase/PostgreSQL se mantiene solo como referencia temporal durante la migracion |
+| Multi-tenancy | `organizations` + `memberships`; `TenantContext`, scopes tenant-aware fail-closed, Policies y constraints/trigger en MariaDB |
+| Cola | Laravel Queues; backend de base MariaDB solo si aporta simplicidad y con locking transaccional validado |
 | Cumplimiento 2257 | Desde los cimientos, con bloqueo en la base |
 | Idiomas | Bilingue es/en con `next-intl` desde el inicio |
 | Subidas | URL prefirmada tras validar token, con vigencia y limites estrictos |
@@ -125,10 +125,16 @@ preguntar.
 
 ## Reglas que no se rompen
 
-1. **El aislamiento vive en la base, no en la aplicacion.** Toda consulta nueva
-   pasa por RLS. Si algo necesita la clave de servicio, es que falta una politica
-   o que de verdad no hay usuario que autorice la operacion (subida anonima,
-   workers, runners de publicacion). No hay un tercer caso.
+> Las reglas que mencionan Supabase/PostgreSQL/RLS mas abajo son contratos del
+> legado TypeScript mientras exista. No definen la tecnologia objetivo Laravel.
+> Sus invariantes funcionales deben preservarse al migrarlos a MariaDB.
+
+1. **El aislamiento Laravel falla cerrado.** Todo modelo tenant-owned debe llevar
+   `organization_id` y usar el contrato tenant-aware del proyecto. Sin
+   `TenantContext` de organizacion, una consulta tenant-owned devuelve cero
+   filas y una creacion falla. Las Policies autorizan mutaciones y MariaDB
+   conserva FKs, unicidad, ENUMs e invariantes estructurales. Bypassear el scope
+   solo se permite en caminos administrativos explicitamente revisados.
 
 2. **Nada se publica sin sanitizar.** Una foto de movil lleva las coordenadas del
    sitio donde se tomo. El trigger `schedules_enforce_gates` lo impide en la
@@ -235,7 +241,7 @@ preguntar.
     `alter default privileges`, pero conviene comprobarlo con una asercion en
     cada tabla nueva.
 
-## Topologia de compuertas
+## Topologia de compuertas del legado TypeScript
 
 ```
 lint ──────┐
