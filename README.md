@@ -12,7 +12,7 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-003 · ffprobe metadata** | IMPLEMENTED en rama enfocada |
+| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN CODE · CI #221 |
 | Base exacta | ✅ **main** | `62499a5963218db53239c54a5c302caf79e38324` |
 | Produccion actual | ✅ **smoke verde** | Production Smoke #31 sobre la base exacta |
 | Migraciones | ✅ **0 pendientes** | no hay cambios de schema en este slice |
@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+530** | **−40** | **+490** |
+| **9** | **+531** | **−41** | **+490** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -93,9 +93,9 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `feat/ffprobe-media-metadata-v2`.
-- La base de producción previa sigue VALIDATED IN PRODUCTION por Smoke #31.
-- No se habilita ni se requiere el ejecutable real `ffprobe` para desplegar este cambio.
+- Estado actual: **VALIDATED IN CODE** sobre el head funcional `d39060d8b3269739d9f2b4080fe3fbf0d23c0b11`.
+- GrindFlow CI #221 pasó fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate.
+- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots.
 - Las pruebas usan Laravel Process fakes y bloquean procesos no simulados.
 - Antes del merge se exige matriz completa, Sonar, revisión externa aplicable y recheck de `main`.
 
@@ -103,7 +103,7 @@ flowchart LR
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR, ejecutar matriz completa y cerrar cualquier hallazgo sobre ffprobe/procesamiento. |
+| **NOW** | Revalidar el head final, revisar CodeRabbit y hacer squash merge con recheck de `main`. |
 | **NEXT** | Tras merge, validar exact-main + Production Smoke; habilitar ffprobe solo cuando el hosting confirme el binario. |
 | **BLOCKED / EXTERNAL** | Object storage S3-compatible sigue sin configurar; disponibilidad real de ffprobe en hosting aun no esta validada. |
 | **LATER** | Derivados FFmpeg detrás del mismo contrato y luego continuar P2. |
@@ -112,7 +112,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Media processing | `probe_v2` + ffprobe feature-gated IMPLEMENTED |
+| **NOW** | Media processing | `probe_v2` + ffprobe feature-gated VALIDATED IN CODE |
 | **NEXT** | Derivados | thumbnails/previews/normalización con FFmpeg |
 | **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
 | **BLOCKED / EXTERNAL** | Hosting / storage | ffprobe real y S3-compatible requieren configuración externa |
