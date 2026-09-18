@@ -89,6 +89,23 @@ aggregate check, avoiding churn when internal job names change.
 Background jobs and integration failures must be diagnosable without logging
 credentials or sensitive payloads.
 
+### GF-NFR-005 — Visual shell
+**Status:** validated-in-code
+
+The Laravel application provides a consistent responsive visual shell for the
+public landing page, authentication and authenticated dashboard.
+
+**Acceptance criteria:**
+- Landing, login and dashboard share the same GrindFlow visual language.
+- The UI remains usable on desktop and mobile layouts.
+- Interactive controls preserve visible focus states and semantic HTML.
+- The shell does not require the legacy Next.js build pipeline.
+- Visual assets are deployable directly by the Laravel/Hostinger runtime.
+
+**Verification:** Laravel feature tests assert the main visual routes render
+their expected shell and the shared stylesheet exists.
+
+
 ## Security requirements
 
 ### GF-SEC-001 — Secret handling
