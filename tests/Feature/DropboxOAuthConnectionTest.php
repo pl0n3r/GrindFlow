@@ -177,6 +177,49 @@ class DropboxOAuthConnectionTest extends TestCase
         $this->assertSame(0, DB::table('media_connections')->count());
     }
 
+    public function test_expired_state_fails_before_provider_io(): void
+    {
+        [$user, $organization] = $this->manager();
+        $state = $this->startAuthorization($user, $organization);
+
+        $this->travel(11)->minutes();
+
+        Http::fake();
+
+        $this->actingAs($user)
+            ->get(route('connections.dropbox.callback', [
+                'code' => 'authorization-code',
+                'state' => $state,
+            ]))
+            ->assertStatus(419);
+
+        Http::assertNothingSent();
+        $this->assertSame(0, DB::table('media_connections')->count());
+    }
+
+    public function test_actor_losing_management_access_is_rejected_before_provider_io(): void
+    {
+        [$user, $organization] = $this->manager();
+        $state = $this->startAuthorization($user, $organization);
+
+        Membership::query()
+            ->where('organization_id', $organization->getKey())
+            ->where('user_id', $user->getKey())
+            ->delete();
+
+        Http::fake();
+
+        $this->actingAs($user)
+            ->get(route('connections.dropbox.callback', [
+                'code' => 'authorization-code',
+                'state' => $state,
+            ]))
+            ->assertForbidden();
+
+        Http::assertNothingSent();
+        $this->assertSame(0, DB::table('media_connections')->count());
+    }
+
     public function test_provider_denial_is_safe_and_does_not_exchange_code(): void
     {
         [$user, $organization] = $this->manager();
