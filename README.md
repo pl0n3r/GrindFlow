@@ -47,8 +47,13 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del Google Drive adapter slice: **IMPLEMENTED**, pendiente de
-  `GrindFlow CI / validate`.
+- Estado actual del Google Drive adapter slice: **VALIDATED IN CODE**.
+- El head funcional `6a0d1cffeef575a6bc1b5af005c377e791fed473` paso `fast`,
+  `tests`, `php-quality` y `GrindFlow CI / validate`; browser/database/legacy
+  fueron correctamente omitidos por no aplicar al alcance.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
+  0.0% duplicacion en codigo nuevo despues de extraer la politica HTTP comun.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
 - Dropbox adapter + conexiones cifradas + scheduler + token refresh + OAuth
   connect: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
@@ -58,8 +63,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit, browser y `GrindFlow CI / validate`; resolver
-  SonarQube/CodeRabbit si reportan hallazgos y fusionar por squash.
 - Mantener pendiente la migracion operacional de `media_connections` hasta
   aprobacion explicita.
 - Despues implementar Google OAuth offline + refresh sobre la misma capa cifrada.
@@ -74,9 +77,9 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** Dropbox end-to-end VALIDATED IN CODE; Google
-  Drive adapter IMPLEMENTED; pendientes validacion del adapter, OAuth/refresh,
-  Changes API y configuracion/migracion de produccion.
+- **P1 — Media Vault / ingesta:** Dropbox end-to-end + Google Drive adapter
+  VALIDATED IN CODE; pendientes Google OAuth/refresh, Changes API y
+  configuracion/migracion de produccion.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** scan scheduling VALIDATED IN CODE; pipeline
   de procesamiento general sigue pendiente.
