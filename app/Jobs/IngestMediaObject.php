@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Queue\Middleware\UseOrganizationContext;
 use App\Services\Media\FilesystemMediaIngestor;
 use App\Services\Media\MediaIngestionException;
+use App\Services\Media\MediaProcessingCoordinator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -86,7 +87,10 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
         return $this->idempotency;
     }
 
-    public function handle(FilesystemMediaIngestor $ingestor): void
+    public function handle(
+        FilesystemMediaIngestor $ingestor,
+        MediaProcessingCoordinator $processing,
+    ): void
     {
         $actor = User::query()->findOrFail($this->actor);
 
@@ -99,6 +103,14 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
         $ingestion = MediaIngestion::query()->findOrFail($this->ingestionId);
 
         if ($ingestion->status === MediaIngestion::STATUS_COMPLETED) {
+            if ($ingestion->media_asset_id !== null) {
+                $asset = $ingestion->asset;
+
+                if ($asset !== null) {
+                    $processing->queue($asset, $actor);
+                }
+            }
+
             return;
         }
 
@@ -128,6 +140,8 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
             'status' => MediaIngestion::STATUS_COMPLETED,
             'last_error' => null,
         ])->save();
+
+        $processing->queue($asset, $actor);
     }
 
     private function markFailed(MediaIngestion $ingestion, string $safeError): void
