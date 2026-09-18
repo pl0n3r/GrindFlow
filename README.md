@@ -38,27 +38,34 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado actual del readiness: **VALIDATED IN PRODUCTION**.
 - PR #38 fue fusionado a `main` con CI verde y Sonar Quality Gate OK.
+- PR #39 fue fusionado a `main` como `f5221fe64cdbe9e1e266a860c500c5c3069b591b`
+  con `fast`, `php-quality`, `tests`, `browser` y `validate` en verde;
+  Sonar Quality Gate OK, 0 issues y 0 Security Hotspots.
+- Production Smoke exact-main paso sobre ese commit y confirmo que Dashboard,
+  System y Vault siguen operativos.
+- El mismo smoke confirmo `MEDIA_STORAGE_READY=0` en produccion y creo el issue
+  automatico #40 `[AUTO] Media Storage Not Configured`.
+- Quick upload permanece disponible; Direct upload todavia no esta listo en
+  produccion porque faltan credenciales/configuracion efectiva de object storage.
 - Este cambio no agrega, cambia ni registra secretos.
-- El status de storage se deriva de la configuracion cargada por Laravel y no
-  intenta conectarse ni escribir un objeto.
 - Una subida real en produccion sigue requiriendo aprobacion explicita.
 
 ## Qué sigue
 
-- Pasar CI/Sonar y fusionar este readiness.
-- Esperar el Production Smoke exact-main.
-- Leer el issue automatico resultante para saber si produccion ya tiene object
-  storage configurado, sin SSH ni prueba manual.
-- Si el storage aparece Ready, validar CORS y una subida real solo con aprobacion
+- Configurar el object storage S3-compatible en el entorno de produccion y el
+  CORS del bucket.
+- Dejar que Production Smoke cierre automaticamente el issue #40 cuando
+  `MEDIA_STORAGE_READY` cambie a 1.
+- Con el storage en Ready, validar CORS y una subida real solo con aprobacion
   explicita.
 
 ## Panorama general pendiente
 
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Media Vault / object storage:** provider-neutral VALIDATED IN CODE;
-  readiness IMPLEMENTED; pendiente estado real de produccion y CORS.
+  readiness VALIDATED IN PRODUCTION; produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN PRODUCTION; faltan
