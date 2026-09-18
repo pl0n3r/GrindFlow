@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+530** | **−40** | **+490** |
+| **10** | **+545** | **−42** | **+503** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -90,6 +90,7 @@ flowchart LR
 - `docs/REQUIREMENTS.md` — verificación actualizada de GF-FR-003.
 - `tests/Feature/FfprobeMediaInspectorTest.php` — normalización y fallos seguros.
 - `tests/Feature/MediaProcessingJobTest.php` — contrato v2 con feature gate desactivado.
+- `tests/secrets.test.ts` — manipulación AES-GCM determinista para eliminar un flake Base64URL.
 
 ## Validación
 
