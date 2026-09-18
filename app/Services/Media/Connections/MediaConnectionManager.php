@@ -65,7 +65,7 @@ class MediaConnectionManager
             'token_expires_at' => $tokenExpiresAt,
             'scopes' => array_values(array_filter(
                 $scopes,
-                static fn (mixed $scope): bool => is_string($scope) && $scope !== '',
+                static fn (string $scope): bool => $scope !== '',
             )),
             'root_path' => $rootPath,
             'status' => MediaConnection::STATUS_ACTIVE,
