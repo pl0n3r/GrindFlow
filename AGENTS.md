@@ -90,8 +90,13 @@ Reglas:
 - Solo `platform_role=admin` puede consultar `/admin/diagnostics` y
   `/admin/diagnostics.json`.
 - El production smoke debe consultar el endpoint diagnostico cuando una ruta
-  autenticada falla y dejar los ultimos incidentes sanitizados en GitHub Actions,
-  para que los agentes puedan leerlos con la integracion de GitHub.
+  autenticada falla y dejar los ultimos incidentes sanitizados en GitHub Actions.
+- Cuando el production smoke falla, debe crear o actualizar el issue automatico
+  `[AUTO] Production Smoke Failure` con el diagnostico sanitizado. Ese issue es
+  la fuente primaria que los agentes deben leer para depurar produccion.
+- Si falta el secret `PRODUCTION_E2E_PASSWORD`, el workflow debe mantener visible
+  el issue `[AUTO] Production Smoke Not Configured` hasta que la configuracion
+  exista; no debe aparentar que produccion fue validada.
 - Para depurar produccion: primero revisar Production Smoke y Diagnostics,
   despues logs internos si siguen haciendo falta; SSH queda como ultimo recurso.
 - Nunca se expone `laravel.log` crudo mediante una ruta publica o autenticada.
