@@ -155,7 +155,7 @@
                                     <strong>Selecciona una imagen o video</strong>
                                     <small>
                                         JPEG, PNG, WebP, GIF, MP4, MOV o WebM ·
-                                        max {{ number_format(config('grindflow.media.max_upload_kb', 512000) / 1024) }} MB
+                                        max 8 MB
                                     </small>
                                 </span>
                                 <input
