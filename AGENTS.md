@@ -77,6 +77,25 @@ Reglas:
 - Si la API de Sonar exige autenticacion, el workflow debe explicitar que falta el secreto `SONAR_TOKEN`; nunca imprimir el valor del token.
 - Un fallo del reporter no sustituye ni altera el Quality Gate nativo de Sonar. El reporter es una capa de observabilidad, no un segundo analizador.
 
+### Regla de diagnosticos de aplicacion
+
+- Todo fallo HTTP 5xx debe quedar registrado automaticamente con un `incident_id`
+  unico y datos suficientes para depuracion sin depender de SSH.
+- Laravel conserva su log tecnico rotado en `storage/logs/laravel-*.log`.
+- GrindFlow mantiene ademas un log JSONL sanitizado en
+  `storage/logs/diagnostics-*.jsonl*` con excepcion, mensaje sanitizado,
+  ubicacion, ruta/metodo, usuario/tenant cuando existan y un trace sin argumentos.
+- El log diagnostico **nunca** guarda request bodies, cookies, headers,
+  passwords, tokens, API keys ni secretos de conexion.
+- Solo `platform_role=admin` puede consultar `/admin/diagnostics` y
+  `/admin/diagnostics.json`.
+- El production smoke debe consultar el endpoint diagnostico cuando una ruta
+  autenticada falla y dejar los ultimos incidentes sanitizados en GitHub Actions,
+  para que los agentes puedan leerlos con la integracion de GitHub.
+- Para depurar produccion: primero revisar Production Smoke y Diagnostics,
+  despues logs internos si siguen haciendo falta; SSH queda como ultimo recurso.
+- Nunca se expone `laravel.log` crudo mediante una ruta publica o autenticada.
+
 ### Cambio de arquitectura aprobado — 17 de septiembre de 2026
 
 GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
