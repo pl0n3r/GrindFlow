@@ -22,8 +22,10 @@ siguiente deploy.
   no autorizadas.
 - El dashboard ya abre el Vault de cada organizacion y el Vault tiene UI visible
   para listado, metricas y carga manual de imagen/video.
-- La carga inicial acepta JPEG, PNG, WebP, GIF, MP4, MOV y WebM. Admin/studio
-  pueden cargar; miembros sin permiso de gestion solo pueden consultar.
+- La carga inicial acepta JPEG, PNG, WebP, GIF, MP4, MOV y WebM. El formulario
+  tradicional queda limitado temporalmente a 7 MB; archivos grandes iran por
+  direct-to-S3/multipart en la siguiente iteracion. Admin/studio pueden cargar;
+  miembros sin permiso de gestion solo pueden consultar.
 - `Admin > System` ahora muestra migraciones pendientes y permite ejecutar
   **Run pending migrations** como accion explicita de administrador, sin SSH.
 - CI y Production Smoke nunca ejecutan migraciones de produccion.
