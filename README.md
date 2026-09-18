@@ -12,7 +12,7 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN CODE · CI #221 |
+| Work line | 🟠 **GF-FR-003 · ffprobe metadata** | review fixes IMPLEMENTED · revalidación pendiente |
 | Base exacta | ✅ **main** | `62499a5963218db53239c54a5c302caf79e38324` |
 | Produccion actual | ✅ **smoke verde** | Production Smoke #31 sobre la base exacta |
 | Migraciones | ✅ **0 pendientes** | no hay cambios de schema en este slice |
@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+545** | **−42** | **+503** |
+| **10** | **+698** | **−42** | **+656** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -74,9 +74,9 @@ flowchart LR
 - Eleva el procesador determinista a `probe_v2` sin cambiar su contrato idempotente.
 - Añade `FfprobeMediaInspector` detrás de un feature gate apagado por defecto.
 - Copia el objeto a un temporal, hace `fflush` y ejecuta `ffprobe` con timeout acotado.
-- Persiste solo metadata técnica allowlisted: duración, formato, conteo de streams, codecs, resolución y audio básico.
-- Descarta tags arbitrarios y no persiste stderr ni payloads crudos.
-- Mapea fallo, salida inválida y timeout a códigos de error seguros y acotados.
+- Limita `ffprobe` con `-show_entries` y persiste solo metadata técnica allowlisted: duración, formato, streams, codecs, resolución y audio básico.
+- Rechaza JSON sin secciones `streams`/`format`, descarta tags arbitrarios y no persiste stderr ni payloads crudos.
+- El feature flag usa parsing fail-closed; fallo, salida inválida y timeout se mapean a códigos seguros y acotados.
 - Añade cobertura del inspector, incluido un fallo con stderr sensible que no se propaga.
 
 ## Archivos modificados en este deploy
@@ -94,9 +94,9 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** sobre el head funcional `d39060d8b3269739d9f2b4080fe3fbf0d23c0b11`.
-- GrindFlow CI #221 pasó fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate.
-- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots.
+- Estado actual: **REVALIDATION PENDING** tras corregir los hallazgos de CodeRabbit en el head funcional `c0325c0d70db87be3e9133189e53af939a6233b5`.
+- CI #221 validó la versión previa; el head con fixes de review exige una matriz completa nueva antes del merge.
+- CodeRabbit reportó 5 hallazgos accionables; todos están corregidos y pendientes de re-review.
 - Las pruebas usan Laravel Process fakes y bloquean procesos no simulados.
 - Antes del merge se exige matriz completa, Sonar, revisión externa aplicable y recheck de `main`.
 
@@ -113,7 +113,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Media processing | `probe_v2` + ffprobe feature-gated VALIDATED IN CODE |
+| **NOW** | Media processing | `probe_v2` + ffprobe hardening implementado; revalidación pendiente |
 | **NEXT** | Derivados | thumbnails/previews/normalización con FFmpeg |
 | **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
 | **BLOCKED / EXTERNAL** | Hosting / storage | ffprobe real y S3-compatible requieren configuración externa |
