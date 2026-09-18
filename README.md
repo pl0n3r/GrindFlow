@@ -11,83 +11,85 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se implemento un sistema de diagnostico de aplicacion para que los errores
-  HTTP 5xx dejen informacion util en vez de quedar como un simple "500".
-- Laravel persiste su log tecnico en archivos diarios de
-  `storage/logs/laravel-*.log` ademas de STDERR.
-- Cada 5xx genera un `incident_id` y una entrada JSONL sanitizada con excepcion,
-  mensaje, ubicacion, contexto tenant y trace sin argumentos.
-- Se agregaron `/admin/diagnostics` y `/admin/diagnostics.json`, restringidos a
-  administradores de plataforma.
-- La pagina 500 muestra el incident ID sin revelar detalles tecnicos.
-- El production smoke imprime los incidentes recientes cuando falla Dashboard o
-  System.
-- El reporter de produccion crea o actualiza el issue automatico
-  `[AUTO] Production Smoke Failure` con el diagnostico sanitizado para que los
-  agentes puedan leerlo directamente desde GitHub.
-- Si falta el secret E2E, mantiene visible
-  `[AUTO] Production Smoke Not Configured` en vez de aparentar una validacion.
-- El diagnostico no registra request bodies, cookies, headers, passwords,
-  tokens, API keys ni secretos de conexion.
+- Se inicio la migracion Laravel de **Media Vault / ingesta**.
+- Se agregaron `media_blobs` y `media_assets` como modelos tenant-owned,
+  con UUID, metadata, SHA-256, origen y trazabilidad de duplicados.
+- Los bytes usan una clave deterministica por organizacion + SHA-256: dos
+  ingestas con el mismo contenido conservan dos registros, pero comparten un
+  unico blob.
+- Se agrego middleware reutilizable de contexto de organizacion para rutas
+  `/organizations/{organizationId}/...`, fallando cerrado ante organizaciones
+  no autorizadas.
+- El dashboard ya abre el Vault de cada organizacion y el Vault tiene UI visible
+  para listado, metricas y carga manual de imagen/video.
+- La carga inicial acepta JPEG, PNG, WebP, GIF, MP4, MOV y WebM. El formulario
+  tradicional queda limitado temporalmente a 8 MB; archivos grandes iran por
+  direct-to-S3/multipart en la siguiente iteracion. Admin/studio pueden cargar;
+  miembros sin permiso de gestion solo pueden consultar.
+- `Admin > System` ahora muestra migraciones pendientes y permite ejecutar
+  **Run pending migrations** como accion explicita de administrador, sin SSH.
+- CI y Production Smoke nunca ejecutan migraciones de produccion.
+- Production Smoke ahora exige schema al dia y valida tambien el primer Vault
+  visible de la cuenta E2E, sin mutar contenido real.
+- El secret E2E de GitHub ya fue reconocido por la automatizacion: el issue
+  `[AUTO] Production Smoke Not Configured` se cerro automaticamente.
 
 ## Archivos modificados en este deploy
 
-- `app/Support/Diagnostics/DiagnosticLog.php` — captura, sanitizacion, rotacion y lectura.
-- `bootstrap/app.php` — reporte automatico de excepciones 5xx.
-- `config/logging.php` — persistencia diaria del log tecnico de Laravel.
-- `app/Http/Controllers/Admin/DiagnosticsController.php` — acceso admin a incidentes.
-- `resources/views/admin/diagnostics.blade.php` — visor de diagnosticos.
-- `resources/views/errors/500.blade.php` — error seguro con incident ID.
-- `resources/views/admin/system.blade.php` y `resources/views/dashboard.blade.php` — navegacion.
-- `routes/web.php` — rutas admin de diagnostico.
-- `scripts/production-smoke.sh` — lectura automatica de diagnosticos al fallar.
-- `tests/Feature/DiagnosticsTest.php` — cobertura de sanitizacion y permisos.
-- `public/css/grindflow.css` — UI de Diagnostics/error.
-- `.github/workflows/production-smoke.yml` — handoff automatico de fallos a GitHub Issues.
-- `.gitignore` — exclusion de todos los logs runtime.
-- `docs/DIAGNOSTICS.md` y `AGENTS.md` — contrato operativo durable.
+- `database/migrations/2026_09_18_050000_create_media_vault_tables.php` — schema Vault.
+- `app/Models/MediaBlob.php` y `app/Models/MediaAsset.php` — dominio tenant-aware.
+- `app/Http/Middleware/ResolveOrganizationContext.php` — resolucion de tenant por URL.
+- `app/Services/Media/MediaIngestor.php` — hashing, storage y deduplicacion.
+- `app/Http/Controllers/Vault/VaultController.php` — listado y carga manual.
+- `app/Http/Requests/Vault/StoreMediaUploadRequest.php` — autorizacion y validacion.
+- `resources/views/vault/index.blade.php` — primera UI funcional del Vault.
+- `resources/views/dashboard.blade.php` — acceso visual por organizacion.
+- `app/Http/Controllers/Admin/SystemController.php` — estado de migraciones.
+- `app/Http/Controllers/Admin/RunMigrationsController.php` — migracion explicita sin SSH.
+- `resources/views/admin/system.blade.php` — control de schema desde Admin.
+- `routes/web.php` y `bootstrap/app.php` — rutas/middleware.
+- `config/grindflow.php` y `.env.example` — configuracion de storage/upload.
+- `tests/Feature/MediaVaultTest.php` y `tests/Feature/AdminMigrationTest.php` — cobertura.
+- `scripts/production-smoke.sh` — schema + Vault en produccion.
+- `public/css/grindflow.css` — componentes visuales del Vault.
+- `docs/DEPLOY-HOSTINGER.md` y `AGENTS.md` — flujo operativo sin SSH rutinario.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Diagnostics base, PR #21: **VALIDATED IN CODE** y fusionado a `main` como
-  `33cd7bc972c6c46c96d82f7dfa316903db1019ac`.
-- El exact-main CI de PR #21 paso `fast`, `php-quality`, `tests`, `browser`,
-  `legacy` y `validate`.
-- SonarQube Cloud de PR #21: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- Production Smoke run #2 habia confirmado que faltaba `PRODUCTION_E2E_PASSWORD`.
-- El operador ya reporto el secret como configurado; esta entrega fuerza una nueva
-  ejecucion automatica para confirmarlo y validar las rutas autenticadas.
-- Reporter de incidentes a GitHub: **IMPLEMENTED**, pendiente de fusion del PR #23
-  y exact-main CI.
-- El dashboard de produccion ha presentado un HTTP 500; no se atribuye aun una
-  causa sin evidencia del nuevo diagnostico.
-- No se declara **VALIDATED IN PRODUCTION** hasta observar el flujo real en Hostinger.
+- Estado del cambio actual: **VALIDATED IN CODE**.
+- PR #28 paso `fast`, `php-quality`, `tests`, `database`, `browser`, `legacy` y
+  `GrindFlow CI / validate` en el run #106.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- El schema nuevo exige migracion de produccion despues del merge; no se declara
+  **DEPLOYED** ni **VALIDATED IN PRODUCTION** antes de esa accion.
+- La migracion de produccion sera una accion explicita desde `Admin > System`,
+  no una mutacion automatica de CI.
+- La validacion de produccion debe demostrar login E2E, schema con cero
+  migraciones pendientes, Dashboard, System y Vault sin errores 5xx.
 
 ## Qué sigue
 
-- Fusionar y validar el reporter de incidentes a GitHub.
-- Confirmar automaticamente en el siguiente push a `main` que `PRODUCTION_E2E_PASSWORD`
-  ya esta disponible y ejecutar el smoke autenticado sin usar SSH.
-- Dejar que Hostinger sincronice `main`, reproducir/detectar el 500 y leer su
-  `incident_id`, excepcion y trace desde el issue automatico o Admin Diagnostics.
-- Corregir la causa concreta del 500 con evidencia.
-- Retomar Media Vault / ingesta despues de estabilizar produccion.
+- Fusionar PR #28 y dejar que Hostinger sincronice `main`.
+- En produccion, aplicar la migracion desde `Admin > System` si el contador es
+  mayor que cero.
+- Leer el issue automatico de Production Smoke si aparece un fallo y corregirlo
+  con Diagnostics, sin pedir pruebas manuales pantalla por pantalla.
+- Despues, evolucionar la carga del Vault a direct-to-S3/multipart resumable e
+  iniciar conectores de ingesta.
 
 ## Panorama general pendiente
 
-- **P0 — Produccion / dashboard:** HTTP 500 observado; pendiente capturar la causa
-  exacta con Diagnostics despues del deploy.
-- **P0 — Produccion / smoke:** reporter automatico implementado; el operador ya
-  configuro el secret E2E y queda pendiente confirmacion automatica extremo a extremo.
+- **P0 — Produccion / schema:** aplicar la nueva migracion del Vault desde Admin
+  despues del deploy y exigir cero pendientes.
+- **P0 — Produccion / smoke:** confirmar Dashboard/System/Vault extremo a extremo.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
-- **P1 — Diagnosticos:** VALIDATED IN CODE; pendiente produccion.
-- **P1 — UI:** shell visual y System admin VALIDATED IN CODE.
-- **P1 — Media Vault / ingesta:** pendiente de migracion Laravel.
+- **P1 — Media Vault / ingesta:** foundation IMPLEMENTED; faltan upload
+  direct-to-S3 resumable, conectores, jobs y parity completa GF-FR-002.
+- **P1 — Diagnosticos:** VALIDATED IN CODE; mantener validacion continua en produccion.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
-- **P1 — Higiene del repositorio:** retirar archivos realmente obsoletos al cerrar
-  cada migracion, sin borrar legado necesario antes de GF-MIG-003.
+- **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
 - **P2 — Integraciones / distribucion:** pendiente.
 - **P2 — Trafico / atribucion:** pendiente.
 - **P2 — Finanzas:** pendiente.

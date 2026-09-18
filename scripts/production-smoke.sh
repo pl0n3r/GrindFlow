@@ -13,6 +13,7 @@ cookie_jar="$workdir/cookies.txt"
 login_html="$workdir/login.html"
 dashboard_html="$workdir/dashboard.html"
 system_html="$workdir/system.html"
+vault_html="$workdir/vault.html"
 diagnostics_json="$workdir/diagnostics.json"
 
 cleanup() {
@@ -48,6 +49,43 @@ print(parser.token)
 PY
 }
 
+extract_vault_path() {
+  python3 - "$dashboard_html" <<'PY'
+from html.parser import HTMLParser
+from urllib.parse import urlparse
+import re
+import sys
+
+pattern = re.compile(r"^/organizations/[^/]+/vault$")
+
+class VaultParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.path = None
+
+    def handle_starttag(self, tag, attrs):
+        if self.path is not None or tag != "a":
+            return
+
+        href = dict(attrs).get("href")
+        if not href:
+            return
+
+        path = urlparse(href).path
+        if pattern.match(path):
+            self.path = path
+
+parser = VaultParser()
+with open(sys.argv[1], encoding="utf-8") as handle:
+    parser.feed(handle.read())
+
+if not parser.path:
+    raise SystemExit(2)
+
+print(parser.path)
+PY
+}
+
 assert_contains() {
   local file="$1"
   local expected="$2"
@@ -61,7 +99,7 @@ assert_contains() {
 print_diagnostics() {
   local diagnostic_status
 
-  diagnostic_status="$(curl --silent --show-error --max-time 20     --cookie "$cookie_jar"     --output "$diagnostics_json"     --write-out '%{http_code}'     "$BASE_URL/admin/diagnostics.json" || true)"
+  diagnostic_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$diagnostics_json"     --write-out '%{http_code}'     "$BASE_URL/admin/diagnostics.json" || true)"
 
   printf '\n---- GrindFlow application diagnostics ----\n' >&2
 
@@ -105,17 +143,17 @@ PY
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html"
+  rm -f     "$cookie_jar"     "$login_html"     "$dashboard_html"     "$system_html"     "$vault_html"     "$diagnostics_json"
 
-  curl --fail --silent --show-error --max-time 20     "$BASE_URL/up" >/dev/null
+  curl     --fail     --silent     --show-error     --max-time 20     "$BASE_URL/up" >/dev/null
 
-  curl --fail --silent --show-error --max-time 20     --cookie-jar "$cookie_jar"     "$BASE_URL/login" > "$login_html"
+  curl     --fail     --silent     --show-error     --max-time 20     --cookie-jar "$cookie_jar"     "$BASE_URL/login" > "$login_html"
 
   local token
   token="$(extract_csrf)"
 
   local login_status
-  login_status="$(curl --silent --show-error --max-time 20     --cookie "$cookie_jar"     --cookie-jar "$cookie_jar"     --output /dev/null     --write-out '%{http_code}'     --request POST     --data-urlencode "_token=$token"     --data-urlencode "email=$E2E_USER_EMAIL"     --data-urlencode "password=$E2E_USER_PASSWORD"     "$BASE_URL/login")"
+  login_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --cookie-jar "$cookie_jar"     --output /dev/null     --write-out '%{http_code}'     --request POST     --data-urlencode "_token=$token"     --data-urlencode "email=$E2E_USER_EMAIL"     --data-urlencode "password=$E2E_USER_PASSWORD"     "$BASE_URL/login")"
 
   case "$login_status" in
     302|303) ;;
@@ -126,7 +164,7 @@ run_smoke() {
   esac
 
   local dashboard_status
-  dashboard_status="$(curl --silent --show-error --max-time 20     --cookie "$cookie_jar"     --output "$dashboard_html"     --write-out '%{http_code}'     "$BASE_URL/dashboard")"
+  dashboard_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$dashboard_html"     --write-out '%{http_code}'     "$BASE_URL/dashboard")"
 
   if [[ "$dashboard_status" != "200" ]]; then
     printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2
@@ -145,7 +183,7 @@ run_smoke() {
   fi
 
   local system_status
-  system_status="$(curl --silent --show-error --max-time 20     --cookie "$cookie_jar"     --output "$system_html"     --write-out '%{http_code}'     "$BASE_URL/admin/system")"
+  system_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$system_html"     --write-out '%{http_code}'     "$BASE_URL/admin/system")"
 
   if [[ "$system_status" != "200" ]]; then
     printf 'ERROR: admin system page returned HTTP %s\n' "$system_status" >&2
@@ -158,12 +196,32 @@ run_smoke() {
     return 1
   fi
 
-  if ! assert_contains "$system_html" "Database connection"; then
+  if ! grep -Fq 'data-pending-migrations="0"' "$system_html"; then
+    printf 'ERROR: production has pending database migrations. Apply them from Admin > System.\n' >&2
+    return 1
+  fi
+
+  local vault_path
+  if ! vault_path="$(extract_vault_path)"; then
+    printf 'ERROR: dashboard does not expose an organization Vault link.\n' >&2
+    return 1
+  fi
+
+  local vault_status
+  vault_status="$(curl     --silent     --show-error     --max-time 20     --cookie "$cookie_jar"     --output "$vault_html"     --write-out '%{http_code}'     "$BASE_URL$vault_path")"
+
+  if [[ "$vault_status" != "200" ]]; then
+    printf 'ERROR: organization Vault returned HTTP %s\n' "$vault_status" >&2
     print_diagnostics
     return 1
   fi
 
-  printf 'PASS production smoke: /up, /login, /dashboard, /admin/system\n'
+  if ! assert_contains "$vault_html" "Organization scoped"; then
+    print_diagnostics
+    return 1
+  fi
+
+  printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s\n' "$vault_path"
 }
 
 for attempt in $(seq 1 "$ATTEMPTS"); do

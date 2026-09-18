@@ -22,10 +22,20 @@
                     <span class="gf-navitem__text">Overview</span>
                 </a>
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                    <span class="gf-navitem__text">Vault</span>
-                </span>
+                @if ($organizations->isNotEmpty())
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.vault.index', ['organizationId' => $organizations->first()->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
+                        <span class="gf-navitem__text">Vault</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
+                        <span class="gf-navitem__text">Vault</span>
+                    </span>
+                @endif
 
                 <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
                     <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
@@ -138,13 +148,17 @@
                     @else
                         <div class="gf-org-grid">
                             @foreach ($organizations as $organization)
-                                <article
-                                    class="gf-org"
+                                <a
+                                    class="gf-org gf-org--link"
+                                    href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
                                     data-organization-id="{{ $organization->id }}"
                                 >
-                                    <h3 class="gf-org__name">{{ $organization->name }}</h3>
-                                    <div class="gf-org__id">{{ $organization->id }}</div>
-                                </article>
+                                    <div>
+                                        <h3 class="gf-org__name">{{ $organization->name }}</h3>
+                                        <div class="gf-org__id">{{ $organization->id }}</div>
+                                    </div>
+                                    <span class="gf-org__action">Open Vault →</span>
+                                </a>
                             @endforeach
                         </div>
                     @endif

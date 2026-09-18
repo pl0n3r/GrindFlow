@@ -62,9 +62,7 @@
 
         <main class="gf-main">
             <header class="gf-appbar">
-                <div class="gf-appbar__meta">
-                    GF / ADMIN / SYSTEM
-                </div>
+                <div class="gf-appbar__meta">GF / ADMIN / SYSTEM</div>
 
                 <div class="gf-avatar" aria-label="Usuario autenticado">
                     {{ strtoupper(substr((string) auth()->user()?->name, 0, 2)) }}
@@ -79,13 +77,25 @@
                     </span>
                     <h1>System</h1>
                     <p>
-                        Vista operativa del runtime de GrindFlow sin depender de SSH
-                        para comprobaciones rutinarias.
+                        Estado del runtime y operaciones controladas sin depender de SSH
+                        para el trabajo rutinario.
                     </p>
                 </div>
 
                 <span class="gf-badge">Admin only</span>
             </section>
+
+            @if (session('status'))
+                <div class="gf-notice gf-notice--success" role="status">
+                    {{ session('status') }}
+                </div>
+            @endif
+
+            @if ($errors->has('migration'))
+                <div class="gf-alert" role="alert">
+                    {{ $errors->first('migration') }}
+                </div>
+            @endif
 
             <section class="gf-metrics" aria-label="Estado del sistema">
                 <article class="gf-metric">
@@ -103,9 +113,13 @@
                 </article>
 
                 <article class="gf-metric">
-                    <div class="gf-metric__label">Environment</div>
-                    <div class="gf-metric__value">{{ ucfirst($environment) }}</div>
-                    <div class="gf-metric__meta">Server configuration</div>
+                    <div class="gf-metric__label">Pending migrations</div>
+                    <div class="gf-metric__value">
+                        {{ $pendingMigrations === null ? '?' : $pendingMigrations }}
+                    </div>
+                    <div class="gf-metric__meta">
+                        {{ $pendingMigrations === 0 ? 'Schema current' : 'Operator action required' }}
+                    </div>
                 </article>
             </section>
 
@@ -123,6 +137,19 @@
                                 <span>{{ strtoupper($databaseDriver) }}</span>
                                 <span class="gf-state {{ $databaseOnline ? 'gf-state--ok' : 'gf-state--error' }}">
                                     {{ $databaseOnline ? 'Connected' : 'Unavailable' }}
+                                </span>
+                            </div>
+                        </article>
+
+                        <article class="gf-system-item">
+                            <div class="gf-system-item__label">Database schema</div>
+                            <div class="gf-system-item__row">
+                                <span>Pending migrations</span>
+                                <span
+                                    class="gf-state {{ $pendingMigrations === 0 ? 'gf-state--ok' : 'gf-state--error' }}"
+                                    data-pending-migrations="{{ $pendingMigrations === null ? 'unknown' : $pendingMigrations }}"
+                                >
+                                    {{ $pendingMigrations === null ? 'Unknown' : $pendingMigrations }}
                                 </span>
                             </div>
                         </article>
@@ -156,16 +183,51 @@
 
             <section class="gf-panel gf-panel--spaced">
                 <header class="gf-panel__head">
+                    <h2>Database migrations</h2>
+                    <span class="gf-appbar__meta">explicit operator action</span>
+                </header>
+
+                <div class="gf-panel__body">
+                    <div class="gf-admin-action">
+                        <div>
+                            <div class="gf-metric__label">Schema maintenance</div>
+                            <h3>
+                                {{ $pendingMigrations === 0
+                                    ? 'Database schema is current'
+                                    : 'Pending migrations need to be applied' }}
+                            </h3>
+                            <p class="gf-system-copy">
+                                GrindFlow nunca ejecuta migraciones de produccion desde CI.
+                                Un administrador puede aplicarlas aqui de forma explicita,
+                                con CSRF y un lock para evitar ejecuciones simultaneas.
+                            </p>
+                        </div>
+
+                        <form method="POST" action="{{ route('admin.system.migrate') }}">
+                            @csrf
+                            <button
+                                class="gf-button gf-button--primary"
+                                type="submit"
+                                {{ ! $databaseOnline || $pendingMigrations === 0 ? 'disabled' : '' }}
+                            >
+                                Run pending migrations
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="gf-panel gf-panel--spaced">
+                <header class="gf-panel__head">
                     <h2>Operational contract</h2>
-                    <span class="gf-appbar__meta">no SSH required</span>
+                    <span class="gf-appbar__meta">no routine SSH</span>
                 </header>
 
                 <div class="gf-panel__body">
                     <p class="gf-system-copy">
-                        Esta pantalla solo expone estado no sensible. No muestra claves,
-                        credenciales, variables de entorno ni datos internos de conexion.
-                        Las operaciones rutinarias deben moverse al panel web conforme
-                        se implementen.
+                        Esta pantalla no muestra claves, credenciales, variables de
+                        entorno ni datos internos de conexion. SSH queda reservado para
+                        diagnostico excepcional o recuperacion.
                     </p>
                 </div>
             </section>
