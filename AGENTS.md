@@ -5,6 +5,46 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 
 ---
 
+## Protocolo de inicio para agentes y sesiones
+
+1. Leer este `AGENTS.md` completo.
+2. Revisar `docs/GRINDFLOW-SPEC.md`, `docs/REQUIREMENTS.md` y `docs/DEVELOPMENT-MODEL.md`.
+3. Inspeccionar el estado actual de `main`, PRs abiertos y el ultimo `GrindFlow CI / validate`.
+4. Si un PR activo cubre el trabajo, continuar ese PR en vez de duplicarlo.
+5. Mantener cambios enfocados y trazables a uno o mas IDs de requisito.
+6. Seguir rama enfocada -> implementacion -> pruebas -> PR -> CI/revision -> squash merge -> CI exacto en main.
+7. No confundir IMPLEMENTED, VALIDATED IN CODE, DEPLOYED y VALIDATED IN PRODUCTION.
+
+### Regla de paralelizacion
+
+- **Paralelizar todo lo que sea realmente independiente** cuando reduzca el tiempo total de entrega.
+- Se permiten hasta **4 lineas de trabajo concurrentes** si no comparten archivos, estado mutable, migraciones dependientes ni alcance de revision.
+- Analisis, inspeccion de codigo, preparacion de pruebas, revision de gates y tareas sobre modulos independientes pueden ejecutarse en paralelo.
+- Mientras un gate externo corre, se debe aprovechar el tiempo avanzando trabajo independiente en vez de quedar inactivo.
+- Los merges a `main` son siempre **serializados**. Antes de cada merge hay que volver a comprobar el SHA actual de `main`, el SHA de la rama/PR y los gates aplicables.
+- Escrituras sobre el mismo archivo, ramas dependientes, cambios sobre el mismo esquema/estado compartido y secuencias que dependan unas de otras deben permanecer serializadas.
+- Migraciones de produccion, operaciones destructivas, restauraciones, rotacion de secretos y cualquier accion protegida **nunca** se paralelizan ni se ejecutan automaticamente.
+- La paralelizacion no puede reducir cobertura, saltarse validaciones ni justificar mezclar tareas no relacionadas en una misma PR.
+
+### Cambio de arquitectura aprobado — 17 de septiembre de 2026
+
+GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
+code hacia un **monolito modular Laravel**. El stack objetivo es PHP 8.5 +
+Laravel 13 + Blade/Livewire + Tailwind + PostgreSQL + Laravel Queues/Scheduler +
+almacenamiento S3-compatible.
+
+El codigo TypeScript actual es referencia funcional temporal. No se elimina un
+modulo legado hasta que su reemplazo Laravel tenga paridad trazable y este
+VALIDATED IN CODE. Las reglas de este archivo que mencionan implementaciones
+TypeScript/Supabase concretas siguen siendo validas para el legado mientras
+exista, pero no obligan a reproducir esas decisiones tecnicas en Laravel cuando
+el mismo invariante pueda preservarse de forma mas simple.
+
+El modelo de desarrollo y CI se inspira en BRVTAL: contexto durable en AGENTS,
+spec/requisitos versionados, una compuerta final estable `validate`, SonarQube
+Cloud como analisis estatico adicional y CodeRabbit como revisor asesor durante
+su calibracion.
+
 ## Que es el producto
 
 Plataforma SaaS multi-tenant para estudios de contenido adulto y modelos
@@ -19,7 +59,7 @@ preguntar.
 
 | Tema | Decision |
 |---|---|
-| Stack | Next.js App Router, TypeScript, Tailwind v4, Supabase, Cloudflare R2, Python 3.11 |
+| Stack objetivo | PHP 8.5, Laravel 13, Blade + Livewire, Tailwind, PostgreSQL, almacenamiento S3-compatible |
 | Despliegue | VPS propio con contenedores (Docker). Supabase sigue aportando base y Auth. Se descarto Vercel: ToS de contenido adulto y limites de FFmpeg |
 | Multi-tenancy | `organizations` + `memberships`, RLS por `organization_id` |
 | Cola | Tabla en Postgres con `FOR UPDATE SKIP LOCKED` |
@@ -27,7 +67,7 @@ preguntar.
 | Idiomas | Bilingue es/en con `next-intl` desde el inicio |
 | Subidas | URL prefirmada tras validar token, con vigencia y limites estrictos |
 | Acortador | `/l/[slug]` en la misma app, sin dominio aparte |
-| CI | Linters, TypeScript, unidad, RLS, build, workers e imagenes Docker |
+| CI | `GrindFlow CI` con compuerta estable `validate`, gates selectivos, SonarQube Cloud y CodeRabbit asesor |
 | Secretos en reposo | AES-256-GCM con `ENCRYPTION_MASTER_KEY` del entorno |
 | Limite del acortador | Dos capas: memoria del borde y ventana de 60 s en PostgreSQL |
 | Plataformas | Telegram, X, Reddit, Bluesky y webhook generico; credenciales OAuth y API key |

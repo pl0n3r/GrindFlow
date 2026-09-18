@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - main
+  path_filters:
+    - "!vendor/**"
+    - "!node_modules/**"
+    - "!storage/**"
+    - "!bootstrap/cache/**"
+    - "!public/build/**"
+    - "!coverage/**"
+    - "!**/.DS_Store"
+  path_instructions:
+    - path: "app/**"
+      instructions: |
+        Treat AGENTS.md and docs/GRINDFLOW-SPEC.md as canonical. Check authorization,
+        tenant isolation, validation, transaction boundaries, queue idempotency and
+        fail-closed behavior. Business invariants belong in domain/application code,
+        not only in controllers or Livewire components.
+    - path: "routes/**"
+      instructions: |
+        Check authentication, authorization, rate limiting, CSRF expectations and
+        accidental public exposure. Prefer named routes and thin route definitions.
+    - path: "database/**"
+      instructions: |
+        Flag destructive or irreversible migrations, unsafe defaults, missing indexes,
+        tenant-isolation gaps and non-idempotent data migrations. Never assume a source
+        merge means a production migration has run.
+    - path: "app/Jobs/**"
+      instructions: |
+        Require idempotency, bounded retries, explicit timeout/backoff behavior and
+        safe handling of external API failures. A rate-limit response must not be
+        treated as a permanent credential failure.
+    - path: "app/Models/**"
+      instructions: |
+        Check organization scoping, mass-assignment safety, casts, relationships and
+        accidental secret exposure. Sensitive credentials must remain encrypted.
+    - path: "app/Livewire/**"
+      instructions: |
+        Check server-side authorization and validation. UI state is never an
+        authorization boundary. Preserve keyboard/mobile accessibility.
+    - path: "tests/**"
+      instructions: |
+        Require deterministic regression coverage for behavior changes. Prefer the
+        nearest useful feature/unit test. Database isolation tests must attempt
+        cross-tenant access, not merely prove happy-path reads.
+    - path: ".github/workflows/**"
+      instructions: |
+        Preserve the stable GrindFlow CI / validate aggregate. Keep changed-file-aware
+        gates free of false negatives. Do not duplicate SonarQube Cloud automatic
+        analysis with a second scanner unless automatic analysis is intentionally
+        disabled first.
+    - path: "docs/**"
+      instructions: |
+        Keep requirements traceable and durable. Product behavior belongs in the spec
+        or requirements docs; transient delivery state does not.
+knowledge_base:
+  code_guidelines:
+    enabled: true
