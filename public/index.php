@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Deployment\ReleaseCacheGuard;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
@@ -10,6 +11,15 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 }
 
 require __DIR__.'/../vendor/autoload.php';
+
+$cacheGuard = new ReleaseCacheGuard(
+    dirname(__DIR__),
+    dirname(__DIR__).'/storage',
+);
+
+if ($cacheGuard->refreshIfNeeded() && function_exists('opcache_reset')) {
+    opcache_reset();
+}
 
 /** @var Application $app */
 $app = require_once __DIR__.'/../bootstrap/app.php';
