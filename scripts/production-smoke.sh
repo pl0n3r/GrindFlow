@@ -201,6 +201,13 @@ run_smoke() {
     return 1
   fi
 
+  if grep -Fq 'data-media-storage-configured="1"' "$system_html"; then
+    printf 'MEDIA_STORAGE_READY=1\n'
+  else
+    printf 'MEDIA_STORAGE_READY=0\n'
+    printf 'WARN: media object storage is not configured; quick upload remains available.\n'
+  fi
+
   local vault_path
   if ! vault_path="$(extract_vault_path)"; then
     printf 'ERROR: dashboard does not expose an organization Vault link.\n' >&2
