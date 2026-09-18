@@ -48,7 +48,10 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- Estado actual: **VALIDATED IN CODE**.
+- PR #47 paso `fast`, `php-quality`, `tests`, `browser` y `validate`; `database`
+  y `legacy` quedaron correctamente `skipped` por el selector de CI.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
 - GF-FR-002 base, persistent jobs y staged handoff permanecen **VALIDATED IN CODE**.
 - No hay migracion de base de datos en este cambio.
 - No hay llamadas reales a Dropbox, secretos nuevos ni escrituras de contenido
@@ -58,9 +61,7 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit y `validate`; dejar que el selector decida gates
-  adicionales.
-- Fusionar si CI/Sonar quedan verdes.
+- Fusionar PR #47 y dejar que exact-main CI confirme el estado.
 - Luego portar la capa de conexion/credenciales cifradas y scheduler de scans,
   reutilizando este adapter sin duplicar ingesta.
 - Mantener object storage #40 como bloqueo externo independiente.
@@ -73,8 +74,8 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** jobs + handoff VALIDATED IN CODE; primer adapter
-  Dropbox IMPLEMENTED; faltan credenciales/OAuth, scans y Google Drive.
+- **P1 — Media Vault / ingesta:** jobs + handoff + adapter Dropbox VALIDATED IN
+  CODE; faltan credenciales/OAuth, scans y Google Drive.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
