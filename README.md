@@ -11,70 +11,61 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- Se paso al siguiente frente accionable de P1: **Media Vault / ingesta**.
-- Se agrego `media_ingestions`, estado persistente tenant-owned para trabajos de
-  ingesta con idempotencia por source.
-- Un mismo `source_type + source_ref` dentro de una organizacion reutiliza el
-  mismo trabajo; retries no multiplican unidades logicas.
-- Se agrego `IngestMediaObject`, job tenant-aware con revalidacion de rol al
-  ejecutar, retries acotados y errores persistidos como codigos seguros.
-- Se agrego ingesta desde objetos ya staged en cualquier disk Laravel:
-  streaming, verificacion de tamaño, MIME permitido y SHA-256.
-- Sources distintos con los mismos bytes convergen al mismo `media_blob`, pero
-  mantienen assets separados y trazabilidad del origen.
-- El source staged puede eliminarse tras exito solo si fue marcado explicitamente
-  como temporal.
-- No se agrego ninguna ruta que dependa de la nueva tabla, por lo que desplegar
-  el codigo antes de aplicar la migracion no debe romper Dashboard/Vault.
-- El bloqueo externo de object storage sigue rastreado por el issue automatico
-  #40 y no detiene este trabajo independiente.
+- Se agrego el handoff generico que deben usar futuros conectores de ingesta.
+- `StagedMediaSource` encapsula source type/ref, disk/key, filename, MIME, size,
+  cleanup y metadata del proveedor.
+- El DTO valida limites del schema antes de tocar base o cola.
+- `MediaIngestionCoordinator::queueSource` concentra idempotencia, autorizacion,
+  persistencia y dispatch.
+- El metodo `queue` existente se conserva como compatibilidad y delega al mismo
+  handoff, evitando dos caminos logicos.
+- Un conector futuro solo tiene que stagear el objeto y construir
+  `StagedMediaSource`; no debe conocer MediaBlob/MediaAsset ni implementar su
+  propio job.
+- Tests nuevos prueban idempotencia del handoff, metadata de proveedor y rechazo
+  temprano de inputs invalidos.
+- En paralelo, el hotfix del bridge de migraciones fue fusionado a `main` para
+  tolerar timeouts transitorios sin reintentar el POST de migracion.
 
 ## Archivos modificados en este deploy
 
-- `database/migrations/2026_09_18_090000_create_media_ingestions_table.php` —
-  estado persistente, idempotencia y FK tenant-aware.
-- `app/Models/MediaIngestion.php` — modelo tenant-owned y estados.
-- `app/Jobs/IngestMediaObject.php` — job retry-safe y reautorizado.
-- `app/Services/Media/MediaIngestionCoordinator.php` — enqueue/retry idempotente.
-- `app/Services/Media/FilesystemMediaIngestor.php` — streaming, hash y dedup.
-- `app/Services/Media/MediaIngestionException.php` — codigos de error seguros.
-- `tests/Feature/MediaIngestionJobTest.php` — idempotencia, auth, ingesta,
-  deduplicacion y fallo seguro.
-- `docs/REQUIREMENTS.md` — GF-FR-002 actualizado a implemented.
-- `AGENTS.md` — contrato durable de ingesta persistente.
+- `app/Services/Media/StagedMediaSource.php` — value object del handoff.
+- `app/Services/Media/MediaIngestionCoordinator.php` — `queueSource` compartido.
+- `tests/Feature/MediaIngestionJobTest.php` — cobertura del contrato generico.
+- `docs/REQUIREMENTS.md` — verificacion GF-FR-002 ampliada.
+- `AGENTS.md` — regla durable para conectores futuros.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE**.
-- PR #42 fue fusionado a `main` como `a2262a00307db6fddadd453a5887307a0afa3e8e`.
-- GrindFlow CI run #155 termino verde en `fast`, `php-quality`, `tests`, `database` y `validate`; `browser` y `legacy` quedaron correctamente `skipped`.
-- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- CodeRabbit no dejo reviews ni threads accionables observados; permanece asesor.
-- La migracion MariaDB paso el database gate real, pero **todavia no se ha aplicado en produccion**.
-- No hay llamadas a APIs externas ni escrituras de produccion.
-- No se modifica el object storage ni el issue #40.
-- No se declara VALIDATED IN PRODUCTION hasta aplicar explicitamente la migracion
-  y ejecutar una validacion segura posterior.
+- Estado actual del handoff: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
+- GF-FR-002 base permanece **VALIDATED IN CODE**.
+- No hay migracion nueva en este cambio.
+- No hay llamadas a APIs externas, secretos ni escrituras de produccion.
+- La migracion `media_ingestions` del cambio anterior sigue bajo validacion
+  operacional separada y no se ejecuta desde este PR.
 
 ## Qué sigue
 
-- Dejar que Production Smoke detecte la migracion pendiente sin ejecutarla.
-- Aplicar la migracion solo mediante la accion operacional explicita ya aprobada
-  para migraciones, no desde CI.
-- Despues, avanzar el adaptador generico que permita a futuros conectores staged
-  alimentar este mismo pipeline sin duplicar logica.
+- Pasar CI/Sonar del handoff y fusionar.
+- Confirmar el resultado del bridge de migracion de `media_ingestions`.
+- Con schema current, dejar que Production Smoke cierre el incidente automatico.
+- Luego implementar el primer adaptador real sobre este contrato sin duplicar
+  logica de tenant/idempotencia/deduplicacion.
 
 ## Panorama general pendiente
 
+- **P0 — Produccion / schema:** `media_ingestions` pendiente de validacion
+  operacional; bridge endurecido ya fusionado.
+- **P0 — Produccion / smoke:** issue #44 abierto hasta schema current.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`;
   bloqueado en este chat porque el conector actual no expone branch protection.
 - **P1 — Media Vault / object storage:** readiness VALIDATED IN PRODUCTION;
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** persistent jobs VALIDATED IN CODE; pendiente
-  migracion explicita y adaptadores de conectores.
+- **P1 — Media Vault / ingesta:** jobs VALIDATED IN CODE; handoff generico
+  IMPLEMENTED; pendientes adaptadores reales.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
