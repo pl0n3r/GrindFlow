@@ -38,15 +38,19 @@ siguiente deploy.
 
 ## Validación
 
-- Estado del cambio actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
-- El ultimo estado desplegado confirmado sigue siendo el anterior a este cambio.
-- No se declara **DEPLOYED** ni **VALIDATED IN PRODUCTION** para System hasta que
-  Hostinger reciba el merge y se compruebe la pantalla con una sesion admin real.
+- Estado del cambio actual: **VALIDATED IN CODE**.
+- PR #18 paso `fast`, `php-quality`, `tests`, `browser`, `legacy` y
+  `GrindFlow CI / validate`.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- PR #18 se fusiono a `main` como `a93f518cd27d99f87531e698be1ef46648b42333`.
+- No se declara **VALIDATED IN PRODUCTION** para System hasta comprobar
+  `/admin/system` con una sesion admin real en Hostinger.
 
 ## Qué sigue
 
-- Validar este cambio en CI, fusionarlo y comprobar `/admin/system` en Hostinger.
 - Continuar con Media Vault / ingesta Laravel con aislamiento tenant.
+- Comprobar `/admin/system` en Hostinger con la cuenta E2E existente cuando se
+  haga la siguiente validacion de navegador en produccion.
 - Mantener las operaciones rutinarias dentro de UI/CI/deploy y reservar SSH para
   diagnostico excepcional o acciones protegidas.
 
@@ -55,7 +59,7 @@ siguiente deploy.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P0 — Produccion / admin:** validar `/admin/system` con sesion admin real.
 - **P0 — Produccion / identidad:** validar login, sesion y tenancy con evidencia real.
-- **P1 — UI:** shell visual y nuevo System admin implementados.
+- **P1 — UI:** shell visual y System admin VALIDATED IN CODE.
 - **P1 — Browser invitado:** VALIDATED IN CODE.
 - **P1 — Browser autenticado:** VALIDATED IN CODE y fusionado.
 - **P1 — Media Vault / ingesta:** pendiente de migracion Laravel.
