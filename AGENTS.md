@@ -110,9 +110,17 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Un `invalid_grant` o ausencia de refresh token cambia la conexion a
   `needs_reconnect`; un 429 de refresh solo difiere el scan y no consume failure
   budget.
-- El callback OAuth y el intercambio inicial de authorization code siguen en un
-  slice separado. El refresh implementado no sustituye CSRF/state validation del
-  flujo de conexion inicial.
+- El flujo OAuth inicial de Dropbox usa un state aleatorio de un solo uso ligado
+  en sesion a actor + organizacion + tiempo de emision. El callback valida ese
+  state antes de cualquier I/O con Dropbox y lo consume antes de persistir.
+- El callback OAuth es global y estable, pero restaura TenantContext desde el
+  state validado antes de llamar MediaConnectionManager. organization_id nunca
+  se acepta desde query string como fuente de autoridad del callback.
+- El flujo solicita token_access_type=offline y exige refresh token en el
+  intercambio inicial. Access/refresh tokens se cifran inmediatamente; bodies,
+  codes, state y tokens no se guardan en logs, Diagnostics ni metadata.
+- El redirect URI se deriva de la ruta Laravel + APP_URL. Produccion debe
+  registrar exactamente /connections/dropbox/callback en la consola de Dropbox.
 
 ### Regla de direct uploads del Vault
 
