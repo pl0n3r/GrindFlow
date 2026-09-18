@@ -38,6 +38,11 @@ class MediaConnectorException extends RuntimeException
         return new self('connector_oauth_not_configured');
     }
 
+    public static function oauthExchangeFailed(): self
+    {
+        return new self('connector_oauth_exchange_failed');
+    }
+
     public static function refreshUnavailable(): self
     {
         return new self('connector_refresh_unavailable', true);
