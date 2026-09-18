@@ -11,11 +11,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ResolveOrganizationContext
 {
-    public function handle(
-        Request $request,
-        Closure $next,
-        TenantContext $tenantContext,
-    ): Response {
+    public function __construct(private readonly TenantContext $tenantContext) {}
+
+    public function handle(Request $request, Closure $next): Response
+    {
         $user = $request->user();
 
         abort_unless($user instanceof User, 401);
@@ -29,7 +28,7 @@ class ResolveOrganizationContext
 
         $request->attributes->set('tenantOrganization', $organization);
 
-        return $tenantContext->runWithinOrganization(
+        return $this->tenantContext->runWithinOrganization(
             $user,
             (string) $organization->getKey(),
             fn (): Response => $next($request),
