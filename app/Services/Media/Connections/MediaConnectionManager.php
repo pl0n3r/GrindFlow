@@ -89,6 +89,7 @@ class MediaConnectionManager
         string $accessToken,
         ?string $refreshToken = null,
         ?\DateTimeInterface $tokenExpiresAt = null,
+        ?array $scopes = null,
     ): MediaConnection {
         $this->assertConnectionAccess($connection, $actor);
         $this->assertText($accessToken, 16_384, 'Dropbox access token');
@@ -110,6 +111,12 @@ class MediaConnectionManager
                 ? $connection->refresh_ciphertext
                 : $this->cipher->encrypt($refreshToken, $context),
             'token_expires_at' => $tokenExpiresAt,
+            'scopes' => $scopes === null
+                ? $connection->scopes
+                : array_values(array_filter(
+                    $scopes,
+                    static fn (string $scope): bool => $scope !== '',
+                )),
             'status' => MediaConnection::STATUS_ACTIVE,
             'next_scan_at' => now(),
             'last_error' => null,
