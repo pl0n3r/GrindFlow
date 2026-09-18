@@ -215,20 +215,12 @@ class DiagnosticLog
             return [];
         }
 
-        $file = new \SplFileObject($path, 'r');
-        $file->seek(PHP_INT_MAX);
-        $lastLine = $file->key();
-        $lines = [];
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
-        for ($line = $lastLine; $line >= 0 && count($lines) < $limit; $line--) {
-            $file->seek($line);
-            $value = trim((string) $file->current());
-
-            if ($value !== '') {
-                $lines[] = $value;
-            }
+        if ($lines === false) {
+            return [];
         }
 
-        return $lines;
+        return array_slice(array_reverse($lines), 0, $limit);
     }
 }
