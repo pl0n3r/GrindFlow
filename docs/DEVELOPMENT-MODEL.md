@@ -39,7 +39,7 @@ legacy ────────┘
 - **fast** always runs and computes changed-file scope.
 - **php-quality** runs for Laravel/PHP surfaces.
 - **tests** runs Laravel/Pest/PHPUnit tests when application behavior changes.
-- **database** is reserved for PostgreSQL-sensitive integration paths.
+- **database** runs MariaDB-sensitive migrations and integration paths.
 - **browser** runs only when UI/browser behavior requires it.
 - **legacy** protects the current TypeScript implementation only while migration
   is incomplete.
