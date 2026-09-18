@@ -129,6 +129,15 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - nextPageToken de Drive es solo cursor de paginacion de una consulta activa;
   no se persiste como cursor incremental entre scans. El incremental durable
   debe implementarse con el contrato de Changes API en un slice posterior.
+- Dropbox y Google Drive comparten OAuthPendingState +
+  OAuthConnectionCoordinator. Ningun proveedor nuevo duplica validacion de
+  state, binding actor/organizacion, replay protection o errores del callback.
+- Google Drive OAuth usa access_type=offline, prompt=consent y
+  drive.readonly. Las conexiones Google nacen paused y next_scan_at=null hasta
+  que Changes API habilite un cursor incremental durable.
+- MediaConnectionTokenProvider es provider-aware: refresca Dropbox o Google
+  segun provider, conserva refresh token si el proveedor no devuelve uno nuevo
+  y nunca cambia una conexion Google pausada a active durante un refresh.
 
 ### Regla de direct uploads del Vault
 
