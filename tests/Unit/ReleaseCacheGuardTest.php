@@ -61,6 +61,27 @@ class ReleaseCacheGuardTest extends TestCase
         $this->assertFileDoesNotExist($this->root.'/bootstrap/cache/routes-v7.php');
     }
 
+    public function test_dashboard_defensively_checks_incremental_routes_before_linking(): void
+    {
+        $dashboard = file_get_contents(
+            dirname(__DIR__, 2).'/resources/views/dashboard.blade.php',
+        );
+
+        $this->assertIsString($dashboard);
+        $this->assertStringContainsString(
+            "Route::has('organizations.vault.index')",
+            $dashboard,
+        );
+        $this->assertStringContainsString(
+            "Route::has('admin.system')",
+            $dashboard,
+        );
+        $this->assertStringContainsString(
+            "Route::has('admin.diagnostics')",
+            $dashboard,
+        );
+    }
+
     private function deleteTree(string $path): void
     {
         if (! is_dir($path)) {
