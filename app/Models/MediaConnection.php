@@ -11,6 +11,8 @@ class MediaConnection extends TenantModel
 
     public const PROVIDER_DROPBOX = 'dropbox';
 
+    public const PROVIDER_GOOGLE_DRIVE = 'google_drive';
+
     public const STATUS_ACTIVE = 'active';
 
     public const STATUS_PAUSED = 'paused';
