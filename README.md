@@ -54,10 +54,14 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual del media processing foundation: **IMPLEMENTED**, pendiente de
-  `GrindFlow CI / validate`, SonarQube y CodeRabbit.
-- GF-FR-003 queda implementado en su primera capa, todavia no
-  VALIDATED IN CODE.
+- Estado actual del media processing foundation: **VALIDATED IN CODE**.
+- El head funcional `6a14193306dfa68e8b699cfc7f264580bce6fe36` paso
+  `fast`, `tests`, `php-quality`, MariaDB y `GrindFlow CI / validate`;
+  browser/legacy fueron correctamente omitidos por no aplicar al diff.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues, 0 Security Hotspots y
+  0.0% duplicacion en codigo nuevo.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
+- GF-FR-003 queda **VALIDATED IN CODE** en su primera capa.
 - Dropbox + Google ingestion/scheduling: **VALIDATED IN CODE**.
 - No hay migracion nueva.
 - Produccion no se modifica desde CI.
@@ -65,8 +69,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar fast, PHPUnit, php-quality, MariaDB, browser y `GrindFlow CI / validate`.
-- Resolver SonarQube/CodeRabbit sin silenciar hallazgos y fusionar por squash.
 - Despues añadir el primer processor real de derivados, probablemente probe
   multimedia/FFmpeg y sanitizacion, manteniendo `ProcessMediaAsset` como contrato.
 - Mantener pendiente object storage real, migracion de `media_connections` y
@@ -82,8 +84,8 @@ siguiente deploy.
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox + Google adapter + OAuth/refresh +
   Changes API VALIDATED IN CODE; pendientes configuracion/migracion de produccion.
-- **P1 — Procesamiento / scheduling:** cloud scheduling VALIDATED IN CODE;
-  processing foundation IMPLEMENTED; derivados/FFmpeg pendientes.
+- **P1 — Procesamiento / scheduling:** cloud scheduling + processing foundation
+  VALIDATED IN CODE; derivados/FFmpeg pendientes.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
