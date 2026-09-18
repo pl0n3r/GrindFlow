@@ -8,10 +8,10 @@ use App\Models\User;
 use App\Queue\Middleware\UseOrganizationContext;
 use App\Services\Media\FilesystemMediaIngestor;
 use App\Services\Media\MediaIngestionException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -30,12 +30,25 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
 
     public int $uniqueFor = 3600;
 
+    public readonly string $ingestionId;
+
+    private readonly string $organization;
+
+    private readonly string $actor;
+
+    private readonly string $idempotency;
+
     public function __construct(
-        public readonly string $ingestionId,
-        private readonly string $organization,
-        private readonly string $actor,
-        private readonly string $idempotency,
-    ) {}
+        string $ingestionId,
+        string $organization,
+        string $actor,
+        string $idempotency,
+    ) {
+        $this->ingestionId = $ingestionId;
+        $this->organization = $organization;
+        $this->actor = $actor;
+        $this->idempotency = $idempotency;
+    }
 
     /**
      * @return array<int, int>
