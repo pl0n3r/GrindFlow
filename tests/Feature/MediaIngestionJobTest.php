@@ -14,11 +14,13 @@ use App\Queue\Middleware\UseOrganizationContext;
 use App\Services\Media\FilesystemMediaIngestor;
 use App\Services\Media\MediaIngestionCoordinator;
 use App\Services\Media\MediaIngestionException;
+use App\Services\Media\StagedMediaSource;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class MediaIngestionJobTest extends TestCase
@@ -72,6 +74,68 @@ class MediaIngestionJobTest extends TestCase
         );
 
         Queue::assertPushed(IngestMediaObject::class, 1);
+    }
+
+    public function test_staged_source_handoff_is_the_shared_connector_boundary(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        $source = new StagedMediaSource(
+            sourceType: 'cloud_connector',
+            sourceRef: 'drive:file:abc123:v7',
+            sourceDisk: 'source',
+            sourceKey: 'staging/abc123',
+            originalFilename: 'abc123.png',
+            mimeType: 'image/png',
+            byteSize: 68,
+            deleteAfterIngest: true,
+            metadata: [
+                'connector' => 'drive',
+                'external_version' => 'v7',
+            ],
+        );
+
+        [$first, $second] = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user, $source): array {
+                $coordinator = app(MediaIngestionCoordinator::class);
+
+                return [
+                    $coordinator->queueSource($user, $source),
+                    $coordinator->queueSource($user, $source),
+                ];
+            },
+        );
+
+        $this->assertSame($first->getKey(), $second->getKey());
+        $this->assertSame('cloud_connector', $first->source_type);
+        $this->assertSame('drive:file:abc123:v7', $first->source_ref);
+        $this->assertSame('drive', $first->metadata['connector']);
+        $this->assertSame('v7', $first->metadata['external_version']);
+        $this->assertTrue($first->delete_source_after_ingest);
+
+        Queue::assertPushed(IngestMediaObject::class, 1);
+    }
+
+    public function test_staged_source_rejects_invalid_connector_input_before_queueing(): void
+    {
+        Queue::fake();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        new StagedMediaSource(
+            sourceType: 'connector',
+            sourceRef: '',
+            sourceDisk: 'source',
+            sourceKey: 'staging/file',
+            originalFilename: 'file.png',
+        );
     }
 
     public function test_non_manager_cannot_queue_media_ingestion(): void

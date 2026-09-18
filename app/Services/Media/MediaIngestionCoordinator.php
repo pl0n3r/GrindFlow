@@ -27,6 +27,26 @@ class MediaIngestionCoordinator
         bool $deleteSourceAfterIngest = false,
         array $metadata = [],
     ): MediaIngestion {
+        return $this->queueSource(
+            $actor,
+            new StagedMediaSource(
+                sourceType: $sourceType,
+                sourceRef: $sourceRef,
+                sourceDisk: $sourceDisk,
+                sourceKey: $sourceKey,
+                originalFilename: $originalFilename,
+                mimeType: $mimeType,
+                byteSize: $byteSize,
+                deleteAfterIngest: $deleteSourceAfterIngest,
+                metadata: $metadata,
+            ),
+        );
+    }
+
+    public function queueSource(
+        User $actor,
+        StagedMediaSource $source,
+    ): MediaIngestion {
         $organizationId = $this->tenantContext->organizationId();
 
         if ($organizationId === null) {
@@ -41,25 +61,22 @@ class MediaIngestionCoordinator
             );
         }
 
-        $idempotencyKey = hash(
-            'sha256',
-            $sourceType."\0".$sourceRef,
-        );
+        $idempotencyKey = $source->idempotencyKey();
 
         $ingestion = MediaIngestion::query()->firstOrCreate(
             ['idempotency_key' => $idempotencyKey],
             [
                 'requested_by_user_id' => $actor->getKey(),
-                'source_type' => $sourceType,
-                'source_ref' => $sourceRef,
-                'source_disk' => $sourceDisk,
-                'source_key' => $sourceKey,
-                'original_filename' => $originalFilename,
-                'mime_type' => $mimeType,
-                'byte_size' => $byteSize,
+                'source_type' => $source->sourceType,
+                'source_ref' => $source->sourceRef,
+                'source_disk' => $source->sourceDisk,
+                'source_key' => $source->sourceKey,
+                'original_filename' => $source->originalFilename,
+                'mime_type' => $source->mimeType,
+                'byte_size' => $source->byteSize,
                 'status' => MediaIngestion::STATUS_QUEUED,
-                'delete_source_after_ingest' => $deleteSourceAfterIngest,
-                'metadata' => $metadata,
+                'delete_source_after_ingest' => $source->deleteAfterIngest,
+                'metadata' => $source->metadata,
             ],
         );
 
