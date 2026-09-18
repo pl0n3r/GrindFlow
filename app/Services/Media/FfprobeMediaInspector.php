@@ -53,6 +53,8 @@ class FfprobeMediaInspector
                     'error',
                     '-show_streams',
                     '-show_format',
+                    '-show_entries',
+                    'stream=codec_type,codec_name,width,height,sample_rate,channels:format=duration,format_name',
                     '-of',
                     'json',
                     $path,
@@ -100,12 +102,12 @@ class FfprobeMediaInspector
             throw MediaProcessingException::probeInvalidOutput();
         }
 
-        $streams = is_array($payload['streams'] ?? null)
-            ? $payload['streams']
-            : [];
-        $format = is_array($payload['format'] ?? null)
-            ? $payload['format']
-            : [];
+        $streams = $payload['streams'] ?? null;
+        $format = $payload['format'] ?? null;
+
+        if (is_array($streams) === false || is_array($format) === false) {
+            throw MediaProcessingException::probeInvalidOutput();
+        }
 
         $video = $this->firstStream($streams, 'video');
         $audio = $this->firstStream($streams, 'audio');

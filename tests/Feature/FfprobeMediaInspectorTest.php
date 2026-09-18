@@ -12,9 +12,12 @@ use App\Services\Media\MediaProcessingException;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyProcessTimedOutException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 use Tests\TestCase;
 
 class FfprobeMediaInspectorTest extends TestCase
@@ -107,6 +110,12 @@ class FfprobeMediaInspectorTest extends TestCase
                 && $process->command[0] === 'ffprobe'
                 && in_array('-show_streams', $process->command, true)
                 && in_array('-show_format', $process->command, true)
+                && in_array('-show_entries', $process->command, true)
+                && in_array(
+                    'stream=codec_type,codec_name,width,height,sample_rate,channels:format=duration,format_name',
+                    $process->command,
+                    true,
+                )
                 && $process->timeout === 15
                 && $result->successful();
         });
@@ -130,6 +139,34 @@ class FfprobeMediaInspectorTest extends TestCase
             );
 
             $this->fail('Expected invalid ffprobe JSON to fail.');
+        } catch (MediaProcessingException $exception) {
+            $this->assertSame(
+                'processing_probe_invalid_output',
+                $exception->getMessage(),
+            );
+        }
+    }
+
+    public function test_missing_required_ffprobe_sections_returns_safe_error(): void
+    {
+        Process::fake([
+            '*' => Process::result(output: json_encode([
+                'streams' => [],
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        [$user, $organization, $blob] = $this->blob();
+
+        try {
+            app(TenantContext::class)->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                fn (): array => app(FfprobeMediaInspector::class)->inspect(
+                    MediaBlob::query()->findOrFail($blob->getKey()),
+                ),
+            );
+
+            $this->fail('Expected missing format section to fail safely.');
         } catch (MediaProcessingException $exception) {
             $this->assertSame(
                 'processing_probe_invalid_output',
@@ -166,6 +203,39 @@ class FfprobeMediaInspectorTest extends TestCase
             );
             $this->assertStringNotContainsString(
                 'sensitive-provider-stderr',
+                $exception->getMessage(),
+            );
+        }
+    }
+
+    public function test_ffprobe_timeout_returns_safe_processing_error(): void
+    {
+        $symfonyProcess = new SymfonyProcess(['ffprobe']);
+        $symfonyProcess->setTimeout(15);
+
+        Process::fake(fn () => new ProcessTimedOutException(
+            new SymfonyProcessTimedOutException(
+                $symfonyProcess,
+                SymfonyProcessTimedOutException::TYPE_GENERAL,
+            ),
+            Process::result(exitCode: 1),
+        ));
+
+        [$user, $organization, $blob] = $this->blob();
+
+        try {
+            app(TenantContext::class)->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                fn (): array => app(FfprobeMediaInspector::class)->inspect(
+                    MediaBlob::query()->findOrFail($blob->getKey()),
+                ),
+            );
+
+            $this->fail('Expected ffprobe timeout to fail safely.');
+        } catch (MediaProcessingException $exception) {
+            $this->assertSame(
+                'processing_probe_timed_out',
                 $exception->getMessage(),
             );
         }

@@ -101,9 +101,11 @@ vault with traceable source metadata.
   codes and can be retried without creating another asset.
 - The `probe_v2` processor preserves deterministic object/size/MIME checks and
   can enrich canonical media with feature-gated `ffprobe` metadata.
-- `ffprobe` is disabled by default, has a bounded timeout and persists only a
-  whitelist of technical fields; arbitrary tags, stderr and provider payloads
-  are never copied into asset metadata or safe processing errors.
+- `ffprobe` is disabled by default with fail-closed boolean parsing, has a
+  bounded timeout, requests only allowlisted fields via `-show_entries`, and
+  rejects missing/non-array stream or format sections before persistence.
+- Arbitrary tags, stderr and provider payloads are never copied into asset
+  metadata or safe processing errors.
 - Invalid output, process failure and timeout map to bounded processing error
   codes and remain retry-safe. FFmpeg-derived artifacts remain a later slice
   behind this contract.

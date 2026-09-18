@@ -37,7 +37,11 @@ return [
         'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 'media'),
         'staging_disk' => env('MEDIA_STAGING_DISK', 'media'),
         'ffprobe' => [
-            'enabled' => (bool) env('MEDIA_FFPROBE_ENABLED', false),
+            'enabled' => filter_var(
+                env('MEDIA_FFPROBE_ENABLED', false),
+                FILTER_VALIDATE_BOOL,
+                FILTER_NULL_ON_FAILURE,
+            ) ?? false,
             'binary' => env('MEDIA_FFPROBE_BINARY', 'ffprobe'),
             'timeout_seconds' => (int) env(
                 'MEDIA_FFPROBE_TIMEOUT_SECONDS',
