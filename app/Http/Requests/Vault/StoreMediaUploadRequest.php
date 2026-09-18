@@ -31,7 +31,7 @@ class StoreMediaUploadRequest extends FormRequest
                 'required',
                 'file',
                 'mimetypes:'.implode(',', $mimetypes),
-                'max:'.(int) config('grindflow.media.max_upload_kb', 7168),
+                'max:8000',
             ],
         ];
     }
