@@ -136,8 +136,7 @@ class DropboxTokenRefreshTest extends TestCase
         );
 
         Http::assertNotSent(
-            fn (Request $request): bool =>
-                $request->url() === 'https://api.dropboxapi.com/oauth2/token',
+            fn (Request $request): bool => $request->url() === 'https://api.dropboxapi.com/oauth2/token',
         );
         Http::assertSentCount(1);
     }
