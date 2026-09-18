@@ -110,9 +110,8 @@ class FilesystemMediaIngestor
                 ->oldest('created_at')
                 ->first();
 
-            $metadata = is_array($ingestion->metadata)
-                ? $ingestion->metadata
-                : [];
+            $rawMetadata = $ingestion->getAttribute('metadata');
+            $metadata = is_array($rawMetadata) ? $rawMetadata : [];
 
             $asset = MediaAsset::query()->create([
                 'media_blob_id' => $blob->getKey(),
