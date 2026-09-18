@@ -135,7 +135,7 @@ class ReleaseCacheGuard
     private function clearCompiledViews(): void
     {
         foreach (glob($this->storagePath('framework/views/*.php')) ?: [] as $path) {
-            if (is_file($path) && ! unlink($path)) {
+            if (is_file($path) && unlink($path) === false) {
                 throw new RuntimeException('Unable to clear a compiled Laravel view.');
             }
         }
