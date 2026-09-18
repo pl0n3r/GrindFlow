@@ -52,8 +52,6 @@
                         <span class="gf-navitem__text">System</span>
                     </a>
                 @endif
-
-                <x-admin-system-link />
             </nav>
 
             <div class="gf-sidebar__bottom">
