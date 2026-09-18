@@ -97,8 +97,8 @@
 
                 <article class="gf-metric">
                     <div class="gf-metric__label">Isolation</div>
-                    <div class="gf-metric__value">RLS</div>
-                    <div class="gf-metric__meta">PostgreSQL boundary</div>
+                    <div class="gf-metric__value">Scoped</div>
+                    <div class="gf-metric__meta">Laravel + MariaDB integrity</div>
                 </article>
             </section>
 
@@ -116,8 +116,8 @@
                                 <h3>Aun no hay organizaciones disponibles.</h3>
                                 <p>
                                     La interfaz ya esta lista. El siguiente paso de produccion
-                                    es conectar PostgreSQL runtime y cargar las memberships
-                                    reales de esta cuenta.
+                                    es conectar MariaDB y cargar las memberships reales
+                                    de esta cuenta.
                                 </p>
                             </div>
                         </div>

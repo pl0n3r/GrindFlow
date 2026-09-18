@@ -23,6 +23,9 @@ class VisualShellTest extends TestCase
             ->assertOk()
             ->assertSee('Bienvenido.')
             ->assertSee('Entrar al workspace')
+            ->assertSee('MariaDB active')
+            ->assertDontSee('PostgreSQL')
+            ->assertDontSee('RLS enabled')
             ->assertSee('css/grindflow.css');
     }
 }
