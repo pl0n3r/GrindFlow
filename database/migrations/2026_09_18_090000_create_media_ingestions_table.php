@@ -54,7 +54,7 @@ return new class extends Migration
             )
                 ->references(['id', 'organization_id'])
                 ->on('media_assets')
-                ->nullOnDelete();
+                ->restrictOnDelete();
         });
     }
 
