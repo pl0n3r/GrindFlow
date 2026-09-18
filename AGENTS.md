@@ -90,10 +90,18 @@ Reglas:
 - Solo `platform_role=admin` puede consultar `/admin/diagnostics` y
   `/admin/diagnostics.json`.
 - El production smoke debe consultar el endpoint diagnostico cuando una ruta
-  autenticada falla y dejar los ultimos incidentes sanitizados en GitHub Actions.
+  autenticada falla. El payload no se publica en el cuerpo de issues: se guarda
+  como artifact de GitHub Actions con retencion corta.
 - Cuando el production smoke falla, debe crear o actualizar el issue automatico
-  `[AUTO] Production Smoke Failure` con el diagnostico sanitizado. Ese issue es
-  la fuente primaria que los agentes deben leer para depurar produccion.
+  `[AUTO] Production Smoke Failure` con run ID y nombre del artifact; el issue
+  no contiene el payload diagnostico.
+- El issue durable `[AUTO] Production Diagnostics Bridge` acepta el comando
+  exacto `/production-diagnostics` solo de OWNER/MEMBER/COLLABORATOR. El workflow
+  asociado autentica la cuenta E2E, consulta `/admin/diagnostics.json`, elimina
+  identificadores de usuario/organizacion y PII adicional del handoff, y sube
+  `production-diagnostics-<run_id>` con retencion de 3 dias.
+- Para una peticion "revisa el log de produccion", el agente debe usar primero
+  ese bridge, recuperar el artifact por GitHub y correlacionar incident IDs.
 - Si falta el secret `PRODUCTION_E2E_PASSWORD`, el workflow debe mantener visible
   el issue `[AUTO] Production Smoke Not Configured` hasta que la configuracion
   exista; no debe aparentar que produccion fue validada.
