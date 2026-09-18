@@ -38,7 +38,7 @@ class DropboxTokenRefreshTest extends TestCase
     public function test_expiring_dropbox_access_token_is_refreshed_before_scan(): void
     {
         Http::fake(function (Request $request) {
-            if ($request->url() === 'https://api.dropboxapi.com/oauth2/token') {
+            if ($request->url() === 'https://api.dropbox.com/oauth2/token') {
                 return Http::response([
                     'access_token' => 'fresh-access-token',
                     'expires_in' => 14_400,
@@ -97,7 +97,7 @@ class DropboxTokenRefreshTest extends TestCase
         );
 
         Http::assertSent(function (Request $request): bool {
-            if ($request->url() !== 'https://api.dropboxapi.com/oauth2/token') {
+            if ($request->url() !== 'https://api.dropbox.com/oauth2/token') {
                 return false;
             }
 
@@ -136,7 +136,7 @@ class DropboxTokenRefreshTest extends TestCase
         );
 
         Http::assertNotSent(
-            fn (Request $request): bool => $request->url() === 'https://api.dropboxapi.com/oauth2/token',
+            fn (Request $request): bool => $request->url() === 'https://api.dropbox.com/oauth2/token',
         );
         Http::assertSentCount(1);
     }
@@ -144,7 +144,7 @@ class DropboxTokenRefreshTest extends TestCase
     public function test_invalid_refresh_grant_marks_connection_for_reconnect(): void
     {
         Http::fake([
-            'https://api.dropboxapi.com/oauth2/token' => Http::response(
+            'https://api.dropbox.com/oauth2/token' => Http::response(
                 ['error' => 'invalid_grant'],
                 400,
             ),
@@ -217,7 +217,7 @@ class DropboxTokenRefreshTest extends TestCase
     public function test_refresh_rate_limit_defers_without_spending_failure_budget(): void
     {
         Http::fake([
-            'https://api.dropboxapi.com/oauth2/token' => Http::response(
+            'https://api.dropbox.com/oauth2/token' => Http::response(
                 ['error' => 'too_many_requests'],
                 429,
                 ['Retry-After' => '180'],
