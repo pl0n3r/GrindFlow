@@ -10,7 +10,7 @@ La compuerta estable es `GrindFlow CI / validate`. Internamente agrega:
 | `php-quality` | Composer, sintaxis PHP, Pint y Larastan | cuando existe Laravel |
 | `tests` | PHPUnit feature/unit con SQLite rapido | cuando existe Laravel |
 | `database` | migraciones y pruebas sensibles contra MariaDB 11.4 | cuando cambian DB/modelos o manual |
-| `browser` | cobertura de navegador cuando existe una implementacion activa | selectiva |
+| `browser` | Laravel real + Chrome headless sobre landing/login/dashboard invitado | cuando cambia UI/HTTP/rutas o manual |
 | `legacy` | lint/typecheck/tests del stack Next/TypeScript | mientras exista el legado |
 | `validate` | agrega los gates anteriores en un nombre estable | siempre |
 
@@ -41,6 +41,24 @@ desechable del runner y ejecuta el grupo PHPUnit `database`.
 SQLite se usa para feedback rapido, pero no reemplaza MariaDB cuando una
 migracion, trigger, ENUM o comportamiento SQL depende del motor objetivo.
 
+## Browser smoke
+
+El gate `browser` levanta Laravel con `php artisan serve`, espera `/up` y
+usa Chrome/Chromium headless real para comprobar:
+
+- landing `/`;
+- login `/login`;
+- redirect del dashboard invitado a `/login`.
+
+Los cambios en `resources/`, `app/Livewire/`, `app/Http/`,
+`routes/web.php`, el script del smoke y el propio workflow activan este gate.
+Si falla, GitHub Actions conserva DOM, screenshots y
+`storage/logs/browser-server.log` como artefactos de diagnostico.
+
+Este smoke usa SQLite desechable porque valida HTTP/renderizado, no el contrato
+SQL. El gate `database` con MariaDB sigue siendo autoritativo para migraciones
+e invariantes del motor.
+
 ## Legado TypeScript/Supabase
 
 El stack legado conserva sus pruebas PostgreSQL/RLS mientras siga existiendo.
@@ -50,7 +68,7 @@ Laravel/MariaDB antes de retirar la implementacion anterior.
 
 ## Lo que sigue pendiente
 
-- Browser E2E real esta en PR #12 y queda pausado hasta terminar este pivot.
+- El browser smoke cubre invitado; falta cobertura autenticada del dashboard con datos E2E desechables.
 - Las integraciones externas aun necesitan smoke tests contra servicios reales.
 - Los modulos de ingesta, procesamiento, scheduling, distribucion, trafico y
   finanzas deben obtener cobertura Laravel al migrarse.

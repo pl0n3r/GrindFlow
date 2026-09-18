@@ -103,7 +103,9 @@ public landing page, authentication and authenticated dashboard.
 - Visual assets are deployable directly by the Laravel/Hostinger runtime.
 
 **Verification:** Laravel feature tests assert the main visual routes render
-their expected shell and the shared stylesheet exists.
+their expected shell and the shared stylesheet exists. The CI browser gate also
+boots Laravel and opens landing, login and the guest dashboard flow in a real
+headless Chrome instance.
 
 
 ## Security requirements
