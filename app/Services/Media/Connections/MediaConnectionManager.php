@@ -46,38 +46,39 @@ class MediaConnectionManager
             $this->assertText($accountIdentifier, 191, 'Account identifier');
         }
 
+        $context = sprintf(
+            'grindflow:cloud:%s:%s',
+            $organizationId,
+            MediaConnection::PROVIDER_DROPBOX,
+        );
+
         $connection = new MediaConnection;
         $connection->forceFill([
             'authorized_by_user_id' => $actor->getKey(),
             'provider' => MediaConnection::PROVIDER_DROPBOX,
             'label' => $label,
             'account_identifier' => $accountIdentifier,
+            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
+            'refresh_ciphertext' => $refreshToken === null
+                ? null
+                : $this->cipher->encrypt($refreshToken, $context),
+            'token_expires_at' => $tokenExpiresAt,
+            'scopes' => array_values(array_filter(
+                $scopes,
+                static fn (mixed $scope): bool => is_string($scope) && $scope !== '',
+            )),
             'root_path' => $rootPath,
             'status' => MediaConnection::STATUS_ACTIVE,
             'scan_interval_minutes' => $this->interval($scanIntervalMinutes),
             'next_scan_at' => now(),
             'last_error' => null,
             'consecutive_failures' => 0,
-            'scopes' => array_values(array_filter(
-                $scopes,
-                static fn (mixed $scope): bool => is_string($scope) && $scope !== '',
-            )),
-            'token_expires_at' => $tokenExpiresAt,
         ]);
         $connection->save();
 
         if ((string) $connection->organization_id !== $organizationId) {
             throw new AuthorizationException('Connection tenant mismatch.');
         }
-
-        $context = $connection->cryptoContext();
-
-        $connection->forceFill([
-            'access_ciphertext' => $this->cipher->encrypt($accessToken, $context),
-            'refresh_ciphertext' => $refreshToken === null
-                ? null
-                : $this->cipher->encrypt($refreshToken, $context),
-        ])->save();
 
         return $connection->refresh();
     }
