@@ -20,7 +20,11 @@ return new class extends Migration
 
             $table->string('provider', 32);
             $table->string('label', 191);
-            $table->longText('credentials');
+            $table->string('account_identifier', 191)->nullable();
+            $table->longText('access_ciphertext');
+            $table->longText('refresh_ciphertext')->nullable();
+            $table->timestamp('token_expires_at')->nullable();
+            $table->json('scopes')->nullable();
             $table->text('cursor')->nullable();
             $table->string('root_path', 1024)->nullable();
             $table->string('status', 32)->default('active');
