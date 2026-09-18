@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Vault\StoreMediaUploadRequest;
 use App\Models\MediaAsset;
 use App\Models\MediaBlob;
+use App\Models\MediaConnection;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\Media\DirectMediaUpload;
@@ -13,6 +14,7 @@ use App\Services\Media\MediaIngestor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class VaultController extends Controller
@@ -36,6 +38,20 @@ class VaultController extends Controller
             ->where('status', MediaAsset::STATUS_DUPLICATE)
             ->count();
         $storageBytes = (int) MediaBlob::query()->sum('byte_size');
+        $canUpload = $user->canManageOrganization($organization);
+        $connectionsReady = Schema::hasTable('media_connections');
+        $dropboxOAuthConfigured = (string) config(
+            'grindflow.connectors.dropbox.app_key',
+            '',
+        ) !== '' && (string) config(
+            'grindflow.connectors.dropbox.app_secret',
+            '',
+        ) !== '';
+        $dropboxConnectionCount = $connectionsReady
+            ? MediaConnection::query()
+                ->where('provider', MediaConnection::PROVIDER_DROPBOX)
+                ->count()
+            : 0;
 
         return view('vault.index', [
             'organization' => $organization,
@@ -44,8 +60,13 @@ class VaultController extends Controller
             'blobCount' => $blobCount,
             'duplicateCount' => $duplicateCount,
             'storageBytes' => $storageBytes,
-            'canUpload' => $user->canManageOrganization($organization),
+            'canUpload' => $canUpload,
             'directUploadAvailable' => $directUploads->available(),
+            'dropboxConnectAvailable' => $canUpload
+                && $connectionsReady
+                && $dropboxOAuthConfigured,
+            'dropboxConnectionCount' => $dropboxConnectionCount,
+            'mediaConnectionsReady' => $connectionsReady,
             'directUploadMaxBytes' => $directUploads->maxBytes(),
         ]);
     }

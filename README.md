@@ -11,46 +11,52 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- La capa de conexiones cifradas + scans de PR #48 quedo **VALIDATED IN CODE** y
-  fusionada a `main` como `36be1814193b3feb6e7b7cdb7b0e6b96159756a6`.
-- Se implemento el siguiente slice: refresh automatico de access tokens Dropbox.
-- Antes de un scan, si `token_expires_at` entra en el margen configurado,
-  GrindFlow descifra el refresh token en memoria y llama al endpoint OAuth de
-  Dropbox.
-- El access token reemplazado se cifra inmediatamente con AES-256-GCM y el mismo
-  AAD `grindflow:cloud:<organization_id>:dropbox`.
-- El refresh token existente se conserva si Dropbox no retorna uno nuevo.
-- `invalid_grant` y refresh token ausente requieren reconexion.
-- HTTP 429 de refresh difiere el siguiente scan sin gastar failure budget.
-- Falta de APP key/secret y respuestas malformadas se convierten a errores
-  seguros; nunca se persiste el body crudo de OAuth.
-- El margen de refresh es configurable, default 300 s y acotado a 60–3600 s.
-- CI usa HTTP fakes; no se usan credenciales Dropbox reales ni se toca produccion.
-- El callback OAuth inicial sigue pendiente.
-- La migracion `media_connections` de PR #48 sigue requiriendo accion
-  operacional explicita en produccion.
+- El refresh automatico de Dropbox de PR #50 quedo **VALIDATED IN CODE** y fue
+  fusionado a `main` como `734c975127771e089c07f66171475b835322834b`.
+- Se implemento el siguiente slice P1: conexion inicial Dropbox mediante OAuth
+  authorization code con acceso offline.
+- El inicio OAuth vive dentro del contexto de organizacion y exige un rol que
+  pueda administrarla.
+- El `state` es aleatorio, se conserva server-side solo como hash SHA-256 y se
+  liga a usuario, organizacion y tiempo de emision.
+- El callback valida `state` antes de cualquier request a Dropbox, es de un solo
+  uso y restaura `TenantContext` desde el estado validado.
+- El callback no acepta `organization_id` del query string como autoridad.
+- El intercambio inicial exige access token + refresh token y los persiste solo
+  mediante `MediaConnectionManager`, cifrados con el AAD tenant/provider.
+- El Vault muestra la accion Connect Dropbox solo cuando OAuth esta configurado
+  y la tabla `media_connections` ya existe.
+- Antes de esa migracion operacional, el UI falla cerrado y no ofrece una
+  conexion que no pueda persistirse.
+- Provider denial, state invalido, respuestas malformadas y fallos de red no
+  persisten bodies, codes, state ni secretos.
+- CI usa HTTP fakes; no se llaman APIs Dropbox reales ni se toca produccion.
+- La migracion `media_connections` y la configuracion real de la app Dropbox
+  siguen siendo acciones operacionales pendientes.
 - Object storage #40 sigue siendo un bloqueo externo independiente.
 
 ## Archivos modificados en este deploy
 
-- `app/Services/Media/Connections/DropboxOAuthClient.php` — refresh-token exchange seguro.
-- `app/Services/Media/Connections/RefreshedAccessToken.php` — DTO normalizado.
-- `app/Services/Media/Connections/MediaConnectionTokenProvider.php` — decide uso/refresh del token.
-- `app/Services/Media/Connections/MediaConnectionScanner.php` — obtiene token vigente antes del scan.
-- `app/Services/Media/Connections/MediaConnectionManager.php` — persiste token/expiry/scopes refrescados.
-- `app/Services/Media/Connectors/MediaConnectorException.php` — errores seguros de refresh.
-- `config/grindflow.php` y `.env.example` — app credentials + refresh margin.
-- `tests/Feature/DropboxTokenRefreshTest.php` — refresh, no-refresh, invalid grant, missing refresh y 429.
+- `app/Http/Controllers/Connections/DropboxConnectionController.php` — inicio y callback OAuth tenant-safe.
+- `app/Services/Media/Connections/DropboxOAuthClient.php` — authorize URL + authorization-code exchange.
+- `app/Services/Media/Connections/DropboxAuthorizationTokens.php` — DTO del intercambio inicial.
+- `app/Services/Media/Connectors/MediaConnectorException.php` — error seguro de OAuth exchange.
+- `app/Http/Controllers/Vault/VaultController.php` — readiness de conexiones cloud.
+- `resources/views/vault/index.blade.php` — accion Connect Dropbox fail-closed.
+- `routes/web.php` — rutas authorize/callback con throttling.
+- `config/grindflow.php` y `.env.example` — TTL acotado del state OAuth.
+- `tests/Feature/DropboxOAuthConnectionTest.php` — state, callback, cifrado, replay, denial y permisos.
 - `docs/MEDIA-CONNECTORS.md`, `docs/REQUIREMENTS.md` y `AGENTS.md` — contrato durable.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado actual del refresh slice: **VALIDATED IN CODE**.
-- `fast`, `tests`, `php-quality`, `browser` y `GrindFlow CI / validate` pasaron sobre el head del slice.
-- SonarQube reporto Quality Gate **OK**, 0 issues y 0 Security Hotspots durante la validacion del PR.
-- CodeRabbit no dejo review threads abiertos.
-- La capa base de conexiones/scheduler: **VALIDATED IN CODE**.
+- Estado actual del OAuth connect slice: **VALIDATED IN CODE**.
+- El head funcional `c866e3278e3e818711c648f4f68bf3c01094e430` paso `fast`,
+  `tests`, `php-quality`, `browser` y `GrindFlow CI / validate`.
+- SonarQube Cloud reporto Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- CodeRabbit no dejo review threads abiertos sobre el slice revisado.
+- Refresh automatico + conexiones cifradas + scheduler: **VALIDATED IN CODE**.
 - No hay migracion nueva en este slice.
 - No se llama a Dropbox real ni se escriben credenciales reales.
 - Produccion no se modifica desde CI.
@@ -58,11 +64,11 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Fusionar el refresh automatico despues del ultimo gate del PR.
 - Mantener pendiente la migracion operacional de `media_connections` hasta
   aprobacion explicita.
-- Despues portar el callback OAuth inicial con state/CSRF y conexion tenant-safe,
-  reutilizando esta capa de refresh.
+- Configurar la app real de Dropbox solo mediante accion operacional protegida:
+  app key/secret y redirect exacto `/connections/dropbox/callback`.
+- Despues continuar Google Drive sobre el mismo contrato de conexiones cifradas.
 
 ## Panorama general pendiente
 
@@ -73,8 +79,8 @@ siguiente deploy.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
 - **P1 — Media Vault / ingesta:** Dropbox adapter + conexiones cifradas +
-  scheduler + token refresh VALIDATED IN CODE; pendiente callback OAuth,
-  migracion de produccion y Google Drive.
+  scheduler + token refresh + OAuth connect VALIDATED IN CODE; pendiente
+  migracion/configuracion de produccion y Google Drive.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** scan scheduling VALIDATED IN CODE; pipeline
   de procesamiento general sigue pendiente.

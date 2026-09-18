@@ -116,5 +116,20 @@ Refresh failures follow the same safe policy as scans:
 - missing app configuration -> `connector_oauth_not_configured`
 - malformed/network/provider failure -> safe request-failed code
 
-OAuth authorization callbacks and initial code exchange remain a separate slice.
-CI uses provider fakes and makes no real Dropbox API call.
+The initial Dropbox OAuth authorization-code flow is now implemented as a
+session-bound browser flow:
+
+- authorization starts inside an authorized organization context
+- a cryptographically random state nonce is stored server-side as a SHA-256 hash
+  together with organization, actor and issuance time
+- callback state is validated before provider I/O and consumed once
+- the callback restores the organization context before persisting credentials
+- the authorization request asks Dropbox for offline access
+- the code exchange requires both short-lived access and refresh tokens
+- access/refresh tokens are immediately encrypted through MediaConnectionManager
+- provider denial, malformed responses and network failures surface only safe
+  application messages; raw provider bodies are never persisted
+
+The callback route is stable at /connections/dropbox/callback and must be
+registered against the production APP_URL in the Dropbox app console. CI uses
+provider fakes and makes no real Dropbox API call.

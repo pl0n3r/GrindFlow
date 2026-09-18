@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DiagnosticsController;
 use App\Http\Controllers\Admin\RunMigrationsController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Connections\DropboxConnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
@@ -34,7 +35,14 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::post('/vault/direct-upload/complete', [DirectUploadController::class, 'complete'])
                 ->middleware('throttle:30,1')
                 ->name('organizations.vault.direct.complete');
+            Route::get('/connections/dropbox/authorize', [DropboxConnectionController::class, 'authorize'])
+                ->middleware('throttle:10,1')
+                ->name('organizations.connections.dropbox.authorize');
         });
+
+    Route::get('/connections/dropbox/callback', [DropboxConnectionController::class, 'callback'])
+        ->middleware('throttle:20,1')
+        ->name('connections.dropbox.callback');
 
     Route::get('/admin/system', SystemController::class)
         ->name('admin.system');

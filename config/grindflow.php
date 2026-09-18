@@ -13,6 +13,10 @@ return [
                 'DROPBOX_REFRESH_MARGIN_SECONDS',
                 300,
             ),
+            'oauth_state_ttl_seconds' => (int) env(
+                'DROPBOX_OAUTH_STATE_TTL_SECONDS',
+                600,
+            ),
         ],
     ],
 
