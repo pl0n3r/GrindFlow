@@ -90,7 +90,7 @@ class SecretCipher
 
     private function masterKey(): string
     {
-        $raw = (string) env('ENCRYPTION_MASTER_KEY', '');
+        $raw = (string) config('grindflow.security.encryption_master_key', '');
 
         if (
             strlen($raw) !== self::KEY_BYTES * 2
