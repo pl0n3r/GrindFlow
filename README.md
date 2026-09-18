@@ -46,8 +46,12 @@ siguiente deploy.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED**, pendiente de `GrindFlow CI / validate`.
-- Este cambio incluye migracion MariaDB, por lo que el database gate debe correr.
+- Estado actual: **VALIDATED IN CODE**.
+- PR #42 fue fusionado a `main` como `a2262a00307db6fddadd453a5887307a0afa3e8e`.
+- GrindFlow CI run #155 termino verde en `fast`, `php-quality`, `tests`, `database` y `validate`; `browser` y `legacy` quedaron correctamente `skipped`.
+- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- CodeRabbit no dejo reviews ni threads accionables observados; permanece asesor.
+- La migracion MariaDB paso el database gate real, pero **todavia no se ha aplicado en produccion**.
 - No hay llamadas a APIs externas ni escrituras de produccion.
 - No se modifica el object storage ni el issue #40.
 - No se declara VALIDATED IN PRODUCTION hasta aplicar explicitamente la migracion
@@ -55,8 +59,6 @@ siguiente deploy.
 
 ## Qué sigue
 
-- Pasar php-quality, PHPUnit, MariaDB y `validate`.
-- Fusionar si los gates quedan verdes.
 - Dejar que Production Smoke detecte la migracion pendiente sin ejecutarla.
 - Aplicar la migracion solo mediante la accion operacional explicita ya aprobada
   para migraciones, no desde CI.
@@ -71,7 +73,7 @@ siguiente deploy.
   produccion reporta setup pendiente en #40.
 - **P1 — Media Vault / direct upload:** VALIDATED IN CODE; pendiente prueba real
   contra object storage.
-- **P1 — Media Vault / ingesta:** persistent jobs IMPLEMENTED; pendiente CI,
+- **P1 — Media Vault / ingesta:** persistent jobs VALIDATED IN CODE; pendiente
   migracion explicita y adaptadores de conectores.
 - **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; mantener smoke continuo.
 - **P1 — Procesamiento / scheduling:** pendiente.
