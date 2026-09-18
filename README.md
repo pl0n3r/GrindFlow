@@ -40,9 +40,13 @@ siguiente deploy.
 - `fast`, `php-quality`, `tests`, `database`, `browser`, `legacy` y
   `validate`: verdes.
 - SonarQube Cloud: Quality Gate verde, 0 issues, 0 Security Hotspots.
-- No se ejecuto ninguna migracion destructiva ni accion contra produccion.
-- El dominio publico no pudo verificarse desde el verificador disponible, por lo
-  que no se marca DEPLOYED ni VALIDATED IN PRODUCTION.
+- Hostinger esta sincronizado exactamente con `2de0d26334bc6c7346627adf1705de9a144df330`.
+- Laravel conecto correctamente con MariaDB en produccion (`DB OK`).
+- Las migraciones de identidad/integridad MariaDB se ejecutaron correctamente.
+- El health check `/up` respondio con **Application up**.
+- Estado de produccion: **DEPLOYED**.
+- Aun no se marca **VALIDATED IN PRODUCTION** hasta comprobar login, sesion,
+  dashboard y organizacion reales.
 
 ## Qué sigue
 
@@ -56,10 +60,11 @@ siguiente deploy.
 
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`;
   la conexion actual permite leer la configuracion pero no modificarla.
-- **P0 — Produccion / DB:** configurar/validar MariaDB real en Hostinger.
-- **P0 — Deploy:** confirmar que Hostinger recibio el `main` Laravel y validar
-  landing/login/dashboard en produccion.
-- **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta validacion en produccion.
+- **P0 — Produccion / DB:** MariaDB conectada y migrada; falta validar identidad
+  y tenancy con datos reales.
+- **P0 — Deploy:** DEPLOYED en Hostinger; falta validar landing/login/dashboard.
+- **P0 — Identidad / tenancy:** VALIDATED IN CODE; falta login/dashboard real
+  antes de VALIDATED IN PRODUCTION.
 - **P1 — UI:** shell visual y copy MariaDB VALIDATED IN CODE.
 - **P1 — Browser invitado:** VALIDATED IN CODE.
 - **P1 — Browser autenticado:** VALIDATED IN CODE y fusionado.
