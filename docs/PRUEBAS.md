@@ -61,22 +61,6 @@ Este smoke usa SQLite desechable porque valida HTTP/renderizado, no el contrato
 SQL. El gate `database` con MariaDB sigue siendo autoritativo para migraciones
 e invariantes del motor.
 
-## Usuario E2E manual para pruebas de administración
-
-Para pruebas manuales del panel existe el comando `grindflow:e2e-admin`.
-Crea o actualiza un usuario temporal con `platform_role=admin`, una organización
-E2E y membership `admin`. La contraseña se genera aleatoriamente y se muestra
-una sola vez en la terminal; volver a ejecutar el comando la rota.
-
-En producción el comando falla cerrado salvo que la intención sea explícita:
-
-```bash
-php artisan grindflow:e2e-admin --allow-production
-```
-
-La cuenta no se crea desde CI ni desde migraciones y no existe ninguna contraseña
-E2E fija en el repositorio.
-
 ## Legado TypeScript/Supabase
 
 El stack legado conserva sus pruebas PostgreSQL/RLS mientras siga existiendo.
