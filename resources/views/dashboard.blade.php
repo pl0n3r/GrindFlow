@@ -44,7 +44,7 @@
                     <span class="gf-navitem__text">Analytics</span>
                 </span>
 
-                @if ($isPlatformAdmin)
+                @if (auth()->user()?->isPlatformAdmin())
                     <span class="gf-sidebar__label">Admin</span>
 
                     <a class="gf-navitem" href="{{ route('admin.system') }}">
