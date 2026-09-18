@@ -22,7 +22,8 @@ class ReleaseCacheGuard
     public function __construct(
         private readonly ?string $basePathOverride = null,
         private readonly ?string $storagePathOverride = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Clear stale Laravel caches once when deployment-sensitive source changes.
@@ -68,7 +69,9 @@ class ReleaseCacheGuard
             }
 
             if (! rename($temporaryMarker, $markerPath)) {
-                @unlink($temporaryMarker);
+                if (is_file($temporaryMarker)) {
+                    unlink($temporaryMarker);
+                }
 
                 throw new RuntimeException('Unable to publish deployment cache marker.');
             }
@@ -123,7 +126,7 @@ class ReleaseCacheGuard
     private function clearBootstrapCaches(): void
     {
         foreach (glob($this->basePath('bootstrap/cache/*.php')) ?: [] as $path) {
-            if (is_file($path) && ! @unlink($path)) {
+            if (is_file($path) && ! unlink($path)) {
                 throw new RuntimeException('Unable to clear a Laravel bootstrap cache file.');
             }
         }
@@ -132,7 +135,7 @@ class ReleaseCacheGuard
     private function clearCompiledViews(): void
     {
         foreach (glob($this->storagePath('framework/views/*.php')) ?: [] as $path) {
-            if (is_file($path) && ! @unlink($path)) {
+            if (is_file($path) && ! unlink($path)) {
                 throw new RuntimeException('Unable to clear a compiled Laravel view.');
             }
         }
