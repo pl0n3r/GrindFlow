@@ -41,23 +41,35 @@ class ReleaseCacheGuardTest extends TestCase
         file_put_contents($this->root.'/bootstrap/cache/config.php', '<?php // stale config cache');
         file_put_contents($this->root.'/storage/framework/views/compiled.php', '<?php // stale view');
 
-        $guard = new ReleaseCacheGuard(
-            $this->root,
-            $this->root.'/storage',
-        );
+        $guard = new ReleaseCacheGuard();
 
-        $this->assertTrue($guard->refreshIfNeeded());
+        $this->assertTrue(
+            $guard->refreshIfNeeded(
+                $this->root,
+                $this->root.'/storage',
+            ),
+        );
         $this->assertFileDoesNotExist($this->root.'/bootstrap/cache/routes-v7.php');
         $this->assertFileDoesNotExist($this->root.'/bootstrap/cache/config.php');
         $this->assertFileDoesNotExist($this->root.'/storage/framework/views/compiled.php');
         $this->assertFileExists($this->root.'/storage/framework/grindflow-release.sha256');
 
-        $this->assertFalse($guard->refreshIfNeeded());
+        $this->assertFalse(
+            $guard->refreshIfNeeded(
+                $this->root,
+                $this->root.'/storage',
+            ),
+        );
 
         file_put_contents($this->root.'/bootstrap/cache/routes-v7.php', '<?php // stale again');
         file_put_contents($this->root.'/routes/web.php', '<?php // v2');
 
-        $this->assertTrue($guard->refreshIfNeeded());
+        $this->assertTrue(
+            $guard->refreshIfNeeded(
+                $this->root,
+                $this->root.'/storage',
+            ),
+        );
         $this->assertFileDoesNotExist($this->root.'/bootstrap/cache/routes-v7.php');
     }
 
