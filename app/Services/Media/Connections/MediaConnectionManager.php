@@ -83,6 +83,9 @@ class MediaConnectionManager
         return $connection->refresh();
     }
 
+    /**
+     * @param  list<string>|null  $scopes
+     */
     public function replaceDropboxTokens(
         MediaConnection $connection,
         User $actor,
