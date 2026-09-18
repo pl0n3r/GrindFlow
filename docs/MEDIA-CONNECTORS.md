@@ -159,3 +159,31 @@ Current behavior:
 
 OAuth connection, refresh and scheduled change tracking for Google Drive remain
 separate follow-up slices. The adapter itself does not persist credentials.
+
+
+## Google Drive OAuth and refresh
+
+Google Drive now reuses the same encrypted media-connection contract as Dropbox.
+
+The browser flow uses Google's web-server authorization endpoints with:
+
+- a session-bound single-use state nonce tied to actor + organization
+- `access_type=offline` so a refresh token can be issued
+- `prompt=consent` so an explicit reconnect can obtain offline credentials
+- the exact Laravel callback route `/connections/google-drive/callback`
+- the `https://www.googleapis.com/auth/drive.readonly` scope because this
+  product needs server-side listing and download of existing Drive media
+
+The Drive read-only scope is broad/restricted in Google's scope taxonomy.
+Production enablement therefore remains an operational/compliance task outside CI.
+
+Authorization-code exchange and refresh use
+`https://oauth2.googleapis.com/token`. Access and refresh tokens are persisted
+only through `MediaConnectionManager` and remain bound to the
+organization/provider AAD.
+
+Google Drive connections are created in `paused` state with no
+`next_scan_at`. This is deliberate: scheduled Drive scans must not start until
+the Changes API slice establishes a durable incremental cursor. Token refresh is
+already provider-aware and preserves the encrypted refresh token when Google's
+refresh response omits one.
