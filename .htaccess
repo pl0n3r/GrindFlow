@@ -1,0 +1,9 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Hostinger Web/Cloud serves the repository from public_html.
+    # Laravel's public entrypoint lives in /public, so keep the public URL clean
+    # and internally route every request there.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
