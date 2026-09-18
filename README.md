@@ -11,79 +11,67 @@ siguiente deploy.
 
 ## Qué se hizo
 
-- El hotfix de cache Laravel para Hostinger fue fusionado a `main` como
-  `18affd37191ed0a7f7ee8599fb4049ffc5841542`.
-- Se agrego un puente on-demand para que los agentes puedan leer diagnosticos de
-  produccion desde GitHub sin SSH ni descarga manual desde hPanel.
-- El comando operativo sera `/production-diagnostics` dentro del issue durable
+- PR #30 fue fusionado a `main` como
+  `8024c1ad8c02398ead148e33b928631a24d70541`.
+- `GrindFlow CI` quedo optimizado con seleccion de gates por paths,
+  cache Composer por `composer.lock`, cache npm, checkout corto y timeouts.
+- Cambiar el propio `grindflow-ci.yml` o usar `workflow_dispatch` fuerza todos
+  los gates para evitar que el selector se valide a si mismo con falsos skips.
+- El run #126 del PR #30 ejecuto el set completo y termino verde:
+  `fast`, `php-quality`, `tests`, `database`, `browser`, `legacy` y
+  `validate`.
+- El bridge on-demand de diagnosticos ya existe en el issue #31
   `[AUTO] Production Diagnostics Bridge`.
-- El workflow autentica la cuenta E2E, consulta `/admin/diagnostics.json`,
-  reduce el payload a datos de debug y elimina user ID, organization ID, emails,
-  IPs, UUIDs secundarios y tokens largos.
-- El resultado se guarda como artifact corto
-  `production-diagnostics-<run_id>` durante 3 dias. El issue solo recibe el run
-  ID y nombre del artifact.
-- Production Smoke tambien deja de copiar el diagnostico al cuerpo del issue
-  publico. En fallo sube `production-smoke-diagnostics-<run_id>` por 3 dias.
-- CI valida la sintaxis del nuevo fetcher antes de permitir merge.
-- `GrindFlow CI` ahora selecciona `php-quality`, PHPUnit, MariaDB, browser y
-  legado segun paths; cambios de docs/automatizacion ya cubiertos por `fast`
-  dejan de arrancar runners pesados innecesarios.
-- Un cambio al propio `grindflow-ci.yml` o un `workflow_dispatch` fuerza todos
-  los gates para impedir falsos verdes del selector.
-- Los cuatro jobs PHP reutilizan cache de descargas Composer por `composer.lock`;
-  el legado conserva cache npm y usa `npm ci --prefer-offline --no-audit --no-fund`.
-- Todos los jobs pesados tienen timeouts explicitos.
-- El archivo privado `storage/logs/diagnostics-*.jsonl` sigue sin exponerse de
-  forma directa.
+- La primera ejecucion real de `/production-diagnostics` llego a estado
+  **ready**, confirmando autenticacion E2E y acceso al endpoint diagnostico.
+- Esa primera ejecucion revelo un defecto pequeno del handoff: Markdown con
+  backticks dentro del heredoc de Bash produjo sustitucion de comando y dejo
+  vacios el Run ID y el nombre del artifact en el comentario.
+- Este cambio corrige el handoff usando `printf` con backticks literales, sin
+  tocar el payload ni exponer el log privado.
+- El payload diagnostico sigue viviendo solo en artifacts de 3 dias; los issues
+  publicos reciben exclusivamente metadata del run.
 
 ## Archivos modificados en este deploy
 
-- `scripts/fetch-production-diagnostics.sh` — login E2E, lectura y sanitizacion.
-- `.github/workflows/production-diagnostics.yml` — bridge activado por comentario autorizado.
-- `.github/workflows/production-smoke.yml` — diagnosticos de fallo como artifact corto.
-- `.github/workflows/grindflow-ci.yml` — selector de gates, caches, timeouts y validacion del nuevo script.
-- `docs/DIAGNOSTICS.md` — contrato y flujo completo del bridge.
-- `AGENTS.md` — regla durable para "revisa el log de produccion".
+- `.github/workflows/production-diagnostics.yml` — corrige Run ID/artifact en el comentario del bridge.
 - `README.md` — snapshot operativo actualizado.
 
 ## Validación
 
-- Estado del bridge y optimizacion CI: **VALIDATED IN CODE**.
-- El run #125 de `GrindFlow CI` forzo todos los gates por tratarse de un cambio al
-  propio workflow y termino verde: `fast`, `php-quality`, `tests`, `database`,
-  `browser`, `legacy` y `validate`.
-- SonarQube Cloud: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
-- El hotfix anterior si esta **VALIDATED IN CODE** y fusionado a `main`; produccion
-  todavia necesita confirmar que el deploy de Hostinger recibio ese commit.
-- El bridge no ejecuta comandos SSH, migraciones ni operaciones destructivas.
-- El payload diagnostico no se publica en issues; solo artifacts de retencion corta.
+- CI optimizado y bridge base: **VALIDATED IN CODE**.
+- PR #30: run #126 completo en verde.
+- SonarQube Cloud del PR #30: Quality Gate **OK**, 0 issues y 0 Security Hotspots.
+- La primera captura del bridge llego a **ready**, pero el handoff de metadata
+  quedo incompleto; este hotfix todavia debe pasar CI antes de merge.
+- Este PR es tambien una prueba real del selector optimizado: al tocar solo el
+  workflow diagnostico y README, los gates pesados deben quedar `skipped` y
+  solo `fast` + `validate` deben ser necesarios.
 
 ## Qué sigue
 
-- Fusionar PR #30 y dejar que el exact-main CI vuelva a comprobar el selector.
-- Crear el issue durable `[AUTO] Production Diagnostics Bridge`.
-- Lanzar la primera peticion real con `/production-diagnostics`.
-- Recuperar el artifact desde GitHub y comprobar que puedo leer el error de
-  produccion directamente desde el chat.
-- Con esa evidencia, cerrar el HTTP 500 actual y luego retomar Vault/schema.
+- Pasar el CI selectivo de este hotfix y confirmar los skips esperados.
+- Fusionar el hotfix.
+- Volver a comentar `/production-diagnostics` en el issue #31.
+- Recuperar el artifact por GitHub y leer los incidentes desde el chat, sin SSH.
+- Reejecutar Production Smoke despues del deploy de Hostinger y cerrar el HTTP 500.
 
 ## Panorama general pendiente
 
 - **P0 — Produccion / Dashboard:** HTTP 500 con causa de route cache identificada;
-  hotfix fusionado, pendiente confirmacion real en Hostinger.
-- **P0 — Produccion / Diagnostics bridge:** VALIDATED IN CODE; pendiente merge y
-  primera captura end-to-end.
-- **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE; pendiente confirmar el
-  comportamiento selectivo en las siguientes PRs reales de docs/Laravel/legacy.
+  hotfix de cache fusionado, pendiente confirmacion real en Hostinger.
+- **P0 — Produccion / Diagnostics bridge:** captura real llega a ready; pendiente
+  corregir/validar metadata y leer el primer artifact desde el conector.
+- **P0 — CI:** selector/caches/timeouts VALIDATED IN CODE; este hotfix debe
+  demostrar por primera vez el ahorro real mediante skips selectivos.
 - **P0 — Produccion / schema:** aplicar la migracion del Vault solo cuando
   Dashboard/System vuelvan a estar operativos.
 - **P0 — Produccion / smoke:** cerrar automaticamente el issue #27 con un run verde.
 - **P0 — Branch protection:** GitHub debe exigir `GrindFlow CI / validate`.
 - **P1 — Media Vault / ingesta:** foundation VALIDATED IN CODE; pendiente produccion
   y siguientes fases de upload/conectores/jobs.
-- **P1 — Diagnosticos:** log de aplicacion y panel VALIDATED IN CODE; bridge on-demand
-  pendiente validacion.
+- **P1 — Diagnosticos:** log, panel y bridge VALIDATED IN CODE; pendiente lectura
+  completa end-to-end del artifact.
 - **P1 — Procesamiento / scheduling:** pendiente.
 - **P1 — Operacion:** observabilidad de queues/scheduler, retries y backups.
 - **P1 — Higiene del repositorio:** retirar legado solo al cerrar GF-MIG-003 por modulo.
