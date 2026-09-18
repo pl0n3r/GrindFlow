@@ -29,6 +29,8 @@ and role.
 reads and writes.
 
 ### GF-FR-002 — Media ingestion
+**Status:** implemented
+
 **Statement:** Authorized users can ingest supported media into the organization
 vault with traceable source metadata.
 
@@ -36,6 +38,13 @@ vault with traceable source metadata.
 - Ingestion is resumable/retry-safe.
 - Ambiguous ownership is not guessed.
 - Duplicate bytes do not create uncontrolled duplicate storage.
+
+**Verification:**
+- Manual/direct uploads retain tenant isolation and SHA-256 deduplication.
+- Persistent `media_ingestions` use tenant-scoped idempotency keys.
+- Queue jobs revalidate organization membership and management authorization.
+- Feature tests cover duplicate source enqueue, staged-object ingestion, safe
+  failure state and two different source refs converging to one blob.
 
 ### GF-FR-003 — Media processing
 **Statement:** Media can be processed through deterministic background jobs.
