@@ -464,7 +464,11 @@ Reglas:
   del contrato operativo y no se elimina sin reemplazo equivalente validado.
 - Las migraciones de produccion nunca las ejecuta CI ni el smoke. El camino
   preferido para el operador es `Admin > System > Run pending migrations`;
-  requiere admin, CSRF y ejecucion explicita. SSH es solo fallback de recuperacion.
+  exige platform admin, CSRF, inventario visible, reconocimiento humano de un
+  backup externo restaurable, confirmacion MIGRAR y fingerprint del lote pendiente
+  (nombres + SHA-256 de archivos) revalidado dentro del lock justo antes de
+  ejecutar. La confirmacion NO verifica tecnicamente el backup ni sustituye su
+  comprobacion externa. SSH es solo fallback de recuperacion.
 - Nunca se expone `laravel.log` crudo mediante una ruta publica o autenticada.
 
 ### Cambio de arquitectura aprobado — 17 de septiembre de 2026
