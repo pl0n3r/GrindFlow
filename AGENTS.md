@@ -232,8 +232,9 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   elimina, su FK puede quedar null sin reescribir el asiento historico.
 - Una reversa copia monto, moneda, fuente y beneficiario del original, exige
   razon y solo puede existir una vez por asiento. Una reversa no se revierte.
-- Totales netos se derivan como asignaciones originales menos reversas; no se
-  persiste un balance mutable separado en este slice.
+- Totales netos se derivan como asignaciones originales menos reversas **por
+  moneda**; nunca se suman minor units de currencies distintas y no se persiste
+  un balance mutable separado en este slice.
 - La migration de Finance es explicita. Antes de aplicarla, el GET explica
   `Migration required` y los writes responden 503 antes del FormRequest.
 - Finance core v1 no implementa cobros, payouts bancarios, impuestos, invoices
