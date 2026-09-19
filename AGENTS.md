@@ -215,6 +215,41 @@ el cambio aquí en el mismo PR que modifica el producto.
   preservar old() y link activo de una fila; disabled/foreign no se
   convierten en opciones, filtros coexistentes, migracion de links faltante.
 
+### E2E en navegador autenticado (CI aislado)
+
+- `scripts/browser-smoke.sh` termina ejecutando
+  `scripts/browser-workflow.sh` SOLO en DB SQLite descartable del
+  browser job (`APP_ENV=testing`), usando `E2eSeeder` con 106 assets y
+  links sinteticos, 27 schedules, 7 clicks diarios y 2500 COP de Finance.
+  Seeder prohibe entornos no local/testing y debe ser idempotente.
+- El recorrido browser descubrio 404 falso en reverse Finance: la ruta padre
+  tambien posee {organizationId}, y un argumento scalar $allocationId
+  en Controller puede recibir ese ID por posicion. En acciones bajo
+  /organizations/{organizationId} usar $request->route('allocationId')
+  para identificar la fila financiera, nunca confiar en el primer scalar.
+  Probar POST HTTP POSITIVO de reversa, no solo 404 cross-tenant/manager.
+- Chrome ejecuta JavaScript real y envia formularios DOM con CSRF/session
+  para Scheduler create, paginar, asociar/desvincular link, Traffic
+  editar/disable/enable y Finance alloc/reversal/CSV.
+  No sustituye clicks fisicos ni prueba producción, pero verifica
+  flujo HTTP real en sesion Chromium y respuesta HTML.
+- Nunca ejecutar este workflow contra Hostinger: crea filas del tenant
+  descartable. Production Smoke conserva GETs solo lectura y no visita
+  /l/*, que genera clicks.
+- La plantilla publica temporal contiene password del usuario E2E solo
+  durante el comando; borrar en trap y remover script del DOM ANTES de
+  capturar artifact. En workflow Github Actions, ejecutar ::add-mask::
+  ANTES de exportar E2E_USER_PASSWORD a GITHUB_ENV; si no, el runner
+  puede mostrar la clave temporal en el entorno de los logs del step.
+  Rechazar/descartar DOM si aparece password, nunca
+  imprimir HTML ni payloads de respuestas en logs ante fallo. No tomar
+  captura adicional que reejecute workflow y duplique writes.
+- Los fixtures de media son METADATA sintética procesada, no prueba
+  de subir bytes ni de proveedor/FFmpeg remoto. Browser job necesita
+  layout, auth y rutas reales, pero no cuentas ni tokens externos.
+- Cada nuevo modulo UI deberia ampliar recorrido positivo/negativo en
+  navegador cuando aporte mas que otro assert HTML PHPUnit.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership

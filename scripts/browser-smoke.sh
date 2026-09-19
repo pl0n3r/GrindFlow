@@ -228,4 +228,8 @@ capture_page \
 
 capture_authenticated_dashboard
 
+# The additional workflow runs only on disposable local/testing CI data.
+# It submits real authenticated forms; never invoke it from Production Smoke.
+GRINDFLOW_BROWSER_CHROME="$CHROME" bash scripts/browser-workflow.sh
+
 echo "Real browser smoke tests passed."

@@ -285,3 +285,28 @@ The execution roadmap and durable progress history live in
   service-level scheduling eligibility/role/status checks.
 - Linking schema absent keeps existing GET fallback and hides link search;
   no new migration or external provider calls are required.
+
+## 20. Disposable authenticated browser workflow coverage
+
+- The CI browser gate seeds an isolated local/testing tenant with >100
+  processed-metadata media options and active tracked links, 27 scheduled
+  rows, safe click aggregate and immutable Finance opening event. Fixture
+  seeding is idempotent and forbidden outside local/testing.
+- Positive HTTP reversal must resolve the explicit allocationId route key;
+  the parent route also carries organizationId and Laravel may otherwise
+  pass that first UUID into an action's positional scalar argument, causing
+  a false 404 even if service-layer reversal works. Regression is covered
+  by the real browser and a feature HTTP POST test.
+- Chromium logs in and uses rendered HTML forms plus session and CSRF to
+  search for deep resources, schedule, navigate calendar page two, detach
+  and reattach its tracked link; edit/pause/resume an existing Traffic link,
+  retrieve aggregate CSV; create/reverse a Finance allocation and check
+  reconciled CSV. No real external provider or link-click route is called.
+- The test checks server responses and final markup, not real pointer
+  events. Test media blobs only model already-processed metadata; no
+  object-store upload or real FFmpeg pipeline is claimed by this gate.
+- The ephemeral bootstrap is removed after use; its embedded E2E
+  credential-bearing JS is removed from the DOM before saving a failure
+  artifact. A leak detector discards any DOM containing the password.
+- Production Smoke remains a separate authenticated READ-ONLY workflow
+  and must never reuse this write-capable CI test.

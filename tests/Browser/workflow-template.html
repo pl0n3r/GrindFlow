@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>GrindFlow browser workflow</title></head>
+<body>
+<h1>Disposable authenticated browser workflow</h1>
+<p id="status">RUNNING</p>
+<ol id="results"></ol>
+<script>
+{
+  // The generated public HTML exists only inside disposable CI. Remove
+  // this script from DOM immediately so Chrome diagnostics cannot include
+  // the temporary login password, even if an assertion fails.
+  const email = __E2E_EMAIL_JSON__;
+  const password = __E2E_PASSWORD_JSON__;
+  const organizationName = __E2E_ORG_NAME_JSON__;
+  document.currentScript.remove();
+
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+  const parse = (html) => new DOMParser().parseFromString(html, 'text/html');
+
+  function assert(condition, description) {
+    if (!condition) {
+      throw new Error(description);
+    }
+  }
+
+  function pass(description) {
+    const item = document.createElement('li');
+    item.textContent = 'PASS: ' + description;
+    results.appendChild(item);
+  }
+
+  async function get(path) {
+    const response = await fetch(path, {
+      credentials: 'include',
+      redirect: 'follow',
+      headers: {'Accept': 'text/html'},
+    });
+
+    assert(response.ok, 'GET failed: ' + path + ' status=' + response.status);
+    const doc = parse(await response.text());
+    assert(!doc.querySelector('form[action="/login"]'), 'Session lost at ' + path);
+
+    return {doc, response, path};
+  }
+
+  async function submit(form, edits = {}, referrerPath = '/dashboard') {
+    assert(form, 'The expected editable HTML form was not rendered');
+    const action = new URL(form.action, location.origin);
+    assert(action.origin === location.origin, 'Cross-origin form is forbidden');
+
+    const data = new URLSearchParams(new FormData(form));
+    for (const [name, value] of Object.entries(edits)) {
+      if (value === null) {
+        data.delete(name);
+      } else {
+        data.set(name, value);
+      }
+    }
+
+    const response = await fetch(action.href, {
+      method: 'POST',
+      credentials: 'include',
+      redirect: 'follow',
+      referrer: new URL(referrerPath, location.origin).href,
+      headers: {
+        'Accept': 'text/html',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: data,
+    });
+
+    assert(response.ok, 'HTML form submit failed: ' + action.pathname + ' status=' + response.status);
+    const doc = parse(await response.text());
+    assert(!doc.querySelector('form[action="/login"]'), 'Session lost after ' + action.pathname);
+
+    return {doc, response};
+  }
+
+  const text = (doc) => doc.body.textContent;
+  const schedulerEdit = (doc, publicationId) =>
+    [...doc.querySelectorAll('form[action$="/scheduler/tracked-link"]')]
+      .find(form => form.querySelector('[name="publication_id"]')?.value === publicationId);
+
+  (async () => {
+    // This is NOT a production test: a guard on the PHP E2E seeder
+    // guarantees that fixture writes only run in local/testing.
+    const loginResponse = await fetch('/login', {credentials: 'include'});
+    assert(loginResponse.ok, 'Login page must load');
+    const loginDoc = parse(await loginResponse.text());
+    const token = loginDoc.querySelector('input[name="_token"]')?.value;
+    assert(token, 'Login form must contain a CSRF token');
+
+    const loginBody = new URLSearchParams({_token: token, email, password});
+    const loggedIn = await fetch('/login', {
+      method: 'POST',
+      credentials: 'include',
+      redirect: 'follow',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: loginBody,
+    });
+    assert(loggedIn.ok && new URL(loggedIn.url).pathname === '/dashboard', 'Login must reach dashboard');
+    const dashboard = parse(await loggedIn.text());
+    assert(text(dashboard).includes(organizationName), 'E2E organization visible on dashboard');
+    const card = [...dashboard.querySelectorAll('.gf-org[data-organization-id]')]
+      .find(node => node.textContent.includes(organizationName));
+    const id = card?.getAttribute('data-organization-id');
+    assert(/^[0-9a-f-]{36}$/.test(id || ''), 'Organization UUID discoverable from visible card');
+    pass('real browser login + tenant workspace');
+
+    const base = '/organizations/' + id;
+    const schedulerPath = base + '/scheduler';
+    const trafficPath = base + '/traffic';
+    const financePath = base + '/finance';
+
+    const baseline = await get(schedulerPath);
+    assert(text(baseline.doc).includes('106 eligible total'), 'Scheduler must count all eligible media');
+    assert(text(baseline.doc).includes('27 matching'), 'Scheduler must show all 27 preseeded schedules');
+    assert(![...baseline.doc.querySelectorAll('#asset_id option')]
+      .some(option => option.textContent.includes('ZZ-e2e-needle-media.jpg')),
+      'Deep media should not already be in the first 100-option window');
+    assert(text(baseline.doc).includes('Only 100 matching media options'), 'Bounded selector needs explicit warning');
+    pass('Scheduler 106 ready assets, bounded picker and 27 calendar rows');
+
+    const searchPath = schedulerPath
+      + '?media_q=e2e-needle-media&link_q=e2e-needle-campaign&status=scheduled';
+    const search = await get(searchPath);
+    const media = [...search.doc.querySelectorAll('#asset_id option')]
+      .find(option => option.textContent.includes('ZZ-e2e-needle-media.jpg'));
+    const link = [...search.doc.querySelectorAll('#tracked_link_id option')]
+      .find(option => option.textContent.includes('ZZ E2E needle link'));
+    const destination = search.doc.querySelector('#destination_ids option');
+    assert(media?.value && link?.value && destination?.value, 'Deep resource pickers need real UUID values');
+    const newSchedule = search.doc.querySelector('form[action$="/scheduler"][method="POST"]');
+    assert(newSchedule?.querySelector('[name="_token"]')?.value, 'Schedule form must have CSRF token');
+    const future = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 16);
+    const create = await submit(newSchedule, {
+      asset_id: media.value,
+      'destination_ids[]': destination.value,
+      tracked_link_id: link.value,
+      scheduled_for_local: future,
+      timezone: 'UTC',
+    }, searchPath);
+    assert(text(create.doc).includes('1 publicación(es) programada(s).'), 'Creating a searched media/link schedule must succeed');
+    assert(new URL(create.response.url).pathname === schedulerPath, 'Creation must redirect to Scheduler');
+    pass('search deep media/link, send CSRF-protected form, create real sandbox schedule');
+
+    const filtered = await get(searchPath);
+    assert(text(filtered.doc).includes('28 matching'), 'New schedule must increment real filtered total');
+    const next = filtered.doc.querySelector('nav[aria-label="Scheduler pagination"] a[rel="next"]');
+    assert(next, 'Previous/Next controls must be navigable');
+    const nextUrl = new URL(next.href);
+    assert(nextUrl.searchParams.get('page') === '2', 'Next must target page 2');
+    assert(nextUrl.searchParams.get('media_q') === 'e2e-needle-media', 'Picker media term retained');
+    assert(nextUrl.searchParams.get('link_q') === 'e2e-needle-campaign', 'Picker link term retained');
+    assert(nextUrl.searchParams.get('status') === 'scheduled', 'Calendar status retained');
+
+    const secondPath = nextUrl.pathname + nextUrl.search;
+    const second = await get(secondPath);
+    assert(text(second.doc).includes('Showing 26–28 of 28'), 'Second page has the final 3 rows');
+    const assignedForm = [...second.doc.querySelectorAll('form[action$="/scheduler/tracked-link"]')]
+      .find(form => form.querySelector('select[name="tracked_link_id"]')?.value === link.value);
+    const publicationId = assignedForm?.querySelector('[name="publication_id"]')?.value;
+    assert(publicationId, 'New schedule must render its editable tracked-link assignment');
+    pass('navigate real calendar page 2, retain picker + status filters');
+
+    const detached = await submit(assignedForm, {tracked_link_id: ''}, secondPath);
+    assert(text(detached.doc).includes('Tracked link assignment updated.'), 'Detach must show success');
+    const emptyAssignment = schedulerEdit(detached.doc, publicationId);
+    assert(emptyAssignment?.querySelector('select[name="tracked_link_id"]')?.value === '',
+      'Link assignment must be detached in returned HTML');
+    const reattached = await submit(emptyAssignment, {tracked_link_id: link.value}, secondPath);
+    assert(text(reattached.doc).includes('Tracked link assignment updated.'), 'Reattach must succeed');
+    assert(schedulerEdit(reattached.doc, publicationId)
+      ?.querySelector('select[name="tracked_link_id"]')?.value === link.value,
+      'Same public link UUID must reattach without token rotation');
+    pass('detach and reattach tracked link on the created schedule');
+
+    const campaignPath = trafficPath + '?campaign=e2e-needle-campaign';
+    const traffic = await get(campaignPath);
+    assert(text(traffic.doc).includes('ZZ E2E needle link'), 'Link must be visible in Traffic');
+    const edit = traffic.doc.querySelector('form[action*="/traffic/links/"][action$="' + link.value + '"]');
+    assert(edit?.querySelector('[name="destination_url"]'), 'Link metadata editor must be rendered');
+    const shortLink = traffic.doc.querySelector('a[href*="/l/"]')?.getAttribute('href');
+    assert(shortLink, 'Short URL must remain visible');
+
+    const updated = await submit(edit, {
+      label: 'ZZ E2E updated label',
+      destination_url: 'https://example.test/browser-updated',
+      channel: 'e2e-needle',
+      campaign: 'e2e-needle-campaign',
+    }, campaignPath);
+    assert(text(updated.doc).includes('Tracked link updated.'), 'Traffic edit must succeed');
+    assert(text(updated.doc).includes('ZZ E2E updated label'), 'Edited label must render');
+    assert(text(updated.doc).includes('https://example.test/browser-updated'), 'New target must render');
+    assert(updated.doc.querySelector('a[href*="/l/"]')?.getAttribute('href') === shortLink,
+      'Public short URL must be preserved');
+    pass('edit existing Traffic link without changing public token');
+
+    const disableForm = [...updated.doc.querySelectorAll('form[action$="/status"]')]
+      .find(form => form.action.includes(link.value));
+    assert(disableForm?.querySelector('[name="status"]')?.value === 'disabled', 'Disable action exists');
+    const disabled = await submit(disableForm, {}, campaignPath);
+    assert(text(disabled.doc).includes('Tracked link disabled.'), 'Disable must succeed');
+    // updateLinkStatus redirects to unfiltered Traffic. The deep link can
+    // fall outside page 1, so reapply the real campaign filter before
+    // looking for the reverse action.
+    const disabledFiltered = await get(campaignPath);
+    const enableForm = [...disabledFiltered.doc.querySelectorAll('form[action$="/status"]')]
+      .find(form => form.action.includes(link.value));
+    assert(enableForm?.querySelector('[name="status"]')?.value === 'active', 'Enable action exists');
+    const enabled = await submit(enableForm, {}, campaignPath);
+    assert(text(enabled.doc).includes('Tracked link enabled.'), 'Resume must succeed');
+    const enabledFiltered = await get(campaignPath);
+    assert(enabledFiltered.doc.querySelector('a[href*="/l/"]')?.getAttribute('href') === shortLink,
+      'Disable/resume must preserve short URL');
+    pass('pause/resume link without following click-recording /l routes');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const csv = await fetch(trafficPath + '/export?from=' + today + '&to=' + today
+      + '&campaign=e2e-needle-campaign', {credentials: 'include'});
+    assert(csv.ok, 'Traffic aggregate CSV must return 200');
+    assert((csv.headers.get('content-type') || '').includes('text/csv'), 'Traffic CSV content type');
+    const trafficCsv = await csv.text();
+    assert(trafficCsv.includes('date_utc,label,short_link,channel,campaign,status,clicks'),
+      'Traffic CSV daily aggregate header');
+    assert(trafficCsv.includes('ZZ E2E updated label') && trafficCsv.includes(',7'),
+      'Traffic CSV must show edited current metadata and seeded 7 clicks');
+    pass('authenticated Traffic CSV, no visitor-level data');
+
+    const finance = await get(financePath);
+    assert(text(finance.doc).includes('E2E seeded reconciliation'), 'Seeded immutable ledger entry visible');
+    const createFinance = finance.doc.querySelector('form[action$="/finance"][method="POST"]');
+    assert(createFinance?.querySelector('[name="_token"]'), 'Finance create form must have CSRF');
+    const allocation = await submit(createFinance, {
+      source_label: 'E2E browser allocation',
+      amount_minor: '1300',
+      currency: 'COP',
+      occurred_on: today,
+      beneficiary_user_id: '',
+      note: 'Disposable browser flow only',
+    }, financePath);
+    assert(text(allocation.doc).includes('E2E browser allocation'), 'Finance new row visible');
+    assert(text(allocation.doc).includes('3,800'), 'Finance currency total must reconcile 2500+1300');
+    pass('Finance append-only allocation via real authenticated form');
+
+    const reverseForm = [...allocation.doc.querySelectorAll('form[action*="/finance/"][action$="/reverse"]')]
+      .find(form => form.closest('tr')?.textContent.includes('E2E browser allocation'));
+    assert(reverseForm?.querySelector('[name="reason"]'), 'New finance row must have reversal form');
+    const reversed = await submit(reverseForm, {reason: 'E2E browser correction'}, financePath);
+    assert(text(reversed.doc).includes('E2E browser correction'), 'Reversal reason visible in ledger');
+    assert(text(reversed.doc).includes('2,500'), 'Finance net must return to seeded 2500');
+    const financeCsvResponse = await fetch(financePath + '/reconciliation.csv?currency=COP',
+      {credentials: 'include'});
+    assert(financeCsvResponse.ok
+      && (financeCsvResponse.headers.get('content-type') || '').includes('text/csv'),
+      'Finance CSV must return group-level private report');
+    const financeCsv = await financeCsvResponse.text();
+    assert(financeCsv.includes('3800,1300,2500,3'),
+      'Finance CSV must report two allocations + one reversal on same currency');
+    assert(!financeCsv.includes('Disposable browser flow only'), 'Finance CSV must not leak row notes');
+    pass('reversal and filtered grouped Finance CSV reconcile without row-level data');
+
+    status.textContent = 'SUCCESS: authenticated Scheduler → Traffic → Finance browser workflow';
+  })().catch(error => {
+    // Never serialize response bodies, login data or raw session context.
+    status.textContent = 'ERROR: ' + (error instanceof Error ? error.message : 'unknown workflow failure');
+  });
+}
+</script>
+</body>
+</html>

@@ -472,6 +472,67 @@ class FinanceTest extends TestCase
         }
     }
 
+    public function test_authenticated_http_reverse_uses_allocation_route_id_not_parent_organization_id(): void
+    {
+        [$studio, $organization] = $this->identity(UserRole::Studio);
+        [$otherStudio, $otherOrganization] = $this->identity(UserRole::Studio);
+        $index = route('organizations.finance.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+
+        $this->actingAs($studio)->post($index, [
+            'source_label' => 'HTTP reversal coverage',
+            'amount_minor' => 1300,
+            'currency' => 'COP',
+            'occurred_on' => now('UTC')->toDateString(),
+        ])->assertRedirect($index);
+
+        $allocation = app(TenantContext::class)->runWithinOrganization(
+            $studio,
+            (string) $organization->getKey(),
+            fn (): RevenueAllocation => RevenueAllocation::query()
+                ->where('source_label', 'HTTP reversal coverage')
+                ->sole(),
+        );
+
+        $route = route('organizations.finance.reverse', [
+            'organizationId' => $organization->getKey(),
+            'allocationId' => $allocation->getKey(),
+        ]);
+
+        $this->actingAs($studio)->post($route, [
+            'reason' => 'Browser-discovered correction',
+        ])->assertRedirect($index)
+            ->assertSessionHas('status', 'Revenue allocation reversed.');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $studio,
+            (string) $organization->getKey(),
+            function () use ($allocation): void {
+                $this->assertSame(2, RevenueAllocation::query()->count());
+                $original = RevenueAllocation::query()->findOrFail($allocation->getKey());
+                $reversal = $original->reversal;
+                $this->assertNotNull($reversal);
+                $this->assertSame(
+                    $allocation->getKey(),
+                    $reversal->reversal_of_id,
+                );
+                $this->assertSame(1300, $reversal->amount_minor);
+            },
+        );
+
+        $this->actingAs($studio)->post($route, [
+            'reason' => 'Double reverse forbidden',
+        ])->assertSessionHasErrors('allocation');
+
+        $this->actingAs($otherStudio)->post(route('organizations.finance.reverse', [
+            'organizationId' => $otherOrganization->getKey(),
+            'allocationId' => $allocation->getKey(),
+        ]), [
+            'reason' => 'Foreign record forbidden',
+        ])->assertNotFound();
+    }
+
     /**
      * @return array{User, Organization}
      */
