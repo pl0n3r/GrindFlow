@@ -11,6 +11,8 @@ use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -46,12 +48,6 @@ class ContentScheduler
             );
         }
 
-        if ($this->isAssetEligible($asset) === false) {
-            throw ValidationException::withMessages([
-                'asset_id' => 'The selected media is not ready for scheduling.',
-            ]);
-        }
-
         if ($destination->status !== PublishingDestination::STATUS_ACTIVE) {
             throw ValidationException::withMessages([
                 'destination_id' => 'The selected destination is not active.',
@@ -63,14 +59,48 @@ class ContentScheduler
             $timezone,
         );
 
-        return ScheduledPublication::query()->create([
-            'media_asset_id' => $asset->getKey(),
-            'publishing_destination_id' => $destination->getKey(),
-            'scheduled_by_user_id' => $actor->getKey(),
-            'status' => ScheduledPublication::STATUS_SCHEDULED,
-            'scheduled_for_utc' => $scheduledForUtc,
-            'timezone' => $timezone,
-        ]);
+        return DB::transaction(function () use (
+            $asset,
+            $destination,
+            $actor,
+            $scheduledForUtc,
+            $timezone,
+        ): ScheduledPublication {
+            $lockedAsset = MediaAsset::query()
+                ->whereKey($asset->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($this->isAssetEligible($lockedAsset) === false) {
+                throw ValidationException::withMessages([
+                    'asset_id' => 'The selected media is not ready for scheduling.',
+                ]);
+            }
+
+            return ScheduledPublication::query()->create([
+                'media_asset_id' => $lockedAsset->getKey(),
+                'publishing_destination_id' => $destination->getKey(),
+                'scheduled_by_user_id' => $actor->getKey(),
+                'status' => ScheduledPublication::STATUS_SCHEDULED,
+                'scheduled_for_utc' => $scheduledForUtc,
+                'timezone' => $timezone,
+            ]);
+        });
+    }
+
+    /**
+     * @return Builder<MediaAsset>
+     */
+    public function eligibleAssetsQuery(): Builder
+    {
+        return MediaAsset::query()
+            ->where('status', MediaAsset::STATUS_READY)
+            ->whereNull('duplicate_of')
+            ->where('metadata->processing->status', 'completed')
+            ->where(
+                'metadata->processing->version',
+                $this->processor->currentVersion(),
+            );
     }
 
     public function isAssetEligible(MediaAsset $asset): bool
