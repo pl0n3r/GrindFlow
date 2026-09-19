@@ -48,6 +48,18 @@ return [
                 30,
             ),
         ],
+        'ffmpeg' => [
+            'enabled' => filter_var(
+                env('MEDIA_FFMPEG_DERIVATIVES_ENABLED', false),
+                FILTER_VALIDATE_BOOL,
+                FILTER_NULL_ON_FAILURE,
+            ) ?? false,
+            'binary' => env('MEDIA_FFMPEG_BINARY', 'ffmpeg'),
+            'timeout_seconds' => (int) env(
+                'MEDIA_FFMPEG_TIMEOUT_SECONDS',
+                60,
+            ),
+        ],
         'connector_max_bytes' => (int) env(
             'MEDIA_CONNECTOR_MAX_BYTES',
             2_147_483_648,

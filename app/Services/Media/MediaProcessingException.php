@@ -41,6 +41,26 @@ class MediaProcessingException extends RuntimeException
         return new self('processing_probe_timed_out');
     }
 
+    public static function derivativeFailed(): self
+    {
+        return new self('processing_derivative_failed');
+    }
+
+    public static function derivativeTimedOut(): self
+    {
+        return new self('processing_derivative_timed_out');
+    }
+
+    public static function derivativeInvalidOutput(): self
+    {
+        return new self('processing_derivative_invalid_output');
+    }
+
+    public static function derivativeWriteFailed(): self
+    {
+        return new self('processing_derivative_write_failed');
+    }
+
     public static function invalidProcessorVersion(): self
     {
         return new self('processing_invalid_processor_version');
