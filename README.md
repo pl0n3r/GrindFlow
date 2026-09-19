@@ -25,7 +25,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+1600** | **−44** | **+1556** |
+| **16** | **+1649** | **−30** | **+1619** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -129,15 +129,4 @@ flowchart LR
 | **NEXT** | Scheduling producción | migration approval + Production Smoke |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
 | **LATER** | Traffic attribution | GF-FR-006 |
-| **LATER** | Legacy retirement | solo tras los requisitos GF-MIG pendientes |
-
-
-
-| Lane | Frente | Estado |
-| --- | --- | --- |
-| **NOW** | Scheduling | core v1 MERGED en `main` · pendiente exact-main CI + Production Smoke |
-| **NEXT** | Scheduling producción | exact-main CI, Production Smoke, migration approval y verificación |
-| **NEXT** | Distribution | contratos/provider adapters sobre schedules válidos |
-| **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
-| **LATER** | Operación | queues, scheduler worker, retries y backups |
 | **LATER** | Legacy retirement | solo tras los requisitos GF-MIG pendientes |
