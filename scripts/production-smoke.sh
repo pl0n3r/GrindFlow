@@ -107,7 +107,7 @@ class ReleaseParser(HTMLParser):
         self.versions = []
 
     def handle_data(self, data):
-        self.versions.extend(re.findall(r"\\bGrindFlow v([0-9]+\\.[0-9]+\\.[0-9]+)\\b", data))
+        self.versions.extend(re.findall(r"\bGrindFlow v([0-9]+\.[0-9]+\.[0-9]+)\b", data))
 
 parser = ReleaseParser()
 with open(sys.argv[1], encoding="utf-8") as handle:
