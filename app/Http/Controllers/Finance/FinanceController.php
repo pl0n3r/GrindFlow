@@ -32,8 +32,7 @@ class FinanceController extends Controller
         $financeReady = Schema::hasTable('revenue_allocations');
         $allocations = collect();
         $beneficiaries = collect();
-        $allocatedMinor = 0;
-        $reversedMinor = 0;
+        $currencySummaries = collect();
 
         if ($financeReady) {
             $allocations = RevenueAllocation::query()
@@ -48,13 +47,26 @@ class FinanceController extends Controller
                 ->orderBy('name')
                 ->get();
 
-            $allocatedMinor = (int) RevenueAllocation::query()
-                ->whereNull('reversal_of_id')
-                ->sum('amount_minor');
+            $currencySummaries = RevenueAllocation::query()
+                ->selectRaw(
+                    'currency, '
+                    .'SUM(CASE WHEN reversal_of_id IS NULL THEN amount_minor ELSE 0 END) AS allocated_minor, '
+                    .'SUM(CASE WHEN reversal_of_id IS NOT NULL THEN amount_minor ELSE 0 END) AS reversed_minor',
+                )
+                ->groupBy('currency')
+                ->orderBy('currency')
+                ->get()
+                ->map(function (RevenueAllocation $summary): array {
+                    $allocated = (int) $summary->getAttribute('allocated_minor');
+                    $reversed = (int) $summary->getAttribute('reversed_minor');
 
-            $reversedMinor = (int) RevenueAllocation::query()
-                ->whereNotNull('reversal_of_id')
-                ->sum('amount_minor');
+                    return [
+                        'currency' => (string) $summary->currency,
+                        'allocated_minor' => $allocated,
+                        'reversed_minor' => $reversed,
+                        'net_minor' => $allocated - $reversed,
+                    ];
+                });
         }
 
         return view('finance.index', [
@@ -62,9 +74,7 @@ class FinanceController extends Controller
             'financeReady' => $financeReady,
             'allocations' => $allocations,
             'beneficiaries' => $beneficiaries,
-            'allocatedMinor' => $allocatedMinor,
-            'reversedMinor' => $reversedMinor,
-            'netMinor' => $allocatedMinor - $reversedMinor,
+            'currencySummaries' => $currencySummaries,
         ]);
     }
 
