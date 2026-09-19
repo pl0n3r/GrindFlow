@@ -10,6 +10,7 @@ use App\Models\MediaBlob;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\PublicationDelivery;
+use App\Models\PublicationDeliveryEvent;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
 use App\Models\User;
@@ -22,9 +23,12 @@ use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use LogicException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -743,6 +747,202 @@ class DistributionTest extends TestCase
             $fresh->last_error_code,
         );
         $this->assertSame(0, $provider->calls);
+    }
+
+    public function test_delivery_attempt_timeline_is_immutable_tenant_scoped_and_visible(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $provider = new SequenceDistributionProvider([
+            new DistributionResult('external-safe-result-123'),
+        ]);
+        $this->provider($provider);
+        $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+
+        $this->dispatch($delivery, $user, $organization);
+        $this->dispatch($delivery, $user, $organization);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($delivery): void {
+                $events = PublicationDeliveryEvent::query()
+                    ->where('publication_delivery_id', $delivery->getKey())
+                    ->orderBy('event_number')
+                    ->get();
+
+                $this->assertSame(
+                    ['attempt_started', 'published'],
+                    $events->pluck('event_type')->all(),
+                );
+                $this->assertSame([1, 1], $events->pluck('provider_attempt')->all());
+                $this->assertNull($events[1]->error_code);
+            },
+        );
+
+        [$otherUser, $otherOrganization] = $this->identity();
+        app(TenantContext::class)->runWithinOrganization(
+            $otherUser,
+            (string) $otherOrganization->getKey(),
+            fn () => $this->assertSame(0, PublicationDeliveryEvent::query()->count()),
+        );
+
+        $this->actingAs($user)
+            ->get(route('organizations.distribution.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertOk()
+            ->assertSee('Attempt timeline')
+            ->assertSee('attempt started')
+            ->assertSee('external-safe-result-123');
+
+        $this->assertSame(1, $provider->calls);
+    }
+
+    public function test_rate_limits_append_safe_outcome_without_consuming_attempt_budget(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $provider = new SequenceDistributionProvider([
+            DistributionProviderException::rateLimited(60),
+            new DistributionResult('published-after-throttle'),
+        ]);
+        $this->provider($provider);
+        $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+
+        $this->dispatch($delivery, $user, $organization);
+        $retry = $this->delivery($delivery, $user, $organization);
+        $this->assertSame(0, $retry->attempts);
+
+        $this->makeRetryDue($retry, $user, $organization);
+        $this->dispatch($retry, $user, $organization);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($delivery): void {
+                $events = PublicationDeliveryEvent::query()
+                    ->where('publication_delivery_id', $delivery->getKey())
+                    ->orderBy('event_number')
+                    ->get();
+
+                $this->assertSame(
+                    ['attempt_started', 'retry_scheduled', 'attempt_started', 'published'],
+                    $events->pluck('event_type')->all(),
+                );
+                $this->assertSame(
+                    [1, 1, 1, 1],
+                    $events->pluck('provider_attempt')->all(),
+                );
+                $this->assertSame('distribution_rate_limited', $events[1]->error_code);
+                $this->assertSame(
+                    1,
+                    PublicationDelivery::query()->findOrFail($delivery->getKey())->attempts,
+                );
+            },
+        );
+    }
+
+    public function test_audit_events_refuse_model_updates(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $this->provider(new SequenceDistributionProvider([
+            new DistributionResult('immutable-result'),
+        ]));
+        $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+        $this->dispatch($delivery, $user, $organization);
+
+        $this->expectException(LogicException::class);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => PublicationDeliveryEvent::query()->firstOrFail()
+                ->forceFill(['event_type' => 'failed'])->save(),
+        );
+    }
+
+    public function test_audit_events_refuse_raw_updates_in_mariadb(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MariaDB/MySQL is required for immutable ledger triggers.');
+        }
+
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $this->provider(new SequenceDistributionProvider([
+            new DistributionResult('immutable-result'),
+        ]));
+        $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+        $this->dispatch($delivery, $user, $organization);
+
+        $this->expectException(QueryException::class);
+
+        DB::table('publication_delivery_events')
+            ->where('publication_delivery_id', $delivery->getKey())
+            ->update(['event_type' => 'failed']);
+    }
+
+    public function test_parent_delivery_deletion_cannot_erase_immutable_audit_events_in_mariadb(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MariaDB/MySQL is required for restrictive ledger foreign keys.');
+        }
+
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $this->provider(new SequenceDistributionProvider([
+            new DistributionResult('retain-on-parent-delete'),
+        ]));
+        $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+        $this->dispatch($delivery, $user, $organization);
+
+        $this->assertSame(
+            2,
+            DB::table('publication_delivery_events')
+                ->where('publication_delivery_id', $delivery->getKey())
+                ->count(),
+        );
+
+        $this->expectException(QueryException::class);
+
+        DB::table('publication_deliveries')
+            ->where('id', $delivery->getKey())
+            ->delete();
+    }
+
+    public function test_delivery_stays_operational_before_audit_migration(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $this->provider(new SequenceDistributionProvider([
+            new DistributionResult('works-before-audit-migration'),
+        ]));
+        $migration = require database_path(
+            'migrations/2026_09_19_160000_create_publication_delivery_events_table.php',
+        );
+
+        $migration->down();
+
+        try {
+            $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+            $this->dispatch($delivery, $user, $organization);
+
+            $this->assertSame(
+                PublicationDelivery::STATUS_PUBLISHED,
+                $this->delivery($delivery, $user, $organization)->status,
+            );
+
+            $this->actingAs($user)
+                ->get(route('organizations.distribution.index', [
+                    'organizationId' => $organization->getKey(),
+                ]))
+                ->assertOk()
+                ->assertSee('Audit migration required');
+        } finally {
+            $migration->up();
+        }
     }
 
     public function test_cross_tenant_delivery_queue_is_rejected(): void

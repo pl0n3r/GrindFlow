@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $attempts
@@ -48,6 +49,15 @@ class PublicationDelivery extends TenantModel
             'claimed_until' => 'immutable_datetime',
             'published_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * @return HasMany<PublicationDeliveryEvent, $this>
+     */
+    public function events(): HasMany
+    {
+        return $this->hasMany(PublicationDeliveryEvent::class, 'publication_delivery_id')
+            ->orderBy('event_number');
     }
 
     /**

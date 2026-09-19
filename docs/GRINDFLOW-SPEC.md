@@ -129,7 +129,23 @@ Finance begins as a tenant-owned append-only revenue-allocation ledger.
 - Finance routes remain deploy-before-migration safe and production migrations
   require explicit operational approval.
 
-## 10. Product version and verified deployment identity
+## 10. Distribution attempt audit
+
+- A delivery retains its existing stable provider idempotency key while each
+  accepted provider-attempt transition appends an immutable tenant-owned event.
+- Event ordering is per delivery and unique; rate limits can produce multiple
+  events with the same retry-budget attempt count without overwriting history.
+- Started and terminal/retry events are persisted in the same transaction as
+  their claim or fenced state transition. A superseded worker produces no
+  terminal event, even if its provider call returns afterward.
+- Audit rows store only the allowlisted event type, attempt count, time and
+  safe internal error code. Raw provider responses, headers and credentials
+  never enter the event ledger. MariaDB blocks UPDATE/DELETE through triggers and RESTRICT on both parent foreign keys; parent deletion must not erase the ledger.
+- Before the additive audit migration, delivery operations and the Distribution
+  page remain available; the timeline is labeled migration-required rather
+  than causing a 500 or silently fabricating history.
+
+## 11. Product version and verified deployment identity
 
 GrindFlow has a deliberate human-readable pre-1.0 release number in
 `config/version.php`, initially `0.1.0`. Each deploy-bound PR increments

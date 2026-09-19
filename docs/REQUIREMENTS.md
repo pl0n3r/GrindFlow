@@ -190,6 +190,14 @@ platform integrations.
   work until the delivery table exists.
 - This slice ships only the provider contract/registry plus fake-backed tests;
   no real platform credentials or external publishing adapters are enabled.
+- Each claimed provider attempt and accepted outcome is appended to a tenant-owned
+  immutable `publication_delivery_events` ledger. The event order is explicit
+  per delivery and a stale worker cannot append an outcome for a superseded claim.
+- Only the event type, attempt number and safe error code are stored; external
+  provider responses, tokens, exception text and HTTP payloads are never audited.
+- The Delivery history UI renders the attempt timeline. Before the audit table
+  migration, existing delivery dispatch and history remain usable with an
+  explicit migration-required timeline state.
 
 ### GF-FR-006 — Traffic attribution
 **Status:** implemented

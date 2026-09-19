@@ -56,8 +56,27 @@
             @endif
             <section class="gf-panel gf-panel--spaced"><header class="gf-panel__head"><h2>Delivery history</h2><span class="gf-appbar__meta">{{ $deliveries->count() }} loaded</span></header><div class="gf-panel__body gf-panel__body--flush-mobile">
                 @if($deliveries->isEmpty())<div class="gf-empty"><div><div class="gf-empty__icon">⇢</div><h3>No deliveries match.</h3><p>Las entregas aparecen cuando una programación vence.</p></div></div>@else
-                <div class="gf-table-wrap"><table class="gf-table"><thead><tr><th>Media</th><th>Destination</th><th>Status</th><th>Attempts</th><th>Result</th><th>Action</th></tr></thead><tbody>
-                    @foreach($deliveries as $delivery)<tr><td>{{ $delivery->scheduledPublication?->mediaAsset?->original_filename ?? 'Missing media' }}</td><td>{{ $delivery->scheduledPublication?->destination?->name ?? 'Missing destination' }}</td><td><span class="gf-state {{ $delivery->status === 'published' ? 'gf-state--ok' : '' }}">{{ str_replace('_',' ',$delivery->status) }}</span></td><td>{{ $delivery->attempts }}</td><td><div>{{ $delivery->external_publication_id ?? '—' }}</div><div class="gf-media-meta">{{ $delivery->last_error_code ?? ($delivery->next_attempt_at ? 'Retry '.$delivery->next_attempt_at->format('Y-m-d H:i').' UTC' : 'No error') }}</div></td><td>@if($canManageDestinations && in_array($delivery->status,['failed','retry_scheduled'],true))<form method="POST" action="{{ route('organizations.distribution.deliveries.retry',['organizationId'=>$organization->id,'deliveryId'=>$delivery->id]) }}">@csrf<button class="gf-button gf-button--ghost">Retry</button></form>@else — @endif</td></tr>@endforeach
+                <div class="gf-table-wrap"><table class="gf-table"><thead><tr><th>Media</th><th>Destination</th><th>Status</th><th>Attempts</th><th>Result</th><th>Attempt timeline</th><th>Action</th></tr></thead><tbody>
+                    @foreach($deliveries as $delivery)<tr><td>{{ $delivery->scheduledPublication?->mediaAsset?->original_filename ?? 'Missing media' }}</td><td>{{ $delivery->scheduledPublication?->destination?->name ?? 'Missing destination' }}</td><td><span class="gf-state {{ $delivery->status === 'published' ? 'gf-state--ok' : '' }}">{{ str_replace('_',' ',$delivery->status) }}</span></td><td>{{ $delivery->attempts }}</td><td><div>{{ $delivery->external_publication_id ?? '—' }}</div><div class="gf-media-meta">{{ $delivery->last_error_code ?? ($delivery->next_attempt_at ? 'Retry '.$delivery->next_attempt_at->format('Y-m-d H:i').' UTC' : 'No error') }}</div></td><td>
+                        @if (! $auditReady)
+                            <span class="gf-media-meta">Audit migration required</span>
+                        @elseif ($delivery->events->isEmpty())
+                            <span class="gf-media-meta">No attempt events</span>
+                        @else
+                            <ol class="gf-media-meta" aria-label="Delivery attempt timeline">
+                                @foreach ($delivery->events as $event)
+                                    <li>
+                                        {{ $event->created_at->format('Y-m-d H:i:s') }} UTC
+                                        · #{{ $event->provider_attempt }}
+                                        · {{ str_replace('_', ' ', $event->event_type) }}
+                                        @if ($event->error_code)
+                                            · {{ $event->error_code }}
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ol>
+                        @endif
+                    </td><td>@if($canManageDestinations && in_array($delivery->status,['failed','retry_scheduled'],true))<form method="POST" action="{{ route('organizations.distribution.deliveries.retry',['organizationId'=>$organization->id,'deliveryId'=>$delivery->id]) }}">@csrf<button class="gf-button gf-button--ghost">Retry</button></form>@else — @endif</td></tr>@endforeach
                 </tbody></table></div>@endif
             </div></section>
         @endif
