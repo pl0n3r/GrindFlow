@@ -12,14 +12,12 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | ✅ **GF-OPS · Migration readiness** | MERGED en `main` por PR #79 |
-| Feature merge commit | ✅ **main** | `7c364d7b074eb016e6da9f944d350904ce46ccbd` |
-| CI del PR | ✅ **GrindFlow CI #344** | fast, PHP quality, PHPUnit, MariaDB, browser y validate |
-| Sonar | ✅ **Quality Gate OK** | 0 issues / 0 hotspots en PR #79 |
-| CodeRabbit | 🟠 **pending al merge** | no se atribuye revisión final no emitida |
-| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | PR CI y exact-main son distintos |
-| Production Smoke | 🟠 **pendiente de evidencia exact-main** | despliegue no inferido del merge |
-| Migraciones | 🟠 **sin ejecutar** | inventario y confirmación preparados, backup externo pendiente |
+| Work line | 🟠 **GF-OPS · Production Smoke migration blocker** | rama enfocada |
+| Base exacta | ✅ **main** | `6464a8a0be5f364aa61b05e61cdcfd0b1d6e9930` |
+| Diagnóstico anterior | ✅ **schema drift identificado** | issue #69 / Smoke `75a81c31…`; no se atribuye al nuevo main |
+| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | CI de PR y main son evidencias separadas |
+| Production Smoke | 🟠 **requiere verificación exact-main** | esta PR mejora el diagnóstico, no prueba un despliegue |
+| Migraciones | 🟠 **sin ejecutar desde este cambio** | aprobación + backup externo verificado son acciones del operador |
 
 ## Huella del cambio
 
@@ -37,12 +35,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
-| GrindFlow CI | docs-only: contrato y dashboard exacto |
-| Sonar | análisis independiente del PR documental |
-| CodeRabbit | review documental no sustituye revisión del feature |
-| Migración | no se ejecuta desde este PR |
-| Producción | sin cambios desde este PR |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| GrindFlow CI | `fast` ejecuta el contrato Smoke usando curl simulado |
+| Sonar | revisión separada sobre el head exacto del PR |
+| CodeRabbit | revisión separada sobre el head exacto del PR |
+| Migración | ningún job del Smoke ejecuta migraciones |
+| Producción | no se modifica desde este PR; el Smoke conserva exit no-cero si hay schema drift |
 
 ## Flujo de entrega
 
@@ -69,43 +67,45 @@ flowchart LR
 
 ## Qué se hizo
 
-- Registra el squash merge de Migration Readiness como `7c364d7b…`.
-- Preserva CI #344 y Sonar de PR #79 como evidencia de feature, no de exact-main.
-- Registra CodeRabbit pendiente al merge sin afirmar aprobación.
-- Mantiene backups externos y aplicación de migraciones como acciones del operador.
-- El guard disponible en el código exige inventario, fingerprint, confirmación `MIGRAR` y declaración de backup.
-- No cambia runtime, schema, secrets, hosting ni contenido productivo desde este PR documental.
+- Clasifica migraciones pendientes mediante el inventario real de Admin > System, no por HTML textual ambiguo.
+- Emite marcador seguro `MIGRATIONS_PENDING=N` y detiene el Smoke tras el primer intento si se requiere acción del operador.
+- Los inventarios desconocidos siguen siendo errores genéricos; no se confunden con migraciones pendientes.
+- GitHub Actions distingue un bloqueo operativo de un HTTP 500, conserva artefacto corto y registra SHA exacto del run.
+- Añade contrato offline de tres escenarios usando curl simulado y lo ejecuta en `fast`.
+- Ningún secreto, backup, archivo productivo ni esquema de producción se modifica en esta entrega.
 
 ## Archivos modificados en este deploy
 
-- `README.md` — snapshot posterior al merge y siguiente frente operativo.
+- `.github/workflows/grindflow-ci.yml` — ejecutar contrato Smoke en fast.
+- `.github/workflows/production-smoke.yml` — clasificación de incidente de migraciones.
+- `README.md` — dashboard exacto.
+- `scripts/production-smoke-contract.sh` — escenarios offline.
+- `scripts/production-smoke.sh` — marcador y salida temprana del bloqueo.
 
 ## Validación
 
-- Migration Readiness fue fusionado como `7c364d7b074eb016e6da9f944d350904ce46ccbd`.
-- PR #79 pasó GrindFlow CI #344 sobre el head `87a662a76125a556708dcd37700b1d213fbfff61`.
-- Sonar reportó Quality Gate OK, 0 issues y 0 hotspots.
-- CodeRabbit estaba pending al merge y no había threads abiertos.
-- No se ha verificado un backup externo desde GrindFlow ni se ejecutaron migraciones en producción.
-- Exact-main CI y Production Smoke siguen como evidencia separada.
+- Base exacta: `6464a8a0be5f364aa61b05e61cdcfd0b1d6e9930`.
+- El diagnóstico registrado en issue #69 corresponde al SHA `75a81c31…`, no es evidencia de un Smoke nuevo.
+- Contrato cubre pending=3 (exit 2, un intento), pending=0 (PASS) e inventario unknown (error sin marcador).
+- La migración, verificación del backup, inspección del lote y aprobación siguen fuera de CI.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Verificar exact-main CI y Production Smoke del commit `7c364d7b…`. |
-| **NEXT** | Inspeccionar el lote de migraciones en Admin > System tras confirmar despliegue. |
-| **NEXT** | Aplicar migraciones solo con aprobación y backup externo restaurable verificado. |
-| **BLOCKED / EXTERNAL** | Storage S3, FFmpeg y operaciones del hosting. |
-| **LATER** | Provider real en sandbox y conciliación Finance. |
+| **NOW** | Abrir PR y validar la clasificación de Smoke contra el head exacto. |
+| **NEXT** | Fusionar tras CI/revisión y verificar Smoke real del nuevo main. |
+| **NEXT** | Inspeccionar el lote pendiente en Admin > System y verificar un backup externo restaurable. |
+| **BLOCKED / EXTERNAL** | Aprobación de migraciones, S3, FFmpeg y configuración Hostinger. |
+| **LATER** | Providers reales solo tras sandbox y operación estable. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Exact-main delivery | PR #79 MERGED; CI y Smoke de merge por confirmar |
-| **NEXT** | Migration readiness producción | backup externo + inventario + aprobación |
-| **NEXT** | Scheduling/Distribution/Traffic/Finance | migraciones productivas pendientes |
+| **NOW** | Production Smoke | clasificación de schema drift en PR |
+| **NEXT** | Migraciones productivas | inventario + backup + aprobación |
+| **NEXT** | Scheduling/Distribution/Traffic/Finance | schema pendiente de comprobación productiva |
 | **BLOCKED / EXTERNAL** | Hosting/storage | S3 + FFmpeg |
 | **LATER** | Provider adapters | sandbox y credenciales cifradas |
-| **LATER** | Legacy retirement | solo tras GF-MIG |
+| **LATER** | Legacy retirement | tras GF-MIG |
