@@ -25,7 +25,9 @@ class StoreScheduledPublicationRequest extends FormRequest
     {
         return [
             'asset_id' => ['required', 'uuid'],
-            'destination_id' => ['required', 'uuid'],
+            'destination_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'destination_ids.*' => ['required', 'uuid', 'distinct'],
+            'request_key' => ['required', 'string', 'size:36'],
             'tracked_link_id' => ['nullable', 'uuid'],
             'scheduled_for_local' => [
                 'required',
@@ -38,5 +40,12 @@ class StoreScheduledPublicationRequest extends FormRequest
                 'timezone',
             ],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('destination_ids') && $this->has('destination_id')) {
+            $this->merge(['destination_ids' => [$this->input('destination_id')]]);
+        }
     }
 }

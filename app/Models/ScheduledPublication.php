@@ -24,6 +24,7 @@ class ScheduledPublication extends TenantModel
         'status',
         'scheduled_for_utc',
         'timezone',
+        'request_key',
     ];
 
     /**

@@ -7,12 +7,14 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Connections\DropboxConnectionController;
 use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Distribution\DistributionController;
 use App\Http\Controllers\Finance\FinanceController;
 use App\Http\Controllers\Scheduling\SchedulerController;
 use App\Http\Controllers\Traffic\TrackedLinkRedirectController;
 use App\Http\Controllers\Traffic\TrafficController;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
+use App\Http\Middleware\RequireDistributionSchema;
 use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Middleware\RequireTrafficSchema;
@@ -47,6 +49,25 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::post('/scheduler', [SchedulerController::class, 'store'])
                 ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.store');
+            Route::patch('/scheduler', [SchedulerController::class, 'update'])
+                ->middleware(RequireSchedulingSchema::class)
+                ->name('organizations.scheduler.update');
+            Route::post('/scheduler/cancel', [SchedulerController::class, 'cancel'])
+                ->middleware(RequireSchedulingSchema::class)
+                ->name('organizations.scheduler.cancel');
+            Route::get('/distribution', [DistributionController::class, 'index'])
+                ->name('organizations.distribution.index');
+            Route::post('/distribution/destinations', [DistributionController::class, 'storeDestination'])
+                ->middleware(RequireSchedulingSchema::class)
+                ->name('organizations.distribution.destinations.store');
+            Route::patch('/distribution/destinations/{destinationId}', [DistributionController::class, 'updateDestination'])
+                ->middleware(RequireSchedulingSchema::class)
+                ->whereUuid('destinationId')
+                ->name('organizations.distribution.destinations.update');
+            Route::post('/distribution/deliveries/{deliveryId}/retry', [DistributionController::class, 'retry'])
+                ->middleware(RequireDistributionSchema::class)
+                ->whereUuid('deliveryId')
+                ->name('organizations.distribution.deliveries.retry');
             Route::get('/traffic', [TrafficController::class, 'index'])
                 ->name('organizations.traffic.index');
             Route::post('/traffic', [TrafficController::class, 'store'])

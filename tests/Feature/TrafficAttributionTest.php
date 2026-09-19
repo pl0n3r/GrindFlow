@@ -7,6 +7,7 @@ use App\Jobs\RecordTrackedLinkClick;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\TrackedLink;
+use App\Models\TrackedLinkDailyMetric;
 use App\Models\User;
 use App\Services\Traffic\TrafficAttributionRecorder;
 use App\Services\Traffic\VisitorFingerprint;
@@ -465,6 +466,57 @@ class TrafficAttributionTest extends TestCase
             $migration = require $migrationPath;
             $migration->up();
         }
+    }
+
+    public function test_dashboard_filters_daily_metrics_by_period_and_channel(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Studio);
+        [$selected, $other] = [
+            $this->link($user, $organization, 'Selected', 'https://example.com/selected'),
+            $this->link($user, $organization, 'Other', 'https://example.com/other'),
+        ];
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($selected, $other): void {
+                $other->forceFill(['channel' => 'other'])->save();
+                TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $selected->getKey(),
+                    'metric_date' => '2026-09-10',
+                    'clicks' => 7,
+                ]);
+                TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $selected->getKey(),
+                    'metric_date' => '2026-09-11',
+                    'clicks' => 3,
+                ]);
+                TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $selected->getKey(),
+                    'metric_date' => '2026-08-31',
+                    'clicks' => 50,
+                ]);
+                TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $other->getKey(),
+                    'metric_date' => '2026-09-10',
+                    'clicks' => 90,
+                ]);
+            },
+        );
+
+        $this->actingAs($user)->get(route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+            'from' => '2026-09-01',
+            'to' => '2026-09-19',
+            'channel' => 'test',
+        ]))
+            ->assertOk()
+            ->assertSee('10')
+            ->assertSee('Selected')
+            ->assertSee('2026-09-10: 7 clicks')
+            ->assertSee('2026-09-11: 3 clicks')
+            ->assertDontSee('2026-08-31: 50 clicks')
+            ->assertDontSee('Other');
     }
 
     /**

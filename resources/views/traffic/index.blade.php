@@ -30,6 +30,11 @@
                     <span class="gf-navitem__text">Vault</span>
                 </a>
 
+                <a class="gf-navitem" href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}">
+                    <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
+                    <span class="gf-navitem__text">Distribution</span>
+                </a>
+
                 <a
                     class="gf-navitem"
                     href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
@@ -138,9 +143,9 @@
                     <article class="gf-metric">
                         <div class="gf-metric__label">Loaded clicks</div>
                         <div class="gf-metric__value">
-                            {{ number_format((int) $links->sum(fn ($link) => (int) ($link->total_clicks ?? 0))) }}
+                            {{ number_format($totalClicks) }}
                         </div>
-                        <div class="gf-metric__meta">Agregado diario, sin IP cruda</div>
+                        <div class="gf-metric__meta">{{ $from }} → {{ $to }}, sin IP cruda</div>
                     </article>
 
                     <article class="gf-metric">
@@ -148,6 +153,27 @@
                         <div class="gf-metric__value">10m</div>
                         <div class="gf-metric__meta">Ventana fija server-side</div>
                     </article>
+                </section>
+
+                <section class="gf-panel gf-panel--spaced">
+                    <header class="gf-panel__head"><h2>Traffic analytics</h2><span class="gf-appbar__meta">Filtered daily aggregates</span></header>
+                    <div class="gf-panel__body">
+                        <form class="gf-form" method="GET">
+                            <div class="gf-field"><label for="from">From</label><input class="gf-input" id="from" name="from" type="date" value="{{ $from }}" required></div>
+                            <div class="gf-field"><label for="to">To</label><input class="gf-input" id="to" name="to" type="date" value="{{ $to }}" required></div>
+                            <div class="gf-field"><label for="channel_filter">Channel</label><select class="gf-input" id="channel_filter" name="channel"><option value="">All channels</option>@foreach($channels as $channel)<option value="{{ $channel }}" @selected(($filters['channel'] ?? '') === $channel)>{{ $channel }}</option>@endforeach</select></div>
+                            <div class="gf-field"><label for="campaign_filter">Campaign</label><input class="gf-input" id="campaign_filter" name="campaign" maxlength="128" value="{{ $filters['campaign'] ?? '' }}"></div>
+                            <button class="gf-button gf-button--primary">Apply filters</button>
+                        </form>
+                        @php($chartMax = max(1, (int) $series->max('clicks')))
+                        <div class="gf-chart" role="img" aria-label="Daily clicks from {{ $from }} to {{ $to }}">
+                            @forelse($series as $point)
+                                <div class="gf-chart__column" title="{{ $point->metric_date->format('Y-m-d') }}: {{ $point->clicks }} clicks"><span class="gf-chart__value">{{ $point->clicks }}</span><div class="gf-chart__bar" style="height: {{ max(4, round(((int)$point->clicks / $chartMax) * 140)) }}px"></div><small>{{ $point->metric_date->format('m/d') }}</small></div>
+                            @empty
+                                <div class="gf-empty gf-empty--compact"><div><h3>No clicks in this period.</h3><p>Adjust the filters or use a tracked link to collect test metrics.</p></div></div>
+                            @endforelse
+                        </div>
+                    </div>
                 </section>
 
                 @if ($canManageTraffic)
@@ -259,6 +285,7 @@
                                             <th>Channel / campaign</th>
                                             <th>Clicks</th>
                                             <th>Status</th>
+                                            <th>Publications</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -290,6 +317,11 @@
                                                     <span class="gf-state gf-state--ok">
                                                         {{ $link->status }}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    @forelse($link->scheduledPublicationLinks as $assignment)
+                                                        <div>{{ $assignment->scheduledPublication?->destination?->name ?? 'Unknown destination' }}</div><small class="gf-media-meta">{{ $assignment->scheduledPublication?->scheduled_for_utc?->format('Y-m-d H:i') }} UTC · shared link metric</small>
+                                                    @empty — @endforelse
                                                 </td>
                                             </tr>
                                         @endforeach

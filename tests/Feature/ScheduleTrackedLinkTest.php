@@ -369,6 +369,7 @@ class ScheduleTrackedLinkTest extends TestCase
         $data = [
             'asset_id' => (string) $asset->getKey(),
             'destination_id' => (string) $destination->getKey(),
+            'request_key' => (string) Str::uuid(),
             'scheduled_for_local' => now('UTC')
                 ->addDay()
                 ->format('Y-m-d\TH:i'),

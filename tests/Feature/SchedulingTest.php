@@ -57,6 +57,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => $local,
                     'timezone' => $timezone,
                 ],
@@ -144,6 +145,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => $local,
                     'timezone' => $timezone,
                 ],
@@ -241,6 +243,7 @@ class SchedulingTest extends TestCase
                     [
                         'asset_id' => $asset->getKey(),
                         'destination_id' => $destination->getKey(),
+                        'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                         'scheduled_for_local' => now('UTC')
                             ->addDay()
                             ->format('Y-m-d\TH:i'),
@@ -307,6 +310,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $duplicate->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -353,6 +357,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->subHour()
                         ->format('Y-m-d\TH:i'),
@@ -399,6 +404,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -445,6 +451,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -500,6 +507,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $foreignDestination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -516,6 +524,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $foreignAsset->getKey(),
                     'destination_id' => $localDestination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -562,6 +571,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -692,6 +702,105 @@ class SchedulingTest extends TestCase
                     ScheduledPublication::query()->count(),
                 );
             },
+        );
+    }
+
+    public function test_one_request_schedules_multiple_destinations_idempotently(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $this->membership($user, $organization, UserRole::Editor);
+
+        [$asset, $destinations] = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): array => [
+                $this->readyAsset(),
+                collect(['A', 'B'])->map(fn (string $name) => PublishingDestination::query()->create([
+                    'name' => $name,
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ])),
+            ],
+        );
+
+        $payload = [
+            'asset_id' => $asset->getKey(),
+            'destination_ids' => $destinations->pluck('id')->all(),
+            'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
+            'scheduled_for_local' => now('UTC')->addDay()->format('Y-m-d\TH:i'),
+            'timezone' => 'UTC',
+        ];
+        $route = route('organizations.scheduler.store', ['organizationId' => $organization->getKey()]);
+
+        $withoutKey = $payload;
+        unset($withoutKey['request_key']);
+        $this->actingAs($user)->post($route, $withoutKey)
+            ->assertSessionHasErrors('request_key');
+
+        $this->actingAs($user)->post($route, $payload)->assertRedirect();
+        $this->actingAs($user)->post($route, $payload)->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(2, ScheduledPublication::query()->count()),
+        );
+    }
+
+    public function test_future_undelivered_schedule_can_be_edited_and_cancelled(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $this->membership($user, $organization, UserRole::Studio);
+
+        $publication = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user): ScheduledPublication {
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Sandbox',
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+
+                return app(ContentScheduler::class)->schedule(
+                    $this->readyAsset(),
+                    $destination,
+                    $user,
+                    now('UTC')->addDays(2)->format('Y-m-d\TH:i'),
+                    'UTC',
+                );
+            },
+        );
+
+        $rescheduledFor = CarbonImmutable::now('UTC')->addDays(3)->startOfMinute();
+
+        $this->actingAs($user)->patch(route('organizations.scheduler.update', [
+            'organizationId' => $organization->getKey(),
+        ]), [
+            'publication_id' => $publication->getKey(),
+            'scheduled_for_local' => $rescheduledFor->format('Y-m-d\TH:i'),
+            'timezone' => 'UTC',
+        ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                $rescheduledFor->format('Y-m-d\TH:i'),
+                $publication->fresh()->scheduled_for_utc?->format('Y-m-d\TH:i'),
+            ),
+        );
+
+        $this->actingAs($user)->post(route('organizations.scheduler.cancel', [
+            'organizationId' => $organization->getKey(),
+        ]), ['publication_id' => $publication->getKey()])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(ScheduledPublication::STATUS_CANCELLED, $publication->fresh()->status),
         );
     }
 
