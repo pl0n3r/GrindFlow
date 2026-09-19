@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\ReverseRevenueAllocationRequest;
 use App\Http\Requests\Finance\StoreRevenueAllocationRequest;
 use App\Models\Organization;
-use App\Models\RevenueAllocation;
 use App\Models\User;
 use App\Services\Finance\FinanceLedgerManager;
 use App\Services\Finance\FinanceReconciliationReport;
@@ -16,8 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
 {

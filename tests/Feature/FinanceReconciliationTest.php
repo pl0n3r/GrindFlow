@@ -148,7 +148,7 @@ class FinanceReconciliationTest extends TestCase
         $csv = $this->actingAs($studio)->get($this->exportRoute($organization))
             ->assertOk()
             ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
-            ->assertHeader('Cache-Control', 'private, no-store')
+            ->assertHeader('Cache-Control', 'no-store, private')
             ->assertHeader('X-Content-Type-Options', 'nosniff');
 
         $content = $csv->streamedContent();
