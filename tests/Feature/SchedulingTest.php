@@ -748,6 +748,7 @@ class SchedulingTest extends TestCase
                     'provider' => 'sandbox',
                     'status' => PublishingDestination::STATUS_ACTIVE,
                 ]);
+
                 return app(ContentScheduler::class)->schedule(
                     $this->readyAsset(),
                     $destination,

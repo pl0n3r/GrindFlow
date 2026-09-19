@@ -8,6 +8,7 @@ use App\Models\MediaAsset;
 use App\Models\Organization;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
+use App\Models\Scopes\TenantScope;
 use App\Models\TrackedLink;
 use App\Models\User;
 use App\Services\Scheduling\ContentScheduler;
@@ -112,8 +113,11 @@ class SchedulerController extends Controller
             'timezones' => DateTimeZone::listIdentifiers(),
             'defaultTimezone' => (string) config('app.timezone', 'UTC'),
             'filters' => $filters ?? [],
-            'calendarDays' => $publications->groupBy(fn (ScheduledPublication $publication) =>
-                $publication->scheduled_for_utc?->setTimezone($publication->timezone)->format('Y-m-d')),
+            'calendarDays' => $publications->groupBy(
+                fn (ScheduledPublication $publication) => $publication->scheduled_for_utc
+                    ?->setTimezone($publication->timezone)
+                    ->format('Y-m-d'),
+            ),
         ]);
     }
 
@@ -166,8 +170,13 @@ class SchedulerController extends Controller
             'scheduled_for_local' => ['required', 'date_format:Y-m-d\\TH:i'],
             'timezone' => ['required', 'string', 'max:64', 'timezone'],
         ]);
+        $publication = ScheduledPublication::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('organization_id', $organization->getKey())
+            ->whereKey($publicationId)
+            ->firstOrFail();
         $scheduler->reschedule(
-            ScheduledPublication::query()->findOrFail($publicationId),
+            $publication,
             $user,
             $validated['scheduled_for_local'],
             $validated['timezone'],
@@ -186,7 +195,12 @@ class SchedulerController extends Controller
         /** @var User $user */
         $user = $request->user();
         abort_unless($user->canScheduleOrganization($organization), 403);
-        $scheduler->cancel(ScheduledPublication::query()->findOrFail($publicationId), $user);
+        $publication = ScheduledPublication::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('organization_id', $organization->getKey())
+            ->whereKey($publicationId)
+            ->firstOrFail();
+        $scheduler->cancel($publication, $user);
 
         return back()->with('status', 'Programación cancelada.');
     }

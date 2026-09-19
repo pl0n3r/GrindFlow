@@ -25,7 +25,8 @@ class ContentScheduler
     public function __construct(
         private readonly TenantContext $tenantContext,
         private readonly MediaAssetProcessor $processor,
-    ) {}
+    ) {
+    }
 
     public function schedule(
         MediaAsset $asset,
@@ -187,7 +188,7 @@ class ContentScheduler
                     'request_key' => $requestKey,
                 ];
 
-                $publication = $requestKey === null || ! Schema::hasColumn('scheduled_publications', 'request_key')
+                $publication = $requestKey === null || !Schema::hasColumn('scheduled_publications', 'request_key')
                     ? ScheduledPublication::query()->create($attributes)
                     : ScheduledPublication::query()->firstOrCreate(
                         [
