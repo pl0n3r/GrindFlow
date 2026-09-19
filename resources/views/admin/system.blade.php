@@ -22,20 +22,65 @@
                     <span class="gf-navitem__text">Overview</span>
                 </a>
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                    <span class="gf-navitem__text">Vault</span>
-                </span>
+                @if ($workspaceOrganization)
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.vault.index', ['organizationId' => $workspaceOrganization->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
+                        <span class="gf-navitem__text">Vault</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
+                        <span class="gf-navitem__text">Vault</span>
+                    </span>
+                @endif
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                    <span class="gf-navitem__text">Scheduler</span>
-                </span>
+                @if ($workspaceOrganization)
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.scheduler.index', ['organizationId' => $workspaceOrganization->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
+                        <span class="gf-navitem__text">Scheduler</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
+                        <span class="gf-navitem__text">Scheduler</span>
+                    </span>
+                @endif
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">↗</span>
-                    <span class="gf-navitem__text">Distribution</span>
-                </span>
+                @if ($workspaceOrganization)
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.distribution.index', ['organizationId' => $workspaceOrganization->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
+                        <span class="gf-navitem__text">Distribution</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
+                        <span class="gf-navitem__text">Distribution</span>
+                    </span>
+                @endif
+
+                @if ($workspaceOrganization)
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.traffic.index', ['organizationId' => $workspaceOrganization->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
+                        <span class="gf-navitem__text">Traffic</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
+                        <span class="gf-navitem__text">Traffic</span>
+                    </span>
+                @endif
 
                 <span class="gf-sidebar__label">Admin</span>
 
