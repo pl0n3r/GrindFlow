@@ -40,10 +40,24 @@
                     <span class="gf-navitem__text">Scheduler</span>
                 </a>
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">↗</span>
+                <a class="gf-navitem" href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}">
+                    <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
                     <span class="gf-navitem__text">Distribution</span>
-                </span>
+                </a>
+
+                <span class="gf-sidebar__label">Insights</span>
+
+                <a class="gf-navitem" href="{{ route('organizations.traffic.index', ['organizationId' => $organization->id]) }}">
+                    <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
+                    <span class="gf-navitem__text">Traffic</span>
+                </a>
+
+                @if (auth()->user()?->canManageFinanceOrganization($organization))
+                    <a class="gf-navitem" href="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}">
+                        <span class="gf-navitem__icon" aria-hidden="true">$</span>
+                        <span class="gf-navitem__text">Finance</span>
+                    </a>
+                @endif
 
                 @if (auth()->user()?->isPlatformAdmin())
                     <span class="gf-sidebar__label">Admin</span>
