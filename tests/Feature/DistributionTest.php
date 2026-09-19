@@ -106,6 +106,7 @@ class DistributionTest extends TestCase
             'deliveryId' => $delivery->getKey(),
         ]);
 
+        $this->withoutExceptionHandling();
         $this->actingAs($user)->post($route)->assertRedirect();
 
         $fresh = $this->delivery($delivery, $user, $organization);
