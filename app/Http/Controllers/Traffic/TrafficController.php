@@ -9,10 +9,15 @@ use App\Models\TrackedLink;
 use App\Models\TrackedLinkDailyMetric;
 use App\Models\User;
 use App\Services\Traffic\TrackedLinkManager;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TrafficController extends Controller
 {
@@ -31,16 +36,11 @@ class TrafficController extends Controller
         $trafficReady = $this->trafficReady();
         $links = collect();
         $series = collect();
-        $filters = $request->validate([
-            'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-            'channel' => ['nullable', 'string', 'max:64'],
-            'campaign' => ['nullable', 'string', 'max:128'],
-            'tracked_link_id' => ['nullable', 'uuid'],
-        ]);
+        $filters = $this->filters($request);
         $from = $filters['from'] ?? now('UTC')->subDays(29)->toDateString();
         $to = $filters['to'] ?? now('UTC')->toDateString();
         $totalClicks = 0;
+        $linkCount = 0;
         $channels = collect();
 
         if ($trafficReady) {
@@ -48,6 +48,8 @@ class TrafficController extends Controller
                 ->when($filters['channel'] ?? null, fn ($query, $channel) => $query->where('channel', $channel))
                 ->when($filters['campaign'] ?? null, fn ($query, $campaign) => $query->where('campaign', $campaign))
                 ->when($filters['tracked_link_id'] ?? null, fn ($query, $id) => $query->whereKey($id));
+
+            $linkCount = (clone $filteredLinks)->count();
 
             $links = (clone $filteredLinks)
                 ->with(['scheduledPublicationLinks.scheduledPublication.destination'])
@@ -71,6 +73,7 @@ class TrafficController extends Controller
             'organization' => $organization,
             'trafficReady' => $trafficReady,
             'links' => $links,
+            'linkCount' => $linkCount,
             'canManageTraffic' => $trafficReady,
             'filters' => $filters,
             'from' => $from,
@@ -78,6 +81,137 @@ class TrafficController extends Controller
             'series' => $series,
             'totalClicks' => $totalClicks,
             'channels' => $channels,
+        ]);
+    }
+
+    /**
+     * Download filtered per-link daily aggregates, not visitor-level events.
+     * The streaming query is explicitly tenant-scoped: middleware may clear
+     * the request's ambient TenantContext before Symfony sends the body.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $organization = $this->organization($request);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless(
+            $user->canManageTrafficOrganization($organization),
+            403,
+        );
+
+        abort_unless($this->trafficReady(), 503);
+
+        $filters = $this->filters($request);
+        $from = $filters['from'] ?? now('UTC')->subDays(29)->toDateString();
+        $to = $filters['to'] ?? now('UTC')->toDateString();
+
+        if (Carbon::parse($from, 'UTC')->diffInDays(
+            Carbon::parse($to, 'UTC'),
+        ) > 366) {
+            throw ValidationException::withMessages([
+                'to' => 'The CSV export supports up to 366 days.',
+            ]);
+        }
+
+        $organizationId = (string) $organization->getKey();
+
+        $query = DB::table('tracked_link_daily_metrics as metrics')
+            ->join('tracked_links as links', function (JoinClause $join): void {
+                $join->on('metrics.tracked_link_id', '=', 'links.id')
+                    ->on('metrics.organization_id', '=', 'links.organization_id');
+            })
+            ->where('metrics.organization_id', $organizationId)
+            ->where('links.organization_id', $organizationId)
+            ->whereBetween('metrics.metric_date', [$from, $to])
+            ->when(
+                $filters['channel'] ?? null,
+                fn ($query, $channel) => $query->where('links.channel', $channel),
+            )
+            ->when(
+                $filters['campaign'] ?? null,
+                fn ($query, $campaign) => $query->where('links.campaign', $campaign),
+            )
+            ->when(
+                $filters['tracked_link_id'] ?? null,
+                fn ($query, $id) => $query->where('links.id', $id),
+            )
+            ->orderBy('metrics.metric_date')
+            ->orderBy('links.id')
+            ->select([
+                'metrics.metric_date',
+                'metrics.clicks',
+                'links.label',
+                'links.token',
+                'links.channel',
+                'links.campaign',
+                'links.status',
+            ]);
+
+        return response()->streamDownload(
+            static function () use ($query): void {
+                $output = fopen('php://output', 'wb');
+
+                if ($output === false) {
+                    throw new \RuntimeException('Cannot initialize the CSV stream.');
+                }
+
+                try {
+                    fwrite($output, "\xEF\xBB\xBF");
+                    fputcsv(
+                        $output,
+                        ['date_utc', 'label', 'short_link', 'channel', 'campaign', 'status', 'clicks'],
+                        ',',
+                        '"',
+                        '',
+                    );
+
+                    foreach ($query->cursor() as $row) {
+                        fputcsv($output, [
+                            (string) $row->metric_date,
+                            self::csvCell((string) $row->label),
+                            route('traffic.redirect', ['token' => $row->token]),
+                            self::csvCell((string) ($row->channel ?? '')),
+                            self::csvCell((string) ($row->campaign ?? '')),
+                            self::csvCell((string) $row->status),
+                            (int) $row->clicks,
+                        ], ',', '"', '');
+                    }
+                } finally {
+                    fclose($output);
+                }
+            },
+            "grindflow-traffic-{$from}-{$to}.csv",
+            [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+        );
+    }
+
+    /**
+     * Prevent spreadsheet formula execution from user-controlled labels and tags.
+     */
+    private static function csvCell(string $value): string
+    {
+        return preg_match('/^[\\s\\x00-\\x1F]*[=+@-]/u', $value) === 1
+            ? "'".$value
+            : $value;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function filters(Request $request): array
+    {
+        return $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'channel' => ['nullable', 'string', 'max:64'],
+            'campaign' => ['nullable', 'string', 'max:128'],
+            'tracked_link_id' => ['nullable', 'uuid'],
         ]);
     }
 

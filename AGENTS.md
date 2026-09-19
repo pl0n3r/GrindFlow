@@ -71,6 +71,17 @@ el cambio aquí en el mismo PR que modifica el producto.
   ejecutados, PR/merge y bloqueos de produccion. Nunca presentar una rama
   preparada como funcionalidad validada o desplegada.
 
+### Regla de reportes CSV de Traffic
+
+- Exportar unicamente agregados por link/dia, nunca IP, hash de visitante,
+  User-Agent, referrer o evento individual.
+- Un streaming response no puede depender de que el contexto tenant del
+  middleware continue vivo durante sendContent; la consulta de export debe
+  incluir filtros explicitos de organizacion en ambas tablas.
+- Mantener filtros de dashboard y CSV sincronizados; preview de 100 enlaces no
+  limita el reporte ni el conteo. Proteger CSV frente a formula injection y
+  fechas excesivas.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership

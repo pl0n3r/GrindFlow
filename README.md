@@ -5,8 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-
-> **Snapshot del PR candidato v0.1.6; NO es evidencia de deploy. El contrato «solo el deploy actual» aplica al publicarse. `main` v0.1.5 paso exact-main CI; Production Smoke confirma esquema previo sin pendientes; ledger nuevo aun no migrado.
+> **Snapshot del candidato v0.1.7; solo el deploy actual se verifica con evidencia del entorno.** `main` v0.1.6 (`f6e46c8cf07800df2bdc3ce730572a6f4ae5639b`) paso CI #35452780637. La migracion de audit v0.1.6 fue aplicada en produccion (1→0) #35452844884 y Smoke #35452780703 attempt 2 paso.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -15,31 +14,32 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-FR-005 · Immutable delivery attempt audit** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.5 · PR #96 fusionado** | `main` `1109664cb3ef9afd69cf24d415d88c1304021846` |
-| Version | 🚧 **v0.1.6** | audit de transiciones de distribucion |
-| CI del PR | 🚧 **head rebasado pendiente** | candidato anterior #35451318697 paso; revalidar |
-| Sonar | 🚧 **head rebasado pendiente** | candidato anterior bd05cc9f Quality Gate OK; revalidar |
-| CodeRabbit | 🚧 **2 findings abordados** | FK RESTRICT + evidencia; nueva revision pendiente |
-| CI del SHA exacto de main | ✅ **v0.1.5 validado** | validate #35451987029 |
-| Production Smoke | ✅ **esquema previo actual** | #35451987030; 0 pendientes antes del ledger nuevo |
-| Migraciones | 🚧 **ledger nuevo pendiente** | requiere backup + aprobacion expresa |
+| Work line | 🚧 **GF-FR-006B · Traffic daily CSV export** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.6 · PR #95 fusionado** | `f6e46c8cf07800df2bdc3ce730572a6f4ae5639b` |
+| Version | 🚧 **v0.1.7** | exportacion filtrada de metricas diarias |
+| CI del PR | 🚧 **pendiente** | validar SHA candidato |
+| Sonar | 🚧 **pendiente** | Quality Gate por SHA |
+| CodeRabbit | 🚧 **pendiente** | full review head estable |
+| CI del SHA exacto de main | ✅ **v0.1.6 validado** | validate #35452780637 |
+| Production Smoke | ✅ **schema v0.1.6 sin pendientes** | #35452780703 attempt 2 |
+| Migraciones | ✅ **ledger v0.1.6 aplicado** | #35452844884: 1 → 0 |
+| Deploy v0.1.7 | 🚧 **no confirmado** | CSV validado solo en codigo hasta su entrega |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+549** | **−91** | **+458** |
+| **9** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| Audit | ledger tenant-owned append-only, orden por entrega y error interno seguro |
-| Concurrencia | eventos de resultado en la misma transaccion que la transicion cercada |
-| UI | timeline por entrega o explicacion de migracion pendiente |
-| Produccion | no ejecuta migraciones ni publica externamente |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
+| Reporte | GET autenticado tenant-scoped con los mismos filtros del dashboard |
+| Escala | CSV por link/dia sin limite artificial de 100; maximo 366 dias |
+| Seguridad | no visitor-level datos, no destino original, proteccion formula CSV |
+| Schema | GET export 503 si las tablas de trafico faltan; sin migracion nueva |
 
 ## Flujo de entrega
 ```mermaid
@@ -64,46 +64,42 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Distribution registra `attempt_started` y resultados aceptados en ledger append-only por organizacion y entrega.
-- `event_number` conserva orden determinista aunque rate limits repitan el mismo attempt budget.
-- Un worker obsoleto no puede anotar un resultado tras perder su claim.
-- MariaDB impide UPDATE/DELETE mediante triggers y RESTRICT evita borrado de padres que suprima historial.
-- La vista de Distribution muestra timeline seguro por entrega y sigue funcionando antes de la migracion de auditoria.
-- Tests cubren publicacion, rate limit, ausencia de tabla, aislamiento de organizaciones, inmutabilidad ORM/SQL y DELETE del padre rechazado.
+- Traffic exporta CSV UTF-8 por enlace/dia con fecha UTC, nombre, enlace rastreable, canal, campana, estado y clicks agregados.
+- Filtrado consistente con el dashboard; incluye todos los enlaces coincidentes, no solo los 100 visibles.
+- Conteo del panel refleja el total real de enlaces filtrados, distingue preview de 100.
+- Exportacion segura para hojas de calculo y descargable sin cache; 366 dias maximos.
+- Consultas CSV incluyen organizacion explicita en ambas tablas, sin depender del contexto tenant durante streaming.
+- PHPUnit cubre filtros, tenants, privilegios, schema ausente, export completo y valores con formula.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md` — invariantes durables de auditoria.
-- `README.md` — snapshot exacto del candidato v0.1.6.
-- `app/Http/Controllers/Distribution/DistributionController.php` — eager load del timeline condicionado a schema.
-- `app/Models/PublicationDelivery.php` — relacion ordenada de eventos.
-- `app/Models/PublicationDeliveryEvent.php` — modelo tenant-owned append-only.
-- `app/Services/Distribution/PublicationDeliveryManager.php` — escrituras atomicas y cercadas.
-- `config/version.php` — version humana v0.1.6.
-- `database/migrations/2026_09_19_160000_create_publication_delivery_events_table.php` — ledger y triggers.
-- `docs/GRINDFLOW-SPEC.md` — contrato de audit.
-- `docs/REQUIREMENTS.md` — criterios de GF-FR-005.
-- `resources/views/distribution/index.blade.php` — historial visible.
-- `tests/Feature/DistributionTest.php` — regresiones de eventos y fallback.
+- `AGENTS.md` — invariantes CSV, contexto tenant y privacidad.
+- `README.md` — snapshot exacto de entrega v0.1.7.
+- `app/Http/Controllers/Traffic/TrafficController.php` — consulta, export y conteo.
+- `config/version.php` — version 0.1.7.
+- `docs/GRINDFLOW-SPEC.md` — contrato de export.
+- `docs/REQUIREMENTS.md` — requisito GF-FR-006B.
+- `resources/views/traffic/index.blade.php` — boton de CSV, conteo real.
+- `routes/web.php` — ruta GET autenticada y migration-safe.
+- `tests/Feature/TrafficAttributionTest.php` — cobertura funcional/seguridad.
 
 ## Validación
-- `main` v0.1.5 exacto `1109664cb3ef9afd69cf24d415d88c1304021846`: CI `validate` #35451987029 success.
-- v0.1.6 esta implementada en rama: CI #35451318697 y Sonar pasaron en head anterior; head rebasado requiere nuevas validaciones.
-- Production Smoke #35451987030 confirmo cero migraciones previas pendientes; ledger v0.1.6 aun no migrado.
-- Bridge #35452041675 fue no-op (0 previo); ledger nuevo no migrado ni desplegado.
+- `main` v0.1.6 validado: CI #35452780637; migration #35452844884; Smoke #35452780703 attempt 2.
+- CSV v0.1.7: CI/Sonar/CodeRabbit pendientes para este SHA candidato; no declarar desplegado hasta observarlo.
+- Sin nueva migracion SQL ni publicacion en proveedores externos.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar y entregar audit v0.1.6; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 Storage S3/CORS #40 y browser coverage en Distribution. |
-| **LATER** | 🚧 Adapter externo solo con autorizacion y credenciales aptas. |
-| **BLOCKED / EXTERNAL** | 🚧 migracion nueva del ledger: backup restaurable + aprobacion expresa. |
+| **NOW** | 🚧 Entregar Traffic CSV v0.1.7; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 S3/CORS y FFmpeg configurados en Hostinger #40. |
+| **LATER** | 🚧 E2E de modulos y paridad del legado. |
+| **BLOCKED / EXTERNAL** | 🚧 Identidad exacta del checkout Hostinger sin marcador verificable. |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Workflow #87, navegacion #90/#91, diagnostico #92 y runtime #94~~ | ✅ ~~main v0.1.5 validado~~ |
-| **NOW** | 🚧 Ledger append-only de Distribution | 🚧 v0.1.6 |
-| **NEXT** | 🚧 Storage y migracion nueva de audit | 🚧 #40 · audit v0.1.6 |
-| **LATER** | 🚧 Finance y paridad legado | 🚧 despues del esquema |
-| **BLOCKED / EXTERNAL** | 🚧 Produccion | 🚧 migracion nueva y checkout verificable |
+| **DONE** | ✅ ~~Audit Distribution #95 y migracion autorizada~~ | ✅ ~~CI exact-main y Smoke v0.1.6~~ |
+| **NOW** | 🚧 Reporte Traffic CSV | 🚧 v0.1.7 |
+| **NEXT** | 🚧 Object storage y FFmpeg de produccion | 🚧 #40 |
+| **LATER** | 🚧 Mejoras operativas y paridad legado | 🚧 roadmap #88 |
+| **BLOCKED / EXTERNAL** | 🚧 Observabilidad del SHA realmente desplegado | 🚧 Hostinger |
