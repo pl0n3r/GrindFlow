@@ -331,7 +331,11 @@ run_smoke() {
 
   local vault_path
   if ! vault_path="$(extract_vault_path)"; then
+    printf 'VAULT_READ_ONLY=failed\n'
     printf 'ERROR: dashboard does not expose an organization Vault link.\n' >&2
+    if [[ "$migrations_blocked" -eq 1 ]]; then
+      return 3
+    fi
     return 1
   fi
 

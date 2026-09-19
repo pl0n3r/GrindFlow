@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+252** | **−52** | **+200** |
+| **11** | **+285** | **−53** | **+232** |
 
 ## Calidad y entrega
 
@@ -42,7 +42,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| Tests | Admin System, migraciones, módulos, Smoke bloqueado y Vault |
+| Tests | Admin System, esquema parcial, Smoke bloqueado, Vault 500 y enlace ausente |
 | Autorización | solo admin; sin errores crudos, cookies ni credenciales en la UI |
 | Producción | Smoke solo lectura; nunca ejecuta migraciones |
 
@@ -76,8 +76,8 @@ flowchart LR
 - Readiness de Vault, Scheduling, Distribution, Traffic y Finance según las tablas reales, incluso si otro módulo tiene migraciones pendientes.
 - Un inventario desconocido bloquea el formulario; los errores internos no se muestran.
 - Smoke reutiliza la sesión para comprobar Vault aunque haya migraciones pendientes y registra media storage sin nuevos requests.
-- Si Vault también falla, el issue distingue ambos incidentes; no reintenta logins ni aplica SQL.
-- Tests PHP/MariaDB y contrato fake HTTP; regla duradera de avances sustanciales por mensaje.
+- Si Vault responde 500 o Dashboard omite el enlace Vault, el issue distingue ambos incidentes; no reintenta logins ni aplica SQL.
+- Tests PHP/MariaDB y contrato fake HTTP para esquema parcial, enlace ausente y bloqueos; regla duradera de avances sustanciales por mensaje.
 
 ## Archivos modificados en este deploy
 
@@ -85,10 +85,10 @@ flowchart LR
 - `config/version.php` — versión humana v0.1.3.
 - `app/Http/Controllers/Admin/SystemController.php` — conexión, inventario y módulos.
 - `resources/views/admin/system.blade.php` — panel de readiness.
-- `tests/Feature/AdminSystemTest.php` — regresión de fallo de inventario.
+- `tests/Feature/AdminSystemTest.php` — inventario fallido y esquema parcialmente migrado.
 - `tests/Feature/AdminMigrationReadinessTest.php` — lote pendiente y módulos independientes.
 - `scripts/production-smoke.sh` — Vault solo lectura pese a migraciones.
-- `scripts/production-smoke-contract.sh` — éxito, bloqueo y fallo de Vault.
+- `scripts/production-smoke-contract.sh` — bloqueo, Vault 500 y enlace ausente.
 - `.github/workflows/production-smoke.yml` — incidentes concurrentes visibles.
 - `AGENTS.md` — avance sustancial por mensaje.
 - `docs/DEVELOPMENT-MODEL.md` — contrato operativo de diagnóstico.

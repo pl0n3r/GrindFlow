@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Support\Operations\MigrationReadiness;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
@@ -40,6 +41,28 @@ class AdminSystemTest extends TestCase
             ->assertSee('data-module-readiness="vault:ready"', false)
             ->assertSee('data-module-readiness="scheduling:ready"', false)
             ->assertSee('data-module-readiness="distribution:ready"', false)
+            ->assertSee('data-module-readiness="traffic:ready"', false)
+            ->assertSee('data-module-readiness="finance:ready"', false);
+    }
+
+    public function test_system_identifies_partial_module_schema_without_marking_database_offline(): void
+    {
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+
+        Schema::shouldReceive('hasTable')
+            ->andReturnUsing(
+                fn (string $table): bool => $table !== 'publication_deliveries',
+            );
+
+        $this->actingAs($admin)
+            ->get(route('admin.system'))
+            ->assertOk()
+            ->assertSee('Connected')
+            ->assertSee('data-module-readiness="vault:ready"', false)
+            ->assertSee('data-module-readiness="scheduling:ready"', false)
+            ->assertSee('data-module-readiness="distribution:migration-required"', false)
             ->assertSee('data-module-readiness="traffic:ready"', false)
             ->assertSee('data-module-readiness="finance:ready"', false);
     }
