@@ -62,6 +62,17 @@ case "$url" in
     ;;
   http://mock/admin/system)
     body="<h2>Runtime configuration</h2><span data-pending-migrations=\"$MOCK_PENDING\">status</span><span data-media-storage-configured=\"0\">storage</span>"
+    if [[ "$MOCK_PENDING" == "3" ]]; then
+      fingerprint="$(printf 'a%.0s' {1..64})"
+      inventory='<ol data-pending-migration-inventory><li><code>2026_09_19_000001_first</code></li><li><code>2026_09_19_000002_second</code></li><li><code>2026_09_19_000003_third</code></li></ol>'
+      case "${MOCK_INVENTORY_MODE:-valid}" in
+        missing) inventory="" ;;
+        mismatch) inventory='<ol data-pending-migration-inventory><li><code>2026_09_19_000001_first</code></li></ol>' ;;
+        unsafe) inventory='<ol data-pending-migration-inventory><li><code>2026_09_19_bad-secret=never-print</code></li><li><code>2026_09_19_000002_second</code></li><li><code>2026_09_19_000003_third</code></li></ol>' ;;
+        no_fingerprint) fingerprint=invalid ;;
+      esac
+      body+="<input name=\"migration_batch\" value=\"$fingerprint\"><input name=\"_token\" value=\"do-not-leak-csrf\">$inventory"
+    fi
     ;;
   http://mock/organizations/example/vault)
     body="Organization scoped Direct upload"
@@ -87,10 +98,11 @@ run_case() {
   local label="$1"
   local pending="$2"
   local expected_status="$3"
+  local inventory_mode="${4:-valid}"
   local log="$workdir/$label.log"
   local result
 
-  if MOCK_PENDING="$pending" \
+  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" \
     BASE_URL=http://mock \
     E2E_USER_PASSWORD=synthetic-only \
     CURL_BIN="$workdir/mock-curl" \
@@ -108,8 +120,73 @@ run_case() {
   fi
 
   case "$label" in
-    pending)
+    pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
+      if [[ "$inventory_mode" == "valid" ]]; then
+        grep -Fxq 'MIGRATION_INVENTORY_STATUS=verified' "$log"
+        grep -Fxq 'MIGRATION_NAME=2026_09_19_000001_first' "$log"
+        grep -Fxq 'MIGRATION_NAME=2026_09_19_000002_second' "$log"
+        grep -Fxq 'MIGRATION_NAME=2026_09_19_000003_third' "$log"
+        grep -Eq '^MIGRATION_BATCH_SHA256=[a-f0-9]{64}
+      if grep -Fq 'Production smoke attempt 2/' "$log"; then
+        printf 'FAIL: migration-blocked smoke repeated a request.\n' >&2
+        exit 1
+      fi
+      ;;
+    current)
+      grep -Fq 'PASS production smoke:' "$log"
+      if grep -q '^MIGRATIONS_PENDING=' "$log"; then
+        printf 'FAIL: current schema reported pending migrations.\n' >&2
+        exit 1
+      fi
+      ;;
+    unknown)
+      grep -Fq 'ERROR: production migration inventory is unavailable.' "$log"
+      if grep -q '^MIGRATIONS_PENDING=' "$log"; then
+        printf 'FAIL: unknown schema was misclassified as pending.\n' >&2
+        exit 1
+      fi
+      ;;
+  esac
+  printf 'PASS production smoke contract: %s\n' "$label"
+}
+
+run_case pending 3 2
+run_case pending_missing 3 2 missing
+run_case pending_mismatch 3 2 mismatch
+run_case pending_unsafe 3 2 unsafe
+run_case pending_no_fingerprint 3 2 no_fingerprint
+run_case current 0 0
+
+# Unknown schema uses the existing bounded retry policy rather than a migration claim.
+if MOCK_PENDING=unknown BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only \
+  CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 \
+  bash "$script_dir/production-smoke.sh" > "$workdir/unknown.log" 2>&1; then
+  printf 'FAIL: unknown schema passed smoke.\n' >&2
+  exit 1
+else
+  result=$?
+fi
+[[ "$result" -eq 1 ]]
+grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unknown.log"
+if grep -q '^MIGRATIONS_PENDING=' "$workdir/unknown.log"; then
+  printf 'FAIL: unknown schema was misclassified as pending.\n' >&2
+  exit 1
+fi
+printf 'PASS production smoke contract: unknown\n'
+ "$log"
+        [[ "$(grep -c '^MIGRATION_NAME=' "$log")" -eq 3 ]]
+      else
+        grep -Fxq 'MIGRATION_INVENTORY_STATUS=unavailable' "$log"
+        if grep -Eq '^MIGRATION_(NAME|BATCH_SHA256)=' "$log"; then
+          printf 'FAIL: invalid inventory emitted an unverified manifest.\n' >&2
+          exit 1
+        fi
+      fi
+      if grep -Fq 'do-not-leak-csrf' "$log" || grep -Fq 'never-print' "$log"; then
+        printf 'FAIL: migration inventory log leaked untrusted HTML.\n' >&2
+        exit 1
+      fi
       grep -Fq 'BLOCKED: production smoke stopped on pending migrations' "$log"
       if grep -Fq 'Production smoke attempt 2/' "$log"; then
         printf 'FAIL: migration-blocked smoke repeated a request.\n' >&2
