@@ -29,6 +29,13 @@ expect_flag "$docs" "run_database=false" "docs skip database"
 expect_flag "$docs" "run_browser=false" "docs skip browser"
 expect_flag "$docs" "run_legacy=false" "docs skip legacy"
 
+release="$(run_scope pull_request README.md AGENTS.md config/version.php)"
+expect_flag "$release" "run_php_quality=false" "human release metadata stays fast-only"
+expect_flag "$release" "run_tests=false" "human release metadata skips tests"
+expect_flag "$release" "run_database=false" "human release metadata skips MariaDB"
+expect_flag "$release" "run_browser=false" "human release metadata skips browser"
+expect_flag "$release" "run_legacy=false" "human release metadata skips legacy"
+
 service="$(run_scope pull_request app/Services/Media/MediaAssetProcessor.php)"
 expect_flag "$service" "run_php_quality=true" "Laravel service selects php-quality"
 expect_flag "$service" "run_tests=true" "Laravel service selects tests"

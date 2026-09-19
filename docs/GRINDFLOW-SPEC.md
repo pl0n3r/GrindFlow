@@ -129,3 +129,19 @@ Finance begins as a tenant-owned append-only revenue-allocation ledger.
 - Finance routes remain deploy-before-migration safe and production migrations
   require explicit operational approval.
 
+## 10. Product version and verified deployment identity
+
+GrindFlow has a deliberate human-readable pre-1.0 release number in
+`config/version.php`, initially `0.1.0`. Each deploy-bound PR increments
+patch exactly once, or increments minor and resets patch to zero only for an
+explicit milestone. The product owner must explicitly approve `1.0.0`.
+CI validates the committed transition but never creates metadata commits.
+
+Admin > System shows the version as product information only. It is **not**
+a Git SHA, Hostinger deploy marker, production smoke outcome or migration status.
+The exact deployed source identity requires independent read-only evidence from
+the target environment. CI success alone means VALIDATED IN CODE.
+
+The execution roadmap and durable progress history live in
+[GitHub #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88);
+`README.md` remains a latest-delivery dashboard, not a changelog.

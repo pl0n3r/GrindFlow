@@ -10,24 +10,75 @@ for Laravel, MariaDB and GrindFlow's staged migration.
 3. `AGENTS.md`;
 4. `docs/GRINDFLOW-SPEC.md` and `docs/REQUIREMENTS.md`;
 5. area-specific docs;
-6. chat history.
+6. [Execution roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) for priority and durable delivery history; README for the latest deploy only;
+7. chat history.
 
 ## Branch lifecycle
 
 1. Start from green exact `main`.
 2. Create one focused branch.
-3. Reference one or more requirement IDs when product behavior changes.
+3. Use the ordered roadmap #88 unless explicitly reprioritized; reference requirement IDs when product behavior changes.
 4. Implement the smallest coherent change.
 5. Run directed tests first.
-6. Finalize the intended file set and exact README dashboard.
+6. Bump the deliberate human product version once in `config/version.php`; finalize the intended file set, README exact snapshot and progress convention.
 7. Open the PR and let GrindFlow CI + Sonar start.
 8. Request one CodeRabbit full review on the same stable intended head.
 9. Inspect CI, Sonar and CodeRabbit concurrently.
 10. Batch deterministic fixes into a new logical head when needed and revalidate.
 11. Require `GrindFlow CI / validate` and a green Sonar Quality Gate.
 12. Squash merge.
-13. Verify the exact merged `main` SHA through GrindFlow CI.
+13. Verify `GrindFlow CI / validate` on the exact merged `main` SHA before starting a dependent new PR.
 14. Treat deployment and production validation as separate evidence.
+
+## Autonomous agent handoff
+
+`AGENTS.md` is the complete session bootstrap. New ChatGPT, Work and Codex
+sessions read it first, check the current main/PR/gates, then follow issue
+[#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). They must not
+need old chat history to reconstruct priorities or architecture. The owner
+retains authority over product ambiguity and irreversible/protected actions.
+
+Parallelize independent source inspection, gate reviews and up to four distinct
+workstreams; batch related Git writes into logical commits. CI/Sonar/CodeRabbit
+review the **stable intended head**; never repeat a full review for each
+intermediate file edit. Merges are serialized. Existing PRs are finished first.
+
+Use disposable authenticated PHP/MariaDB + Chromium E2E wherever reasonable
+for admin workflows, alongside focused mocks. No production data mutation,
+credentials, external publication or migrations as part of ordinary E2E.
+
+## End-to-end multidisciplinary ownership
+
+The agent is GrindFlow's **Principal Software Engineer + Technical Executor**,
+not an advisor waiting for step-by-step permission. Own instruction → inspect
+actual state → diagnose → design → implement → test → review correctness/security
+→ deliver → verify available evidence.
+
+Architecture/product, UI/UX, visual art direction, backend/data, automated QA,
+security, performance/reliability, DevOps/release and routine technical product
+decisions are complementary capabilities used **together**, not sequential
+approval gates. Inspect related defects and fix root causes within a reasonable
+scope. Preserve GrindFlow's own coherent brand rather than importing BRVTAL's
+editorial art direction or generic SaaS templates.
+
+Do not block on reversible technical choices inferable from repo context.
+Escalate only ambiguous product direction, absent credentials/permissions,
+business decisions or irreversible/sensitive production actions. Explicitly
+separate IMPLEMENTED, VALIDATED IN CODE, DEPLOYED and VALIDATED IN PRODUCTION.
+
+## Progress and product release
+
+- `✅ ~~Completed~~`: verified through its applicable delivery gates;
+  `🚧 Pending`: pending or in progress, not struck through.
+- Keep delivered checklist items struck through in **roadmap #88**, not as
+  cumulative history in README.
+- Every deploy-bound PR commits a deliberate patch bump in
+  `config/version.php` before final review. Pre-1.0 minor bumps require an
+  explicit milestone; crossing 1.0 requires the product owner's decision.
+- `scripts/release-version.py` checks the exact Git base/head transition;
+  CI never rewrites product-version files or creates metadata commits.
+- Admin System displays the human version. It does **not** claim the real
+  deployed SHA, which must be observed independently from Hostinger.
 
 ## CI topology
 
@@ -72,7 +123,8 @@ behavior is protected by `scripts/ci-scope-contract.sh`.
 - deletions;
 - net line delta;
 - selected gate plan;
-- required delivery-state sections and priority lanes.
+- required delivery-state sections and priority lanes;
+- the CI-enforced progress convention, linked canonical issue and human release version.
 
 The README is therefore a machine-checked delivery dashboard rather than a
 manually maintained release story.

@@ -102,6 +102,11 @@ def section(readme: str, heading: str) -> str:
 def require_markers(readme: str) -> None:
     markers = [
         "# GrindFlow — Último deploy",
+        "## Progress convention",
+        "✅ ~~Completado~~",
+        "🚧 Pendiente",
+        "Version",
+        "https://github.com/drpipe1098-commits/GrindFlow/issues/88",
         "## Estado del deploy",
         "## Huella del cambio",
         "## Calidad y entrega",
@@ -155,6 +160,31 @@ def validate_roadmap(readme: str) -> None:
     if missing:
         fail("missing roadmap lane(s): " + ", ".join(missing))
 
+    convention = section(readme, "## Progress convention")
+    if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
+        fail("canonical progress convention missing or not documented")
+
+    roadmap = section(readme, "## Qué sigue") + section(readme, "## Panorama general pendiente")
+    if "https://github.com/drpipe1098-commits/GrindFlow/issues/88" not in roadmap:
+        fail("roadmap must link to canonical issue #88")
+
+    for row in roadmap.splitlines():
+        if not re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", row):
+            continue
+        if "✅" not in row and "🚧" not in row:
+            fail("roadmap row missing completed/pending symbol")
+        if "✅" in row and "~~" not in row:
+            fail("completed work must be struck through")
+        if "🚧" in row and "~~" in row:
+            fail("pending work must remain unstruck")
+
+
+def validate_version(readme: str) -> None:
+    content = (ROOT / "config" / "version.php").read_text(encoding="utf-8")
+    version = re.findall(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", content)
+    if len(version) != 1 or f"v{version[0]}" not in section(readme, "## Estado del deploy"):
+        fail("README must display exact committed GrindFlow product version")
+
 
 def validate(base: str, head: str) -> None:
     files = changed_files(base, head)
@@ -166,6 +196,7 @@ def validate(base: str, head: str) -> None:
     validate_gate_plan(readme, scope)
     validate_changed_files(readme, files)
     validate_roadmap(readme)
+    validate_version(readme)
     print(
         "README dashboard matches exact diff: "
         f"{len(files)} files, +{additions}/-{deletions}, "
