@@ -20,6 +20,21 @@ reviews:
     - "!coverage/**"
     - "!**/.DS_Store"
   path_instructions:
+    - path: "**/*"
+      instructions: |
+        Responde al propietario en español de Colombia cuando sea técnicamente
+        viable. AGENTS.md es el protocolo operativo, docs/GOVERNANCE.md contiene
+        las reglas durables de colaboración y Issue #88 solo trabajo/progreso.
+        Prioriza defectos comprobables, seguridad y pruebas de comportamiento;
+        evita opiniones cosméticas. No confundas CI, deploy y producción.
+    - path: ".github/ISSUE_TEMPLATE/**"
+      instructions: |
+        Las nuevas plantillas orientan a títulos (V X.Y.Z), no llevan versión
+        hard-coded que quedaría obsoleta ni introducen permisos globales.
+    - path: "scripts/validate-governance.py"
+      instructions: |
+        Asegura validación determinista y no destructiva de versión, enlaces
+        locales y labels. El gate de título usa la versión del head y no edita Git.
     - path: "app/**"
       instructions: |
         Treat AGENTS.md and docs/GRINDFLOW-SPEC.md as canonical. Check authorization,

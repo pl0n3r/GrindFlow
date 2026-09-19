@@ -1,0 +1,26 @@
+name: Proponer mejora
+description: Mejora funcional, experiencia o ingeniería.
+title: "mejora: [resumen breve] (V X.Y.Z)"
+labels:
+  - "tipo: mejora"
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema u oportunidad
+    validations:
+      required: true
+  - type: textarea
+    id: resultado
+    attributes:
+      label: Resultado verificable esperado
+    validations:
+      required: true
+  - type: textarea
+    id: alcance
+    attributes:
+      label: Alcance y exclusiones
+  - type: textarea
+    id: riesgos
+    attributes:
+      label: Riesgos o dependencias

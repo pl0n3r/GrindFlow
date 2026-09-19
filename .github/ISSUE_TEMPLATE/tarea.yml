@@ -1,0 +1,28 @@
+name: Crear tarea técnica
+description: Trabajo de implementación y pruebas concreto.
+title: "tarea: [resumen breve] (V X.Y.Z)"
+labels:
+  - "tipo: infraestructura"
+body:
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+    validations:
+      required: true
+  - type: textarea
+    id: alcance
+    attributes:
+      label: Alcance y exclusiones
+    validations:
+      required: true
+  - type: textarea
+    id: aceptacion
+    attributes:
+      label: Criterios de aceptación
+    validations:
+      required: true
+  - type: textarea
+    id: riesgos
+    attributes:
+      label: Riesgos / bloqueos

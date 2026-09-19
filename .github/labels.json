@@ -1,0 +1,57 @@
+[
+  {
+    "name": "tipo: error",
+    "color": "D73A4A",
+    "description": "Defecto reproducible o regresión."
+  },
+  {
+    "name": "tipo: mejora",
+    "color": "A2EEEF",
+    "description": "Mejora de producto, experiencia o ingeniería."
+  },
+  {
+    "name": "tipo: producto",
+    "color": "7057FF",
+    "description": "Definición o decisión funcional."
+  },
+  {
+    "name": "tipo: infraestructura",
+    "color": "1D76DB",
+    "description": "CI/CD, automatización, hosting o plataforma."
+  },
+  {
+    "name": "tipo: documentación",
+    "color": "0075CA",
+    "description": "Conocimiento durable y comunicación."
+  },
+  {
+    "name": "tipo: pruebas",
+    "color": "BFDADC",
+    "description": "Contrato, integración o E2E."
+  },
+  {
+    "name": "calidad",
+    "color": "0E8A16",
+    "description": "Mantenibilidad y calidad verificable."
+  },
+  {
+    "name": "seguridad",
+    "color": "B60205",
+    "description": "Autorización, privacidad o riesgo de seguridad."
+  },
+  {
+    "name": "deuda técnica",
+    "color": "FBCA04",
+    "description": "Mantenimiento o deuda priorizada."
+  },
+  {
+    "name": "prioridad: alta",
+    "color": "D93F0B",
+    "description": "Atención prioritaria."
+  },
+  {
+    "name": "estado: bloqueado",
+    "color": "000000",
+    "description": "Dependencia externa real."
+  }
+]

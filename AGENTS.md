@@ -8,6 +8,45 @@ el cambio aquí en el mismo PR que modifica el producto.
 
 ---
 
+## Prácticas compartidas con Condor: gobierno operativo de GrindFlow
+
+**Fuente:** [Condor](https://github.com/pl0n3r/Condor), adaptado sin importar
+nombre, dominio, reglas de negocio, arquitectura ni decisiones de moneda.
+Las decisiones durables de gobierno se conservan en
+[`docs/GOVERNANCE.md`](docs/GOVERNANCE.md). La aplicación sigue teniendo
+sus propias [especificaciones](docs/GRINDFLOW-SPEC.md), y este `AGENTS.md`
+continúa siendo el archivo operativo canónico para todos los agentes.
+
+- Español de Colombia en **nueva** comunicación humana, PRs, Issues,
+  plantillas, labels y nueva UI cuando sea viable. Identificadores técnicos
+  estables y legado en inglés se conservan si cambiarlos rompe contratos.
+  No imponer COP ni `es-CO` sobre contabilidad multimoneda/UTC.
+- Los **nuevos** títulos de PR, Issues, Releases y milestones cierran exactamente
+  con `(V X.Y.Z)`. En PR deploy-bound la versión del título debe coincidir
+  con `config/version.php`; `scripts/validate-governance.py` lo exige
+  en preflight. Los tickets automáticos e historial anterior no se renombran
+  a la fuerza.
+- Documentar progresos y bloqueos **únicamente** en roadmap Issue #88:
+  [`ROADMAP.md`](ROADMAP.md) solo enlaza. Conservar todo el historial
+  `✅ ~~completado~~`, `🚧 pendiente`, `⛔ bloqueado` hasta al menos la
+  primera versión 1.0.0 madura. Si el Issue se acerca al límite, abrir
+  volumen de continuación con enlaces bidireccionales, nunca borrar log.
+- **No introducir normas permanentes en roadmap**: protocolos en AGENTS.md,
+  reglas de colaboración en docs/GOVERNANCE.md, requisitos funcionales
+  en docs/REQUIREMENTS.md, términos para socios en [GLOSARIO.md](GLOSARIO.md).
+- README sigue siendo un solo snapshot machine-validated del deploy y
+  distingue objetivo, release observado, CI, SHA exacto main, checkout
+  remoto no verificado y validación producción. No reutilizar etiqueta
+  de release como evidencia de SHA Hostinger.
+- Plantillas GitHub y etiquetas nuevas en español son aditivas; workflow
+  `sincronizar-gobierno` solo crea/actualiza labels declarados, **nunca**
+  borra etiquetas, Issues o milestones. No modificar permisos productivos.
+- Registrar incidentes de Smoke en roadmap y no usar un CI verde como
+  sustituto de producción. Código/E2E local testing sí puede escribir
+  fixtures aisladas, producción Smoke jamás.
+- Actualizar GLOSARIO cuando se creen términos de negocio técnicos.
+  Revisar docs, scripts y gates en el mismo PR que adopta una regla.
+
 ## Protocolo de inicio para agentes y sesiones
 
 1. Leer este `AGENTS.md` completo. Consultar docs especificas de la tarea,
