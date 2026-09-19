@@ -73,6 +73,9 @@ grindflow_ci_classify_files() {
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
         GRINDFLOW_SCOPE_RUN_TESTS=true
         ;;
+      config/version.php)
+        grindflow_ci_scope_add_area "Product release metadata"
+        ;;
       config/*)
         grindflow_ci_scope_add_area "Runtime config"
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
