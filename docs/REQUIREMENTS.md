@@ -396,3 +396,25 @@ short link without deleting attribution history or changing its public URL.
   through the status endpoint. A Model role is forbidden, bad values rejected,
   and missing schema produces 503.
 - CSV ranges count UTC calendar dates inclusively: 366 permitted, 367 rejected.
+
+### GF-OPS-009 — Production workspace read-only verification
+**Status:** implemented
+
+**Statement:** Synthetic production verification must validate functional
+read-only module routes, not merely a successful dashboard login.
+
+**Acceptance criteria:**
+- The production smoke observes the committed human release in Admin System,
+  then checks organization Vault, Scheduler, Distribution, Traffic, Finance and
+  the CSV download in one session, only when schema inventory is current.
+- Each module returns HTTP 200 with its specific ready marker; CSV serves
+  aggregate header and expected download headers. Public tracked-link
+  redirects are NOT exercised by smoke (they mutate click counts).
+- Pending migrations retain a safe inventory + Vault-only diagnostic path;
+  actual module failures are non-retryable and reported without response data.
+- GitHub source SHA and observed human release are documented separately from
+  the unobserved exact Hostinger checkout SHA. Smoke never asserts that the
+  former equals the latter.
+
+**Verification:** shell contract covers current, schema-pending, unknown,
+stale release, failed module, malformed CSV and failed Vault.
