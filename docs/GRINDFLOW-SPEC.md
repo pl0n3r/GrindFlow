@@ -199,3 +199,17 @@ The execution roadmap and durable progress history live in
   but dependent module probing is skipped.
 - Offline/missing storage is still reported independently and does not block
   existing small-object upload. No migration is executed by smoke.
+
+## 15. Reversible Scheduler-to-Traffic assignment management
+
+- Studio/Admin/Editor and authorized platform admins can add, replace or detach
+  one tracked link from an existing future/undelivered scheduled publication.
+- The controller and domain manager both check organization membership; the
+  manager re-reads the publication under a scoped row lock inside a transaction.
+- New links must be active and belong to the same organization; a currently
+  assigned disabled link is never offered as a new selection, but can be removed.
+- No mutation is allowed on cancelled, due or delivery-claimed publications.
+- Changing the assignment does not change short-link tokens, click aggregates,
+  destination, scheduled date, media or idempotency keys. Detach removes only
+  the schedule-to-link association. The endpoint is schema-safe (503 before
+  link-assignment migration), and no SQL migration is required for this slice.

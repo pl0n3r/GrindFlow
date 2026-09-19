@@ -418,3 +418,27 @@ read-only module routes, not merely a successful dashboard login.
 
 **Verification:** shell contract covers current, schema-pending, unknown,
 stale release, failed module, malformed CSV and failed Vault.
+
+### GF-FR-004C — Edit Scheduler-to-Traffic attribution association
+**Status:** implemented
+
+**Statement:** A scheduling manager can add, swap and detach a tracked
+link after a scheduled publication has been created, until delivery begins.
+
+**Acceptance criteria:**
+- An authorized user can update a future, scheduled, undelivered publication
+  through an explicit form; omission of the link field must fail validation,
+  while an explicit empty selection detaches it.
+- New links must be active and owned by the same organization as the schedule;
+  a foreign publication/link or a Model role cannot be used to mutate the link.
+- Lock and revalidate under a transaction; scheduled rows with any delivery,
+  cancelled or due status cannot be changed. Repeated requests do not duplicate
+  assignments or mutate click aggregates.
+- Detached or replaced tracked links retain their public URLs, campaign
+  metadata and historical clicks; media and destination remain unchanged.
+- GET Scheduler continues to render before the assignment migration, while
+  POST/PATCH to edit a link returns 503 without that schema.
+
+**Verification:** feature tests cover no-assignment → attach → idempotent
+re-attach → swap → detach; disabled/foreign link, foreign publication, Model
+role, queued delivery, cancelled state, missing field and missing migration.
