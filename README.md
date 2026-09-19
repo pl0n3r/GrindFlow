@@ -29,13 +29,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+658** | **−44** | **+614** |
+| **11** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
 | Browser | Chromium + auth session y formularios reales con CSRF |
 | Scheduler | Deep search, POST schedule, pagina 2, detach/reattach |
 | Traffic | Edit target, pause/resume token, CSV privado |
@@ -78,6 +78,7 @@ flowchart LR
 - `AGENTS.md` — limite E2E y proteccion de credenciales.
 - `README.md` — foto exacta v0.1.15.
 - `config/version.php` — release humana.
+- `.github/workflows/grindflow-ci.yml` — protege E2E password en logs y CI full matrix.
 - `database/seeders/E2eSeeder.php` — fixtures aislados idempotentes.
 - `docs/DEVELOPMENT-MODEL.md` — E2E vs Production Smoke.
 - `docs/GRINDFLOW-SPEC.md` — contrato navegador.

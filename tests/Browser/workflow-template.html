@@ -203,12 +203,17 @@
     assert(disableForm?.querySelector('[name="status"]')?.value === 'disabled', 'Disable action exists');
     const disabled = await submit(disableForm, {}, campaignPath);
     assert(text(disabled.doc).includes('Tracked link disabled.'), 'Disable must succeed');
-    const enableForm = [...disabled.doc.querySelectorAll('form[action$="/status"]')]
+    // updateLinkStatus redirects to unfiltered Traffic. The deep link can
+    // fall outside page 1, so reapply the real campaign filter before
+    // looking for the reverse action.
+    const disabledFiltered = await get(campaignPath);
+    const enableForm = [...disabledFiltered.doc.querySelectorAll('form[action$="/status"]')]
       .find(form => form.action.includes(link.value));
     assert(enableForm?.querySelector('[name="status"]')?.value === 'active', 'Enable action exists');
     const enabled = await submit(enableForm, {}, campaignPath);
     assert(text(enabled.doc).includes('Tracked link enabled.'), 'Resume must succeed');
-    assert(enabled.doc.querySelector('a[href*="/l/"]')?.getAttribute('href') === shortLink,
+    const enabledFiltered = await get(campaignPath);
+    assert(enabledFiltered.doc.querySelector('a[href*="/l/"]')?.getAttribute('href') === shortLink,
       'Disable/resume must preserve short URL');
     pass('pause/resume link without following click-recording /l routes');
 

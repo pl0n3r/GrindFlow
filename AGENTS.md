@@ -232,7 +232,10 @@ el cambio aquí en el mismo PR que modifica el producto.
   /l/*, que genera clicks.
 - La plantilla publica temporal contiene password del usuario E2E solo
   durante el comando; borrar en trap y remover script del DOM ANTES de
-  capturar artifact. Rechazar/descartar DOM si aparece password, nunca
+  capturar artifact. En workflow Github Actions, ejecutar ::add-mask::
+  ANTES de exportar E2E_USER_PASSWORD a GITHUB_ENV; si no, el runner
+  puede mostrar la clave temporal en el entorno de los logs del step.
+  Rechazar/descartar DOM si aparece password, nunca
   imprimir HTML ni payloads de respuestas en logs ante fallo. No tomar
   captura adicional que reejecute workflow y duplique writes.
 - Los fixtures de media son METADATA sintética procesada, no prueba
