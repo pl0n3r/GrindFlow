@@ -101,7 +101,7 @@
                 <article class="gf-metric">
                     <div class="gf-metric__label">Application</div>
                     <div class="gf-metric__value">Online</div>
-                    <div class="gf-metric__meta">Laravel {{ $laravelVersion }}</div>
+                    <div class="gf-metric__meta">GrindFlow v{{ config('version.number', 'unknown') }} · Laravel {{ $laravelVersion }}</div>
                 </article>
 
                 <article class="gf-metric">
