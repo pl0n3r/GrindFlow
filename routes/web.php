@@ -7,11 +7,13 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Connections\DropboxConnectionController;
 use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Finance\FinanceController;
 use App\Http\Controllers\Scheduling\SchedulerController;
 use App\Http\Controllers\Traffic\TrackedLinkRedirectController;
 use App\Http\Controllers\Traffic\TrafficController;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
+use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Middleware\RequireTrafficSchema;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +52,18 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::post('/traffic', [TrafficController::class, 'store'])
                 ->middleware(RequireTrafficSchema::class)
                 ->name('organizations.traffic.store');
+            Route::get('/finance', [FinanceController::class, 'index'])
+                ->name('organizations.finance.index');
+            Route::post('/finance', [FinanceController::class, 'store'])
+                ->middleware(RequireFinanceSchema::class)
+                ->name('organizations.finance.store');
+            Route::post(
+                '/finance/{allocationId}/reverse',
+                [FinanceController::class, 'reverse'],
+            )
+                ->middleware(RequireFinanceSchema::class)
+                ->whereUuid('allocationId')
+                ->name('organizations.finance.reverse');
             Route::post('/vault/direct-upload', [DirectUploadController::class, 'create'])
                 ->middleware('throttle:30,1')
                 ->name('organizations.vault.direct.create');

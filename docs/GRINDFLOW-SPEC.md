@@ -106,3 +106,26 @@ different mechanism to preserve the same invariant.
 Features move module-by-module. A module is not removed from the legacy
 implementation until its Laravel replacement is **VALIDATED IN CODE** and the
 migration requirement for that module is satisfied.
+
+## 9. Finance core contract
+
+Finance begins as a tenant-owned append-only revenue-allocation ledger.
+
+- Admin and Studio roles may manage Finance; Editor and Model roles may not.
+- Money is stored as positive integer minor units plus a three-letter currency
+  code. Floating-point monetary persistence is prohibited.
+- Corrections are explicit reversal entries referencing the original row.
+  Originals and reversals are not edited or deleted as normal product actions;
+  MariaDB enforces this with append-only UPDATE/DELETE triggers.
+- A beneficiary is optional and must belong to the same organization at write
+  time. Actor and beneficiary deletion may null their user references without
+  rewriting financial history.
+- Net allocation is derived from original entries minus reversals per currency;
+  minor units from different currencies are never combined, and no mutable
+  balance cache is authoritative in core v1.
+- Payment execution, payouts, invoices, taxes and reconciliation are outside
+  core v1 and must integrate through auditable ledger entries rather than
+  bypassing them.
+- Finance routes remain deploy-before-migration safe and production migrations
+  require explicit operational approval.
+

@@ -40,6 +40,48 @@ class MariaDbIntegrityTest extends TestCase
             ->update(['organization_id' => $organizationB->id]);
     }
 
+    public function test_finance_ledger_rejects_direct_updates_in_mariadb(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MariaDB/MySQL is required for this integrity contract.');
+        }
+
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $allocationId = $this->financeAllocation(
+            $user,
+            $organization,
+        );
+
+        $this->expectException(QueryException::class);
+
+        DB::table('revenue_allocations')
+            ->where('id', $allocationId)
+            ->update(['amount_minor' => 1]);
+    }
+
+    public function test_finance_ledger_rejects_direct_deletes_in_mariadb(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MariaDB/MySQL is required for this integrity contract.');
+        }
+
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $allocationId = $this->financeAllocation(
+            $user,
+            $organization,
+        );
+
+        $this->expectException(QueryException::class);
+
+        DB::table('revenue_allocations')
+            ->where('id', $allocationId)
+            ->delete();
+    }
+
     public function test_invalid_membership_role_is_rejected_by_mariadb_enum(): void
     {
         if (DB::connection()->getDriverName() !== 'mysql') {
@@ -59,5 +101,32 @@ class MariaDbIntegrityTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function financeAllocation(
+        User $user,
+        Organization $organization,
+    ): string {
+        Membership::query()->create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role' => UserRole::Studio,
+        ]);
+
+        $allocationId = fake()->uuid();
+
+        DB::table('revenue_allocations')->insert([
+            'id' => $allocationId,
+            'organization_id' => $organization->id,
+            'created_by_user_id' => $user->id,
+            'source_label' => 'Integrity test',
+            'amount_minor' => 1000,
+            'currency' => 'COP',
+            'occurred_on' => '2026-09-19',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $allocationId;
     }
 }
