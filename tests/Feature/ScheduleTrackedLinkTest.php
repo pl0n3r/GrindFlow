@@ -340,7 +340,7 @@ class ScheduleTrackedLinkTest extends TestCase
         app(TenantContext::class)->runWithinOrganization(
             $actor,
             (string) $organization->getKey(),
-            function () use ($publication, $first): void {
+            function () use ($first): void {
                 $this->assertSame(1, ScheduledPublicationLink::query()->count());
                 $this->assertSame(
                     $first->getKey(),
