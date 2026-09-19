@@ -442,3 +442,27 @@ link after a scheduled publication has been created, until delivery begins.
 **Verification:** feature tests cover no-assignment → attach → idempotent
 re-attach → swap → detach; disabled/foreign link, foreign publication, Model
 role, queued delivery, cancelled state, missing field and missing migration.
+
+### GF-FR-004D — Paginated Scheduling calendar
+**Status:** implemented
+
+**Statement:** The organization Scheduler must show all matching
+publications across navigable pages, including those beyond the former
+first-100 limit.
+
+**Acceptance criteria:**
+- Server-side pages of 25 are ordered by UTC timestamp and UUID, with a
+  true filtered total; date cards only summarize the current page.
+- Previous/Next links preserve status, destination, UTC from/to while
+  rejecting invalid/oversized page parameters and omitting unrelated
+  request parameters.
+- Historical schedules remain filterable through disabled destinations,
+  which are never offered in the new-publication destination selector.
+- A request for a page beyond the last offers navigation back rather
+  than claiming the organization has no schedules.
+- Tenant isolation remains mandatory on count and page data; delivery
+  eligibility is eager-loaded; no scheduling migration is required.
+
+**Verification:** 106 local plus foreign rows with equal UTC timestamps,
+total/page counts, deterministic page slices, disabled-destination
+status/date filters, malformed and out-of-range page parameters.

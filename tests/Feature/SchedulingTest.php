@@ -804,6 +804,238 @@ class SchedulingTest extends TestCase
         );
     }
 
+    public function test_calendar_paginates_all_matching_schedules_without_cross_tenant_leaks(): void
+    {
+        $actor = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $otherActor = User::factory()->create();
+        $otherOrganization = Organization::factory()->create();
+
+        $this->membership($actor, $organization, UserRole::Editor);
+        $this->membership($otherActor, $otherOrganization, UserRole::Editor);
+
+        $utc = CarbonImmutable::now('UTC')->addDays(2)->startOfMinute();
+        $scheduledIds = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($actor, $utc): array {
+                $asset = $this->readyAsset();
+                $active = PublishingDestination::query()->create([
+                    'name' => 'Current channel',
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+                $archived = PublishingDestination::query()->create([
+                    'name' => 'Archived channel',
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_DISABLED,
+                ]);
+
+                $ids = [];
+
+                // Identical UTC timestamps require a stable secondary UUID
+                // ordering, including across the old 100-row preview cap.
+                for ($i = 0; $i < 105; $i++) {
+                    $ids[] = ScheduledPublication::query()->create([
+                        'media_asset_id' => $asset->getKey(),
+                        'publishing_destination_id' => $active->getKey(),
+                        'scheduled_by_user_id' => $actor->getKey(),
+                        'status' => ScheduledPublication::STATUS_SCHEDULED,
+                        'scheduled_for_utc' => $utc,
+                        'timezone' => 'UTC',
+                    ])->getKey();
+                }
+
+                ScheduledPublication::query()->create([
+                    'media_asset_id' => $asset->getKey(),
+                    'publishing_destination_id' => $archived->getKey(),
+                    'scheduled_by_user_id' => $actor->getKey(),
+                    'status' => ScheduledPublication::STATUS_CANCELLED,
+                    'scheduled_for_utc' => $utc,
+                    'timezone' => 'UTC',
+                ]);
+
+                sort($ids, SORT_STRING);
+
+                return $ids;
+            },
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $otherActor,
+            (string) $otherOrganization->getKey(),
+            function () use ($otherActor, $utc): void {
+                $asset = $this->readyAsset();
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Foreign private channel',
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+
+                for ($i = 0; $i < 3; $i++) {
+                    ScheduledPublication::query()->create([
+                        'media_asset_id' => $asset->getKey(),
+                        'publishing_destination_id' => $destination->getKey(),
+                        'scheduled_by_user_id' => $otherActor->getKey(),
+                        'status' => ScheduledPublication::STATUS_SCHEDULED,
+                        'scheduled_for_utc' => $utc,
+                        'timezone' => 'UTC',
+                    ]);
+                }
+            },
+        );
+
+        $route = route('organizations.scheduler.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+
+        $first = $this->actingAs($actor)->get($route)
+            ->assertOk()
+            ->assertSee('106 matching')
+            ->assertSee('Showing 1–25 of 106')
+            ->assertSee('Page 1 of 5')
+            ->assertSee('Calendar preview reflects this page')
+            ->assertSee('Archived channel · inactive')
+            ->assertDontSee('Foreign private channel');
+
+        $firstPage = $first->viewData('publications');
+
+        $this->assertSame(106, $firstPage->total());
+        $this->assertSame(25, $firstPage->count());
+        $this->assertSame(
+            array_slice($scheduledIds, 0, 25),
+            $firstPage->getCollection()->pluck('id')->all(),
+        );
+        $this->assertSame(
+            25,
+            $first->viewData('calendarDays')->sum(
+                fn ($items): int => $items->count(),
+            ),
+        );
+        $this->assertSame(
+            ['Current channel'],
+            $first->viewData('destinations')->pluck('name')->all(),
+        );
+
+        $second = $this->actingAs($actor)->get($firstPage->nextPageUrl())
+            ->assertOk()
+            ->assertSee('Showing 26–50 of 106')
+            ->assertSee('Page 2 of 5');
+
+        $this->assertSame(
+            array_slice($scheduledIds, 25, 25),
+            $second->viewData('publications')->getCollection()->pluck('id')->all(),
+        );
+
+        $last = $this->actingAs($actor)->get($route.'?page=5')
+            ->assertOk()
+            ->assertSee('Showing 101–106 of 106')
+            ->assertSee('Page 5 of 5');
+
+        $this->assertSame(6, $last->viewData('publications')->count());
+
+        $this->actingAs($actor)->get($route.'?page=8')
+            ->assertOk()
+            ->assertSee('No schedules on this page.')
+            ->assertSee('Go to last available page')
+            ->assertDontSee('No matching schedules.');
+
+        $this->actingAs($actor)->get($route.'?page=0')
+            ->assertSessionHasErrors('page');
+        $this->actingAs($actor)->get($route.'?page=10001')
+            ->assertSessionHasErrors('page');
+    }
+
+    public function test_calendar_preserves_filters_across_pages_including_disabled_destinations(): void
+    {
+        $actor = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $this->membership($actor, $organization, UserRole::Editor);
+
+        $date = CarbonImmutable::now('UTC')->addDays(3)->startOfMinute();
+
+        [$active, $disabled] = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($actor, $date): array {
+                $asset = $this->readyAsset();
+                $active = PublishingDestination::query()->create([
+                    'name' => 'Available channel',
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+                $disabled = PublishingDestination::query()->create([
+                    'name' => 'Retired channel',
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_DISABLED,
+                ]);
+
+                for ($i = 0; $i < 28; $i++) {
+                    ScheduledPublication::query()->create([
+                        'media_asset_id' => $asset->getKey(),
+                        'publishing_destination_id' => $disabled->getKey(),
+                        'scheduled_by_user_id' => $actor->getKey(),
+                        'status' => ScheduledPublication::STATUS_CANCELLED,
+                        'scheduled_for_utc' => $date,
+                        'timezone' => 'UTC',
+                    ]);
+                }
+
+                ScheduledPublication::query()->create([
+                    'media_asset_id' => $asset->getKey(),
+                    'publishing_destination_id' => $active->getKey(),
+                    'scheduled_by_user_id' => $actor->getKey(),
+                    'status' => ScheduledPublication::STATUS_SCHEDULED,
+                    'scheduled_for_utc' => $date,
+                    'timezone' => 'UTC',
+                ]);
+
+                return [$active, $disabled];
+            },
+        );
+
+        $route = route('organizations.scheduler.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+        $filters = [
+            'status' => 'cancelled',
+            'destination_id' => $disabled->getKey(),
+            'from' => $date->format('Y-m-d'),
+            'to' => $date->format('Y-m-d'),
+        ];
+
+        $first = $this->actingAs($actor)->get($route.'?'.http_build_query($filters))
+            ->assertOk()
+            ->assertSee('28 matching')
+            ->assertSee('Showing 1–25 of 28')
+            ->assertSee('Retired channel · inactive');
+
+        $page = $first->viewData('publications');
+        $this->assertSame(28, $page->total());
+        $this->assertSame(25, $page->count());
+        $this->assertFalse($first->viewData('destinations')->contains('id', $disabled->getKey()));
+        $this->assertTrue($first->viewData('destinations')->contains('id', $active->getKey()));
+
+        $next = $page->nextPageUrl();
+        $this->assertIsString($next);
+        parse_str((string) parse_url($next, PHP_URL_QUERY), $query);
+
+        $this->assertSame('2', $query['page']);
+        unset($query['page']);
+        $this->assertEquals($filters, $query);
+
+        $second = $this->actingAs($actor)->get($next)
+            ->assertOk()
+            ->assertSee('Showing 26–28 of 28')
+            ->assertSee('Page 2 of 2');
+
+        $this->assertSame(3, $second->viewData('publications')->count());
+
+        $this->actingAs($actor)->get($route.'?status=scheduled&destination_id='.$disabled->getKey())
+            ->assertOk()
+            ->assertSee('No matching schedules.');
+    }
+
     private function readyAsset(?array $metadata = null): MediaAsset
     {
         $blob = MediaBlob::query()->create([

@@ -124,6 +124,24 @@ el cambio aquí en el mismo PR que modifica el producto.
   mientras el PATCH de asociacion retorna 503; no ejecutar migraciones
   por el smoke ni permitir cross-tenant por IDs globales.
 
+### Scheduler: calendario paginado sin cortes silenciosos
+
+- No usar `limit(100)` para la lista principal de programaciones: pagina
+  25 items con total SQL real, orden estable por UTC + id y links Prev/Next
+  que preservan SOLO los filtros validados; no propagar query params ajenos.
+- Vista calendario agrupa UNICAMENTE la pagina actual; mostrarlo
+  explicitamente y distinguir conteo total vs cargados para no llamar
+  calendario completo a un preview parcial.
+- Los destinos deshabilitados siguen disponibles como filtro para consultar
+  schedules historicos, pero nunca entran en el selector de nuevos destinos.
+- Eager-load `delivery` cuando el listado comprueba si hay entrega
+  para permitir acciones; evita consulta individual por cada fila.
+- Sin migracion de Scheduling, el GET debe seguir dando fallback amigable,
+  sin acceder a metodos de paginacion de una Collection vacia.
+- Probar >100 filas con misma fecha y 2 organizaciones, paginacion
+  determinista, filtros combinados + links, destino inactivo,
+  paginas fuera de rango y query de pagina malformada.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership
