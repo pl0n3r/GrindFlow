@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+1299** | **−52** | **+1247** |
+| **14** | **+1458** | **−52** | **+1406** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -73,11 +73,11 @@ flowchart LR
 - Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible.
 - Un asset solo es elegible si es canónico, está `ready` y su procesamiento terminó en la **versión actual** del procesador.
 - Rechaza procesamiento stale/failed, duplicados, destinos deshabilitados, timezone inválida y fechas pasadas.
-- Guarda el instante debido en UTC y conserva la timezone IANA original para reconstruir la hora local.
+- Guarda y **lee** el instante debido explícitamente en UTC, independiente de `APP_TIMEZONE`, y conserva la timezone IANA original para reconstruir la hora local.
 - Expone GET/POST `/organizations/{organizationId}/scheduler` y habilita Scheduler en la navegación.
 - La UI lista destinos activos, assets elegibles y próximas publicaciones.
 - El controller es migration-safe: sin tablas, la vista explica el bloqueo y los writes responden 503 en vez de provocar un 500.
-- Añade pruebas de autorización, tenant isolation, destino deshabilitado, processing incompleto y timezone explícita.
+- Añade pruebas de autorización, tenant isolation, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC y endpoints seguros antes de migrar.
 - GF-FR-005 queda separado: este slice no intenta publicar, reintentar ni hablar con proveedores externos.
 
 ## Archivos modificados en este deploy
