@@ -21,9 +21,9 @@
 | Línea de trabajo | 🚧 **Paridad técnica con BRVTAL adaptada** | v0.1.21 |
 | Base exacta | ✅ **main v0.1.20** | `9206524801a86b4c603f802ce512b8ee01ff04b6` |
 | Version | 🚧 **v0.1.21 objetivo** | config/version.php |
-| CI del PR | 🚧 **pendiente** | validate |
-| Sonar | 🚧 **Quality Gate aún sin confirmar** | `pl0n3r_GrindFlow` |
-| CodeRabbit | 🚧 **revisión completa pendiente** | head estable |
+| CI del PR | ✅ **9 jobs exitosos en `a19401e`; revalidación del head final pendiente** | [CI #35474880373](https://github.com/pl0n3r/GrindFlow/actions/runs/35474880373) |
+| Sonar | ✅ **Quality Gate OK en `a19401e`; revalidación del head final pendiente** | `pl0n3r_GrindFlow` |
+| CodeRabbit | 🚧 **Revisión de `a19401e` recibida y dos ajustes aplicados; head final pendiente** | [PR #5](https://github.com/pl0n3r/GrindFlow/pull/5) |
 | CI del SHA exacto de main | 🚧 **posterior al merge** | base verde #35472591631 |
 | Deploy Observer | 🚧 **nuevo, solo versión** | SHA Hostinger no observado |
 | Production Smoke | ⛔ **sin credencial** | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
@@ -34,7 +34,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **20** | **+517** | **−107** | **+410** |
+| **20** | **+527** | **−111** | **+416** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -95,7 +95,7 @@ flowchart LR
 
 ## Validación
 - Base: [CI #35472591631](https://github.com/pl0n3r/GrindFlow/actions/runs/35472591631), ocho gates exitosos.
-- Candidato: ejecutar CI, real-stack y revisiones antes de merge; no se declaran aprobados anticipadamente.
+- Candidato: [CI #35474880373](https://github.com/pl0n3r/GrindFlow/actions/runs/35474880373) completó nueve jobs en `a19401e`; Sonar Quality Gate OK. Dos ajustes de revisión requieren nuevo CI y revisión del head final antes del merge.
 - Observer no demuestra SHA remoto ni comportamiento autenticado. Smoke real bloqueado por credencial #1.
 
 ## Qué sigue
