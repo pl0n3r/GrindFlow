@@ -75,6 +75,7 @@ class PublicationDeliveryManager
                         (string) $lockedPublication->getKey(),
                     ),
                     'status' => PublicationDelivery::STATUS_QUEUED,
+                    'attempts' => 0,
                     'claimed_until' => now('UTC')->addSeconds(
                         self::CLAIM_SECONDS,
                     ),
