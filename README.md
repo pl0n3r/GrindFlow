@@ -12,9 +12,9 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN CODE · CI #232 |
-| Base exacta | ✅ **main** | `62499a5963218db53239c54a5c302caf79e38324` |
-| Produccion actual | ✅ **smoke verde** | Production Smoke #31 sobre la base exacta |
+| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN PRODUCTION · CI #235 · Smoke #32 |
+| Base exacta | ✅ **main** | `7fa8d350a1e2c53e848f06f01c741002c6735d9c` |
+| Produccion actual | ✅ **smoke verde** | Production Smoke #32 sobre el SHA exacto |
 | Migraciones | ✅ **0 pendientes** | no hay cambios de schema en este slice |
 | Feature gate | 🔒 **off por defecto** | `MEDIA_FFPROBE_ENABLED=false` |
 
@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+867** | **−54** | **+813** |
+| **1** | **+13** | **−24** | **-11** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -34,7 +34,7 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| Gates seleccionados | **preflight · fast[contracts]** |
 | GrindFlow CI | `validate` exige success real para cada gate seleccionado |
 | Sonar | análisis independiente + comentario estable de detalles del PR |
 | CodeRabbit | full review sobre el head estable |
@@ -81,33 +81,22 @@ flowchart LR
 
 ## Archivos modificados en este deploy
 
-- `.env.example` — feature gate, binario y timeout de ffprobe.
-- `README.md` — snapshot exacto del slice actual.
-- `app/Jobs/ProcessMediaAsset.php` — ejecuta exactamente la version de procesador encolada.
-- `app/Services/Media/FfprobeMediaInspector.php` — inspección técnica normalizada y validación estricta.
-- `app/Services/Media/MediaAssetProcessor.php` — v2 sin ffprobe y v3 con ffprobe.
-- `app/Services/Media/MediaProcessingCoordinator.php` — selecciona version por modo y separa idempotencia/reintentos.
-- `app/Services/Media/MediaProcessingException.php` — errores seguros del probe/version.
-- `config/grindflow.php` — configuración ffprobe fail-closed.
-- `docs/REQUIREMENTS.md` — verificación actualizada de GF-FR-003.
-- `tests/Feature/FfprobeMediaInspectorTest.php` — normalización, malformed entries y fallos seguros.
-- `tests/Feature/MediaProcessingJobTest.php` — idempotencia y transición v2 → v3.
-- `tests/secrets.test.ts` — manipulación AES-GCM determinista para eliminar un flake Base64URL.
+- `README.md` — sincroniza el dashboard con el SHA, CI y Production Smoke ya validados.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** sobre el head funcional `3e96cfdaf90c01e14b9631e62a7f89de057f219b`.
-- GrindFlow CI #232 pasó fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate.
-- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots sobre el PR actualizado.
+- Estado actual: **VALIDATED IN PRODUCTION** sobre `main` `7fa8d350a1e2c53e848f06f01c741002c6735d9c`.
+- GrindFlow CI #235 pasó preflight, fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate sobre el SHA exacto de `main`.
+- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots en #62.
 - Las pruebas usan Laravel Process fakes y bloquean procesos no simulados.
-- Antes del merge se exige matriz completa, Sonar, revisión externa aplicable y recheck de `main`.
+- Production Smoke #32 pasó después del merge; ffprobe permanece deshabilitado por defecto y no requiere binario real para este deploy.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Revalidar el head final, revisar CodeRabbit y hacer squash merge con recheck de `main`. |
-| **NEXT** | Tras merge, validar exact-main + Production Smoke; habilitar ffprobe solo cuando el hosting confirme el binario. |
+| **NOW** | Sincronizar este dashboard con el deploy validado y arrancar derivados FFmpeg en una rama separada. |
+| **NEXT** | Implementar thumbnails/previews deterministas detrás del contrato de procesamiento existente. |
 | **BLOCKED / EXTERNAL** | Object storage S3-compatible sigue sin configurar; disponibilidad real de ffprobe en hosting aun no esta validada. |
 | **LATER** | Derivados FFmpeg detrás del mismo contrato y luego continuar P2. |
 
@@ -115,7 +104,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Media processing | v2 disabled + v3 ffprobe hardening VALIDATED IN CODE |
+| **NOW** | Media processing | v2 disabled + v3 ffprobe VALIDATED IN PRODUCTION con gate apagado |
 | **NEXT** | Derivados | thumbnails/previews/normalización con FFmpeg |
 | **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
 | **BLOCKED / EXTERNAL** | Hosting / storage | ffprobe real y S3-compatible requieren configuración externa |
