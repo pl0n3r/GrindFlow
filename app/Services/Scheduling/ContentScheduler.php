@@ -48,7 +48,6 @@ class ContentScheduler
 
     /**
      * @param Collection<int, PublishingDestination> $destinations
-     *
      * @return Collection<int, ScheduledPublication>
      */
     public function scheduleMany(
@@ -240,8 +239,7 @@ class ContentScheduler
         });
     }
 
-    public function cancel(ScheduledPublication $publication, User $actor): void
-    {
+    public function cancel(ScheduledPublication $publication, User $actor): void {
         $organizationId = $this->tenantContext->organizationId();
         if (
             $organizationId === null
