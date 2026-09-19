@@ -79,6 +79,52 @@ class DistributionTest extends TestCase
         );
     }
 
+    public function test_abandoned_queued_delivery_can_be_redriven_after_lease(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $delivery = $this->queueAndGetDelivery(
+            $publication,
+            $user,
+            $organization,
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($delivery): void {
+                PublicationDelivery::query()
+                    ->findOrFail($delivery->getKey())
+                    ->forceFill([
+                        'claimed_until' => now('UTC')->subSecond(),
+                    ])
+                    ->save();
+            },
+        );
+
+        $redriven = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): bool => app(PublicationDeliveryManager::class)
+                ->queue($publication, $user),
+        );
+
+        $this->assertTrue($redriven);
+        Queue::assertPushed(
+            DispatchScheduledPublication::class,
+            2,
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                1,
+                PublicationDelivery::query()->count(),
+            ),
+        );
+    }
+
     public function test_authentication_failure_is_terminal_and_distinct(): void
     {
         [$user, $organization] = $this->identity();
