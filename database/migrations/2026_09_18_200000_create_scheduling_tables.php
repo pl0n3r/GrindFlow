@@ -66,7 +66,7 @@ return new class extends Migration
             )
                 ->references(['id', 'organization_id'])
                 ->on('media_assets')
-                ->restrictOnDelete();
+                ->cascadeOnDelete();
 
             $table->foreign(
                 ['publishing_destination_id', 'organization_id'],
@@ -74,7 +74,7 @@ return new class extends Migration
             )
                 ->references(['id', 'organization_id'])
                 ->on('publishing_destinations')
-                ->restrictOnDelete();
+                ->cascadeOnDelete();
         });
     }
 
