@@ -5,7 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot del candidato v0.1.7; solo el deploy actual se verifica con evidencia del entorno.** `main` v0.1.6 (`f6e46c8cf07800df2bdc3ce730572a6f4ae5639b`) paso CI #35452780637. La migracion de audit v0.1.6 fue aplicada en produccion (1→0) #35452844884 y Smoke #35452780703 attempt 2 paso.
+> **Snapshot del PR candidato v0.1.8; NO es evidencia de deploy. El contrato «solo el deploy actual» aplica al publicarse.** `main` v0.1.7 `02bdbcb3c5da234b32b06d9b140d1aa9c1f032c9`: CI #35453332338 success y Production Smoke #35453332333 success; SHA remoto Hostinger todavia no verificado.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -14,32 +14,33 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-FR-006B · Traffic daily CSV export** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.6 · PR #95 fusionado** | `f6e46c8cf07800df2bdc3ce730572a6f4ae5639b` |
-| Version | 🚧 **v0.1.7** | exportacion filtrada de metricas diarias |
-| CI del PR | 🚧 **pendiente** | validar SHA candidato |
+| Work line | 🚧 **GF-FR-006C · Traffic link lifecycle + CSV boundary** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.7 · PR #97 fusionado** | `02bdbcb3c5da234b32b06d9b140d1aa9c1f032c9` |
+| Version | 🚧 **v0.1.8** | pausa y reanudacion de links |
+| CI del PR | 🚧 **pendiente** | validar nuevo SHA |
 | Sonar | 🚧 **pendiente** | Quality Gate por SHA |
 | CodeRabbit | 🚧 **pendiente** | full review head estable |
-| CI del SHA exacto de main | ✅ **v0.1.6 validado** | validate #35452780637 |
-| Production Smoke | ✅ **schema v0.1.6 sin pendientes** | #35452780703 attempt 2 |
-| Migraciones | ✅ **ledger v0.1.6 aplicado** | #35452844884: 1 → 0 |
-| Deploy v0.1.7 | 🚧 **no confirmado** | CSV validado solo en codigo hasta su entrega |
+| CI del SHA exacto de main | ✅ **v0.1.7 validado** | validate #35453332338 |
+| Production Smoke | ✅ **rutas autenticadas previas OK** | #35453332333; no prueba esta feature |
+| Migraciones | ✅ **no requiere SQL nuevo** | schema previo sin pendientes |
+| Deploy v0.1.8 | 🚧 **no confirmado** | no atribuir CI a Hostinger |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+424** | **−60** | **+364** |
+| **10** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
-| Reporte | GET autenticado tenant-scoped con los mismos filtros del dashboard |
-| Escala | CSV por link/dia sin limite artificial de 100; maximo 366 dias |
-| Seguridad | no visitor-level datos, no destino original, proteccion formula CSV |
-| Schema | GET export 503 si las tablas de trafico faltan; sin migracion nueva |
+| Lifecycle | PATCH tenant-scoped + transicion bloqueada por fila |
+| Retencion | link y token estables, historial de clicks intacto |
+| Redirect | disabled → 404 sin nuevo click; active → mismo short URL |
+| CSV | maximo 366 fechas UTC inclusivas, 367 rechazadas |
+| Produccion | sin SQL nuevo, sin publicacion a plataformas |
 
 ## Flujo de entrega
 ```mermaid
@@ -64,42 +65,43 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Traffic exporta CSV UTF-8 por enlace/dia con fecha UTC, nombre, enlace rastreable, canal, campana, estado y clicks agregados.
-- Filtrado consistente con el dashboard; incluye todos los enlaces coincidentes, no solo los 100 visibles.
-- Conteo del panel refleja el total real de enlaces filtrados, distingue preview de 100.
-- Exportacion segura para hojas de calculo y descargable sin cache; 366 dias maximos.
-- Consultas CSV incluyen organizacion explicita en ambas tablas, sin depender del contexto tenant durante streaming.
-- PHPUnit cubre filtros, tenants, privilegios, schema ausente, export completo y valores con formula.
+- Tracked links permiten Disable/Enable desde Traffic sin borrar ni rotar el enlace.
+- Deshabilitar corta redireccion y atribucion; reactivar restaura la URL corta anterior.
+- El historial diario, asociaciones programadas y reportes siguen visibles.
+- La autorizacion por rol+tenant se verifica en controller y manager, con lock en update y 503 antes de schema.
+- Se corrige finding de CodeRabbit PR #97: exactamente 366 fechas inclusivas admitidas; 367 rechazadas.
+- Tests cubren ciclo completo, idempotencia, permisos, cross-tenant, schema ausente y limite leap-year CSV.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md` — invariantes CSV, contexto tenant y privacidad.
-- `README.md` — snapshot exacto de entrega v0.1.7.
-- `app/Http/Controllers/Traffic/TrafficController.php` — consulta, export y conteo.
-- `config/version.php` — version 0.1.7.
-- `docs/GRINDFLOW-SPEC.md` — contrato de export.
-- `docs/REQUIREMENTS.md` — requisito GF-FR-006B.
-- `resources/views/traffic/index.blade.php` — boton de CSV, conteo real.
-- `routes/web.php` — ruta GET autenticada y migration-safe.
-- `tests/Feature/TrafficAttributionTest.php` — cobertura funcional/seguridad.
+- `AGENTS.md` — regla durable lifecycle y CSV fechas inclusivas.
+- `README.md` — snapshot del candidato v0.1.8.
+- `app/Http/Controllers/Traffic/TrafficController.php` — status patch y 366 fechas.
+- `app/Services/Traffic/TrackedLinkManager.php` — transicion tenant-scoped atomica.
+- `config/version.php` — version humana 0.1.8.
+- `docs/GRINDFLOW-SPEC.md` — contrato de status/CSV.
+- `docs/REQUIREMENTS.md` — GF-FR-006C.
+- `resources/views/traffic/index.blade.php` — acciones Disable/Enable accesibles.
+- `routes/web.php` — PATCH status migration-safe.
+- `tests/Feature/TrafficAttributionTest.php` — regresiones status y CSV.
 
 ## Validación
-- `main` v0.1.6 validado: CI #35452780637; migration #35452844884; Smoke #35452780703 attempt 2.
-- CSV v0.1.7: CI/Sonar/CodeRabbit pendientes para este SHA candidato; no declarar desplegado hasta observarlo.
-- Sin nueva migracion SQL ni publicacion en proveedores externos.
+- Base v0.1.7: CI validate #35453332338 y read-only Production Smoke #35453332333 exitosos.
+- PR v0.1.8 requiere CI, Sonar y CodeRabbit del head final; no afirmar deploy ni produccion validada.
+- Sin migracion nueva ni borrado, cambios de estado opt-in desde UI.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Entregar Traffic CSV v0.1.7; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 S3/CORS y FFmpeg configurados en Hostinger #40. |
-| **LATER** | 🚧 E2E de modulos y paridad del legado. |
-| **BLOCKED / EXTERNAL** | 🚧 Identidad exacta del checkout Hostinger sin marcador verificable. |
+| **NOW** | 🚧 Validar/entregar Traffic lifecycle v0.1.8; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 Storage S3/CORS y capacidad FFmpeg #40. |
+| **LATER** | 🚧 E2E visual de Scheduler/Traffic/Distribution y Finance. |
+| **BLOCKED / EXTERNAL** | 🚧 Identidad SHA checkout Hostinger verificable. |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Audit Distribution #95 y migracion autorizada~~ | ✅ ~~CI exact-main y Smoke v0.1.6~~ |
-| **NOW** | 🚧 Reporte Traffic CSV | 🚧 v0.1.7 |
-| **NEXT** | 🚧 Object storage y FFmpeg de produccion | 🚧 #40 |
-| **LATER** | 🚧 Mejoras operativas y paridad legado | 🚧 roadmap #88 |
-| **BLOCKED / EXTERNAL** | 🚧 Observabilidad del SHA realmente desplegado | 🚧 Hostinger |
+| **DONE** | ✅ ~~Distribution audit #95 y Traffic CSV #97~~ | ✅ ~~v0.1.7 CI + Smoke~~ |
+| **NOW** | 🚧 Pausa/reanudacion de tracked links | 🚧 v0.1.8 |
+| **NEXT** | 🚧 S3 y FFmpeg runtime | 🚧 #40 |
+| **LATER** | 🚧 E2E y paridad legado | 🚧 roadmap #88 |
+| **BLOCKED / EXTERNAL** | 🚧 Observabilidad Git SHA realmente desplegado | 🚧 Hostinger |

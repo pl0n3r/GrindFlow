@@ -376,3 +376,23 @@ aggregates as the dashboard without leaking visitor-level identifiers.
   Traffic schema returns 503 rather than a server error.
 - The dashboard's matched link count includes all filtered records, not merely
   the 100-link preview.
+
+### GF-FR-006C — Tracked-link lifecycle
+**Status:** implemented
+
+**Statement:** Authorized Traffic managers can pause and resume an existing
+short link without deleting attribution history or changing its public URL.
+
+**Verification notes (Laravel):**
+- Active and disabled are the only accepted status mutations; link ID must be
+  a UUID and belongs to the request's active organization.
+- Authorization is repeated in the manager, and state transitions are
+  serialized under an organization-scoped row lock.
+- A disabled link returns public HTTP 404 and does not record new clicks; after
+  enabling, the exact same token resumes redirecting and collecting counts.
+- Existing daily aggregate metrics and scheduled link associations survive the
+  transition; no destructive deletes or migration required.
+- A manager from another organization cannot mutate the link or discover it
+  through the status endpoint. A Model role is forbidden, bad values rejected,
+  and missing schema produces 503.
+- CSV ranges count UTC calendar dates inclusively: 366 permitted, 367 rejected.

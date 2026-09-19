@@ -82,6 +82,17 @@ el cambio aquí en el mismo PR que modifica el producto.
   limita el reporte ni el conteo. Proteger CSV frente a formula injection y
   fechas excesivas.
 
+### Traffic: ciclo de vida reversible y export de calendario
+
+- Pausar/reanudar link no elimina metricas, no rota token ni modifica
+  asociaciones programadas. Las URLs deshabilitadas responden 404 y no suman
+  clics; la habilitacion restaura el mismo enlace.
+- Los PATCH validan rol+tenant+estado en HTTP y vuelven a autorizar en manager.
+  Nunca aceptar un link de otra organizacion ni dejar que una tabla ausente cause
+  un 500. Testear historia conservada y reintento idempotente.
+- El limite CSV de 366 dias es INCLUSIVO: una diferencia de 366 fechas de
+  medianoche abarca 367 dias y se rechaza (CodeRabbit PR #97).
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership

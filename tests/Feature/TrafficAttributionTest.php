@@ -630,6 +630,12 @@ class TrafficAttributionTest extends TestCase
             ->assertSessionHasErrors('to');
         $this->actingAs($editor)->get($url.'?from=2024-01-01&to=2026-09-19')
             ->assertSessionHasErrors('to');
+        // Inclusive UTC dates: 366 are allowed, but a distance of 366
+        // midnight boundaries spans 367 exported dates.
+        $this->actingAs($editor)->get($url.'?from=2024-01-01&to=2024-12-31')
+            ->assertOk();
+        $this->actingAs($editor)->get($url.'?from=2024-01-01&to=2025-01-01')
+            ->assertSessionHasErrors('to');
         $this->actingAs($editor)->get($url.'?tracked_link_id=not-a-uuid')
             ->assertSessionHasErrors('tracked_link_id');
     }
@@ -704,6 +710,192 @@ class TrafficAttributionTest extends TestCase
             ]))->assertOk()->streamedContent();
 
         $this->assertSame(102, count(explode("\n", trim($csv))));
+    }
+
+    public function test_traffic_manager_can_pause_resume_link_without_losing_history(): void
+    {
+        Queue::fake([RecordTrackedLinkClick::class]);
+
+        [$user, $organization] = $this->identity(UserRole::Studio);
+        $link = $this->link(
+            $user,
+            $organization,
+            'Lifecycle link',
+            'https://example.com/lifecycle',
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => TrackedLinkDailyMetric::query()->create([
+                'tracked_link_id' => $link->getKey(),
+                'metric_date' => '2026-09-10',
+                'clicks' => 12,
+            ]),
+        );
+
+        $url = route('organizations.traffic.links.status', [
+            'organizationId' => $organization->getKey(),
+            'linkId' => $link->getKey(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertOk()
+            ->assertSee('Disable link Lifecycle link');
+
+        $this->actingAs($user)
+            ->patch($url, ['status' => TrackedLink::STATUS_DISABLED])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Tracked link disabled. Historical metrics are preserved.');
+
+        $this->actingAs($user)
+            ->patch($url, ['status' => TrackedLink::STATUS_DISABLED])
+            ->assertRedirect();
+
+        $this->get(route('traffic.redirect', [
+            'token' => $link->token,
+        ]))->assertNotFound();
+
+        Queue::assertNothingPushed();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($link): void {
+                $this->assertSame(
+                    TrackedLink::STATUS_DISABLED,
+                    TrackedLink::query()->findOrFail($link->getKey())->status,
+                );
+                $this->assertSame(
+                    12,
+                    (int) TrackedLinkDailyMetric::query()
+                        ->where('tracked_link_id', $link->getKey())
+                        ->value('clicks'),
+                );
+            },
+        );
+
+        $this->actingAs($user)
+            ->get(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertOk()
+            ->assertSee('Enable link Lifecycle link');
+
+        $this->actingAs($user)
+            ->patch($url, ['status' => TrackedLink::STATUS_ACTIVE])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Tracked link enabled.');
+
+        $this->get(route('traffic.redirect', [
+            'token' => $link->token,
+        ]))
+            ->assertStatus(302)
+            ->assertRedirect('https://example.com/lifecycle');
+
+        Queue::assertPushed(RecordTrackedLinkClick::class, 1);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($link): void {
+                $this->assertSame(
+                    TrackedLink::STATUS_ACTIVE,
+                    TrackedLink::query()->findOrFail($link->getKey())->status,
+                );
+                $this->assertSame(
+                    12,
+                    (int) TrackedLinkDailyMetric::query()
+                        ->where('tracked_link_id', $link->getKey())
+                        ->value('clicks'),
+                );
+            },
+        );
+    }
+
+    public function test_traffic_link_status_rejects_model_foreign_link_and_invalid_status(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Studio);
+        [$otherUser, $otherOrganization] = $this->identity(UserRole::Studio);
+        [$model, $modelOrganization] = $this->identity(UserRole::Model);
+
+        $link = $this->link(
+            $user,
+            $organization,
+            'Private link',
+            'https://example.com/private',
+        );
+
+        $foreignUrl = route('organizations.traffic.links.status', [
+            'organizationId' => $otherOrganization->getKey(),
+            'linkId' => $link->getKey(),
+        ]);
+        $localUrl = route('organizations.traffic.links.status', [
+            'organizationId' => $organization->getKey(),
+            'linkId' => $link->getKey(),
+        ]);
+
+        $this->actingAs($otherUser)->patch($foreignUrl, [
+            'status' => TrackedLink::STATUS_DISABLED,
+        ])->assertNotFound();
+
+        $this->actingAs($model)->patch(
+            route('organizations.traffic.links.status', [
+                'organizationId' => $modelOrganization->getKey(),
+                'linkId' => $link->getKey(),
+            ]),
+            ['status' => TrackedLink::STATUS_DISABLED],
+        )->assertForbidden();
+
+        $this->actingAs($user)->patch($localUrl, [
+            'status' => 'archived',
+        ])->assertSessionHasErrors('status');
+
+        $this->actingAs($user)->patch($localUrl, [
+            'status' => TrackedLink::STATUS_DISABLED,
+        ])->assertRedirect();
+
+        $this->actingAs($user)->patch($localUrl, [
+            'status' => 'published',
+        ])->assertSessionHasErrors('status');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                TrackedLink::STATUS_DISABLED,
+                TrackedLink::query()->findOrFail($link->getKey())->status,
+            ),
+        );
+    }
+
+    public function test_traffic_link_status_is_safe_before_migration(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Studio);
+
+        Schema::dropIfExists('tracked_link_dedupes');
+        Schema::dropIfExists('tracked_link_daily_metrics');
+        Schema::dropIfExists('tracked_links');
+
+        $migrationPath = database_path(
+            'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
+        );
+
+        try {
+            $this->actingAs($user)->patch(
+                route('organizations.traffic.links.status', [
+                    'organizationId' => $organization->getKey(),
+                    'linkId' => Str::uuid()->toString(),
+                ]),
+                ['status' => TrackedLink::STATUS_DISABLED],
+            )->assertStatus(503);
+        } finally {
+            $migration = require $migrationPath;
+            $migration->up();
+        }
     }
 
     /**

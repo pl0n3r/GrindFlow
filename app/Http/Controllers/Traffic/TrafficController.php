@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -109,7 +110,7 @@ class TrafficController extends Controller
 
         if (Carbon::parse($from, 'UTC')->diffInDays(
             Carbon::parse($to, 'UTC'),
-        ) > 366) {
+        ) >= 366) {
             throw ValidationException::withMessages([
                 'to' => 'The CSV export supports up to 366 days.',
             ]);
@@ -241,6 +242,49 @@ class TrafficController extends Controller
                 'organizationId' => $this->organization($request)->getKey(),
             ])
             ->with('status', 'Tracked link created.');
+    }
+
+    public function updateLinkStatus(
+        Request $request,
+        TrackedLinkManager $manager,
+        string $linkId,
+    ): RedirectResponse {
+        $organization = $this->organization($request);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless(
+            $user->canManageTrafficOrganization($organization),
+            403,
+        );
+
+        $validated = $request->validate([
+            'status' => [
+                'required',
+                Rule::in([
+                    TrackedLink::STATUS_ACTIVE,
+                    TrackedLink::STATUS_DISABLED,
+                ]),
+            ],
+        ]);
+
+        $manager->setStatus(
+            $user,
+            $linkId,
+            (string) $validated['status'],
+        );
+
+        return redirect()
+            ->route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ])
+            ->with(
+                'status',
+                $validated['status'] === TrackedLink::STATUS_DISABLED
+                    ? 'Tracked link disabled. Historical metrics are preserved.'
+                    : 'Tracked link enabled.',
+            );
     }
 
     private function trafficReady(): bool
