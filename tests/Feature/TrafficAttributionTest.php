@@ -487,6 +487,16 @@ class TrafficAttributionTest extends TestCase
                     'clicks' => 7,
                 ]);
                 TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $selected->getKey(),
+                    'metric_date' => '2026-09-11',
+                    'clicks' => 3,
+                ]);
+                TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $selected->getKey(),
+                    'metric_date' => '2026-08-31',
+                    'clicks' => 50,
+                ]);
+                TrackedLinkDailyMetric::query()->create([
                     'tracked_link_id' => $other->getKey(),
                     'metric_date' => '2026-09-10',
                     'clicks' => 90,
@@ -499,7 +509,14 @@ class TrafficAttributionTest extends TestCase
             'from' => '2026-09-01',
             'to' => '2026-09-19',
             'channel' => 'test',
-        ]))->assertOk()->assertSee('7')->assertSee('Selected')->assertDontSee('Other');
+        ]))
+            ->assertOk()
+            ->assertSee('10')
+            ->assertSee('Selected')
+            ->assertSee('2026-09-10: 7 clicks')
+            ->assertSee('2026-09-11: 3 clicks')
+            ->assertDontSee('2026-08-31: 50 clicks')
+            ->assertDontSee('Other');
     }
 
     /**
