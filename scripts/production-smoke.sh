@@ -308,6 +308,15 @@ run_smoke() {
 
   if [[ "$pending_migrations" != "0" ]]; then
     printf 'MIGRATIONS_PENDING=%s\n' "$pending_migrations"
+
+    # Reuse the same authenticated System response. The parser emits only
+    # allowlisted filenames and a content-derived fingerprint; never raw HTML.
+    if python3 scripts/production-migration-inventory.py "$system_html" "$pending_migrations"; then
+      printf 'MIGRATION_INVENTORY_STATUS=verified\n'
+    else
+      printf 'MIGRATION_INVENTORY_STATUS=unavailable\n'
+    fi
+
     printf 'BLOCKED: production has %s pending database migration(s). Review the exact batch and verified external backup in Admin > System; no migration was executed.\n' "$pending_migrations" >&2
     return 2
   fi
