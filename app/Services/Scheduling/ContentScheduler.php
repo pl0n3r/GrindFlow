@@ -77,6 +77,12 @@ class ContentScheduler
                 ]);
             }
 
+            if ($scheduledForUtc->isFuture() === false) {
+                throw ValidationException::withMessages([
+                    'scheduled_for_local' => 'The scheduled time must be in the future.',
+                ]);
+            }
+
             return ScheduledPublication::query()->create([
                 'media_asset_id' => $lockedAsset->getKey(),
                 'publishing_destination_id' => $destination->getKey(),
