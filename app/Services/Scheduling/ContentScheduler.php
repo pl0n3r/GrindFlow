@@ -5,6 +5,7 @@ namespace App\Services\Scheduling;
 use App\Models\MediaAsset;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
+use App\Models\Scopes\TenantScope;
 use App\Models\ScheduledPublicationLink;
 use App\Models\TrackedLink;
 use App\Models\User;
@@ -242,6 +243,102 @@ class ContentScheduler
             }
 
             $locked->forceFill(['scheduled_for_utc' => $due, 'timezone' => $timezone])->save();
+        });
+    }
+
+    /**
+     * Replace or detach the tracked link while the schedule is still editable.
+     * This operation changes only the assignment: neither the public link
+     * nor its historical click aggregates are ever removed or rotated.
+     */
+    public function updateTrackedLink(
+        ScheduledPublication $publication,
+        User $actor,
+        ?string $trackedLinkId,
+    ): void {
+        $organizationId = $this->tenantContext->organizationId();
+
+        if (
+            $organizationId === null
+            || (string) $publication->organization_id !== $organizationId
+            || $actor->canScheduleOrganization($organizationId) === false
+        ) {
+            throw new AuthorizationException('The user cannot edit this schedule.');
+        }
+
+        if (
+            Schema::hasTable('tracked_links') === false
+            || Schema::hasTable('scheduled_publication_links') === false
+        ) {
+            abort(503, 'Tracked-link scheduling requires its database migration.');
+        }
+
+        DB::transaction(function () use ($publication, $trackedLinkId, $organizationId): void {
+            $locked = ScheduledPublication::query()
+                ->withoutGlobalScope(TenantScope::class)
+                ->where('organization_id', $organizationId)
+                ->whereKey($publication->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (
+                $locked->status !== ScheduledPublication::STATUS_SCHEDULED
+                || $locked->scheduled_for_utc?->isFuture() !== true
+                || $locked->delivery()->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'tracked_link_id' => 'Only future, undelivered schedules can change their tracked link.',
+                ]);
+            }
+
+            $trackedLink = null;
+
+            if ($trackedLinkId !== null) {
+                $trackedLink = TrackedLink::query()
+                    ->whereKey($trackedLinkId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (
+                    (string) $trackedLink->organization_id !== $organizationId
+                ) {
+                    throw new AuthorizationException(
+                        'The tracked link belongs to another organization.',
+                    );
+                }
+
+                if ($trackedLink->status !== TrackedLink::STATUS_ACTIVE) {
+                    throw ValidationException::withMessages([
+                        'tracked_link_id' => 'The selected tracked link is not active.',
+                    ]);
+                }
+            }
+
+            $assignment = ScheduledPublicationLink::query()
+                ->where('scheduled_publication_id', $locked->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if ($trackedLink === null) {
+                $assignment?->delete();
+
+                return;
+            }
+
+            if ($assignment === null) {
+                ScheduledPublicationLink::query()->create([
+                    'scheduled_publication_id' => $locked->getKey(),
+                    'tracked_link_id' => $trackedLink->getKey(),
+                ]);
+
+                return;
+            }
+
+            if ((string) $assignment->tracked_link_id !== (string) $trackedLink->getKey()) {
+                $assignment->forceFill([
+                    'tracked_link_id' => $trackedLink->getKey(),
+                ])->save();
+            }
         });
     }
 

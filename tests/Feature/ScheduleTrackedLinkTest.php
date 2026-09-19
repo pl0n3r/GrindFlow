@@ -14,6 +14,7 @@ use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
 use App\Models\ScheduledPublicationLink;
 use App\Models\TrackedLink;
+use App\Models\TrackedLinkDailyMetric;
 use App\Models\User;
 use App\Services\Distribution\DistributionProviderRegistry;
 use App\Services\Distribution\DistributionResult;
@@ -282,6 +283,305 @@ class ScheduleTrackedLinkTest extends TestCase
         $this->assertSame(0, $provider->calls);
     }
 
+    public function test_manager_can_attach_swap_and_detach_a_link_without_losing_metrics(): void
+    {
+        [$actor, $organization] = $this->identity();
+        [$asset, $destination, $first] = $this->fixtures($actor, $organization);
+
+        $this->actingAs($actor)
+            ->post($this->indexRoute($organization), $this->payload(
+                $asset,
+                $destination,
+                null,
+            ))
+            ->assertRedirect();
+
+        [$publication, $second] = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($actor, $first): array {
+                $publication = ScheduledPublication::query()->sole();
+
+                TrackedLinkDailyMetric::query()->create([
+                    'tracked_link_id' => $first->getKey(),
+                    'metric_date' => '2026-09-19',
+                    'clicks' => 17,
+                ]);
+
+                $second = TrackedLink::query()->create([
+                    'created_by_user_id' => $actor->getKey(),
+                    'token' => Str::random(22),
+                    'label' => 'Second campaign',
+                    'destination_url' => 'https://example.test/second',
+                    'status' => TrackedLink::STATUS_ACTIVE,
+                ]);
+
+                return [$publication, $second];
+            },
+        );
+
+        $url = $this->linkEditRoute($organization);
+
+        $this->actingAs($actor)->get($this->indexRoute($organization))
+            ->assertOk()
+            ->assertSee('Save tracked link')
+            ->assertSee($url);
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => $first->getKey(),
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => $first->getKey(),
+        ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($publication, $first): void {
+                $this->assertSame(1, ScheduledPublicationLink::query()->count());
+                $this->assertSame(
+                    $first->getKey(),
+                    ScheduledPublicationLink::query()->sole()->tracked_link_id,
+                );
+                $this->assertSame(
+                    17,
+                    (int) TrackedLinkDailyMetric::query()
+                        ->where('tracked_link_id', $first->getKey())
+                        ->value('clicks'),
+                );
+            },
+        );
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => $second->getKey(),
+        ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($second): void {
+                $this->assertSame(1, ScheduledPublicationLink::query()->count());
+                $this->assertSame(
+                    $second->getKey(),
+                    ScheduledPublicationLink::query()->sole()->tracked_link_id,
+                );
+            },
+        );
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => '',
+        ])->assertRedirect();
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => '',
+        ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($publication, $first, $second): void {
+                $this->assertSame(0, ScheduledPublicationLink::query()->count());
+                $this->assertSame(1, ScheduledPublication::query()->count());
+                $this->assertNotNull(TrackedLink::query()->find($first->getKey()));
+                $this->assertNotNull(TrackedLink::query()->find($second->getKey()));
+                $this->assertSame(
+                    17,
+                    (int) TrackedLinkDailyMetric::query()->sole()->clicks,
+                );
+                $this->assertNull(
+                    $publication->fresh()?->linkAssignment,
+                );
+            },
+        );
+    }
+
+    public function test_link_edit_rejects_other_tenant_model_and_invalid_or_disabled_link(): void
+    {
+        [$actor, $organization] = $this->identity();
+        [$otherActor, $otherOrganization] = $this->identity();
+        [$asset, $destination, $link] = $this->fixtures($actor, $organization);
+        [, , $foreignLink] = $this->fixtures($otherActor, $otherOrganization);
+
+        $this->actingAs($actor)
+            ->post($this->indexRoute($organization), $this->payload(
+                $asset,
+                $destination,
+                $link,
+            ))->assertRedirect();
+
+        $publication = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn (): ScheduledPublication => ScheduledPublication::query()->sole(),
+        );
+
+        $this->actingAs($actor)->patch($this->linkEditRoute($organization), [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => $foreignLink->getKey(),
+        ])->assertNotFound();
+
+        $this->actingAs($otherActor)->patch($this->linkEditRoute($otherOrganization), [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => $foreignLink->getKey(),
+        ])->assertNotFound();
+
+        $this->actingAs($actor)->patch($this->linkEditRoute($organization), [
+            'publication_id' => $publication->getKey(),
+        ])->assertSessionHasErrors('tracked_link_id');
+
+        $this->actingAs($actor)->patch($this->linkEditRoute($organization), [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => 'not-a-uuid',
+        ])->assertSessionHasErrors('tracked_link_id');
+
+        $model = User::factory()->create();
+        Membership::query()->create([
+            'organization_id' => $organization->getKey(),
+            'user_id' => $model->getKey(),
+            'role' => UserRole::Model,
+        ]);
+
+        $this->actingAs($model)->patch($this->linkEditRoute($organization), [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => '',
+        ])->assertForbidden();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn () => TrackedLink::query()->findOrFail($link->getKey())
+                ->forceFill(['status' => TrackedLink::STATUS_DISABLED])
+                ->save(),
+        );
+
+        $this->actingAs($actor)->get($this->indexRoute($organization))
+            ->assertOk()
+            ->assertSee('Current link unavailable. Choose another or remove.')
+            ->assertSee('Test campaign');
+
+        $this->actingAs($actor)->patch($this->linkEditRoute($organization), [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => $link->getKey(),
+        ])->assertSessionHasErrors('tracked_link_id');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                $link->getKey(),
+                ScheduledPublicationLink::query()->sole()->tracked_link_id,
+            ),
+        );
+    }
+
+    public function test_link_edit_rejects_cancelled_or_claimed_delivery(): void
+    {
+        [$actor, $organization] = $this->identity();
+        [$asset, $destination, $link] = $this->fixtures($actor, $organization);
+
+        $this->actingAs($actor)
+            ->post($this->indexRoute($organization), $this->payload(
+                $asset,
+                $destination,
+                $link,
+            ))->assertRedirect();
+
+        $publication = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn (): ScheduledPublication => ScheduledPublication::query()->sole(),
+        );
+
+        $url = $this->linkEditRoute($organization);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn () => PublicationDelivery::query()->create([
+                'scheduled_publication_id' => $publication->getKey(),
+                'idempotency_key' => (string) Str::uuid(),
+                'status' => PublicationDelivery::STATUS_QUEUED,
+                'attempts' => 0,
+            ]),
+        );
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => '',
+        ])->assertSessionHasErrors('tracked_link_id');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($publication): void {
+                PublicationDelivery::query()->where(
+                    'scheduled_publication_id',
+                    $publication->getKey(),
+                )->delete();
+                $publication->forceFill([
+                    'status' => ScheduledPublication::STATUS_CANCELLED,
+                ])->save();
+            },
+        );
+
+        $this->actingAs($actor)->patch($url, [
+            'publication_id' => $publication->getKey(),
+            'tracked_link_id' => '',
+        ])->assertSessionHasErrors('tracked_link_id');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                $link->getKey(),
+                ScheduledPublicationLink::query()->sole()->tracked_link_id,
+            ),
+        );
+    }
+
+    public function test_link_edit_requires_existing_link_schema(): void
+    {
+        [$actor, $organization] = $this->identity();
+        [$asset, $destination] = $this->fixtures($actor, $organization);
+
+        $this->actingAs($actor)
+            ->post($this->indexRoute($organization), $this->payload(
+                $asset,
+                $destination,
+                null,
+            ))->assertRedirect();
+
+        $publication = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn (): ScheduledPublication => ScheduledPublication::query()->sole(),
+        );
+
+        Schema::dropIfExists('scheduled_publication_links');
+
+        try {
+            $this->actingAs($actor)->patch($this->linkEditRoute($organization), [
+                'publication_id' => $publication->getKey(),
+                'tracked_link_id' => '',
+            ])->assertStatus(503);
+
+            $this->actingAs($actor)->get($this->indexRoute($organization))
+                ->assertOk()
+                ->assertDontSee('Save tracked link');
+        } finally {
+            $migration = require database_path(
+                'migrations/2026_09_19_053000_create_scheduled_publication_links.php',
+            );
+            $migration->up();
+        }
+    }
+
     /**
      * @return array{User, Organization}
      */
@@ -349,6 +649,13 @@ class ScheduleTrackedLinkTest extends TestCase
                 return [$asset, $destination, $link];
             },
         );
+    }
+
+    private function linkEditRoute(Organization $organization): string
+    {
+        return route('organizations.scheduler.tracked-link.update', [
+            'organizationId' => $organization->getKey(),
+        ]);
     }
 
     private function indexRoute(Organization $organization): string

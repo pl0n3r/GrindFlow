@@ -184,6 +184,39 @@ class SchedulerController extends Controller
         return back()->with('status', 'Programación actualizada.');
     }
 
+    public function updateTrackedLink(
+        Request $request,
+        ContentScheduler $scheduler,
+    ): RedirectResponse {
+        $organization = $this->organization($request);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless($user->canScheduleOrganization($organization), 403);
+
+        $validated = $request->validate([
+            'publication_id' => ['required', 'uuid'],
+            'tracked_link_id' => ['present', 'nullable', 'uuid'],
+        ]);
+
+        $publication = ScheduledPublication::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('organization_id', $organization->getKey())
+            ->whereKey($validated['publication_id'])
+            ->firstOrFail();
+
+        $scheduler->updateTrackedLink(
+            $publication,
+            $user,
+            empty($validated['tracked_link_id'])
+                ? null
+                : (string) $validated['tracked_link_id'],
+        );
+
+        return back()->with('status', 'Tracked link assignment updated.');
+    }
+
     public function cancel(
         Request $request,
         ContentScheduler $scheduler,

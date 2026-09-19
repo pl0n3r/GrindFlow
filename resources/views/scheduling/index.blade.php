@@ -354,6 +354,33 @@
                                                                 <button class="gf-button gf-button--ghost">Save</button>
                                                             </form>
                                                         </details>
+                                                        @if ($linkingReady)
+                                                            <details>
+                                                                <summary>Tracked link</summary>
+                                                                <form class="gf-form" method="POST" action="{{ route('organizations.scheduler.tracked-link.update', ['organizationId' => $organization->id]) }}">
+                                                                    @csrf
+                                                                    @method('PATCH')
+                                                                    <input type="hidden" name="publication_id" value="{{ $publication->id }}">
+                                                                    <label for="link_for_{{ $publication->id }}">Assigned tracked link</label>
+                                                                    <select class="gf-input" id="link_for_{{ $publication->id }}" name="tracked_link_id">
+                                                                        <option value="" @selected(! $publication->linkAssignment)>No tracked link</option>
+                                                                        @if ($publication->linkAssignment && ! $trackedLinks->contains('id', $publication->linkAssignment->tracked_link_id))
+                                                                            <option selected disabled value="unavailable">Current link unavailable. Choose another or remove.</option>
+                                                                        @endif
+                                                                        @foreach ($trackedLinks as $link)
+                                                                            <option
+                                                                                value="{{ $link->id }}"
+                                                                                @selected($publication->linkAssignment?->tracked_link_id === $link->id)
+                                                                            >
+                                                                                {{ $link->label }}{{ $link->campaign ? ' · '.$link->campaign : '' }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                    <small class="gf-media-meta">The assignment can change only before delivery. Existing click totals stay intact.</small>
+                                                                    <button class="gf-button gf-button--ghost" type="submit">Save tracked link</button>
+                                                                </form>
+                                                            </details>
+                                                        @endif
                                                         <form method="POST" action="{{ route('organizations.scheduler.cancel', ['organizationId' => $organization->id]) }}">
                                                             @csrf
                                                             <input type="hidden" name="publication_id" value="{{ $publication->id }}">

@@ -5,7 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot candidato v0.1.9, no evidencia de deploy. El contrato «solo el deploy actual» requiere observacion del entorno.** Base `main` v0.1.8 `298615285a82d56df492a1216178c12b1a7842a0`: CI #35454799196 y Smoke #35454799194 success; faltaba verificar GETs de los modulos. El Git SHA remoto de Hostinger sigue sin marcador verificable.
+> **Snapshot del PR candidato v0.1.10; no demuestra despliegue en Hostinger.** Base `main` v0.1.9 `e897cea488356d6b9543a3bac0b7da4e5e684612`: CI #35455531632 success, authenticated Production Smoke #35455531712 success (Scheduler, Distribution, Traffic, Finance y CSV). SHA del checkout Hostinger aun sin marcador verificable.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -14,33 +14,33 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-OPS-009 · Smoke autentico vertical de modulos** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.8 · PR #98 fusionado** | `298615285a82d56df492a1216178c12b1a7842a0` |
-| Version | 🚧 **v0.1.9** | workspace smoke read-only |
+| Work line | 🚧 **GF-FR-004C · Edicion de tracked links en Scheduler** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.9 · PR #99 fusionado** | `e897cea488356d6b9543a3bac0b7da4e5e684612` |
+| Version | 🚧 **v0.1.10** | asociacion editada desde Scheduler |
 | CI del PR | 🚧 **pendiente** | validar SHA estable |
-| Sonar | 🚧 **pendiente** | Quality Gate |
-| CodeRabbit | 🚧 **pendiente** | full review head estable |
-| CI del SHA exacto de main | ✅ **v0.1.8 validado** | validate #35454799196 |
-| Production Smoke | ✅ **basico v0.1.8** | #35454799194 |
-| Nuevos checks en prod | 🚧 **no verificados** | Scheduler, Distribution, Traffic, Finance, CSV |
-| Migraciones | ✅ **sin SQL nuevo** | continua schema vigente |
+| Sonar | 🚧 **pendiente** | Quality Gate por SHA |
+| CodeRabbit | 🚧 **pendiente** | full review del head final |
+| CI del SHA exacto de main | ✅ **v0.1.9 validado** | validate #35455531632 |
+| Production Smoke | ✅ **v0.1.9 observado** | #35455531712, checks read-only de modulos |
+| Deploy v0.1.10 | 🚧 **no confirmado** | no afirmar deploy por GitHub CI |
+| Migraciones | ✅ **sin SQL nuevo** | reutiliza scheduled_publication_links |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+216** | **−59** | **+157** |
+| **10** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
-| Session | una sola sesion E2E: Vault + Scheduler + Distribution + Traffic + Finance |
-| CSV | GET agregado comprueba 200, content-type, disposition y header |
-| Release | Admin System muestra v0.1.9 observada; no equivale a SHA Hostinger |
-| Faults | modulo real roto detiene smoke sin logins repetidos |
-| Schema pendiente | conserva Vault read-only e inventario; omite probes dependientes |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
+| Workflow | Crear schedule → anadir/cambiar/retirar enlace de Traffic antes del delivery |
+| Seguridad | rol y tenant HTTP + dominio, lock transaccional de schedule y enlace |
+| Concurrencia | no cambios si cancelado, vencido o con delivery existente |
+| Historico | conserva URL corta, métricas y schedule; detach borra solo asociacion |
+| Schema | GET Scheduler y scheduling normal seguros sin migracion de links |
 
 ## Flujo de entrega
 ```mermaid
@@ -65,41 +65,43 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Production Smoke ahora inspecciona cuatro pantallas funcionales y el CSV en una sola sesion existente.
-- Verifica las etiquetas de readiness de cada modulo y cabeceras/encabezado del reporte sin publicar filas.
-- Compara la version humana del System real con la version del workflow, sin fingir exact deployed SHA.
-- La ruta bajo migracion pendiente conserva su comportamiento previo y nunca hace mutaciones.
-- Contract mock cubre modulo 500, CSV corrupto, version desactualizada, sesion unica y schema pendiente.
-- Mensajes de issues y summary identifican GITHUB_SHA como fuente del workflow, no checkout observado.
+- Scheduler permite asignar, reemplazar o desvincular un enlace de Traffic a una programacion existente, aun si fue creada sin link.
+- El nuevo formulario aparece solo en programaciones futuras, activas y aun no entregadas; el enlace actualmente deshabilitado puede separarse pero no reasignarse.
+- La transaccion revalida rol, organizacion, elegibilidad temporal, delivery y estado del enlace bajo locks; IDs de otras organizaciones no son visibles.
+- Repetir una asignacion o detach no duplica filas; metricas acumuladas y URLs de campañas sobreviven.
+- PHPUnit cubre lifecycle, schema faltante, rol Model, links disabled/foreign, schedule foreign/cancelled/claimed y valores omitidos.
+- Contratos y regla durable en docs y AGENTS.md; sin SQL nuevo ni publicacion a proveedores.
 
 ## Archivos modificados en este deploy
-- `.github/workflows/production-smoke.yml` — reporta cobertura ampliada y evidencia de release.
-- `AGENTS.md` — protocolo durable del smoke vertical no destructivo.
-- `README.md` — snapshot de entrega v0.1.9.
-- `config/version.php` — version humana 0.1.9.
-- `docs/GRINDFLOW-SPEC.md` — contrato operativo de smoke.
-- `docs/REQUIREMENTS.md` — requisito GF-OPS-009.
-- `scripts/production-smoke-contract.sh` — pruebas de fake HTTP y fallos seguros.
-- `scripts/production-smoke.sh` — probes autenticados y release UI observado.
+- `AGENTS.md` — reglas durables del Scheduler ↔ Traffic.
+- `README.md` — snapshot exacto v0.1.10.
+- `app/Http/Controllers/Scheduling/SchedulerController.php` — PATCH de enlace.
+- `app/Services/Scheduling/ContentScheduler.php` — transaccion de asociacion.
+- `config/version.php` — version 0.1.10.
+- `docs/GRINDFLOW-SPEC.md` — asociacion editable antes de entrega.
+- `docs/REQUIREMENTS.md` — GF-FR-004C.
+- `resources/views/scheduling/index.blade.php` — selector por schedule.
+- `routes/web.php` — nueva ruta protegida PATCH.
+- `tests/Feature/ScheduleTrackedLinkTest.php` — pruebas de comportamiento.
 
 ## Validación
-- Base v0.1.8: exact-main CI #35454799196 y Production Smoke #35454799194 success.
-- Candidato v0.1.9: CI, Sonar, CodeRabbit y luego exact-main/production pendientes.
-- No nuevo schema SQL, POST de publicaciones, clicks sinteticos ni subida de medios.
+- Base v0.1.9: exact-main CI #35455531632 y Production Smoke #35455531712 passed.
+- v0.1.10: CI/Sonar/CodeRabbit de la PR pendientes; no se declara deploy ni comportamiento de escritura probado en produccion.
+- Production Smoke sigue siendo de solo lectura, no modifica links ni schedules reales.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar y entregar smoke vertical v0.1.9; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 S3/CORS y media runtime #40; diagnosticar error si modulo falla en produccion. |
-| **LATER** | 🚧 Browser E2E persistente y Finance. |
-| **BLOCKED / EXTERNAL** | 🚧 Prueba exacta del checkout Git SHA Hostinger, release humano no basta. |
+| **NOW** | 🚧 Integrar Scheduler ↔ Traffic editable v0.1.10. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 Media Storage S3/CORS y FFmpeg runtime #40. |
+| **LATER** | 🚧 UI para mas de 100 schedules y Finance reconciliation. |
+| **BLOCKED / EXTERNAL** | 🚧 SHA exacto desplegado por Hostinger sin marcador publico. |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Distribution audit, Traffic CSV/lifecycle~~ | ✅ ~~v0.1.8 CI+Smoke basico~~ |
-| **NOW** | 🚧 Smoke workspace y CSV autenticos | 🚧 v0.1.9 |
-| **NEXT** | 🚧 S3/CORS y FFmpeg operacional | 🚧 #40 |
-| **LATER** | 🚧 E2E browser y Finance | 🚧 roadmap #88 |
-| **BLOCKED / EXTERNAL** | 🚧 SHA real Hostinger | 🚧 observabilidad |
+| **DONE** | ✅ ~~Traffic lifecycle #98 y Production Smoke #99~~ | ✅ ~~v0.1.9 CI + Smoke real~~ |
+| **NOW** | 🚧 Editar asignacion Scheduler ↔ Traffic | 🚧 v0.1.10 |
+| **NEXT** | 🚧 Media runtime y CORS | 🚧 #40 |
+| **LATER** | 🚧 E2E escritura controlada y paginacion | 🚧 roadmap #88 |
+| **BLOCKED / EXTERNAL** | 🚧 Identidad exacta checkout Hostinger | 🚧 observabilidad |

@@ -108,6 +108,22 @@ el cambio aquí en el mismo PR que modifica el producto.
   el diagnostico queda en artifact de corta retencion. Anotar en run/issue que
   GITHUB_SHA es fuente del workflow, NO checkout confirmado en Hostinger.
 
+### Scheduler: edicion segura de asociaciones Traffic
+
+- Las asociaciones con tracked links se pueden anadir, reemplazar o separar
+  tras crear un schedule, solo si sigue scheduled, futuro y sin delivery.
+- Toda mutacion va en transaccion con lock del schedule y luego del enlace,
+  revalida actor+tenant y estado active del nuevo tracked link en servidor.
+- Un link deshabilitado existente puede separarse, nunca reasignarse como nuevo.
+  Los destinos, asset, timezone, token corto y metricas historicas no se
+  modifican al cambiar un link de schedule.
+- Un form de cambio debe incluir publication_id + campo tracked_link_id
+  explicitamente presente, aun cuando sea vacio para detach; un campo
+  omitido no se interpreta como permiso para borrar la asociacion.
+- Un schema no migrado mantiene GET Scheduler y Schedule sin link,
+  mientras el PATCH de asociacion retorna 503; no ejecutar migraciones
+  por el smoke ni permitir cross-tenant por IDs globales.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership
