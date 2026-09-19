@@ -58,7 +58,11 @@ case "$url" in
     fi
     ;;
   http://mock/dashboard)
-    body='<h1>Overview</h1>Tenant isolation active <a href="/organizations/example/vault">Vault</a>'
+    if [[ "${MOCK_VAULT_MODE:-ok}" == "missing_link" ]]; then
+      body='<h1>Overview</h1>Tenant isolation active'
+    else
+      body='<h1>Overview</h1>Tenant isolation active <a href="/organizations/example/vault">Vault</a>'
+    fi
     ;;
   http://mock/admin/system)
     body="<h2>Runtime configuration</h2><span data-pending-migrations=\"$MOCK_PENDING\">status</span><span data-media-storage-configured=\"0\">storage</span>"
@@ -75,7 +79,12 @@ case "$url" in
     fi
     ;;
   http://mock/organizations/example/vault)
-    body="Organization scoped Direct upload"
+    if [[ "${MOCK_VAULT_MODE:-ok}" == "failed" ]]; then
+      status=500
+      body="synthetic vault failure"
+    else
+      body="Organization scoped Direct upload"
+    fi
     ;;
   *)
     status=404
@@ -99,11 +108,12 @@ run_case() {
   local pending="$2"
   local expected_status="$3"
   local inventory_mode="${4:-valid}"
+  local vault_mode="${5:-ok}"
   local log="$workdir/$label.log"
   local result
 
   if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" \
-    BASE_URL=http://mock \
+    MOCK_VAULT_MODE="$vault_mode" BASE_URL=http://mock \
     E2E_USER_PASSWORD=synthetic-only \
     CURL_BIN="$workdir/mock-curl" \
     ATTEMPTS=15 WAIT_SECONDS=0 \
@@ -122,6 +132,13 @@ run_case() {
   case "$label" in
     pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
+      if [[ "$vault_mode" == "failed" || "$vault_mode" == "missing_link" ]]; then
+        grep -Fxq 'VAULT_READ_ONLY=failed' "$log"
+        grep -Fq 'ERROR: read-only Vault check failed while migrations remain pending' "$log"
+      else
+        grep -Fxq 'VAULT_READ_ONLY=ok' "$log"
+        grep -Fxq 'MEDIA_STORAGE_READY=0' "$log"
+      fi
       if [[ "$inventory_mode" == "valid" ]]; then
         grep -Fxq 'MIGRATION_INVENTORY_STATUS=verified' "$log"
         grep -Fxq 'MIGRATION_NAME=2026_09_19_000001_first' "$log"
@@ -140,13 +157,18 @@ run_case() {
         printf 'FAIL: migration inventory log leaked untrusted HTML.\n' >&2
         exit 1
       fi
-      grep -Fq 'BLOCKED: production smoke stopped on pending migrations' "$log"
+      if [[ "$vault_mode" == "failed" || "$vault_mode" == "missing_link" ]]; then
+        grep -Fq 'ERROR: read-only Vault check failed while migrations remain pending' "$log"
+      else
+        grep -Fq 'BLOCKED: production smoke stopped on pending migrations' "$log"
+      fi
       if grep -Fq 'Production smoke attempt 2/' "$log"; then
         printf 'FAIL: migration-blocked smoke repeated a request.\n' >&2
         exit 1
       fi
       ;;
     current)
+      grep -Fxq 'VAULT_READ_ONLY=ok' "$log"
       grep -Fq 'PASS production smoke:' "$log"
       if grep -q '^MIGRATIONS_PENDING=' "$log"; then
         printf 'FAIL: current schema reported pending migrations.\n' >&2
@@ -169,6 +191,8 @@ run_case pending_missing 3 2 missing
 run_case pending_mismatch 3 2 mismatch
 run_case pending_unsafe 3 2 unsafe
 run_case pending_no_fingerprint 3 2 no_fingerprint
+run_case pending_vault_failure 3 3 valid failed
+run_case pending_vault_link_missing 3 3 valid missing_link
 run_case current 0 0
 
 # Unknown schema uses the existing bounded retry policy rather than a migration claim.

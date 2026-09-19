@@ -254,6 +254,36 @@
 
             <section class="gf-panel gf-panel--spaced">
                 <header class="gf-panel__head">
+                    <h2>Workspace module readiness</h2>
+                    <span class="gf-appbar__meta">read only · current schema</span>
+                </header>
+                <div class="gf-panel__body">
+                    <p class="gf-system-copy">
+                        Cada modulo se verifica por sus tablas necesarias. Un modulo puede
+                        estar listo aunque existan migraciones pendientes de otro modulo.
+                    </p>
+                    <div class="gf-system-grid">
+                        @foreach (['Vault', 'Scheduling', 'Distribution', 'Traffic', 'Finance'] as $module)
+                            @php
+                                $ready = $moduleReadiness[$module] ?? null;
+                                $state = $ready === null ? 'unknown' : ($ready ? 'ready' : 'migration-required');
+                            @endphp
+                            <article class="gf-system-item" data-module-readiness="{{ strtolower($module) }}:{{ $state }}">
+                                <div class="gf-system-item__label">{{ $module }}</div>
+                                <div class="gf-system-item__row">
+                                    <span>Schema</span>
+                                    <span class="gf-state {{ $ready ? 'gf-state--ok' : 'gf-state--neutral' }}">
+                                        {{ $ready === null ? 'Unknown' : ($ready ? 'Ready' : 'Migration required') }}
+                                    </span>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
+            <section class="gf-panel gf-panel--spaced">
+                <header class="gf-panel__head">
                     <h2>Database migrations</h2>
                     <span class="gf-appbar__meta">explicit operator action</span>
                 </header>
@@ -263,9 +293,11 @@
                         <div>
                             <div class="gf-metric__label">Schema maintenance</div>
                             <h3>
-                                {{ $pendingMigrations === 0
-                                    ? 'Database schema is current'
-                                    : 'Pending migrations need to be applied' }}
+                                {{ $pendingMigrations === null
+                                    ? 'Migration inventory unavailable'
+                                    : ($pendingMigrations === 0
+                                        ? 'Database schema is current'
+                                        : 'Pending migrations need to be applied') }}
                             </h3>
                             <p class="gf-system-copy">
                                 Revisa el lote exacto antes de continuar. CI no ejecuta
