@@ -98,9 +98,10 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `feat/scheduling-core-v1`.
+- Estado actual: **IMPLEMENTED · PR #67 OPEN · required gates passed** en `feat/scheduling-core-v1`.
 - Base exacta: `bc9694cb49a4e049f41d08b367b04903411915da`.
 - La base fue validada en PR #66 por GrindFlow CI #245 completo + Sonar sin issues/hotspots.
+- PR #67 pasó GrindFlow CI #270 completo sobre `3b74224e…`; Sonar reporta Quality Gate passed y los findings funcionales de CodeRabbit fueron corregidos.
 - Production Smoke confirmó `/up`, login, dashboard y admin sobre el commit base exacto.
 - Object storage S3-compatible sigue siendo un bloqueo externo independiente; Quick Upload continúa disponible.
 - Este slice contiene **una migración nueva**, pero no la ejecuta ni muta producción automáticamente.
@@ -109,7 +110,7 @@ flowchart LR
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR de Scheduling y validar matriz completa, Sonar y CodeRabbit. |
+| **NOW** | PR #67 abierto; código y required gates validados. Pendiente squash merge y validación exact-main. |
 | **NEXT** | Tras merge y Smoke, aplicar la migración con aprobación y verificar Scheduler en producción. |
 | **NEXT** | Añadir configuración administrable de destinos si GF-FR-005 la necesita como boundary estable. |
 | **BLOCKED / EXTERNAL** | Object storage S3-compatible y FFmpeg real en Hostinger siguen requiriendo configuración externa. |
@@ -119,7 +120,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Scheduling | core v1 IMPLEMENTED, pendiente gates |
+| **NOW** | Scheduling | core v1 IMPLEMENTED · PR #67 abierto · required gates passed |
 | **NEXT** | Scheduling producción | merge, migration approval y Smoke |
 | **NEXT** | Distribution | contratos/provider adapters sobre schedules válidos |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
