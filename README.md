@@ -1,11 +1,11 @@
 # GrindFlow — Último deploy
 
 <p align="center">
-  <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
-  <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
-  <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
+<a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
+<a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
+<a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot PR v0.1.16: solo el deploy actual.** Base `main` v0.1.15 `c8eb382937ccdc75203d0791f8d6504184ce3daa`: CI exact-main #35462651485 success; Production Smoke #35462651478 **falló**, incidente [#106](https://github.com/drpipe1098-commits/GrindFlow/issues/106). No afirmar validación de v0.1.15 en producción ni inferir SHA checkout Hostinger.
+> **Snapshot PR v0.1.17: solo el deploy actual.** Base main v0.1.16 `79567348473cfa22cabd76675873dd7cbb739e71`: CI #35463437820 success; Production Smoke #35463437826 falló. Incidente [#106](https://github.com/drpipe1098-commits/GrindFlow/issues/106) abierto. No inferir checkout SHA de Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -18,105 +18,77 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **Gobierno compartido Condor → GrindFlow** | Roadmap [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **main v0.1.15** | `c8eb382937ccdc75203d0791f8d6504184ce3daa` |
-| Version | 🚧 **v0.1.16 objetivo** | gobierno y validación |
-| Version desplegada | ⚠️ **v0.1.15 no comprobada** | último Smoke falló; ver #106 |
-| CI del PR | 🚧 **pendiente** | validar head final |
+| Work line | 🚧 **Smoke observable y reglas operativas** | Roadmap #88 |
+| Base exacta | ✅ **main v0.1.16** | `79567348473cfa22cabd76675873dd7cbb739e71` |
+| Version | 🚧 **v0.1.17 objetivo** | config/version.php |
+| Version desplegada | ⚠️ **desconocida** | release v0.1.16 no detectada |
+| CI del PR | 🚧 **pendiente** | validate |
 | Sonar | 🚧 **pendiente** | Quality Gate |
 | CodeRabbit | 🚧 **pendiente** | full review head estable |
-| CI del SHA exacto de main | ✅ **base v0.1.15** | #35462651485 |
-| Production Smoke | ⚠️ **base v0.1.15 falló** | #35462651478 · #106 |
-| Deploy v0.1.16 | 🚧 **no confirmado** | Smoke post-merge requerido |
-| Migraciones | ✅ **sin SQL nuevo** | gobierno de repo solamente |
+| CI del SHA exacto de main | ✅ **base v0.1.16** | #35463437820 |
+| Production Smoke | ⚠️ **base falló** | #35463437826 · #106 |
+| Deploy v0.1.17 | 🚧 **no confirmado** | requiere observación separada |
+| Migraciones | ✅ **sin SQL nuevo** | ninguna escritura productiva |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **18** | **+600** | **−52** | **+548** |
+| **5** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
-| Version | Nuevo titulo de PR `(V X.Y.Z)` validado contra version.php |
-| Idioma | Nuevo contenido humano español es-CO, contratos tecnicos sin traducir |
-| Fuentes | AGENTS operativo; GOVERNANCE duradero; #88 trabajo; README snapshot |
-| Gobierno GitHub | Plantillas y labels españoles, sincronizacion **solo aditiva** |
-| Validacion | Títulos, archivos, links, etiquetas; casos positivos/negativos |
-| Seguridad | Sin migracion, cambios de permisos ni writes de produccion |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Version | Objetivo 0.1.17, patch +1 desde main |
+| Seguridad | Solo etiqueta visible de versión; no HTML ni credenciales en logs |
+| Verificación | Current, stale, missing y ambiguous en mock Smoke |
+| Producción | Smoke GET sin migraciones, clicks /l ni writes |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
  P --> F["fast contracts + release"]
- P --> Q["php-quality"]
- P --> T["PHPUnit"]
- P --> D["MariaDB"]
- P --> B["browser"]
- P --> L["legacy"]
  A --> S["Sonar"]
  A --> C["CodeRabbit review"]
  F --> V["validate"]
- Q --> V
- T --> V
- D --> V
- B --> V
- L --> V
  V --> M["Squash merge"]
  M --> X["CI exact-main"]
+ X --> R["Production Smoke separado"]
 ```
 
 ## Qué se hizo
-- Comparadas reglas de Condor: separación entre operación/especificación/progreso, títulos versionados, español es-CO progresivo, glosario y plantillas.
-- Roadmap #88 preservado como historia; ROADMAP.md enlaza sin duplicar.
-- Preflight valida versión objetivo en título de PR; fast comprueba archivos, enlaces, templates, labels y regresiones del validador.
-- Etiquetas GitHub se sincronizan aditivamente, sin borrar etiquetas ni títulos anteriores ni crear milestones por patch.
-- CodeRabbit recibe instrucciones en español; Copilot corrige DB canónica a MariaDB.
-- Sin importar nombre, dominio, código o moneda predeterminada de Condor.
-- Smoke de v0.1.15 **fallido** señalado por separado: CI verde no lo reemplaza.
+- Regla AGENTS: mensajes breves de progreso con hitos verificables y sin generar/entregar ZIP.
+- Smoke: etiqueta de versión realmente observada, comparación explícita esperada/observada, fallo seguro si falta o es ambigua.
+- Contrato: versión actual, antigua, ausente y ambigua en la sesión sintética.
+- #106: run #35463437826 mostró Vault correcto y storage pendiente, pero no registró qué versión estaba sirviendo Hostinger.
 
 ## Archivos modificados en este deploy
-- `.coderabbit.yaml` — gobierno.
-- `.github/ISSUE_TEMPLATE/config.yml` — plantilla.
-- `.github/ISSUE_TEMPLATE/error.yml` — plantilla.
-- `.github/ISSUE_TEMPLATE/mejora.yml` — plantilla.
-- `.github/ISSUE_TEMPLATE/tarea.yml` — plantilla.
-- `.github/copilot-instructions.md` — gobierno.
-- `.github/labels.json` — gobierno.
-- `.github/pull_request_template.md` — gobierno.
-- `.github/workflows/grindflow-ci.yml` — gobierno.
-- `.github/workflows/sincronizar-gobierno.yml` — gobierno.
-- `AGENTS.md` — gobierno.
-- `GLOSARIO.md` — gobierno.
-- `README.md` — snapshot del deploy.
-- `ROADMAP.md` — gobierno.
-- `config/version.php` — gobierno.
-- `docs/DEVELOPMENT-MODEL.md` — gobierno.
-- `docs/GOVERNANCE.md` — decisiones.
-- `scripts/validate-governance.py` — gobierno.
+- `AGENTS.md` — regla de comunicación y entregas.
+- `README.md` — estado exacto de este PR.
+- `config/version.php` — versión 0.1.17.
+- `scripts/production-smoke-contract.sh` — regresiones.
+- `scripts/production-smoke.sh` — diagnóstico seguro de release.
 
 ## Validación
-- Base v0.1.15: CI #35462651485 success; Production Smoke #35462651478 failure, Issue #106.
-- v0.1.16: CI/Sonar/CodeRabbit y exact-main/Smoke requieren evidencia posterior.
-- Smoke es read-only, no prueba labels ni demuestra SHA remoto.
+- Base exact-main CI #35463437820 success; Production Smoke #35463437826 failed; Issue #106.
+- CI/Sonar/CodeRabbit v0.1.17 pendientes de head final. No afirmar deploy ni SHA checkout remoto.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Gobierno Condor → GrindFlow v0.1.16. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| **NEXT** | 🚧 Incidente Production Smoke [#106](https://github.com/drpipe1098-commits/GrindFlow/issues/106) |
+| **NOW** | 🚧 Observabilidad Smoke v0.1.17, [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| **NEXT** | 🚧 Investigar desfase de despliegue [#106](https://github.com/drpipe1098-commits/GrindFlow/issues/106) |
 | **LATER** | 🚧 Storage/FFmpeg [#40](https://github.com/drpipe1098-commits/GrindFlow/issues/40) |
-| **BLOCKED / EXTERNAL** | 🚧 SHA checkout Hostinger y object storage |
+| **BLOCKED / EXTERNAL** | 🚧 Checkout Hostinger no verificado |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Browser E2E funcional v0.1.15 en CI~~ | ✅ ~~main CI verde~~ |
-| **NOW** | 🚧 Gobierno/plantillas/validacion Condor | 🚧 v0.1.16 |
-| **NEXT** | 🚧 Smoke produccion #106 | 🚧 investigar |
-| **LATER** | 🚧 Media Storage/FFmpeg | 🚧 #40 |
-| **BLOCKED / EXTERNAL** | 🚧 Git SHA checkout Hostinger | 🚧 no demostrado |
+| **DONE** | ✅ ~~CI main v0.1.16~~ | ✅ ~~validate success~~ |
+| **NOW** | 🚧 Smoke observable v0.1.17 | 🚧 CI pendiente |
+| **NEXT** | 🚧 Incidente producción #106 | 🚧 release remota |
+| **LATER** | 🚧 Media Storage | 🚧 #40 |
+| **BLOCKED / EXTERNAL** | 🚧 SHA checkout Hostinger | 🚧 no demostrado |
