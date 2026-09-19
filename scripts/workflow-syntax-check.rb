@@ -35,7 +35,6 @@ steps.each do |step|
   checked += 1
 end
 
-
 # A missing production test secret is not a passing production smoke.
 # Keep incident reporting before the final failure step and check this contract in CI.
 missing_notice = steps.find_index { |step| step["name"] == "Report missing smoke credentials" }
@@ -44,7 +43,7 @@ abort "Production smoke must report missing credentials before failing" if missi
 abort "Unconfigured smoke must be the final step" unless missing_failure == steps.length - 1
 guard = steps.fetch(missing_failure)
 abort "Unconfigured smoke is missing its exact credentials guard" unless guard["if"] == "steps.credentials.outputs.configured == 'false'"
-abort "Unconfigured smoke must exit nonzero" unless guard["run"].match?(/(?:^|\\n)\\s*exit [1-9][0-9]*\\s*(?:\\n|\\z)/)
+abort "Unconfigured smoke must exit nonzero" unless guard["run"].match?(/(?:^|\n)\s*exit [1-9][0-9]*\s*(?:\n|\z)/)
 
 abort "No smoke shell steps checked" if checked.zero?
 puts "PASS production-smoke embedded Bash syntax (#{checked} steps)"
