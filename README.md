@@ -12,12 +12,14 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-006A · Traffic + Distribution handoff** | IMPLEMENTED en rama enfocada |
-| Base exacta | ✅ **main** | `1d9d148bca14c3095b7a439112e5213bfeb84e57` |
-| Dependencias | ✅ **Scheduler, Traffic, Distribution merged** | PR #67, #70 y #73 |
-| CI del SHA exacto de main | ⚪ **no observable por el conector** | PR validation se separa de exact-main |
-| Producción | ⚪ **sin cambios** | sin providers ni publicaciones reales |
-| Migración | 🟠 **una tabla opcional nueva** | `scheduled_publication_links`; no aplicada automáticamente |
+| Work line | ✅ **GF-FR-006A · Traffic + Distribution handoff** | MERGED en `main` |
+| Feature merge commit | ✅ **main base** | `ba758c14bff177277307766a0bfbfea5eab43d23` |
+| CI del PR | ✅ **GrindFlow CI #332** | fast, PHP quality, PHPUnit, MariaDB, browser y validate |
+| Sonar | ✅ **Quality Gate pasado en PR #77** | 0 issues / 0 hotspots |
+| CodeRabbit | 🟠 **pending al merge** | no se atribuye revisión final no emitida |
+| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | CI del PR y exact-main son distintos |
+| Production Smoke | 🟠 **pendiente de evidencia exact-main** | no se confunde con validación en CI |
+| Migración | 🟠 **tabla nueva sin aplicar** | `scheduled_publication_links`, aprobación operacional requerida |
 
 ## Huella del cambio
 
@@ -25,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **13** | **+695** | **−50** | **+645** |
+| **1** | **+38** | **−51** | **-13** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -35,12 +37,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| GrindFlow CI | `validate` exige success real de cada gate seleccionado |
-| Sonar | análisis independiente y comentario detallado del PR |
-| CodeRabbit | revisión sobre head estable, findings revisados antes del merge |
-| Migración | no se aplica desde este PR |
-| Producción | no se habilitan providers ni mutaciones externas |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| GrindFlow CI | docs-only: contratos + dashboard exacto |
+| Sonar | análisis independiente del PR documental |
+| CodeRabbit | review documental no sustituye el review del feature |
+| Migración | no se ejecuta desde este PR |
+| Producción | sin cambios desde este PR |
 
 ## Flujo de entrega
 
@@ -67,59 +69,44 @@ flowchart LR
 
 ## Qué se hizo
 
-- Añade `scheduled_publication_links` como asociación opcional y única por schedule.
-- Las foreign keys compuestas protegen tenant entre schedule y tracked link, también en MariaDB.
-- El Scheduler permite seleccionar un tracked link **activo** de la organización.
-- Crea la asociación dentro de la transacción que crea la publicación; no crea schedule huérfano cuando falla la validación del link.
-- Cross-tenant y links disabled se rechazan server-side, además de los permisos existentes.
-- Sin la nueva tabla, GET y schedules sin tracked link siguen funcionando; POST con link devuelve 503.
-- La lista de próximas publicaciones muestra el label del tracked link si existe.
-- Distribution carga la asociación cuando está disponible y bloquea un link deshabilitado antes de provider I/O.
-- Añade regresiones positivas, negativas, pre-migración, dispatch y FK cross-tenant en MariaDB.
-- No crea adaptadores reales, pagos ni conexiones a plataformas externas.
+- Registra el squash merge del handoff Traffic + Distribution como `ba758c14…`.
+- Preserva CI #332 y Sonar de PR #77 como evidencia del feature, distinta de exact-main.
+- Documenta la nueva tabla de asociación opcional, **sin aplicar en producción**.
+- Registra que CodeRabbit estaba pendiente al merge, sin inventar aprobación.
+- Avanza la línea activa a cierre operacional de migraciones y Smoke.
+- No cambia código, schema, secrets, hosting ni contenido de producción.
 
 ## Archivos modificados en este deploy
 
-- `AGENTS.md` — regla duradera de asociación tenant-aware.
-- `README.md` — dashboard exacto de este slice.
-- `app/Http/Controllers/Scheduling/SchedulerController.php` — lista y registra link opcional.
-- `app/Http/Requests/Scheduling/StoreScheduledPublicationRequest.php` — UUID opcional.
-- `app/Models/ScheduledPublication.php` — relación al link asociado.
-- `app/Models/ScheduledPublicationLink.php` — modelo de asociación tenant-owned.
-- `app/Models/TrackedLink.php` — relación inversa.
-- `app/Services/Distribution/PublicationDeliveryManager.php` — revalidación pre-provider.
-- `app/Services/Scheduling/ContentScheduler.php` — asociación transaccional/validación.
-- `database/migrations/2026_09_19_053000_create_scheduled_publication_links.php` — FKs compuestas.
-- `docs/REQUIREMENTS.md` — aceptación GF-FR-006A.
-- `resources/views/scheduling/index.blade.php` — selector y lista de enlaces.
-- `tests/Feature/ScheduleTrackedLinkTest.php` — tenant, migration-safe y distribución.
+- `README.md` — snapshot post-merge y siguiente frente operativo.
 
 ## Validación
 
-- Estado: **IMPLEMENTED en `feat/traffic-distribution-link-v1`**, pendiente PR/gates.
-- Base exacta: `1d9d148bca14c3095b7a439112e5213bfeb84e57`.
-- Un mismo schedule solo puede guardar un link asociado.
-- La migración es aditiva; schedules no vinculados conservan el comportamiento existente.
-- El test MariaDB verifica que SQL directo tampoco enlaza registros de distintos tenants.
-- No se modificó producción ni se ejecutó migración productiva.
+- GF-FR-006A ya está MERGED en `main` como `ba758c14bff177277307766a0bfbfea5eab43d23`.
+- PR #77 pasó GrindFlow CI #332 sobre el head `8f191fb013b6660b38871e349e13110bd787eadc`.
+- Sonar reportó Quality Gate OK y 0 issues / hotspots en PR #77.
+- CodeRabbit estaba `pending` al merge, sin threads abiertos reportados.
+- Schedules sin link siguen disponibles cuando falta la nueva tabla; asociar link requiere su migración.
+- Las migraciones Scheduling/Distribution/Traffic/Finance/Tracking permanecen como paso operacional separado.
+- Producción aún necesita evidencia propia de exact-main y Smoke.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR del handoff Traffic + Distribution y validar matriz completa + reviews. |
-| **NEXT** | Squash merge, exact-main CI y Smoke como evidencias independientes. |
-| **NEXT** | Adaptador real con credenciales seguras y contrato explícito del tracked URL. |
-| **BLOCKED / EXTERNAL** | Migraciones productivas, FFmpeg y S3-compatible requieren configuración/aprobación. |
-| **LATER** | Payouts/invoices y retiro progresivo del legacy. |
+| **NOW** | Verificar exact-main CI y Production Smoke, y preparar inventario de migraciones pendientes. |
+| **NEXT** | Aplicar migraciones únicamente con aprobación y backup verificable. |
+| **NEXT** | Implementar primer provider real detrás del contrato con sandbox y gestión segura de credenciales. |
+| **BLOCKED / EXTERNAL** | FFmpeg real, S3-compatible, operación de hosting y migraciones productivas. |
+| **LATER** | Conciliación Finance, payouts/invoices y retiro progresivo del legacy. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Traffic + Distribution | asociación implementada · pendiente CI/review |
+| **NOW** | Delivery exact-main | CI y Smoke del merge por confirmar |
+| **NEXT** | Tracking + Distribution | asociación MERGED; migration approval |
 | **NEXT** | Distribution providers | adapters reales + auth/reconnect |
-| **NEXT** | Finance | ledger v1 merged, conciliación pendiente |
-| **BLOCKED / EXTERNAL** | Producción | Scheduling/Distribution/Traffic/Finance migrations + Smoke |
-| **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
+| **NEXT** | Finance | core MERGED; conciliación pendiente |
+| **BLOCKED / EXTERNAL** | Producción | migraciones + hosting, FFmpeg y S3 |
 | **LATER** | Legacy retirement | solo tras GF-MIG |
