@@ -81,6 +81,38 @@ class DistributionTest extends TestCase
         );
     }
 
+    public function test_destination_edit_uses_target_uuid_after_organization_route_parameter(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $destination = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): PublishingDestination => $publication->destination()->firstOrFail(),
+        );
+
+        $this->actingAs($user)->patch(route(
+            'organizations.distribution.destinations.update',
+            [
+                'organizationId' => $organization->getKey(),
+                'destinationId' => $destination->getKey(),
+            ],
+        ), [
+            'name' => 'Updated sandbox',
+            'status' => PublishingDestination::STATUS_DISABLED,
+        ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($destination): void {
+                $fresh = $destination->fresh();
+                $this->assertSame('Updated sandbox', $fresh->name);
+                $this->assertSame(PublishingDestination::STATUS_DISABLED, $fresh->status);
+            },
+        );
+    }
+
     public function test_manual_retry_preserves_provider_attempts_and_rejects_exhaustion(): void
     {
         [$user, $organization] = $this->identity();
