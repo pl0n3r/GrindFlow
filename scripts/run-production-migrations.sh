@@ -116,50 +116,77 @@ print(parser.value)
 PY
 }
 
-extract_migration_csrf() {
+extract_migration_form() {
   local file="$1"
 
   python3 - "$file" <<'PY'
 from html.parser import HTMLParser
 from urllib.parse import urlparse
+import re
 import sys
+
 
 class MigrationFormParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.in_target_form = False
-        self.token = None
+        self.form_count = 0
+        self.tokens = []
+        self.fingerprints = []
+        self.invalid = False
 
     def handle_starttag(self, tag, attrs):
-        values = dict(attrs)
-
         if tag == "form":
-            action = values.get("action", "")
-            path = urlparse(action).path
-            self.in_target_form = path == "/admin/system/migrations"
+            if self.in_target_form:
+                self.invalid = True
+            action = [value for name, value in attrs if name == "action"]
+            if len(action) != 1:
+                self.invalid = True
+                return
+            self.in_target_form = urlparse(action[0] or "").path == "/admin/system/migrations"
+            if self.in_target_form:
+                self.form_count += 1
             return
 
-        if (
-            self.in_target_form
-            and tag == "input"
-            and values.get("name") == "_token"
-            and values.get("value")
-        ):
-            self.token = values["value"]
+        if not self.in_target_form or tag != "input":
+            return
+
+        names = [value for name, value in attrs if name == "name"]
+        values = [value for name, value in attrs if name == "value"]
+        if len(names) != 1:
+            self.invalid = True
+            return
+        if names[0] not in ("_token", "migration_batch"):
+            return
+        if len(values) != 1:
+            self.invalid = True
+            return
+        if names[0] == "_token":
+            self.tokens.append(values[0] or "")
+        else:
+            self.fingerprints.append(values[0] or "")
 
     def handle_endtag(self, tag):
         if tag == "form":
             self.in_target_form = False
 
-parser = MigrationFormParser()
 
+parser = MigrationFormParser()
 with open(sys.argv[1], encoding="utf-8") as handle:
     parser.feed(handle.read())
 
-if not parser.token:
+if (
+    parser.invalid
+    or parser.form_count != 1
+    or len(parser.tokens) != 1
+    or len(parser.fingerprints) != 1
+    or re.fullmatch(r"[A-Za-z0-9_-]{20,256}", parser.tokens[0]) is None
+    or re.fullmatch(r"[0-9a-f]{64}", parser.fingerprints[0]) is None
+):
     raise SystemExit(2)
 
-print(parser.token)
+print(parser.tokens[0])
+print(parser.fingerprints[0])
 PY
 }
 
@@ -220,14 +247,23 @@ if [[ "$pending_before" != "$EXPECTED_PENDING" ]]; then
   exit 1
 fi
 
-if ! migration_token="$(extract_migration_csrf "$system_before")"; then
-  write_result false "$pending_before" unknown "Unable to read the migration CSRF token."
-  printf 'ERROR: migration CSRF token is unavailable.\n' >&2
+if ! extract_migration_form "$system_before" > "$workdir/migration-form-fields.txt"; then
+  write_result false "$pending_before" unknown "Migration CSRF or batch fingerprint is unavailable or ambiguous."
+  printf 'ERROR: migration form fields are invalid or unavailable. No migration was executed.\n' >&2
   exit 1
 fi
 
+mapfile -t migration_form_fields < "$workdir/migration-form-fields.txt"
+if (( ${#migration_form_fields[@]} != 2 )); then
+  write_result false "$pending_before" unknown "Migration form fields are incomplete."
+  printf 'ERROR: migration form is incomplete. No migration was executed.\n' >&2
+  exit 1
+fi
+migration_token="${migration_form_fields[0]}"
+migration_batch="${migration_form_fields[1]}"
+
 set +e
-migration_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 120   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$migration_token"   "$BASE_URL/admin/system/migrations")"
+migration_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 120   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$migration_token"   --data-urlencode "backup_confirmed=1"   --data-urlencode "confirmation=MIGRAR"   --data-urlencode "migration_batch=$migration_batch"   "$BASE_URL/admin/system/migrations")"
 migration_exit=$?
 set -e
 
