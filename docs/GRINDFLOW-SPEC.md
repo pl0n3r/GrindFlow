@@ -292,6 +292,11 @@ The execution roadmap and durable progress history live in
   processed-metadata media options and active tracked links, 27 scheduled
   rows, safe click aggregate and immutable Finance opening event. Fixture
   seeding is idempotent and forbidden outside local/testing.
+- Positive HTTP reversal must resolve the explicit allocationId route key;
+  the parent route also carries organizationId and Laravel may otherwise
+  pass that first UUID into an action's positional scalar argument, causing
+  a false 404 even if service-layer reversal works. Regression is covered
+  by the real browser and a feature HTTP POST test.
 - Chromium logs in and uses rendered HTML forms plus session and CSRF to
   search for deep resources, schedule, navigate calendar page two, detach
   and reattach its tracked link; edit/pause/resume an existing Traffic link,

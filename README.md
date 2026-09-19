@@ -29,7 +29,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+678** | **−45** | **+633** |
+| **13** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -71,11 +71,14 @@ flowchart LR
 - Browser busca recursos antiguos, programa realmente con formulario CSRF, pagina a la segunda hoja, separa/reasocia link de la publicacion.
 - Edita destino de Traffic, pausa/reactiva sin rotar token, lee CSV de metricas agregadas sin generar click /l.
 - Finance crea allocation, reversa y verifica CSV total 3800 asignado /1300 reversado /2500 neto.
+- El nuevo recorrido encontro un bug real: reverse Finance recibia el organizationId de la ruta padre como allocationId por la posicion del argumento; reparado con request->route('allocationId') y un test HTTP positivo de reversa, duplicado y tenant ajeno.
 - Bootstrap temporal elimina JS con password del DOM y el archivo publico tras ejecutar; si aparece password en artifact descarta archivo sin imprimirlo.
 - Diferencia CI de escritura solo en base descartable de Production Smoke GET solo lectura; no se requieren secretos de proveedores o migraciones.
 
 ## Archivos modificados en este deploy
 - `AGENTS.md` — limite E2E y proteccion de credenciales.
+- `app/Http/Controllers/Finance/FinanceController.php` — route allocationId explicito en reversal HTTP.
+- `tests/Feature/FinanceTest.php` — regresion HTTP positiva reverse/tenant/idempotence.
 - `README.md` — foto exacta v0.1.15.
 - `config/version.php` — release humana.
 - `.github/workflows/grindflow-ci.yml` — protege E2E password en logs y CI full matrix.

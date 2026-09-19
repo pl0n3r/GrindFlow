@@ -218,14 +218,16 @@ class FinanceController extends Controller
     public function reverse(
         ReverseRevenueAllocationRequest $request,
         FinanceLedgerManager $manager,
-        string $allocationId,
     ): RedirectResponse {
         /** @var User $user */
         $user = $request->user();
 
+        // Controller routes also carry {organizationId} from the parent
+        // prefix. A positional scalar argument may receive that UUID
+        // instead of {allocationId}, producing a false 404 on real reversal.
         $manager->reverse(
             $user,
-            $allocationId,
+            (string) $request->route('allocationId'),
             (string) $request->validated('reason'),
         );
 

@@ -222,6 +222,12 @@ el cambio aquí en el mismo PR que modifica el producto.
   browser job (`APP_ENV=testing`), usando `E2eSeeder` con 106 assets y
   links sinteticos, 27 schedules, 7 clicks diarios y 2500 COP de Finance.
   Seeder prohibe entornos no local/testing y debe ser idempotente.
+- El recorrido browser descubrio 404 falso en reverse Finance: la ruta padre
+  tambien posee {organizationId}, y un argumento scalar $allocationId
+  en Controller puede recibir ese ID por posicion. En acciones bajo
+  /organizations/{organizationId} usar $request->route('allocationId')
+  para identificar la fila financiera, nunca confiar en el primer scalar.
+  Probar POST HTTP POSITIVO de reversa, no solo 404 cross-tenant/manager.
 - Chrome ejecuta JavaScript real y envia formularios DOM con CSRF/session
   para Scheduler create, paginar, asociar/desvincular link, Traffic
   editar/disable/enable y Finance alloc/reversal/CSV.

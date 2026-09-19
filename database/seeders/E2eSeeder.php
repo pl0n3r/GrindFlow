@@ -7,18 +7,18 @@ use App\Enums\UserRole;
 use App\Models\MediaAsset;
 use App\Models\MediaBlob;
 use App\Models\Membership;
+use App\Models\Organization;
 use App\Models\PublishingDestination;
 use App\Models\RevenueAllocation;
 use App\Models\ScheduledPublication;
 use App\Models\ScheduledPublicationLink;
 use App\Models\TrackedLink;
 use App\Models\TrackedLinkDailyMetric;
-use App\Models\Organization;
 use App\Models\User;
 use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Str;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class E2eSeeder extends Seeder
@@ -59,7 +59,7 @@ class E2eSeeder extends Seeder
             ],
             ['role' => UserRole::Studio],
         );
-        
+
         // The browser fixture only lives in a disposable, migrated local/
         // testing database. Never seed staging/production or trigger providers.
         app(TenantContext::class)->runWithinOrganization(
@@ -204,5 +204,4 @@ class E2eSeeder extends Seeder
             ]);
         }
     }
-
 }

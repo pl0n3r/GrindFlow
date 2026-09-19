@@ -566,6 +566,9 @@ regressions in the Scheduler → Traffic → Finance workflow before merge.
   cookies, login HTML or DB credentials on failure.
 - Browser workflow never reaches a real external provider or public /l/*
   redirect. It is not run by Production Smoke; the latter stays read-only.
+- HTTP Finance reversal resolves the allocationId route parameter rather
+  than the parent organizationId; prove real same-tenant positive reversal,
+  idempotence error and foreign ID 404 at the controller boundary.
 - Failed browser assertion fails the required CI aggregate validate gate.
 
 **Verification:** browser job executes authenticated Chromium workflow
