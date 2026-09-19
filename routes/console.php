@@ -1,8 +1,8 @@
 <?php
 
 use App\Services\Distribution\DistributionScheduler;
-use App\Services\Traffic\TrafficAttributionRecorder;
 use App\Services\Media\Connections\MediaConnectionScheduler;
+use App\Services\Traffic\TrafficAttributionRecorder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
@@ -33,7 +33,6 @@ Schedule::command('grindflow:dispatch-media-scans')
 Schedule::command('grindflow:dispatch-publications')
     ->everyMinute()
     ->withoutOverlapping(5);
-
 
 Artisan::command('grindflow:prune-traffic-dedupes', function (): int {
     $deleted = app(TrafficAttributionRecorder::class)->pruneExpired();
