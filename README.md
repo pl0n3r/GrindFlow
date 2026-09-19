@@ -12,14 +12,14 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-007 · Finance core v1** | IMPLEMENTED en rama enfocada |
-| Base exacta | ✅ **main** | `eb8a051d85e866c8e99012eed3b56e67554ab749` |
-| Traffic dependency | ✅ **GF-FR-006 merged** | PR #73 + snapshot post-merge #74 |
-| Ledger | ✅ **append-only** | corrections use explicit reversal rows |
-| Money | ✅ **integer minor units** | no floating-point persistence |
-| CI del SHA exacto de main | ⚪ **no observable por el conector** | PR validation kept separate |
-| Producción | ⚪ **sin cambios** | no payouts, invoices, bank operations or mutations |
-| Migraciones | 🟠 **1 nueva en este slice** | `revenue_allocations`; no se aplica automáticamente |
+| Work line | ✅ **GF-FR-007 · Finance core v1** | PR #75 fusionada en `main` |
+| Finance merge commit | ✅ **main base** | `76b234c2e0926d0a46cd840bd8118fe689c008d0` |
+| CI de PR | ✅ **GrindFlow CI #328** | fast, Pint/PHPStan, PHPUnit, MariaDB, browser y validate |
+| Sonar | ✅ **último Quality Gate del PR passed** | 0 issues / 0 hotspots; no se atribuye validación del squash SHA |
+| CodeRabbit | 🟠 **pending al merge** | no se atribuye review final no emitido |
+| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | CI de PR y CI de `main` son distintos |
+| Production Smoke | 🟠 **sin evidencia exact-main confirmada** | no se atribuye prueba de hosting desde el merge |
+| Migraciones | 🟠 **2 nuevas sin aplicar** | tabla `revenue_allocations` + triggers de inmutabilidad |
 
 ## Huella del cambio
 
@@ -27,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **19** | **+1752** | **−39** | **+1713** |
+| **1** | **+0000** | **−0000** | **+0000** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -37,12 +37,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| GrindFlow CI | `validate` exige success real de cada gate seleccionado |
-| Sonar | análisis independiente + comentario estable del PR |
-| CodeRabbit | full review sobre el head estable |
-| Migración | nunca se ejecuta automáticamente desde este PR |
-| Producción | Finance core no ejecuta payouts ni mutaciones financieras externas |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| GrindFlow CI | docs-only: contratos y dashboard exacto |
+| Sonar | review documental independiente |
+| CodeRabbit | review documental no reemplaza evidencia de PR #75 |
+| Migración | no se ejecuta desde este PR |
+| Producción | no se modifica desde este PR |
 
 ## Flujo de entrega
 
@@ -69,71 +69,46 @@ flowchart LR
 
 ## Qué se hizo
 
-- Añade `revenue_allocations` como ledger tenant-owned y append-only, protegido también por triggers MariaDB contra UPDATE/DELETE directo.
-- Admin/Studio pueden administrar Finance; Editor/Model quedan bloqueados server-side.
-- Persiste dinero como `amount_minor` entero positivo + currency de 3 letras.
-- Beneficiario opcional, validado contra memberships de la organización activa.
-- Cada asiento conserva actor, fecha, fuente y nota auditables.
-- Las correcciones crean una única reversa con `reversal_of_id`; no hay update/delete funcional.
-- Una reversa no puede revertirse y el original no puede tener dos reversas.
-- El neto se deriva como originales menos reversas **por moneda**; nunca se mezclan minor units de currencies distintas.
-- Añade workspace Finance con creación, listado, métricas y reversa explícita.
-- Deploy-before-migration es seguro: GET informa bloqueo y writes responden 503.
-- No implementa payouts, invoices, taxes, payment providers ni bank reconciliation.
+- Sincroniza el dashboard después del squash merge de Finance core v1 (PR #75).
+- Registra el commit del feature `76b234c2…` y CI #328 completo del head `80d37acd…`.
+- Corrige el inventario: Finance agregó **dos migraciones**, una de tabla y otra de triggers MariaDB.
+- Mantiene Quality Gate de Sonar y CodeRabbit pendientes/emitidos con evidencia diferenciada.
+- Deja exact-main CI, Production Smoke y aplicación de migraciones como pasos independientes.
+- Avanza el roadmap hacia la integración Traffic + Distribution sin activar providers externos.
 
 ## Archivos modificados en este deploy
 
-- `AGENTS.md` — reglas durables del ledger Finance.
-- `README.md` — dashboard exacto del slice.
-- `app/Http/Controllers/Finance/FinanceController.php` — workspace tenant.
-- `app/Http/Middleware/RequireFinanceSchema.php` — write gate migration-safe.
-- `app/Http/Requests/Finance/ReverseRevenueAllocationRequest.php` — validación de reversas.
-- `app/Http/Requests/Finance/StoreRevenueAllocationRequest.php` — validación de creación.
-- `app/Models/RevenueAllocation.php` — asiento append-only.
-- `app/Models/User.php` — capability Admin/Studio para Finance.
-- `app/Services/Finance/FinanceLedgerManager.php` — create/reverse + tenant/beneficiary checks.
-- `database/migrations/2026_09_19_041500_create_revenue_allocations_table.php` — schema Finance.
-- `database/migrations/2026_09_19_041600_enforce_finance_ledger_integrity.php` — triggers append-only MariaDB.
-- `docs/GRINDFLOW-SPEC.md` — contrato de producto Finance core.
-- `docs/REQUIREMENTS.md` — verificación GF-FR-007.
-- `resources/views/dashboard.blade.php` — acceso al workspace.
-- `resources/views/finance/index.blade.php` — UI del ledger.
-- `resources/views/traffic/index.blade.php` — navegación hacia Finance.
-- `routes/web.php` — rutas tenant create/reverse/index.
-- `tests/Feature/FinanceTest.php` — roles, tenant, reversas, inmutabilidad y migration safety.
-- `tests/Feature/MariaDbIntegrityTest.php` — SQL directo no puede update/delete el ledger.
+- `README.md` — snapshot post-merge de Finance y próximo frente.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `feat/finance-core-v1`.
-- Base exacta: `eb8a051d85e866c8e99012eed3b56e67554ab749`.
-- El ledger no usa floats y bloquea update/delete tanto en Eloquent como por SQL directo en MariaDB.
-- Beneficiarios se validan contra membership same-tenant en cada creación.
-- Reversas son únicas, append-only y conservan monto/moneda/fuente/beneficiario del original.
-- Totales COP/USD/etc. se calculan por separado; hay regresión explícita contra sumas cross-currency.
-- Editor/Model no pueden acceder a Finance.
-- Cross-tenant listing y reversal están cubiertos negativamente.
-- La migración nueva no se ejecuta desde CI ni desde esta rama.
-- No hay integración bancaria, pagos, impuestos ni mutación financiera externa.
+- GF-FR-007 Finance core v1 fusionado en `main` como `76b234c2e0926d0a46cd840bd8118fe689c008d0`.
+- CI #328 pasó completamente sobre PR #75 head `80d37acd1f989214faf726180e6810df0d1aac6a`.
+- El ledger persiste dinero en unidades menores enteras y agrega cada moneda por separado.
+- Reversas crean filas auditables; MariaDB bloquea UPDATE/DELETE directos con triggers.
+- Admin/Studio tienen acceso; Editor/Model y accesos cross-tenant se deniegan.
+- Las migraciones de Finance **no se aplicaron desde la PR**. No hay pagos, bancos ni impuestos conectados.
+- CodeRabbit seguía `pending` al merge; no se registra aprobación inexistente.
+- Exact-main CI y Smoke de producción aún requieren evidencia propia.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR de Finance core v1 y validar CI, Sonar y CodeRabbit sobre el head estable. |
-| **NEXT** | Squash merge + snapshot post-merge; mantener migración/Smoke separados. |
-| **NEXT** | Integrar tracked links con Distribution/campañas y conectar Finance con revenue sources reales. |
-| **BLOCKED / EXTERNAL** | Migraciones productivas requieren aprobación operacional. |
-| **LATER** | Providers reales, payouts/invoices y retiro progresivo del legacy. |
+| **NOW** | Integrar tracked links con Distribution/campañas bajo tenant y roles existentes. |
+| **NEXT** | Obtener evidencia exact-main + Production Smoke antes de migraciones productivas. |
+| **NEXT** | Evolucionar Finance desde ledger a conciliación de fuentes verificables, sin payouts en este slice. |
+| **BLOCKED / EXTERNAL** | Aplicación de migraciones, providers reales, FFmpeg y S3-compatible requieren configuración/aprobación. |
+| **LATER** | Retiro del legacy solo tras GF-MIG. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Finance | core v1 IMPLEMENTED · pendiente PR/gates |
-| **NEXT** | Traffic + Distribution | tracked links por campaña |
+| **NOW** | Traffic + Distribution | tracked links por campaña · siguiente slice |
+| **NEXT** | Finance | core v1 MERGED; conciliación/atribución de fuentes pendiente |
 | **NEXT** | Distribution providers | adapters reales + auth/reconnect |
-| **BLOCKED / EXTERNAL** | Scheduling/Distribution/Traffic/Finance producción | migrations + Smoke |
+| **BLOCKED / EXTERNAL** | Producción | Scheduling/Distribution/Traffic/Finance migrations + Smoke |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
-| **LATER** | Payouts / invoices | fuera de Finance core v1 |
+| **LATER** | Payouts / invoices | fuera del core |
 | **LATER** | Legacy retirement | solo tras GF-MIG |
