@@ -92,6 +92,13 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   el README después del merge; incluir release, decisiones y panorama en el PR
   lógico, y registrar estados operativos en #88 si procede.
 
+### Regla de entregas sin ZIP
+
+- No generar, empaquetar ni entregar archivos ZIP del proyecto. Preferir cambios
+  directos en GitHub, PRs y archivos individuales cuando sea necesario.
+- Los artifacts de diagnostico de GitHub Actions existentes pueden inspeccionarse
+  como entrada de lectura, sin crear ni ofrecer un ZIP de entrega.
+
 ### Regla de avance sustancial por cada mensaje
 
 - Cuando el propietario diga "sigue", "adelante" o equivalente, ejecutar un
@@ -133,6 +140,13 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   medianoche abarca 367 dias y se rechaza (CodeRabbit PR #97).
 
 ### Smoke de produccion vertical / version observada
+
+- Leer version humana numerica desde el marcador exclusivo Admin System
+  `data-grindflow-release`, con fallback de texto seguro para releases antiguos.
+  Distinguir `RELEASE_UI_OBSERVED` de `RELEASE_UI_EXPECTED`; nunca imprimir
+  el HTML completo de Admin System ni secretos. Fallo de version desconocida o
+  distinta es determinista, sin 15 reintentos/login repetidos y sin declarar
+  Hostinger SHA por inferencia.
 
 - Reutilizar UNA sesion E2E de produccion para GET seguros de Vault,
   Scheduler, Distribution, Traffic, Finance y CSV diario; nunca ejecutar

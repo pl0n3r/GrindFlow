@@ -28,7 +28,9 @@ case "$url" in
   http://mock/admin/system)
     release="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" "$MOCK_REPOSITORY_ROOT/config/version.php")"
     [[ "${MOCK_RELEASE_MODE:-current}" == stale ]] && release=0.0.0
-    body="<h2>Runtime configuration</h2>GrindFlow v$release<span data-pending-migrations=\"$MOCK_PENDING\">status</span><span data-media-storage-configured=\"0\">storage</span>"
+    release_markup="<div data-grindflow-release=\"$release\">GrindFlow v$release</div>"
+    [[ "${MOCK_RELEASE_MODE:-current}" == missing ]] && release_markup=""
+    body="<h2>Runtime configuration</h2>$release_markup<span data-pending-migrations=\"$MOCK_PENDING\">status</span><span data-media-storage-configured=\"0\">storage</span>"
     if [[ "$MOCK_PENDING" == 3 ]]; then
       fingerprint="$(printf 'a%.0s' {1..64})"
       inventory='<ol data-pending-migration-inventory><li><code>2026_09_19_000001_first</code></li><li><code>2026_09_19_000002_second</code></li><li><code>2026_09_19_000003_third</code></li></ol>'
@@ -81,6 +83,7 @@ run_case() {
     current)
       grep -Fxq 'VAULT_READ_ONLY=ok' "$log"
       grep -Eq '^RELEASE_UI_OBSERVED=v[0-9]+\.[0-9]+\.[0-9]+$' "$log"
+      grep -Eq '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' "$log"
       for module in scheduler distribution traffic finance traffic-csv; do grep -Fxq "MODULE_READ_ONLY=$module:ok" "$log"; done
       [[ "$(grep -c '^MODULE_READ_ONLY=.*:ok$' "$log")" -eq 5 ]]
       grep -Fq 'PASS production smoke:' "$log"
@@ -94,9 +97,18 @@ run_case() {
       ! grep -Fq 'Production smoke attempt 2/' "$log"
       [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
       ;;
-    current_stale_release)
-      grep -Fq 'ERROR: production release does not match candidate v' "$log"
+    current_stale_release|current_missing_release)
+      grep -Eq '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' "$log"
+      if [[ "$release_mode" == stale ]]; then
+        grep -Fxq 'RELEASE_UI_OBSERVED=v0.0.0' "$log"
+        grep -Fq 'ERROR: production release v0.0.0 differs from candidate v' "$log"
+      else
+        grep -Fxq 'RELEASE_UI_OBSERVED=unknown' "$log"
+        grep -Fq 'ERROR: production release cannot be identified' "$log"
+      fi
       ! grep -q '^MODULE_READ_ONLY=' "$log"
+      ! grep -Fq 'Production smoke attempt 2/' "$log"
+      [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
       ;;
     current_vault_failure|current_vault_link_missing)
       grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; ! grep -Fq 'Production smoke attempt 2/' "$log";;
@@ -114,7 +126,8 @@ run_case pending_vault_link_missing 3 3 valid missing_link
 run_case current 0 0
 run_case current_module_failure 0 5 valid ok failed
 run_case current_csv_failure 0 5 valid ok ok failed
-run_case current_stale_release 0 1 valid ok ok ok stale
+run_case current_stale_release 0 6 valid ok ok ok stale
+run_case current_missing_release 0 6 valid ok ok ok missing
 run_case current_vault_failure 0 4 valid failed
 run_case current_vault_link_missing 0 4 valid missing_link
 

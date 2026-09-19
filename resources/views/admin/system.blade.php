@@ -143,7 +143,7 @@
             @endif
 
             <section class="gf-metrics" aria-label="Estado del sistema">
-                <article class="gf-metric">
+                <article class="gf-metric" data-grindflow-release="{{ config('version.number', 'unknown') }}">
                     <div class="gf-metric__label">Application</div>
                     <div class="gf-metric__value">Online</div>
                     <div class="gf-metric__meta">GrindFlow v{{ config('version.number', 'unknown') }} · Laravel {{ $laravelVersion }}</div>

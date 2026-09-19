@@ -109,6 +109,41 @@ print(parser.value)
 PY
 }
 
+extract_observed_release() {
+  python3 - "$system_html" <<'PY'
+from html.parser import HTMLParser
+import re
+import sys
+
+SEMVER = re.compile(r"^[0-9]+[.][0-9]+[.][0-9]+$")
+LEGACY = re.compile(r"\bGrindFlow v([0-9]+[.][0-9]+[.][0-9]+)\b")
+
+class ReleaseParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.markers = []
+        self.legacy = []
+
+    def handle_starttag(self, tag, attrs):
+        value = dict(attrs).get("data-grindflow-release")
+        if value is not None:
+            self.markers.append(value)
+
+    def handle_data(self, data):
+        self.legacy.extend(LEGACY.findall(data))
+
+parser = ReleaseParser()
+with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+    parser.feed(handle.read())
+values = parser.markers if parser.markers else parser.legacy
+if not values or any(not SEMVER.fullmatch(value) for value in values):
+    raise SystemExit(2)
+if len(set(values)) != 1:
+    raise SystemExit(2)
+print(values[0])
+PY
+}
+
 assert_contains() {
   local file="$1" expected="$2"
   if ! grep -Fq "$expected" "$file"; then
@@ -250,11 +285,19 @@ run_smoke() {
 
   # A product release label proves the observed runtime serves that release,
   # not the exact deployed Git commit (Hostinger checkout SHA remains unknown).
-  if ! assert_contains "$system_html" "GrindFlow v$EXPECTED_RELEASE"; then
-    printf 'ERROR: production release does not match candidate v%s.\n' "$EXPECTED_RELEASE" >&2
-    return 1
+  local observed_release
+  if ! observed_release="$(extract_observed_release)"; then
+    printf 'RELEASE_UI_OBSERVED=unknown\n'
+    printf 'RELEASE_UI_EXPECTED=v%s\n' "$EXPECTED_RELEASE"
+    printf 'ERROR: production release cannot be identified from Admin System.\n' >&2
+    return 6
   fi
-  printf 'RELEASE_UI_OBSERVED=v%s\n' "$EXPECTED_RELEASE"
+  printf 'RELEASE_UI_OBSERVED=v%s\n' "$observed_release"
+  printf 'RELEASE_UI_EXPECTED=v%s\n' "$EXPECTED_RELEASE"
+  if [[ "$observed_release" != "$EXPECTED_RELEASE" ]]; then
+    printf 'ERROR: production release v%s differs from candidate v%s; no retry for a deterministic version mismatch.\n' "$observed_release" "$EXPECTED_RELEASE" >&2
+    return 6
+  fi
 
   check_workspace_modules "$vault_path" || return $?
   printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
@@ -268,6 +311,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
     3) printf 'ERROR: read-only Vault check failed while migrations remain pending; no automatic migration or repeated login requests.\n' >&2; exit 3 ;;
     4) printf 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.\n' >&2; exit 4 ;;
     5) printf 'ERROR: read-only workspace module check failed; no repeated login requests.\n' >&2; exit 5 ;;
+    6) printf 'ERROR: production release inventory failed or differs; no repeated login requests.\n' >&2; exit 6 ;;
   esac
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then sleep "$WAIT_SECONDS"; fi
 done
