@@ -27,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **17** | **+1532** | **−39** | **+1493** |
+| **17** | **+1538** | **−39** | **+1499** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
