@@ -50,11 +50,10 @@ class DistributionScheduler
             }
 
             $last = $publications->last();
-            $rawDue = $last?->getRawOriginal('scheduled_for_utc');
+            $rawDue = $last->getRawOriginal('scheduled_for_utc');
 
             if (
-                $last === null
-                || is_string($rawDue) === false
+                is_string($rawDue) === false
                 || $rawDue === ''
                 || $publications->count() < 20
             ) {
