@@ -51,6 +51,8 @@ class SchedulerController extends Controller
                     'destination',
                     'scheduledBy',
                 ])
+                ->where('status', ScheduledPublication::STATUS_SCHEDULED)
+                ->where('scheduled_for_utc', '>', now('UTC'))
                 ->orderBy('scheduled_for_utc')
                 ->limit(100)
                 ->get();
