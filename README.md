@@ -69,7 +69,7 @@ flowchart LR
 
 ## Qué se hizo
 
-- Añade `revenue_allocations` como ledger tenant-owned y append-only.
+- Añade `revenue_allocations` como ledger tenant-owned y append-only, protegido también por triggers MariaDB contra UPDATE/DELETE directo.
 - Admin/Studio pueden administrar Finance; Editor/Model quedan bloqueados server-side.
 - Persiste dinero como `amount_minor` entero positivo + currency de 3 letras.
 - Beneficiario opcional, validado contra memberships de la organización activa.
@@ -93,6 +93,7 @@ flowchart LR
 - `app/Models/User.php` — capability Admin/Studio para Finance.
 - `app/Services/Finance/FinanceLedgerManager.php` — create/reverse + tenant/beneficiary checks.
 - `database/migrations/2026_09_19_041500_create_revenue_allocations_table.php` — schema Finance.
+- `database/migrations/2026_09_19_041600_enforce_finance_ledger_integrity.php` — triggers append-only MariaDB.
 - `docs/GRINDFLOW-SPEC.md` — contrato de producto Finance core.
 - `docs/REQUIREMENTS.md` — verificación GF-FR-007.
 - `resources/views/dashboard.blade.php` — acceso al workspace.
@@ -100,12 +101,13 @@ flowchart LR
 - `resources/views/traffic/index.blade.php` — navegación hacia Finance.
 - `routes/web.php` — rutas tenant create/reverse/index.
 - `tests/Feature/FinanceTest.php` — roles, tenant, reversas, inmutabilidad y migration safety.
+- `tests/Feature/MariaDbIntegrityTest.php` — SQL directo no puede update/delete el ledger.
 
 ## Validación
 
 - Estado actual: **IMPLEMENTED** en `feat/finance-core-v1`.
 - Base exacta: `eb8a051d85e866c8e99012eed3b56e67554ab749`.
-- El ledger no usa floats y no expone update/delete de asientos.
+- El ledger no usa floats y bloquea update/delete tanto en Eloquent como por SQL directo en MariaDB.
 - Beneficiarios se validan contra membership same-tenant en cada creación.
 - Reversas son únicas, append-only y conservan monto/moneda/fuente/beneficiario del original.
 - Totales COP/USD/etc. se calculan por separado; hay regresión explícita contra sumas cross-currency.
