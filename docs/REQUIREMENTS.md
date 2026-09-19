@@ -170,11 +170,18 @@ platform integrations.
   the scheduling actor can still distribute for the organization.
 - Provider authentication failures become terminal `authentication_failed`
   state while HTTP/provider rate limits become `retry_scheduled` with a
-  bounded 60-3600 second retry window.
+  bounded 60-3600 second retry window and do not consume the transient attempt
+  budget.
 - Transient retries use persisted backoff and stop after four provider attempts;
   attempts, next retry time and safe error code remain queryable.
+- Queue-backend dispatch failures become observable retry state instead of a
+  terminal publication failure.
 - Queued/processing work uses a five-minute lease so abandoned jobs can be
-  redriven without creating a second logical delivery.
+  redriven without creating a second logical delivery; post-provider writes are
+  fenced by processing state + attempt number so stale workers cannot overwrite
+  a newer claim.
+- Candidate discovery paginates past missing/revoked actors so invalid history
+  cannot permanently starve later valid publications.
 - Provider retries always reuse the same idempotency key and a published
   delivery is a no-op on subsequent job execution.
 - Dispatch revalidates the current destination and media-processing eligibility
