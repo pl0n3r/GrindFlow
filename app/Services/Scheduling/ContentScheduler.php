@@ -14,9 +14,9 @@ use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -48,6 +48,7 @@ class ContentScheduler
 
     /**
      * @param Collection<int, PublishingDestination> $destinations
+     *
      * @return Collection<int, ScheduledPublication>
      */
     public function scheduleMany(
@@ -65,8 +66,9 @@ class ContentScheduler
             $organizationId === null
             || (string) $asset->organization_id !== $organizationId
             || $destinations->isEmpty()
-            || $destinations->contains(fn (PublishingDestination $destination): bool =>
-                (string) $destination->organization_id !== $organizationId)
+            || $destinations->contains(
+                fn (PublishingDestination $destination): bool => (string) $destination->organization_id !== $organizationId,
+            )
         ) {
             throw new AuthorizationException(
                 'The active tenant does not match this scheduling request.',
@@ -79,8 +81,9 @@ class ContentScheduler
             );
         }
 
-        if ($destinations->contains(fn (PublishingDestination $destination): bool =>
-            $destination->status !== PublishingDestination::STATUS_ACTIVE)) {
+        if ($destinations->contains(
+            fn (PublishingDestination $destination): bool => $destination->status !== PublishingDestination::STATUS_ACTIVE,
+        )) {
             throw ValidationException::withMessages([
                 'destination_id' => 'The selected destination is not active.',
             ]);
@@ -130,8 +133,9 @@ class ContentScheduler
 
             if (
                 $lockedDestinations->count() !== $destinations->count()
-                || $lockedDestinations->contains(fn (PublishingDestination $destination): bool =>
-                    $destination->status !== PublishingDestination::STATUS_ACTIVE)
+                || $lockedDestinations->contains(
+                    fn (PublishingDestination $destination): bool => $destination->status !== PublishingDestination::STATUS_ACTIVE,
+                )
             ) {
                 throw ValidationException::withMessages([
                     'destination_ids' => 'Every selected destination must be active.',
@@ -166,7 +170,12 @@ class ContentScheduler
             }
 
             return $lockedDestinations->map(function (PublishingDestination $destination) use (
-                $lockedAsset, $actor, $scheduledForUtc, $timezone, $trackedLink, $requestKey,
+                $lockedAsset,
+                $actor,
+                $scheduledForUtc,
+                $timezone,
+                $trackedLink,
+                $requestKey,
             ): ScheduledPublication {
                 $attributes = [
                     'media_asset_id' => $lockedAsset->getKey(),
@@ -180,10 +189,13 @@ class ContentScheduler
 
                 $publication = $requestKey === null || ! Schema::hasColumn('scheduled_publications', 'request_key')
                     ? ScheduledPublication::query()->create($attributes)
-                    : ScheduledPublication::query()->firstOrCreate([
-                        'request_key' => $requestKey,
-                        'publishing_destination_id' => $destination->getKey(),
-                    ], $attributes);
+                    : ScheduledPublication::query()->firstOrCreate(
+                        [
+                            'request_key' => $requestKey,
+                            'publishing_destination_id' => $destination->getKey(),
+                        ],
+                        $attributes,
+                    );
 
                 if ($trackedLink !== null) {
                     ScheduledPublicationLink::query()->firstOrCreate([
@@ -203,19 +215,27 @@ class ContentScheduler
         string $timezone,
     ): void {
         $organizationId = $this->tenantContext->organizationId();
-        if ($organizationId === null || (string) $publication->organization_id !== $organizationId
-            || ! $actor->canScheduleOrganization($organizationId)) {
+        if (
+            $organizationId === null
+            || (string) $publication->organization_id !== $organizationId
+            || ! $actor->canScheduleOrganization($organizationId)
+        ) {
             throw new AuthorizationException('The user cannot edit this schedule.');
         }
 
         $due = $this->scheduledForUtc($localDateTime, $timezone);
         DB::transaction(function () use ($publication, $due, $timezone): void {
             $locked = ScheduledPublication::query()->lockForUpdate()->findOrFail($publication->getKey());
-            if ($locked->status !== ScheduledPublication::STATUS_SCHEDULED
+            if (
+                $locked->status !== ScheduledPublication::STATUS_SCHEDULED
                 || $locked->scheduled_for_utc?->isFuture() !== true
-                || $locked->delivery()->exists()) {
-                throw ValidationException::withMessages(['schedule' => 'Only future, undelivered schedules can be edited.']);
+                || $locked->delivery()->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'schedule' => 'Only future, undelivered schedules can be edited.',
+                ]);
             }
+
             $locked->forceFill(['scheduled_for_utc' => $due, 'timezone' => $timezone])->save();
         });
     }
@@ -223,16 +243,25 @@ class ContentScheduler
     public function cancel(ScheduledPublication $publication, User $actor): void
     {
         $organizationId = $this->tenantContext->organizationId();
-        if ($organizationId === null || (string) $publication->organization_id !== $organizationId
-            || ! $actor->canScheduleOrganization($organizationId)) {
+        if (
+            $organizationId === null
+            || (string) $publication->organization_id !== $organizationId
+            || ! $actor->canScheduleOrganization($organizationId)
+        ) {
             throw new AuthorizationException('The user cannot cancel this schedule.');
         }
 
         DB::transaction(function () use ($publication): void {
             $locked = ScheduledPublication::query()->lockForUpdate()->findOrFail($publication->getKey());
-            if ($locked->status !== ScheduledPublication::STATUS_SCHEDULED || $locked->delivery()->exists()) {
-                throw ValidationException::withMessages(['schedule' => 'This schedule can no longer be cancelled.']);
+            if (
+                $locked->status !== ScheduledPublication::STATUS_SCHEDULED
+                || $locked->delivery()->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'schedule' => 'This schedule can no longer be cancelled.',
+                ]);
             }
+
             $locked->forceFill(['status' => ScheduledPublication::STATUS_CANCELLED])->save();
         });
     }

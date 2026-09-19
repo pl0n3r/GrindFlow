@@ -5,6 +5,7 @@ namespace App\Http\Requests\Scheduling;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 
 class StoreScheduledPublicationRequest extends FormRequest
 {
@@ -49,7 +50,7 @@ class StoreScheduledPublicationRequest extends FormRequest
         }
 
         if (! $this->has('request_key')) {
-            $this->merge(['request_key' => (string) \Illuminate\Support\Str::uuid()]);
+            $this->merge(['request_key' => (string) Str::uuid()]);
         }
     }
 }

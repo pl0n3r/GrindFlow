@@ -14,8 +14,8 @@ use App\Http\Controllers\Traffic\TrackedLinkRedirectController;
 use App\Http\Controllers\Traffic\TrafficController;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
-use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireDistributionSchema;
+use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Middleware\RequireTrafficSchema;
 use Illuminate\Support\Facades\Route;
@@ -50,10 +50,10 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
                 ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.store');
             Route::patch('/scheduler/{publicationId}', [SchedulerController::class, 'update'])
-                ->middleware(RequireSchedulingSchema::class)->whereUuid('publicationId')
+                ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.update');
             Route::post('/scheduler/{publicationId}/cancel', [SchedulerController::class, 'cancel'])
-                ->middleware(RequireSchedulingSchema::class)->whereUuid('publicationId')
+                ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.cancel');
             Route::get('/distribution', [DistributionController::class, 'index'])
                 ->name('organizations.distribution.index');

@@ -42,17 +42,35 @@ class DistributionController extends Controller
 
         if ($ready) {
             $destinations = PublishingDestination::query()->orderBy('name')->get();
+
             $query = PublicationDelivery::query()
                 ->with(['scheduledPublication.mediaAsset', 'scheduledPublication.destination'])
                 ->latest();
 
-            $query->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status));
-            $query->when($filters['destination_id'] ?? null, function ($q, $destinationId): void {
-                $q->whereHas('scheduledPublication', fn ($publication) => $publication
-                    ->where('publishing_destination_id', $destinationId));
-            });
-            $query->when($filters['from'] ?? null, fn ($q, $from) => $q->whereDate('created_at', '>=', $from));
-            $query->when($filters['to'] ?? null, fn ($q, $to) => $q->whereDate('created_at', '<=', $to));
+            $query->when(
+                $filters['status'] ?? null,
+                fn ($query, $status) => $query->where('status', $status),
+            );
+            $query->when(
+                $filters['destination_id'] ?? null,
+                function ($query, $destinationId): void {
+                    $query->whereHas(
+                        'scheduledPublication',
+                        fn ($publication) => $publication->where(
+                            'publishing_destination_id',
+                            $destinationId,
+                        ),
+                    );
+                },
+            );
+            $query->when(
+                $filters['from'] ?? null,
+                fn ($query, $from) => $query->whereDate('created_at', '>=', $from),
+            );
+            $query->when(
+                $filters['to'] ?? null,
+                fn ($query, $to) => $query->whereDate('created_at', '<=', $to),
+            );
 
             $deliveries = $query->limit(100)->get();
             $counts = PublicationDelivery::query()
@@ -72,6 +90,7 @@ class DistributionController extends Controller
     public function storeDestination(StoreDestinationRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+
         PublishingDestination::query()->create([
             'name' => trim((string) $validated['name']),
             'provider' => 'sandbox',
@@ -98,8 +117,10 @@ class DistributionController extends Controller
         PublicationDeliveryManager $manager,
     ): RedirectResponse {
         $organization = $this->organization($request);
+
         /** @var User $user */
         $user = $request->user();
+
         abort_unless($user->canManageOrganization($organization), 403);
 
         $delivery = PublicationDelivery::query()->findOrFail($deliveryId);
@@ -130,7 +151,9 @@ class DistributionController extends Controller
     private function organization(Request $request): Organization
     {
         $organization = $request->attributes->get('tenantOrganization');
+
         abort_unless($organization instanceof Organization, 404);
+
         return $organization;
     }
 

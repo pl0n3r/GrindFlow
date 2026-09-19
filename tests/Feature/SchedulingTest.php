@@ -744,12 +744,16 @@ class SchedulingTest extends TestCase
             (string) $organization->getKey(),
             function () use ($user): ScheduledPublication {
                 $destination = PublishingDestination::query()->create([
-                    'name' => 'Sandbox', 'provider' => 'sandbox',
+                    'name' => 'Sandbox',
+                    'provider' => 'sandbox',
                     'status' => PublishingDestination::STATUS_ACTIVE,
                 ]);
                 return app(ContentScheduler::class)->schedule(
-                    $this->readyAsset(), $destination, $user,
-                    now('UTC')->addDays(2)->format('Y-m-d\TH:i'), 'UTC',
+                    $this->readyAsset(),
+                    $destination,
+                    $user,
+                    now('UTC')->addDays(2)->format('Y-m-d\TH:i'),
+                    'UTC',
                 );
             },
         );
