@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **15** | **+1676** | **−54** | **+1622** |
+| **15** | **+1719** | **−54** | **+1665** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -68,14 +68,14 @@ flowchart LR
 
 - Añade `publishing_destinations` y `scheduled_publications` como tablas tenant-owned con FKs compuestas por organización.
 - Autoriza Scheduling a platform admins y memberships Admin/Studio/Editor; Model no puede crear schedules.
-- Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible, revalidando el asset bajo `lockForUpdate()` dentro de la misma transacción que crea el schedule.
+- Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible, revalidando el asset bajo `lockForUpdate()` y comprobando de nuevo que la hora siga en el futuro justo antes de crear el schedule.
 - Un asset solo es elegible si es canónico, está `ready` y su procesamiento terminó en la **versión actual** del procesador.
 - Rechaza procesamiento stale/failed, duplicados, destinos deshabilitados, timezone inválida y fechas pasadas.
 - Guarda y **lee** el instante debido explícitamente en UTC, independiente de `APP_TIMEZONE`, y conserva la timezone IANA original para reconstruir la hora local.
 - Expone GET/POST `/organizations/{organizationId}/scheduler` y habilita Scheduler en la navegación.
 - La UI lista destinos activos, assets elegibles y próximas publicaciones; la elegibilidad se aplica antes del límite de 100 resultados.
 - El Scheduler es migration-safe: sin tablas, GET muestra el bloqueo y un middleware del POST responde 503 **antes** de autorización/validación del FormRequest.
-- Añade pruebas de autorización, tenant isolation, duplicados, fecha pasada, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC, race de elegibilidad y endpoints seguros antes de migrar.
+- Añade pruebas de autorización, tenant isolation de destino **y asset**, duplicados, fecha pasada, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC, race de elegibilidad y endpoints seguros antes de migrar.
 - GF-FR-005 queda separado: este slice no intenta publicar, reintentar ni hablar con proveedores externos.
 
 ## Archivos modificados en este deploy
