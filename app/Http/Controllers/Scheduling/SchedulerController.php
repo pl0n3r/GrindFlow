@@ -187,7 +187,6 @@ class SchedulerController extends Controller
 
     public function cancel(
         Request $request,
-        string $publicationId,
         ContentScheduler $scheduler,
     ): RedirectResponse {
         $organization = $this->organization($request);
@@ -195,10 +194,11 @@ class SchedulerController extends Controller
         /** @var User $user */
         $user = $request->user();
         abort_unless($user->canScheduleOrganization($organization), 403);
+        $validated = $request->validate(['publication_id' => ['required', 'uuid']]);
         $publication = ScheduledPublication::query()
             ->withoutGlobalScope(TenantScope::class)
             ->where('organization_id', $organization->getKey())
-            ->whereKey($publicationId)
+            ->whereKey($validated['publication_id'])
             ->firstOrFail();
         $scheduler->cancel($publication, $user);
 

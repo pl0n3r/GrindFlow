@@ -768,8 +768,8 @@ class SchedulingTest extends TestCase
         ])->assertRedirect();
 
         $this->actingAs($user)->post(route('organizations.scheduler.cancel', [
-            'organizationId' => $organization->getKey(), 'publicationId' => $publication->getKey(),
-        ]))->assertRedirect();
+            'organizationId' => $organization->getKey(),
+        ]), ['publication_id' => $publication->getKey()])->assertRedirect();
 
         app(TenantContext::class)->runWithinOrganization(
             $user,

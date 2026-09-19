@@ -187,7 +187,7 @@ class ContentScheduler
                     'request_key' => $requestKey,
                 ];
 
-                $publication = $requestKey === null || ! Schema::hasColumn('scheduled_publications', 'request_key')
+                $publication = $requestKey === null || Schema::hasColumn('scheduled_publications', 'request_key') === false
                     ? ScheduledPublication::query()->create($attributes)
                     : ScheduledPublication::query()->firstOrCreate(
                         [
@@ -218,7 +218,7 @@ class ContentScheduler
         if (
             $organizationId === null
             || (string) $publication->organization_id !== $organizationId
-            || ! $actor->canScheduleOrganization($organizationId)
+            || $actor->canScheduleOrganization($organizationId) === false
         ) {
             throw new AuthorizationException('The user cannot edit this schedule.');
         }
@@ -246,7 +246,7 @@ class ContentScheduler
         if (
             $organizationId === null
             || (string) $publication->organization_id !== $organizationId
-            || ! $actor->canScheduleOrganization($organizationId)
+            || $actor->canScheduleOrganization($organizationId) === false
         ) {
             throw new AuthorizationException('The user cannot cancel this schedule.');
         }

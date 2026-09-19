@@ -52,7 +52,7 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::patch('/scheduler', [SchedulerController::class, 'update'])
                 ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.update');
-            Route::post('/scheduler/{publicationId}/cancel', [SchedulerController::class, 'cancel'])
+            Route::post('/scheduler/cancel', [SchedulerController::class, 'cancel'])
                 ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.cancel');
             Route::get('/distribution', [DistributionController::class, 'index'])

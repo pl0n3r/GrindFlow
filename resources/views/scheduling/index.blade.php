@@ -358,8 +358,9 @@
                                                                 <button class="gf-button gf-button--ghost">Save</button>
                                                             </form>
                                                         </details>
-                                                        <form method="POST" action="{{ route('organizations.scheduler.cancel', ['organizationId' => $organization->id, 'publicationId' => $publication->id]) }}">
+                                                        <form method="POST" action="{{ route('organizations.scheduler.cancel', ['organizationId' => $organization->id]) }}">
                                                             @csrf
+                                                            <input type="hidden" name="publication_id" value="{{ $publication->id }}">
                                                             <button class="gf-button gf-button--ghost">Cancel</button>
                                                         </form>
                                                     @else
