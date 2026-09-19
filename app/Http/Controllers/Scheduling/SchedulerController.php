@@ -73,8 +73,6 @@ class SchedulerController extends Controller
         StoreScheduledPublicationRequest $request,
         ContentScheduler $scheduler,
     ): RedirectResponse {
-        abort_unless($this->schedulingReady(), 503);
-
         $validated = $request->validated();
 
         $asset = MediaAsset::query()
