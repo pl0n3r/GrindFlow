@@ -15,6 +15,7 @@
 | Work line | 🟠 **GF-FR-005 · Distribution core v1** | PR #70 abierto · review fixes aplicados |
 | Base exacta | ✅ **main** | `3a9a8229da059fddea2e7da11c4a73cd39dd27b7` |
 | Scheduling dependency | ✅ **GF-FR-004 merged** | PR #67 + snapshot post-merge #68 |
+| CI del SHA exacto de main | ⚪ **no observable por el conector** | no se atribuye evidencia de eventos `push` no expuestos |
 | Validación PR | 🟠 **rerun pendiente** | CI #283 + Sonar pasaron en `e6ea2883…`; CodeRabbit encontró 4 findings funcionales ya corregidos en el head actual |
 | Producción | ⚪ **sin cambios** | ningún provider real, secret o publicación externa habilitada |
 | Migraciones | 🟠 **1 nueva en este slice** | `publication_deliveries`; no se aplica automáticamente |
