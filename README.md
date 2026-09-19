@@ -47,7 +47,7 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 ```mermaid
 flowchart LR
-    A["PR #70 validado"] --> M["Squash merge"]
+    A["PR + snapshot exacto"] --> M["PR #70 validado + squash merge"]
     M --> N["main f3abe464…"]
     N --> D["Snapshot docs-only"]
     N --> X["CI exact-main (no observable)"]
