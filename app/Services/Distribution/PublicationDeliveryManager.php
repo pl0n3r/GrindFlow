@@ -7,6 +7,7 @@ use App\Models\MediaAsset;
 use App\Models\PublicationDelivery;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
+use App\Models\TrackedLink;
 use App\Models\User;
 use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
@@ -14,6 +15,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class PublicationDeliveryManager
@@ -243,11 +245,17 @@ class PublicationDeliveryManager
             return;
         }
 
+        $relations = [
+            'mediaAsset.blob',
+            'destination',
+        ];
+
+        if (Schema::hasTable('scheduled_publication_links')) {
+            $relations[] = 'linkAssignment.trackedLink';
+        }
+
         $publication = ScheduledPublication::query()
-            ->with([
-                'mediaAsset.blob',
-                'destination',
-            ])
+            ->with($relations)
             ->findOrFail($claimed->scheduled_publication_id);
 
         if ($this->isEligible($publication) === false) {
@@ -434,6 +442,17 @@ class PublicationDeliveryManager
             || $asset->status !== MediaAsset::STATUS_READY
         ) {
             return false;
+        }
+
+        if (Schema::hasTable('scheduled_publication_links')) {
+            $assignment = $publication->linkAssignment;
+
+            if (
+                $assignment !== null
+                && $assignment->trackedLink?->status !== TrackedLink::STATUS_ACTIVE
+            ) {
+                return false;
+            }
         }
 
         $metadata = $asset->getAttribute('metadata');
