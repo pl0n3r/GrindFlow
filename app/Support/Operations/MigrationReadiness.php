@@ -46,7 +46,7 @@ class MigrationReadiness
         }
 
         return [
-            'names' => array_values(array_keys($pending)),
+            'names' => array_keys($pending),
             'fingerprint' => hash(
                 'sha256',
                 implode("\n", $checksums),
