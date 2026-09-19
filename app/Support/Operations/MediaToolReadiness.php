@@ -38,9 +38,13 @@ class MediaToolReadiness
         }
 
         try {
-            return $this->finder->find($binary) === null
-                ? 'binary-missing'
-                : 'binary-found';
+            // Symfony's PATH lookup is for command names; configured absolute
+            // paths require an explicit executable-file check instead.
+            $found = str_contains($binary, '/') || str_contains($binary, '\\')
+                ? is_file($binary) && is_executable($binary)
+                : $this->finder->find($binary) !== null;
+
+            return $found ? 'binary-found' : 'binary-missing';
         } catch (Throwable) {
             // Never echo an operator-controlled path or process error into the UI.
             return 'binary-missing';
