@@ -38,17 +38,12 @@ class SchedulerController extends Controller
                 ->orderBy('name')
                 ->get();
 
-            $eligibleAssets = MediaAsset::query()
+            $eligibleAssets = $scheduler
+                ->eligibleAssetsQuery()
                 ->with('blob')
-                ->where('status', MediaAsset::STATUS_READY)
-                ->whereNull('duplicate_of')
                 ->latest()
                 ->limit(100)
-                ->get()
-                ->filter(
-                    fn (MediaAsset $asset): bool => $scheduler->isAssetEligible($asset),
-                )
-                ->values();
+                ->get();
 
             $publications = ScheduledPublication::query()
                 ->with([
