@@ -36,7 +36,7 @@ class RunMigrationsController extends Controller
         $lockPath = storage_path('framework/grindflow-migrate.lock');
         $directory = dirname($lockPath);
 
-        if (! is_dir($directory)) {
+        if (is_dir($directory) === false) {
             mkdir($directory, 0775, true);
         }
 
@@ -46,7 +46,7 @@ class RunMigrationsController extends Controller
             throw new RuntimeException('Unable to create the migration lock.');
         }
 
-        if (! flock($lock, LOCK_EX | LOCK_NB)) {
+        if (flock($lock, LOCK_EX | LOCK_NB) === false) {
             fclose($lock);
 
             return redirect()
