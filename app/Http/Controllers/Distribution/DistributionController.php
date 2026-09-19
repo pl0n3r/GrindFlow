@@ -128,10 +128,14 @@ class DistributionController extends Controller
             PublicationDelivery::STATUS_FAILED,
             PublicationDelivery::STATUS_RETRY_SCHEDULED,
         ], true), 409, 'Only failed or scheduled retries can be queued manually.');
+        abort_unless(
+            $delivery->attempts < PublicationDeliveryManager::MAX_ATTEMPTS,
+            409,
+            'The delivery retry budget is exhausted.',
+        );
 
         $delivery->forceFill([
             'status' => PublicationDelivery::STATUS_RETRY_SCHEDULED,
-            'attempts' => 0,
             'next_attempt_at' => now('UTC'),
             'claimed_until' => null,
         ])->save();
