@@ -25,7 +25,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **15** | **+1722** | **−54** | **+1668** |
+| **1** | **+23** | **−42** | **−19** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -83,7 +83,7 @@ flowchart LR
 - Commit exacto de `main`: `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0`.
 - La base fue validada en PR #66 por GrindFlow CI #245 completo + Sonar sin issues/hotspots.
 - PR #67 pasó GrindFlow CI #272 completo sobre el head final `28926fda…`; Sonar reportó Quality Gate passed y los findings de CodeRabbit fueron corregidos antes del squash merge.
-- Production Smoke confirmó `/up`, login, dashboard y admin sobre el commit base exacto.
+- El último Production Smoke confirmado pertenece al `main` anterior `bc9694cb…`; el nuevo `main` `9ca8707c…` aún requiere evidencia exact-main.
 - Object storage S3-compatible sigue siendo un bloqueo externo independiente; Quick Upload continúa disponible.
 - Este slice contiene **una migración nueva**, pero no la ejecuta ni muta producción automáticamente.
 
