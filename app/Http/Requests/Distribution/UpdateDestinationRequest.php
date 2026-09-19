@@ -20,6 +20,9 @@ class UpdateDestinationRequest extends FormRequest
             && $user->canManageOrganization($organization);
     }
 
+    /**
+     * @return array<string, list<string|\Illuminate\Contracts\Validation\ValidationRule|\Illuminate\Validation\Rules\In>>
+     */
     public function rules(): array
     {
         return [
