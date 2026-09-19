@@ -1,6 +1,6 @@
 # GrindFlow — Roadmap
 
-El único roadmap activo y acumulativo es [Issue #88 — plan de ejecución de GrindFlow](https://github.com/drpipe1098-commits/GrindFlow/issues/88).
+El único roadmap activo y acumulativo es [Issue #2 — plan de ejecución de GrindFlow](https://github.com/pl0n3r/GrindFlow/issues/2).
 
 Este archivo es solo un punto de entrada desde el repositorio y **no duplica** tareas, estados ni historial.
 

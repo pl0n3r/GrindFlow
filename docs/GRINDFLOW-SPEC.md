@@ -159,7 +159,7 @@ The exact deployed source identity requires independent read-only evidence from
 the target environment. CI success alone means VALIDATED IN CODE.
 
 The execution roadmap and durable progress history live in
-[GitHub #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88);
+[GitHub #2](https://github.com/pl0n3r/GrindFlow/issues/2);
 `README.md` remains a latest-delivery dashboard, not a changelog.
 
 ## 12. Traffic daily aggregate export

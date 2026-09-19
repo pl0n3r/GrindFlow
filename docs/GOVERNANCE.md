@@ -10,7 +10,7 @@
 | [AGENTS.md](../AGENTS.md) | Protocolo para agentes, límites de seguridad y entrega |
 | [GRINDFLOW-SPEC.md](GRINDFLOW-SPEC.md) y [REQUIREMENTS.md](REQUIREMENTS.md) | Arquitectura y criterios de aceptación funcionales |
 | Este documento | Reglas permanentes de colaboración y gobierno |
-| [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) | **Solo** trabajo, orden, progreso, bloqueos y evidencia acumulativa |
+| [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) | **Solo** trabajo, orden, progreso, bloqueos y evidencia acumulativa |
 | [ROADMAP.md](../ROADMAP.md) | Acceso al Issue canónico, sin copiar su contenido |
 | [README.md](../README.md) | Foto de **una sola entrega** y sus gates; no changelog |
 | [GLOSARIO.md](../GLOSARIO.md) | Conceptos técnicos en lenguaje comprensible |
@@ -18,7 +18,7 @@
 
 ## Idioma y nombres
 
-GrindFlow mantiene su identidad **GrindFlow**, abreviatura **GF**, repositorio `drpipe1098-commits/GrindFlow` y dominio `https://www.grindflow.com.co`. En comunicación nueva con personas, documentación, PRs/Issues, plantillas, revisiones y nuevas UI usar español de Colombia siempre que sea razonable. Términos técnicos, APIs, identificadores y contenido heredado pueden seguir en inglés cuando traducirlos rompa compatibilidad o requiera una migración separada. **No** forzar locale, zona horaria o COP globalmente: el producto opera con UTC explícito y admite varias monedas y organizaciones.
+GrindFlow mantiene su identidad **GrindFlow**, abreviatura **GF**, repositorio `pl0n3r/GrindFlow` y dominio `https://www.grindflow.com.co`. En comunicación nueva con personas, documentación, PRs/Issues, plantillas, revisiones y nuevas UI usar español de Colombia siempre que sea razonable. Términos técnicos, APIs, identificadores y contenido heredado pueden seguir en inglés cuando traducirlos rompa compatibilidad o requiera una migración separada. **No** forzar locale, zona horaria o COP globalmente: el producto opera con UTC explícito y admite varias monedas y organizaciones.
 
 ## Versiones y títulos (desde esta adopción)
 
@@ -30,7 +30,7 @@ GrindFlow mantiene su identidad **GrindFlow**, abreviatura **GF**, repositorio `
 
 ## Roadmap como registro de progreso
 
-El Issue #88 conserva **todas las entradas históricas** de trabajo hasta por lo menos una 1.0.0 madura. Agregar nuevas tareas, marcar ✅ y tachar completadas; conservar bloqueos e incidentes con su resolución. Si sobrepasa límites, enlazar un volumen de continuación sin borrar el original.
+El Issue #2 conserva **todas las entradas históricas** de trabajo hasta por lo menos una 1.0.0 madura. Agregar nuevas tareas, marcar ✅ y tachar completadas; conservar bloqueos e incidentes con su resolución. Si sobrepasa límites, enlazar un volumen de continuación sin borrar el original.
 
 No incluir en el roadmap políticas permanentes, guías, manuales o especificaciones. Mover únicamente ese texto normativo a `AGENTS.md` / este documento / especificación, sin eliminar entradas de ejecución.
 
@@ -43,3 +43,11 @@ El preflight valida el título PR; fast ejecuta comprobación de archivos, plant
 ## Seguridad y estados
 
 Respetar la secuencia: IMPLEMENTADO → VALIDADO EN CÓDIGO → DESPLEGADO → VALIDADO EN PRODUCCIÓN. No saltar etapas. Nunca ejecutar migraciones productivas, reseteos, uploads externos, cambios irreversibles o pruebas E2E con datos reales por copiar prácticas de otro proyecto. Gobierno GitHub usa permisos mínimos solo para labels; cualquier protección/ruleset de `main` que exija acceso administrativo queda documentada como dependencia externa, no se simula.
+
+## Traslado del repositorio (2026-09-19)
+
+La ruta actual es `pl0n3r/GrindFlow`. El historial de Git se preservó,
+pero los Issues del propietario anterior no están presentes en este repositorio.
+El roadmap actual comienza en Issue #2; el anterior #88 queda citado solo
+como referencia histórica, nunca como destino operativo. Los enlaces y las
+credenciales de GitHub Actions requieren comprobación independiente tras un traslado.

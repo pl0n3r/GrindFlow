@@ -227,3 +227,10 @@ jobs:
         if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
         shell: bash
         run: exit 1
+
+      - name: Fail unconfigured authenticated production smoke
+        if: steps.credentials.outputs.configured == 'false'
+        shell: bash
+        run: |
+          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
+          exit 1

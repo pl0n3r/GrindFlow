@@ -99,8 +99,10 @@ def governance_errors(root: Path) -> list[str]:
         errors.extend(relative_link_errors(root / name, root))
 
     roadmap = (root / "ROADMAP.md").read_text(encoding="utf-8")
-    if "https://github.com/drpipe1098-commits/GrindFlow/issues/88" not in roadmap:
-        errors.append("ROADMAP.md debe apuntar al Issue #88.")
+    if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
+        errors.append("ROADMAP.md debe apuntar al Issue #2.")
+    if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", roadmap, flags=re.I):
+        errors.append("ROADMAP.md no debe apuntar al Issue #88 histórico como roadmap activo.")
     return errors
 
 

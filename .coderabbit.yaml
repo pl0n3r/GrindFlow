@@ -24,7 +24,7 @@ reviews:
       instructions: |
         Responde al propietario en español de Colombia cuando sea técnicamente
         viable. AGENTS.md es el protocolo operativo, docs/GOVERNANCE.md contiene
-        las reglas durables de colaboración y Issue #88 solo trabajo/progreso.
+        las reglas durables de colaboración y Issue #2 solo trabajo/progreso.
         Prioriza defectos comprobables, seguridad y pruebas de comportamiento;
         evita opiniones cosméticas. No confundas CI, deploy y producción.
     - path: ".github/ISSUE_TEMPLATE/**"
