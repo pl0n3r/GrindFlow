@@ -104,6 +104,7 @@ class DistributionController extends Controller
 
     public function updateDestination(
         UpdateDestinationRequest $request,
+        string $organizationId,
         string $destinationId,
     ): RedirectResponse {
         $destination = PublishingDestination::query()->findOrFail($destinationId);
@@ -114,6 +115,7 @@ class DistributionController extends Controller
 
     public function retry(
         Request $request,
+        string $organizationId,
         string $deliveryId,
         PublicationDeliveryManager $manager,
     ): RedirectResponse {
