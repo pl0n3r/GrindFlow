@@ -176,6 +176,18 @@ before merging.
 
 ## Production evidence
 
+Admin > System presenta por separado conexion a MariaDB, inventario pendiente
+y readiness de los modulos por tablas. Un fallo del inventario no debe
+convertir una conexion viva en falsa alarma Offline; un inventario desconocido
+bloquea el formulario de migracion. El estado de un modulo puede ser Ready
+mientras otro requiere migraciones.
+
+Si hay migraciones pendientes, Production Smoke conserva el codigo de bloqueo
+sin reintentar logins, pero reutiliza la sesion existente para comprobar Vault
+en modo solo lectura. El log distingue Vault correcto de Vault fallido, y el
+issue automatico no debe ocultar una segunda averia bajo el bloqueo del schema.
+No ejecutar mutaciones, backups o migraciones como parte del smoke.
+
 `GrindFlow Production Smoke` already runs independently on `main` pushes and
 performs authenticated, read-only checks. It is stronger evidence than inventing
 a deploy observer without an exact public SHA marker.

@@ -306,7 +306,9 @@ run_smoke() {
     return 1
   fi
 
+  local migrations_blocked=0
   if [[ "$pending_migrations" != "0" ]]; then
+    migrations_blocked=1
     printf 'MIGRATIONS_PENDING=%s\n' "$pending_migrations"
 
     # Reuse the same authenticated System response. The parser emits only
@@ -318,7 +320,6 @@ run_smoke() {
     fi
 
     printf 'BLOCKED: production has %s pending database migration(s). Review the exact batch and verified external backup in Admin > System; no migration was executed.\n' "$pending_migrations" >&2
-    return 2
   fi
 
   if grep -Fq 'data-media-storage-configured="1"' "$system_html"; then
@@ -338,19 +339,36 @@ run_smoke() {
   vault_status="$(curl_common     --cookie "$cookie_jar"     --output "$vault_html"     --write-out '%{http_code}'     "$BASE_URL$vault_path")"
 
   if [[ "$vault_status" != "200" ]]; then
+    printf 'VAULT_READ_ONLY=failed\n'
     printf 'ERROR: organization Vault returned HTTP %s\n' "$vault_status" >&2
     print_diagnostics
+    if [[ "$migrations_blocked" -eq 1 ]]; then
+      return 3
+    fi
     return 1
   fi
 
   if ! assert_contains "$vault_html" "Organization scoped"; then
+    printf 'VAULT_READ_ONLY=failed\n'
     print_diagnostics
+    if [[ "$migrations_blocked" -eq 1 ]]; then
+      return 3
+    fi
     return 1
   fi
 
   if ! assert_contains "$vault_html" "Direct upload"; then
+    printf 'VAULT_READ_ONLY=failed\n'
     print_diagnostics
+    if [[ "$migrations_blocked" -eq 1 ]]; then
+      return 3
+    fi
     return 1
+  fi
+
+  printf 'VAULT_READ_ONLY=ok\n'
+  if [[ "$migrations_blocked" -eq 1 ]]; then
+    return 2
   fi
 
   printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s\n' "$vault_path"
@@ -367,8 +385,12 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
 
   # An operator-controlled schema change cannot resolve through HTTP retries.
   if [[ "$smoke_status" -eq 2 ]]; then
-    printf 'BLOCKED: production smoke stopped on pending migrations; no automatic migration or repeated login requests.\n' >&2
+    printf 'BLOCKED: production smoke stopped on pending migrations after read-only Vault verification; no automatic migration or repeated login requests.\n' >&2
     exit 2
+  fi
+  if [[ "$smoke_status" -eq 3 ]]; then
+    printf 'ERROR: read-only Vault check failed while migrations remain pending; no automatic migration or repeated login requests.\n' >&2
+    exit 3
   fi
 
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then

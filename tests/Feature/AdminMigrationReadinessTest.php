@@ -35,6 +35,24 @@ class AdminMigrationReadinessTest extends TestCase
         $response->assertDontSee('Database schema is current');
     }
 
+    public function test_pending_batch_does_not_hide_independent_module_readiness(): void
+    {
+        $this->fakePendingMigrations([
+            '2026_09_19_080000_new_module_requires_deploy',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.system'))
+            ->assertOk()
+            ->assertSee('data-pending-migrations="1"', false)
+            ->assertSee('data-module-readiness="vault:ready"', false)
+            ->assertSee('data-module-readiness="scheduling:ready"', false)
+            ->assertSee('data-module-readiness="distribution:ready"', false)
+            ->assertSee('data-module-readiness="traffic:ready"', false)
+            ->assertSee('data-module-readiness="finance:ready"', false)
+            ->assertSee('name="migration_batch"', false);
+    }
+
     public function test_missing_operator_confirmation_never_runs_migrations(): void
     {
         Artisan::shouldReceive('call')->never();
