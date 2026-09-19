@@ -134,6 +134,24 @@ destinations.
 - Invalid or incomplete content cannot enter a publishable state.
 - Timezone handling is explicit.
 
+**Verification notes (current Laravel slice):**
+- `publishing_destinations` and `scheduled_publications` are tenant-owned and
+  protected by composite organization foreign keys.
+- Platform admins plus organization Admin/Studio/Editor memberships may schedule;
+  Model memberships remain read-only for scheduling.
+- Only canonical `ready` assets whose media-processing status is `completed`
+  on the currently active processor version are eligible.
+- Disabled destinations, duplicate assets, stale/failed processing and past
+  times are rejected server-side before a scheduled row is created.
+- The UI requires an explicit IANA timezone, stores the due instant as UTC and
+  preserves the source timezone for deterministic local display.
+- Scheduler routes are migration-safe: before both scheduling tables exist the
+  page renders a setup-required state and writes return HTTP 503 instead of
+  causing an application 500.
+- This slice stops at validated scheduling. Provider dispatch, retries and
+  publication idempotency remain GF-FR-005 concerns.
+
+
 ### GF-FR-005 — Distribution
 **Statement:** GrindFlow can dispatch eligible scheduled content to supported
 platform integrations.
