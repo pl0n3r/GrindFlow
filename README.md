@@ -36,7 +36,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+95** | **−67** | **+28** |
+| **12** | **+106** | **−71** | **+35** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -63,6 +63,7 @@ flowchart LR
 
 ## Qué se hizo
 - Rutas del repositorio, roadmap y validadores actualizadas después del traslado a `pl0n3r/GrindFlow`.
+- Referencias canónicas `#2` uniformes y detección de enlaces activos obsoletos al antiguo `#88`.
 - Issue #2 restablece el seguimiento técnico sin inventar historial de Issues del propietario anterior.
 - Versión humana v0.1.20 para una entrega trazable con el gate de release intacto.
 - Se explicita que un Smoke verde por credenciales ausentes no verifica rutas autenticadas.
@@ -72,10 +73,12 @@ flowchart LR
 - `.coderabbit.yaml` — referencia al Issue #2.
 - `.github/workflows/production-smoke.yml` — evita éxito falso sin credenciales.
 - `AGENTS.md` — roadmap actual.
+- `GLOSARIO.md` — enlace al roadmap general.
 - `README.md` — snapshot veraz del traslado.
 - `ROADMAP.md` — acceso al Issue #2.
 - `config/version.php` — v0.1.20.
 - `docs/GOVERNANCE.md` — identidad y registro del traslado.
+- `docs/GRINDFLOW-SPEC.md` — enlace al roadmap general.
 - `scripts/readme-dashboard.py` — validar roadmap vigente.
 - `scripts/validate-governance.py` — validar enlace al roadmap vigente.
 - `scripts/workflow-syntax-check.rb` — comprueba que el smoke no pase sin autenticación.
