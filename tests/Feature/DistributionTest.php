@@ -725,7 +725,7 @@ class DistributionTest extends TestCase
     }
 
     private function provider(
-        SequenceDistributionProvider $provider,
+        DistributionProvider $provider,
     ): void {
         app(DistributionProviderRegistry::class)
             ->register('provider-test', $provider);
