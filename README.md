@@ -12,7 +12,7 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-OPS · Migration readiness** | IMPLEMENTED en rama enfocada |
+| Work line | 🟠 **GF-OPS · Migration readiness** | PR #79 abierto · revalidando correcciones |
 | Base exacta | ✅ **main** | `75a81c310ea3f7f768e5220de913d120dc9fcb35` |
 | Cambio | 🟠 **Admin > System** | inventario y aprobación del lote, sin ejecutar migraciones |
 | CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | validación del PR y exact-main no son equivalentes |
@@ -25,7 +25,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+385** | **−73** | **+312** |
+| **8** | **+403** | **−74** | **+329** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -86,6 +86,7 @@ flowchart LR
 - `app/Support/Operations/MigrationReadiness.php` — huella estable de pendientes.
 - `resources/views/admin/system.blade.php` — revisión y confirmación de lote.
 - `tests/Feature/AdminMigrationReadinessTest.php` — regresiones de seguridad.
+- `tests/Feature/AdminMigrationTest.php` — prueba histórica adaptada al nuevo contrato.
 
 ## Validación
 
@@ -98,7 +99,7 @@ flowchart LR
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR de migration readiness y validar CI, Sonar y CodeRabbit. |
+| **NOW** | Revalidar PR #79 tras corregir PHPUnit y Pint; inspeccionar Sonar y CodeRabbit. |
 | **NEXT** | Merge y validar el SHA exacto de main. |
 | **NEXT** | Revisar backup externo y migraciones pendientes en Admin > System antes de pedir aprobación operacional. |
 | **BLOCKED / EXTERNAL** | Storage S3, FFmpeg en hosting y migraciones de producción. |
@@ -108,7 +109,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Migration readiness | implementado en rama · pendiente gates |
+| **NOW** | Migration readiness | PR #79 abierto · pendiente gates |
 | **NEXT** | Production Smoke | requiere evidencia exact-main |
 | **NEXT** | Scheduling/Distribution/Traffic/Finance | migraciones bajo aprobación |
 | **BLOCKED / EXTERNAL** | Hosting/storage | S3 + FFmpeg |
