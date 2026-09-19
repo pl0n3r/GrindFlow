@@ -12,11 +12,11 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-003 · FFmpeg video preview_v1** | IMPLEMENTED en rama enfocada |
-| Base exacta | ✅ **main** | `df7663819d9955b65321faf060135995768e8537` |
-| Calidad de la base | ✅ **PR #65 validado** | CI #241 completo + Sonar OK; exact-main/Smoke siguen como evidencia separada |
-| Migraciones | ✅ **0 pendientes en este slice** | no hay cambios de schema |
-| Feature gates | 🔒 **off por defecto** | `MEDIA_FFPROBE_ENABLED=false` · `MEDIA_FFMPEG_DERIVATIVES_ENABLED=false` |
+| Work line | 🟠 **GF-FR-004 · Scheduling core v1** | IMPLEMENTED en rama enfocada |
+| Base exacta | ✅ **main** | `bc9694cb49a4e049f41d08b367b04903411915da` |
+| Calidad de la base | ✅ **PR #66 validado + Smoke exacto** | CI #245 completo, Sonar OK y Production Smoke pasó sobre `bc9694cb…` |
+| Exact-main CI base | ⚪ **no observable por el conector** | no se atribuye evidencia que el conector no expone para eventos `push` |
+| Migraciones | 🟠 **1 nueva en este slice** | Scheduling queda migration-safe hasta aplicarla |
 
 ## Huella del cambio
 
@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+510** | **−134** | **+376** |
+| **14** | **+0000** | **−0000** | **+0000** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -38,8 +38,8 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 | GrindFlow CI | `validate` exige success real para cada gate seleccionado |
 | Sonar | análisis independiente + comentario estable de detalles del PR |
 | CodeRabbit | full review sobre el head estable |
-| Exact-main | CI vuelve a validar el SHA exacto después del squash merge |
-| Producción | FFmpeg no se habilita automáticamente aunque el código se despliegue |
+| Migración | nunca se ejecuta automáticamente desde este PR |
+| Producción | Scheduler muestra setup seguro hasta que existan ambas tablas |
 
 ## Flujo de entrega
 
@@ -60,61 +60,69 @@ flowchart LR
     D --> V
     B --> V
     L --> V
-    S --> H["head estable"]
-    C --> H
-    V --> H
-    H --> M["Squash merge"]
-    M --> X["CI del SHA exacto de main"]
+    V --> M["Squash merge"]
+    M --> X["CI exact-main"]
     M --> R["Production Smoke"]
+    R --> G["Aplicar migración con aprobación"]
 ```
 
 ## Qué se hizo
 
-- Conserva v4/v5 como contrato histórico **thumbnail-only** para jobs FFmpeg ya encolados.
-- Introduce v6/v7 como perfil actual: thumbnail determinista y, solo para video, `preview_v1`.
-- Genera `preview_v1` como MP4 H.264/yuv420p sin audio, metadata ni capítulos, con máximo 720 px y 15 fps.
-- Acota la duración a 3–15 segundos, 8 segundos por defecto mediante `MEDIA_FFMPEG_PREVIEW_SECONDS`.
-- Mantiene imágenes en thumbnail-only aunque el procesador actual sea v6/v7.
-- Usa claves deterministas por organización + SHA-256 + perfil; los retries sobrescriben el mismo artefacto.
-- Persiste MIME, disk, key, byte size y SHA-256 solo después de una escritura exitosa.
-- Añade regresiones para upgrade disabled → preview, compatibilidad v4 y exclusión de preview en imágenes.
+- Añade `publishing_destinations` y `scheduled_publications` como tablas tenant-owned con FKs compuestas por organización.
+- Autoriza Scheduling a platform admins y memberships Admin/Studio/Editor; Model no puede crear schedules.
+- Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible.
+- Un asset solo es elegible si es canónico, está `ready` y su procesamiento terminó en la **versión actual** del procesador.
+- Rechaza procesamiento stale/failed, duplicados, destinos deshabilitados, timezone inválida y fechas pasadas.
+- Guarda el instante debido en UTC y conserva la timezone IANA original para reconstruir la hora local.
+- Expone GET/POST `/organizations/{organizationId}/scheduler` y habilita Scheduler en la navegación.
+- La UI lista destinos activos, assets elegibles y próximas publicaciones.
+- El controller es migration-safe: sin tablas, la vista explica el bloqueo y los writes responden 503 en vez de provocar un 500.
+- Añade pruebas de autorización, tenant isolation, destino deshabilitado, processing incompleto y timezone explícita.
+- GF-FR-005 queda separado: este slice no intenta publicar, reintentar ni hablar con proveedores externos.
 
 ## Archivos modificados en este deploy
 
-- `.env.example` — duración configurable del preview.
-- `README.md` — snapshot exacto de esta entrega.
-- `app/Services/Media/FfmpegMediaDerivativeGenerator.php` — `preview_v1` y perfiles deterministas.
-- `app/Services/Media/MediaAssetProcessor.php` — versiones 6/7 preservando v4/v5.
-- `config/grindflow.php` — configuración bounded del preview.
-- `docs/REQUIREMENTS.md` — contrato verificable actualizado de GF-FR-003.
-- `tests/Feature/MediaProcessingJobTest.php` — regresiones de preview, legacy e imágenes.
+- `README.md` — dashboard exacto de la entrega.
+- `app/Http/Controllers/Scheduling/SchedulerController.php` — lectura/escritura migration-safe del Scheduler.
+- `app/Http/Requests/Scheduling/StoreScheduledPublicationRequest.php` — autorización y validación del formulario.
+- `app/Models/PublishingDestination.php` — destino lógico tenant-owned.
+- `app/Models/ScheduledPublication.php` — schedule tenant-owned con hora UTC + timezone.
+- `app/Models/User.php` — permiso explícito para Scheduling.
+- `app/Services/Scheduling/ContentScheduler.php` — reglas de elegibilidad y creación del schedule.
+- `database/migrations/2026_09_18_200000_create_scheduling_tables.php` — schema de Scheduling.
+- `docs/REQUIREMENTS.md` — contrato verificable GF-FR-004.
+- `resources/views/dashboard.blade.php` — navegación a Scheduler.
+- `resources/views/scheduling/index.blade.php` — workspace visual del Scheduler.
+- `resources/views/vault/index.blade.php` — navegación Vault → Scheduler.
+- `routes/web.php` — rutas tenant-scoped del Scheduler.
+- `tests/Feature/SchedulingTest.php` — regresiones funcionales y de aislamiento.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `feat/ffmpeg-video-preview-v1`.
-- Base exacta: `df7663819d9955b65321faf060135995768e8537`.
-- PR #65 dejó CI #241 completo verde y Sonar con 0 issues / 0 Security Hotspots antes del squash.
-- Esta rama no contiene migraciones, cambios de secretos ni mutaciones de producción.
-- `MEDIA_FFMPEG_DERIVATIVES_ENABLED=false` por defecto: desplegar código no activa FFmpeg.
-- Antes del merge se exige matriz completa, Sonar, CodeRabbit y recheck del SHA actual de `main`.
+- Estado actual: **IMPLEMENTED** en `feat/scheduling-core-v1`.
+- Base exacta: `bc9694cb49a4e049f41d08b367b04903411915da`.
+- La base fue validada en PR #66 por GrindFlow CI #245 completo + Sonar sin issues/hotspots.
+- Production Smoke confirmó `/up`, login, dashboard y admin sobre el commit base exacto.
+- Object storage S3-compatible sigue siendo un bloqueo externo independiente; Quick Upload continúa disponible.
+- Este slice contiene **una migración nueva**, pero no la ejecuta ni muta producción automáticamente.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR y validar matriz completa + Sonar + revisión del contrato `preview_v1`. |
-| **NEXT** | Tras merge, CI exacto + Production Smoke; luego evaluar normalización adicional versionada. |
-| **BLOCKED / EXTERNAL** | FFmpeg real en Hostinger y object storage S3-compatible requieren configuración externa. |
-| **LATER** | Continuar Scheduling/Distribution P2 cuando GF-FR-003 quede cerrado operacionalmente. |
+| **NOW** | Abrir PR de Scheduling y validar matriz completa, Sonar y CodeRabbit. |
+| **NEXT** | Tras merge y Smoke, aplicar la migración con aprobación y verificar Scheduler en producción. |
+| **NEXT** | Añadir configuración administrable de destinos si GF-FR-005 la necesita como boundary estable. |
+| **BLOCKED / EXTERNAL** | Object storage S3-compatible y FFmpeg real en Hostinger siguen requiriendo configuración externa. |
+| **LATER** | GF-FR-005 Distribution: dispatch, clasificación de errores, retries bounded e idempotencia de publicación. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Media processing | `preview_v1` IMPLEMENTED, gate off |
-| **NEXT** | Media processing | validación exact-main/producción y normalización adicional |
-| **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
-| **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real y S3-compatible requieren configuración externa |
-| **LATER** | Operación | queues, scheduler, retries y backups |
-| **LATER** | Legacy retirement | solo tras GF-MIG-003 / GF-MIG-004 |
-| **LATER** | Producto P2 | scheduling, distribución, atribución y finanzas |
+| **NOW** | Scheduling | core v1 IMPLEMENTED, pendiente gates |
+| **NEXT** | Scheduling producción | merge, migration approval y Smoke |
+| **NEXT** | Distribution | contratos/provider adapters sobre schedules válidos |
+| **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
+| **LATER** | Operación | queues, scheduler worker, retries y backups |
+| **LATER** | Legacy retirement | solo tras los requisitos GF-MIG pendientes |
