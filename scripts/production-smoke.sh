@@ -93,6 +93,31 @@ print(parser.path)
 PY
 }
 
+# Read only the visible version label from Admin > System; never emit HTML.
+# Ambiguous or missing labels fail closed without leaking session content.
+extract_observed_release() {
+  python3 - "$system_html" <<'PY'
+from html.parser import HTMLParser
+import re
+import sys
+
+class ReleaseParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.versions = []
+
+    def handle_data(self, data):
+        self.versions.extend(re.findall(r"\\bGrindFlow v([0-9]+\\.[0-9]+\\.[0-9]+)\\b", data))
+
+parser = ReleaseParser()
+with open(sys.argv[1], encoding="utf-8") as handle:
+    parser.feed(handle.read())
+if len(parser.versions) != 1:
+    raise SystemExit(2)
+print(parser.versions[0])
+PY
+}
+
 extract_pending_migrations() {
   python3 - "$system_html" <<'PY'
 from html.parser import HTMLParser
@@ -250,11 +275,17 @@ run_smoke() {
 
   # A product release label proves the observed runtime serves that release,
   # not the exact deployed Git commit (Hostinger checkout SHA remains unknown).
-  if ! assert_contains "$system_html" "GrindFlow v$EXPECTED_RELEASE"; then
-    printf 'ERROR: production release does not match candidate v%s.\n' "$EXPECTED_RELEASE" >&2
+  local observed_release
+  if ! observed_release="$(extract_observed_release)"; then
+    printf 'RELEASE_UI_OBSERVED=unknown\n'
+    printf 'ERROR: production release label is missing or ambiguous; expected v%s.\n' "$EXPECTED_RELEASE" >&2
     return 1
   fi
-  printf 'RELEASE_UI_OBSERVED=v%s\n' "$EXPECTED_RELEASE"
+  printf 'RELEASE_UI_OBSERVED=v%s\n' "$observed_release"
+  if [[ "$observed_release" != "$EXPECTED_RELEASE" ]]; then
+    printf 'ERROR: production release mismatch: expected v%s, observed v%s.\n' "$EXPECTED_RELEASE" "$observed_release" >&2
+    return 1
+  fi
 
   check_workspace_modules "$vault_path" || return $?
   printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
