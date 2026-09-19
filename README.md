@@ -6,7 +6,7 @@
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot del PR candidato v0.1.3; NO es evidencia de deploy.** El último main validado es v0.1.2. Implementación, revisión, merge y producción son estados distintos.
+> **Snapshot del PR candidato v0.1.3; NO es evidencia de deploy.** El contrato «solo el deploy actual» aplica al publicarse; hoy el último main validado es v0.1.2 y producción requiere verificación separada.
 
 ## Progress convention
 
