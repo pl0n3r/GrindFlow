@@ -18,6 +18,7 @@ use App\Http\Middleware\RequireDistributionSchema;
 use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Middleware\RequireTrafficSchema;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
@@ -34,7 +35,7 @@ Route::get('/_deployment', static function (): JsonResponse {
         'source' => 'release-only',
     ])->header('Cache-Control', 'no-store, max-age=0')
         ->header('X-Content-Type-Options', 'nosniff');
-})->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class])
+})->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
     ->name('deployment.marker');
 
 Route::get('/l/{token}', TrackedLinkRedirectController::class)
