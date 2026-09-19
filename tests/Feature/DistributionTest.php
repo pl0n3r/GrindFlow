@@ -79,6 +79,96 @@ class DistributionTest extends TestCase
             ->assertSee($traffic);
     }
 
+    public function test_distribution_history_pages_all_tenant_deliveries_with_stable_order_and_filters(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+
+        $orderedIds = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user, $publication): array {
+                for ($index = 0; $index < 106; $index++) {
+                    $schedule = ScheduledPublication::query()->create([
+                        'media_asset_id' => $publication->media_asset_id,
+                        'publishing_destination_id' => $publication->publishing_destination_id,
+                        'scheduled_by_user_id' => $user->getKey(),
+                        'status' => ScheduledPublication::STATUS_SCHEDULED,
+                        'scheduled_for_utc' => now('UTC')->subMinute(),
+                        'timezone' => 'UTC',
+                    ]);
+
+                    PublicationDelivery::query()->create([
+                        'scheduled_publication_id' => $schedule->getKey(),
+                        'idempotency_key' => 'pagination-'.$schedule->getKey(),
+                        'status' => PublicationDelivery::STATUS_FAILED,
+                        'attempts' => 1,
+                    ]);
+                }
+
+                return PublicationDelivery::query()
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->pluck('id')
+                    ->all();
+            },
+        );
+
+        [$otherUser, $otherOrganization] = $this->identity();
+        $otherPublication = $this->duePublication($otherUser, $otherOrganization);
+        $foreignId = app(TenantContext::class)->runWithinOrganization(
+            $otherUser,
+            (string) $otherOrganization->getKey(),
+            fn (): string => (string) PublicationDelivery::query()->create([
+                'scheduled_publication_id' => $otherPublication->getKey(),
+                'idempotency_key' => 'foreign-pagination-'.$otherPublication->getKey(),
+                'status' => PublicationDelivery::STATUS_FAILED,
+                'attempts' => 1,
+            ])->getKey(),
+        );
+
+        $base = route('organizations.distribution.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+
+        $pageOne = $this->actingAs($user)->get($base);
+        $pageOne->assertOk()
+            ->assertSee('106 matching deliveries')
+            ->assertSee('Showing 1–25 of 106')
+            ->assertSee('Page 1 of 5')
+            ->assertSee($orderedIds[0])
+            ->assertDontSee($orderedIds[25])
+            ->assertDontSee($foreignId)
+            ->assertSee('page=2');
+
+        $pageTwo = $this->actingAs($user)->get(
+            $base.'?status=failed&destination_id='.$publication->publishing_destination_id.'&page=2',
+        );
+        $pageTwo->assertOk()
+            ->assertSee('Showing 26–50 of 106')
+            ->assertSee('Page 2 of 5')
+            ->assertSee($orderedIds[25])
+            ->assertDontSee($orderedIds[0])
+            ->assertSee('status=failed')
+            ->assertSee('destination_id='.(string) $publication->publishing_destination_id)
+            ->assertDontSee($foreignId);
+
+        $last = $this->actingAs($user)->get($base.'?page=5');
+        $last->assertOk()
+            ->assertSee('Showing 101–106 of 106')
+            ->assertSee($orderedIds[105])
+            ->assertDontSee($orderedIds[0]);
+
+        $outside = $this->actingAs($user)->get($base.'?page=6');
+        $outside->assertOk()
+            ->assertSee('No deliveries on this page.')
+            ->assertSee('Go to first page')
+            ->assertDontSee($foreignId);
+
+        $this->actingAs($user)->get($base.'?page=0')->assertSessionHasErrors('page');
+        $this->actingAs($user)->get($base.'?page=10001')->assertSessionHasErrors('page');
+    }
+
     public function test_due_publication_is_queued_once(): void
     {
         [$user, $organization] = $this->identity();

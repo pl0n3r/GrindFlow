@@ -170,6 +170,19 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   el diagnostico queda en artifact de corta retencion. Anotar en run/issue que
   GITHUB_SHA es fuente del workflow, NO checkout confirmado en Hostinger.
 
+### Distribution: historial paginado y conteo real
+
+- Historial de entregas por tenant paginado en SQL (25 por pagina), orden
+  determinista `created_at DESC, id DESC`, nunca corte silencioso a 100.
+- Filtros status/destination/from/to y page validados; Prev/Next conserva
+  exclusivamente filtros permitidos. El conteo total filtrado es distinto
+  de las metricas globales por estado.
+- El timeline de intentos solo se carga para la pagina actual y conserva
+  su fallback cuando falta migracion de audit. Pagina fuera de rango
+  muestra recuperacion a la primera y no expone filas de otro tenant.
+- Probar >100 entregas, orden, filtros, tenant ajeno, paginas profundas,
+  pagina fuera de rango y valores malformados.
+
 ### Scheduler: edicion segura de asociaciones Traffic
 
 - Las asociaciones con tracked links se pueden anadir, reemplazar o separar
