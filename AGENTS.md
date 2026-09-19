@@ -53,6 +53,24 @@ el cambio aquí en el mismo PR que modifica el producto.
   el README después del merge; incluir release, decisiones y panorama en el PR
   lógico, y registrar estados operativos en #88 si procede.
 
+### Regla de avance sustancial por cada mensaje
+
+- Cuando el propietario diga "sigue", "adelante" o equivalente, ejecutar un
+  **bloque coherente de desarrollo**: inspeccion -> codigo -> pruebas ->
+  revision -> entrega verificable. No cerrar una sesion tras una sola
+  correccion minima si hay trabajo independiente y seguro disponible.
+- Agrupar en el mismo ciclo varias mejoras relacionadas o un modulo vertical
+  completo, incluyendo tests, documentacion de la entrega y gates aplicables.
+  El numero de archivos no mide el valor: preferir flujos funcionales y
+  defectos de causa raiz, no commits o notas de progreso cosmeticos.
+- Si CI, Sonar o CodeRabbit estan ejecutandose, inspeccionar o implementar
+  una linea independiente mientras tanto. No detener el avance por esperas
+  externas, pero tampoco saltar los controles del PR ni abrir un PR
+  dependiente sin revalidar su base.
+- En cada respuesta distinguir con precision cambios ya escritos, tests
+  ejecutados, PR/merge y bloqueos de produccion. Nunca presentar una rama
+  preparada como funcionalidad validada o desplegada.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership

@@ -35,7 +35,13 @@ class AdminSystemTest extends TestCase
             ->assertSee('Media object storage')
             ->assertSee('data-media-storage-configured=', false)
             ->assertSee('Session driver')
-            ->assertSee('Queue connection');
+            ->assertSee('Queue connection')
+            ->assertSee('Workspace module readiness')
+            ->assertSee('data-module-readiness="vault:ready"', false)
+            ->assertSee('data-module-readiness="scheduling:ready"', false)
+            ->assertSee('data-module-readiness="distribution:ready"', false)
+            ->assertSee('data-module-readiness="traffic:ready"', false)
+            ->assertSee('data-module-readiness="finance:ready"', false);
     }
 
     public function test_system_reports_live_database_when_migration_inventory_fails(): void
@@ -56,6 +62,8 @@ class AdminSystemTest extends TestCase
             ->assertSee('Connected')
             ->assertSee('data-pending-migrations="unknown"', false)
             ->assertSee('El inventario no esta disponible')
+            ->assertSee('Migration inventory unavailable')
+            ->assertSee('data-module-readiness="vault:ready"', false)
             ->assertSee(route('organizations.vault.index', [
                 'organizationId' => $organization->getKey(),
             ]))
