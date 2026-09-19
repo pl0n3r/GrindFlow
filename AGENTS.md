@@ -1,19 +1,80 @@
-# Contexto durable — GrindFlow & Traffic Engine
+# GrindFlow — contexto canonico para AI / Work / Codex
 
-Este archivo es el contexto que sobrevive entre entregas. El `README.md` es una
-foto de la entrega actual; esto es lo que hay que saber siempre.
+**Leer este archivo primero, completo.** Un agente nuevo debe poder continuar
+usando solo el repositorio: no depende de memoria, chats anteriores ni prompts
+previos. El `README.md` es solo la foto de la entrega actual; las decisiones
+durables viven aqui y en las especificaciones. Si una decisión cambia, registrar
+el cambio aquí en el mismo PR que modifica el producto.
 
 ---
 
 ## Protocolo de inicio para agentes y sesiones
 
-1. Leer este `AGENTS.md` completo.
-2. Revisar `docs/GRINDFLOW-SPEC.md`, `docs/REQUIREMENTS.md` y `docs/DEVELOPMENT-MODEL.md`.
-3. Inspeccionar el estado actual de `main`, PRs abiertos y el ultimo `GrindFlow CI / validate`.
-4. Si un PR activo cubre el trabajo, continuar ese PR en vez de duplicarlo.
-5. Mantener cambios enfocados y trazables a uno o mas IDs de requisito.
-6. Seguir rama enfocada -> implementacion -> pruebas -> PR -> CI/revision -> squash merge -> CI exacto en main.
-7. No confundir IMPLEMENTED, VALIDATED IN CODE, DEPLOYED y VALIDATED IN PRODUCTION.
+1. Leer este `AGENTS.md` completo. Consultar docs especificas de la tarea,
+   no releer todo el repositorio después de cada ajuste menor.
+2. Inspeccionar `main`, PRs abiertos, `GrindFlow CI / validate` del SHA exacto
+   y el roadmap [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88).
+3. Si un PR activo cubre el trabajo, terminarlo y verificar sus gates antes
+   de abrir otro PR dependiente. Si `main` no tiene CI verde, investigar primero.
+4. Aplicar los requisitos de `docs/GRINDFLOW-SPEC.md`, `docs/REQUIREMENTS.md`
+   y `docs/DEVELOPMENT-MODEL.md` relevantes al cambio. El usuario puede
+   repriorizar expresamente el roadmap.
+5. Rama enfocada -> implementación -> pruebas -> README exacto + versión humana
+   -> PR -> CI/Sonar/CodeRabbit sobre head estable -> squash merge -> CI exact-main.
+6. No confundir IMPLEMENTED, VALIDATED IN CODE, DEPLOYED y VALIDATED IN
+   PRODUCTION; ni asumir que producción fue migrada tras fusionar código.
+7. Usar la sesión E2E sintética en PHP/MariaDB/Chromium para flujos autenticados
+   cuando sea viable; producción solo en pruebas autorizadas de lectura.
+
+### Roadmap, progreso y release humana
+
+- El issue [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88)
+  es la **hoja de ruta maestra ordenada** por riesgo y dependencias; cada issue
+  funcional conserva sus criterios de aceptación. Si cambia la prioridad, actualizar
+  #88 y este archivo en la próxima PR correspondiente. No duplicar roadmap en
+  README ni guardar una segunda historia acumulativa.
+- Progreso canónico en roadmap, issues, README y handoffs: `✅ ~~Completado~~`
+  solo tras las compuertas aplicables; `🚧 Pendiente` (texto normal) para
+  pendiente/en curso. Conservar entregas finalizadas tachadas en roadmap durable,
+  **no** convertir el README efímero en changelog.
+- `config/version.php` guarda `number` y `released_at`, empezando por
+  `0.1.0`. Cada PR deploy-bound incrementa patch exactamente una unidad;
+  un hito minor explícito `0.x.y -> 0.(x+1).0` es deliberado. `1.0.0`
+  requiere decisión expresa del propietario. No usar la versión humana como
+  certificado del Git SHA que está desplegado.
+- `scripts/release-version.py` verifica transiciones, no altera Git ni
+  genera commits. Versionar antes del head estable final de CI, Sonar y CodeRabbit;
+  si `main` avanza, revalidar el cambio contra la nueva base.
+- La versión se muestra en Admin > System. El SHA real de Hostinger solo puede
+  declararse **DEPLOYED** tras un marcador/observación verificable de ese
+  checkout; un Smoke de solo lectura sin SHA remoto comprobado no basta.
+- Cuando el último PR se fusione, dejar que su README dé paso al snapshot del
+  siguiente deploy. No crear PR documental adicional por rutina para corregir
+  el README después del merge; incluir release, decisiones y panorama en el PR
+  lógico, y registrar estados operativos en #88 si procede.
+
+### Propiedad técnica de extremo a extremo
+
+El agente actúa como ingeniero principal y dueño de arquitectura, frontend/UX,
+QA/E2E, seguridad, rendimiento y entrega. Esas funciones son perspectivas
+simultáneas, no etapas de aprobación adicionales. Tomar decisiones técnicas
+rutinarias desde el código y los requisitos; escalar solo ambigüedad de producto
+real o acciones protegidas de producción. Preservar admin profesional legible,
+responsive, teclado, estados de error, validación del servidor y una sola
+navegación por workspace, sin clonar innecesariamente la estética pública de BRVTAL.
+
+### Precedencia de fuentes
+
+1. Código fusionado en `main` y evidencia de ejecución comprobada.
+2. Tests y decisiones de PR fusionados más recientes.
+3. Este `AGENTS.md`.
+4. Especificación, requisitos y documentación de área.
+5. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88)
+   para orden/estado de ejecución; README para snapshot de la última entrega.
+6. Memoria o chat histórico, solo como contexto no canónico.
+
+Si código/CI contradicen prosa antigua, investigar y corregir la documentación
+en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
 
 ### Regla de paralelizacion
 
@@ -730,9 +791,9 @@ Preguntas abiertas para el arquitecto antes de empezar:
 | 2 — Ingesta y vault | Completo: subidas, Dropbox, Drive, triaje y escaneo automatico. Falta ejecutarlo contra las APIs reales |
 | 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
 | 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
-| 5 — Distribucion | Laravel: core idempotente/retries implementado, sin providers reales ni mutacion externa. Legacy TS conserva Telegram/webhook; X, Reddit y Bluesky siguen sin implementar |
-| 6 — Enlaces y trafico | Acortador y analitica funcionando. Falta el panel de metricas |
-| 7 — Finanzas | Laravel: ledger append-only tenant-owned en desarrollo; legacy conserva solo referencia funcional hasta cerrar GF-MIG-003 |
+| 5 — Distribucion | Laravel: dashboard, destinos sandbox y retries probados en PR #87; providers reales y produccion pendientes; legado TS aun requiere paridad |
+| 6 — Enlaces y trafico | Laravel: enlaces, filtros y panel de metricas implementados y validados por CI en PR #87; no validado en produccion pendiente de esquema |
+| 7 — Finanzas | Laravel: ledger append-only tenant-owned validado en codigo, operacion productiva bloqueada por migraciones; legacy hasta GF-MIG-003 |
 
 ## Riesgos cerrados
 
