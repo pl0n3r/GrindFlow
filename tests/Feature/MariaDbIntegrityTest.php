@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Membership;
-use App\Models\RevenueAllocation;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -50,7 +49,7 @@ class MariaDbIntegrityTest extends TestCase
         $user = User::factory()->create();
         $organization = Organization::factory()->create();
 
-        $allocation = $this->financeAllocation(
+        $allocationId = $this->financeAllocation(
             $user,
             $organization,
         );
@@ -58,7 +57,7 @@ class MariaDbIntegrityTest extends TestCase
         $this->expectException(QueryException::class);
 
         DB::table('revenue_allocations')
-            ->where('id', $allocation->id)
+            ->where('id', $allocationId)
             ->update(['amount_minor' => 1]);
     }
 
@@ -71,7 +70,7 @@ class MariaDbIntegrityTest extends TestCase
         $user = User::factory()->create();
         $organization = Organization::factory()->create();
 
-        $allocation = $this->financeAllocation(
+        $allocationId = $this->financeAllocation(
             $user,
             $organization,
         );
@@ -79,7 +78,7 @@ class MariaDbIntegrityTest extends TestCase
         $this->expectException(QueryException::class);
 
         DB::table('revenue_allocations')
-            ->where('id', $allocation->id)
+            ->where('id', $allocationId)
             ->delete();
     }
 
@@ -106,22 +105,27 @@ class MariaDbIntegrityTest extends TestCase
     private function financeAllocation(
         User $user,
         Organization $organization,
-    ): RevenueAllocation {
+    ): string {
         Membership::query()->create([
             'organization_id' => $organization->id,
             'user_id' => $user->id,
             'role' => UserRole::Studio,
         ]);
 
-        return RevenueAllocation::query()
-            ->withoutGlobalScopes()
-            ->create([
-                'organization_id' => $organization->id,
-                'created_by_user_id' => $user->id,
-                'source_label' => 'Integrity test',
-                'amount_minor' => 1000,
-                'currency' => 'COP',
-                'occurred_on' => '2026-09-19',
-            ]);
+        $allocationId = fake()->uuid();
+
+        DB::table('revenue_allocations')->insert([
+            'id' => $allocationId,
+            'organization_id' => $organization->id,
+            'created_by_user_id' => $user->id,
+            'source_label' => 'Integrity test',
+            'amount_minor' => 1000,
+            'currency' => 'COP',
+            'occurred_on' => '2026-09-19',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $allocationId;
     }
 }
