@@ -5,7 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot PR v0.1.13: solo el deploy actual se valida en el entorno, no con el CI de GitHub por si solo.** Base `main` v0.1.12 `e8afdea0c1a285034dc33017a6ece2936b68c7bc`: exact-main CI #35457891225 y Production Smoke #35457891216 success. SHA checkout Hostinger no demostrado.
+> **Snapshot PR v0.1.14: solo el deploy actual es la foto de entrega, no el roadmap historico.** Base `main` v0.1.13 `1dca023d2bda7f75e6be1483b6b873d841bdf185`: exact-main CI #35459345034 y Production Smoke #35459345054 exitosos. SHA del checkout Hostinger no verificado independientemente.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -14,33 +14,34 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-FR-006D · Traffic link management completo** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.12 · PR #102 fusionado** | `e8afdea0c1a285034dc33017a6ece2936b68c7bc` |
-| Version | 🚧 **v0.1.13** | editor de enlaces + paginacion + status filters |
-| CI del PR | 🚧 **pendiente** | validar head final |
+| Work line | 🚧 **GF-FR-004E · Busqueda de opciones de Scheduler** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.13 · PR #103 fusionado** | `1dca023d2bda7f75e6be1483b6b873d841bdf185` |
+| Version | 🚧 **v0.1.14** | seleccionar assets y links mas alla de 100 |
+| CI del PR | 🚧 **pendiente** | verificar head estable |
 | Sonar | 🚧 **pendiente** | Quality Gate |
-| CodeRabbit | 🚧 **pendiente** | full review del head final |
-| CI del SHA exacto de main | ✅ **v0.1.12 validado** | #35457891225 |
-| Production Smoke | ✅ **v0.1.12 observado** | #35457891216 read-only |
-| Deploy v0.1.13 | 🚧 **no confirmado** | comprobar despues de merge |
-| Migraciones | ✅ **sin SQL nuevo** | esquema Traffic existente |
+| CodeRabbit | 🚧 **pendiente** | review final |
+| CI del SHA exacto de main | ✅ **v0.1.13 validado** | #35459345034 |
+| Production Smoke | ✅ **v0.1.13 observado** | #35459345054 read-only |
+| Deploy v0.1.14 | 🚧 **no confirmado** | Smoke tras fusion |
+| Migraciones | ✅ **sin SQL nuevo** | media y links existentes |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+589** | **−57** | **+532** |
+| **8** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
-| Workflow | crear enlace → editar datos/destino → pausar/reactivar |
-| Paging | 25 links, total SQL, orden UTC created_at + UUID, >100 |
-| Filters | fecha UTC/canal/campana/status conservados; CSV completo |
-| Historico | mismo token, dedupe, asociaciones y clicks; metadatos actuales |
-| Security | HTTP(S), tenant/rol, lock, validacion y schema 503 |
+| Scheduling | Busqueda de assets elegibles por filename/UUID exacto |
+| Traffic | Busqueda de links activos por label/campaign/token exacto |
+| Picker | Max 100 opciones por busqueda, conteo total y aviso claro |
+| Retention | old() valido y links activos ya asignados aunque esten fuera de ventana |
+| Seguridad | tenant/rol, disabled no asignable, POST revalida en manager |
+| Calendar | total real, calendario paginado y filtros de busqueda sincronizados |
 
 ## Flujo de entrega
 ```mermaid
@@ -65,45 +66,41 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Traffic permite editar titulo, destino HTTP(S), canal y campana desde cada enlace, activo o deshabilitado.
-- Cambiar el destino modifica redirects futuros manteniendo el mismo short URL; un link deshabilitado sigue sin redirigir.
-- No se pierden clicks, deduplicacion o asociaciones a programaciones. Los reportes historicos muestran la metadata actual del link, advertencia explicita en la UI.
-- El listado ya no corta a 100: paginas de 25, total real, navegacion con filtros y recuperacion fuera de rango.
-- Nuevo filtro active/disabled aplica a listado, KPIs, grafica y export CSV completo.
-- Corrige limite final de fecha UTC en grafica y CSV para incluir clicks del propio ultimo dia tanto en MariaDB como en pruebas SQLite.
-- Tests de edicion y estado, redirects, rol/tenant, validacion HTTP(S), 105 links con tiempos identicos, filtro de estado y migracion ausente.
-- Sin SQL nuevo, publicaciones externas ni cambios destructivos.
+- El Scheduler deja de bloquear media y enlaces que caen fuera de los primeros 100 del selector: se pueden buscar por nombre, campana, UUID de asset y token del link.
+- Muestra numero real de assets elegibles y resultados coincidentes, aunque solo se carguen 100 opciones por busqueda para mantener la pagina responsiva.
+- Preserva un asset/link validamente seleccionado en old() tras validacion y los links activos de publicaciones visibles aunque la busqueda sea diferente; no muestra IDs extranjeros o links disabled como asignables.
+- Busquedas y filtros de calendario coexisten sin perderlos al pasar a la siguiente pagina, con conteo de schedules total y no solo las filas visibles.
+- 3 pruebas feature: >100 media + links con tenant ajeno, post real de programacion de opciones profundas, vieja seleccion, link disabled, convivencia con paginacion y falta de schema.
+- Sin cambios de modelo SQL, acciones a proveedores ni migraciones.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md` — reglas duraderas de Traffic y attribution.
-- `README.md` — snapshot exacto v0.1.13.
-- `app/Http/Controllers/Traffic/TrafficController.php` — pagination, filtros y PATCH.
-- `app/Services/Traffic/TrackedLinkManager.php` — edicion transaccional tenant-scoped.
-- `config/version.php` — version humana 0.1.13.
-- `docs/GRINDFLOW-SPEC.md` — comportamiento de edit y vista completa.
-- `docs/REQUIREMENTS.md` — GF-FR-006D.
-- `resources/views/traffic/index.blade.php` — UI editor/estado/paginacion.
-- `routes/web.php` — PATCH protegido por schema y UUID.
-- `tests/Feature/TrafficAttributionTest.php` — tests de lifecycle/volumen/seguridad.
+- `AGENTS.md` — reglas de busqueda tenant-safe en selectores.
+- `README.md` — snapshot exacto v0.1.14.
+- `app/Http/Controllers/Scheduling/SchedulerController.php` — GET busca y conserva selecciones autorizadas.
+- `config/version.php` — version humana 0.1.14.
+- `docs/GRINDFLOW-SPEC.md` — contrato de selector buscable.
+- `docs/REQUIREMENTS.md` — GF-FR-004E.
+- `resources/views/scheduling/index.blade.php` — formulario buscar, avisos y KPI real.
+- `tests/Feature/SchedulerPickerSearchTest.php` — pruebas de >100 y seguridad.
 
 ## Validación
-- Base v0.1.12: CI #35457891225 y Production Smoke #35457891216 success.
-- v0.1.13 necesita exact-head CI/Sonar/CodeRabbit y, tras merge, exact-main/Smoke.
-- Production Smoke es read-only: no cambia enlaces ni crea clicks; no verifica desde navegador remoto el PATCH.
+- Base v0.1.13: CI #35459345034 y Production Smoke #35459345054 exitosos.
+- v0.1.14: CI/Sonar/CodeRabbit pendientes; exact-main/Smoke tras merge.
+- Production Smoke es read-only, no crea publicaciones ni prueba el POST nuevo en Hostinger.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Entregar Traffic links editable/paginado v0.1.13. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NOW** | 🚧 Entregar GF-FR-004E picker buscable v0.1.14. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
 | **NEXT** | 🚧 Media Storage/CORS/FFmpeg runtime #40. |
-| **LATER** | 🚧 Búsqueda y paginacion de opciones del Scheduler para >100 assets/links. |
+| **LATER** | 🚧 Mejorar cobertura browser del flujo Scheduler y busqueda de destinos. |
 | **BLOCKED / EXTERNAL** | 🚧 Marcador SHA exacto Hostinger. |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Finance reconciliation + Scheduler pagination~~ | ✅ ~~v0.1.12 CI+Smoke~~ |
-| **NOW** | 🚧 Traffic link details & full list | 🚧 v0.1.13 |
-| **NEXT** | 🚧 Media runtime/storage | 🚧 #40 |
-| **LATER** | 🚧 Scheduler searchable selectors | 🚧 roadmap #88 |
+| **DONE** | ✅ ~~Traffic link edit + full pagination~~ | ✅ ~~v0.1.13 CI+Smoke~~ |
+| **NOW** | 🚧 Scheduler buscar opciones en inventario grande | 🚧 v0.1.14 |
+| **NEXT** | 🚧 Media Storage/FFmpeg | 🚧 #40 |
+| **LATER** | 🚧 Browser E2E Scheduler/Distribution | 🚧 roadmap #88 |
 | **BLOCKED / EXTERNAL** | 🚧 Git SHA Hostinger | 🚧 observabilidad |

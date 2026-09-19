@@ -116,9 +116,9 @@
             @else
                 <section class="gf-metrics" aria-label="Metricas del Scheduler">
                     <article class="gf-metric">
-                        <div class="gf-metric__label">Scheduled</div>
-                        <div class="gf-metric__value">{{ $publications->count() }}</div>
-                        <div class="gf-metric__meta">Publicaciones en cola logica</div>
+                        <div class="gf-metric__label">Matching schedules</div>
+                        <div class="gf-metric__value">{{ $publications->total() }}</div>
+                        <div class="gf-metric__meta">Con filtros actuales, todas las paginas</div>
                     </article>
 
                     <article class="gf-metric">
@@ -129,12 +129,56 @@
 
                     <article class="gf-metric">
                         <div class="gf-metric__label">Eligible media</div>
-                        <div class="gf-metric__value">{{ $eligibleAssets->count() }}</div>
-                        <div class="gf-metric__meta">Procesamiento actual completado</div>
+                        <div class="gf-metric__value">{{ $eligibleAssetCount }}</div>
+                        <div class="gf-metric__meta">Assets listos en esta organizacion</div>
                     </article>
                 </section>
 
-                @if ($canSchedule && $destinations->isNotEmpty() && $eligibleAssets->isNotEmpty())
+                @if ($canSchedule)
+                    <section class="gf-panel gf-panel--spaced" aria-label="Find schedulable media and links">
+                        <header class="gf-panel__head">
+                            <h2>Find media &amp; tracked links</h2>
+                            <span class="gf-appbar__meta">Search beyond the first 100 · tenant-scoped</span>
+                        </header>
+                        <div class="gf-panel__body">
+                            <form class="gf-form" method="GET" action="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}">
+                                @foreach (['status', 'destination_id', 'from', 'to'] as $filterName)
+                                    @if (isset($filters[$filterName]) && $filters[$filterName] !== '')
+                                        <input type="hidden" name="{{ $filterName }}" value="{{ $filters[$filterName] }}">
+                                    @endif
+                                @endforeach
+                                <div class="gf-field">
+                                    <label for="media_q">Find eligible media by filename or exact UUID</label>
+                                    <input class="gf-input" id="media_q" name="media_q" type="search" maxlength="100"
+                                           value="{{ $filters['media_q'] ?? '' }}" placeholder="e.g. launch-clip">
+                                </div>
+                                @if ($linkingReady)
+                                    <div class="gf-field">
+                                        <label for="link_q">Find active tracked links by label, campaign or exact token</label>
+                                        <input class="gf-input" id="link_q" name="link_q" type="search" maxlength="100"
+                                               value="{{ $filters['link_q'] ?? '' }}" placeholder="e.g. autumn-campaign">
+                                    </div>
+                                @endif
+                                <div class="gf-upload__footer">
+                                    <p class="gf-media-meta">
+                                        Media: {{ min(100, $assetMatches) }} of {{ $assetMatches }} matching,
+                                        {{ $eligibleAssetCount }} eligible total.
+                                        @if ($linkingReady)
+                                            Active links: {{ min(100, $linkMatches) }} of {{ $linkMatches }} matching.
+                                        @endif
+                                        Narrow a search to select entries beyond the 100-option window.
+                                    </p>
+                                    <div>
+                                        <button class="gf-button gf-button--primary" type="submit">Find options</button>
+                                        <a class="gf-button gf-button--ghost" href="{{ route('organizations.scheduler.index', array_merge(['organizationId' => $organization->id], collect($filters)->only(['status', 'destination_id', 'from', 'to'])->all())) }}">Clear searches</a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+                @endif
+
+                @if ($canSchedule && $destinations->isNotEmpty() && $eligibleAssetCount > 0)
                     <section class="gf-panel gf-panel--spaced">
                         <header class="gf-panel__head">
                             <h2>New schedule</h2>
@@ -153,6 +197,9 @@
                                 <div class="gf-field">
                                     <label for="asset_id">Media</label>
                                     <select class="gf-input" id="asset_id" name="asset_id" required>
+                                        @if ($eligibleAssets->isEmpty())
+                                            <option value="">No media matching the current search. Refine the search above.</option>
+                                        @endif
                                         <option value="">Select media</option>
                                         @foreach ($eligibleAssets as $asset)
                                             <option
@@ -163,6 +210,11 @@
                                             </option>
                                         @endforeach
                                     </select>
+                                    @if ($assetMatches > 100)
+                                        <small class="gf-media-meta">Only 100 matching media options are shown. Narrow the filename/UUID search above for older items.</small>
+                                    @elseif ($assetMatches === 0)
+                                        <small class="gf-media-meta">No matching eligible media. Clear or refine the media search above.</small>
+                                    @endif
                                 </div>
 
                                 <div class="gf-field">
@@ -193,6 +245,11 @@
                                                 </option>
                                             @endforeach
                                         </select>
+                                        @if ($linkMatches > 100)
+                                            <small class="gf-media-meta">Only 100 matching active links are shown. Narrow the link search above. Current active assignments stay available; inactive links cannot be assigned.</small>
+                                        @elseif ($linkMatches === 0)
+                                            <small class="gf-media-meta">No matching active links. You can still schedule without a tracked link.</small>
+                                        @endif
                                     </div>
                                 @endif
 
@@ -227,7 +284,7 @@
                                         GrindFlow revalida tenant, media, destino y tracked link
                                         activo antes de crear la programacion.
                                     </p>
-                                    <button class="gf-button gf-button--primary" type="submit">
+                                    <button class="gf-button gf-button--primary" type="submit" @disabled($eligibleAssets->isEmpty())>
                                         Schedule
                                     </button>
                                 </div>
@@ -259,6 +316,11 @@
 
                     <div class="gf-panel__body">
                         <form class="gf-form" method="GET">
+                            @foreach (['media_q', 'link_q'] as $searchName)
+                                @if (isset($filters[$searchName]) && $filters[$searchName] !== '')
+                                    <input type="hidden" name="{{ $searchName }}" value="{{ $filters[$searchName] }}">
+                                @endif
+                            @endforeach
                             <div class="gf-field"><label for="filter_status">Status</label><select class="gf-input" id="filter_status" name="status"><option value="">All</option><option value="scheduled" @selected(($filters['status'] ?? '') === 'scheduled')>Scheduled</option><option value="cancelled" @selected(($filters['status'] ?? '') === 'cancelled')>Cancelled</option></select></div>
                             <div class="gf-field"><label for="filter_destination">Destination</label><select class="gf-input" id="filter_destination" name="destination_id"><option value="">All</option>@foreach($filterDestinations as $destination)<option value="{{ $destination->id }}" @selected(($filters['destination_id'] ?? '') === $destination->id)>{{ $destination->name }}{{ $destination->status !== 'active' ? ' · inactive' : '' }}</option>@endforeach</select></div>
                             <div class="gf-field"><label for="filter_from">From (UTC)</label><input class="gf-input" id="filter_from" type="date" name="from" value="{{ $filters['from'] ?? '' }}"></div>

@@ -16,6 +16,7 @@ use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -39,15 +40,27 @@ class SchedulerController extends Controller
         $filterDestinations = collect();
         $eligibleAssets = collect();
         $publications = collect();
+        $eligibleAssetCount = 0;
+        $assetMatches = 0;
+        $linkMatches = 0;
+        $filters = [];
 
         if ($schedulingReady) {
-            if ($linkingReady) {
-                $trackedLinks = TrackedLink::query()
-                    ->where('status', TrackedLink::STATUS_ACTIVE)
-                    ->orderBy('label')
-                    ->limit(100)
-                    ->get();
-            }
+            $filters = $request->validate([
+                'status' => ['nullable', Rule::in(['scheduled', 'cancelled'])],
+                'destination_id' => ['nullable', 'uuid'],
+                'from' => ['nullable', 'date_format:Y-m-d'],
+                'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+                'media_q' => ['nullable', 'string', 'max:100'],
+                'link_q' => ['nullable', 'string', 'max:100'],
+                'page' => ['nullable', 'integer', 'min:1', 'max:10000'],
+            ]);
+
+            // Search options and the calendar share one GET, but never let
+            // unvalidated query parameters propagate through pagination.
+            unset($filters['page']);
+            $mediaQuery = trim((string) ($filters['media_q'] ?? ''));
+            $linkQuery = trim((string) ($filters['link_q'] ?? ''));
 
             // Historical schedules remain filterable if a destination was disabled.
             $filterDestinations = PublishingDestination::query()
@@ -58,12 +71,45 @@ class SchedulerController extends Controller
                 ->where('status', PublishingDestination::STATUS_ACTIVE)
                 ->values();
 
-            $eligibleAssets = $scheduler
-                ->eligibleAssetsQuery()
+            $assetQuery = $scheduler->eligibleAssetsQuery();
+            $eligibleAssetCount = (clone $assetQuery)->count();
+
+            if ($mediaQuery !== '') {
+                $assetQuery->where(function ($query) use ($mediaQuery): void {
+                    $query->where('original_filename', 'like', '%'.$mediaQuery.'%');
+
+                    if (Str::isUuid($mediaQuery)) {
+                        $query->orWhereKey($mediaQuery);
+                    }
+                });
+            }
+
+            $assetMatches = (clone $assetQuery)->count();
+            $eligibleAssets = $assetQuery
                 ->with('blob')
-                ->latest()
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
                 ->limit(100)
                 ->get();
+
+            // A validated POST may return with old() referencing a resource
+            // outside the current search window. Preserve it only when it
+            // remains an eligible asset of the current tenant.
+            $previousAssetId = old('asset_id');
+            if (
+                is_string($previousAssetId)
+                && Str::isUuid($previousAssetId)
+                && ! $eligibleAssets->contains('id', $previousAssetId)
+            ) {
+                $previousAsset = $scheduler->eligibleAssetsQuery()
+                    ->with('blob')
+                    ->whereKey($previousAssetId)
+                    ->first();
+
+                if ($previousAsset !== null) {
+                    $eligibleAssets->push($previousAsset);
+                }
+            }
 
             $relations = [
                 'mediaAsset.blob',
@@ -75,18 +121,6 @@ class SchedulerController extends Controller
             if ($linkingReady) {
                 $relations[] = 'linkAssignment.trackedLink';
             }
-
-            $filters = $request->validate([
-                'status' => ['nullable', Rule::in(['scheduled', 'cancelled'])],
-                'destination_id' => ['nullable', 'uuid'],
-                'from' => ['nullable', 'date_format:Y-m-d'],
-                'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-                'page' => ['nullable', 'integer', 'min:1', 'max:10000'],
-            ]);
-
-            // The paginator owns its page parameter; only validated filters
-            // belong in previous/next links so unrelated query keys do not leak.
-            unset($filters['page']);
 
             $publications = ScheduledPublication::query()
                 ->with($relations)
@@ -110,6 +144,57 @@ class SchedulerController extends Controller
                 ->orderBy('id')
                 ->paginate(25)
                 ->appends($filters);
+
+            if ($linkingReady) {
+                $linkQueryBuilder = TrackedLink::query()
+                    ->where('status', TrackedLink::STATUS_ACTIVE);
+
+                if ($linkQuery !== '') {
+                    $linkQueryBuilder->where(
+                        fn ($query) => $query
+                            ->where('label', 'like', '%'.$linkQuery.'%')
+                            ->orWhere('campaign', 'like', '%'.$linkQuery.'%')
+                            ->orWhere('token', $linkQuery),
+                    );
+                }
+
+                $linkMatches = (clone $linkQueryBuilder)->count();
+                $trackedLinks = $linkQueryBuilder
+                    ->orderBy('label')
+                    ->orderBy('id')
+                    ->limit(100)
+                    ->get();
+
+                // Keep the current active assignment selectable even when it
+                // falls outside the first 100 results or search term. Missing
+                // and disabled assignments remain removable but not reusable.
+                $selectedLinkIds = $publications->getCollection()
+                    ->pluck('linkAssignment.trackedLink')
+                    ->filter(fn ($link) => $link?->status === TrackedLink::STATUS_ACTIVE)
+                    ->pluck('id');
+
+                $previousLinkId = old('tracked_link_id');
+                if (is_string($previousLinkId) && Str::isUuid($previousLinkId)) {
+                    $selectedLinkIds->push($previousLinkId);
+                }
+
+                $extraIds = $selectedLinkIds
+                    ->diff($trackedLinks->pluck('id'))
+                    ->unique()
+                    ->values();
+
+                if ($extraIds->isNotEmpty()) {
+                    $extraLinks = TrackedLink::query()
+                        ->where('status', TrackedLink::STATUS_ACTIVE)
+                        ->whereIn('id', $extraIds)
+                        ->get();
+
+                    $trackedLinks = $trackedLinks
+                        ->merge($extraLinks)
+                        ->sortBy('label')
+                        ->values();
+                }
+            }
         }
 
         return view('scheduling.index', [
@@ -120,12 +205,15 @@ class SchedulerController extends Controller
             'destinations' => $destinations,
             'filterDestinations' => $filterDestinations,
             'eligibleAssets' => $eligibleAssets,
+            'eligibleAssetCount' => $eligibleAssetCount,
+            'assetMatches' => $assetMatches,
+            'linkMatches' => $linkMatches,
             'publications' => $publications,
             'canSchedule' => $schedulingReady
                 && $user->canScheduleOrganization($organization),
             'timezones' => DateTimeZone::listIdentifiers(),
             'defaultTimezone' => (string) config('app.timezone', 'UTC'),
-            'filters' => $filters ?? [],
+            'filters' => $filters,
             'calendarDays' => $schedulingReady
                 ? $publications->getCollection()->groupBy(
                     fn (ScheduledPublication $publication) => $publication->scheduled_for_utc

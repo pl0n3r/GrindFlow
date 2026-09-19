@@ -188,6 +188,33 @@ el cambio aquí en el mismo PR que modifica el producto.
   opcionales y autorizacion de edit sean iguales a create.
   Sin schema Traffic, PATCH retorna 503 y GET mantiene fallback.
 
+### Scheduler: search sobre opciones de creacion (mas de 100)
+
+- El selector Media y el selector de links activos no deben bloquear
+  recursos validos por el antiguo preview limit(100). Ofrecer `media_q`
+  (filename/UUID exacto) y `link_q` (label/campaign/token exacto) bajo
+  GET autenticado tenant-scoped, hasta 100 OPCIONES a la vez con contador
+  de matching/total y aviso claro para acotar una busqueda.
+- No alterar los dominios de validacion de POST ni los locks de Scheduler;
+  un UUID digitado siempre se revalida en server, nunca se confia en
+  un <option> del browser. Enold() preservar IDs previamente seleccionados
+  solo si siguen elegibles/activos y son del tenant actual.
+- Links asignados al schedule visible permanecen seleccionables incluso
+  cuando estan fuera de los 100 primeros o de otra busqueda. Un linked
+  link disabled NO entra en opciones activas, pero el usuario puede
+  desconectarlo (estado "Current link unavailable").
+- Separar `eligibleAssetCount` y `assetMatches` de las opciones visibles:
+  no mostrar un bloqueo de prerequisitos solo porque una busqueda no tiene
+  coincidencias. El KPI de schedules usa el total filtrado, no 25/100 items.
+- GET search y filtros de calendario conservan mutualmente status,
+  destination_id, from/to y media_q/link_q validados; nunca propagar
+  params arbitrarios ni el page previo al cambiar una busqueda. Schema
+  incompleto mantiene GET seguro y no consulta la tabla de links faltante.
+- Tests obligatorios: >100 assets y links + foreign organization, recobrar
+  un item antiguo por filename/UUID/campana/token y POST real con ellos,
+  preservar old() y link activo de una fila; disabled/foreign no se
+  convierten en opciones, filtros coexistentes, migracion de links faltante.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership
