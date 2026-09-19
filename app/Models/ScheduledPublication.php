@@ -81,6 +81,14 @@ class ScheduledPublication extends TenantModel
     }
 
     /**
+     * @return HasOne<ScheduledPublicationLink, $this>
+     */
+    public function linkAssignment(): HasOne
+    {
+        return $this->hasOne(ScheduledPublicationLink::class);
+    }
+
+    /**
      * @return HasOne<PublicationDelivery, $this>
      */
     public function delivery(): HasOne

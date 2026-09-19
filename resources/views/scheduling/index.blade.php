@@ -178,6 +178,23 @@
                                     </select>
                                 </div>
 
+                                @if ($linkingReady)
+                                    <div class="gf-field">
+                                        <label for="tracked_link_id">Tracked link (optional)</label>
+                                        <select class="gf-input" id="tracked_link_id" name="tracked_link_id">
+                                            <option value="">No tracked link</option>
+                                            @foreach ($trackedLinks as $link)
+                                                <option
+                                                    value="{{ $link->id }}"
+                                                    @selected(old('tracked_link_id') === $link->id)
+                                                >
+                                                    {{ $link->label }}{{ $link->campaign ? ' · '.$link->campaign : '' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @endif
+
                                 <div class="gf-field">
                                     <label for="scheduled_for_local">Local date and time</label>
                                     <input
@@ -206,8 +223,8 @@
 
                                 <div class="gf-upload__footer">
                                     <p>
-                                        GrindFlow revalida permisos, estado del asset, version del
-                                        procesador y destino activo antes de crear el schedule.
+                                        GrindFlow revalida tenant, media, destino y tracked link
+                                        activo antes de crear la programacion.
                                     </p>
                                     <button class="gf-button gf-button--primary" type="submit">
                                         Schedule
@@ -258,6 +275,9 @@
                                         <tr>
                                             <th>Media</th>
                                             <th>Destination</th>
+                                            @if ($linkingReady)
+                                                <th>Tracked link</th>
+                                            @endif
                                             <th>Local time</th>
                                             <th>Timezone</th>
                                             <th>Status</th>
@@ -277,6 +297,11 @@
                                                         {{ $publication->destination?->provider ?? 'unknown' }}
                                                     </div>
                                                 </td>
+                                                @if ($linkingReady)
+                                                    <td>
+                                                        {{ $publication->linkAssignment?->trackedLink?->label ?? 'Not linked' }}
+                                                    </td>
+                                                @endif
                                                 <td>
                                                     {{ $publication->scheduled_for_utc
                                                         ?->setTimezone($publication->timezone)

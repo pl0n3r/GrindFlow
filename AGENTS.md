@@ -157,6 +157,21 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   FFmpeg/transcoding/artifacts se agregan detras de este contrato, no dentro de
   la ingesta.
 
+### Regla de enlaces de campana en publicaciones
+
+- Un schedule puede asociarse de forma opcional a un tracked link mediante
+  `scheduled_publication_links`; no se modifica el contrato obligatorio de
+  `scheduled_publications` para preservar deploy-before-migration.
+- La asociacion es unica por schedule y comparte `organization_id` con la
+  publicacion y el link mediante foreign keys compuestas.
+- El servicio del Scheduler revalida tenant y estado active del link bajo lock
+  dentro de la misma transaccion que crea el schedule.
+- Un link deshabilitado despues del scheduling bloquea Distribution antes de
+  provider I/O; un link de otro tenant nunca se acepta.
+- Si falta la nueva tabla, los schedules sin tracked link siguen operativos y
+  las escrituras que solicitan vincularlo devuelven 503 sin mutar datos.
+- Ninguna integracion real ni credencial externa se habilita por este handoff.
+
 ### Regla de distribucion
 
 - Cada `scheduled_publication` converge en una sola fila tenant-owned de

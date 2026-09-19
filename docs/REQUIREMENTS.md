@@ -218,6 +218,27 @@ without retaining unnecessary raw visitor identifiers.
   writes return 503 before FormRequest validation, redirects return 404, and the
   prune command returns zero.
 
+### GF-FR-006A — Tracked links in scheduling and distribution
+**Status:** implemented
+
+**Statement:** An eligible scheduled publication can optionally carry a
+tracked campaign link owned by the same organization, without changing the
+existing publishing contract when the attribution migration is absent.
+
+**Verification notes (current Laravel slice):**
+- A separate tenant-owned `scheduled_publication_links` association uses
+  composite foreign keys to both scheduled publications and tracked links.
+- At most one tracked link can be attached to each schedule; the association
+  and schedule are created within the same transaction.
+- The FormRequest accepts only optional UUIDs; the service revalidates the
+  selected link's tenant and active state under database lock.
+- Cross-tenant or disabled links cannot enter a schedule.
+- The existing Scheduler GET and unlinked POST remain usable before this
+  migration. Opt-in link scheduling responds 503 until both link tables exist.
+- Distribution checks linked campaign status immediately before provider I/O,
+  rejecting deliveries tied to disabled tracked links.
+- No real provider adapter or platform post is activated by this slice.
+
 ### GF-FR-007 — Finance
 **Status:** implemented
 

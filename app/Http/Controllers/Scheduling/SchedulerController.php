@@ -8,6 +8,7 @@ use App\Models\MediaAsset;
 use App\Models\Organization;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
+use App\Models\TrackedLink;
 use App\Models\User;
 use App\Services\Scheduling\ContentScheduler;
 use DateTimeZone;
@@ -28,11 +29,23 @@ class SchedulerController extends Controller
         $user = $request->user();
 
         $schedulingReady = $this->schedulingReady();
+        $linkingReady = $schedulingReady
+            && Schema::hasTable('tracked_links')
+            && Schema::hasTable('scheduled_publication_links');
+        $trackedLinks = collect();
         $destinations = collect();
         $eligibleAssets = collect();
         $publications = collect();
 
         if ($schedulingReady) {
+            if ($linkingReady) {
+                $trackedLinks = TrackedLink::query()
+                    ->where('status', TrackedLink::STATUS_ACTIVE)
+                    ->orderBy('label')
+                    ->limit(100)
+                    ->get();
+            }
+
             $destinations = PublishingDestination::query()
                 ->where('status', PublishingDestination::STATUS_ACTIVE)
                 ->orderBy('name')
@@ -45,12 +58,18 @@ class SchedulerController extends Controller
                 ->limit(100)
                 ->get();
 
+            $relations = [
+                'mediaAsset.blob',
+                'destination',
+                'scheduledBy',
+            ];
+
+            if ($linkingReady) {
+                $relations[] = 'linkAssignment.trackedLink';
+            }
+
             $publications = ScheduledPublication::query()
-                ->with([
-                    'mediaAsset.blob',
-                    'destination',
-                    'scheduledBy',
-                ])
+                ->with($relations)
                 ->where('status', ScheduledPublication::STATUS_SCHEDULED)
                 ->where('scheduled_for_utc', '>', now('UTC'))
                 ->orderBy('scheduled_for_utc')
@@ -61,6 +80,8 @@ class SchedulerController extends Controller
         return view('scheduling.index', [
             'organization' => $organization,
             'schedulingReady' => $schedulingReady,
+            'linkingReady' => $linkingReady,
+            'trackedLinks' => $trackedLinks,
             'destinations' => $destinations,
             'eligibleAssets' => $eligibleAssets,
             'publications' => $publications,
@@ -91,6 +112,9 @@ class SchedulerController extends Controller
             $user,
             (string) $validated['scheduled_for_local'],
             (string) $validated['timezone'],
+            isset($validated['tracked_link_id'])
+                ? (string) $validated['tracked_link_id']
+                : null,
         );
 
         return redirect()

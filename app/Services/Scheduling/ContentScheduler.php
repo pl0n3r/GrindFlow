@@ -5,6 +5,8 @@ namespace App\Services\Scheduling;
 use App\Models\MediaAsset;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
+use App\Models\ScheduledPublicationLink;
+use App\Models\TrackedLink;
 use App\Models\User;
 use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
@@ -13,6 +15,7 @@ use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -29,6 +32,7 @@ class ContentScheduler
         User $actor,
         string $localDateTime,
         string $timezone,
+        ?string $trackedLinkId = null,
     ): ScheduledPublication {
         $organizationId = $this->tenantContext->organizationId();
 
@@ -54,6 +58,16 @@ class ContentScheduler
             ]);
         }
 
+        if (
+            $trackedLinkId !== null
+            && (
+                Schema::hasTable('tracked_links') === false
+                || Schema::hasTable('scheduled_publication_links') === false
+            )
+        ) {
+            abort(503, 'Tracked-link scheduling requires its database migration.');
+        }
+
         $scheduledForUtc = $this->scheduledForUtc(
             $localDateTime,
             $timezone,
@@ -65,6 +79,8 @@ class ContentScheduler
             $actor,
             $scheduledForUtc,
             $timezone,
+            $trackedLinkId,
+            $organizationId,
         ): ScheduledPublication {
             $lockedAsset = MediaAsset::query()
                 ->whereKey($asset->getKey())
@@ -83,7 +99,28 @@ class ContentScheduler
                 ]);
             }
 
-            return ScheduledPublication::query()->create([
+            $trackedLink = null;
+
+            if ($trackedLinkId !== null) {
+                $trackedLink = TrackedLink::query()
+                    ->whereKey($trackedLinkId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ((string) $trackedLink->organization_id !== $organizationId) {
+                    throw new AuthorizationException(
+                        'The tracked link belongs to another organization.',
+                    );
+                }
+
+                if ($trackedLink->status !== TrackedLink::STATUS_ACTIVE) {
+                    throw ValidationException::withMessages([
+                        'tracked_link_id' => 'The selected tracked link is not active.',
+                    ]);
+                }
+            }
+
+            $publication = ScheduledPublication::query()->create([
                 'media_asset_id' => $lockedAsset->getKey(),
                 'publishing_destination_id' => $destination->getKey(),
                 'scheduled_by_user_id' => $actor->getKey(),
@@ -91,6 +128,15 @@ class ContentScheduler
                 'scheduled_for_utc' => $scheduledForUtc,
                 'timezone' => $timezone,
             ]);
+
+            if ($trackedLink !== null) {
+                ScheduledPublicationLink::query()->create([
+                    'scheduled_publication_id' => $publication->getKey(),
+                    'tracked_link_id' => $trackedLink->getKey(),
+                ]);
+            }
+
+            return $publication;
         });
     }
 

@@ -26,6 +26,7 @@ class StoreScheduledPublicationRequest extends FormRequest
         return [
             'asset_id' => ['required', 'uuid'],
             'destination_id' => ['required', 'uuid'],
+            'tracked_link_id' => ['nullable', 'uuid'],
             'scheduled_for_local' => [
                 'required',
                 'date_format:Y-m-d\TH:i',
