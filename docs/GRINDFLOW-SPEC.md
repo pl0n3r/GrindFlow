@@ -119,7 +119,8 @@ Finance begins as a tenant-owned append-only revenue-allocation ledger.
 - A beneficiary is optional and must belong to the same organization at write
   time. Actor and beneficiary deletion may null their user references without
   rewriting financial history.
-- Net allocation is derived from original entries minus reversals; no mutable
+- Net allocation is derived from original entries minus reversals per currency;
+  minor units from different currencies are never combined, and no mutable
   balance cache is authoritative in core v1.
 - Payment execution, payouts, invoices, taxes and reconciliation are outside
   core v1 and must integrate through auditable ledger entries rather than
