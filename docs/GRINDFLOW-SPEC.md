@@ -261,6 +261,8 @@ The execution roadmap and durable progress history live in
 - Status filtering also applies to the existing complete daily CSV. A new
   destination affects future redirects, while historical dates in CSV use
   *current* label/channel/campaign: this is not a per-click metadata archive.
+- Daily metric/date filters use a half-open UTC day range [from, to + 1 day)
+  to include the complete final day even with datetime-backed test records.
 - HTTP(S) URL validation, bounded fields, org permission and locked
   tenant-scoped lookup reject foreign link IDs and unsafe schemes. No
   link token rotation, deletion, data migration or provider publication.

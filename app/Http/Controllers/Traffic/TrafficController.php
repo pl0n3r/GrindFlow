@@ -40,6 +40,9 @@ class TrafficController extends Controller
         $filters = $this->filters($request);
         $from = $filters['from'] ?? now('UTC')->subDays(29)->toDateString();
         $to = $filters['to'] ?? now('UTC')->toDateString();
+        // Exclusive next-day bound includes the full final UTC day on both DATE
+        // and datetime-backed test databases without wrapping indexed columns.
+        $toExclusive = Carbon::parse($to, 'UTC')->addDay()->toDateString();
         $totalClicks = 0;
         $linkCount = 0;
         $channels = collect();
@@ -54,7 +57,8 @@ class TrafficController extends Controller
             $links = (clone $filteredLinks)
                 ->with(['scheduledPublicationLinks.scheduledPublication.destination'])
                 ->withSum(['dailyMetrics as total_clicks' => fn ($query) => $query
-                    ->whereBetween('metric_date', [$from, $to])], 'clicks')
+                    ->where('metric_date', '>=', $from)
+                    ->where('metric_date', '<', $toExclusive)], 'clicks')
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
                 ->paginate(25)
@@ -62,7 +66,8 @@ class TrafficController extends Controller
             $linkCount = $links->total();
             $series = TrackedLinkDailyMetric::query()
                 ->whereIn('tracked_link_id', (clone $filteredLinks)->select('id'))
-                ->whereBetween('metric_date', [$from, $to])
+                ->where('metric_date', '>=', $from)
+                ->where('metric_date', '<', $toExclusive)
                 ->selectRaw('metric_date, SUM(clicks) as clicks')
                 ->groupBy('metric_date')
                 ->orderBy('metric_date')
@@ -108,6 +113,9 @@ class TrafficController extends Controller
         $filters = $this->filters($request);
         $from = $filters['from'] ?? now('UTC')->subDays(29)->toDateString();
         $to = $filters['to'] ?? now('UTC')->toDateString();
+        // Exclusive next-day bound includes the full final UTC day on both DATE
+        // and datetime-backed test databases without wrapping indexed columns.
+        $toExclusive = Carbon::parse($to, 'UTC')->addDay()->toDateString();
 
         if (Carbon::parse($from, 'UTC')->diffInDays(
             Carbon::parse($to, 'UTC'),
@@ -126,7 +134,8 @@ class TrafficController extends Controller
             })
             ->where('metrics.organization_id', $organizationId)
             ->where('links.organization_id', $organizationId)
-            ->whereBetween('metrics.metric_date', [$from, $to])
+            ->where('metrics.metric_date', '>=', $from)
+            ->where('metrics.metric_date', '<', $toExclusive)
             ->when(
                 $filters['channel'] ?? null,
                 fn ($query, $channel) => $query->where('links.channel', $channel),

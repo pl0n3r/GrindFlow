@@ -172,6 +172,9 @@ el cambio aquí en el mismo PR que modifica el producto.
 - Las cifras de clicks y grafica agregan TODOS los links coincidentes,
   no solo los de la pagina. CSV diario filtra tambien por status
   si se pide, pero no pagina eventos ni registra clicks por descargar.
+- Usar limites UTC [from, to+1 dia) para consultas DATE: incluyen todo
+  el ultimo dia en MariaDB y SQLite sin perder metric_date con hora 00:00:00
+  de los tests ni romper indices con whereDate(metric_date).
 - Se pueden editar label, destination_url (HTTP[S]), channel y campaign
   del link activo o deshabilitado; ambas rutas y dominio comprueban
   tenant/rol, lookup scoped y lock antes de actualizar.

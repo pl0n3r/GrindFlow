@@ -70,6 +70,7 @@ flowchart LR
 - No se pierden clicks, deduplicacion o asociaciones a programaciones. Los reportes historicos muestran la metadata actual del link, advertencia explicita en la UI.
 - El listado ya no corta a 100: paginas de 25, total real, navegacion con filtros y recuperacion fuera de rango.
 - Nuevo filtro active/disabled aplica a listado, KPIs, grafica y export CSV completo.
+- Corrige limite final de fecha UTC en grafica y CSV para incluir clicks del propio ultimo dia tanto en MariaDB como en pruebas SQLite.
 - Tests de edicion y estado, redirects, rol/tenant, validacion HTTP(S), 105 links con tiempos identicos, filtro de estado y migracion ausente.
 - Sin SQL nuevo, publicaciones externas ni cambios destructivos.
 
