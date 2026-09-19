@@ -888,9 +888,19 @@ a {
   }
 
   .gf-sidebar .gf-brand__name,
-  .gf-navitem__text,
   .gf-sidebar__label {
     display: none;
+  }
+
+  /* Collapsed icon labels still provide accessible link names. */
+  .gf-navitem__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   .gf-sidebar {
@@ -948,7 +958,7 @@ a {
     position: fixed;
     top: auto;
     right: 10px;
-    bottom: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
     left: 10px;
     z-index: 20;
     display: block;
@@ -967,23 +977,45 @@ a {
     display: none;
   }
 
+  /* Do not hide permitted destinations beyond the fourth mobile item. */
   .gf-sidebar__nav {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
+    flex-wrap: nowrap;
     gap: 5px;
+    width: 100%;
     margin: 0;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
   }
 
-  .gf-navitem {
-    min-height: 48px;
+  .gf-sidebar__nav > .gf-navitem {
+    flex: 0 0 auto;
+    flex-direction: column;
+    min-width: 76px;
+    min-height: 54px;
+    gap: 2px;
+    padding: 5px 9px;
+    font-size: 11px;
+    scroll-snap-align: start;
   }
 
-  .gf-navitem:nth-of-type(n+5) {
-    display: none;
+  .gf-sidebar .gf-navitem__text {
+    position: static;
+    display: inline;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
   }
 
   .gf-main {
-    padding: 18px 14px 96px;
+    padding: 18px 14px calc(120px + env(safe-area-inset-bottom));
   }
 
   .gf-metrics {

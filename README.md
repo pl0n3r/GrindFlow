@@ -17,14 +17,14 @@
 
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-OPS · Navegación entre workspaces** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.0 · PR #89 fusionado** | `main` `f65059a0d2d2e3e40b48a5563604fea7286d119c` |
-| Version | 🚧 **v0.1.1** | patch de navegación |
-| CI del PR | 🚧 **pendiente del head final** | GrindFlow CI / validate |
-| Sonar | 🚧 **pendiente** | Quality Gate del PR |
-| CodeRabbit | 🚧 **pendiente** | review sobre head estable |
-| CI del SHA exacto de main | 🚧 **verificar tras merge** | separado del CI del PR |
-| Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes en run #35428068354 |
+| Work line | 🚧 **GF-UX · Navegación móvil y Vault** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.1 · PR #90 fusionado** | `main` `9c183dab05690d78b7b08f5b226d54b058187187` |
+| Version | 🚧 **v0.1.2** | patch de navegación accesible |
+| CI del PR | 🚧 **revalidar navegación por rol** | #35429309186 verde antes del ajuste adicional |
+| Sonar | 🚧 **revalidar navegación por rol** | Quality Gate OK antes del ajuste adicional |
+| CodeRabbit | 🚧 **revisión final del head en curso** | hallazgos iniciales resueltos; más rutas por rol |
+| CI del SHA exacto de main | 🚧 **v0.1.2 por verificar tras merge** | v0.1.1 verde: #35428328028 |
+| Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes en run #35428327988 |
 | Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + aprobación expresa |
 
 ## Huella del cambio
@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+180** | **−61** | **+119** |
+| **10** | **+238** | **−46** | **+192** |
 
 ## Calidad y entrega
 
@@ -41,8 +41,8 @@
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
-| Tests | enlaces reales, organización visible/ajena, empty state y versión |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
+| Tests | Vault, Dashboard y Distribution por rol/tenant, Traffic 403, CSS móvil |
 | Autorización | sin cambios de roles ni permiso por UI; rutas tenant-scoped ya protegidas |
 | Producción | migraciones y deploy siguen controles separados |
 
@@ -72,42 +72,45 @@ flowchart LR
 
 ## Qué se hizo
 
-- Corrige el Dashboard: Distribution vuelve a ser navegable cuando existe una organización visible.
-- Admin > System enlaza Vault, Scheduler, Distribution y Traffic en una organización accesible al admin.
-- Sin organización, los accesos conservan el estado deshabilitado; System no depende del esquema nuevo de estos módulos.
-- Incorpora regresiones de enlaces, aislamiento entre organizaciones y navegación vacía.
-- Bump deliberado `v0.1.1`, sin SQL de producción ni acciones externas.
+- En móviles el rail inferior permite desplazarse entre todos los destinos autorizados; ya no oculta la quinta ruta en adelante.
+- En pantallas medianas los nombres del rail compacto conservan accesibilidad para lectores de pantalla.
+- Vault, Dashboard y Distribution solo enlazan Traffic cuando el rol permite abrirlo; Finance sigue restringido y no se crean enlaces a otro tenant.
+- Incorpora regresiones tenant-scoped, Traffic 403 en Model, contraste Editor y CSS. Bump v0.1.2, sin schema ni publicación externa.
 
 ## Archivos modificados en este deploy
 
-- `README.md` — dashboard de v0.1.1.
-- `app/Http/Controllers/Admin/SystemController.php` — organización para enlaces.
-- `config/version.php` — patch de versión.
-- `resources/views/admin/system.blade.php` — navegación funcional.
-- `resources/views/dashboard.blade.php` — enlace Distribution tenant-scoped.
-- `tests/Feature/AdminSystemTest.php` — regresiones de navegación.
+- `README.md` — snapshot de v0.1.2
+- `config/version.php` — versión humana v0.1.2
+- `public/css/grindflow.css` — navegación móvil y accesibilidad
+- `resources/views/vault/index.blade.php` — enlaces tenant-scoped y Traffic/Finance por rol
+- `resources/views/dashboard.blade.php` — Traffic solo cuando el rol puede abrirlo
+- `resources/views/distribution/index.blade.php` — navegación Traffic por rol
+- `tests/Feature/MediaVaultTest.php` — regresiones de navegación y roles
+- `tests/Feature/VisualShellTest.php` — contrato de navegación móvil
+- `tests/Feature/OrganizationVisibilityTest.php` — navegación Dashboard por rol
+- `tests/Feature/DistributionTest.php` — navegación Distribution por rol
 
 ## Validación
 
-- Requiere CI / validate y Sonar sobre el head final.
-- Prueba de rutas operativas y de ausencia de enlaces a organizaciones ajenas.
-- El último Smoke exact-main informó **7 migraciones pendientes**, no ejecutadas.
+- CI / validate del SHA exacto de main v0.1.1 verde (#35428328028); Smoke #35428327988 reportó siete migraciones pendientes.
+- v0.1.2 CI / validate #35429309186 y Sonar verdes tras hallazgos CodeRabbit; revalidar los últimos ajustes de roles sobre head final y después exact-main.
+- Migraciones, backup externo, identidad desplegada y pruebas productivas permanecen independientes.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar y fusionar navegación v0.1.1; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 Verificar CI exact-main, Hostinger y lote de [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69). |
-| **LATER** | 🚧 Auditoría de intentos y providers en sandbox. |
-| **BLOCKED / EXTERNAL** | 🚧 Backup restaurable, aprobación, storage S3 y FFmpeg. |
+| **NOW** | 🚧 Validar navegación móvil v0.1.2; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 Identidad desplegada y preparación segura de [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69). |
+| **LATER** | 🚧 Enlaces cruzados restantes y auditoría de intentos. |
+| **BLOCKED / EXTERNAL** | 🚧 Backup restaurable, aprobación de migraciones, storage S3 y FFmpeg. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Workflow #87 y modelo operativo #89 fusionados~~ | ✅ ~~CI de PR aprobado; no implica producción~~ |
-| **NOW** | 🚧 Navegación | 🚧 v0.1.1 |
+| **DONE** | ✅ ~~Workflow #87 y navegación #90 fusionados~~ | ✅ ~~CI de PR aprobado; no implica producción~~ |
+| **NOW** | 🚧 Navegación móvil | 🚧 v0.1.2 |
 | **NEXT** | 🚧 Migraciones y storage | 🚧 [#34](https://github.com/drpipe1098-commits/GrindFlow/issues/34) · [#40](https://github.com/drpipe1098-commits/GrindFlow/issues/40) |
 | **LATER** | 🚧 Finance y paridad legado | 🚧 Después del esquema |
 | **BLOCKED / EXTERNAL** | 🚧 Producción | 🚧 Backup/aprobación y deploy |

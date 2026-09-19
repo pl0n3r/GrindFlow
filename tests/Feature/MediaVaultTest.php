@@ -76,13 +76,55 @@ class MediaVaultTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('visible.jpg')
+            ->assertSee(route('organizations.distribution.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertDontSee(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertDontSee(route('organizations.finance.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertDontSee(route('organizations.distribution.index', [
+                'organizationId' => $otherOrganization->getKey(),
+            ]))
             ->assertDontSee('hidden.jpg');
+
+        $this->actingAs($user)
+            ->get(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertForbidden();
 
         $this->actingAs($user)
             ->get(route('organizations.vault.index', [
                 'organizationId' => $otherOrganization->getKey(),
             ]))
             ->assertNotFound();
+    }
+
+    public function test_studio_vault_navigation_shows_finance_for_own_organization_only(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $foreign = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        $this->actingAs($user)
+            ->get(route('organizations.vault.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertOk()
+            ->assertSee(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertSee(route('organizations.finance.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertDontSee(route('organizations.finance.index', [
+                'organizationId' => $foreign->getKey(),
+            ]));
     }
 
     public function test_manager_upload_deduplicates_bytes_but_keeps_ingestion_records(): void
