@@ -17,7 +17,7 @@
 | CI del PR | ✅ **GrindFlow CI #361 / validate** | fast, php-quality, PHPUnit, MariaDB, browser y legacy pasaron |
 | Sonar | ✅ **Quality Gate OK** | PR #85: 0 issues / 0 hotspots tras corrección de parser |
 | CodeRabbit | 🟠 **advisory sin aprobación final verificada** | no threads visibles al merge |
-| CI exact-main | ⚪ **sin evidencia confirmada aquí** | PR y push de merge son controles distintos |
+| CI del SHA exacto de main | ⚪ **sin evidencia confirmada aquí** | PR y push de merge son controles distintos |
 | Production Smoke | 🟠 **BLOCKED: seis migraciones identificadas** | run #35423144507, SHA `a5c05147…`, artifact de tres días |
 | Migraciones | 🟠 **no ejecutadas** | no hay backup externo restaurable verificado ni aprobación del lote |
 
