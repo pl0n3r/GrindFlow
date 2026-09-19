@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+387** | **−100** | **+287** |
+| **11** | **+453** | **−100** | **+353** |
 
 ## Calidad y entrega
 
@@ -76,7 +76,7 @@ flowchart LR
 - Se crea el [roadmap único #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) para prioridades, entregas tachadas y traspaso entre sesiones sin depender del chat.
 - Se incorpora versión humana inicial `v0.1.0` en Admin > System, independiente del SHA exacto de Hostinger y del estado de migraciones.
 - CI valida cada transición posterior de versión (patch +1 o minor deliberado) y prueba casos inválidos sin hacer commits automáticos.
-- `AGENTS.md` y el modelo de desarrollo fijan autonomía, propietario cross-functional, paralelización de lecturas, commits lógicos, CI/Sonar/CodeRabbit estables, E2E sintético y operaciones productivas protegidas.
+- `AGENTS.md` y el modelo de desarrollo incorporan la regla expresa del propietario: Principal Software Engineer + Technical Executor, nueve capacidades multidisciplinarias simultáneas, ownership completo, decisiones reversibles autónomas y límites productivos protegidos.
 - El README verifica el estado visual ✅/🚧, versión exacta y enlace al roadmap; sigue siendo un snapshot, no un changelog.
 
 ## Archivos modificados en este deploy
