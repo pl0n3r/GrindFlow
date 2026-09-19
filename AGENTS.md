@@ -148,6 +148,15 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - El limite CSV de 366 dias es INCLUSIVO: una diferencia de 366 fechas de
   medianoche abarca 367 dias y se rechaza (CodeRabbit PR #97).
 
+### Credenciales de Smoke: no aceptar verde sin autenticacion
+
+- Si falta `PRODUCTION_E2E_PASSWORD` en el repositorio activo, registrar
+  el incidente de configuración y terminar el workflow con error.
+  No presentar un job omitido como validación de producción satisfactoria.
+- Comprobar este comportamiento en el contrato de sintaxis del workflow;
+  nunca registrar el valor de la credencial ni probar login con secretos reales
+  en el CI de pull requests.
+
 ### Smoke de produccion vertical / version observada
 
 - Leer version humana numerica desde el marcador exclusivo Admin System
