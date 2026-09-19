@@ -261,6 +261,116 @@ class SchedulingTest extends TestCase
         );
     }
 
+    public function test_duplicate_asset_cannot_be_scheduled(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        [$duplicate, $destination] = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function (): array {
+                $canonical = $this->readyAsset();
+                $duplicate = MediaAsset::query()->create([
+                    'media_blob_id' => $canonical->media_blob_id,
+                    'duplicate_of' => $canonical->getKey(),
+                    'original_filename' => 'duplicate-media.jpg',
+                    'source_type' => 'manual_upload',
+                    'status' => MediaAsset::STATUS_READY,
+                    'metadata' => [
+                        'processing' => [
+                            'version' => app(MediaAssetProcessor::class)
+                                ->currentVersion(),
+                            'status' => 'completed',
+                            'attempts' => 1,
+                            'last_error' => null,
+                        ],
+                    ],
+                ]);
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Primary channel',
+                    'provider' => 'provider-test',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+
+                return [$duplicate, $destination];
+            },
+        );
+
+        $this->actingAs($user)
+            ->post(
+                route('organizations.scheduler.store', [
+                    'organizationId' => $organization->getKey(),
+                ]),
+                [
+                    'asset_id' => $duplicate->getKey(),
+                    'destination_id' => $destination->getKey(),
+                    'scheduled_for_local' => now('UTC')
+                        ->addDay()
+                        ->format('Y-m-d\TH:i'),
+                    'timezone' => 'UTC',
+                ],
+            )
+            ->assertSessionHasErrors('asset_id');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                0,
+                ScheduledPublication::query()->count(),
+            ),
+        );
+    }
+
+    public function test_past_time_cannot_be_scheduled(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        [$asset, $destination] = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): array => [
+                $this->readyAsset(),
+                PublishingDestination::query()->create([
+                    'name' => 'Primary channel',
+                    'provider' => 'provider-test',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]),
+            ],
+        );
+
+        $this->actingAs($user)
+            ->post(
+                route('organizations.scheduler.store', [
+                    'organizationId' => $organization->getKey(),
+                ]),
+                [
+                    'asset_id' => $asset->getKey(),
+                    'destination_id' => $destination->getKey(),
+                    'scheduled_for_local' => now('UTC')
+                        ->subHour()
+                        ->format('Y-m-d\TH:i'),
+                    'timezone' => 'UTC',
+                ],
+            )
+            ->assertSessionHasErrors('scheduled_for_local');
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                0,
+                ScheduledPublication::query()->count(),
+            ),
+        );
+    }
+
     public function test_disabled_destination_cannot_be_scheduled(): void
     {
         $user = User::factory()->create();
@@ -453,9 +563,11 @@ class SchedulingTest extends TestCase
     public function test_scheduler_endpoints_are_safe_before_scheduling_migration(): void
     {
         $user = User::factory()->create();
+        $modelUser = User::factory()->create();
         $organization = Organization::factory()->create();
 
         $this->membership($user, $organization, UserRole::Editor);
+        $this->membership($modelUser, $organization, UserRole::Model);
 
         Schema::dropIfExists('scheduled_publications');
         Schema::dropIfExists('publishing_destinations');
@@ -475,14 +587,11 @@ class SchedulingTest extends TestCase
                 ->assertSee('Scheduling migration required.');
 
             $this->actingAs($user)
-                ->post($route, [
-                    'asset_id' => fake()->uuid(),
-                    'destination_id' => fake()->uuid(),
-                    'scheduled_for_local' => now('UTC')
-                        ->addDay()
-                        ->format('Y-m-d\TH:i'),
-                    'timezone' => 'UTC',
-                ])
+                ->post($route, [])
+                ->assertStatus(503);
+
+            $this->actingAs($modelUser)
+                ->post($route, [])
                 ->assertStatus(503);
         } finally {
             $migration = require $migrationPath;
