@@ -229,3 +229,20 @@ The execution roadmap and durable progress history live in
 - Delivery is eagerly loaded to avoid N+1 queries for edit/cancel controls.
   Missing schema retains the original friendly fallback and does not require
   new migrations, providers, or external publishing.
+
+## 17. Finance filtered beneficiary reconciliation (read-only)
+
+- One tenant-scoped ledger query powers currency totals, currency/beneficiary
+  allocations-vs-reversals, paginated 25-event history and complete-group CSV.
+- The report applies exact 3-letter currency, active organization beneficiary
+  (or 'unassigned') and inclusive UTC occurred_on from/to filters; reversal
+  entries count on their own event date. A period net may be negative when
+  its original falls outside the selected period, and is not a bank statement
+  reconciliation or all-time account balance.
+- Distinct currencies never share a net total. CSV contains grouped totals
+  only, no raw allocation note, immutable identifier or secret; escaped names
+  cannot be interpreted as spreadsheet formulas. private/no-store/nosniff.
+- Page number is positive and bounded. No 100-record cutoff or cross-tenant
+  count leakage; CSV uses all filtered groups regardless of visible page.
+- Missing Finance schema retains GET fallback and 503 for CSV. The report
+  performs no ledger mutations, provider calls or new SQL migrations.

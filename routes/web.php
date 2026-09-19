@@ -85,6 +85,9 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
                 ->name('organizations.traffic.links.status');
             Route::get('/finance', [FinanceController::class, 'index'])
                 ->name('organizations.finance.index');
+            Route::get('/finance/reconciliation.csv', [FinanceController::class, 'export'])
+                ->middleware(RequireFinanceSchema::class)
+                ->name('organizations.finance.reconciliation.export');
             Route::post('/finance', [FinanceController::class, 'store'])
                 ->middleware(RequireFinanceSchema::class)
                 ->name('organizations.finance.store');

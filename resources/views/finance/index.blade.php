@@ -125,9 +125,60 @@
                     </div>
                 </section>
             @else
-                <section class="gf-panel" aria-label="Metricas de Finance por moneda">
+                <section class="gf-panel" aria-label="Finance reconciliation filters">
                     <header class="gf-panel__head">
-                        <h2>Currency totals</h2>
+                        <h2>Reconciliation · event dates (UTC)</h2>
+                        <span class="gf-appbar__meta">Ledger + grouped totals share these filters</span>
+                    </header>
+                    <div class="gf-panel__body">
+                        <form class="gf-form" method="GET" action="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}">
+                            <div class="gf-field">
+                                <label for="finance_currency">Currency (optional)</label>
+                                <input class="gf-input" id="finance_currency" name="currency" type="text"
+                                       maxlength="3" pattern="[A-Za-z]{3}" value="{{ $filters['currency'] ?? '' }}"
+                                       placeholder="All currencies">
+                            </div>
+                            <div class="gf-field">
+                                <label for="finance_beneficiary">Beneficiary</label>
+                                <select class="gf-input" id="finance_beneficiary" name="beneficiary">
+                                    <option value="">All beneficiaries</option>
+                                    <option value="unassigned" @selected(($filters['beneficiary'] ?? '') === 'unassigned')>Organization / unassigned</option>
+                                    @foreach ($beneficiaries as $beneficiary)
+                                        <option value="{{ $beneficiary->id }}" @selected(($filters['beneficiary'] ?? '') === $beneficiary->id)>
+                                            {{ $beneficiary->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="gf-field">
+                                <label for="finance_from">From (UTC event date)</label>
+                                <input class="gf-input" id="finance_from" name="from" type="date" value="{{ $filters['from'] ?? '' }}">
+                            </div>
+                            <div class="gf-field">
+                                <label for="finance_to">To (UTC event date)</label>
+                                <input class="gf-input" id="finance_to" name="to" type="date" value="{{ $filters['to'] ?? '' }}">
+                            </div>
+                            <div class="gf-upload__footer">
+                                <p>Una reversa cuenta en su propia fecha UTC; el neto del periodo refleja eventos, no un saldo historico acumulado.</p>
+                                <button class="gf-button gf-button--primary" type="submit">Apply reconciliation filters</button>
+                            </div>
+                        </form>
+                        <div class="gf-upload__footer">
+                            <p class="gf-media-meta">CSV resume todos los grupos coincidentes, incluso los que no aparecen en esta pagina del ledger.</p>
+                            <a class="gf-button gf-button--ghost"
+                               href="{{ route('organizations.finance.reconciliation.export', array_merge(['organizationId' => $organization->id], $filters)) }}">
+                                Download reconciliation CSV
+                            </a>
+                        </div>
+                        @if ($filters !== [])
+                            <a href="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}">Clear filters</a>
+                        @endif
+                    </div>
+                </section>
+
+                <section class="gf-panel gf-panel--spaced" aria-label="Metricas de Finance por moneda">
+                    <header class="gf-panel__head">
+                        <h2>Currency totals · matching events</h2>
                         <span class="gf-appbar__meta">Minor units · never cross-currency</span>
                     </header>
 
@@ -159,6 +210,47 @@
                                                 <td>
                                                     <strong>{{ number_format($summary['net_minor']) }}</strong>
                                                 </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
+                <section class="gf-panel gf-panel--spaced" aria-label="Beneficiary reconciliation">
+                    <header class="gf-panel__head">
+                        <h2>Beneficiary reconciliation</h2>
+                        <span class="gf-appbar__meta">{{ $beneficiarySummaries->count() }} currency / beneficiary groups</span>
+                    </header>
+                    <div class="gf-panel__body gf-panel__body--flush-mobile">
+                        @if ($beneficiarySummaries->isEmpty())
+                            <div class="gf-empty">
+                                <div><h3>No matching reconciliation entries.</h3><p>Adjust the filters to include ledger events.</p></div>
+                            </div>
+                        @else
+                            <div class="gf-table-wrap">
+                                <table class="gf-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Beneficiary</th>
+                                            <th>Currency</th>
+                                            <th>Allocated</th>
+                                            <th>Reversed</th>
+                                            <th>Net</th>
+                                            <th>Events</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($beneficiarySummaries as $summary)
+                                            <tr>
+                                                <td>{{ $summary['beneficiary_label'] }}</td>
+                                                <td><strong>{{ $summary['currency'] }}</strong></td>
+                                                <td>{{ number_format($summary['allocated_minor']) }}</td>
+                                                <td>{{ number_format($summary['reversed_minor']) }}</td>
+                                                <td><strong>{{ number_format($summary['net_minor']) }}</strong></td>
+                                                <td>{{ $summary['events'] }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -280,7 +372,7 @@
                 <section class="gf-panel gf-panel--spaced">
                     <header class="gf-panel__head">
                         <h2>Revenue ledger</h2>
-                        <span class="gf-appbar__meta">{{ $allocations->count() }} loaded</span>
+                        <span class="gf-appbar__meta">{{ $allocations->total() }} matching · {{ $allocations->count() }} on this page</span>
                     </header>
 
                     <div class="gf-panel__body gf-panel__body--flush-mobile">
@@ -288,8 +380,14 @@
                             <div class="gf-empty">
                                 <div>
                                     <div class="gf-empty__icon" aria-hidden="true">$</div>
-                                    <h3>No finance entries yet.</h3>
-                                    <p>Registra la primera asignacion para iniciar el ledger.</p>
+                                    <h3>{{ $allocations->total() ? 'No ledger events on this page.' : 'No matching finance entries.' }}</h3>
+                                    <p>
+                                        @if ($allocations->total())
+                                            <a href="{{ $allocations->url($allocations->lastPage()) }}">Go to last ledger page</a>
+                                        @else
+                                            Adjust filters or record the first allocation.
+                                        @endif
+                                    </p>
                                 </div>
                             </div>
                         @else
@@ -365,6 +463,24 @@
                             </div>
                         @endif
                     </div>
+                    @if ($allocations->total() > 0)
+                        <nav class="gf-panel__body" aria-label="Finance ledger pagination">
+                            <div class="gf-upload__footer">
+                                <p class="gf-media-meta">
+                                    Showing {{ $allocations->firstItem() ?? 0 }}–{{ $allocations->lastItem() ?? 0 }} of {{ $allocations->total() }}
+                                    · Page {{ $allocations->currentPage() }} of {{ $allocations->lastPage() }}
+                                </p>
+                                <div>
+                                    @if ($allocations->previousPageUrl())
+                                        <a class="gf-button gf-button--ghost" rel="prev" href="{{ $allocations->previousPageUrl() }}">Previous</a>
+                                    @endif
+                                    @if ($allocations->nextPageUrl())
+                                        <a class="gf-button gf-button--ghost" rel="next" href="{{ $allocations->nextPageUrl() }}">Next</a>
+                                    @endif
+                                </div>
+                            </div>
+                        </nav>
+                    @endif
                 </section>
             @endif
         </main>

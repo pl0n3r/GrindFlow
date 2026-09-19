@@ -142,6 +142,27 @@ el cambio aquí en el mismo PR que modifica el producto.
   determinista, filtros combinados + links, destino inactivo,
   paginas fuera de rango y query de pagina malformada.
 
+### Finance: reconciliacion por eventos, no saldo bancario
+
+- La fecha filtrada en Finance es `occurred_on` del asiento: una reversa
+  cuenta en SU propia fecha UTC (puede generar neto negativo temporal).
+  No presentar esto como conciliacion de pagos bancarios o saldo historico
+  sin verificar el periodo completo de vida de los asientos.
+- Un SOLO builder tenant-scoped genera ledger paginado, totales por moneda,
+  resumen por moneda+beneficiario y CSV de TODOS los grupos coincidentes.
+  No sumar monedas distintas ni usar el preview de 25 filas para reportes.
+- Preservar currency, beneficiary, from/to validados en enlaces de pagina,
+  y excluir otros parametros. Limitar page y no entregar identificadores
+  internos, notas, cookies ni nombres de clientes fuera del tenant en CSV.
+- Beneficiarios sin miembro activo aparecen como 'Former beneficiary'
+  y nulos como 'Organization / unassigned', sin intentar inferirlos de
+  records de otra organizacion; un beneficiary_id arbitrario no es filtro
+  autorizado. Nombres que comiencen con formula de planilla se prefijan.
+- Finance solo Admin/Studio autorizados, GET fallback con schema no migrado,
+  descarga 503 hasta schema y encabezados private/no-store/nosniff.
+- Nunca reescribir, borrar ni compensar el ledger automaticamente para
+  cuadrar un reporte. La gestion de reversas permanece append-only.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership
