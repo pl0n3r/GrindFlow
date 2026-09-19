@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\In;
 
 class StoreDestinationRequest extends FormRequest
 {
@@ -20,7 +21,7 @@ class StoreDestinationRequest extends FormRequest
     }
 
     /**
-     * @return array<string, list<string|\Illuminate\Contracts\Validation\ValidationRule|\Illuminate\Validation\Rules\In>>
+     * @return array<string, list<string|In>>
      */
     public function rules(): array
     {
