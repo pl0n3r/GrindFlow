@@ -11,6 +11,7 @@
     @php
         $vaultRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.vault.index');
         $schedulerRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.scheduler.index');
+        $trafficRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.traffic.index');
         $systemRouteAvailable = \Illuminate\Support\Facades\Route::has('admin.system');
         $diagnosticsRouteAvailable = \Illuminate\Support\Facades\Route::has('admin.diagnostics');
     @endphp
@@ -66,10 +67,20 @@
 
                 <span class="gf-sidebar__label">Insights</span>
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                    <span class="gf-navitem__text">Analytics</span>
-                </span>
+                @if ($organizations->isNotEmpty() && $trafficRouteAvailable)
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.traffic.index', ['organizationId' => $organizations->first()->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
+                        <span class="gf-navitem__text">Traffic</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
+                        <span class="gf-navitem__text">Traffic</span>
+                    </span>
+                @endif
 
                 @if (auth()->user()?->isPlatformAdmin())
                     <span class="gf-sidebar__label">Admin</span>

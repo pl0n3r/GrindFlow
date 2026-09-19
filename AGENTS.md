@@ -189,6 +189,34 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 - Ningun provider real, secreto o mutacion externa se habilita en el foundation
   de GF-FR-005; primero se valida el contrato con fakes.
 
+### Regla de atribucion de trafico
+
+- `tracked_links` es tenant-owned; la resolucion publica puede saltar el scope
+  solo por token globalmente unico y solo para links `active`.
+- El redirector es 302, `Cache-Control: no-store` y
+  `Referrer-Policy: no-referrer`. La metrica se despacha despues de responder:
+  perder una metrica es preferible a perder una conversion.
+- Nunca se persisten IP, User-Agent, referrer ni country en MariaDB. El primer
+  slice solo guarda agregado diario y un hash temporal para dedupe.
+- El hash del visitante es HMAC con secreto server-side y contexto por link. La
+  misma IP produce hashes distintos en links distintos, por lo que la base no
+  permite correlacionar al visitante entre campanas.
+- No se parsea `X-Forwarded-For` manualmente. Se usa `Request::ip()`; la
+  confianza en proxies se configura operacionalmente en Laravel, no desde el
+  request.
+- La ventana autoritativa de dedupe es una constante server-side de 10 minutos.
+  No es parametro, query string, header ni configuracion editable por anonimos.
+- La deduplicacion vive en MariaDB y usa `insertOrIgnore + lockForUpdate` para
+  que replicas concurrentes no inflen el contador.
+- Los hashes de dedupe son datos efimeros: se podan tras 24 horas con
+  `grindflow:prune-traffic-dedupes`. El agregado diario no necesita conservar
+  el identificador del visitante.
+- Si no existe hash key/IP valida, el redirect sigue funcionando pero no se
+  genera attribution job. Privacidad y conversion tienen prioridad.
+- Deploy-before-migration debe ser seguro: management GET explica el bloqueo,
+  POST devuelve 503 antes del FormRequest, `/l/{token}` devuelve 404 y el
+  pruner devuelve cero.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal

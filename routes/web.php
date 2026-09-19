@@ -8,12 +8,20 @@ use App\Http\Controllers\Connections\DropboxConnectionController;
 use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Scheduling\SchedulerController;
+use App\Http\Controllers\Traffic\TrackedLinkRedirectController;
+use App\Http\Controllers\Traffic\TrafficController;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
 use App\Http\Middleware\RequireSchedulingSchema;
+use App\Http\Middleware\RequireTrafficSchema;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::get('/l/{token}', TrackedLinkRedirectController::class)
+    ->middleware('throttle:120,1')
+    ->where('token', '[A-Za-z0-9]{22}')
+    ->name('traffic.redirect');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])
@@ -37,6 +45,11 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::post('/scheduler', [SchedulerController::class, 'store'])
                 ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.store');
+            Route::get('/traffic', [TrafficController::class, 'index'])
+                ->name('organizations.traffic.index');
+            Route::post('/traffic', [TrafficController::class, 'store'])
+                ->middleware(RequireTrafficSchema::class)
+                ->name('organizations.traffic.store');
             Route::post('/vault/direct-upload', [DirectUploadController::class, 'create'])
                 ->middleware('throttle:30,1')
                 ->name('organizations.vault.direct.create');

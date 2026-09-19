@@ -5,6 +5,10 @@ return [
         'encryption_master_key' => env('ENCRYPTION_MASTER_KEY'),
     ],
 
+    'traffic' => [
+        'hash_key' => env('TRAFFIC_HASH_KEY', env('APP_KEY')),
+    ],
+
     'connectors' => [
         'dropbox' => [
             'app_key' => env('DROPBOX_APP_KEY'),
