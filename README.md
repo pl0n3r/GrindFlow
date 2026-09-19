@@ -12,11 +12,11 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟢 **Production Smoke 403 diagnostics** | PR #61 VALIDATED IN CODE |
-| Base exacta | ✅ **main** | `aa9d3b0fd634b9b49834638d5014a29ab5feb4c5` |
-| CI de main | ✅ **verde** | run #217 completo sobre el SHA exacto |
-| Migraciones | ✅ **0 pendientes** | bridge #35397783306: `pending_before=1`, `pending_after=0` |
-| Produccion | 🟠 **no validada aun** | rerun del smoke llega a HTTP 403 en `/up` y `/login` |
+| Work line | 🟢 **GF-FR-003 · ffprobe metadata** | VALIDATED IN CODE · CI #232 |
+| Base exacta | ✅ **main** | `62499a5963218db53239c54a5c302caf79e38324` |
+| Produccion actual | ✅ **smoke verde** | Production Smoke #31 sobre la base exacta |
+| Migraciones | ✅ **0 pendientes** | no hay cambios de schema en este slice |
+| Feature gate | 🔒 **off por defecto** | `MEDIA_FFPROBE_ENABLED=false` |
 
 ## Huella del cambio
 
@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **2** | **+119** | **−57** | **+62** |
+| **12** | **+867** | **−54** | **+813** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -34,12 +34,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
 | GrindFlow CI | `validate` exige success real para cada gate seleccionado |
-| Sonar | reporter estable de detalles completos del PR cuando aplica |
-| CodeRabbit | revision full sobre el head estable |
+| Sonar | análisis independiente + comentario estable de detalles del PR |
+| CodeRabbit | full review sobre el head estable |
 | Exact-main | CI vuelve a validar el SHA exacto despues del squash merge |
-| Produccion | Production Smoke sigue separado del source CI |
+| Produccion | ffprobe no se habilita automaticamente aunque el codigo se despliegue |
 
 ## Flujo de entrega
 
@@ -47,9 +47,19 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 flowchart LR
     A["PR + snapshot exacto"] --> P["preflight"]
     P --> F["fast contracts"]
+    P --> Q["php-quality"]
+    P --> T["PHPUnit"]
+    P --> D["MariaDB"]
+    P --> B["browser"]
+    P --> L["legacy"]
     A --> S["Sonar"]
     A --> C["CodeRabbit full review"]
     F --> V["validate"]
+    Q --> V
+    T --> V
+    D --> V
+    B --> V
+    L --> V
     S --> H["head estable"]
     C --> H
     V --> H
@@ -60,45 +70,55 @@ flowchart LR
 
 ## Qué se hizo
 
-- Confirma que la migracion de produccion termino con cero pendientes.
-- Separa los incidentes Laravel historicos del bloqueo HTTP 403 actual.
-- Centraliza todas las llamadas HTTP del smoke en `curl_common`.
-- Usa un User-Agent compatible con navegador e identificable como `GrindFlowProductionSmoke/1.0`.
-- Hace fail-fast en `/up` y en el GET de `/login` en vez de continuar con errores encadenados.
-- Cuando falla un endpoint publico, conserva solo headers seguros y una muestra corta del body en el artefacto privado de diagnostico.
-- Mantiene fuera del issue publico cookies, credenciales y payloads sensibles.
+- Porta el slice útil del PR #59 sobre la arquitectura actual de GF-FR-003.
+- Separa el procesamiento por version: v2 sin ffprobe y v3 con ffprobe, manteniendo idempotencia determinista.
+- Añade `FfprobeMediaInspector` detrás de un feature gate apagado por defecto.
+- Copia el objeto a un temporal, hace `fflush` y ejecuta `ffprobe` con timeout acotado.
+- Limita `ffprobe` con `-show_entries` y persiste solo metadata técnica allowlisted: duración, formato, streams, codecs, resolución y audio básico.
+- Rechaza JSON sin secciones `streams`/`format` y entries malformadas; descarta tags arbitrarios y no persiste stderr ni payloads crudos.
+- El feature flag usa parsing fail-closed; fallo, salida inválida y timeout se mapean a códigos seguros y acotados.
+- Añade cobertura del inspector, incluido un fallo con stderr sensible que no se propaga.
 
 ## Archivos modificados en este deploy
 
-- `README.md` — snapshot exacto del diagnostico y delivery actual.
-- `scripts/production-smoke.sh` — requests consistentes, fail-fast y diagnostico HTTP seguro.
+- `.env.example` — feature gate, binario y timeout de ffprobe.
+- `README.md` — snapshot exacto del slice actual.
+- `app/Jobs/ProcessMediaAsset.php` — ejecuta exactamente la version de procesador encolada.
+- `app/Services/Media/FfprobeMediaInspector.php` — inspección técnica normalizada y validación estricta.
+- `app/Services/Media/MediaAssetProcessor.php` — v2 sin ffprobe y v3 con ffprobe.
+- `app/Services/Media/MediaProcessingCoordinator.php` — selecciona version por modo y separa idempotencia/reintentos.
+- `app/Services/Media/MediaProcessingException.php` — errores seguros del probe/version.
+- `config/grindflow.php` — configuración ffprobe fail-closed.
+- `docs/REQUIREMENTS.md` — verificación actualizada de GF-FR-003.
+- `tests/Feature/FfprobeMediaInspectorTest.php` — normalización, malformed entries y fallos seguros.
+- `tests/Feature/MediaProcessingJobTest.php` — idempotencia y transición v2 → v3.
+- `tests/secrets.test.ts` — manipulación AES-GCM determinista para eliminar un flake Base64URL.
 
 ## Validación
 
-- Estado actual: **VALIDATED IN CODE** sobre el head funcional `b99d59916d7466340b8096eb96dedcd60f244232`.
-- GrindFlow CI #218: `preflight`, `fast[contracts]` y `validate` en success.
-- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots.
-- La migracion de produccion ya esta aplicada y reporta cero pendientes.
-- El rerun anterior del Production Smoke fallo 15/15 veces por HTTP 403 antes de llegar a las comprobaciones autenticadas.
-- CodeRabbit full review fue solicitado; mientras siga procesando no se afirma aprobacion y cualquier hallazgo accionable debe resolverse.
+- Estado actual: **VALIDATED IN CODE** sobre el head funcional `3e96cfdaf90c01e14b9631e62a7f89de057f219b`.
+- GrindFlow CI #232 pasó fast, PHP quality, PHPUnit, MariaDB, browser, legacy y validate.
+- SonarQube Cloud: Quality Gate OK, 0 issues y 0 Security Hotspots sobre el PR actualizado.
+- Las pruebas usan Laravel Process fakes y bloquean procesos no simulados.
+- Antes del merge se exige matriz completa, Sonar, revisión externa aplicable y recheck de `main`.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Revalidar el head documental, hacer squash merge y ejecutar CI + Production Smoke sobre el SHA exacto de `main`. |
-| **NEXT** | Si el User-Agent resuelve el bloqueo, merge + Production Smoke sobre el SHA exacto; si no, usar headers/body seguros para aislar WAF/hosting. |
-| **BLOCKED / EXTERNAL** | Acceso directo al panel/WAF de Hostinger no esta disponible desde este conector; object storage real sigue operacional. |
-| **LATER** | Continuar GF-FR-003 con derivados/probe multimedia/FFmpeg y despues P2. |
+| **NOW** | Revalidar el head final, revisar CodeRabbit y hacer squash merge con recheck de `main`. |
+| **NEXT** | Tras merge, validar exact-main + Production Smoke; habilitar ffprobe solo cuando el hosting confirme el binario. |
+| **BLOCKED / EXTERNAL** | Object storage S3-compatible sigue sin configurar; disponibilidad real de ffprobe en hosting aun no esta validada. |
+| **LATER** | Derivados FFmpeg detrás del mismo contrato y luego continuar P2. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Production Smoke | diagnostico 403 endurecido |
-| **NEXT** | Media processing | foundation VALIDATED IN CODE; derivados/FFmpeg pendientes |
-| **NEXT** | Media Vault produccion | migraciones al dia; smoke de produccion pendiente |
-| **BLOCKED / EXTERNAL** | Hosting / storage | WAF/acceso y object storage requieren evidencia/configuracion externa |
+| **NOW** | Media processing | v2 disabled + v3 ffprobe hardening VALIDATED IN CODE |
+| **NEXT** | Derivados | thumbnails/previews/normalización con FFmpeg |
+| **NEXT** | Media Vault producción | Quick Upload disponible; Direct Upload espera object storage |
+| **BLOCKED / EXTERNAL** | Hosting / storage | ffprobe real y S3-compatible requieren configuración externa |
 | **LATER** | Operacion | queues, scheduler, retries y backups |
 | **LATER** | Legacy retirement | solo tras GF-MIG-003 / GF-MIG-004 |
-| **LATER** | Producto P2 | distribucion, atribucion y finanzas |
+| **LATER** | Producto P2 | distribución, atribución y finanzas |

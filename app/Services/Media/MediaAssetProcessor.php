@@ -8,13 +8,30 @@ use Illuminate\Support\Facades\Storage;
 
 class MediaAssetProcessor
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
+
+    public const FFPROBE_VERSION = 3;
+
+    public function __construct(
+        private readonly FfprobeMediaInspector $ffprobe,
+    ) {}
+
+    public function currentVersion(): int
+    {
+        return $this->ffprobe->enabled()
+            ? self::FFPROBE_VERSION
+            : self::VERSION;
+    }
 
     /**
      * @return array<string, mixed>
      */
-    public function process(MediaAsset $asset): array
-    {
+    public function process(
+        MediaAsset $asset,
+        ?int $processorVersion = null,
+    ): array {
+        $processorVersion ??= $this->currentVersion();
+        $ffprobeEnabled = $this->ffprobeEnabledForVersion($processorVersion);
         $blob = $asset->blob;
 
         if ($blob instanceof MediaBlob === false) {
@@ -44,13 +61,28 @@ class MediaAssetProcessor
         }
 
         return [
-            'version' => self::VERSION,
-            'profile' => 'probe_v1',
+            'version' => $processorVersion,
+            'profile' => 'probe_v'.$processorVersion,
             'media_kind' => $kind,
             'mime_type' => $mimeType,
             'byte_size' => $blob->byte_size,
             'sha256' => $blob->sha256,
+            'technical_probe' => $ffprobeEnabled
+                ? 'ffprobe'
+                : 'disabled',
+            'technical_metadata' => $ffprobeEnabled
+                ? $this->ffprobe->inspect($blob)
+                : null,
         ];
+    }
+
+    private function ffprobeEnabledForVersion(int $processorVersion): bool
+    {
+        return match ($processorVersion) {
+            self::VERSION => false,
+            self::FFPROBE_VERSION => true,
+            default => throw MediaProcessingException::invalidProcessorVersion(),
+        };
     }
 
     private function kind(string $mimeType): ?string

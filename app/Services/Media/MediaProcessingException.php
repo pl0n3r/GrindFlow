@@ -25,4 +25,24 @@ class MediaProcessingException extends RuntimeException
     {
         return new self('processing_unsupported_mime');
     }
+
+    public static function probeFailed(): self
+    {
+        return new self('processing_probe_failed');
+    }
+
+    public static function probeInvalidOutput(): self
+    {
+        return new self('processing_probe_invalid_output');
+    }
+
+    public static function probeTimedOut(): self
+    {
+        return new self('processing_probe_timed_out');
+    }
+
+    public static function invalidProcessorVersion(): self
+    {
+        return new self('processing_invalid_processor_version');
+    }
 }

@@ -13,6 +13,7 @@ class MediaProcessingCoordinator
 {
     public function __construct(
         private readonly TenantContext $tenantContext,
+        private readonly MediaAssetProcessor $processor,
     ) {}
 
     public function queue(MediaAsset $asset, User $actor): MediaAsset
@@ -42,9 +43,13 @@ class MediaProcessingCoordinator
         }
 
         $processing = $this->processingMetadata($asset);
+        $processorVersion = $this->processor->currentVersion();
+        $attempts = ($processing['version'] ?? null) === $processorVersion
+            ? (int) ($processing['attempts'] ?? 0)
+            : 0;
 
         if (
-            ($processing['version'] ?? null) === MediaAssetProcessor::VERSION
+            ($processing['version'] ?? null) === $processorVersion
             && in_array(
                 $processing['status'] ?? null,
                 ['queued', 'processing', 'completed'],
@@ -56,9 +61,9 @@ class MediaProcessingCoordinator
 
         $metadata = $this->metadata($asset);
         $metadata['processing'] = [
-            'version' => MediaAssetProcessor::VERSION,
+            'version' => $processorVersion,
             'status' => 'queued',
-            'attempts' => (int) ($processing['attempts'] ?? 0),
+            'attempts' => $attempts,
             'last_error' => null,
         ];
 
@@ -69,14 +74,14 @@ class MediaProcessingCoordinator
                 (string) $asset->getKey(),
                 $organizationId,
                 (string) $actor->getKey(),
-                MediaAssetProcessor::VERSION,
+                $processorVersion,
             );
         } catch (Throwable $exception) {
             $metadata = $this->metadata($asset);
             $metadata['processing'] = [
-                'version' => MediaAssetProcessor::VERSION,
+                'version' => $processorVersion,
                 'status' => 'dispatch_failed',
-                'attempts' => (int) ($processing['attempts'] ?? 0),
+                'attempts' => $attempts,
                 'last_error' => 'processing_dispatch_failed',
             ];
 

@@ -19,6 +19,18 @@ import {
 const TOKEN = '1234567890:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw';
 const CONTEXT = 'grindflow:credential:org-alfa:telegram';
 
+function tamperBase64Url(value: string): string {
+  const bytes = Buffer.from(value, 'base64url');
+
+  if (bytes.length === 0) {
+    throw new Error('Cannot tamper with an empty Base64URL value.');
+  }
+
+  bytes[0] = bytes[0]! ^ 0x01;
+
+  return bytes.toString('base64url');
+}
+
 describe('ida y vuelta', () => {
   it('devuelve el secreto original', () => {
     expect(decryptSecret(encryptSecret(TOKEN))).toBe(TOKEN);
@@ -67,13 +79,13 @@ describe('el texto cifrado no filtra nada', () => {
 describe('deteccion de manipulacion', () => {
   it('falla si se altera el texto cifrado', () => {
     const [v, iv, tag, ct] = encryptSecret(TOKEN).split('.') as [string, string, string, string];
-    const alterado = [v, iv, tag, ct.slice(0, -2) + (ct.endsWith('A') ? 'BB' : 'AA')].join('.');
+    const alterado = [v, iv, tag, tamperBase64Url(ct)].join('.');
     expect(() => decryptSecret(alterado)).toThrow(SecretCryptoError);
   });
 
   it('falla si se altera la etiqueta de autenticacion', () => {
     const [v, iv, tag, ct] = encryptSecret(TOKEN).split('.') as [string, string, string, string];
-    const alterado = [v, iv, tag.slice(0, -2) + (tag.endsWith('A') ? 'BB' : 'AA'), ct].join('.');
+    const alterado = [v, iv, tamperBase64Url(tag), ct].join('.');
     expect(() => decryptSecret(alterado)).toThrow(SecretCryptoError);
   });
 

@@ -81,7 +81,7 @@ vault with traceable source metadata.
   files do not enter staging.
 
 ### GF-FR-003 — Media processing
-**Status:** implemented
+**Status:** validated-in-code
 
 **Statement:** Media can be processed through deterministic background jobs.
 
@@ -99,9 +99,19 @@ vault with traceable source metadata.
 - A completed processor version is a no-op on retry.
 - Missing objects, size mismatch and unsupported MIME produce bounded safe error
   codes and can be retried without creating another asset.
-- The initial `probe_v1` processor validates object existence/size and records
-  deterministic media kind, MIME, byte size and SHA-256 metadata. FFmpeg-derived
-  artifacts remain a later slice behind this contract.
+- Processor version 2 preserves deterministic object/size/MIME checks with
+  technical probing disabled; version 3 adds feature-gated `ffprobe` metadata.
+- The queued processor version fixes the processing mode for the lifetime of
+  each job, so mixed worker configuration cannot change a job's result and
+  enabling `ffprobe` reprocesses assets completed under version 2.
+- `ffprobe` is disabled by default with fail-closed boolean parsing, has a
+  bounded timeout, requests only allowlisted fields via `-show_entries`, and
+  rejects missing/non-array stream or format sections before persistence.
+- Arbitrary tags, stderr and provider payloads are never copied into asset
+  metadata or safe processing errors.
+- Invalid output, process failure and timeout map to bounded processing error
+  codes and remain retry-safe. FFmpeg-derived artifacts remain a later slice
+  behind this contract.
 
 ### GF-FR-004 — Scheduling
 **Statement:** Authorized users can schedule eligible content for configured
