@@ -98,6 +98,19 @@ class TrafficAttributionTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_model_role_cannot_view_traffic_analytics(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Model);
+
+        $this->actingAs($user)
+            ->get(
+                route('organizations.traffic.index', [
+                    'organizationId' => $organization->getKey(),
+                ]),
+            )
+            ->assertForbidden();
+    }
+
     public function test_destination_requires_http_or_https(): void
     {
         [$user, $organization] = $this->identity(UserRole::Editor);
