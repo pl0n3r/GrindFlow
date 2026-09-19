@@ -93,10 +93,7 @@
 
             @if ($errors->has('migration') || $errors->has('backup_confirmed') || $errors->has('confirmation') || $errors->has('migration_batch'))
                 <div class="gf-alert" role="alert">
-                    {{ $errors->first('migration')
-                        ?? $errors->first('backup_confirmed')
-                        ?? $errors->first('confirmation')
-                        ?? $errors->first('migration_batch') }}
+                    {{ $errors->first() }}
                 </div>
             @endif
 
