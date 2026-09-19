@@ -157,6 +157,31 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   FFmpeg/transcoding/artifacts se agregan detras de este contrato, no dentro de
   la ingesta.
 
+### Regla de distribucion
+
+- Cada `scheduled_publication` converge en una sola fila tenant-owned de
+  `publication_deliveries`; la unicidad de cola no sustituye esta idempotencia
+  persistente.
+- La clave de idempotencia enviada al provider es estable por organizacion +
+  schedule y se reutiliza en todos los retries.
+- Los providers normalizan fallos como authentication, rate-limit o transient;
+  nunca se persisten bodies, tokens, headers ni mensajes crudos.
+- Authentication es terminal hasta intervencion/reconexion. Rate-limit conserva
+  un retry acotado entre 60 y 3600 segundos. Los transitorios usan backoff
+  persistente y maximo cuatro intentos de provider.
+- `attempts`, `next_attempt_at`, `claimed_until` y `last_error_code`
+  hacen observable el lifecycle sin exponer secretos.
+- Work queued/processing usa lease de cinco minutos. Una lease vencida puede
+  redespacharse, pero nunca crear otra fila logica ni otra idempotency key.
+- Antes de I/O externo se revalidan tenant, actor, schedule, destino y asset
+  procesado con la version actual.
+- El scheduler global solo descubre candidatos; cada job restaura
+  `TenantContext` antes de tocar modelos tenant-owned.
+- Deploy-before-migration debe ser seguro: si falta
+  `publication_deliveries`, el tick de distribucion devuelve cero.
+- Ningun provider real, secreto o mutacion externa se habilita en el foundation
+  de GF-FR-005; primero se valida el contrato con fakes.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
