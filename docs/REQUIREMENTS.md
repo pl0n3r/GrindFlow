@@ -219,8 +219,29 @@ without retaining unnecessary raw visitor identifiers.
   prune command returns zero.
 
 ### GF-FR-007 — Finance
+**Status:** implemented
+
 **Statement:** Authorized roles can view and manage revenue-allocation records
 within their organization.
+
+**Verification notes (current Laravel slice):**
+- Admin/Studio can view, create and reverse tenant-owned revenue allocations;
+  Editor/Model are denied server-side.
+- Amounts are positive integer minor units plus a three-letter currency code;
+  no floating-point money is persisted.
+- Entries are append-only. Corrections create one explicit reversal row and
+  original history cannot be updated or deleted through the model.
+- A beneficiary is optional but must belong to the active organization when the
+  allocation is created.
+- Reversal rows copy amount/currency/source/beneficiary from the original,
+  require an audit reason, cannot be reversed again and are unique per original.
+- Net allocation is derived from originals minus reversals instead of a mutable
+  balance column.
+- Cross-tenant listing/reversal attempts fail closed under TenantScope.
+- Missing Finance schema is deploy-safe: management GET renders
+  migration-required while create/reverse writes return 503 before validation.
+- This slice intentionally excludes payouts, invoices, taxes, payment-provider
+  integrations and bank reconciliation.
 
 ## Non-functional requirements
 
