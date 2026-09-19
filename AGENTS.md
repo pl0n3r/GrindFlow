@@ -110,6 +110,21 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   ejecutados, PR/merge y bloqueos de produccion. Nunca presentar una rama
   preparada como funcionalidad validada o desplegada.
 
+### Progreso visible y archivos de entrega
+
+- Ante solicitudes de desarrollo, enviar actualizaciones **breves y separadas**
+  durante la ejecucion: que se esta inspeccionando, que se ha modificado,
+  pruebas/gates y resultado o bloqueo. Priorizar avisos tras hitos reales;
+  evitar una respuesta gigantesca con todos los logs o trazas.
+- Dividir operaciones grandes en bloques verificables para que un fallo no
+  oculte el resto del progreso. Resumir errores sin exponer secretos; los
+  mensajes cortos mejoran la trazabilidad pero no sustituyen CI y pruebas.
+- **No generar ni entregar archivos .zip** como resultado de trabajo de
+  GrindFlow. Entregar archivos individuales, enlaces a commits o PRs y
+  rutas de GitHub. Los artefactos empaquetados automaticamente por GitHub
+  no se deben presentar como entregables del agente; preferir logs y
+  referencias individuales cuando sean suficientes.
+
 ### Regla de reportes CSV de Traffic
 
 - Exportar unicamente agregados por link/dia, nunca IP, hash de visitante,
