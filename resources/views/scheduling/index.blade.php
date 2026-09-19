@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070a12">
+    <title>Scheduler · {{ $organization->name }} · GrindFlow</title>
+    <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
+</head>
+<body>
+    <div class="gf-grid" aria-hidden="true"></div>
+
+    <div class="gf-app">
+        <aside class="gf-sidebar">
+            <x-brand :href="route('dashboard')" />
+
+            <nav class="gf-sidebar__nav" aria-label="Navegacion del workspace">
+                <span class="gf-sidebar__label">Workspace</span>
+
+                <a class="gf-navitem" href="{{ route('dashboard') }}">
+                    <span class="gf-navitem__icon" aria-hidden="true">◫</span>
+                    <span class="gf-navitem__text">Overview</span>
+                </a>
+
+                <a
+                    class="gf-navitem"
+                    href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
+                >
+                    <span class="gf-navitem__icon" aria-hidden="true">◇</span>
+                    <span class="gf-navitem__text">Vault</span>
+                </a>
+
+                <a
+                    class="gf-navitem gf-navitem--active"
+                    href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
+                    aria-current="page"
+                >
+                    <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
+                    <span class="gf-navitem__text">Scheduler</span>
+                </a>
+
+                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                    <span class="gf-navitem__icon" aria-hidden="true">↗</span>
+                    <span class="gf-navitem__text">Distribution</span>
+                </span>
+            </nav>
+
+            <div class="gf-sidebar__bottom">
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button class="gf-button gf-button--ghost gf-button--full" type="submit">
+                        Cerrar sesion
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="gf-main">
+            <header class="gf-appbar">
+                <div class="gf-appbar__meta">
+                    GF / {{ strtoupper($organization->slug) }} / SCHEDULER
+                </div>
+
+                <div class="gf-avatar" aria-label="Usuario autenticado">
+                    {{ strtoupper(substr((string) auth()->user()?->name, 0, 2)) }}
+                </div>
+            </header>
+
+            <section class="gf-pagehead">
+                <div>
+                    <span class="gf-kicker">
+                        <span class="gf-kicker__dot"></span>
+                        Server-side scheduling
+                    </span>
+                    <h1>Scheduler</h1>
+                    <p>
+                        Programa contenido validado para destinos activos con timezone
+                        explicita y aislamiento por organizacion.
+                    </p>
+                </div>
+
+                <span class="gf-badge">
+                    {{ $schedulingReady ? 'Scheduling schema ready' : 'Migration required' }}
+                </span>
+            </section>
+
+            @if (session('status'))
+                <div class="gf-notice gf-notice--success" role="status">
+                    {{ session('status') }}
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div class="gf-alert" role="alert">
+                    {{ $errors->first() }}
+                </div>
+            @endif
+
+            @if (! $schedulingReady)
+                <section class="gf-panel">
+                    <div class="gf-panel__body">
+                        <div class="gf-empty">
+                            <div>
+                                <div class="gf-empty__icon" aria-hidden="true">⌁</div>
+                                <h3>Scheduling migration required.</h3>
+                                <p>
+                                    El codigo ya esta preparado, pero las tablas de Scheduling
+                                    aun no existen en esta base de datos. La pantalla queda en modo
+                                    seguro hasta aplicar la migracion.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            @else
+                <section class="gf-metrics" aria-label="Metricas del Scheduler">
+                    <article class="gf-metric">
+                        <div class="gf-metric__label">Scheduled</div>
+                        <div class="gf-metric__value">{{ $publications->count() }}</div>
+                        <div class="gf-metric__meta">Publicaciones en cola logica</div>
+                    </article>
+
+                    <article class="gf-metric">
+                        <div class="gf-metric__label">Destinations</div>
+                        <div class="gf-metric__value">{{ $destinations->count() }}</div>
+                        <div class="gf-metric__meta">Destinos activos configurados</div>
+                    </article>
+
+                    <article class="gf-metric">
+                        <div class="gf-metric__label">Eligible media</div>
+                        <div class="gf-metric__value">{{ $eligibleAssets->count() }}</div>
+                        <div class="gf-metric__meta">Procesamiento actual completado</div>
+                    </article>
+                </section>
+
+                @if ($canSchedule && $destinations->isNotEmpty() && $eligibleAssets->isNotEmpty())
+                    <section class="gf-panel gf-panel--spaced">
+                        <header class="gf-panel__head">
+                            <h2>New schedule</h2>
+                            <span class="gf-appbar__meta">GF-FR-004</span>
+                        </header>
+
+                        <div class="gf-panel__body">
+                            <form
+                                class="gf-form"
+                                method="POST"
+                                action="{{ route('organizations.scheduler.store', ['organizationId' => $organization->id]) }}"
+                            >
+                                @csrf
+
+                                <div class="gf-field">
+                                    <label for="asset_id">Media</label>
+                                    <select class="gf-input" id="asset_id" name="asset_id" required>
+                                        <option value="">Select media</option>
+                                        @foreach ($eligibleAssets as $asset)
+                                            <option
+                                                value="{{ $asset->id }}"
+                                                @selected(old('asset_id') === $asset->id)
+                                            >
+                                                {{ $asset->original_filename }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="gf-field">
+                                    <label for="destination_id">Destination</label>
+                                    <select class="gf-input" id="destination_id" name="destination_id" required>
+                                        <option value="">Select destination</option>
+                                        @foreach ($destinations as $destination)
+                                            <option
+                                                value="{{ $destination->id }}"
+                                                @selected(old('destination_id') === $destination->id)
+                                            >
+                                                {{ $destination->name }} · {{ $destination->provider }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="gf-field">
+                                    <label for="scheduled_for_local">Local date and time</label>
+                                    <input
+                                        class="gf-input"
+                                        id="scheduled_for_local"
+                                        name="scheduled_for_local"
+                                        type="datetime-local"
+                                        value="{{ old('scheduled_for_local') }}"
+                                        required
+                                    >
+                                </div>
+
+                                <div class="gf-field">
+                                    <label for="timezone">Timezone</label>
+                                    <select class="gf-input" id="timezone" name="timezone" required>
+                                        @foreach ($timezones as $timezone)
+                                            <option
+                                                value="{{ $timezone }}"
+                                                @selected(old('timezone', $defaultTimezone) === $timezone)
+                                            >
+                                                {{ $timezone }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="gf-upload__footer">
+                                    <p>
+                                        GrindFlow revalida permisos, estado del asset, version del
+                                        procesador y destino activo antes de crear el schedule.
+                                    </p>
+                                    <button class="gf-button gf-button--primary" type="submit">
+                                        Schedule
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+                @elseif ($canSchedule)
+                    <section class="gf-panel gf-panel--spaced">
+                        <div class="gf-panel__body">
+                            <div class="gf-empty gf-empty--compact">
+                                <div>
+                                    <div class="gf-empty__icon" aria-hidden="true">⌁</div>
+                                    <h3>Scheduling is blocked by prerequisites.</h3>
+                                    <p>
+                                        Se necesita al menos un destino activo y un asset canonico
+                                        cuyo procesamiento actual haya terminado correctamente.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                @endif
+
+                <section class="gf-panel gf-panel--spaced">
+                    <header class="gf-panel__head">
+                        <h2>Upcoming publications</h2>
+                        <span class="gf-appbar__meta">{{ $publications->count() }} loaded</span>
+                    </header>
+
+                    <div class="gf-panel__body gf-panel__body--flush-mobile">
+                        @if ($publications->isEmpty())
+                            <div class="gf-empty">
+                                <div>
+                                    <div class="gf-empty__icon" aria-hidden="true">⌁</div>
+                                    <h3>No schedules yet.</h3>
+                                    <p>
+                                        Las publicaciones validas apareceran aqui antes de pasar
+                                        al motor de Distribution.
+                                    </p>
+                                </div>
+                            </div>
+                        @else
+                            <div class="gf-table-wrap">
+                                <table class="gf-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Media</th>
+                                            <th>Destination</th>
+                                            <th>Local time</th>
+                                            <th>Timezone</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($publications as $publication)
+                                            <tr>
+                                                <td>
+                                                    <div class="gf-media-name">
+                                                        {{ $publication->mediaAsset?->original_filename ?? 'Missing media' }}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {{ $publication->destination?->name ?? 'Missing destination' }}
+                                                    <div class="gf-media-meta">
+                                                        {{ $publication->destination?->provider ?? 'unknown' }}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {{ $publication->scheduled_for_utc
+                                                        ?->setTimezone($publication->timezone)
+                                                        ->format('Y-m-d H:i') }}
+                                                </td>
+                                                <td>{{ $publication->timezone }}</td>
+                                                <td>
+                                                    <span class="gf-state gf-state--ok">
+                                                        {{ $publication->status }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                </section>
+            @endif
+        </main>
+    </div>
+</body>
+</html>

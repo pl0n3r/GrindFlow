@@ -94,4 +94,24 @@ class User extends Authenticatable
             ->whereIn('role', [UserRole::Admin->value, UserRole::Studio->value])
             ->exists();
     }
+
+    public function canScheduleOrganization(Organization|string $organization): bool
+    {
+        if ($this->isPlatformAdmin()) {
+            return true;
+        }
+
+        $organizationId = $organization instanceof Organization
+            ? $organization->getKey()
+            : $organization;
+
+        return $this->memberships()
+            ->where('organization_id', $organizationId)
+            ->whereIn('role', [
+                UserRole::Admin->value,
+                UserRole::Studio->value,
+                UserRole::Editor->value,
+            ])
+            ->exists();
+    }
 }

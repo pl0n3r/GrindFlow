@@ -32,10 +32,13 @@
                     <span class="gf-navitem__text">Vault</span>
                 </a>
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                <a
+                    class="gf-navitem"
+                    href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
+                >
                     <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
                     <span class="gf-navitem__text">Scheduler</span>
-                </span>
+                </a>
 
                 <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
                     <span class="gf-navitem__icon" aria-hidden="true">↗</span>
