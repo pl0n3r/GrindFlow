@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -143,17 +145,21 @@ class PublicationDeliveryManager
         }
 
         try {
-            DispatchScheduledPublication::dispatch(
-                (string) $delivery->getKey(),
-                $organizationId,
-                (string) $actor->getKey(),
+            app(BusDispatcher::class)->dispatch(
+                new DispatchScheduledPublication(
+                    (string) $delivery->getKey(),
+                    $organizationId,
+                    (string) $actor->getKey(),
+                ),
             );
         } catch (Throwable $exception) {
             PublicationDelivery::query()
                 ->whereKey($delivery->getKey())
+                ->where('status', PublicationDelivery::STATUS_QUEUED)
+                ->where('attempts', $delivery->attempts)
                 ->update([
-                    'status' => PublicationDelivery::STATUS_FAILED,
-                    'next_attempt_at' => null,
+                    'status' => PublicationDelivery::STATUS_RETRY_SCHEDULED,
+                    'next_attempt_at' => now('UTC')->addSeconds(60),
                     'claimed_until' => null,
                     'last_error_code' => 'distribution_dispatch_failed',
                     'updated_at' => now(),
@@ -284,8 +290,7 @@ class PublicationDeliveryManager
             return;
         }
 
-        PublicationDelivery::query()
-            ->whereKey($claimed->getKey())
+        $this->claimedDeliveryQuery($claimed)
             ->update([
                 'status' => PublicationDelivery::STATUS_PUBLISHED,
                 'next_attempt_at' => null,
@@ -305,8 +310,7 @@ class PublicationDeliveryManager
             $exception->kind
             === DistributionProviderException::KIND_AUTHENTICATION
         ) {
-            PublicationDelivery::query()
-                ->whereKey($delivery->getKey())
+            $this->claimedDeliveryQuery($delivery)
                 ->update([
                     'status' => PublicationDelivery::STATUS_AUTHENTICATION_FAILED,
                     'next_attempt_at' => null,
@@ -331,6 +335,7 @@ class PublicationDeliveryManager
                 $delivery,
                 'distribution_rate_limited',
                 $delay,
+                decrementAttempt: true,
             );
 
             return;
@@ -347,35 +352,42 @@ class PublicationDeliveryManager
         PublicationDelivery $delivery,
         string $safeError,
         int $delaySeconds,
+        bool $decrementAttempt = false,
     ): void {
-        $fresh = PublicationDelivery::query()
-            ->findOrFail($delivery->getKey());
+        $attempts = $decrementAttempt
+            ? max(0, $delivery->attempts - 1)
+            : $delivery->attempts;
 
-        if ($fresh->attempts >= self::MAX_ATTEMPTS) {
-            $fresh->forceFill([
-                'status' => PublicationDelivery::STATUS_FAILED,
-                'next_attempt_at' => null,
-                'claimed_until' => null,
-                'last_error_code' => $safeError.'_exhausted',
-            ])->save();
+        if ($attempts >= self::MAX_ATTEMPTS) {
+            $this->claimedDeliveryQuery($delivery)
+                ->update([
+                    'status' => PublicationDelivery::STATUS_FAILED,
+                    'attempts' => $attempts,
+                    'next_attempt_at' => null,
+                    'claimed_until' => null,
+                    'last_error_code' => $safeError.'_exhausted',
+                    'updated_at' => now(),
+                ]);
 
             return;
         }
 
-        $fresh->forceFill([
-            'status' => PublicationDelivery::STATUS_RETRY_SCHEDULED,
-            'next_attempt_at' => now('UTC')->addSeconds($delaySeconds),
-            'claimed_until' => null,
-            'last_error_code' => $safeError,
-        ])->save();
+        $this->claimedDeliveryQuery($delivery)
+            ->update([
+                'status' => PublicationDelivery::STATUS_RETRY_SCHEDULED,
+                'attempts' => $attempts,
+                'next_attempt_at' => now('UTC')->addSeconds($delaySeconds),
+                'claimed_until' => null,
+                'last_error_code' => $safeError,
+                'updated_at' => now(),
+            ]);
     }
 
     private function markTerminalFailure(
         PublicationDelivery $delivery,
         string $safeError,
     ): void {
-        PublicationDelivery::query()
-            ->whereKey($delivery->getKey())
+        $this->claimedDeliveryQuery($delivery)
             ->update([
                 'status' => PublicationDelivery::STATUS_FAILED,
                 'next_attempt_at' => null,
@@ -383,6 +395,18 @@ class PublicationDeliveryManager
                 'last_error_code' => $safeError,
                 'updated_at' => now(),
             ]);
+    }
+
+    /**
+     * @return Builder<PublicationDelivery>
+     */
+    private function claimedDeliveryQuery(
+        PublicationDelivery $delivery,
+    ): Builder {
+        return PublicationDelivery::query()
+            ->whereKey($delivery->getKey())
+            ->where('status', PublicationDelivery::STATUS_PROCESSING)
+            ->where('attempts', $delivery->attempts);
     }
 
     private function transientDelay(int $attempts): int
