@@ -192,8 +192,31 @@ platform integrations.
   no real platform credentials or external publishing adapters are enabled.
 
 ### GF-FR-006 — Traffic attribution
+**Status:** implemented
+
 **Statement:** GrindFlow can create tracked links and aggregate attribution data
 without retaining unnecessary raw visitor identifiers.
+
+**Verification notes (current Laravel slice):**
+- Authorized Admin/Studio/Editor users can create tenant-owned tracked links
+  with server-generated 22-character public tokens.
+- Public `/l/{token}` redirects are 302 + `no-store` +
+  `Referrer-Policy: no-referrer`; metric recording is dispatched after the
+  response so attribution failure does not block the destination.
+- The database stores no IP address, User-Agent, referrer or country. Visitor
+  dedupe uses a server-keyed HMAC that is scoped to one tracked link, preventing
+  cross-link correlation from the stored hash.
+- The authoritative dedupe window is a fixed ten minutes in server code and is
+  not accepted from request input.
+- Accepted clicks increment daily aggregate rows. No per-click event history is
+  retained.
+- Dedupe hashes are pruned after 24 hours by an hourly Laravel scheduler command;
+  daily aggregates remain.
+- The public redirect resolves links outside tenant context only by globally
+  unique token and revalidates `active` state. Management remains tenant scoped.
+- Missing traffic schema is deploy-safe: management renders migration-required,
+  writes return 503 before FormRequest validation, redirects return 404, and the
+  prune command returns zero.
 
 ### GF-FR-007 — Finance
 **Statement:** Authorized roles can view and manage revenue-allocation records
