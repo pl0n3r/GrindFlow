@@ -27,6 +27,13 @@ class FinanceLedgerManager
         ?string $note,
     ): RevenueAllocation {
         $organizationId = $this->requireTenant($actor);
+        $sourceLabel = trim($sourceLabel);
+
+        if ($sourceLabel === '') {
+            throw ValidationException::withMessages([
+                'source_label' => 'Source is required.',
+            ]);
+        }
 
         if ($amountMinor < 1) {
             throw ValidationException::withMessages([
@@ -50,7 +57,7 @@ class FinanceLedgerManager
         return RevenueAllocation::query()->create([
             'created_by_user_id' => $actor->getKey(),
             'beneficiary_user_id' => $beneficiaryUserId,
-            'source_label' => trim($sourceLabel),
+            'source_label' => $sourceLabel,
             'amount_minor' => $amountMinor,
             'currency' => $currency,
             'occurred_on' => $occurredOn->toDateString(),
@@ -64,6 +71,13 @@ class FinanceLedgerManager
         string $reason,
     ): RevenueAllocation {
         $this->requireTenant($actor);
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw ValidationException::withMessages([
+                'reason' => 'Reversal reason is required.',
+            ]);
+        }
 
         return DB::transaction(function () use (
             $actor,
@@ -98,7 +112,7 @@ class FinanceLedgerManager
                 'amount_minor' => $original->amount_minor,
                 'currency' => $original->currency,
                 'occurred_on' => CarbonImmutable::now('UTC')->toDateString(),
-                'note' => trim($reason),
+                'note' => $reason,
             ]);
         });
     }
