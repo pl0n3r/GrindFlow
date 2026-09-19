@@ -11,6 +11,7 @@
     @php
         $vaultRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.vault.index');
         $schedulerRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.scheduler.index');
+        $distributionRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.distribution.index');
         $trafficRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.traffic.index');
         $financeRouteAvailable = \Illuminate\Support\Facades\Route::has('organizations.finance.index');
         $systemRouteAvailable = \Illuminate\Support\Facades\Route::has('admin.system');
@@ -61,10 +62,20 @@
                     </span>
                 @endif
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">↗</span>
-                    <span class="gf-navitem__text">Distribution</span>
-                </span>
+                @if ($organizations->isNotEmpty() && $distributionRouteAvailable)
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.distribution.index', ['organizationId' => $organizations->first()->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
+                        <span class="gf-navitem__text">Distribution</span>
+                    </a>
+                @else
+                    <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
+                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
+                        <span class="gf-navitem__text">Distribution</span>
+                    </span>
+                @endif
 
                 <span class="gf-sidebar__label">Insights</span>
 

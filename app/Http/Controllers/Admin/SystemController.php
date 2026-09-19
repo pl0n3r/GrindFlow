@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\User;
 use App\Services\Media\DirectMediaUpload;
 use App\Support\Operations\MigrationReadiness;
@@ -29,6 +30,7 @@ class SystemController extends Controller
         $pendingMigrations = null;
         $pendingMigrationNames = [];
         $migrationFingerprint = null;
+        $workspaceOrganization = null;
 
         try {
             DB::connection()->select('select 1');
@@ -37,6 +39,7 @@ class SystemController extends Controller
             $pendingMigrationNames = $snapshot['names'];
             $pendingMigrations = count($pendingMigrationNames);
             $migrationFingerprint = $snapshot['fingerprint'];
+            $workspaceOrganization = Organization::query()->orderBy('name')->first();
         } catch (Throwable) {
             $databaseOnline = false;
         }
@@ -45,6 +48,7 @@ class SystemController extends Controller
 
         return view('admin.system', [
             'databaseOnline' => $databaseOnline,
+            'workspaceOrganization' => $workspaceOrganization,
             'databaseDriver' => DB::connection()->getDriverName(),
             'environment' => app()->environment(),
             'laravelVersion' => app()->version(),
