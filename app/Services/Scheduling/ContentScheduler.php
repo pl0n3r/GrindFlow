@@ -49,7 +49,6 @@ class ContentScheduler
 
     /**
      * @param Collection<int, PublishingDestination> $destinations
-     *
      * @return Collection<int, ScheduledPublication>
      */
     public function scheduleMany(
@@ -188,7 +187,7 @@ class ContentScheduler
                     'request_key' => $requestKey,
                 ];
 
-                $publication = $requestKey === null || !Schema::hasColumn('scheduled_publications', 'request_key')
+                $publication = $requestKey === null || ! Schema::hasColumn('scheduled_publications', 'request_key')
                     ? ScheduledPublication::query()->create($attributes)
                     : ScheduledPublication::query()->firstOrCreate(
                         [

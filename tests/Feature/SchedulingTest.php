@@ -760,8 +760,9 @@ class SchedulingTest extends TestCase
         );
 
         $this->actingAs($user)->patch(route('organizations.scheduler.update', [
-            'organizationId' => $organization->getKey(), 'publicationId' => $publication->getKey(),
+            'organizationId' => $organization->getKey(),
         ]), [
+            'publication_id' => $publication->getKey(),
             'scheduled_for_local' => now('UTC')->addDays(3)->format('Y-m-d\TH:i'),
             'timezone' => 'UTC',
         ])->assertRedirect();

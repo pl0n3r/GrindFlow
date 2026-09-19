@@ -341,9 +341,10 @@
                                                     @if ($canSchedule && $publication->status === 'scheduled' && $publication->scheduled_for_utc?->isFuture() && ! $publication->delivery)
                                                         <details>
                                                             <summary>Edit</summary>
-                                                            <form class="gf-form" method="POST" action="{{ route('organizations.scheduler.update', ['organizationId' => $organization->id, 'publicationId' => $publication->id]) }}">
+                                                            <form class="gf-form" method="POST" action="{{ route('organizations.scheduler.update', ['organizationId' => $organization->id]) }}">
                                                                 @csrf
                                                                 @method('PATCH')
+                                                                <input type="hidden" name="publication_id" value="{{ $publication->id }}">
                                                                 <label for="scheduled_for_{{ $publication->id }}">New local time</label>
                                                                 <input
                                                                     class="gf-input"

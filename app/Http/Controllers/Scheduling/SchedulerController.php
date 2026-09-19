@@ -158,7 +158,6 @@ class SchedulerController extends Controller
 
     public function update(
         Request $request,
-        string $publicationId,
         ContentScheduler $scheduler,
     ): RedirectResponse {
         $organization = $this->organization($request);
@@ -167,13 +166,14 @@ class SchedulerController extends Controller
         $user = $request->user();
         abort_unless($user->canScheduleOrganization($organization), 403);
         $validated = $request->validate([
+            'publication_id' => ['required', 'uuid'],
             'scheduled_for_local' => ['required', 'date_format:Y-m-d\\TH:i'],
             'timezone' => ['required', 'string', 'max:64', 'timezone'],
         ]);
         $publication = ScheduledPublication::query()
             ->withoutGlobalScope(TenantScope::class)
             ->where('organization_id', $organization->getKey())
-            ->whereKey($publicationId)
+            ->whereKey($validated['publication_id'])
             ->firstOrFail();
         $scheduler->reschedule(
             $publication,
