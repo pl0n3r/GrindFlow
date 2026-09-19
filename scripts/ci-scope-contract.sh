@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCOPE="$ROOT/scripts/ci-scope.sh"
+RUN_REALSTACK_ENABLED="run_realstack=true"
 
 run_scope() {
   local event="$1"
@@ -43,18 +44,18 @@ expect_flag "$service" "run_php_quality=true" "Laravel service selects php-quali
 expect_flag "$service" "run_tests=true" "Laravel service selects tests"
 expect_flag "$service" "run_database=false" "Laravel service does not force database"
 expect_flag "$service" "run_browser=false" "Laravel service does not force browser"
-expect_flag "$service" "run_realstack=true" "Laravel service selects real-stack"
+expect_flag "$service" $RUN_REALSTACK_ENABLED "Laravel service selects real-stack"
 
 provider="$(run_scope pull_request app/Support/Operations/ReleaseCacheGuard.php)"
-expect_flag "$provider" "run_realstack=true" "Laravel support service selects real-stack"
+expect_flag "$provider" $RUN_REALSTACK_ENABLED "Laravel support service selects real-stack"
 
 model="$(run_scope pull_request app/Models/MediaAsset.php)"
 expect_flag "$model" "run_database=true" "model selects database"
-expect_flag "$model" "run_realstack=true" "model selects MariaDB real-stack"
+expect_flag "$model" $RUN_REALSTACK_ENABLED "model selects MariaDB real-stack"
 
 view="$(run_scope pull_request resources/views/vault/index.blade.php)"
 expect_flag "$view" "run_browser=true" "view selects browser"
-expect_flag "$view" "run_realstack=true" "view selects real-stack"
+expect_flag "$view" $RUN_REALSTACK_ENABLED "view selects real-stack"
 
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
@@ -75,7 +76,7 @@ mixed="$(run_scope pull_request app/Services/Media/MediaAssetProcessor.php resou
 expect_flag "$mixed" "run_php_quality=true" "mixed keeps php-quality"
 expect_flag "$mixed" "run_tests=true" "mixed keeps tests"
 expect_flag "$mixed" "run_browser=true" "mixed unions browser"
-expect_flag "$mixed" "run_realstack=true" "mixed unions real-stack"
+expect_flag "$mixed" $RUN_REALSTACK_ENABLED "mixed unions real-stack"
 expect_flag "$mixed" "run_legacy=true" "mixed unions legacy"
 
 printf 'GrindFlow CI scope contract passed.\n'
