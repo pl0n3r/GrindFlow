@@ -48,6 +48,16 @@
                     <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
                     <span class="gf-navitem__text">Traffic</span>
                 </a>
+
+                @if (auth()->user()?->canManageFinanceOrganization($organization))
+                    <a
+                        class="gf-navitem"
+                        href="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}"
+                    >
+                        <span class="gf-navitem__icon" aria-hidden="true">$</span>
+                        <span class="gf-navitem__text">Finance</span>
+                    </a>
+                @endif
             </nav>
 
             <div class="gf-sidebar__bottom">
