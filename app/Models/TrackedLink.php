@@ -24,6 +24,14 @@ class TrackedLink extends TenantModel
     ];
 
     /**
+     * @return HasMany<ScheduledPublicationLink, $this>
+     */
+    public function scheduledPublicationLinks(): HasMany
+    {
+        return $this->hasMany(ScheduledPublicationLink::class);
+    }
+
+    /**
      * @return HasMany<TrackedLinkDailyMetric, $this>
      */
     public function dailyMetrics(): HasMany
