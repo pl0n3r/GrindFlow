@@ -8,9 +8,9 @@ use App\Http\Controllers\Connections\DropboxConnectionController;
 use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Scheduling\SchedulerController;
-use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
+use App\Http\Middleware\RequireSchedulingSchema;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
