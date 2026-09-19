@@ -312,8 +312,14 @@
                                                             ]) }}"
                                                         >
                                                             @csrf
+                                                            <label
+                                                                for="reason-{{ $allocation->id }}"
+                                                            >
+                                                                Reversal reason
+                                                            </label>
                                                             <input
                                                                 class="gf-input"
+                                                                id="reason-{{ $allocation->id }}"
                                                                 name="reason"
                                                                 type="text"
                                                                 maxlength="1000"
