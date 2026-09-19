@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\Schema;
 
@@ -27,7 +28,54 @@ class DistributionScheduler
             return 0;
         }
 
-        $publications = ScheduledPublication::query()
+        $dispatched = 0;
+        $afterDue = null;
+        $afterId = null;
+
+        while ($dispatched < 20) {
+            $publications = $this->candidatePage($afterDue, $afterId);
+
+            if ($publications->isEmpty()) {
+                break;
+            }
+
+            foreach ($publications as $publication) {
+                if ($dispatched >= 20) {
+                    break;
+                }
+
+                if ($this->dispatchCandidate($publication)) {
+                    $dispatched++;
+                }
+            }
+
+            $last = $publications->last();
+            $rawDue = $last?->getRawOriginal('scheduled_for_utc');
+
+            if (
+                $last === null
+                || is_string($rawDue) === false
+                || $rawDue === ''
+                || $publications->count() < 20
+            ) {
+                break;
+            }
+
+            $afterDue = $rawDue;
+            $afterId = (string) $last->getKey();
+        }
+
+        return $dispatched;
+    }
+
+    /**
+     * @return Collection<int, ScheduledPublication>
+     */
+    private function candidatePage(
+        ?string $afterDue,
+        ?string $afterId,
+    ): Collection {
+        $query = ScheduledPublication::query()
             ->withoutGlobalScope(TenantScope::class)
             ->leftJoin(
                 'publication_deliveries as delivery',
@@ -55,8 +103,8 @@ class DistributionScheduler
                 '<=',
                 now('UTC'),
             )
-            ->where(function (Builder $query): void {
-                $query
+            ->where(function (Builder $candidate): void {
+                $candidate
                     ->whereNull('delivery.id')
                     ->orWhere(function (Builder $retry): void {
                         $retry
@@ -90,50 +138,76 @@ class DistributionScheduler
                                     );
                             });
                     });
-            })
-            ->orderBy('scheduled_publications.scheduled_for_utc')
-            ->limit(20)
-            ->get();
+            });
 
-        $dispatched = 0;
-
-        foreach ($publications as $publication) {
-            $actorId = $publication->scheduled_by_user_id;
-
-            if (is_string($actorId) === false || $actorId === '') {
-                continue;
-            }
-
-            $actor = User::query()->find($actorId);
-
-            if (
-                $actor === null
-                || $actor->canScheduleOrganization(
-                    (string) $publication->organization_id,
-                ) === false
-            ) {
-                continue;
-            }
-
-            try {
-                $queued = $this->tenantContext->runWithinOrganization(
-                    $actor,
-                    (string) $publication->organization_id,
-                    fn (): bool => $this->deliveries->queue(
-                        ScheduledPublication::query()
-                            ->findOrFail($publication->getKey()),
-                        $actor,
-                    ),
-                );
-            } catch (AuthorizationException) {
-                continue;
-            }
-
-            if ($queued) {
-                $dispatched++;
-            }
+        if ($afterDue !== null && $afterId !== null) {
+            $query->where(function (Builder $cursor) use (
+                $afterDue,
+                $afterId,
+            ): void {
+                $cursor
+                    ->where(
+                        'scheduled_publications.scheduled_for_utc',
+                        '>',
+                        $afterDue,
+                    )
+                    ->orWhere(function (Builder $sameDue) use (
+                        $afterDue,
+                        $afterId,
+                    ): void {
+                        $sameDue
+                            ->where(
+                                'scheduled_publications.scheduled_for_utc',
+                                $afterDue,
+                            )
+                            ->where(
+                                'scheduled_publications.id',
+                                '>',
+                                $afterId,
+                            );
+                    });
+            });
         }
 
-        return $dispatched;
+        return $query
+            ->orderBy('scheduled_publications.scheduled_for_utc')
+            ->orderBy('scheduled_publications.id')
+            ->limit(20)
+            ->get();
+    }
+
+    private function dispatchCandidate(
+        ScheduledPublication $publication,
+    ): bool {
+        $actorId = $publication->scheduled_by_user_id;
+
+        if (is_string($actorId) === false || $actorId === '') {
+            return false;
+        }
+
+        $actor = User::query()->find($actorId);
+
+        if (
+            $actor === null
+            || $actor->canScheduleOrganization(
+                (string) $publication->organization_id,
+            ) === false
+        ) {
+            return false;
+        }
+
+        try {
+            return $this->tenantContext->runWithinOrganization(
+                $actor,
+                (string) $publication->organization_id,
+                fn (): bool => $this->deliveries->queue(
+                    ScheduledPublication::query()
+                        ->findOrFail($publication->getKey()),
+                    $actor,
+                ),
+            );
+        } catch (AuthorizationException) {
+            return false;
+        }
     }
 }
