@@ -546,3 +546,28 @@ active tracked links even if the organization has more than 100 of each.
 **Verification:** >100 tenant media and active links, foreign and disabled
 entries, deep asset/link search and actual Schedule POST, old() and assigned
 active link preservation, filters/pagination and partial-schema fallback.
+
+### GF-NFR-006 — Authenticated cross-module browser regression
+**Status:** implemented
+
+**Statement:** The CI browser job must catch real HTML/session/CSRF
+regressions in the Scheduler → Traffic → Finance workflow before merge.
+
+**Acceptance criteria:**
+- Disposable local/testing E2E seeder provisions >100 media/links, page-two
+  schedules, click aggregate, and an append-only Finance starting event;
+  rerunning seeder does not duplicate rows. Other environments reject it.
+- Chrome logs in and uses rendered forms to create a schedule using deep
+  search, check retained paginator filters, detach and reattach its link,
+  edit/pause/resume a Traffic link while preserving the short URL, retrieve
+  aggregate CSV, create/reverse Finance allocation and reconcile CSV.
+- Browser artifacts cannot disclose temporary E2E password; fixture
+  bootstrap file and profile are always removed. Never print payloads,
+  cookies, login HTML or DB credentials on failure.
+- Browser workflow never reaches a real external provider or public /l/*
+  redirect. It is not run by Production Smoke; the latter stays read-only.
+- Failed browser assertion fails the required CI aggregate validate gate.
+
+**Verification:** browser job executes authenticated Chromium workflow
+against disposable migrated SQLite and checks ten behavioral milestones;
+PHP fast/quality/test/MariaDB and Sonar PR gates as applicable.
