@@ -44,21 +44,20 @@ class TrafficController extends Controller
         $channels = collect();
 
         if ($trafficReady) {
-            $linkQuery = TrackedLink::query()
-                ->with(['scheduledPublicationLinks.scheduledPublication.destination'])
-                ->withSum(['dailyMetrics as total_clicks' => fn ($query) => $query
-                    ->whereBetween('metric_date', [$from, $to])], 'clicks')
+            $filteredLinks = TrackedLink::query()
                 ->when($filters['channel'] ?? null, fn ($query, $channel) => $query->where('channel', $channel))
                 ->when($filters['campaign'] ?? null, fn ($query, $campaign) => $query->where('campaign', $campaign))
                 ->when($filters['tracked_link_id'] ?? null, fn ($query, $id) => $query->whereKey($id));
 
-            $linkIds = (clone $linkQuery)->pluck('id');
-            $links = $linkQuery
+            $links = (clone $filteredLinks)
+                ->with(['scheduledPublicationLinks.scheduledPublication.destination'])
+                ->withSum(['dailyMetrics as total_clicks' => fn ($query) => $query
+                    ->whereBetween('metric_date', [$from, $to])], 'clicks')
                 ->latest()
                 ->limit(100)
                 ->get();
             $series = TrackedLinkDailyMetric::query()
-                ->whereIn('tracked_link_id', $linkIds)
+                ->whereIn('tracked_link_id', (clone $filteredLinks)->select('id'))
                 ->whereBetween('metric_date', [$from, $to])
                 ->selectRaw('metric_date, SUM(clicks) as clicks')
                 ->groupBy('metric_date')
