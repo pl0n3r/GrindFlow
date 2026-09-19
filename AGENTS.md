@@ -217,6 +217,28 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   POST devuelve 503 antes del FormRequest, `/l/{token}` devuelve 404 y el
   pruner devuelve cero.
 
+### Regla de Finance
+
+- `revenue_allocations` es un ledger tenant-owned **append-only**. No existe
+  update/delete funcional; una correccion crea una fila nueva con
+  `reversal_of_id`.
+- Solo Admin/Studio pueden ver o mutar Finance. Editor/Model no reciben acceso
+  por ocultar UI: la autorizacion se repite server-side.
+- Los montos se persisten como enteros positivos en `amount_minor`; nunca usar
+  float/double para dinero. `currency` es un codigo de tres letras en mayuscula.
+- El beneficiario es opcional pero, si existe, debe tener membership en la misma
+  organizacion al momento de crear el asiento.
+- Cada asiento conserva actor, fecha, fuente y nota. Si un actor/beneficiario se
+  elimina, su FK puede quedar null sin reescribir el asiento historico.
+- Una reversa copia monto, moneda, fuente y beneficiario del original, exige
+  razon y solo puede existir una vez por asiento. Una reversa no se revierte.
+- Totales netos se derivan como asignaciones originales menos reversas; no se
+  persiste un balance mutable separado en este slice.
+- La migration de Finance es explicita. Antes de aplicarla, el GET explica
+  `Migration required` y los writes responden 503 antes del FormRequest.
+- Finance core v1 no implementa cobros, payouts bancarios, impuestos, invoices
+  ni conciliacion; esos flujos deben vivir detras de este ledger auditable.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
@@ -689,7 +711,7 @@ Preguntas abiertas para el arquitecto antes de empezar:
 | 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
 | 5 — Distribucion | Laravel: core idempotente/retries implementado, sin providers reales ni mutacion externa. Legacy TS conserva Telegram/webhook; X, Reddit y Bluesky siguen sin implementar |
 | 6 — Enlaces y trafico | Acortador y analitica funcionando. Falta el panel de metricas |
-| 7 — Finanzas | Esquema y vista de la modelo. Falta la gestion desde el estudio |
+| 7 — Finanzas | Laravel: ledger append-only tenant-owned en desarrollo; legacy conserva solo referencia funcional hasta cerrar GF-MIG-003 |
 
 ## Riesgos cerrados
 
