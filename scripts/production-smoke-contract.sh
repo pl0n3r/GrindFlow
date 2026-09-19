@@ -42,7 +42,13 @@ MOCK
 chmod +x "$workdir/mock-curl"
 
 run_case() {
-  local label="$1" pending="$2" expected_status="$3" inventory_mode="${4:-valid}" vault_mode="${5:-ok}" log="$workdir/$label.log" result
+  local label="$1"
+  local pending="$2"
+  local expected_status="$3"
+  local inventory_mode="${4:-valid}"
+  local vault_mode="${5:-ok}"
+  local log="$workdir/$label.log"
+  local result
   if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=15 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
   case "$label" in
