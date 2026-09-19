@@ -5,7 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot PR v0.1.15: solo este deploy, no el historial acumulado.** Base `main` v0.1.14 `416f3f476d8d1358d26548131a36291682ac8460`: exact-main CI #35460562559 y Production Smoke #35460562558 success. No se ha verificado el SHA checkout Hostinger de manera independiente.
+> **Snapshot PR v0.1.15: solo el deploy actual, no el historial acumulado.** Base `main` v0.1.14 `416f3f476d8d1358d26548131a36291682ac8460`: exact-main CI #35460562559 y Production Smoke #35460562558 success. No se ha verificado el SHA checkout Hostinger de manera independiente.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
