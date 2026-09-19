@@ -24,7 +24,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+1544** | **−54** | **+1490** |
+| **15** | **+1675** | **−54** | **+1621** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -74,14 +74,15 @@ flowchart LR
 - Guarda y **lee** el instante debido explícitamente en UTC, independiente de `APP_TIMEZONE`, y conserva la timezone IANA original para reconstruir la hora local.
 - Expone GET/POST `/organizations/{organizationId}/scheduler` y habilita Scheduler en la navegación.
 - La UI lista destinos activos, assets elegibles y próximas publicaciones; la elegibilidad se aplica antes del límite de 100 resultados.
-- El controller es migration-safe: sin tablas, la vista explica el bloqueo y los writes responden 503 en vez de provocar un 500.
-- Añade pruebas de autorización, tenant isolation, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC y endpoints seguros antes de migrar.
+- El Scheduler es migration-safe: sin tablas, GET muestra el bloqueo y un middleware del POST responde 503 **antes** de autorización/validación del FormRequest.
+- Añade pruebas de autorización, tenant isolation, duplicados, fecha pasada, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC, race de elegibilidad y endpoints seguros antes de migrar.
 - GF-FR-005 queda separado: este slice no intenta publicar, reintentar ni hablar con proveedores externos.
 
 ## Archivos modificados en este deploy
 
 - `README.md` — dashboard exacto de la entrega.
 - `app/Http/Controllers/Scheduling/SchedulerController.php` — lectura/escritura migration-safe del Scheduler.
+- `app/Http/Middleware/RequireSchedulingSchema.php` — garantiza 503 antes del FormRequest cuando falta el schema.
 - `app/Http/Requests/Scheduling/StoreScheduledPublicationRequest.php` — autorización y validación del formulario.
 - `app/Models/PublishingDestination.php` — destino lógico tenant-owned.
 - `app/Models/ScheduledPublication.php` — schedule tenant-owned con hora UTC + timezone.
