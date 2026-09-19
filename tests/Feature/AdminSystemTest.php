@@ -6,7 +6,11 @@ use App\Enums\UserRole;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Operations\MigrationReadiness;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
+use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class AdminSystemTest extends TestCase
@@ -32,7 +36,62 @@ class AdminSystemTest extends TestCase
             ->assertSee('Media object storage')
             ->assertSee('data-media-storage-configured=', false)
             ->assertSee('Session driver')
-            ->assertSee('Queue connection');
+            ->assertSee('Queue connection')
+            ->assertSee('Workspace module readiness')
+            ->assertSee('data-module-readiness="vault:ready"', false)
+            ->assertSee('data-module-readiness="scheduling:ready"', false)
+            ->assertSee('data-module-readiness="distribution:ready"', false)
+            ->assertSee('data-module-readiness="traffic:ready"', false)
+            ->assertSee('data-module-readiness="finance:ready"', false);
+    }
+
+    public function test_system_identifies_partial_module_schema_without_marking_database_offline(): void
+    {
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+
+        Schema::shouldReceive('hasTable')
+            ->andReturnUsing(
+                fn (string $table): bool => $table !== 'publication_deliveries',
+            );
+
+        $this->actingAs($admin)
+            ->get(route('admin.system'))
+            ->assertOk()
+            ->assertSee('Connected')
+            ->assertSee('data-module-readiness="vault:ready"', false)
+            ->assertSee('data-module-readiness="scheduling:ready"', false)
+            ->assertSee('data-module-readiness="distribution:migration-required"', false)
+            ->assertSee('data-module-readiness="traffic:ready"', false)
+            ->assertSee('data-module-readiness="finance:ready"', false);
+    }
+
+    public function test_system_reports_live_database_when_migration_inventory_fails(): void
+    {
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+        $organization = Organization::factory()->create();
+        $readiness = Mockery::mock(MigrationReadiness::class);
+        $readiness->shouldReceive('snapshot')
+            ->once()
+            ->andThrow(new RuntimeException('sensitive-internal-schema-error'));
+        $this->app->instance(MigrationReadiness::class, $readiness);
+
+        $this->actingAs($admin)
+            ->get(route('admin.system'))
+            ->assertOk()
+            ->assertSee('Connected')
+            ->assertSee('data-pending-migrations="unknown"', false)
+            ->assertSee('El inventario no esta disponible')
+            ->assertSee('Migration inventory unavailable')
+            ->assertSee('data-module-readiness="vault:ready"', false)
+            ->assertSee(route('organizations.vault.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertDontSee('name="migration_batch"', false)
+            ->assertDontSee('sensitive-internal-schema-error');
     }
 
     public function test_admin_system_links_existing_workspace_modules_for_visible_organization(): void
