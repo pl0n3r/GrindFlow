@@ -7,8 +7,8 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use RuntimeException;
 
 class TrackedLinkManager
@@ -72,10 +72,16 @@ class TrackedLinkManager
             );
         }
 
-        if (! in_array($status, [
-            TrackedLink::STATUS_ACTIVE,
-            TrackedLink::STATUS_DISABLED,
-        ], true)) {
+        if (
+            in_array(
+                $status,
+                [
+                    TrackedLink::STATUS_ACTIVE,
+                    TrackedLink::STATUS_DISABLED,
+                ],
+                true,
+            ) === false
+        ) {
             throw new InvalidArgumentException('Unsupported tracked-link status.');
         }
 
