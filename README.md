@@ -20,9 +20,9 @@
 | Work line | 🚧 **GF-OPS · Diagnóstico de esquema y Smoke** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **v0.1.2 · PR #91 fusionado** | `main` `98ad68b32fea1e56538b7386cd32f6eb7699b1d3` |
 | Version | 🚧 **v0.1.3** | patch de observabilidad segura |
-| CI del PR | ✅ **validado para v0.1.3** | #35430563622 sobre `9a8ec205` |
-| Sonar | ✅ **Quality Gate OK** | 0 issues; `9a8ec205` |
-| CodeRabbit | 🚧 **hallazgo README en resolución** | revisión del head `9a8ec205` |
+| CI del PR | 🚧 **revalidando head estable** | #35434965707; contrato Smoke ya pasó, snapshot README se resincroniza |
+| Sonar | 🚧 **revalidación del head final pendiente** | Quality Gate previo OK; no extrapolar al head nuevo |
+| CodeRabbit | 🚧 **revisión final pendiente** | hallazgos anteriores resueltos; requiere cobertura del head estable |
 | CI del SHA exacto de main | 🚧 **v0.1.3 por verificar tras merge** | v0.1.2 CI #35430357855 |
 | Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes |
 | Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + aprobación expresa |
@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+289** | **−57** | **+232** |
+| **11** | **+335** | **−425** | **−90** |
 
 ## Calidad y entrega
 
@@ -76,8 +76,9 @@ flowchart LR
 - Readiness de Vault, Scheduling, Distribution, Traffic y Finance según las tablas reales, incluso si otro módulo tiene migraciones pendientes.
 - Un inventario desconocido bloquea el formulario; los errores internos no se muestran.
 - Smoke reutiliza la sesión para comprobar Vault aunque haya migraciones pendientes y registra media storage sin nuevos requests.
-- Si Vault responde 500 o Dashboard omite el enlace Vault, el issue distingue ambos incidentes; no reintenta logins ni aplica SQL.
-- Tests PHP/MariaDB y contrato fake HTTP para esquema parcial, enlace ausente y bloqueos; regla duradera de avances sustanciales por mensaje.
+- Si Vault responde 500 o Dashboard omite el enlace Vault, el issue distingue ambos incidentes y el Smoke termina con estado no reintentable, sin repetir login ni aplicar SQL.
+- Tests PHP/MariaDB y contrato fake HTTP cubren esquema parcial, enlace ausente, Vault HTTP fallido, inventario inválido y la ausencia de segundo intento con `ATTEMPTS=15`.
+- Regla duradera de avances sustanciales por mensaje en AGENTS y modelo de desarrollo.
 
 ## Archivos modificados en este deploy propuesto (PR #92; no desplegado)
 
@@ -87,8 +88,8 @@ flowchart LR
 - `resources/views/admin/system.blade.php` — panel de readiness.
 - `tests/Feature/AdminSystemTest.php` — inventario fallido y esquema parcialmente migrado.
 - `tests/Feature/AdminMigrationReadinessTest.php` — lote pendiente y módulos independientes.
-- `scripts/production-smoke.sh` — Vault solo lectura pese a migraciones.
-- `scripts/production-smoke-contract.sh` — bloqueo, Vault 500 y enlace ausente.
+- `scripts/production-smoke.sh` — Vault solo lectura y fallos no reintentables.
+- `scripts/production-smoke-contract.sh` — bloqueo, Vault 500, enlace ausente y no-retry.
 - `.github/workflows/production-smoke.yml` — incidentes concurrentes visibles.
 - `AGENTS.md` — avance sustancial por mensaje.
 - `docs/DEVELOPMENT-MODEL.md` — contrato operativo de diagnóstico.
@@ -96,7 +97,7 @@ flowchart LR
 ## Validación
 
 - v0.1.2 PR #91 fusionado; la identidad real del checkout Hostinger sigue sin verificar.
-- v0.1.3 CI / validate #35430563622 y Sonar OK sobre el head `9a8ec205`; revisión del texto de entrega por CodeRabbit y exact-main tras merge pendientes.
+- En v0.1.3, el contrato fake HTTP completo pasó en CI #35434965707 después de corregir la inicialización de locales Bash; el head final todavía debe completar CI / validate, Sonar y CodeRabbit antes del merge.
 - Las migraciones, backup externo y validación productiva requieren evidencia separada.
 
 ## Qué sigue
