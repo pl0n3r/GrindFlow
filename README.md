@@ -12,14 +12,12 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | ✅ **GF-FR-007 · Finance core v1** | PR #75 fusionada en `main` |
-| Finance merge commit | ✅ **main base** | `76b234c2e0926d0a46cd840bd8118fe689c008d0` |
-| CI de PR | ✅ **GrindFlow CI #328** | fast, Pint/PHPStan, PHPUnit, MariaDB, browser y validate |
-| Sonar | ✅ **último Quality Gate del PR passed** | 0 issues / 0 hotspots; no se atribuye validación del squash SHA |
-| CodeRabbit | 🟠 **pending al merge** | no se atribuye review final no emitido |
-| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | CI de PR y CI de `main` son distintos |
-| Production Smoke | 🟠 **sin evidencia exact-main confirmada** | no se atribuye prueba de hosting desde el merge |
-| Migraciones | 🟠 **2 nuevas sin aplicar** | tabla `revenue_allocations` + triggers de inmutabilidad |
+| Work line | 🟠 **GF-FR-006A · Traffic + Distribution handoff** | IMPLEMENTED en rama enfocada |
+| Base exacta | ✅ **main** | `1d9d148bca14c3095b7a439112e5213bfeb84e57` |
+| Dependencias | ✅ **Scheduler, Traffic, Distribution merged** | PR #67, #70 y #73 |
+| CI del SHA exacto de main | ⚪ **no observable por el conector** | PR validation se separa de exact-main |
+| Producción | ⚪ **sin cambios** | sin providers ni publicaciones reales |
+| Migración | 🟠 **una tabla opcional nueva** | `scheduled_publication_links`; no aplicada automáticamente |
 
 ## Huella del cambio
 
@@ -27,7 +25,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **1** | **+39** | **−64** | **-25** |
+| **13** | **+0000** | **−0000** | **+0000** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -37,12 +35,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
-| GrindFlow CI | docs-only: contratos y dashboard exacto |
-| Sonar | review documental independiente |
-| CodeRabbit | review documental no reemplaza evidencia de PR #75 |
-| Migración | no se ejecuta desde este PR |
-| Producción | no se modifica desde este PR |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
+| GrindFlow CI | `validate` exige success real de cada gate seleccionado |
+| Sonar | análisis independiente y comentario detallado del PR |
+| CodeRabbit | revisión sobre head estable, findings revisados antes del merge |
+| Migración | no se aplica desde este PR |
+| Producción | no se habilitan providers ni mutaciones externas |
 
 ## Flujo de entrega
 
@@ -69,46 +67,59 @@ flowchart LR
 
 ## Qué se hizo
 
-- Sincroniza el dashboard después del squash merge de Finance core v1 (PR #75).
-- Registra el commit del feature `76b234c2…` y CI #328 completo del head `80d37acd…`.
-- Corrige el inventario: Finance agregó **dos migraciones**, una de tabla y otra de triggers MariaDB.
-- Mantiene Quality Gate de Sonar y CodeRabbit pendientes/emitidos con evidencia diferenciada.
-- Deja exact-main CI, Production Smoke y aplicación de migraciones como pasos independientes.
-- Avanza el roadmap hacia la integración Traffic + Distribution sin activar providers externos.
+- Añade `scheduled_publication_links` como asociación opcional y única por schedule.
+- Las foreign keys compuestas protegen tenant entre schedule y tracked link, también en MariaDB.
+- El Scheduler permite seleccionar un tracked link **activo** de la organización.
+- Crea la asociación dentro de la transacción que crea la publicación; no crea schedule huérfano cuando falla la validación del link.
+- Cross-tenant y links disabled se rechazan server-side, además de los permisos existentes.
+- Sin la nueva tabla, GET y schedules sin tracked link siguen funcionando; POST con link devuelve 503.
+- La lista de próximas publicaciones muestra el label del tracked link si existe.
+- Distribution carga la asociación cuando está disponible y bloquea un link deshabilitado antes de provider I/O.
+- Añade regresiones positivas, negativas, pre-migración, dispatch y FK cross-tenant en MariaDB.
+- No crea adaptadores reales, pagos ni conexiones a plataformas externas.
 
 ## Archivos modificados en este deploy
 
-- `README.md` — snapshot post-merge de Finance y próximo frente.
+- `AGENTS.md` — regla duradera de asociación tenant-aware.
+- `README.md` — dashboard exacto de este slice.
+- `app/Http/Controllers/Scheduling/SchedulerController.php` — lista y registra link opcional.
+- `app/Http/Requests/Scheduling/StoreScheduledPublicationRequest.php` — UUID opcional.
+- `app/Models/ScheduledPublication.php` — relación al link asociado.
+- `app/Models/ScheduledPublicationLink.php` — modelo de asociación tenant-owned.
+- `app/Models/TrackedLink.php` — relación inversa.
+- `app/Services/Distribution/PublicationDeliveryManager.php` — revalidación pre-provider.
+- `app/Services/Scheduling/ContentScheduler.php` — asociación transaccional/validación.
+- `database/migrations/2026_09_19_053000_create_scheduled_publication_links.php` — FKs compuestas.
+- `docs/REQUIREMENTS.md` — aceptación GF-FR-006A.
+- `resources/views/scheduling/index.blade.php` — selector y lista de enlaces.
+- `tests/Feature/ScheduleTrackedLinkTest.php` — tenant, migration-safe y distribución.
 
 ## Validación
 
-- GF-FR-007 Finance core v1 fusionado en `main` como `76b234c2e0926d0a46cd840bd8118fe689c008d0`.
-- CI #328 pasó completamente sobre PR #75 head `80d37acd1f989214faf726180e6810df0d1aac6a`.
-- El ledger persiste dinero en unidades menores enteras y agrega cada moneda por separado.
-- Reversas crean filas auditables; MariaDB bloquea UPDATE/DELETE directos con triggers.
-- Admin/Studio tienen acceso; Editor/Model y accesos cross-tenant se deniegan.
-- Las migraciones de Finance **no se aplicaron desde la PR**. No hay pagos, bancos ni impuestos conectados.
-- CodeRabbit seguía `pending` al merge; no se registra aprobación inexistente.
-- Exact-main CI y Smoke de producción aún requieren evidencia propia.
+- Estado: **IMPLEMENTED en `feat/traffic-distribution-link-v1`**, pendiente PR/gates.
+- Base exacta: `1d9d148bca14c3095b7a439112e5213bfeb84e57`.
+- Un mismo schedule solo puede guardar un link asociado.
+- La migración es aditiva; schedules no vinculados conservan el comportamiento existente.
+- El test MariaDB verifica que SQL directo tampoco enlaza registros de distintos tenants.
+- No se modificó producción ni se ejecutó migración productiva.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Integrar tracked links con Distribution/campañas bajo tenant y roles existentes. |
-| **NEXT** | Obtener evidencia exact-main + Production Smoke antes de migraciones productivas. |
-| **NEXT** | Evolucionar Finance desde ledger a conciliación de fuentes verificables, sin payouts en este slice. |
-| **BLOCKED / EXTERNAL** | Aplicación de migraciones, providers reales, FFmpeg y S3-compatible requieren configuración/aprobación. |
-| **LATER** | Retiro del legacy solo tras GF-MIG. |
+| **NOW** | Abrir PR del handoff Traffic + Distribution y validar matriz completa + reviews. |
+| **NEXT** | Squash merge, exact-main CI y Smoke como evidencias independientes. |
+| **NEXT** | Adaptador real con credenciales seguras y contrato explícito del tracked URL. |
+| **BLOCKED / EXTERNAL** | Migraciones productivas, FFmpeg y S3-compatible requieren configuración/aprobación. |
+| **LATER** | Payouts/invoices y retiro progresivo del legacy. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Traffic + Distribution | tracked links por campaña · siguiente slice |
-| **NEXT** | Finance | core v1 MERGED; conciliación/atribución de fuentes pendiente |
+| **NOW** | Traffic + Distribution | asociación implementada · pendiente CI/review |
 | **NEXT** | Distribution providers | adapters reales + auth/reconnect |
+| **NEXT** | Finance | ledger v1 merged, conciliación pendiente |
 | **BLOCKED / EXTERNAL** | Producción | Scheduling/Distribution/Traffic/Finance migrations + Smoke |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
-| **LATER** | Payouts / invoices | fuera del core |
 | **LATER** | Legacy retirement | solo tras GF-MIG |
