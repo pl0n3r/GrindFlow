@@ -163,6 +163,7 @@
                             <div class="gf-field"><label for="to">To</label><input class="gf-input" id="to" name="to" type="date" value="{{ $to }}" required></div>
                             <div class="gf-field"><label for="channel_filter">Channel</label><select class="gf-input" id="channel_filter" name="channel"><option value="">All channels</option>@foreach($channels as $channel)<option value="{{ $channel }}" @selected(($filters['channel'] ?? '') === $channel)>{{ $channel }}</option>@endforeach</select></div>
                             <div class="gf-field"><label for="campaign_filter">Campaign</label><input class="gf-input" id="campaign_filter" name="campaign" maxlength="128" value="{{ $filters['campaign'] ?? '' }}"></div>
+                            <div class="gf-field"><label for="status_filter">Link status</label><select class="gf-input" id="status_filter" name="status"><option value="">Any status</option><option value="active" @selected(($filters['status'] ?? '') === 'active')>Active</option><option value="disabled" @selected(($filters['status'] ?? '') === 'disabled')>Disabled</option></select></div>
                             <button class="gf-button gf-button--primary" type="submit">Apply filters</button>
                             <button class="gf-button gf-button--ghost" type="submit" formaction="{{ route('organizations.traffic.export', ['organizationId' => $organization->id]) }}">Export daily CSV</button>
                         </form>
@@ -261,7 +262,7 @@
                 <section class="gf-panel gf-panel--spaced">
                     <header class="gf-panel__head">
                         <h2>Tracked links</h2>
-                        <span class="gf-appbar__meta">{{ $links->count() }} loaded</span>
+                        <span class="gf-appbar__meta">{{ $linkCount }} matching · {{ $links->count() }} on this page</span>
                     </header>
 
                     <div class="gf-panel__body gf-panel__body--flush-mobile">
@@ -269,10 +270,13 @@
                             <div class="gf-empty">
                                 <div>
                                     <div class="gf-empty__icon" aria-hidden="true">⌗</div>
-                                    <h3>No tracked links yet.</h3>
+                                    <h3>{{ $linkCount > 0 ? 'No links on this page.' : 'No matching tracked links.' }}</h3>
                                     <p>
-                                        Crea el primero para empezar a atribuir clicks por
-                                        canal y campana.
+                                        @if ($linkCount > 0)
+                                            <a href="{{ $links->url($links->lastPage()) }}">Go to last available page</a>
+                                        @else
+                                            Ajusta los filtros o crea un enlace para atribuir clics.
+                                        @endif
                                     </p>
                                 </div>
                             </div>
@@ -327,6 +331,23 @@
                                                 </td>
                                                 <td>
                                                     @if ($canManageTraffic)
+                                                        <details>
+                                                            <summary>Edit link</summary>
+                                                            <form class="gf-form" method="POST" action="{{ route('organizations.traffic.links.update', ['organizationId' => $organization->id, 'linkId' => $link->id]) }}">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <label for="traffic_label_{{ $link->id }}">Link label</label>
+                                                                <input class="gf-input" id="traffic_label_{{ $link->id }}" name="label" type="text" maxlength="191" value="{{ $link->label }}" required>
+                                                                <label for="traffic_destination_{{ $link->id }}">Redirect destination URL</label>
+                                                                <input class="gf-input" id="traffic_destination_{{ $link->id }}" name="destination_url" type="url" maxlength="2048" value="{{ $link->destination_url }}" required>
+                                                                <label for="traffic_channel_{{ $link->id }}">Channel</label>
+                                                                <input class="gf-input" id="traffic_channel_{{ $link->id }}" name="channel" type="text" maxlength="64" value="{{ $link->channel }}">
+                                                                <label for="traffic_campaign_{{ $link->id }}">Campaign</label>
+                                                                <input class="gf-input" id="traffic_campaign_{{ $link->id }}" name="campaign" type="text" maxlength="128" value="{{ $link->campaign }}">
+                                                                <small class="gf-media-meta">Changing the destination changes future redirects, not the short link. Historical clicks remain attached to this link; reports show current label/channel/campaign.</small>
+                                                                <button class="gf-button gf-button--ghost" type="submit">Save link details</button>
+                                                            </form>
+                                                        </details>
                                                         <form method="POST" action="{{ route('organizations.traffic.links.status', ['organizationId' => $organization->id, 'linkId' => $link->id]) }}">
                                                             @csrf
                                                             @method('PATCH')
@@ -346,6 +367,24 @@
                             </div>
                         @endif
                     </div>
+                    @if ($linkCount > 0)
+                        <nav class="gf-panel__body" aria-label="Tracked links pagination">
+                            <div class="gf-upload__footer">
+                                <p class="gf-media-meta">
+                                    Showing {{ $links->firstItem() ?? 0 }}–{{ $links->lastItem() ?? 0 }} of {{ $linkCount }}
+                                    · Page {{ $links->currentPage() }} of {{ $links->lastPage() }}
+                                </p>
+                                <div>
+                                    @if ($links->previousPageUrl())
+                                        <a class="gf-button gf-button--ghost" rel="prev" href="{{ $links->previousPageUrl() }}">Previous</a>
+                                    @endif
+                                    @if ($links->nextPageUrl())
+                                        <a class="gf-button gf-button--ghost" rel="next" href="{{ $links->nextPageUrl() }}">Next</a>
+                                    @endif
+                                </div>
+                            </div>
+                        </nav>
+                    @endif
                 </section>
             @endif
         </main>

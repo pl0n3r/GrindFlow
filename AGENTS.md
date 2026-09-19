@@ -163,6 +163,28 @@ el cambio aquí en el mismo PR que modifica el producto.
 - Nunca reescribir, borrar ni compensar el ledger automaticamente para
   cuadrar un reporte. La gestion de reversas permanece append-only.
 
+### Traffic: gestion completa de links existentes
+
+- Paginacion del listado real por tenant en paginas de 25 con total SQL
+  sin limit(100), orden determinista `created_at DESC, id DESC`,
+  filtros validados (periodo UTC, canal, campana, status y link).
+  Anterior/Siguiente no incorporan page anterior ni params no validados.
+- Las cifras de clicks y grafica agregan TODOS los links coincidentes,
+  no solo los de la pagina. CSV diario filtra tambien por status
+  si se pide, pero no pagina eventos ni registra clicks por descargar.
+- Se pueden editar label, destination_url (HTTP[S]), channel y campaign
+  del link activo o deshabilitado; ambas rutas y dominio comprueban
+  tenant/rol, lookup scoped y lock antes de actualizar.
+- Nunca cambiar token, status, assigned schedules, dedupe ni metricas al
+  editar. El mismo short URL redirige a un destino nuevo solamente SI
+  status active; editar un disabled no lo reactiva.
+- El CSV de fechas historicas muestra la etiqueta/canal/campana ACTUAL
+  del link: no existe snapshot de esos metadatos por click.
+  Debe figurar advertencia honesta en la UI y docs.
+- Reusar StoreTrackedLinkRequest para que HTTP(S), longitudes, campos
+  opcionales y autorizacion de edit sean iguales a create.
+  Sin schema Traffic, PATCH retorna 503 y GET mantiene fallback.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership

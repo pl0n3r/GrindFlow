@@ -79,6 +79,10 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::post('/traffic', [TrafficController::class, 'store'])
                 ->middleware(RequireTrafficSchema::class)
                 ->name('organizations.traffic.store');
+            Route::patch('/traffic/links/{linkId}', [TrafficController::class, 'updateLinkDetails'])
+                ->middleware(RequireTrafficSchema::class)
+                ->whereUuid('linkId')
+                ->name('organizations.traffic.links.update');
             Route::patch('/traffic/links/{linkId}/status', [TrafficController::class, 'updateLinkStatus'])
                 ->middleware(RequireTrafficSchema::class)
                 ->whereUuid('linkId')
