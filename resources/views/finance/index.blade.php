@@ -125,24 +125,47 @@
                     </div>
                 </section>
             @else
-                <section class="gf-metrics" aria-label="Metricas de Finance">
-                    <article class="gf-metric">
-                        <div class="gf-metric__label">Allocated</div>
-                        <div class="gf-metric__value">{{ number_format($allocatedMinor) }}</div>
-                        <div class="gf-metric__meta">Minor units</div>
-                    </article>
+                <section class="gf-panel" aria-label="Metricas de Finance por moneda">
+                    <header class="gf-panel__head">
+                        <h2>Currency totals</h2>
+                        <span class="gf-appbar__meta">Minor units · never cross-currency</span>
+                    </header>
 
-                    <article class="gf-metric">
-                        <div class="gf-metric__label">Reversed</div>
-                        <div class="gf-metric__value">{{ number_format($reversedMinor) }}</div>
-                        <div class="gf-metric__meta">Minor units</div>
-                    </article>
-
-                    <article class="gf-metric">
-                        <div class="gf-metric__label">Net</div>
-                        <div class="gf-metric__value">{{ number_format($netMinor) }}</div>
-                        <div class="gf-metric__meta">Allocated − reversed</div>
-                    </article>
+                    <div class="gf-panel__body gf-panel__body--flush-mobile">
+                        @if ($currencySummaries->isEmpty())
+                            <div class="gf-empty">
+                                <div>
+                                    <h3>No currency totals yet.</h3>
+                                    <p>Los totales apareceran cuando exista el primer asiento.</p>
+                                </div>
+                            </div>
+                        @else
+                            <div class="gf-table-wrap">
+                                <table class="gf-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Currency</th>
+                                            <th>Allocated</th>
+                                            <th>Reversed</th>
+                                            <th>Net</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($currencySummaries as $summary)
+                                            <tr>
+                                                <td><strong>{{ $summary['currency'] }}</strong></td>
+                                                <td>{{ number_format($summary['allocated_minor']) }}</td>
+                                                <td>{{ number_format($summary['reversed_minor']) }}</td>
+                                                <td>
+                                                    <strong>{{ number_format($summary['net_minor']) }}</strong>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
                 </section>
 
                 <section class="gf-panel gf-panel--spaced">
