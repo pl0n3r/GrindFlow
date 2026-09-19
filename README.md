@@ -76,7 +76,7 @@ flowchart LR
 - Cada asiento conserva actor, fecha, fuente y nota auditables.
 - Las correcciones crean una única reversa con `reversal_of_id`; no hay update/delete funcional.
 - Una reversa no puede revertirse y el original no puede tener dos reversas.
-- El neto se deriva como originales menos reversas; no hay balance mutable autoritativo.
+- El neto se deriva como originales menos reversas **por moneda**; nunca se mezclan minor units de currencies distintas.
 - Añade workspace Finance con creación, listado, métricas y reversa explícita.
 - Deploy-before-migration es seguro: GET informa bloqueo y writes responden 503.
 - No implementa payouts, invoices, taxes, payment providers ni bank reconciliation.
@@ -108,6 +108,7 @@ flowchart LR
 - El ledger no usa floats y no expone update/delete de asientos.
 - Beneficiarios se validan contra membership same-tenant en cada creación.
 - Reversas son únicas, append-only y conservan monto/moneda/fuente/beneficiario del original.
+- Totales COP/USD/etc. se calculan por separado; hay regresión explícita contra sumas cross-currency.
 - Editor/Model no pueden acceder a Finance.
 - Cross-tenant listing y reversal están cubiertos negativamente.
 - La migración nueva no se ejecuta desde CI ni desde esta rama.
