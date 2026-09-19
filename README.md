@@ -81,18 +81,7 @@ flowchart LR
 
 ## Archivos modificados en este deploy
 
-- `.env.example` — feature gate, binario y timeout de ffprobe.
-- `README.md` — snapshot exacto del slice actual.
-- `app/Jobs/ProcessMediaAsset.php` — ejecuta exactamente la version de procesador encolada.
-- `app/Services/Media/FfprobeMediaInspector.php` — inspección técnica normalizada y validación estricta.
-- `app/Services/Media/MediaAssetProcessor.php` — v2 sin ffprobe y v3 con ffprobe.
-- `app/Services/Media/MediaProcessingCoordinator.php` — selecciona version por modo y separa idempotencia/reintentos.
-- `app/Services/Media/MediaProcessingException.php` — errores seguros del probe/version.
-- `config/grindflow.php` — configuración ffprobe fail-closed.
-- `docs/REQUIREMENTS.md` — verificación actualizada de GF-FR-003.
-- `tests/Feature/FfprobeMediaInspectorTest.php` — normalización, malformed entries y fallos seguros.
-- `tests/Feature/MediaProcessingJobTest.php` — idempotencia y transición v2 → v3.
-- `tests/secrets.test.ts` — manipulación AES-GCM determinista para eliminar un flake Base64URL.
+- `README.md` — sincroniza el dashboard con el SHA, CI y Production Smoke ya validados.
 
 ## Validación
 
