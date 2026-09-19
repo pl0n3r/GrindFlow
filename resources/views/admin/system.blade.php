@@ -91,9 +91,12 @@
                 </div>
             @endif
 
-            @if ($errors->has('migration'))
+            @if ($errors->has('migration') || $errors->has('backup_confirmed') || $errors->has('confirmation') || $errors->has('migration_batch'))
                 <div class="gf-alert" role="alert">
-                    {{ $errors->first('migration') }}
+                    {{ $errors->first('migration')
+                        ?? $errors->first('backup_confirmed')
+                        ?? $errors->first('confirmation')
+                        ?? $errors->first('migration_batch') }}
                 </div>
             @endif
 
@@ -223,22 +226,75 @@
                                     : 'Pending migrations need to be applied' }}
                             </h3>
                             <p class="gf-system-copy">
-                                GrindFlow nunca ejecuta migraciones de produccion desde CI.
-                                Un administrador puede aplicarlas aqui de forma explicita,
-                                con CSRF y un lock para evitar ejecuciones simultaneas.
+                                Revisa el lote exacto antes de continuar. CI no ejecuta
+                                migraciones productivas. Esta pantalla no hace ni verifica
+                                backups: confirma un respaldo externo restaurable por separado.
                             </p>
+
+                            @if ($pendingMigrations === null)
+                                <p class="gf-system-copy" role="status">
+                                    El inventario no esta disponible. No es seguro ejecutar migraciones.
+                                </p>
+                            @elseif ($pendingMigrations === 0)
+                                <p class="gf-system-copy" role="status">
+                                    Sin migraciones pendientes.
+                                </p>
+                            @else
+                                <p class="gf-metric__label">
+                                    Lote pendiente: {{ $pendingMigrations }} migraciones
+                                </p>
+                                <ol class="gf-system-copy" data-pending-migration-inventory>
+                                    @foreach ($pendingMigrationNames as $migrationName)
+                                        <li><code>{{ $migrationName }}</code></li>
+                                    @endforeach
+                                </ol>
+                            @endif
                         </div>
 
-                        <form method="POST" action="{{ route('admin.system.migrate') }}">
-                            @csrf
-                            <button
-                                class="gf-button gf-button--primary"
-                                type="submit"
-                                {{ ! $databaseOnline || $pendingMigrations === 0 ? 'disabled' : '' }}
-                            >
-                                Run pending migrations
-                            </button>
-                        </form>
+                        @if ($databaseOnline && $pendingMigrations !== null && $pendingMigrations > 0)
+                            <form method="POST" action="{{ route('admin.system.migrate') }}">
+                                @csrf
+                                <input
+                                    type="hidden"
+                                    name="migration_batch"
+                                    value="{{ $migrationFingerprint }}"
+                                >
+
+                                <div class="gf-field">
+                                    <label for="backup_confirmed">
+                                        <input
+                                            id="backup_confirmed"
+                                            type="checkbox"
+                                            name="backup_confirmed"
+                                            value="1"
+                                            required
+                                        >
+                                        Verifique personalmente un backup externo restaurable
+                                        de esta base de datos.
+                                    </label>
+                                </div>
+
+                                <div class="gf-field">
+                                    <label for="confirmation">
+                                        Escribe MIGRAR para confirmar este lote
+                                    </label>
+                                    <input
+                                        class="gf-input"
+                                        id="confirmation"
+                                        name="confirmation"
+                                        type="text"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        placeholder="MIGRAR"
+                                        required
+                                    >
+                                </div>
+
+                                <button class="gf-button gf-button--primary" type="submit">
+                                    Run pending migrations
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </section>
