@@ -42,7 +42,7 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
 | Gobierno | Enlaces y validadores apuntan al repositorio real y al Issue #2 |
 | Release | v0.1.20 incrementa v0.1.19; no se desactiva el gate |
 | Historial | Roadmap previo #88 no se presume migrado; nueva fuente #2 |
