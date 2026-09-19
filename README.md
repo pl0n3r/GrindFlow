@@ -18,9 +18,9 @@
 | Work line | 🚧 **GF-OPS · Media runtime readiness** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **v0.1.3 · PR #92 fusionado** | `main` `78b796746eb880367de9fccda3b9703e68846d9d` |
 | Version | 🚧 **v0.1.4** | patch de prerequisites multimedia |
-| CI del PR | 🚧 **pendiente** | se ejecutara sobre el head estable de este PR |
+| CI del PR | 🚧 **revalidando** | head anterior fallo por plantilla Blade y lookup de ruta absoluta; correcciones en el candidato actual |
 | Sonar | 🚧 **pendiente** | no extrapolar Quality Gate de otro SHA |
-| CodeRabbit | 🚧 **pendiente** | requiere revision del head estable |
+| CodeRabbit | 🚧 **revalidando** | hallazgo de atributos HTML duplicados corregido; requiere revision del head estable |
 | CI del SHA exacto de main | ✅ **v0.1.3 validado** | validate #35446099005 + Sonar Quality Gate passed |
 | Production Smoke | 🚧 **schema bloqueado** | migraciones pendientes; no implica fallo de codigo |
 | Migraciones | 🚧 **no ejecutadas** | backup restaurable + aprobacion expresa |
@@ -29,7 +29,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+365** | **−65** | **+300** |
+| **10** | **+375** | **−65** | **+310** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -65,9 +65,9 @@ flowchart LR
 
 ## Qué se hizo
 - Admin > System muestra FFmpeg y FFprobe como `disabled`, `binary-found` o `binary-missing` sin ejecutar comandos ni exponer rutas.
-- `MediaToolReadiness` respeta flags de configuracion y convierte errores de lookup en estado seguro.
+- `MediaToolReadiness` respeta flags, comprueba rutas configuradas con `is_file`/`is_executable` y convierte fallos en estado seguro.
 - Production Smoke extrae cinco estados de modulo y dos de media mediante parser con allowlist; inventarios incompletos, duplicados o falsificados fallan cerrados.
-- Contrato Python cubre inventario valido, estados invalidos, faltantes, duplicados, extras, payload falsificado, HTML sobredimensionado y no filtracion de secretos.
+- Contrato Python cubre inventario valido, estados invalidos, faltantes, duplicados incluso en el mismo elemento, extras, payload falsificado, HTML sobredimensionado y no filtracion de secretos.
 - Fast CI compila ambos scripts Python y ejecuta el contrato antes del contrato Production Smoke.
 - Tests PHP cubren herramientas desactivadas, ejecutable encontrado/ausente y ausencia de paths controlados por operador en la UI.
 
@@ -85,7 +85,7 @@ flowchart LR
 
 ## Validación
 - `main` v0.1.3 exacto `78b796746eb880367de9fccda3b9703e68846d9d`: CI `validate` #35446099005 y Sonar Quality Gate completaron en success.
-- v0.1.4 esta implementado en rama y aun debe pasar CI, Sonar y CodeRabbit sobre el head estable antes de merge.
+- v0.1.4 corrige el fallo CI observado en el head previo (vista Blade y ruta absoluta del ejecutable) y el hallazgo de CodeRabbit sobre atributos duplicados. CI, Sonar y review del nuevo head siguen pendientes; no hay merge.
 - Ninguna migracion, deploy, FFmpeg, SQL ni accion sensible de produccion forma parte de esta entrega.
 
 ## Qué sigue
