@@ -20,7 +20,7 @@
 | Work line | 🚧 **GF-OPS · Diagnóstico de esquema y Smoke** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **v0.1.2 · PR #91 fusionado** | `main` `98ad68b32fea1e56538b7386cd32f6eb7699b1d3` |
 | Version | 🚧 **v0.1.3** | patch de observabilidad segura |
-| CI del PR | 🚧 **revalidando head estable** | #35434965707; contrato Smoke ya pasó, snapshot README se resincroniza |
+| CI del PR | 🚧 **revalidando head estable** | CI #422 verificó contratos/PHPUnit/MariaDB/browser; falló solo por delta README +1 |
 | Sonar | 🚧 **revalidación del head final pendiente** | Quality Gate previo OK; no extrapolar al head nuevo |
 | CodeRabbit | 🚧 **revisión final pendiente** | hallazgos anteriores resueltos; requiere cobertura del head estable |
 | CI del SHA exacto de main | 🚧 **v0.1.3 por verificar tras merge** | v0.1.2 CI #35430357855 |
@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+335** | **−425** | **−90** |
+| **11** | **+336** | **−425** | **−89** |
 
 ## Calidad y entrega
 
@@ -97,7 +97,8 @@ flowchart LR
 ## Validación
 
 - v0.1.2 PR #91 fusionado; la identidad real del checkout Hostinger sigue sin verificar.
-- En v0.1.3, el contrato fake HTTP completo pasó en CI #35434965707 después de corregir la inicialización de locales Bash; el head final todavía debe completar CI / validate, Sonar y CodeRabbit antes del merge.
+- En v0.1.3, CI #422 confirmó preflight, contratos Smoke, php-quality, PHPUnit, MariaDB y browser; el único fallo fue el snapshot machine-checkable del README desfasado por una inserción, corregido en el head siguiente.
+- El head final todavía debe completar CI / validate, Sonar y CodeRabbit antes del merge.
 - Las migraciones, backup externo y validación productiva requieren evidencia separada.
 
 ## Qué sigue
