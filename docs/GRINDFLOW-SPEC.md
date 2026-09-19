@@ -246,3 +246,23 @@ The execution roadmap and durable progress history live in
   count leakage; CSV uses all filtered groups regardless of visible page.
 - Missing Finance schema retains GET fallback and 503 for CSV. The report
   performs no ledger mutations, provider calls or new SQL migrations.
+
+## 18. Traffic link management and complete paginated reporting
+
+- Authorized Traffic managers can update the label, HTTP(S) destination,
+  channel and campaign of a link regardless of active/disabled state;
+  its public 22-character token, status, Scheduler assignments, dedupe
+  state and click history remain unchanged. Editing a disabled link never
+  reactivates it.
+- All list pages are tenant-filtered, 25 links per page ordered stably by
+  created_at DESC then UUID DESC, with a real matching total. Navigation
+  keeps validated UTC dates, channel, campaign, status and chosen link.
+  The CSV and click chart aggregate all filtered links, never merely page 1.
+- Status filtering also applies to the existing complete daily CSV. A new
+  destination affects future redirects, while historical dates in CSV use
+  *current* label/channel/campaign: this is not a per-click metadata archive.
+- Daily metric/date filters use a half-open UTC day range [from, to + 1 day)
+  to include the complete final day even with datetime-backed test records.
+- HTTP(S) URL validation, bounded fields, org permission and locked
+  tenant-scoped lookup reject foreign link IDs and unsafe schemes. No
+  link token rotation, deletion, data migration or provider publication.

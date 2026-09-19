@@ -98,6 +98,79 @@ class TrackedLinkManager
         });
     }
 
+    /**
+     * Editing metadata or its redirect destination must preserve the public
+     * token, active/disabled state, scheduler assignments and click history.
+     * Historical CSV labels/tags show current metadata, not old snapshots.
+     */
+    public function updateDetails(
+        User $actor,
+        string $linkId,
+        string $label,
+        string $destinationUrl,
+        ?string $channel,
+        ?string $campaign,
+    ): void {
+        $organizationId = $this->tenantContext->organizationId();
+
+        if (
+            $organizationId === null
+            || $actor->canManageTrafficOrganization($organizationId) === false
+        ) {
+            throw new AuthorizationException(
+                'The user cannot manage traffic for this organization.',
+            );
+        }
+
+        $label = trim($label);
+        $destinationUrl = trim($destinationUrl);
+
+        if ($label === '' || mb_strlen($label) > 191) {
+            throw new InvalidArgumentException('A valid link label is required.');
+        }
+
+        if (
+            mb_strlen($destinationUrl) > 2048
+            || filter_var($destinationUrl, FILTER_VALIDATE_URL) === false
+            || ! in_array(
+                strtolower((string) parse_url($destinationUrl, PHP_URL_SCHEME)),
+                ['http', 'https'],
+                true,
+            )
+        ) {
+            throw new InvalidArgumentException('The destination must be a valid HTTP(S) URL.');
+        }
+
+        $channel = $this->nullableTrim($channel);
+        $campaign = $this->nullableTrim($campaign);
+
+        if (
+            ($channel !== null && mb_strlen($channel) > 64)
+            || ($campaign !== null && mb_strlen($campaign) > 128)
+        ) {
+            throw new InvalidArgumentException('Link metadata exceeds its maximum length.');
+        }
+
+        DB::transaction(static function () use (
+            $linkId,
+            $label,
+            $destinationUrl,
+            $channel,
+            $campaign,
+        ): void {
+            $link = TrackedLink::query()
+                ->lockForUpdate()
+                ->findOrFail($linkId);
+
+            $link->forceFill([
+                'label' => $label,
+                'destination_url' => $destinationUrl,
+                'channel' => $channel,
+                'campaign' => $campaign,
+            ])->save();
+        });
+    }
+
     private function uniqueToken(): string
     {
         for ($attempt = 0; $attempt < self::TOKEN_ATTEMPTS; $attempt++) {

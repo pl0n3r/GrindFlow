@@ -898,6 +898,311 @@ class TrafficAttributionTest extends TestCase
         }
     }
 
+    public function test_editing_link_details_preserves_short_url_clicks_status_and_redirects(): void
+    {
+        Queue::fake([RecordTrackedLinkClick::class]);
+
+        [$actor, $organization] = $this->identity(UserRole::Studio);
+        $link = $this->link(
+            $actor,
+            $organization,
+            'Original link',
+            'https://example.com/original',
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn () => TrackedLinkDailyMetric::query()->create([
+                'tracked_link_id' => $link->getKey(),
+                'metric_date' => '2026-09-19',
+                'clicks' => 14,
+            ]),
+        );
+
+        $url = route('organizations.traffic.links.update', [
+            'organizationId' => $organization->getKey(),
+            'linkId' => $link->getKey(),
+        ]);
+        $redirect = route('traffic.redirect', ['token' => $link->token]);
+
+        $this->actingAs($actor)->get(route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+        ]))->assertOk()->assertSee('Save link details');
+
+        $this->actingAs($actor)
+            ->patch($url, [
+                'label' => '  New title  ',
+                'destination_url' => 'https://example.com/changed',
+                'channel' => '    ',
+                'campaign' => '  Autumn  ',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas(
+                'status',
+                'Tracked link updated. Public token and click totals are unchanged.',
+            );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($link): void {
+                $fresh = TrackedLink::query()->findOrFail($link->getKey());
+
+                $this->assertSame('New title', $fresh->label);
+                $this->assertSame('https://example.com/changed', $fresh->destination_url);
+                $this->assertNull($fresh->channel);
+                $this->assertSame('Autumn', $fresh->campaign);
+                $this->assertSame($link->token, $fresh->token);
+                $this->assertSame(TrackedLink::STATUS_ACTIVE, $fresh->status);
+                $this->assertSame(
+                    14,
+                    (int) TrackedLinkDailyMetric::query()
+                        ->where('tracked_link_id', $link->getKey())
+                        ->value('clicks'),
+                );
+            },
+        );
+
+        $this->get($redirect)
+            ->assertRedirect('https://example.com/changed');
+
+        Queue::assertPushed(RecordTrackedLinkClick::class, 1);
+
+        $csv = $this->actingAs($actor)->get(route('organizations.traffic.export', [
+            'organizationId' => $organization->getKey(),
+            'from' => '2026-09-19',
+            'to' => '2026-09-19',
+        ]))->assertOk()->streamedContent();
+        $this->assertStringContainsString('New title', $csv);
+
+        $this->actingAs($actor)->patch(route('organizations.traffic.links.status', [
+            'organizationId' => $organization->getKey(),
+            'linkId' => $link->getKey(),
+        ]), ['status' => TrackedLink::STATUS_DISABLED])->assertRedirect();
+
+        $this->actingAs($actor)->patch($url, [
+            'label' => 'Disabled updated title',
+            'destination_url' => 'https://example.com/disabled-changed',
+            'channel' => 'email',
+            'campaign' => '',
+        ])->assertRedirect();
+
+        $this->get($redirect)->assertNotFound();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($link): void {
+                $fresh = TrackedLink::query()->findOrFail($link->getKey());
+
+                $this->assertSame('Disabled updated title', $fresh->label);
+                $this->assertNull($fresh->campaign);
+                $this->assertSame($link->token, $fresh->token);
+                $this->assertSame(TrackedLink::STATUS_DISABLED, $fresh->status);
+                $this->assertSame(14, (int) TrackedLinkDailyMetric::query()->sole()->clicks);
+            },
+        );
+    }
+
+    public function test_link_detail_edits_reject_cross_tenant_model_and_invalid_input(): void
+    {
+        [$actor, $organization] = $this->identity(UserRole::Editor);
+        [$foreignActor, $foreignOrganization] = $this->identity(UserRole::Editor);
+        [$model, $modelOrganization] = $this->identity(UserRole::Model);
+
+        $link = $this->link(
+            $actor,
+            $organization,
+            'Secure label',
+            'https://example.com/safe',
+        );
+
+        $url = route('organizations.traffic.links.update', [
+            'organizationId' => $organization->getKey(),
+            'linkId' => $link->getKey(),
+        ]);
+        $payload = [
+            'label' => 'New campaign',
+            'destination_url' => 'https://example.com/new',
+            'channel' => '',
+            'campaign' => '',
+        ];
+
+        $this->actingAs($foreignActor)->patch(route('organizations.traffic.links.update', [
+            'organizationId' => $foreignOrganization->getKey(),
+            'linkId' => $link->getKey(),
+        ]), $payload)->assertNotFound();
+
+        $this->actingAs($model)->patch(route('organizations.traffic.links.update', [
+            'organizationId' => $modelOrganization->getKey(),
+            'linkId' => $link->getKey(),
+        ]), $payload)->assertForbidden();
+
+        foreach ([
+            ['label' => ''],
+            ['destination_url' => 'javascript:alert(1)'],
+            ['destination_url' => 'ftp://example.com/private'],
+            ['destination_url' => 'https://example.com/'.str_repeat('x', 2048)],
+            ['channel' => str_repeat('a', 65)],
+            ['campaign' => str_repeat('b', 129)],
+        ] as $override) {
+            $field = array_key_first($override);
+
+            $this->actingAs($actor)->patch($url, array_replace($payload, $override))
+                ->assertSessionHasErrors($field);
+        }
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($link): void {
+                $fresh = TrackedLink::query()->findOrFail($link->getKey());
+
+                $this->assertSame('Secure label', $fresh->label);
+                $this->assertSame('https://example.com/safe', $fresh->destination_url);
+                $this->assertSame('test', $fresh->channel);
+                $this->assertSame('feature', $fresh->campaign);
+            },
+        );
+    }
+
+    public function test_tracked_link_index_paginates_deep_history_with_filters_and_global_totals(): void
+    {
+        [$actor, $organization] = $this->identity(UserRole::Editor);
+        [$foreignActor, $foreignOrganization] = $this->identity(UserRole::Editor);
+        $createdAt = CarbonImmutable::parse('2026-09-19 12:00:00', 'UTC');
+
+        $ids = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            function () use ($actor, $createdAt): array {
+                $ids = [];
+
+                for ($i = 0; $i < 105; $i++) {
+                    $link = TrackedLink::query()->create([
+                        'created_by_user_id' => $actor->getKey(),
+                        'token' => Str::random(22),
+                        'label' => 'Page link '.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+                        'destination_url' => 'https://example.com/paged',
+                        'channel' => 'page',
+                        'campaign' => 'autumn',
+                        'status' => TrackedLink::STATUS_ACTIVE,
+                    ]);
+                    $link->forceFill(['created_at' => $createdAt])->save();
+                    $ids[] = $link->getKey();
+
+                    TrackedLinkDailyMetric::query()->create([
+                        'tracked_link_id' => $link->getKey(),
+                        'metric_date' => '2026-09-19',
+                        'clicks' => 1,
+                    ]);
+                }
+
+                sort($ids, SORT_STRING);
+
+                return $ids;
+            },
+        );
+
+        $foreignLink = $this->link(
+            $foreignActor,
+            $foreignOrganization,
+            'Foreign private link',
+            'https://example.com/foreign',
+        );
+
+        $url = route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+        $query = [
+            'from' => '2026-09-19',
+            'to' => '2026-09-19',
+            'channel' => 'page',
+            'campaign' => 'autumn',
+            'status' => 'active',
+        ];
+        $first = $this->actingAs($actor)->get($url.'?'.http_build_query($query))
+            ->assertOk()
+            ->assertSee('105 matching')
+            ->assertSee('Showing 1–25 of 105')
+            ->assertDontSee('Foreign private link');
+
+        $this->assertSame(105, $first->viewData('linkCount'));
+        $this->assertSame(105, $first->viewData('totalClicks'));
+        $this->assertSame(25, $first->viewData('links')->count());
+        $this->assertSame(
+            array_reverse(array_slice($ids, 80, 25)),
+            $first->viewData('links')->getCollection()->pluck('id')->all(),
+        );
+
+        $next = $first->viewData('links')->nextPageUrl();
+        $this->assertIsString($next);
+        parse_str((string) parse_url($next, PHP_URL_QUERY), $pageQuery);
+        $this->assertSame('2', $pageQuery['page']);
+        unset($pageQuery['page']);
+        $this->assertEquals($query, $pageQuery);
+
+        $second = $this->actingAs($actor)->get($next)
+            ->assertOk()
+            ->assertSee('Showing 26–50 of 105');
+        $this->assertSame(
+            array_reverse(array_slice($ids, 55, 25)),
+            $second->viewData('links')->getCollection()->pluck('id')->all(),
+        );
+
+        $last = $this->actingAs($actor)->get($url.'?'.http_build_query($query + ['page' => '5']))
+            ->assertOk()
+            ->assertSee('Showing 101–105 of 105');
+        $this->assertSame(5, $last->viewData('links')->count());
+
+        $this->actingAs($actor)->get($url.'?page=6')
+            ->assertOk()
+            ->assertSee('No links on this page.')
+            ->assertSee('Go to last available page');
+
+        $this->actingAs($actor)->get($url.'?page=0')
+            ->assertSessionHasErrors('page');
+        $this->actingAs($actor)->get($url.'?status=archived')
+            ->assertSessionHasErrors('status');
+
+        $this->actingAs($actor)->patch(route('organizations.traffic.links.status', [
+            'organizationId' => $organization->getKey(),
+            'linkId' => $ids[0],
+        ]), ['status' => TrackedLink::STATUS_DISABLED])->assertRedirect();
+
+        $disabled = $this->actingAs($actor)->get($url.'?status=disabled')
+            ->assertOk()->assertSee('1 matching');
+        $this->assertSame(1, $disabled->viewData('linkCount'));
+        $this->assertSame(104, $this->actingAs($actor)->get($url.'?status=active')
+            ->viewData('linkCount'));
+
+        $this->assertNotNull($foreignLink);
+    }
+
+    public function test_link_detail_update_is_schema_safe(): void
+    {
+        [$actor, $organization] = $this->identity(UserRole::Studio);
+        Schema::dropIfExists('tracked_link_dedupes');
+        Schema::dropIfExists('tracked_link_daily_metrics');
+        Schema::dropIfExists('tracked_links');
+
+        try {
+            $this->actingAs($actor)->patch(route('organizations.traffic.links.update', [
+                'organizationId' => $organization->getKey(),
+                'linkId' => Str::uuid()->toString(),
+            ]), [
+                'label' => 'Safe patch',
+                'destination_url' => 'https://example.com/',
+            ])->assertStatus(503);
+        } finally {
+            $migration = require database_path(
+                'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
+            );
+            $migration->up();
+        }
+    }
+
     /**
      * @return array{User, Organization}
      */

@@ -493,3 +493,29 @@ list preview cutoff.
 **Verification:** Finance feature tests for multi-currency/beneficiary event-date
 reversal, complete report >50 ledger rows, CSV formula hardening, cross-tenant
 records and permissions, invalid filters and schema-not-ready fallback.
+
+### GF-FR-006D — Complete Traffic link management
+**Status:** implemented
+
+**Statement:** A Traffic manager can manage and inspect all of the
+organization's tracked links, including those beyond the first 100.
+
+**Acceptance criteria:**
+- Editable label, HTTP(S) redirect destination, channel and campaign with
+  create-equivalent validation; updates on active or disabled links never
+  change the public token, status or accumulated clicks.
+- Future active redirects use the new destination; disabled links remain
+  blocked after editing. Existing Scheduler references and dedupe remain.
+- Pagination at 25 items with deterministic created_at/id descending order,
+  real tenant-scoped total and filter-preserving Previous/Next.
+- Channel, campaign and active/disabled status filters apply to link list,
+  ALL matching-link KPI/chart and complete daily CSV (no truncation).
+- CSV metadata is current state even for older click dates; the UI makes
+  this limitation visible. No raw visitor data is exported.
+- Editor/Model role boundaries and cross-tenant link IDs remain enforced;
+  missing schema keeps GET fallback and PATCH returns 503.
+
+**Verification:** active/disabled edits and no token/history rotation,
+redirect target, unauthorized/foreign/scheme-invalid writes, 105 rows
+with tied timestamps, filters and all-results clicks, deep pages and
+missing-migration PATCH.
