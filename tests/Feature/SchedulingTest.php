@@ -57,6 +57,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => $local,
                     'timezone' => $timezone,
                 ],
@@ -144,6 +145,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => $local,
                     'timezone' => $timezone,
                 ],
@@ -241,6 +243,7 @@ class SchedulingTest extends TestCase
                     [
                         'asset_id' => $asset->getKey(),
                         'destination_id' => $destination->getKey(),
+                        'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                         'scheduled_for_local' => now('UTC')
                             ->addDay()
                             ->format('Y-m-d\TH:i'),
@@ -307,6 +310,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $duplicate->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -353,6 +357,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->subHour()
                         ->format('Y-m-d\TH:i'),
@@ -399,6 +404,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -445,6 +451,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -500,6 +507,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $foreignDestination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -516,6 +524,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $foreignAsset->getKey(),
                     'destination_id' => $localDestination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -562,6 +571,7 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
+                    'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
                     'scheduled_for_local' => now('UTC')
                         ->addDay()
                         ->format('Y-m-d\TH:i'),
@@ -723,6 +733,11 @@ class SchedulingTest extends TestCase
         ];
         $route = route('organizations.scheduler.store', ['organizationId' => $organization->getKey()]);
 
+        $withoutKey = $payload;
+        unset($withoutKey['request_key']);
+        $this->actingAs($user)->post($route, $withoutKey)
+            ->assertSessionHasErrors('request_key');
+
         $this->actingAs($user)->post($route, $payload)->assertRedirect();
         $this->actingAs($user)->post($route, $payload)->assertRedirect();
 
@@ -759,13 +774,24 @@ class SchedulingTest extends TestCase
             },
         );
 
+        $rescheduledFor = CarbonImmutable::now('UTC')->addDays(3)->startOfMinute();
+
         $this->actingAs($user)->patch(route('organizations.scheduler.update', [
             'organizationId' => $organization->getKey(),
         ]), [
             'publication_id' => $publication->getKey(),
-            'scheduled_for_local' => now('UTC')->addDays(3)->format('Y-m-d\TH:i'),
+            'scheduled_for_local' => $rescheduledFor->format('Y-m-d\TH:i'),
             'timezone' => 'UTC',
         ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                $rescheduledFor->format('Y-m-d\TH:i'),
+                $publication->fresh()->scheduled_for_utc?->format('Y-m-d\TH:i'),
+            ),
+        );
 
         $this->actingAs($user)->post(route('organizations.scheduler.cancel', [
             'organizationId' => $organization->getKey(),
