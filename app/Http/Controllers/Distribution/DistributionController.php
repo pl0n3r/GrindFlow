@@ -8,6 +8,7 @@ use App\Http\Requests\Distribution\UpdateDestinationRequest;
 use App\Models\Organization;
 use App\Models\PublicationDelivery;
 use App\Models\PublishingDestination;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Services\Distribution\PublicationDeliveryManager;
 use Illuminate\Http\RedirectResponse;
@@ -123,7 +124,11 @@ class DistributionController extends Controller
 
         abort_unless($user->canManageOrganization($organization), 403);
 
-        $delivery = PublicationDelivery::query()->findOrFail($deliveryId);
+        $delivery = PublicationDelivery::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('organization_id', $organization->getKey())
+            ->whereKey($deliveryId)
+            ->firstOrFail();
         abort_unless(in_array($delivery->status, [
             PublicationDelivery::STATUS_FAILED,
             PublicationDelivery::STATUS_RETRY_SCHEDULED,
