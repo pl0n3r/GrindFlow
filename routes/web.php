@@ -8,6 +8,7 @@ use App\Http\Controllers\Connections\DropboxConnectionController;
 use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Scheduling\SchedulerController;
+use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Controllers\Vault\DirectUploadController;
 use App\Http\Controllers\Vault\VaultController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +35,7 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
             Route::get('/scheduler', [SchedulerController::class, 'index'])
                 ->name('organizations.scheduler.index');
             Route::post('/scheduler', [SchedulerController::class, 'store'])
+                ->middleware(RequireSchedulingSchema::class)
                 ->name('organizations.scheduler.store');
             Route::post('/vault/direct-upload', [DirectUploadController::class, 'create'])
                 ->middleware('throttle:30,1')
