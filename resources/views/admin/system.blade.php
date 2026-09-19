@@ -264,7 +264,9 @@
                     </p>
                     <div class="gf-system-grid">
                         @foreach (['ffmpeg' => 'FFmpeg', 'ffprobe' => 'FFprobe'] as $tool => $label)
-                            @php($toolState = $mediaToolStatus[$tool])
+                            @php
+                                $toolState = $mediaToolStatus[$tool];
+                            @endphp
                             <article class="gf-system-item" data-media-tool="{{ $tool }}:{{ $toolState }}">
                                 <div class="gf-system-item__label">{{ $label }}</div>
                                 <div class="gf-system-item__row">
