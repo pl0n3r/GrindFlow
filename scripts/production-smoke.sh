@@ -116,7 +116,7 @@ import re
 import sys
 
 SEMVER = re.compile(r"^[0-9]+[.][0-9]+[.][0-9]+$")
-LEGACY = re.compile(r"\\bGrindFlow v([0-9]+[.][0-9]+[.][0-9]+)\\b")
+LEGACY = re.compile(r"\bGrindFlow v([0-9]+[.][0-9]+[.][0-9]+)\b")
 
 class ReleaseParser(HTMLParser):
     def __init__(self):
