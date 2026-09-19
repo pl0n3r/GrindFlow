@@ -47,10 +47,12 @@
 
                 <span class="gf-sidebar__label">Insights</span>
 
-                <a class="gf-navitem" href="{{ route('organizations.traffic.index', ['organizationId' => $organization->id]) }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                    <span class="gf-navitem__text">Traffic</span>
-                </a>
+                @if (auth()->user()?->canManageTrafficOrganization($organization))
+                    <a class="gf-navitem" href="{{ route('organizations.traffic.index', ['organizationId' => $organization->id]) }}">
+                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
+                        <span class="gf-navitem__text">Traffic</span>
+                    </a>
+                @endif
 
                 @if (auth()->user()?->canManageFinanceOrganization($organization))
                     <a class="gf-navitem" href="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}">

@@ -79,7 +79,7 @@ class MediaVaultTest extends TestCase
             ->assertSee(route('organizations.distribution.index', [
                 'organizationId' => $organization->getKey(),
             ]))
-            ->assertSee(route('organizations.traffic.index', [
+            ->assertDontSee(route('organizations.traffic.index', [
                 'organizationId' => $organization->getKey(),
             ]))
             ->assertDontSee(route('organizations.finance.index', [
@@ -89,6 +89,12 @@ class MediaVaultTest extends TestCase
                 'organizationId' => $otherOrganization->getKey(),
             ]))
             ->assertDontSee('hidden.jpg');
+
+        $this->actingAs($user)
+            ->get(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
+            ->assertForbidden();
 
         $this->actingAs($user)
             ->get(route('organizations.vault.index', [
@@ -110,6 +116,9 @@ class MediaVaultTest extends TestCase
                 'organizationId' => $organization->getKey(),
             ]))
             ->assertOk()
+            ->assertSee(route('organizations.traffic.index', [
+                'organizationId' => $organization->getKey(),
+            ]))
             ->assertSee(route('organizations.finance.index', [
                 'organizationId' => $organization->getKey(),
             ]))

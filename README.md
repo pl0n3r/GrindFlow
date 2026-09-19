@@ -20,9 +20,9 @@
 | Work line | 🚧 **GF-UX · Navegación móvil y Vault** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **v0.1.1 · PR #90 fusionado** | `main` `9c183dab05690d78b7b08f5b226d54b058187187` |
 | Version | 🚧 **v0.1.2** | patch de navegación accesible |
-| CI del PR | 🚧 **pendiente del head final** | GrindFlow CI / validate |
-| Sonar | 🚧 **pendiente** | Quality Gate del PR |
-| CodeRabbit | 🚧 **pendiente** | review sobre head estable |
+| CI del PR | 🚧 **revalidar fixes CodeRabbit** | #35428827933 verde antes del fix |
+| Sonar | 🚧 **revalidar fixes CodeRabbit** | Quality Gate OK antes del fix |
+| CodeRabbit | 🚧 **2 hallazgos corregidos en código** | Traffic por rol y prueba CSS |
 | CI del SHA exacto de main | 🚧 **v0.1.2 por verificar tras merge** | v0.1.1 verde: #35428328028 |
 | Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes en run #35428327988 |
 | Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + aprobación expresa |
@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+128** | **−40** | **+88** |
+| **6** | **+163** | **−56** | **+107** |
 
 ## Calidad y entrega
 
@@ -42,7 +42,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| Tests | enlaces reales, organización visible/ajena, empty state y versión |
+| Tests | Vault por rol/tenant, Traffic 403, navegación CSS móvil y accesibilidad |
 | Autorización | sin cambios de roles ni permiso por UI; rutas tenant-scoped ya protegidas |
 | Producción | migraciones y deploy siguen controles separados |
 
@@ -74,8 +74,8 @@ flowchart LR
 
 - En móviles el rail inferior permite desplazarse entre todos los destinos autorizados; ya no oculta la quinta ruta en adelante.
 - En pantallas medianas los nombres del rail compacto conservan accesibilidad para lectores de pantalla.
-- Vault enlaza Distribution y Traffic; Finance aparece solo para roles con permiso y en la organización activa.
-- Incorpora regresiones tenant-scoped, de roles y CSS. Bump v0.1.2, sin schema ni publicación externa.
+- Vault enlaza Distribution y, para roles autorizados, Traffic y Finance dentro de la organización activa.
+- Incorpora regresiones tenant-scoped, Traffic 403, de roles y CSS. Bump v0.1.2, sin schema ni publicación externa.
 
 ## Archivos modificados en este deploy
 
@@ -89,7 +89,7 @@ flowchart LR
 ## Validación
 
 - CI / validate del SHA exacto de main v0.1.1 verde (#35428328028); Smoke #35428327988 reportó siete migraciones pendientes.
-- v0.1.2 requiere CI / validate, Sonar y CodeRabbit sobre head estable; después, CI exact-main.
+- v0.1.2 CI / validate #35428827933 y Sonar verdes antes de corregir hallazgos de CodeRabbit; revalidar sobre head final y después exact-main.
 - Migraciones, backup externo, identidad desplegada y pruebas productivas permanecen independientes.
 
 ## Qué sigue
