@@ -12,13 +12,13 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-005 · Distribution core v1** | PR #70 abierto · review fixes aplicados |
-| Base exacta | ✅ **main** | `3a9a8229da059fddea2e7da11c4a73cd39dd27b7` |
-| Scheduling dependency | ✅ **GF-FR-004 merged** | PR #67 + snapshot post-merge #68 |
-| CI del SHA exacto de main | ⚪ **no observable por el conector** | no se atribuye evidencia de eventos `push` no expuestos |
-| Validación PR | 🟠 **rerun pendiente** | CI #283 + Sonar pasaron en `e6ea2883…`; CodeRabbit encontró 4 findings funcionales ya corregidos en el head actual |
-| Producción | ⚪ **sin cambios** | ningún provider real, secret o publicación externa habilitada |
-| Migraciones | 🟠 **1 nueva en este slice** | `publication_deliveries`; no se aplica automáticamente |
+| Work line | ✅ **GF-FR-005 · Distribution core v1** | MERGED por squash en PR #70 |
+| Main exacto | ✅ **main** | `f3abe464565bbccab8ec1e3be4c2e4597164cb04` |
+| Validación del feature | ✅ **PR #70 validado** | GrindFlow CI #297 completo + Sonar Quality Gate passed |
+| Code review | ✅ **findings funcionales corregidos** | starvation, queue outage, lease fencing y rate-limit budget cubiertos por regresiones |
+| CI del SHA exacto de main | ⚪ **no observable por el conector** | no se atribuye evidencia `push` que el conector no expone |
+| Producción | ⚪ **sin cambios** | ningún provider real, secret ni publicación externa habilitada |
+| Migraciones | 🟠 **pendientes de aprobación** | Scheduling/Distribution permanecen deploy-before-migration safe |
 
 ## Huella del cambio
 
@@ -36,94 +36,69 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| GrindFlow CI | `validate` exige success real de cada gate seleccionado |
-| Sonar | análisis independiente + comentario estable del PR |
-| CodeRabbit | full review completado; findings funcionales corregidos y nueva revisión requerida |
-| Migración | nunca se ejecuta automáticamente desde este PR |
-| Producción | providers reales permanecen deshabilitados |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| GrindFlow CI | snapshot docs-only: contratos + dashboard exacto |
+| Feature CI | PR #70 → CI #297 completo ✅ |
+| Sonar | Quality Gate passed en PR #70 |
+| Migraciones | no se ejecutan desde este PR documental |
+| Producción | no se modifica desde este PR documental |
 
 ## Flujo de entrega
 
 ```mermaid
 flowchart LR
-    A["PR + snapshot exacto"] --> P["preflight"]
-    P --> F["fast contracts"]
-    P --> Q["php-quality"]
-    P --> T["PHPUnit"]
-    P --> D["MariaDB"]
-    P --> B["browser"]
-    A --> S["Sonar"]
-    A --> C["CodeRabbit full review"]
-    F --> V["validate"]
-    Q --> V
-    T --> V
-    D --> V
-    B --> V
-    V --> M["Squash merge"]
-    M --> X["CI exact-main"]
-    M --> R["Production Smoke"]
-    R --> G["Aplicar migración con aprobación"]
+    A["PR #70 validado"] --> M["Squash merge"]
+    M --> N["main f3abe464…"]
+    N --> D["Snapshot docs-only"]
+    N --> X["CI exact-main (no observable)"]
+    N --> R["Production Smoke pendiente"]
+    R --> G["Migraciones solo con aprobación"]
 ```
 
 ## Qué se hizo
 
-- Añade `publication_deliveries` como estado tenant-owned único por schedule.
-- Cada delivery conserva una idempotency key estable reutilizada en todos los retries.
-- Añade `DistributionProvider`, registry y resultado normalizado sin credenciales reales.
-- Clasifica provider auth, rate-limit y transient sin persistir mensajes/payloads crudos.
-- Auth es terminal; rate-limit agenda retry entre 60 y 3600 segundos **sin gastar intentos**.
-- Transient usa backoff persistente y máximo **4 intentos**.
-- `queued` y `processing` usan lease de 5 minutos para recuperar jobs abandonados.
-- Revalida actor, tenant, schedule, destino y processing actual inmediatamente antes de provider I/O.
-- El scheduler filtra terminales/leases y pagina más allá de actores inválidos para evitar starvation.
-- Los writes post-provider usan fencing por `processing + attempts`; un worker con lease vencida no puede pisar un takeover.
-- Fallos del backend de cola quedan como retry persistente, no como terminal.
-- Publicaciones ya exitosas son no-op en ejecuciones posteriores.
-- Añade comando/schedule `grindflow:dispatch-publications` cada minuto.
-- Deploy-before-migration es seguro: sin `publication_deliveries`, el tick devuelve 0.
-- Pruebas usan provider fake; no hay publicaciones externas reales.
+- Sincroniza el dashboard después del merge de Distribution core v1.
+- Registra `main` exacto en `f3abe464565bbccab8ec1e3be4c2e4597164cb04`.
+- Registra CI #297 y Sonar como evidencia del head final del PR #70.
+- Mantiene exact-main CI, Production Smoke y migraciones como evidencias/acciones separadas.
+- No cambia runtime, schema, providers, secrets ni producción.
 
 ## Archivos modificados en este deploy
 
-- `AGENTS.md` — reglas durables de distribución e idempotencia.
-- `README.md` — dashboard exacto del slice.
-- `app/Contracts/DistributionProvider.php` — contrato de provider.
-- `app/Jobs/DispatchScheduledPublication.php` — job tenant-aware e idempotente.
-- `app/Models/PublicationDelivery.php` — lifecycle persistente del delivery.
-- `app/Models/ScheduledPublication.php` — relación schedule → delivery.
-- `app/Providers/AppServiceProvider.php` — registry singleton.
-- `app/Services/Distribution/DistributionProviderException.php` — clasificación segura de fallos.
-- `app/Services/Distribution/DistributionProviderRegistry.php` — resolución de providers.
-- `app/Services/Distribution/DistributionResult.php` — resultado normalizado.
-- `app/Services/Distribution/DistributionScheduler.php` — descubrimiento de due/retry sin starvation.
-- `app/Services/Distribution/PublicationDeliveryManager.php` — claim, retry, idempotencia y estado.
-- `database/migrations/2026_09_19_021500_create_publication_deliveries_table.php` — schema de distribution.
-- `docs/REQUIREMENTS.md` — verificación GF-FR-005.
-- `routes/console.php` — comando + scheduler de distribución.
-- `tests/Feature/DistributionTest.php` — auth/rate-limit/retry/idempotencia/tenant/migration safety.
+- `README.md` — snapshot documental post-merge de GF-FR-005.
 
 ## Validación
 
-- Estado actual: **PR #70 OPEN · review fixes aplicados** en `feat/distribution-core-v1`.
-- Base exacta: `3a9a8229da059fddea2e7da11c4a73cd39dd27b7`.
-- Scheduling core v1 ya está fusionado; este slice solo construye distribución encima de schedules válidos.
-- La nueva migración no se ejecuta desde CI ni desde esta rama.
-- No se registran providers reales ni se usan access tokens, refresh tokens o secrets.
-- Auth, rate-limit sin gasto de intentos, transient exhaustion, queue outage, fencing de lease, redrive, idempotencia y starvation tienen regresiones dedicadas.
-- Producción permanece sin mutaciones externas.
+- Distribution core v1 ya está **MERGED en `main`**.
+- PR #70 pasó GrindFlow CI #297 completo y Sonar Quality Gate.
+- Los findings funcionales previos de CodeRabbit quedaron corregidos con regresiones dedicadas.
+- La revisión final de CodeRabbit seguía procesándose al momento del merge y no tenía threads abiertos.
+- El conector no expone CI `push` para el SHA exacto de `main`; no se atribuye esa evidencia.
+- La migración `publication_deliveries` **no se ha ejecutado en producción**.
+- No hay providers reales registrados ni mutaciones externas habilitadas.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Revalidar PR #70 tras los findings funcionales de CodeRabbit y cerrar todos los threads. |
-| **NEXT** | Squash merge + validación exact-main; mantener deploy/Production Smoke como evidencia separada. |
-| **NEXT** | Diseñar primer adapter real detrás del contrato, con credenciales cifradas y sandbox antes de producción. |
-| **BLOCKED / EXTERNAL** | Migraciones de Scheduling/Distribution y providers reales requieren aprobación/configuración operacional. |
-| **LATER** | GF-FR-006 Traffic attribution sobre publicaciones ya distribuidas. |
+| **NOW** | Cerrar snapshot post-merge de Distribution. |
+| **NEXT** | GF-FR-006 Traffic attribution sobre publicaciones distribuidas. |
+| **NEXT** | Diseñar primer adapter real detrás de `DistributionProvider`, con sandbox y credenciales cifradas. |
+| **BLOCKED / EXTERNAL** | Migraciones Scheduling/Distribution y providers reales requieren aprobación/configuración operacional. |
+| **LATER** | Production Smoke exact-main cuando exista evidencia observable. |
 
 ## Panorama general pendiente
+
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | Distribution | core v1 MERGED en `main` |
+| **NEXT** | Traffic attribution | GF-FR-006 |
+| **NEXT** | Distribution providers | adapters reales + auth/reconnect por plataforma |
+| **BLOCKED / EXTERNAL** | Scheduling/Distribution producción | migration approval + Smoke |
+| **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
+| **LATER** | Legacy retirement | solo tras los requisitos GF-MIG pendientes |
+
+
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
