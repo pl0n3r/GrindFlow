@@ -14,6 +14,7 @@ use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class SchedulingTest extends TestCase
@@ -102,41 +103,38 @@ class SchedulingTest extends TestCase
         );
     }
 
-    public function test_incomplete_or_stale_media_cannot_enter_scheduled_state(): void
+    public function test_scheduled_utc_is_read_as_utc_with_non_utc_application_timezone(): void
     {
         $user = User::factory()->create();
         $organization = Organization::factory()->create();
 
-        $this->membership($user, $organization, UserRole::Studio);
+        $this->membership($user, $organization, UserRole::Editor);
 
         [$asset, $destination] = app(TenantContext::class)->runWithinOrganization(
             $user,
             (string) $organization->getKey(),
-            function (): array {
-                $asset = $this->readyAsset([
-                    'processing' => [
-                        'version' => app(MediaAssetProcessor::class)->currentVersion(),
-                        'status' => 'failed',
-                        'attempts' => 1,
-                        'last_error' => 'processing_failed',
-                    ],
-                ]);
-
-                $destination = PublishingDestination::query()->create([
+            fn (): array => [
+                $this->readyAsset(),
+                PublishingDestination::query()->create([
                     'name' => 'Primary channel',
                     'provider' => 'provider-test',
                     'status' => PublishingDestination::STATUS_ACTIVE,
-                ]);
-
-                return [$asset, $destination];
-            },
+                ]),
+            ],
         );
 
-        $this->from(
-            route('organizations.scheduler.index', [
-                'organizationId' => $organization->getKey(),
-            ]),
-        )->actingAs($user)
+        $timezone = 'America/Bogota';
+        $local = CarbonImmutable::now($timezone)
+            ->addDays(2)
+            ->startOfMinute()
+            ->format('Y-m-d\TH:i');
+        $expectedUtc = CarbonImmutable::createFromFormat(
+            '!Y-m-d\TH:i',
+            $local,
+            $timezone,
+        )->setTimezone('UTC');
+
+        $this->actingAs($user)
             ->post(
                 route('organizations.scheduler.store', [
                     'organizationId' => $organization->getKey(),
@@ -144,14 +142,112 @@ class SchedulingTest extends TestCase
                 [
                     'asset_id' => $asset->getKey(),
                     'destination_id' => $destination->getKey(),
-                    'scheduled_for_local' => now('UTC')
-                        ->addDay()
-                        ->format('Y-m-d\TH:i'),
-                    'timezone' => 'UTC',
+                    'scheduled_for_local' => $local,
+                    'timezone' => $timezone,
                 ],
             )
-            ->assertRedirect()
-            ->assertSessionHasErrors('asset_id');
+            ->assertRedirect();
+
+        $originalPhpTimezone = date_default_timezone_get();
+        $originalAppTimezone = (string) config('app.timezone');
+
+        try {
+            date_default_timezone_set('America/New_York');
+            config(['app.timezone' => 'America/New_York']);
+
+            app(TenantContext::class)->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                function () use ($expectedUtc): void {
+                    $publication = ScheduledPublication::query()->firstOrFail();
+
+                    $this->assertSame(
+                        'UTC',
+                        $publication->scheduled_for_utc->getTimezone()->getName(),
+                    );
+                    $this->assertSame(
+                        $expectedUtc->format('Y-m-d H:i:s'),
+                        $publication->scheduled_for_utc->format('Y-m-d H:i:s'),
+                    );
+                },
+            );
+        } finally {
+            config(['app.timezone' => $originalAppTimezone]);
+            date_default_timezone_set($originalPhpTimezone);
+        }
+    }
+
+    public function test_incomplete_or_stale_media_cannot_enter_scheduled_state(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        [$assets, $destination] = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function (): array {
+                $currentVersion = app(MediaAssetProcessor::class)->currentVersion();
+                $cases = [
+                    [
+                        'version' => $currentVersion,
+                        'status' => 'failed',
+                        'attempts' => 1,
+                        'last_error' => 'processing_failed',
+                    ],
+                    [
+                        'version' => $currentVersion,
+                        'status' => 'queued',
+                        'attempts' => 0,
+                        'last_error' => null,
+                    ],
+                    [
+                        'version' => max(0, $currentVersion - 1),
+                        'status' => 'completed',
+                        'attempts' => 1,
+                        'last_error' => null,
+                    ],
+                ];
+
+                $assets = collect($cases)
+                    ->map(fn (array $processing): MediaAsset => $this->readyAsset([
+                        'processing' => $processing,
+                    ]))
+                    ->all();
+
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Primary channel',
+                    'provider' => 'provider-test',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+
+                return [$assets, $destination];
+            },
+        );
+
+        foreach ($assets as $asset) {
+            $this->from(
+                route('organizations.scheduler.index', [
+                    'organizationId' => $organization->getKey(),
+                ]),
+            )->actingAs($user)
+                ->post(
+                    route('organizations.scheduler.store', [
+                        'organizationId' => $organization->getKey(),
+                    ]),
+                    [
+                        'asset_id' => $asset->getKey(),
+                        'destination_id' => $destination->getKey(),
+                        'scheduled_for_local' => now('UTC')
+                            ->addDay()
+                            ->format('Y-m-d\TH:i'),
+                        'timezone' => 'UTC',
+                    ],
+                )
+                ->assertRedirect()
+                ->assertSessionHasErrors('asset_id');
+        }
 
         app(TenantContext::class)->runWithinOrganization(
             $user,
@@ -350,6 +446,46 @@ class SchedulingTest extends TestCase
                 ]),
             )
             ->assertNotFound();
+    }
+
+    public function test_scheduler_endpoints_are_safe_before_scheduling_migration(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Editor);
+
+        Schema::dropIfExists('scheduled_publications');
+        Schema::dropIfExists('publishing_destinations');
+
+        $migrationPath = database_path(
+            'migrations/2026_09_18_200000_create_scheduling_tables.php',
+        );
+
+        try {
+            $route = route('organizations.scheduler.index', [
+                'organizationId' => $organization->getKey(),
+            ]);
+
+            $this->actingAs($user)
+                ->get($route)
+                ->assertOk()
+                ->assertSee('Scheduling migration required.');
+
+            $this->actingAs($user)
+                ->post($route, [
+                    'asset_id' => fake()->uuid(),
+                    'destination_id' => fake()->uuid(),
+                    'scheduled_for_local' => now('UTC')
+                        ->addDay()
+                        ->format('Y-m-d\TH:i'),
+                    'timezone' => 'UTC',
+                ])
+                ->assertStatus(503);
+        } finally {
+            $migration = require $migrationPath;
+            $migration->up();
+        }
     }
 
     private function readyAsset(?array $metadata = null): MediaAsset
