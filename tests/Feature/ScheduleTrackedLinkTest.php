@@ -20,10 +20,13 @@ use App\Services\Distribution\DistributionResult;
 use App\Services\Distribution\PublicationDeliveryManager;
 use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class ScheduleTrackedLinkTest extends TestCase
@@ -97,6 +100,44 @@ class ScheduleTrackedLinkTest extends TestCase
                 $this->assertSame(0, ScheduledPublicationLink::query()->count());
             },
         );
+    }
+
+    #[Group('database')]
+    public function test_composite_database_fk_rejects_cross_tenant_link_association(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MariaDB/MySQL is required for the composite FK contract.');
+        }
+
+        [$actor, $organization] = $this->identity();
+        [$otherActor, $otherOrganization] = $this->identity();
+        [$asset, $destination] = $this->fixtures($actor, $organization);
+        [, , $foreignLink] = $this->fixtures($otherActor, $otherOrganization);
+
+        $this->actingAs($actor)
+            ->post($this->indexRoute($organization), $this->payload(
+                $asset,
+                $destination,
+                null,
+            ))
+            ->assertRedirect();
+
+        $publication = app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $organization->getKey(),
+            fn (): ScheduledPublication => ScheduledPublication::query()->sole(),
+        );
+
+        $this->expectException(QueryException::class);
+
+        DB::table('scheduled_publication_links')->insert([
+            'id' => (string) Str::uuid(),
+            'organization_id' => $organization->getKey(),
+            'scheduled_publication_id' => $publication->getKey(),
+            'tracked_link_id' => $foreignLink->getKey(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_disabled_link_cannot_enter_a_schedule(): void
