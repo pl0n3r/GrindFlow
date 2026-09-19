@@ -5,7 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot del PR candidato v0.1.11: solo el deploy actual se valida contra el entorno, no solo con CI.** Base `main` v0.1.10 `6ae9e5489b0d758eb3c35f582c9a0d4ebfe2c127`: exact-main CI #35456229918 y Production Smoke read-only #35456229908 success. Identidad SHA checkout Hostinger pendiente.
+> **Snapshot PR v0.1.12: solo el deploy actual se valida con pruebas del entorno, no exclusivamente con GitHub CI.** Base `main` v0.1.11 `23484d5f933e342ebfc1f85e35c99da0816f1657`: CI #35456954310 y Production Smoke #35456954250 success. Git SHA exacto del checkout Hostinger sigue sin marcador independiente.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -14,34 +14,33 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-FR-004D · Calendario Scheduler completo y paginado** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.10 · PR #100 fusionado** | `6ae9e5489b0d758eb3c35f582c9a0d4ebfe2c127` |
-| Version | 🚧 **v0.1.11** | paginacion y filtros historicos |
-| CI del PR | 🚧 **pendiente** | validar head estable |
-| Sonar | 🚧 **pendiente** | Quality Gate por SHA |
+| Work line | 🚧 **GF-FR-007B · Reconciliacion financiera real** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.11 · PR #101 fusionado** | `23484d5f933e342ebfc1f85e35c99da0816f1657` |
+| Version | 🚧 **v0.1.12** | filtros, conciliacion por beneficiario, CSV |
+| CI del PR | 🚧 **pendiente** | validar head final |
+| Sonar | 🚧 **pendiente** | Quality Gate |
 | CodeRabbit | 🚧 **pendiente** | full review del head final |
-| CI del SHA exacto de main | ✅ **v0.1.10 validado** | validate #35456229918 |
-| Production Smoke | ✅ **v0.1.10 observado** | #35456229908, GET de modulos + CSV |
-| Deploy v0.1.11 | 🚧 **no confirmado** | Smoke posterior necesario |
-| Migraciones | ✅ **sin SQL nuevo** | consulta paginada sobre schema existente |
+| CI del SHA exacto de main | ✅ **v0.1.11 validado** | validate #35456954310 |
+| Production Smoke | ✅ **v0.1.11 observado** | #35456954250 |
+| Deploy v0.1.12 | 🚧 **no confirmado** | Smoke posterior a fusion |
+| Migraciones | ✅ **sin SQL nuevo** | utiliza ledger existente |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+389** | **−59** | **+330** |
+| **10** | **+771** | **−87** | **+684** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
-| Paging | 25 filas, total real, orden UTC + UUID, paginas >100 |
-| Filters | status, destination y fechas UTC preservados en Prev/Next |
-| Tenancy | total y paginas organizacion-scoped sin datos ajenos |
-| UI | muestra rango/total y advierte que el calendario es preview de pagina |
-| History | destinos deshabilitados filtrables; nuevos schedules solo activos |
-| Performance | delivery eager-loaded; selector de activos reutiliza lectura ordenada |
+| Query | Mismo ledger tenant-scoped en tabla, totales por moneda, reportes y CSV |
+| Agrupacion | Moneda + beneficiario; registros y reversas por propia fecha de evento |
+| Filtros | currency, beneficiary, from/to UTC; paginas 25 y sin limite 100 |
+| CSV | Todos los grupos, sin IDs/notas; escape anti-formula + no-store |
+| Acceso | Solo Admin/Studio, fallback 503 schema missing, no write externo |
 
 ## Flujo de entrega
 ```mermaid
@@ -66,43 +65,45 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- El listado Scheduler deja de ocultar publicaciones por un limite silencioso de 100: muestra paginas de 25 con conteo SQL real.
-- Orden estable por scheduled_for_utc e id, evitando duplicados/omisiones de pagina con horarios identicos.
-- Filtros de status/destino/fechas persisten en Previous y Next sin propagar parametros no validados; pagina positiva y acotada.
-- Historial de destinos deshabilitados se puede filtrar sin exponerlos como seleccion para nueva publicacion.
-- Mejor feedback para pagina fuera de rango y vista calendario claramente etiquetada como preview de la pagina actual.
-- Eager-load de delivery reduce consultas repetidas para controles de editar/cancelar.
-- Pruebas en >100 schedules, tenant ajeno, orden estable, filtro combinado, destinos inactivos y pagina invalida.
-- Sin migraciones ni publicacion a plataformas externas.
+- Finance ofrece vista de reconciliacion por moneda y beneficiario, monto asignado, reversado y neto en unidades menores.
+- Filtros combinables por moneda, beneficiario y periodo UTC aplican coherentemente a totales, desglose, historial y descarga.
+- Una reversa se registra en su propia fecha; el reporte diferencia neto de eventos vs saldos historicos y nunca mezcla monedas.
+- Ledger deja de truncar a primeras 100 filas: navegacion estable de 25 con filtro persistente y conteo total.
+- Descarga CSV de todos los grupos coincidentes aun si hay multiples paginas en el ledger; sin IDs privados ni notas, nombres anti-inyeccion.
+- Acceso seguro por tenant/rol, sin filtrar UUIDs extranjeros, seguro con migracion pendiente.
+- Nuevos tests con multiples monedas, reversa entre fechas, >50 asientos, CSV, fraude cross-tenant y filtros invalidos.
+- Ningun asiento se edita/elimina; no hay nueva migracion ni pagos a proveedores externos.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md` — regla durable paginacion/seguridad.
-- `README.md` — snapshot exacto v0.1.11.
-- `app/Http/Controllers/Scheduling/SchedulerController.php` — query paginada, total, filtros y eager-loading.
-- `config/version.php` — version humana 0.1.11.
-- `docs/GRINDFLOW-SPEC.md` — calendario navegable.
-- `docs/REQUIREMENTS.md` — GF-FR-004D.
-- `resources/views/scheduling/index.blade.php` — navegacion, rango y filtro historico.
-- `tests/Feature/SchedulingTest.php` — regresion de volumen y tenant.
+- `AGENTS.md` — reglas duraderas de reconciliacion.
+- `README.md` — snapshot v0.1.12.
+- `app/Http/Controllers/Finance/FinanceController.php` — filtros, grupos, paginacion y CSV seguro.
+- `app/Services/Finance/FinanceReconciliationReport.php` — consulta tenant-scoped reutilizable.
+- `config/version.php` — version 0.1.12.
+- `docs/GRINDFLOW-SPEC.md` — modelo event-date.
+- `docs/REQUIREMENTS.md` — GF-FR-007B.
+- `resources/views/finance/index.blade.php` — UI de conciliacion y navegacion.
+- `routes/web.php` — export solo autenticado y schema-ready.
+- `tests/Feature/FinanceReconciliationTest.php` — regresiones reportes/privacidad.
 
 ## Validación
-- Base v0.1.10: CI #35456229918, Production Smoke #35456229908 successful.
-- v0.1.11 necesita CI, Sonar, CodeRabbit y comprobacion exact-main/Smoke sin writes productivos.
-- Production Smoke read-only no cambia schedules y no verifica interacciones de cambio de pagina mediante navegador de produccion.
+- Base v0.1.11: CI #35456954310 y Production Smoke #35456954250 passed.
+- v0.1.12: CI/Sonar/CodeRabbit pendientes; exact-main/Smoke solo despues de merge.
+- Smoke es read-only y NO prueba escribir en Finance ni realizar conciliacion bancaria real.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Calendario Scheduler paginado v0.1.11. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 Media Storage/CORS/FFmpeg runtime #40. |
-| **LATER** | 🚧 Buscadores paginados para activos/enlaces y Finance reconciliation. |
-| **BLOCKED / EXTERNAL** | 🚧 Marcador SHA exacto Hostinger no disponible. |
+| **NOW** | 🚧 Entregar Finance reconciliation v0.1.12. [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 Media storage/CORS/FFmpeg runtime #40. |
+| **LATER** | 🚧 Finance import/reconciliacion contra extractos solo cuando existan datos de pagos y autorizacion. |
+| **BLOCKED / EXTERNAL** | 🚧 Marcador SHA exacto del checkout Hostinger. |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Traffic lifecycle + Scheduler link-edit #100~~ | ✅ ~~v0.1.10 CI + Smoke~~ |
-| **NOW** | 🚧 Paginar Scheduler sin corte a 100 | 🚧 v0.1.11 |
-| **NEXT** | 🚧 Media storage/FFmpeg | 🚧 #40 |
-| **LATER** | 🚧 Búsqueda assets/enlaces, Finance | 🚧 roadmap #88 |
+| **DONE** | ✅ ~~Scheduler paginado y link-edit~~ | ✅ ~~v0.1.11 CI+Smoke~~ |
+| **NOW** | 🚧 Finance reconciliation grouped + CSV | 🚧 v0.1.12 |
+| **NEXT** | 🚧 Media Storage / FFmpeg | 🚧 #40 |
+| **LATER** | 🚧 Import de cobros/payouts con pruebas | 🚧 roadmap #88 |
 | **BLOCKED / EXTERNAL** | 🚧 Git SHA checkout Hostinger | 🚧 observabilidad |

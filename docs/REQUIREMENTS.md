@@ -466,3 +466,30 @@ first-100 limit.
 **Verification:** 106 local plus foreign rows with equal UTC timestamps,
 total/page counts, deterministic page slices, disabled-destination
 status/date filters, malformed and out-of-range page parameters.
+
+### GF-FR-007B — Filtered Finance reconciliation and CSV
+**Status:** implemented
+
+**Statement:** Admin/Studio finance managers can reconcile their organization's
+immutable ledger events by currency and beneficiary without losing rows to a
+list preview cutoff.
+
+**Acceptance criteria:**
+- Same tenant-scoped filtered query underlies paginated ledger (25 events),
+  currency totals, beneficiary/currency totals and all-group CSV.
+- UTC from/to dates, three-letter currency and current-member/unassigned
+  beneficiary filters are validated. Reversals count on their own UTC
+  occurred_on, including a negative net if original is outside the period.
+- Totals are integer minor units and grouped by currency; no currency mixing.
+  No new mutable balance and no automatic compensation/reversal.
+- CSV returns complete grouped reconciliation independent of ledger page,
+  avoids raw IDs/notes, escapes formula-leading names and sets no-store,
+  private and nosniff headers.
+- Editor/Model and foreign organizations cannot export. When Finance schema
+  is absent, GET retains fallback while CSV returns 503 before query access.
+- Invalid/foreign beneficiary, dates, currency or pagination fail validation;
+  pagination retains only validated report filters.
+
+**Verification:** Finance feature tests for multi-currency/beneficiary event-date
+reversal, complete report >50 ledger rows, CSV formula hardening, cross-tenant
+records and permissions, invalid filters and schema-not-ready fallback.
