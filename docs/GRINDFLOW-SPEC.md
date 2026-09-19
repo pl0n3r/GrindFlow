@@ -115,7 +115,8 @@ Finance begins as a tenant-owned append-only revenue-allocation ledger.
 - Money is stored as positive integer minor units plus a three-letter currency
   code. Floating-point monetary persistence is prohibited.
 - Corrections are explicit reversal entries referencing the original row.
-  Originals and reversals are not edited or deleted as normal product actions.
+  Originals and reversals are not edited or deleted as normal product actions;
+  MariaDB enforces this with append-only UPDATE/DELETE triggers.
 - A beneficiary is optional and must belong to the same organization at write
   time. Actor and beneficiary deletion may null their user references without
   rewriting financial history.
