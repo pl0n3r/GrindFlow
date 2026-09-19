@@ -65,6 +65,7 @@ def main() -> None:
     check("invalid tool state", valid.replace("ffmpeg:disabled", "ffmpeg:other"), expected=2)
     check("missing module", valid.replace('data-module-readiness="vault:ready"', "data-ignored"), expected=2)
     check("duplicate module", valid.replace("</body>", '<article data-module-readiness="vault:ready"></article></body>'), expected=2)
+    check("duplicate attributes on one element", valid.replace('data-module-readiness="vault:ready"', 'data-module-readiness="vault:ready" data-module-readiness="vault:ready"'), expected=2)
     check("duplicate tool", valid.replace("</body>", '<article data-media-tool="ffmpeg:disabled"></article></body>'), expected=2)
     check("forged status", valid.replace("traffic:ready", "traffic:ready;"+SECRET), expected=2)
     check("extra status", valid.replace("</body>", '<article data-media-tool="unknown:disabled"></article></body>'), expected=2)
