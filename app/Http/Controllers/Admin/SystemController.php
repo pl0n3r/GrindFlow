@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\Media\DirectMediaUpload;
+use App\Support\Operations\MediaToolReadiness;
 use App\Support\Operations\MigrationReadiness;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class SystemController extends Controller
         Request $request,
         MigrationReadiness $readiness,
         DirectMediaUpload $directUploads,
+        MediaToolReadiness $mediaTools,
     ): View {
         $user = $request->user();
 
@@ -91,6 +93,7 @@ class SystemController extends Controller
             'pendingMigrationNames' => $pendingMigrationNames,
             'migrationFingerprint' => $migrationFingerprint,
             'moduleReadiness' => $moduleReadiness,
+            'mediaToolStatus' => $mediaTools->status(),
             'mediaStorageConfigured' => $mediaStorage['configured'],
             'mediaStorageDisk' => $mediaStorage['disk'],
             'mediaStorageDriver' => $mediaStorage['driver'],
