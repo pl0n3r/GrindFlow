@@ -12,12 +12,14 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-OPS · Migration readiness** | PR #79 abierto · revalidando correcciones |
-| Base exacta | ✅ **main** | `75a81c310ea3f7f768e5220de913d120dc9fcb35` |
-| Cambio | 🟠 **Admin > System** | inventario y aprobación del lote, sin ejecutar migraciones |
-| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | validación del PR y exact-main no son equivalentes |
-| Producción | ⚪ **sin cambios** | no se ejecutaron migraciones ni backups |
-| Riesgo externo | 🟠 **backup verificable** | responsabilidad explícita del operador |
+| Work line | ✅ **GF-OPS · Migration readiness** | MERGED en `main` por PR #79 |
+| Feature merge commit | ✅ **main** | `7c364d7b074eb016e6da9f944d350904ce46ccbd` |
+| CI del PR | ✅ **GrindFlow CI #344** | fast, PHP quality, PHPUnit, MariaDB, browser y validate |
+| Sonar | ✅ **Quality Gate OK** | 0 issues / 0 hotspots en PR #79 |
+| CodeRabbit | 🟠 **pending al merge** | no se atribuye revisión final no emitida |
+| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | PR CI y exact-main son distintos |
+| Production Smoke | 🟠 **pendiente de evidencia exact-main** | despliegue no inferido del merge |
+| Migraciones | 🟠 **sin ejecutar** | inventario y confirmación preparados, backup externo pendiente |
 
 ## Huella del cambio
 
@@ -25,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+405** | **−77** | **+328** |
+| **1** | **+0000** | **−0000** | **+0000** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -35,12 +37,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| GrindFlow CI | `validate` requiere éxito de todos los gates seleccionados |
-| Sonar | Quality Gate independiente del PR |
-| CodeRabbit | full review sobre head estable |
-| Migración | lectura y validación de lote, sin auto-ejecución |
-| Producción | no se toca desde este PR |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| GrindFlow CI | docs-only: contrato y dashboard exacto |
+| Sonar | análisis independiente del PR documental |
+| CodeRabbit | review documental no sustituye revisión del feature |
+| Migración | no se ejecuta desde este PR |
+| Producción | sin cambios desde este PR |
 
 ## Flujo de entrega
 
@@ -67,51 +69,43 @@ flowchart LR
 
 ## Qué se hizo
 
-- `Admin > System` muestra los nombres de migraciones pendientes, no solo su cantidad.
-- El lote incluye una huella SHA-256 de nombres y contenido de los archivos pendientes.
-- El POST exige platform admin, CSRF, confirmación `MIGRAR` y declaración explícita de backup externo restaurable.
-- El lote se reconsulta dentro del lock de migración; si cambió, se rechaza y exige nueva revisión.
-- Sin migraciones o sin inventario disponible, no aparece el formulario ejecutable.
-- Los mensajes de validación se muestran sin exponer código, secretos ni detalles de conexión.
-- La pantalla **no crea ni verifica técnicamente backups**, solo requiere confirmación humana.
-- Pruebas cubren acceso, ausencia de confirmación, lote obsoleto, flujo válido simulado y cambio de contenido.
-- No se ejecuta `migrate` en producción desde este desarrollo.
+- Registra el squash merge de Migration Readiness como `7c364d7b…`.
+- Preserva CI #344 y Sonar de PR #79 como evidencia de feature, no de exact-main.
+- Registra CodeRabbit pendiente al merge sin afirmar aprobación.
+- Mantiene backups externos y aplicación de migraciones como acciones del operador.
+- El guard disponible en el código exige inventario, fingerprint, confirmación `MIGRAR` y declaración de backup.
+- No cambia runtime, schema, secrets, hosting ni contenido productivo desde este PR documental.
 
 ## Archivos modificados en este deploy
 
-- `AGENTS.md` — regla durable para el operador.
-- `README.md` — dashboard exacto.
-- `app/Http/Controllers/Admin/RunMigrationsController.php` — guard de aprobación y lote.
-- `app/Http/Controllers/Admin/SystemController.php` — consulta de inventario.
-- `app/Support/Operations/MigrationReadiness.php` — huella estable de pendientes.
-- `resources/views/admin/system.blade.php` — revisión y confirmación de lote.
-- `tests/Feature/AdminMigrationReadinessTest.php` — regresiones de seguridad.
-- `tests/Feature/AdminMigrationTest.php` — prueba histórica adaptada al nuevo contrato.
+- `README.md` — snapshot posterior al merge y siguiente frente operativo.
 
 ## Validación
 
-- Base `main`: `75a81c310ea3f7f768e5220de913d120dc9fcb35`.
-- Feature GF-FR-006A y snapshot #78 ya estaban fusionados en la base.
-- La nueva funcionalidad es un guard operacional; no cambia schema de GrindFlow.
-- CI, deploy, migración y Production Smoke son estados separados.
+- Migration Readiness fue fusionado como `7c364d7b074eb016e6da9f944d350904ce46ccbd`.
+- PR #79 pasó GrindFlow CI #344 sobre el head `87a662a76125a556708dcd37700b1d213fbfff61`.
+- Sonar reportó Quality Gate OK, 0 issues y 0 hotspots.
+- CodeRabbit estaba pending al merge y no había threads abiertos.
+- No se ha verificado un backup externo desde GrindFlow ni se ejecutaron migraciones en producción.
+- Exact-main CI y Production Smoke siguen como evidencia separada.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Revalidar PR #79 tras corregir PHPUnit y Pint; inspeccionar Sonar y CodeRabbit. |
-| **NEXT** | Merge y validar el SHA exacto de main. |
-| **NEXT** | Revisar backup externo y migraciones pendientes en Admin > System antes de pedir aprobación operacional. |
-| **BLOCKED / EXTERNAL** | Storage S3, FFmpeg en hosting y migraciones de producción. |
-| **LATER** | Primer adapter real en sandbox y conciliación Finance. |
+| **NOW** | Verificar exact-main CI y Production Smoke del commit `7c364d7b…`. |
+| **NEXT** | Inspeccionar el lote de migraciones en Admin > System tras confirmar despliegue. |
+| **NEXT** | Aplicar migraciones solo con aprobación y backup externo restaurable verificado. |
+| **BLOCKED / EXTERNAL** | Storage S3, FFmpeg y operaciones del hosting. |
+| **LATER** | Provider real en sandbox y conciliación Finance. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Migration readiness | PR #79 abierto · pendiente gates |
-| **NEXT** | Production Smoke | requiere evidencia exact-main |
-| **NEXT** | Scheduling/Distribution/Traffic/Finance | migraciones bajo aprobación |
+| **NOW** | Exact-main delivery | PR #79 MERGED; CI y Smoke de merge por confirmar |
+| **NEXT** | Migration readiness producción | backup externo + inventario + aprobación |
+| **NEXT** | Scheduling/Distribution/Traffic/Finance | migraciones productivas pendientes |
 | **BLOCKED / EXTERNAL** | Hosting/storage | S3 + FFmpeg |
-| **LATER** | Provider adapters | sandbox + credenciales cifradas |
+| **LATER** | Provider adapters | sandbox y credenciales cifradas |
 | **LATER** | Legacy retirement | solo tras GF-MIG |
