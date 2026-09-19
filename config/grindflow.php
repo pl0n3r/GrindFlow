@@ -59,6 +59,10 @@ return [
                 'MEDIA_FFMPEG_TIMEOUT_SECONDS',
                 60,
             ),
+            'preview_seconds' => (int) env(
+                'MEDIA_FFMPEG_PREVIEW_SECONDS',
+                8,
+            ),
         ],
         'connector_max_bytes' => (int) env(
             'MEDIA_CONNECTOR_MAX_BYTES',
