@@ -35,13 +35,25 @@ class SystemController extends Controller
         try {
             DB::connection()->select('select 1');
             $databaseOnline = true;
-            $snapshot = $readiness->snapshot();
-            $pendingMigrationNames = $snapshot['names'];
-            $pendingMigrations = count($pendingMigrationNames);
-            $migrationFingerprint = $snapshot['fingerprint'];
-            $workspaceOrganization = Organization::query()->orderBy('name')->first();
         } catch (Throwable) {
-            $databaseOnline = false;
+            // A failed connection is distinct from a failed schema inventory.
+        }
+
+        if ($databaseOnline) {
+            try {
+                $snapshot = $readiness->snapshot();
+                $pendingMigrationNames = $snapshot['names'];
+                $pendingMigrations = count($pendingMigrationNames);
+                $migrationFingerprint = $snapshot['fingerprint'];
+            } catch (Throwable) {
+                // Unknown migration state must never enable the migration form.
+            }
+
+            try {
+                $workspaceOrganization = Organization::query()->orderBy('name')->first();
+            } catch (Throwable) {
+                // Workspace navigation is optional on the operational status page.
+            }
         }
 
         $mediaStorage = $directUploads->status();
