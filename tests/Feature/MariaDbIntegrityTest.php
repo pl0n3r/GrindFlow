@@ -102,6 +102,7 @@ class MariaDbIntegrityTest extends TestCase
             'updated_at' => now(),
         ]);
     }
+
     private function financeAllocation(
         User $user,
         Organization $organization,
