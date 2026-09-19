@@ -316,12 +316,6 @@
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    @if($canSchedule && $publication->status === 'scheduled' && $publication->scheduled_for_utc?->isFuture() && ! $publication->delivery)
-                                                        <details><summary>Edit</summary><form class="gf-form" method="POST" action="{{ route('organizations.scheduler.update',['organizationId'=>$organization->id,'publicationId'=>$publication->id]) }}">@csrf @method('PATCH')<input class="gf-input" name="scheduled_for_local" type="datetime-local" value="{{ $publication->scheduled_for_utc->setTimezone($publication->timezone)->format('Y-m-d\\TH:i') }}" required><input type="hidden" name="timezone" value="{{ $publication->timezone }}"><button class="gf-button gf-button--ghost">Save</button></form></details>
-                                                        <form method="POST" action="{{ route('organizations.scheduler.cancel',['organizationId'=>$organization->id,'publicationId'=>$publication->id]) }}">@csrf<button class="gf-button gf-button--ghost">Cancel</button></form>
-                                                    @else — @endif
-                                                </td>
-                                                <td>
                                                     {{ $publication->destination?->name ?? 'Missing destination' }}
                                                     <div class="gf-media-meta">
                                                         {{ $publication->destination?->provider ?? 'unknown' }}
@@ -342,6 +336,34 @@
                                                     <span class="gf-state gf-state--ok">
                                                         {{ $publication->status }}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    @if ($canSchedule && $publication->status === 'scheduled' && $publication->scheduled_for_utc?->isFuture() && ! $publication->delivery)
+                                                        <details>
+                                                            <summary>Edit</summary>
+                                                            <form class="gf-form" method="POST" action="{{ route('organizations.scheduler.update', ['organizationId' => $organization->id, 'publicationId' => $publication->id]) }}">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <label for="scheduled_for_{{ $publication->id }}">New local time</label>
+                                                                <input
+                                                                    class="gf-input"
+                                                                    id="scheduled_for_{{ $publication->id }}"
+                                                                    name="scheduled_for_local"
+                                                                    type="datetime-local"
+                                                                    value="{{ $publication->scheduled_for_utc->setTimezone($publication->timezone)->format('Y-m-d\\TH:i') }}"
+                                                                    required
+                                                                >
+                                                                <input type="hidden" name="timezone" value="{{ $publication->timezone }}">
+                                                                <button class="gf-button gf-button--ghost">Save</button>
+                                                            </form>
+                                                        </details>
+                                                        <form method="POST" action="{{ route('organizations.scheduler.cancel', ['organizationId' => $organization->id, 'publicationId' => $publication->id]) }}">
+                                                            @csrf
+                                                            <button class="gf-button gf-button--ghost">Cancel</button>
+                                                        </form>
+                                                    @else
+                                                        —
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach
