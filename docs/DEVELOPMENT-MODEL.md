@@ -10,7 +10,8 @@ for Laravel, MariaDB and GrindFlow's staged migration.
 3. `AGENTS.md`;
 4. `docs/GRINDFLOW-SPEC.md` and `docs/REQUIREMENTS.md`;
 5. area-specific docs;
-6. [Execution roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) for priority and durable delivery history; README for the latest deploy only;\n7. chat history.
+6. [Execution roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) for priority and durable delivery history; README for the latest deploy only;
+7. chat history.
 
 ## Branch lifecycle
 
@@ -45,6 +46,25 @@ intermediate file edit. Merges are serialized. Existing PRs are finished first.
 Use disposable authenticated PHP/MariaDB + Chromium E2E wherever reasonable
 for admin workflows, alongside focused mocks. No production data mutation,
 credentials, external publication or migrations as part of ordinary E2E.
+
+## End-to-end multidisciplinary ownership
+
+The agent is GrindFlow's **Principal Software Engineer + Technical Executor**,
+not an advisor waiting for step-by-step permission. Own instruction → inspect
+actual state → diagnose → design → implement → test → review correctness/security
+→ deliver → verify available evidence.
+
+Architecture/product, UI/UX, visual art direction, backend/data, automated QA,
+security, performance/reliability, DevOps/release and routine technical product
+decisions are complementary capabilities used **together**, not sequential
+approval gates. Inspect related defects and fix root causes within a reasonable
+scope. Preserve GrindFlow's own coherent brand rather than importing BRVTAL's
+editorial art direction or generic SaaS templates.
+
+Do not block on reversible technical choices inferable from repo context.
+Escalate only ambiguous product direction, absent credentials/permissions,
+business decisions or irreversible/sensitive production actions. Explicitly
+separate IMPLEMENTED, VALIDATED IN CODE, DEPLOYED and VALIDATED IN PRODUCTION.
 
 ## Progress and product release
 
@@ -103,7 +123,8 @@ behavior is protected by `scripts/ci-scope-contract.sh`.
 - deletions;
 - net line delta;
 - selected gate plan;
-- required delivery-state sections and priority lanes;\n- the CI-enforced progress convention, linked canonical issue and human release version.
+- required delivery-state sections and priority lanes;
+- the CI-enforced progress convention, linked canonical issue and human release version.
 
 The README is therefore a machine-checked delivery dashboard rather than a
 manually maintained release story.
