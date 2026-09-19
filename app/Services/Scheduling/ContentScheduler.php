@@ -168,6 +168,8 @@ class ContentScheduler
                 }
             }
 
+            $hasRequestKeyColumn = Schema::hasColumn('scheduled_publications', 'request_key');
+
             return $lockedDestinations->map(function (PublishingDestination $destination) use (
                 $lockedAsset,
                 $actor,
@@ -175,6 +177,7 @@ class ContentScheduler
                 $timezone,
                 $trackedLink,
                 $requestKey,
+                $hasRequestKeyColumn,
             ): ScheduledPublication {
                 $attributes = [
                     'media_asset_id' => $lockedAsset->getKey(),
@@ -183,10 +186,13 @@ class ContentScheduler
                     'status' => ScheduledPublication::STATUS_SCHEDULED,
                     'scheduled_for_utc' => $scheduledForUtc,
                     'timezone' => $timezone,
-                    'request_key' => $requestKey,
                 ];
 
-                $publication = $requestKey === null || Schema::hasColumn('scheduled_publications', 'request_key') === false
+                if ($hasRequestKeyColumn) {
+                    $attributes['request_key'] = $requestKey;
+                }
+
+                $publication = $requestKey === null || $hasRequestKeyColumn === false
                     ? ScheduledPublication::query()->create($attributes)
                     : ScheduledPublication::query()->firstOrCreate(
                         [
