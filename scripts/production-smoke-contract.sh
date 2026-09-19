@@ -76,6 +76,64 @@ run_case() {
   local result
   if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
+  grep -Eq '^RELEASE_UI_EXPECTED=v[0-9]+\.[0-9]+\.[0-9]+    pending*)
+      grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
+      if [[ "$vault_mode" == failed || "$vault_mode" == missing_link ]]; then grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed while migrations remain pending' "$log"; else grep -Fxq 'VAULT_READ_ONLY=ok' "$log"; grep -Fxq 'MEDIA_STORAGE_READY=0' "$log"; fi
+      if [[ "$inventory_mode" == valid ]]; then grep -Fxq 'MIGRATION_INVENTORY_STATUS=verified' "$log"; grep -Fxq 'MIGRATION_NAME=2026_09_19_000001_first' "$log"; grep -Fxq 'MIGRATION_NAME=2026_09_19_000002_second' "$log"; grep -Fxq 'MIGRATION_NAME=2026_09_19_000003_third' "$log"; grep -Eq '^MIGRATION_BATCH_SHA256=[a-f0-9]{64}$' "$log"; [[ "$(grep -c '^MIGRATION_NAME=' "$log")" -eq 3 ]]; else grep -Fxq 'MIGRATION_INVENTORY_STATUS=unavailable' "$log"; ! grep -Eq '^MIGRATION_(NAME|BATCH_SHA256)=' "$log"; fi
+      ! grep -Fq 'do-not-leak-csrf' "$log"; ! grep -Fq 'never-print' "$log"; ! grep -Fq 'Production smoke attempt 2/' "$log"; ! grep -Eq '/(scheduler|distribution|traffic|finance)' "$requests";;
+    current)
+      grep -Fxq 'VAULT_READ_ONLY=ok' "$log"
+      grep -Eq '^RELEASE_UI_OBSERVED=v[0-9]+\.[0-9]+\.[0-9]+$' "$log"
+      for module in scheduler distribution traffic finance traffic-csv; do grep -Fxq "MODULE_READ_ONLY=$module:ok" "$log"; done
+      [[ "$(grep -c '^MODULE_READ_ONLY=.*:ok$' "$log")" -eq 5 ]]
+      grep -Fq 'PASS production smoke:' "$log"
+      ! grep -q '^MIGRATIONS_PENDING=' "$log"
+      [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
+      [[ "$(grep -c '^GET http://mock/organizations/example/traffic/export$' "$requests")" -eq 1 ]]
+      ;;
+    current_module_failure|current_csv_failure)
+      grep -Fxq 'MODULE_READ_ONLY=failed' "$log"
+      grep -Fq 'ERROR: read-only workspace module check failed; no repeated login requests.' "$log"
+      ! grep -Fq 'Production smoke attempt 2/' "$log"
+      [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
+      ;;
+    current_stale_release)
+      grep -Fxq 'RELEASE_UI_OBSERVED=v0.0.0' "$log"
+      grep -Fq 'observed v0.0.0.' "$log"
+      ! grep -q '^MODULE_READ_ONLY=' "$log"
+      ;;
+    current_missing_release|current_ambiguous_release)
+      grep -Fxq 'RELEASE_UI_OBSERVED=unknown' "$log"
+      grep -Fq 'ERROR: production release label is missing or ambiguous' "$log"
+      ! grep -q '^MODULE_READ_ONLY=' "$log"
+      ;;
+    current_vault_failure|current_vault_link_missing)
+      grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; ! grep -Fq 'Production smoke attempt 2/' "$log";;
+  esac
+  printf 'PASS production smoke contract: %s\n' "$label"
+}
+
+run_case pending 3 2
+run_case pending_missing 3 2 missing
+run_case pending_mismatch 3 2 mismatch
+run_case pending_unsafe 3 2 unsafe
+run_case pending_no_fingerprint 3 2 no_fingerprint
+run_case pending_vault_failure 3 3 valid failed
+run_case pending_vault_link_missing 3 3 valid missing_link
+run_case current 0 0
+run_case current_module_failure 0 5 valid ok failed
+run_case current_csv_failure 0 5 valid ok ok failed
+run_case current_stale_release 0 1 valid ok ok ok stale
+run_case current_missing_release 0 1 valid ok ok ok missing
+run_case current_ambiguous_release 0 1 valid ok ok ok ambiguous
+run_case current_vault_failure 0 4 valid failed
+run_case current_vault_link_missing 0 4 valid missing_link
+
+if MOCK_PENDING=unknown MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/unknown.log" 2>&1; then printf 'FAIL: unknown schema passed smoke.\n' >&2; exit 1; else result=$?; fi
+[[ "$result" -eq 1 ]]
+grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unknown.log"
+! grep -q '^MIGRATIONS_PENDING=' "$workdir/unknown.log"
+printf 'PASS production smoke contract: unknown\n' "$log"
   case "$label" in
     pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
