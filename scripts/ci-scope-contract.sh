@@ -43,7 +43,10 @@ expect_flag "$service" "run_php_quality=true" "Laravel service selects php-quali
 expect_flag "$service" "run_tests=true" "Laravel service selects tests"
 expect_flag "$service" "run_database=false" "Laravel service does not force database"
 expect_flag "$service" "run_browser=false" "Laravel service does not force browser"
-expect_flag "$service" "run_realstack=false" "Laravel service does not force real-stack"
+expect_flag "$service" "run_realstack=true" "Laravel service selects real-stack"
+
+provider="$(run_scope pull_request app/Support/Operations/ReleaseCacheGuard.php)"
+expect_flag "$provider" "run_realstack=true" "Laravel support service selects real-stack"
 
 model="$(run_scope pull_request app/Models/MediaAsset.php)"
 expect_flag "$model" "run_database=true" "model selects database"

@@ -722,7 +722,7 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
   agregada para branch protection.
 - Cada PR y push exacto a `main` empieza con un `preflight` corto que calcula
   el diff y ejecuta el clasificador reusable `scripts/ci-scope.sh`.
-- `fast`, `php-quality`, `tests`, `database`, `browser` y `legacy`
+- `fast`, `php-quality`, `tests`, `database`, `browser`, `real-stack` y `legacy`
   salen directamente de `preflight` cuando aplican. Ningun gate pesado espera a
   que termine otro gate independiente.
 - `fast` siempre existe despues de preflight y protege contratos operativos,
@@ -1081,7 +1081,8 @@ se despliega por contenedores: Hostinger usa el checkout Git y PHP/MariaDB.
 | `config/`, `bootstrap/`, `database/` | Configuración, bootstrap, migraciones y seeders |
 | `tests/Feature/`, `tests/Unit/`, `tests/Browser/` | Regresiones y E2E descartable |
 | `.github/workflows/` | CI, observer de release y smoke separado |
-| `docs/`, `AGENTS.md`, `ROADMAP.md` | Referencias durables y roadmap maestro |
+| `docs/`, `AGENTS.md` | Decisiones durables y especificaciones |
+| `ROADMAP.md` | Acceso al roadmap maestro, Issue #2; sin progreso paralelo |
 | `src/`, `workers/`, `supabase/` | Solo legado hasta paridad GF-MIG-003 |
 
 ## Mapa del legado (referencia historica)

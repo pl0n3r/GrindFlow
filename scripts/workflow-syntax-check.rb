@@ -68,5 +68,7 @@ script = probe.fetch("run")
 abort "Observer must probe only the public version marker" unless script.include?("/_deployment?probe=")
 abort "Observer must never claim the remote SHA" unless script.include?("Hostinger checkout SHA: **NOT OBSERVED**")
 abort "Observer must fail on missing release" unless script.include?('[[ "$observed" == true ]] || exit 1')
-abort "Observer must be read-only" if script.match?(/curl[^\n]*(?:--data|--request| -X | -d )/)
+abort "Observer must use exactly one curl request" unless script.scan(/\bcurl\b/).length == 1
+abort "Observer must be read-only" if script.match?(/--(?:data(?:-[a-z-]+)?|request|upload-file|form(?:-string)?|json)\b|(?:^|\s)-(?:X|d|F|T)(?:\s|$)/m)
+abort "Observer must validate all marker fields and types" unless script.include?('.exact == false and .commit == null and .source == "release-only"')
 puts "PASS release-only deploy observer shell and safety contract"

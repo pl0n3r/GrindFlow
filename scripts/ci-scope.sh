@@ -74,6 +74,7 @@ grindflow_ci_classify_files() {
         grindflow_ci_scope_add_area "Laravel application"
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
         GRINDFLOW_SCOPE_RUN_TESTS=true
+        GRINDFLOW_SCOPE_RUN_REALSTACK=true
         ;;
       config/version.php)
         grindflow_ci_scope_add_area "Product release metadata"

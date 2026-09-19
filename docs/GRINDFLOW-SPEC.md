@@ -317,13 +317,16 @@ The execution roadmap and durable progress history live in
 - El timeline de eventos se carga solo para la página y muestra fallback si su migración está ausente.
 - Las métricas globales por estado continúan independientes del total filtrado. Página fuera de rango muestra una ruta de recuperación; nunca mezcla tenants.
 
-## 22. Release observation and isolated real-stack regression
+## 22. Observación del release y regresión real-stack aislada
 
-The public read-only `/_deployment` marker exposes only the committed human
-release with `exact=false`, `commit=null`, `source=release-only` and no-store.
-It establishes **DEPLOYED release** when observed, never the exact Hostinger Git
-SHA or functional validation. Authenticated production smoke remains separate.
+El marcador público de solo lectura `/_deployment` expone únicamente la versión
+humana versionada, con `exact=false`, `commit=null`, `source=release-only` y
+`no-store`. Observar la versión esperada acredita **release desplegado
+observado**, nunca el SHA exacto del checkout Hostinger ni la validación
+funcional. El Production Smoke autenticado es una señal independiente.
+El endpoint no inicia sesión ni consulta MariaDB, aunque las sesiones
+normales estén almacenadas en la base de datos.
 
-The CI `real-stack` lane runs disposable authenticated Chromium on MariaDB
-11.4 alongside the SQLite browser lane. Neither uses production credentials,
-external publishing or production writes.
+La compuerta CI `real-stack` ejecuta Chromium autenticado sobre MariaDB 11.4
+descartable y complementa `browser` sobre SQLite. Ninguna usa credenciales
+productivas, proveedores externos ni escrituras en producción.

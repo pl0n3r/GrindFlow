@@ -10,7 +10,8 @@ La compuerta estable es `GrindFlow CI / validate`. Internamente agrega:
 | `php-quality` | Composer, sintaxis PHP, Pint y Larastan | cuando existe Laravel |
 | `tests` | PHPUnit feature/unit con SQLite rapido | cuando existe Laravel |
 | `database` | migraciones y pruebas sensibles contra MariaDB 11.4 | cuando cambian DB/modelos o manual |
-| `browser` | Laravel real + Chrome headless sobre landing/login/dashboard invitado | cuando cambia UI/HTTP/rutas o manual |
+| `browser` | Laravel + Chromium autenticado sobre SQLite desechable | cuando cambia UI/HTTP/rutas o manual |
+| `real-stack` | El mismo recorrido Chromium autenticado sobre MariaDB 11.4 desechable | cuando cambia runtime Laravel, DB o UI y en full/manual |
 | `legacy` | lint/typecheck/tests del stack Next/TypeScript | mientras exista el legado |
 | `validate` | agrega los gates anteriores en un nombre estable | siempre |
 
@@ -57,9 +58,9 @@ Los cambios en `resources/`, `app/Livewire/`, `app/Http/`,
 Si falla, GitHub Actions conserva DOM, screenshots y
 `storage/logs/browser-server.log` como artefactos de diagnostico.
 
-Este smoke usa SQLite desechable porque valida HTTP/renderizado, no el contrato
-SQL. El gate `database` con MariaDB sigue siendo autoritativo para migraciones
-e invariantes del motor.
+Este smoke usa SQLite desechable para feedback rápido; `real-stack` valida
+el recorrido HTTP sobre MariaDB. El gate `database` conserva pruebas dirigidas
+a migraciones e invariantes SQL.
 
 ## Legado TypeScript/Supabase
 
