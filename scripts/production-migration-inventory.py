@@ -9,11 +9,11 @@ from __future__ import annotations
 import re
 import sys
 from html.parser import HTMLParser
-from pathlib import Path
 
 NAME = re.compile(r"[A-Za-z0-9_]{1,180}\Z")
 FINGERPRINT = re.compile(r"[a-f0-9]{64}\Z")
 MAX_MIGRATIONS = 200
+MAX_HTML_BYTES = 1_000_000
 
 
 class MigrationInventory(HTMLParser):
@@ -75,19 +75,23 @@ class MigrationInventory(HTMLParser):
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         print("ERROR: migration inventory invocation is invalid.", file=sys.stderr)
         return 2
 
     try:
-        expected = int(sys.argv[2])
+        expected = int(sys.argv[1])
         if expected < 1 or expected > MAX_MIGRATIONS:
             raise ValueError
-        page = Path(sys.argv[1]).read_text(encoding="utf-8")
+        # Read only the authenticated page piped by Smoke. No CLI-controlled
+        # filesystem paths, and never accept an unbounded HTML response.
+        page = sys.stdin.read(MAX_HTML_BYTES + 1)
+        if len(page) > MAX_HTML_BYTES:
+            raise ValueError
         parser = MigrationInventory()
         parser.feed(page)
         parser.close()
-    except (OSError, UnicodeError, ValueError):
+    except (UnicodeError, ValueError):
         print("ERROR: migration inventory cannot be verified.", file=sys.stderr)
         return 2
 
