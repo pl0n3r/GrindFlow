@@ -20,8 +20,8 @@
 | Work line | 🚧 **GF-OPS · Diagnóstico de esquema y Smoke** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **v0.1.2 · PR #91 fusionado** | `main` `98ad68b32fea1e56538b7386cd32f6eb7699b1d3` |
 | Version | 🚧 **v0.1.3** | patch de observabilidad segura |
-| CI del PR | 🚧 **revalidando head estable** | CI #423 debe verificar el delta exacto final |
-| Sonar | 🚧 **revalidación del head final pendiente** | Quality Gate de `d793768` OK; no extrapolar al head nuevo |
+| CI del PR | 🚧 **revalidando head estable** | CI #424 verificó contratos y suites; snapshot se resincroniza en este head |
+| Sonar | 🚧 **revalidación del head final pendiente** | no extrapolar Quality Gate de un SHA anterior |
 | CodeRabbit | 🚧 **revisión final pendiente** | hallazgos anteriores resueltos; requiere cobertura del head estable |
 | CI del SHA exacto de main | 🚧 **v0.1.3 por verificar tras merge** | v0.1.2 CI #35430357855 |
 | Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes |
@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+337** | **−425** | **−88** |
+| **11** | **+337** | **−425** | **-88** |
 
 ## Calidad y entrega
 
@@ -97,8 +97,8 @@ flowchart LR
 ## Validación
 
 - v0.1.2 PR #91 fusionado; la identidad real del checkout Hostinger sigue sin verificar.
-- En v0.1.3, CI #423 debe confirmar el head final. El run anterior #35437805923 confirmó contratos Smoke, php-quality, PHPUnit, MariaDB y browser; `fast` falló únicamente porque la huella machine-checkable requería `+337/−425` (neto `−88`).
-- Sonar sobre `d793768` pasó con 0 nuevos issues y 0 security hotspots; el head final debe volver a completar Sonar y CodeRabbit antes del merge.
+- En v0.1.3, CI #424 confirmó preflight, los 11 escenarios del contrato Production Smoke, php-quality, PHPUnit, MariaDB y browser. `fast` falló únicamente porque el snapshot escribía el signo menos tipográfico `−88`; el contrato exige literalmente `-88`. Este head corrige esa representación y debe revalidarse completo.
+- Sonar y CodeRabbit deben cubrir el head final antes del merge; no se extrapolan resultados de SHA anteriores.
 - Las migraciones, backup externo y validación productiva requieren evidencia separada.
 
 ## Qué sigue
