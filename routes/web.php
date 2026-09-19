@@ -22,6 +22,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
+Route::get('/_deployment', static function (): \Illuminate\Http\JsonResponse {
+    // Version humana observable, sin inferir el SHA del checkout remoto.
+    return response()->json([
+        'version' => (string) config('version.number'),
+        'exact' => false,
+        'commit' => null,
+        'source' => 'release-only',
+    ])->header('Cache-Control', 'no-store, max-age=0')
+        ->header('X-Content-Type-Options', 'nosniff');
+})->name('deployment.marker');
+
 Route::get('/l/{token}', TrackedLinkRedirectController::class)
     ->middleware('throttle:120,1')
     ->where('token', '[A-Za-z0-9]{22}')

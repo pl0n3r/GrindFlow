@@ -12,6 +12,7 @@ grindflow_ci_scope_reset() {
   GRINDFLOW_SCOPE_RUN_TESTS=false
   GRINDFLOW_SCOPE_RUN_DATABASE=false
   GRINDFLOW_SCOPE_RUN_BROWSER=false
+  GRINDFLOW_SCOPE_RUN_REALSTACK=false
   GRINDFLOW_SCOPE_RUN_LEGACY=false
   GRINDFLOW_SCOPE_AREAS=""
 }
@@ -30,6 +31,7 @@ grindflow_ci_scope_all() {
   GRINDFLOW_SCOPE_RUN_TESTS=true
   GRINDFLOW_SCOPE_RUN_DATABASE=true
   GRINDFLOW_SCOPE_RUN_BROWSER=true
+  GRINDFLOW_SCOPE_RUN_REALSTACK=true
   GRINDFLOW_SCOPE_RUN_LEGACY=true
 }
 
@@ -125,6 +127,11 @@ grindflow_ci_classify_files() {
     esac
   done <<< "$changed_file_list"
 
+  # UI or database changes also require Chromium on disposable MariaDB.
+  if [[ "$GRINDFLOW_SCOPE_RUN_DATABASE" == true || "$GRINDFLOW_SCOPE_RUN_BROWSER" == true ]]; then
+    GRINDFLOW_SCOPE_RUN_REALSTACK=true
+  fi
+
   if [[ -z "$GRINDFLOW_SCOPE_AREAS" ]]; then
     GRINDFLOW_SCOPE_AREAS="None detected"
   fi
@@ -136,6 +143,7 @@ grindflow_ci_scope_print() {
   printf 'run_tests=%s\n' "$GRINDFLOW_SCOPE_RUN_TESTS"
   printf 'run_database=%s\n' "$GRINDFLOW_SCOPE_RUN_DATABASE"
   printf 'run_browser=%s\n' "$GRINDFLOW_SCOPE_RUN_BROWSER"
+  printf 'run_realstack=%s\n' "$GRINDFLOW_SCOPE_RUN_REALSTACK"
   printf 'run_legacy=%s\n' "$GRINDFLOW_SCOPE_RUN_LEGACY"
   printf 'areas=%s\n' "$GRINDFLOW_SCOPE_AREAS"
 }

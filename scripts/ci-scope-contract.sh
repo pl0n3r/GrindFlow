@@ -27,6 +27,7 @@ expect_flag "$docs" "run_php_quality=false" "docs skip php-quality"
 expect_flag "$docs" "run_tests=false" "docs skip tests"
 expect_flag "$docs" "run_database=false" "docs skip database"
 expect_flag "$docs" "run_browser=false" "docs skip browser"
+expect_flag "$docs" "run_realstack=false" "docs skip real-stack"
 expect_flag "$docs" "run_legacy=false" "docs skip legacy"
 
 release="$(run_scope pull_request README.md AGENTS.md config/version.php)"
@@ -34,6 +35,7 @@ expect_flag "$release" "run_php_quality=false" "human release metadata stays fas
 expect_flag "$release" "run_tests=false" "human release metadata skips tests"
 expect_flag "$release" "run_database=false" "human release metadata skips MariaDB"
 expect_flag "$release" "run_browser=false" "human release metadata skips browser"
+expect_flag "$release" "run_realstack=false" "human release metadata skips real-stack"
 expect_flag "$release" "run_legacy=false" "human release metadata skips legacy"
 
 service="$(run_scope pull_request app/Services/Media/MediaAssetProcessor.php)"
@@ -41,24 +43,27 @@ expect_flag "$service" "run_php_quality=true" "Laravel service selects php-quali
 expect_flag "$service" "run_tests=true" "Laravel service selects tests"
 expect_flag "$service" "run_database=false" "Laravel service does not force database"
 expect_flag "$service" "run_browser=false" "Laravel service does not force browser"
+expect_flag "$service" "run_realstack=false" "Laravel service does not force real-stack"
 
 model="$(run_scope pull_request app/Models/MediaAsset.php)"
 expect_flag "$model" "run_database=true" "model selects database"
+expect_flag "$model" "run_realstack=true" "model selects MariaDB real-stack"
 
 view="$(run_scope pull_request resources/views/vault/index.blade.php)"
 expect_flag "$view" "run_browser=true" "view selects browser"
+expect_flag "$view" "run_realstack=true" "view selects real-stack"
 
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
 ci_core="$(run_scope pull_request .github/workflows/grindflow-ci.yml)"
-for flag in run_php_quality run_tests run_database run_browser run_legacy; do
+for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy; do
   expect_flag "$ci_core" "$flag=true" "CI core forces $flag"
 done
 expect_flag "$ci_core" "full=true" "CI core marks full validation"
 
 manual="$(run_scope workflow_dispatch)"
-for flag in run_php_quality run_tests run_database run_browser run_legacy; do
+for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy; do
   expect_flag "$manual" "$flag=true" "manual dispatch forces $flag"
 done
 expect_flag "$manual" "full=true" "manual dispatch marks full validation"
@@ -67,6 +72,7 @@ mixed="$(run_scope pull_request app/Services/Media/MediaAssetProcessor.php resou
 expect_flag "$mixed" "run_php_quality=true" "mixed keeps php-quality"
 expect_flag "$mixed" "run_tests=true" "mixed keeps tests"
 expect_flag "$mixed" "run_browser=true" "mixed unions browser"
+expect_flag "$mixed" "run_realstack=true" "mixed unions real-stack"
 expect_flag "$mixed" "run_legacy=true" "mixed unions legacy"
 
 printf 'GrindFlow CI scope contract passed.\n'

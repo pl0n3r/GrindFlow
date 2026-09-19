@@ -302,8 +302,8 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 ### E2E en navegador autenticado (CI aislado)
 
 - `scripts/browser-smoke.sh` termina ejecutando
-  `scripts/browser-workflow.sh` SOLO en DB SQLite descartable del
-  browser job (`APP_ENV=testing`), usando `E2eSeeder` con 106 assets y
+  `scripts/browser-workflow.sh` en SQLite descartable del
+  browser job y MariaDB descartable del real-stack job (`APP_ENV=testing`), usando `E2eSeeder` con 106 assets y
   links sinteticos, 27 schedules, 7 clicks diarios y 2500 COP de Finance.
   Seeder prohibe entornos no local/testing y debe ser idempotente.
 - El recorrido browser descubrio 404 falso en reverse Finance: la ruta padre
@@ -807,6 +807,18 @@ Reglas:
   CI/Sonar canonicos verdes, se documenta como reviewer pendiente; no se inventa
   una aprobacion.
 
+### Observacion de deploy y real-stack
+
+- GET `/_deployment` devuelve solo version humana y no usa base de datos:
+  `exact=false`, `commit=null`, `source=release-only`. Sin secretos,
+  detalle interno de hosting ni datos de usuarios.
+- `GrindFlow Deploy Observer` observa la version en Hostinger despues de cada
+  push a main, por separado del CI y Production Smoke. Solo permite afirmar
+  **DEPLOYED release**; nunca inferir el SHA remoto por version coincidente.
+- Los gates `browser` (SQLite) y `real-stack` (MariaDB 11.4) ejecutan el
+  mismo recorrido autenticado sobre bases descartables; no usar Hostinger
+  ni datos o credenciales reales para E2E con escrituras.
+
 ### Regla de visibilidad de SonarQube Cloud
 
 - SonarQube Cloud conserva **Automatic Analysis** como unica fuente de analisis; no se agrega un segundo scanner mientras siga habilitado.
@@ -1125,17 +1137,26 @@ Preguntas abiertas para el arquitecto antes de empezar:
    algo mas cercano a la estetica del sector?
 4. ¿Hay restricciones de accesibilidad (contraste minimo, tamano de fuente)?
 
-## Estado por modulo
+## Estado por modulo y vigencia de memoria
 
-| Modulo | Estado |
-|---|---|
-| 1 — Roles y aislamiento | Completo y probado |
-| 2 — Ingesta y vault | Completo: subidas, Dropbox, Drive, triaje y escaneo automatico. Falta ejecutarlo contra las APIs reales |
-| 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
-| 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
-| 5 — Distribucion | Laravel: dashboard, destinos sandbox y retries probados en PR #87; providers reales y produccion pendientes; legado TS aun requiere paridad |
-| 6 — Enlaces y trafico | Laravel: enlaces, filtros y panel de metricas implementados y validados por CI en PR #87; no validado en produccion pendiente de esquema |
-| 7 — Finanzas | Laravel: ledger append-only tenant-owned validado en codigo, operacion productiva bloqueada por migraciones; legacy hasta GF-MIG-003 |
+El registro actual es [roadmap general #2](https://github.com/pl0n3r/GrindFlow/issues/2),
+`docs/REQUIREMENTS.md` y código de `main`. No interpretar números de PR del
+propietario anterior como PRs abiertos del repositorio transferido.
+
+- Laravel/MariaDB cubre identidad, Vault, ingesta, procesamiento, Scheduling,
+  Distribution, Traffic y Finance con pruebas; paridad completa y producción
+  exigen evidencias independientes.
+- Dropbox/Drive están probados con respuestas sintéticas, no con cuentas reales.
+- Distribution dispone de proveedor sandbox; no afirmar conexión externa real.
+- Finance registra ledger interno; no incluye payouts ni integración bancaria.
+
+### Archivo histórico del legado: no es arquitectura vigente
+
+Los apartados siguientes conservan decisiones y riesgos de Next.js,
+PostgreSQL/Supabase y VPS/Docker. El objetivo operativo vigente es Laravel 13,
+PHP 8.5, MariaDB y Hostinger: consultar `docs/GRINDFLOW-SPEC.md` y
+`docs/DEPLOY-HOSTINGER.md` antes de planificar. Una afirmación histórica
+nunca decide nuevos gates, DB, despliegue ni credenciales.
 
 ## Riesgos cerrados
 

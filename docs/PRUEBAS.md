@@ -74,3 +74,15 @@ Laravel/MariaDB antes de retirar la implementacion anterior.
 - Las integraciones externas aun necesitan smoke tests contra servicios reales.
 - Los modulos de ingesta, procesamiento, scheduling, distribucion, trafico y
   finanzas deben obtener cobertura Laravel al migrarse.
+
+## Real-stack MariaDB + Chromium (GF-NFR-006)
+
+El gate `real-stack` ejecuta el mismo `scripts/browser-smoke.sh` que
+`browser`, pero con Laravel sobre MariaDB 11.4 descartable y cuenta E2E
+sintética. SQLite sigue para feedback rápido y no sustituye la paridad de
+motor de producción.
+
+Seeder restringido a APP_ENV testing/local; password generado y enmascarado
+por run; fixtures y DB aisladas; cero proveedores externos. Los scripts de
+navegador que escriben nunca deben ejecutarse contra Hostinger. El Smoke
+productivo es un workflow separado de solo lectura.

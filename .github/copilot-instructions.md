@@ -13,7 +13,9 @@ tests/decisions override stale prose.
 - Work on one focused issue or requirement at a time.
 - During the migration, do not rewrite working TypeScript merely for style.
 - New application code targets PHP/Laravel unless the migration plan explicitly says otherwise.
-- MariaDB/MySQL is the canonical Laravel database; PostgreSQL belongs to the retained legacy reference.
+- MariaDB/MySQL is the canonical Laravel database; PostgreSQL belongs only to the retained legacy reference.
+- Use both SQLite browser and MariaDB real-stack lanes when the changed scope selects them.
+- `/_deployment` observes the human release, never the exact Hostinger checkout SHA.
 - Prefer a modular monolith: Laravel + Blade/Livewire + queues/scheduler.
 - Reuse Laravel conventions before introducing custom framework layers.
 - Authorization and tenant isolation must be enforced server-side.

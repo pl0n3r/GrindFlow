@@ -1,0 +1,66 @@
+name: GrindFlow Deploy Observer
+run-name: GrindFlow Deploy Observer #${{ github.run_number }} · ${{ github.ref_name }}
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-deploy-observer
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: release-deploy-marker
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PRODUCTION_URL: https://www.grindflow.com.co
+      EXPECTED_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Check out exact main source
+        uses: actions/checkout@v5
+      - name: Read expected human release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(php -r '$v = require "config/version.php"; echo $v["number"];')"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          echo "EXPECTED_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Observe release marker without production writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed=false
+          for attempt in $(seq 1 50); do
+            payload="$(curl -fsS --connect-timeout 3 --max-time 5 \
+              -H 'Cache-Control: no-cache' \
+              "${PRODUCTION_URL}/_deployment?probe=${GITHUB_RUN_ID}-${attempt}" || true)"
+            version="$(jq -r '.version // empty' <<< "$payload" 2>/dev/null || true)"
+            exact="$(jq -r '.exact // empty' <<< "$payload" 2>/dev/null || true)"
+            source="$(jq -r '.source // empty' <<< "$payload" 2>/dev/null || true)"
+            if [[ "$version" == "$EXPECTED_VERSION" && "$exact" == "false" && "$source" == "release-only" ]]; then
+              observed=true
+              break
+            fi
+            if [[ "$attempt" -lt 50 ]]; then sleep 8; fi
+          done
+          {
+            echo '## GrindFlow production release observation'
+            echo
+            echo "- Expected release: \`v$EXPECTED_VERSION\`"
+            echo "- Expected source SHA from GitHub: \`$EXPECTED_SOURCE_SHA\`"
+            echo '- Hostinger checkout SHA: **NOT OBSERVED**'
+            if [[ "$observed" == true ]]; then
+              echo '- State: **DEPLOYED RELEASE OBSERVED** (not functional validation)'
+            else
+              echo '- State: **RELEASE NOT OBSERVED** (check hPanel Git connection, branch and propagation)'
+            fi
+            echo '- Production Smoke is a separate authenticated/read-only signal.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [[ "$observed" == true ]] || exit 1

@@ -316,3 +316,14 @@ The execution roadmap and durable progress history live in
 - Filtros validados status/destino/fechas/página preservados en Previous/Next; ningún parámetro arbitrario viaja a enlaces.
 - El timeline de eventos se carga solo para la página y muestra fallback si su migración está ausente.
 - Las métricas globales por estado continúan independientes del total filtrado. Página fuera de rango muestra una ruta de recuperación; nunca mezcla tenants.
+
+## 22. Release observation and isolated real-stack regression
+
+The public read-only `/_deployment` marker exposes only the committed human
+release with `exact=false`, `commit=null`, `source=release-only` and no-store.
+It establishes **DEPLOYED release** when observed, never the exact Hostinger Git
+SHA or functional validation. Authenticated production smoke remains separate.
+
+The CI `real-stack` lane runs disposable authenticated Chromium on MariaDB
+11.4 alongside the SQLite browser lane. Neither uses production credentials,
+external publishing or production writes.

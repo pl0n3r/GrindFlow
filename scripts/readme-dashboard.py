@@ -84,6 +84,7 @@ def gate_plan(scope: dict[str, str]) -> str:
             ("run_tests", "PHPUnit"),
             ("run_database", "MariaDB"),
             ("run_browser", "browser"),
+            ("run_realstack", "real-stack"),
             ("run_legacy", "legacy"),
         )
         if scope.get(key) == "true"

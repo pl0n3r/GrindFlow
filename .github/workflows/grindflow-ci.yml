@@ -31,6 +31,7 @@ jobs:
       run_tests: ${{ steps.scope.outputs.run_tests }}
       run_database: ${{ steps.scope.outputs.run_database }}
       run_browser: ${{ steps.scope.outputs.run_browser }}
+      run_realstack: ${{ steps.scope.outputs.run_realstack }}
       run_legacy: ${{ steps.scope.outputs.run_legacy }}
       full: ${{ steps.scope.outputs.full }}
       base_sha: ${{ steps.scope.outputs.base_sha }}
@@ -92,7 +93,7 @@ jobs:
 
           while IFS='=' read -r key value; do
             case "$key" in
-              full|run_php_quality|run_tests|run_database|run_browser|run_legacy)
+              full|run_php_quality|run_tests|run_database|run_browser|run_realstack|run_legacy)
                 echo "$key=$value" >> "$GITHUB_OUTPUT"
                 ;;
             esac
@@ -445,6 +446,121 @@ jobs:
             kill "$(cat /tmp/grindflow-browser-server.pid)" 2>/dev/null || true
           fi
 
+  realstack:
+    name: real-stack
+    needs: preflight
+    if: needs.preflight.outputs.has_php == 'true' && needs.preflight.outputs.run_realstack == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: grindflow_realstack_ci
+          MARIADB_USER: grindflow
+          MARIADB_PASSWORD: grindflow
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8000
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_DATABASE: grindflow_realstack_ci
+      DB_USERNAME: grindflow
+      DB_PASSWORD: grindflow
+      CACHE_STORE: array
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      BASE_URL: http://127.0.0.1:8000
+      E2E_USER_EMAIL: e2e-browser@grindflow.test
+      E2E_USER_NAME: E2E Browser User
+      E2E_ORG_NAME: E2E Browser Workspace
+      E2E_ORG_SLUG: e2e-browser-workspace
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_mysql
+          coverage: none
+      - id: composer-cache
+        name: Locate Composer cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress
+      - name: Prepare Laravel browser environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -n .env.example .env || true
+          php artisan key:generate --force
+          php artisan migrate:fresh --force
+          mkdir -p storage/logs tests/Browser/artifacts
+
+          E2E_PASSWORD="$(php -r 'echo bin2hex(random_bytes(24));')"
+          # Mask before GITHUB_ENV makes the temporary password visible to
+          # subsequent step environment diagnostics. Never print the value.
+          printf '::add-mask::%s\n' "$E2E_PASSWORD"
+          echo "E2E_USER_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
+          export E2E_USER_PASSWORD="$E2E_PASSWORD"
+
+          php artisan db:seed --class='Database\Seeders\E2eSeeder' --force
+      - name: Start Laravel
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan serve --host=127.0.0.1 --port=8000 --no-reload > storage/logs/browser-server.log 2>&1 &
+          echo $! > /tmp/grindflow-browser-server.pid
+
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8000/up >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$ready" != "true" ]]; then
+            cat storage/logs/browser-server.log >&2 || true
+            exit 1
+          fi
+      - name: Real browser smoke
+        run: bash scripts/browser-smoke.sh
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: realstack-diagnostics
+          path: |
+            tests/Browser/artifacts
+            storage/logs/browser-server.log
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Stop Laravel
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/grindflow-browser-server.pid ]]; then
+            kill "$(cat /tmp/grindflow-browser-server.pid)" 2>/dev/null || true
+          fi
+
   legacy:
     name: legacy
     needs: preflight
@@ -468,7 +584,7 @@ jobs:
   validate:
     name: validate
     if: always()
-    needs: [preflight, fast, php-quality, tests, database, browser, legacy]
+    needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -481,11 +597,13 @@ jobs:
           TESTS_RESULT: ${{ needs.tests.result }}
           DATABASE_RESULT: ${{ needs.database.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
+          REALSTACK_RESULT: ${{ needs.realstack.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
           RUN_PHP_QUALITY: ${{ needs.preflight.outputs.run_php_quality }}
           RUN_TESTS: ${{ needs.preflight.outputs.run_tests }}
           RUN_DATABASE: ${{ needs.preflight.outputs.run_database }}
           RUN_BROWSER: ${{ needs.preflight.outputs.run_browser }}
+          RUN_REALSTACK: ${{ needs.preflight.outputs.run_realstack }}
           RUN_LEGACY: ${{ needs.preflight.outputs.run_legacy }}
         run: |
           set -euo pipefail
@@ -528,6 +646,7 @@ jobs:
           require_optional tests "$RUN_TESTS" "$TESTS_RESULT"
           require_optional database "$RUN_DATABASE" "$DATABASE_RESULT"
           require_optional browser "$RUN_BROWSER" "$BROWSER_RESULT"
+          require_optional real-stack "$RUN_REALSTACK" "$REALSTACK_RESULT"
           require_optional legacy "$RUN_LEGACY" "$LEGACY_RESULT"
 
           if [[ "$failures" -ne 0 ]]; then
@@ -544,6 +663,7 @@ jobs:
           TESTS_RESULT: ${{ needs.tests.result }}
           DATABASE_RESULT: ${{ needs.database.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
+          REALSTACK_RESULT: ${{ needs.realstack.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
         run: |
           {
@@ -557,5 +677,6 @@ jobs:
             echo "| PHPUnit | **$TESTS_RESULT** |"
             echo "| MariaDB | **$DATABASE_RESULT** |"
             echo "| browser | **$BROWSER_RESULT** |"
+            echo "| real-stack MariaDB | **$REALSTACK_RESULT** |"
             echo "| legacy | **$LEGACY_RESULT** |"
           } >> "$GITHUB_STEP_SUMMARY"
