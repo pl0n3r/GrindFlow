@@ -14,9 +14,9 @@
 | --- | --- | --- |
 | Work line | 🟡 **GF-FR-004/005/006 · Workflow integrado** | rama feature; PR pendiente |
 | Feature merge SHA | ⚪ **no fusionado** | `main` permanece en `1a33be163ca6e223dfd46650b3ad6fed5a66c74b` |
-| CI del PR | ⚪ **pendiente** | se ejecutará sobre el head publicado |
-| Sonar | ⚪ **pendiente** | Quality Gate requerido antes de merge |
-| CodeRabbit | ⚪ **pendiente** | full review sobre head estable |
+| CI del PR | 🟠 **revalidación** | Pint detectó estilo en `ContentScheduler`; corrección aplicada, pendiente nuevo head |
+| Sonar | ✅ **Quality Gate OK en head anterior** | 0 issues y 0 hotspots; reconfirmar head final |
+| CodeRabbit | 🟠 **review en proceso** | full review solicitado sobre head anterior; revisar head final |
 | CI del SHA exacto de main | ⚪ **no aplica todavía** | se verifica después del merge |
 | Production Smoke | 🟠 **bloqueado por migraciones previas** | no se ejecutan migraciones en esta entrega |
 | Migraciones | 🟠 **no ejecutadas en producción** | nueva migración requiere backup, lote revisado y aprobación |
@@ -27,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **20** | **+948** | **−76** | **+872** |
+| **20** | **+946** | **−76** | **+870** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -102,13 +102,13 @@ flowchart LR
 - `npm run lint`: aprobado.
 - `npm run build`: aprobado.
 - `git diff --check`: aprobado.
-- PHP/Pint/PHPStan/PHPUnit/MariaDB/browser: pendientes de GrindFlow CI por ausencia local de PHP/Docker.
+- CI #372: fast, PHPUnit, MariaDB y browser OK; php-quality falló exclusivamente en Pint (`ContentScheduler.php`). Corrección de formato aplicada; CI del nuevo head por verificar.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Publicar PR, corregir CI/Sonar y solicitar CodeRabbit full review. |
+| **NOW** | Revalidar Pint, CI y Sonar sobre el head corregido del PR #87. |
 | **NEXT** | Fusionar solo con gates verdes y comprobar CI exacto de `main`. |
 | **NEXT** | Revisar lote de migraciones; producción exige backup y aprobación explícita. |
 | **BLOCKED / EXTERNAL** | Providers reales, credenciales, object storage S3 y FFmpeg. |
@@ -118,7 +118,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Workflow integrado | código implementado; CI remoto pendiente |
+| **NOW** | Workflow integrado | PR #87 abierto; nueva validación de estilo pendiente |
 | **NEXT** | Entrega | PR, Sonar, CodeRabbit, merge y exact-main |
 | **NEXT** | Producción | migraciones solo con backup, lote exacto y aprobación |
 | **BLOCKED / EXTERNAL** | Publicación real | providers y credenciales no configurados |
