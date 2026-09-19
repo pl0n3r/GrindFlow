@@ -229,8 +229,9 @@ within their organization.
   Editor/Model are denied server-side.
 - Amounts are positive integer minor units plus a three-letter currency code;
   no floating-point money is persisted.
-- Entries are append-only. Corrections create one explicit reversal row and
-  original history cannot be updated or deleted through the model.
+- Entries are append-only. Corrections create one explicit reversal row;
+  Eloquent rejects update/delete and MariaDB triggers reject direct SQL
+  update/delete so original history cannot be rewritten.
 - A beneficiary is optional but must belong to the active organization when the
   allocation is created.
 - Reversal rows copy amount/currency/source/beneficiary from the original,
