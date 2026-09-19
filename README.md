@@ -36,7 +36,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+93** | **−66** | **+27** |
+| **10** | **+95** | **−67** | **+28** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -69,6 +69,7 @@ flowchart LR
 - Smoke de producción ahora falla explícitamente cuando falta la credencial; contrato Ruby previene una regresión.
 
 ## Archivos modificados en este deploy
+- `.coderabbit.yaml` — referencia al Issue #2.
 - `.github/workflows/production-smoke.yml` — evita éxito falso sin credenciales.
 - `AGENTS.md` — roadmap actual.
 - `README.md` — snapshot veraz del traslado.
