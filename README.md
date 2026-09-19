@@ -17,15 +17,15 @@
 
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-OPS · Operating model** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **VALIDATED IN CODE** | #87 squash en `9a1b2525b6d6eae5a15fbb3ab2c3a02844c82f5a`; PR #87 CI #400 `validate` verde |
-| Version | 🚧 **v0.1.0** | bootstrap de versión humana; SHA desplegado independiente |
-| CI del PR | ✅ **GrindFlow CI #402 / validate** | matriz completa verde en `b5a30bf2…`; revalidar head documental final |
-| Sonar | ✅ **Quality Gate OK** | PR #89: 0 issues nuevos y 0 hotspots observados |
-| CodeRabbit | 🚧 **revisión pendiente** | resumen automático en proceso; sin threads visibles al actualizar |
-| CI del SHA exacto de main | 🚧 **por verificar** | independiente del CI del PR |
-| Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): seis pendientes en Smoke #35427532347 del SHA #87 |
-| Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + lote + aprobación explícita |
+| Work line | 🚧 **GF-OPS · Navegación entre workspaces** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.0 · PR #89 fusionado** | `main` `f65059a0d2d2e3e40b48a5563604fea7286d119c` |
+| Version | 🚧 **v0.1.1** | patch de navegación |
+| CI del PR | 🚧 **pendiente del head final** | GrindFlow CI / validate |
+| Sonar | 🚧 **pendiente** | Quality Gate del PR |
+| CodeRabbit | 🚧 **pendiente** | review sobre head estable |
+| CI del SHA exacto de main | 🚧 **verificar tras merge** | separado del CI del PR |
+| Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes en run #35428068354 |
+| Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + aprobación expresa |
 
 ## Huella del cambio
 
@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+453** | **−100** | **+353** |
+| **6** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 
@@ -41,11 +41,10 @@
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
-| CI | comprueba versión semántica y README exacto; nunca escribe metadatos de release |
-| Sonar + CodeRabbit | paralelo sobre head final |
-| E2E | entorno sintético autenticado para validación realista; no muta producción |
-| Deployment | Hostinger debe probar SHA remoto; versión no sustituye ese dato |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
+| Tests | enlaces reales, organización visible/ajena, empty state y versión |
+| Autorización | sin cambios de roles ni permiso por UI; rutas tenant-scoped ya protegidas |
+| Producción | migraciones y deploy siguen controles separados |
 
 ## Flujo de entrega
 
@@ -73,47 +72,42 @@ flowchart LR
 
 ## Qué se hizo
 
-- Se crea el [roadmap único #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) para prioridades, entregas tachadas y traspaso entre sesiones sin depender del chat.
-- Se incorpora versión humana inicial `v0.1.0` en Admin > System, independiente del SHA exacto de Hostinger y del estado de migraciones.
-- CI valida cada transición posterior de versión (patch +1 o minor deliberado) y prueba casos inválidos sin hacer commits automáticos.
-- `AGENTS.md` y el modelo de desarrollo incorporan la regla expresa del propietario: Principal Software Engineer + Technical Executor, nueve capacidades multidisciplinarias simultáneas, ownership completo, decisiones reversibles autónomas y límites productivos protegidos.
-- El README verifica el estado visual ✅/🚧, versión exacta y enlace al roadmap; sigue siendo un snapshot, no un changelog.
+- Corrige el Dashboard: Distribution vuelve a ser navegable cuando existe una organización visible.
+- Admin > System enlaza Vault, Scheduler, Distribution y Traffic en una organización accesible al admin.
+- Sin organización, los accesos conservan el estado deshabilitado; System no depende del esquema nuevo de estos módulos.
+- Incorpora regresiones de enlaces, aislamiento entre organizaciones y navegación vacía.
+- Bump deliberado `v0.1.1`, sin SQL de producción ni acciones externas.
 
 ## Archivos modificados en este deploy
 
-- `.github/workflows/grindflow-ci.yml` — compuerta de versión en fast.
-- `AGENTS.md` — reglas durables de operación, progreso y entrega.
-- `README.md` — snapshot exacto del PR.
-- `config/version.php` — versión humana v0.1.0.
-- `docs/DEVELOPMENT-MODEL.md` — entregas autónomas y versionadas.
-- `docs/GRINDFLOW-SPEC.md` — contrato producto/version/deploy.
-- `resources/views/admin/system.blade.php` — visualización v0.1.0.
-- `scripts/ci-scope-contract.sh` — clasificador versión fast-only para PR futuros.
-- `scripts/ci-scope.sh` — evita gates pesados por cambio de número aislado.
-- `scripts/readme-dashboard.py` — valida progreso, roadmap y versión.
-- `scripts/release-version.py` — valida transición semántica y self-tests.
+- `README.md` — dashboard de v0.1.1.
+- `app/Http/Controllers/Admin/SystemController.php` — organización para enlaces.
+- `config/version.php` — patch de versión.
+- `resources/views/admin/system.blade.php` — navegación funcional.
+- `resources/views/dashboard.blade.php` — enlace Distribution tenant-scoped.
+- `tests/Feature/AdminSystemTest.php` — regresiones de navegación.
 
 ## Validación
 
-- Bootstrap de versión inicial: `0.1.0`; ningún dato productivo modificado.
-- CI #402: preflight, fast (contratos/versión/dashboard), Pint/PHPStan, PHPUnit, MariaDB, browser, legacy y `validate` en success; revalidar head final tras actualizar snapshot. Exact-main y producción son independientes.
-- El último Production Smoke verificado para #87 indica **seis** migraciones pendientes; la nueva política no las ejecuta.
+- Requiere CI / validate y Sonar sobre el head final.
+- Prueba de rutas operativas y de ausencia de enlaces a organizaciones ajenas.
+- El último Smoke exact-main informó **7 migraciones pendientes**, no ejecutadas.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Completar CodeRabbit, revalidar head final y fusionar el PR de operación; registrar evidencias en [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 Auditar artefactos [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69), backup y lote de migraciones. |
-| **LATER** | 🚧 Providers reales en sandbox y auditoría por intento. |
-| **BLOCKED / EXTERNAL** | 🚧 Backup/aprobación del esquema, S3/FFmpeg y validación productiva. |
+| **NOW** | 🚧 Validar y fusionar navegación v0.1.1; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 Verificar CI exact-main, Hostinger y lote de [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69). |
+| **LATER** | 🚧 Auditoría de intentos y providers en sandbox. |
+| **BLOCKED / EXTERNAL** | 🚧 Backup restaurable, aprobación, storage S3 y FFmpeg. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Scheduling + Distribution + Traffic en código PR #87~~ | ✅ ~~CI PR aprobado; no equivale a producción~~ |
-| **NOW** | 🚧 Modelo de entrega/versionado | 🚧 [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| **DONE** | ✅ ~~Workflow #87 y modelo operativo #89 fusionados~~ | ✅ ~~CI de PR aprobado; no implica producción~~ |
+| **NOW** | 🚧 Navegación | 🚧 v0.1.1 |
 | **NEXT** | 🚧 Migraciones y storage | 🚧 [#34](https://github.com/drpipe1098-commits/GrindFlow/issues/34) · [#40](https://github.com/drpipe1098-commits/GrindFlow/issues/40) |
-| **LATER** | 🚧 Finance y paridad del legado | 🚧 Tras esquema/productividad |
-| **BLOCKED / EXTERNAL** | 🚧 Producción | 🚧 Backup restaurable, autorización y SHA desplegado |
+| **LATER** | 🚧 Finance y paridad legado | 🚧 Después del esquema |
+| **BLOCKED / EXTERNAL** | 🚧 Producción | 🚧 Backup/aprobación y deploy |
