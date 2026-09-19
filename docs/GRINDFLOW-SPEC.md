@@ -266,3 +266,22 @@ The execution roadmap and durable progress history live in
 - HTTP(S) URL validation, bounded fields, org permission and locked
   tenant-scoped lookup reject foreign link IDs and unsafe schemes. No
   link token rotation, deletion, data migration or provider publication.
+
+## 19. Scheduler searchable eligible media and tracked-link options
+
+- Authorized schedulers can search tenant-owned eligible media by case-insensitive
+  filename or exact UUID, and active links by label, campaign or exact token,
+  to reach items beyond the first 100 picker options without loading an
+  unbounded dropdown. Show counts and tell users to narrow search.
+- The ready media KPI reports the complete eligible tenant count; a
+  zero-result search does not imply no media exists or prevent searching again.
+  A valid old POST selection is preserved through validation errors only if it
+  remains schedulable/active in this same tenant.
+- Current active tracked links assigned to schedules on the displayed calendar
+  page remain selectable if outside the searched 100. Disabled/missing links
+  remain removable, not selectable for new assignments.
+- Validated picker terms and calendar filters coexist and persist across
+  Previous/Next; the page key is reset when searching. Search never bypasses
+  service-level scheduling eligibility/role/status checks.
+- Linking schema absent keeps existing GET fallback and hides link search;
+  no new migration or external provider calls are required.

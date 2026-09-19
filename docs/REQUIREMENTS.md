@@ -519,3 +519,30 @@ organization's tracked links, including those beyond the first 100.
 redirect target, unauthorized/foreign/scheme-invalid writes, 105 rows
 with tied timestamps, filters and all-results clicks, deep pages and
 missing-migration PATCH.
+
+### GF-FR-004E — Searchable Scheduler resource pickers
+**Status:** implemented
+
+**Statement:** Editor/Studio/Admin must be able to find ready media and
+active tracked links even if the organization has more than 100 of each.
+
+**Acceptance criteria:**
+- GET options can be narrowed by filename/exact media UUID or by link
+  label/campaign/exact token; the 100-option window has matching counts and
+  explicit feedback. All option data is tenant scoped and link options are
+  active only.
+- A search without matches does not incorrectly show Scheduling prerequisites
+  as globally absent or disable valid old() media that is still eligible.
+  Hidden/invalid/foreign old() IDs never become offered options.
+- Active current assignments on a visible schedule remain available for edit
+  even when outside option window/search; disabled links remain detachable
+  but never assignable.
+- Calendar total KPI reports real matching total rather than per-page count;
+  media KPI reports true eligible total rather than limited dropdown length.
+- Picker terms and calendar status/destination/UTC filters coexist in GET and
+  paginate using only validated values; page resets on new picker search.
+- No migration, provider publish or weakening of POST server validation.
+
+**Verification:** >100 tenant media and active links, foreign and disabled
+entries, deep asset/link search and actual Schedule POST, old() and assigned
+active link preservation, filters/pagination and partial-schema fallback.
