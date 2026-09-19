@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Media\DirectMediaUpload;
-use Illuminate\Database\Migrations\Migrator;
+use App\Support\Operations\MigrationReadiness;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -15,7 +15,7 @@ class SystemController extends Controller
 {
     public function __invoke(
         Request $request,
-        Migrator $migrator,
+        MigrationReadiness $readiness,
         DirectMediaUpload $directUploads,
     ): View {
         $user = $request->user();
@@ -27,11 +27,16 @@ class SystemController extends Controller
 
         $databaseOnline = false;
         $pendingMigrations = null;
+        $pendingMigrationNames = [];
+        $migrationFingerprint = null;
 
         try {
             DB::connection()->select('select 1');
             $databaseOnline = true;
-            $pendingMigrations = $this->pendingMigrations($migrator);
+            $snapshot = $readiness->snapshot();
+            $pendingMigrationNames = $snapshot['names'];
+            $pendingMigrations = count($pendingMigrationNames);
+            $migrationFingerprint = $snapshot['fingerprint'];
         } catch (Throwable) {
             $databaseOnline = false;
         }
@@ -46,24 +51,12 @@ class SystemController extends Controller
             'queueConnection' => (string) config('queue.default'),
             'sessionDriver' => (string) config('session.driver'),
             'pendingMigrations' => $pendingMigrations,
+            'pendingMigrationNames' => $pendingMigrationNames,
+            'migrationFingerprint' => $migrationFingerprint,
             'mediaStorageConfigured' => $mediaStorage['configured'],
             'mediaStorageDisk' => $mediaStorage['disk'],
             'mediaStorageDriver' => $mediaStorage['driver'],
             'mediaStorageMaxBytes' => $directUploads->maxBytes(),
         ]);
-    }
-
-    private function pendingMigrations(Migrator $migrator): int
-    {
-        $files = $migrator->getMigrationFiles(database_path('migrations'));
-
-        if (! $migrator->repositoryExists()) {
-            return count($files);
-        }
-
-        return count(array_diff(
-            array_keys($files),
-            $migrator->getRepository()->getRan(),
-        ));
     }
 }
