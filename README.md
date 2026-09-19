@@ -27,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **22** | **+1063** | **−75** | **+988** |
+| **22** | **+1098** | **−75** | **+1023** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -75,7 +75,7 @@ flowchart LR
 - El provider `sandbox` es determinista y no usa red, credenciales ni plataformas reales.
 - Traffic incorpora filtros por período/canal/campaña, KPIs completos, serie diaria visual y asociaciones a publicaciones marcadas como métrica compartida.
 - Se añadieron regresiones para multi-destino/doble envío, edición/cancelación, límite de reintentos, enlace y analítica filtrada.
-- CodeRabbit: preserva intentos, valida clave cliente, evita INSERT antes de migrar, alinea calendario UTC, elimina consulta masiva de IDs y corrige tablas/navegación.
+- CodeRabbit: preserva intentos, valida clave cliente, evita INSERT antes de migrar, alinea calendario UTC, elimina consulta masiva de IDs y corrige tablas/navegación y consume correctamente ambos UUID de rutas anidadas.
 - La migración nueva solo agrega `request_key`; no se ejecutó en producción.
 
 ## Archivos modificados en este deploy
@@ -98,7 +98,7 @@ flowchart LR
 - `resources/views/scheduling/index.blade.php` — calendario y acciones.
 - `resources/views/traffic/index.blade.php` — analítica y asociaciones.
 - `routes/web.php` — rutas protegidas.
-- `tests/Feature/DistributionTest.php` — presupuesto inmutable de reintentos.
+- `tests/Feature/DistributionTest.php` — presupuesto de reintentos y rutas anidadas.
 - `tests/Feature/ScheduleTrackedLinkTest.php` — clave estable en fixtures históricos.
 - `tests/Feature/SchedulingTest.php` — regresiones Scheduling.
 - `tests/Feature/TrafficAttributionTest.php` — regresión Traffic.
@@ -109,7 +109,7 @@ flowchart LR
 - `npm run lint`: aprobado.
 - `npm run build`: aprobado.
 - `git diff --check`: aprobado.
-- CI #372: fast, PHPUnit, MariaDB y browser OK; php-quality detectó Pint. CI #384 permitió aislar fallos de fixtures históricos y el diff exacto de Pint. Correcciones aplicadas; CI final por verificar.
+- CI #372: fast, PHPUnit, MariaDB y browser OK; php-quality detectó Pint. CI #384 permitió aislar fixtures y el diff de Pint. CI #393 aisló el 404 de rutas anidadas y dos anotaciones PHPStan/Pint. Correcciones aplicadas; CI final por verificar.
 
 ## Qué sigue
 
