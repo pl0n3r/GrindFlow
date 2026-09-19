@@ -15,7 +15,7 @@
 | Work line | 🟠 **GF-FR-004 · Scheduling core v1** | IMPLEMENTED en rama enfocada |
 | Base exacta | ✅ **main** | `bc9694cb49a4e049f41d08b367b04903411915da` |
 | Calidad de la base | ✅ **PR #66 validado + Smoke exacto** | CI #245 completo, Sonar OK y Production Smoke pasó sobre `bc9694cb…` |
-| Exact-main CI base | ⚪ **no observable por el conector** | no se atribuye evidencia que el conector no expone para eventos `push` |
+| CI del SHA exacto de main | ⚪ **no observable por el conector** | no se atribuye evidencia que el conector no expone para eventos `push` |
 | Migraciones | 🟠 **1 nueva en este slice** | Scheduling queda migration-safe hasta aplicarla |
 
 ## Huella del cambio
