@@ -298,11 +298,6 @@
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    @forelse($link->scheduledPublicationLinks as $assignment)
-                                                        <div>{{ $assignment->scheduledPublication?->destination?->name ?? 'Unknown destination' }}</div><small class="gf-media-meta">{{ $assignment->scheduledPublication?->scheduled_for_utc?->format('Y-m-d H:i') }} UTC · shared link metric</small>
-                                                    @empty — @endforelse
-                                                </td>
-                                                <td>
                                                     <a
                                                         href="{{ route('traffic.redirect', ['token' => $link->token]) }}"
                                                         target="_blank"
@@ -322,6 +317,11 @@
                                                     <span class="gf-state gf-state--ok">
                                                         {{ $link->status }}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    @forelse($link->scheduledPublicationLinks as $assignment)
+                                                        <div>{{ $assignment->scheduledPublication?->destination?->name ?? 'Unknown destination' }}</div><small class="gf-media-meta">{{ $assignment->scheduledPublication?->scheduled_for_utc?->format('Y-m-d H:i') }} UTC · shared link metric</small>
+                                                    @empty — @endforelse
                                                 </td>
                                             </tr>
                                         @endforeach
