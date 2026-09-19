@@ -15,8 +15,7 @@ class RunMigrationsController extends Controller
     public function __invoke(
         Request $request,
         MigrationReadiness $readiness,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $user = $request->user();
 
         abort_unless(
