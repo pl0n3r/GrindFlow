@@ -51,7 +51,6 @@ flowchart LR
     P --> T["PHPUnit"]
     P --> D["MariaDB"]
     P --> B["browser"]
-    P --> L["legacy"]
     A --> S["Sonar"]
     A --> C["CodeRabbit full review"]
     F --> V["validate"]
@@ -59,7 +58,6 @@ flowchart LR
     T --> V
     D --> V
     B --> V
-    L --> V
     V --> M["Squash merge"]
     M --> X["CI exact-main"]
     M --> R["Production Smoke"]
@@ -70,12 +68,12 @@ flowchart LR
 
 - Añade `publishing_destinations` y `scheduled_publications` como tablas tenant-owned con FKs compuestas por organización.
 - Autoriza Scheduling a platform admins y memberships Admin/Studio/Editor; Model no puede crear schedules.
-- Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible.
+- Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible, revalidando el asset bajo `lockForUpdate()` dentro de la misma transacción que crea el schedule.
 - Un asset solo es elegible si es canónico, está `ready` y su procesamiento terminó en la **versión actual** del procesador.
 - Rechaza procesamiento stale/failed, duplicados, destinos deshabilitados, timezone inválida y fechas pasadas.
 - Guarda y **lee** el instante debido explícitamente en UTC, independiente de `APP_TIMEZONE`, y conserva la timezone IANA original para reconstruir la hora local.
 - Expone GET/POST `/organizations/{organizationId}/scheduler` y habilita Scheduler en la navegación.
-- La UI lista destinos activos, assets elegibles y próximas publicaciones.
+- La UI lista destinos activos, assets elegibles y próximas publicaciones; la elegibilidad se aplica antes del límite de 100 resultados.
 - El controller es migration-safe: sin tablas, la vista explica el bloqueo y los writes responden 503 en vez de provocar un 500.
 - Añade pruebas de autorización, tenant isolation, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC y endpoints seguros antes de migrar.
 - GF-FR-005 queda separado: este slice no intenta publicar, reintentar ni hablar con proveedores externos.
