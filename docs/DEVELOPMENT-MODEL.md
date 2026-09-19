@@ -218,8 +218,8 @@ These states must not be collapsed into one another.
 
 ## E2E boundary: local writes versus production observation
 
-The local CI browser job uses E2eSeeder behind a strict local/testing
-guard; a temporary same-origin login bootstrap logs into Chromium, runs
+Both local CI browser jobs use E2eSeeder behind a strict local/testing
+guard: SQLite and MariaDB 11.4 respectively; a temporary same-origin login bootstrap logs into Chromium, runs
 ten form-backed Scheduler/Traffic/Finance checks, and removes itself.
 The captured DOM has the password-bearing script removed; a second
 credential check rejects artifacts with the E2E password. Browser checks

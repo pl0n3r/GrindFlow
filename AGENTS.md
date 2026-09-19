@@ -924,13 +924,13 @@ preguntar.
 | Multi-tenancy | `organizations` + `memberships`; `TenantContext`, scopes tenant-aware fail-closed, Policies y constraints/trigger en MariaDB |
 | Cola | Laravel Queues; backend de base MariaDB solo si aporta simplicidad y con locking transaccional validado |
 | Cumplimiento 2257 | Desde los cimientos, con bloqueo en la base |
-| Idiomas | Bilingue es/en con `next-intl` desde el inicio |
+| Idiomas | es/en según requisitos de producto; `next-intl` es dependencia solo del legado Next.js |
 | Subidas | URL prefirmada tras validar token, con vigencia y limites estrictos |
 | Acortador | `/l/[slug]` en la misma app, sin dominio aparte |
 | CI | `GrindFlow CI` con compuerta estable `validate`, gates selectivos, SonarQube Cloud y CodeRabbit asesor |
 | Secretos en reposo | AES-256-GCM con `ENCRYPTION_MASTER_KEY` del entorno |
-| Limite del acortador | Dos capas: memoria del borde y ventana de 60 s en PostgreSQL |
-| Plataformas | Telegram, X, Reddit, Bluesky y webhook generico; credenciales OAuth y API key |
+| Limite del acortador | Laravel `/l/{token}` con throttle y deduplicación HMAC de 10 minutos, sin guardar IP |
+| Integraciones previstas en el legado | No implica adaptadores externos reales habilitados en Laravel; verificar por contrato y código |
 
 ## Reglas que no se rompen
 
@@ -1052,6 +1052,10 @@ preguntar.
 
 ## Topologia de compuertas del legado TypeScript
 
+**ARCHIVO HISTÓRICO:** el diagrama siguiente no describe el GitHub Actions
+vigente. La compuerta actual es `GrindFlow CI / validate` con PHP 8.5,
+MariaDB, browser SQLite, real-stack MariaDB y pruebas legadas seleccionadas.
+
 ```
 lint ──────┐
 typecheck ─┤
@@ -1066,11 +1070,21 @@ docker ────┘
 reproduce lo que Supabase da de fabrica, corre las diecisiete migraciones y ejecuta las
 116 aserciones.
 
-La compuerta `docker` construye las dos imagenes de verdad. Existe porque el
-despliegue es por contenedores: un Dockerfile roto no se descubriria al hacer
-merge sino al intentar desplegar.
+Históricamente, el legado aspiró a construir imágenes Docker. Laravel ya no
+se despliega por contenedores: Hostinger usa el checkout Git y PHP/MariaDB.
 
-## Mapa del repositorio
+## Mapa actual del repositorio Laravel
+
+| Ruta | Contenido |
+|---|---|
+| `app/`, `routes/`, `resources/views/` | Aplicación y UI Laravel |
+| `config/`, `bootstrap/`, `database/` | Configuración, bootstrap, migraciones y seeders |
+| `tests/Feature/`, `tests/Unit/`, `tests/Browser/` | Regresiones y E2E descartable |
+| `.github/workflows/` | CI, observer de release y smoke separado |
+| `docs/`, `AGENTS.md`, `ROADMAP.md` | Referencias durables y roadmap maestro |
+| `src/`, `workers/`, `supabase/` | Solo legado hasta paridad GF-MIG-003 |
+
+## Mapa del legado (referencia historica)
 
 | Ruta | Contenido |
 |---|---|
