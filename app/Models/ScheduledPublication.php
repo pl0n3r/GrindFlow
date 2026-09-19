@@ -33,11 +33,7 @@ class ScheduledPublication extends TenantModel
         return Attribute::make(
             get: static fn (?string $value): ?CarbonImmutable => $value === null
                 ? null
-                : CarbonImmutable::createFromFormat(
-                    'Y-m-d H:i:s',
-                    $value,
-                    'UTC',
-                ),
+                : CarbonImmutable::parse($value, 'UTC'),
             set: static function (
                 DateTimeInterface|string|null $value,
             ): ?string {
