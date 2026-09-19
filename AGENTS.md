@@ -221,7 +221,8 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
 
 - `revenue_allocations` es un ledger tenant-owned **append-only**. No existe
   update/delete funcional; una correccion crea una fila nueva con
-  `reversal_of_id`.
+  `reversal_of_id`. MariaDB refuerza el contrato con triggers BEFORE UPDATE /
+  BEFORE DELETE para que SQL directo tampoco pueda reescribir historia.
 - Solo Admin/Studio pueden ver o mutar Finance. Editor/Model no reciben acceso
   por ocultar UI: la autorizacion se repite server-side.
 - Los montos se persisten como enteros positivos en `amount_minor`; nunca usar
