@@ -13,6 +13,7 @@ SMOKE_ACCEPT="${SMOKE_ACCEPT:-text/html,application/xhtml+xml,application/json;q
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPECTED_RELEASE="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/p" "$script_dir/../config/version.php")"
 [[ "$EXPECTED_RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'ERROR: expected release version is unavailable.\n' >&2; exit 1; }
+printf 'RELEASE_UI_EXPECTED=v%s\n' "$EXPECTED_RELEASE"
 
 workdir="$(mktemp -d)"
 cookie_jar="$workdir/cookies.txt"
