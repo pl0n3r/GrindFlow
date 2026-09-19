@@ -247,7 +247,6 @@ class TrafficController extends Controller
     public function updateLinkStatus(
         Request $request,
         TrackedLinkManager $manager,
-        string $linkId,
     ): RedirectResponse {
         $organization = $this->organization($request);
 
@@ -271,7 +270,7 @@ class TrafficController extends Controller
 
         $manager->setStatus(
             $user,
-            $linkId,
+            (string) $request->route('linkId'),
             (string) $validated['status'],
         );
 
