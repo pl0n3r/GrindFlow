@@ -115,8 +115,7 @@ class SchedulerController extends Controller
             'filters' => $filters ?? [],
             'calendarDays' => $publications->groupBy(
                 fn (ScheduledPublication $publication) => $publication->scheduled_for_utc
-                    ?->setTimezone($publication->timezone)
-                    ->format('Y-m-d'),
+                    ?->format('Y-m-d'),
             ),
         ]);
     }
