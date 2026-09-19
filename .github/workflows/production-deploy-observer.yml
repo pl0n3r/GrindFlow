@@ -1,5 +1,5 @@
 name: GrindFlow Deploy Observer
-run-name: GrindFlow Deploy Observer #${{ github.run_number }} · ${{ github.ref_name }}
+run-name: "GrindFlow Deploy Observer #${{ github.run_number }} · ${{ github.ref_name }}"
 
 on:
   push:

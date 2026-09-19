@@ -52,6 +52,7 @@ puts "PASS production-smoke embedded Bash syntax (#{checked} steps)"
 # mutaciones, con salida no exitosa cuando la versión no se observa.
 observer_path = File.join(root, ".github/workflows/production-deploy-observer.yml")
 observer = YAML.safe_load_file(observer_path, aliases: true)
+abort "Observer must retain dynamic run identity" unless observer.fetch("run-name").include?("${{ github.run_number }}")
 observer_job = observer.fetch("jobs").fetch("observe")
 abort "Observer must run only on main" unless observer_job.fetch("if").include?("refs/heads/main")
 observer_steps = observer_job.fetch("steps")
