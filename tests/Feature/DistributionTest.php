@@ -79,6 +79,64 @@ class DistributionTest extends TestCase
         );
     }
 
+    public function test_terminal_history_cannot_starve_new_due_publication(): void
+    {
+        [$user, $organization] = $this->identity();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user, $organization): void {
+                for ($index = 0; $index < 20; $index++) {
+                    $publication = $this->duePublication(
+                        $user,
+                        $organization,
+                    );
+
+                    PublicationDelivery::query()->create([
+                        'scheduled_publication_id' => $publication->getKey(),
+                        'idempotency_key' => 'terminal-'.$publication->getKey(),
+                        'status' => PublicationDelivery::STATUS_PUBLISHED,
+                        'attempts' => 1,
+                        'published_at' => now('UTC'),
+                        'external_publication_id' => 'external-'.$index,
+                    ]);
+                }
+            },
+        );
+
+        $freshPublication = $this->duePublication(
+            $user,
+            $organization,
+        );
+
+        $this->assertSame(
+            1,
+            app(DistributionScheduler::class)->dispatchDue(),
+        );
+
+        $freshDelivery = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): PublicationDelivery => PublicationDelivery::query()
+                ->where(
+                    'scheduled_publication_id',
+                    $freshPublication->getKey(),
+                )
+                ->sole(),
+        );
+
+        $this->assertSame(
+            PublicationDelivery::STATUS_QUEUED,
+            $freshDelivery->status,
+        );
+        Queue::assertPushed(
+            DispatchScheduledPublication::class,
+            fn (DispatchScheduledPublication $job): bool => $job->deliveryId
+                === $freshDelivery->getKey(),
+        );
+    }
+
     public function test_abandoned_queued_delivery_can_be_redriven_after_lease(): void
     {
         [$user, $organization] = $this->identity();
