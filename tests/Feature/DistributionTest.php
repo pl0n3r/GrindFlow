@@ -22,7 +22,6 @@ use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -148,20 +147,7 @@ class DistributionTest extends TestCase
             $organization,
         );
 
-        app(TenantContext::class)->runWithinOrganization(
-            $user,
-            (string) $organization->getKey(),
-            function () use ($delivery): void {
-                PublicationDelivery::query()
-                    ->findOrFail($delivery->getKey())
-                    ->forceFill([
-                        'claimed_until' => now('UTC')->subSecond(),
-                    ])
-                    ->save();
-            },
-        );
-
-        Cache::flush();
+        $this->travel(6)->minutes();
 
         $redriven = app(TenantContext::class)->runWithinOrganization(
             $user,
