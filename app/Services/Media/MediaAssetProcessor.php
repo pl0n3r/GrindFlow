@@ -12,15 +12,26 @@ class MediaAssetProcessor
 
     public const FFPROBE_VERSION = 3;
 
+    public const FFMPEG_VERSION = 4;
+
+    public const FFPROBE_FFMPEG_VERSION = 5;
+
     public function __construct(
         private readonly FfprobeMediaInspector $ffprobe,
+        private readonly FfmpegMediaDerivativeGenerator $derivatives,
     ) {}
 
     public function currentVersion(): int
     {
-        return $this->ffprobe->enabled()
-            ? self::FFPROBE_VERSION
-            : self::VERSION;
+        $ffprobeEnabled = $this->ffprobe->enabled();
+        $ffmpegEnabled = $this->derivatives->enabled();
+
+        return match (true) {
+            $ffprobeEnabled && $ffmpegEnabled => self::FFPROBE_FFMPEG_VERSION,
+            $ffprobeEnabled => self::FFPROBE_VERSION,
+            $ffmpegEnabled => self::FFMPEG_VERSION,
+            default => self::VERSION,
+        };
     }
 
     /**
@@ -32,6 +43,7 @@ class MediaAssetProcessor
     ): array {
         $processorVersion ??= $this->currentVersion();
         $ffprobeEnabled = $this->ffprobeEnabledForVersion($processorVersion);
+        $ffmpegEnabled = $this->ffmpegEnabledForVersion($processorVersion);
         $blob = $asset->blob;
 
         if ($blob instanceof MediaBlob === false) {
@@ -73,14 +85,29 @@ class MediaAssetProcessor
             'technical_metadata' => $ffprobeEnabled
                 ? $this->ffprobe->inspect($blob)
                 : null,
+            'derivative_profile' => $ffmpegEnabled
+                ? FfmpegMediaDerivativeGenerator::PROFILE
+                : 'disabled',
+            'derivatives' => $ffmpegEnabled
+                ? $this->derivatives->generate($blob)
+                : [],
         ];
     }
 
     private function ffprobeEnabledForVersion(int $processorVersion): bool
     {
         return match ($processorVersion) {
-            self::VERSION => false,
-            self::FFPROBE_VERSION => true,
+            self::VERSION, self::FFMPEG_VERSION => false,
+            self::FFPROBE_VERSION, self::FFPROBE_FFMPEG_VERSION => true,
+            default => throw MediaProcessingException::invalidProcessorVersion(),
+        };
+    }
+
+    private function ffmpegEnabledForVersion(int $processorVersion): bool
+    {
+        return match ($processorVersion) {
+            self::VERSION, self::FFPROBE_VERSION => false,
+            self::FFMPEG_VERSION, self::FFPROBE_FFMPEG_VERSION => true,
             default => throw MediaProcessingException::invalidProcessorVersion(),
         };
     }

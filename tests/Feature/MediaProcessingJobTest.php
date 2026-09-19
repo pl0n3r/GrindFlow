@@ -10,6 +10,8 @@ use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
 use App\Queue\Middleware\UseOrganizationContext;
+use App\Services\Media\FfmpegCommandRunner;
+use App\Services\Media\FfmpegMediaDerivativeGenerator;
 use App\Services\Media\MediaAssetProcessor;
 use App\Services\Media\MediaProcessingCoordinator;
 use App\Services\Media\MediaProcessingException;
@@ -33,6 +35,7 @@ class MediaProcessingJobTest extends TestCase
         config([
             'grindflow.media.disk' => 'local',
             'grindflow.media.ffprobe.enabled' => false,
+            'grindflow.media.ffmpeg.enabled' => false,
         ]);
     }
 
@@ -292,6 +295,159 @@ class MediaProcessingJobTest extends TestCase
                 $this->assertSame(
                     3.5,
                     $processing['technical_metadata']['duration_seconds'],
+                );
+            },
+        );
+
+        Queue::assertPushed(ProcessMediaAsset::class, 2);
+    }
+
+    public function test_processor_version_tracks_probe_and_derivative_modes(): void
+    {
+        $this->assertSame(
+            MediaAssetProcessor::VERSION,
+            app(MediaAssetProcessor::class)->currentVersion(),
+        );
+
+        config(['grindflow.media.ffprobe.enabled' => true]);
+
+        $this->assertSame(
+            MediaAssetProcessor::FFPROBE_VERSION,
+            app(MediaAssetProcessor::class)->currentVersion(),
+        );
+
+        config([
+            'grindflow.media.ffprobe.enabled' => false,
+            'grindflow.media.ffmpeg.enabled' => true,
+        ]);
+
+        $this->assertSame(
+            MediaAssetProcessor::FFMPEG_VERSION,
+            app(MediaAssetProcessor::class)->currentVersion(),
+        );
+
+        config(['grindflow.media.ffprobe.enabled' => true]);
+
+        $this->assertSame(
+            MediaAssetProcessor::FFPROBE_FFMPEG_VERSION,
+            app(MediaAssetProcessor::class)->currentVersion(),
+        );
+    }
+
+    public function test_enabling_ffmpeg_reprocesses_and_persists_one_deterministic_thumbnail(): void
+    {
+        Queue::fake();
+
+        [$user, $organization, $asset] = $this->asset(
+            payload: 'ffmpeg-transition-bytes',
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => app(MediaProcessingCoordinator::class)->queue(
+                MediaAsset::query()->findOrFail($asset->getKey()),
+                $user,
+            ),
+        );
+
+        $disabledJob = $this->job($asset, $user, $organization);
+        $this->runJob($disabledJob);
+
+        $runner = new class extends FfmpegCommandRunner
+        {
+            public int $calls = 0;
+
+            /** @var array<int, string> */
+            public array $lastCommand = [];
+
+            /**
+             * @param  array<int, string>  $command
+             */
+            public function run(array $command, int $timeoutSeconds): void
+            {
+                $this->calls++;
+                $this->lastCommand = $command;
+
+                $outputPath = $command[count($command) - 1] ?? null;
+
+                if (is_string($outputPath) === false || $outputPath === '') {
+                    throw MediaProcessingException::derivativeInvalidOutput();
+                }
+
+                file_put_contents(
+                    $outputPath,
+                    'deterministic-webp-thumbnail',
+                );
+            }
+        };
+
+        app()->instance(FfmpegCommandRunner::class, $runner);
+
+        config([
+            'grindflow.media.ffmpeg.enabled' => true,
+            'grindflow.media.ffmpeg.binary' => 'ffmpeg',
+            'grindflow.media.ffmpeg.timeout_seconds' => 45,
+        ]);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => app(MediaProcessingCoordinator::class)->queue(
+                MediaAsset::query()->findOrFail($asset->getKey()),
+                $user,
+            ),
+        );
+
+        $ffmpegJob = $this->job($asset, $user, $organization);
+        $this->runJob($ffmpegJob);
+        $this->runJob($ffmpegJob);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($asset, $organization, $runner): void {
+                $fresh = MediaAsset::query()->findOrFail($asset->getKey());
+                $processing = $fresh->metadata['processing'];
+                $thumbnail = $processing['derivatives']['thumbnail'];
+                $sourceSha = (string) $fresh->blob()->value('sha256');
+                $expectedKey = sprintf(
+                    'organizations/%s/derivatives/%s/%s/%s.webp',
+                    $organization->getKey(),
+                    substr($sourceSha, 0, 2),
+                    $sourceSha,
+                    FfmpegMediaDerivativeGenerator::PROFILE,
+                );
+
+                $this->assertSame('completed', $processing['status']);
+                $this->assertSame(1, $processing['attempts']);
+                $this->assertSame(
+                    MediaAssetProcessor::FFMPEG_VERSION,
+                    $processing['version'],
+                );
+                $this->assertSame('probe_v4', $processing['profile']);
+                $this->assertSame(
+                    FfmpegMediaDerivativeGenerator::PROFILE,
+                    $processing['derivative_profile'],
+                );
+                $this->assertSame($expectedKey, $thumbnail['storage_key']);
+                $this->assertSame('image/webp', $thumbnail['mime_type']);
+                $this->assertSame(
+                    hash('sha256', 'deterministic-webp-thumbnail'),
+                    $thumbnail['sha256'],
+                );
+                $this->assertSame(
+                    strlen('deterministic-webp-thumbnail'),
+                    $thumbnail['byte_size'],
+                );
+                $this->assertSame(1, $runner->calls);
+                $this->assertContains('-map_metadata', $runner->lastCommand);
+                $this->assertContains('-threads', $runner->lastCommand);
+
+                Storage::disk('local')->assertExists($expectedKey);
+                $this->assertCount(
+                    2,
+                    Storage::disk('local')->allFiles(),
                 );
             },
         );

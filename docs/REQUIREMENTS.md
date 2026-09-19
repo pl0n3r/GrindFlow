@@ -110,8 +110,16 @@ vault with traceable source metadata.
 - Arbitrary tags, stderr and provider payloads are never copied into asset
   metadata or safe processing errors.
 - Invalid output, process failure and timeout map to bounded processing error
-  codes and remain retry-safe. FFmpeg-derived artifacts remain a later slice
-  behind this contract.
+  codes and remain retry-safe.
+- Processor version 4 adds feature-gated FFmpeg thumbnail generation while
+  version 5 combines FFprobe metadata with the same derivative profile.
+- FFmpeg derivatives are disabled by default, use bounded process timeouts and
+  write a single `thumbnail_v1` WebP to a deterministic tenant/source-SHA key.
+- Retries overwrite the same derivative key instead of creating duplicate
+  artifacts; processing metadata records the derivative profile, storage
+  location, byte size and SHA-256 only after a successful write.
+- FFmpeg stderr is not persisted; process failure, timeout, invalid output and
+  storage failure map to bounded processing error codes.
 
 ### GF-FR-004 — Scheduling
 **Statement:** Authorized users can schedule eligible content for configured
