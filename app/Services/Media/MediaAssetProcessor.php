@@ -16,6 +16,10 @@ class MediaAssetProcessor
 
     public const FFPROBE_FFMPEG_VERSION = 5;
 
+    public const FFMPEG_PREVIEW_VERSION = 6;
+
+    public const FFPROBE_FFMPEG_PREVIEW_VERSION = 7;
+
     public function __construct(
         private readonly FfprobeMediaInspector $ffprobe,
         private readonly FfmpegMediaDerivativeGenerator $derivatives,
@@ -27,9 +31,9 @@ class MediaAssetProcessor
         $ffmpegEnabled = $this->derivatives->enabled();
 
         return match (true) {
-            $ffprobeEnabled && $ffmpegEnabled => self::FFPROBE_FFMPEG_VERSION,
+            $ffprobeEnabled && $ffmpegEnabled => self::FFPROBE_FFMPEG_PREVIEW_VERSION,
             $ffprobeEnabled => self::FFPROBE_VERSION,
-            $ffmpegEnabled => self::FFMPEG_VERSION,
+            $ffmpegEnabled => self::FFMPEG_PREVIEW_VERSION,
             default => self::VERSION,
         };
     }
@@ -44,6 +48,7 @@ class MediaAssetProcessor
         $processorVersion ??= $this->currentVersion();
         $ffprobeEnabled = $this->ffprobeEnabledForVersion($processorVersion);
         $ffmpegEnabled = $this->ffmpegEnabledForVersion($processorVersion);
+        $previewEnabled = $this->previewEnabledForVersion($processorVersion);
         $blob = $asset->blob;
 
         if ($blob instanceof MediaBlob === false) {
@@ -72,6 +77,8 @@ class MediaAssetProcessor
             throw MediaProcessingException::unsupportedMime();
         }
 
+        $includePreview = $previewEnabled && $kind === 'video';
+
         return [
             'version' => $processorVersion,
             'profile' => 'probe_v'.$processorVersion,
@@ -86,10 +93,10 @@ class MediaAssetProcessor
                 ? $this->ffprobe->inspect($blob)
                 : null,
             'derivative_profile' => $ffmpegEnabled
-                ? FfmpegMediaDerivativeGenerator::PROFILE
+                ? $this->derivatives->profile($includePreview)
                 : 'disabled',
             'derivatives' => $ffmpegEnabled
-                ? $this->derivatives->generate($blob)
+                ? $this->derivatives->generate($blob, $includePreview)
                 : [],
         ];
     }
@@ -97,8 +104,12 @@ class MediaAssetProcessor
     private function ffprobeEnabledForVersion(int $processorVersion): bool
     {
         return match ($processorVersion) {
-            self::VERSION, self::FFMPEG_VERSION => false,
-            self::FFPROBE_VERSION, self::FFPROBE_FFMPEG_VERSION => true,
+            self::VERSION,
+            self::FFMPEG_VERSION,
+            self::FFMPEG_PREVIEW_VERSION => false,
+            self::FFPROBE_VERSION,
+            self::FFPROBE_FFMPEG_VERSION,
+            self::FFPROBE_FFMPEG_PREVIEW_VERSION => true,
             default => throw MediaProcessingException::invalidProcessorVersion(),
         };
     }
@@ -107,7 +118,23 @@ class MediaAssetProcessor
     {
         return match ($processorVersion) {
             self::VERSION, self::FFPROBE_VERSION => false,
-            self::FFMPEG_VERSION, self::FFPROBE_FFMPEG_VERSION => true,
+            self::FFMPEG_VERSION,
+            self::FFPROBE_FFMPEG_VERSION,
+            self::FFMPEG_PREVIEW_VERSION,
+            self::FFPROBE_FFMPEG_PREVIEW_VERSION => true,
+            default => throw MediaProcessingException::invalidProcessorVersion(),
+        };
+    }
+
+    private function previewEnabledForVersion(int $processorVersion): bool
+    {
+        return match ($processorVersion) {
+            self::VERSION,
+            self::FFPROBE_VERSION,
+            self::FFMPEG_VERSION,
+            self::FFPROBE_FFMPEG_VERSION => false,
+            self::FFMPEG_PREVIEW_VERSION,
+            self::FFPROBE_FFMPEG_PREVIEW_VERSION => true,
             default => throw MediaProcessingException::invalidProcessorVersion(),
         };
     }

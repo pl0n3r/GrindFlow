@@ -111,13 +111,17 @@ vault with traceable source metadata.
   metadata or safe processing errors.
 - Invalid output, process failure and timeout map to bounded processing error
   codes and remain retry-safe.
-- Processor version 4 adds feature-gated FFmpeg thumbnail generation while
-  version 5 combines FFprobe metadata with the same derivative profile.
-- FFmpeg derivatives are disabled by default, use bounded process timeouts and
-  write a single `thumbnail_v1` WebP to a deterministic tenant/source-SHA key.
-- Retries overwrite the same derivative key instead of creating duplicate
-  artifacts; processing metadata records the derivative profile, storage
-  location, byte size and SHA-256 only after a successful write.
+- Processor versions 4/5 preserve the original thumbnail-only contract for
+  already-queued jobs; versions 6/7 add the current versioned preview profile.
+- FFmpeg derivatives are disabled by default and use bounded process timeouts.
+  `thumbnail_v1` remains a deterministic WebP for images and videos.
+- Video versions 6/7 also write a deterministic `preview_v1` MP4: no audio,
+  metadata or chapters, maximum 720 px width, 15 fps, H.264/yuv420p and a
+  bounded 3-15 second duration (8 seconds by default).
+- Image assets on versions 6/7 remain thumbnail-only. Retries overwrite the
+  same tenant/source-SHA/profile keys instead of creating duplicate artifacts.
+- Processing metadata records each derivative profile, storage location, MIME,
+  byte size and SHA-256 only after a successful write.
 - FFmpeg stderr is not persisted; process failure, timeout, invalid output and
   storage failure map to bounded processing error codes.
 
