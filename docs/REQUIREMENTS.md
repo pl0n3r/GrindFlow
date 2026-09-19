@@ -153,6 +153,8 @@ destinations.
 
 
 ### GF-FR-005 — Distribution
+**Status:** implemented
+
 **Statement:** GrindFlow can dispatch eligible scheduled content to supported
 platform integrations.
 
@@ -160,6 +162,34 @@ platform integrations.
 - Authentication failures and rate limits are classified differently.
 - Retry/backoff behavior is bounded and observable.
 - A successful retry cannot create duplicate publication through GrindFlow.
+
+**Verification notes (current Laravel slice):**
+- Each schedule converges on one tenant-owned `publication_deliveries` row with
+  a stable provider idempotency key.
+- `DispatchScheduledPublication` restores tenant context and revalidates that
+  the scheduling actor can still distribute for the organization.
+- Provider authentication failures become terminal `authentication_failed`
+  state while HTTP/provider rate limits become `retry_scheduled` with a
+  bounded 60-3600 second retry window and do not consume the transient attempt
+  budget.
+- Transient retries use persisted backoff and stop after four provider attempts;
+  attempts, next retry time and safe error code remain queryable.
+- Queue-backend dispatch failures become observable retry state instead of a
+  terminal publication failure.
+- Queued/processing work uses a five-minute lease so abandoned jobs can be
+  redriven without creating a second logical delivery; post-provider writes are
+  fenced by processing state + attempt number so stale workers cannot overwrite
+  a newer claim.
+- Candidate discovery paginates past missing/revoked actors so invalid history
+  cannot permanently starve later valid publications.
+- Provider retries always reuse the same idempotency key and a published
+  delivery is a no-op on subsequent job execution.
+- Dispatch revalidates the current destination and media-processing eligibility
+  immediately before provider I/O.
+- The distribution scheduler is deploy-before-migration safe and returns zero
+  work until the delivery table exists.
+- This slice ships only the provider contract/registry plus fake-backed tests;
+  no real platform credentials or external publishing adapters are enabled.
 
 ### GF-FR-006 — Traffic attribution
 **Statement:** GrindFlow can create tracked links and aggregate attribution data

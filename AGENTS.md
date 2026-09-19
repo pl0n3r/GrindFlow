@@ -157,6 +157,38 @@ foto de la entrega actual; esto es lo que hay que saber siempre.
   FFmpeg/transcoding/artifacts se agregan detras de este contrato, no dentro de
   la ingesta.
 
+### Regla de distribucion
+
+- Cada `scheduled_publication` converge en una sola fila tenant-owned de
+  `publication_deliveries`; la unicidad de cola no sustituye esta idempotencia
+  persistente.
+- La clave de idempotencia enviada al provider es estable por organizacion +
+  schedule y se reutiliza en todos los retries.
+- Los providers normalizan fallos como authentication, rate-limit o transient;
+  nunca se persisten bodies, tokens, headers ni mensajes crudos.
+- Authentication es terminal hasta intervencion/reconexion. Rate-limit conserva
+  un retry acotado entre 60 y 3600 segundos y **no consume** el presupuesto de
+  intentos. Los transitorios usan backoff persistente y maximo cuatro intentos
+  de provider.
+- `attempts`, `next_attempt_at`, `claimed_until` y `last_error_code`
+  hacen observable el lifecycle sin exponer secretos.
+- Work queued/processing usa lease de cinco minutos. Una lease vencida puede
+  redespacharse, pero nunca crear otra fila logica ni otra idempotency key. Todo
+  write posterior al provider se cerca por status processing + numero de intento
+  para que un holder viejo no pise un takeover.
+- Un fallo del backend de cola deja retry persistente; nunca convierte una
+  publicacion no intentada en fallo terminal.
+- El scanner pagina mas alla de actores faltantes o permisos revocados para que
+  historial invalido no bloquee candidatos validos posteriores.
+- Antes de I/O externo se revalidan tenant, actor, schedule, destino y asset
+  procesado con la version actual.
+- El scheduler global solo descubre candidatos; cada job restaura
+  `TenantContext` antes de tocar modelos tenant-owned.
+- Deploy-before-migration debe ser seguro: si falta
+  `publication_deliveries`, el tick de distribucion devuelve cero.
+- Ningun provider real, secreto o mutacion externa se habilita en el foundation
+  de GF-FR-005; primero se valida el contrato con fakes.
+
 ### Regla de direct uploads del Vault
 
 - Los archivos grandes no atraviesan PHP: el cliente obtiene una URL temporal
@@ -627,7 +659,7 @@ Preguntas abiertas para el arquitecto antes de empezar:
 | 2 — Ingesta y vault | Completo: subidas, Dropbox, Drive, triaje y escaneo automatico. Falta ejecutarlo contra las APIs reales |
 | 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
 | 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
-| 5 — Distribucion | Motor completo con Telegram y webhook. X, Reddit y Bluesky registrados sin implementar |
+| 5 — Distribucion | Laravel: core idempotente/retries implementado, sin providers reales ni mutacion externa. Legacy TS conserva Telegram/webhook; X, Reddit y Bluesky siguen sin implementar |
 | 6 — Enlaces y trafico | Acortador y analitica funcionando. Falta el panel de metricas |
 | 7 — Finanzas | Esquema y vista de la modelo. Falta la gestion desde el estudio |
 
