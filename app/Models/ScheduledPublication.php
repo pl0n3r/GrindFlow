@@ -7,6 +7,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ScheduledPublication extends TenantModel
 {
@@ -77,5 +78,13 @@ class ScheduledPublication extends TenantModel
     public function scheduledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'scheduled_by_user_id');
+    }
+
+    /**
+     * @return HasOne<PublicationDelivery, $this>
+     */
+    public function delivery(): HasOne
+    {
+        return $this->hasOne(PublicationDelivery::class);
     }
 }
