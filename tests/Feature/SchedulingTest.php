@@ -464,21 +464,33 @@ class SchedulingTest extends TestCase
         $this->membership($user, $organization, UserRole::Studio);
         $this->membership($otherUser, $otherOrganization, UserRole::Studio);
 
-        $asset = app(TenantContext::class)->runWithinOrganization(
-            $user,
-            (string) $organization->getKey(),
-            fn (): MediaAsset => $this->readyAsset(),
-        );
+        [$asset, $localDestination] = app(TenantContext::class)
+            ->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                fn (): array => [
+                    $this->readyAsset(),
+                    PublishingDestination::query()->create([
+                        'name' => 'Local channel',
+                        'provider' => 'provider-test',
+                        'status' => PublishingDestination::STATUS_ACTIVE,
+                    ]),
+                ],
+            );
 
-        $foreignDestination = app(TenantContext::class)->runWithinOrganization(
-            $otherUser,
-            (string) $otherOrganization->getKey(),
-            fn (): PublishingDestination => PublishingDestination::query()->create([
-                'name' => 'Foreign channel',
-                'provider' => 'provider-test',
-                'status' => PublishingDestination::STATUS_ACTIVE,
-            ]),
-        );
+        [$foreignAsset, $foreignDestination] = app(TenantContext::class)
+            ->runWithinOrganization(
+                $otherUser,
+                (string) $otherOrganization->getKey(),
+                fn (): array => [
+                    $this->readyAsset(),
+                    PublishingDestination::query()->create([
+                        'name' => 'Foreign channel',
+                        'provider' => 'provider-test',
+                        'status' => PublishingDestination::STATUS_ACTIVE,
+                    ]),
+                ],
+            );
 
         $this->actingAs($user)
             ->post(
@@ -495,6 +507,31 @@ class SchedulingTest extends TestCase
                 ],
             )
             ->assertNotFound();
+
+        $this->actingAs($user)
+            ->post(
+                route('organizations.scheduler.store', [
+                    'organizationId' => $organization->getKey(),
+                ]),
+                [
+                    'asset_id' => $foreignAsset->getKey(),
+                    'destination_id' => $localDestination->getKey(),
+                    'scheduled_for_local' => now('UTC')
+                        ->addDay()
+                        ->format('Y-m-d\TH:i'),
+                    'timezone' => 'UTC',
+                ],
+            )
+            ->assertNotFound();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(
+                0,
+                ScheduledPublication::query()->count(),
+            ),
+        );
     }
 
     public function test_timezone_must_be_explicit_and_valid(): void
