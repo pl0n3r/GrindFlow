@@ -753,8 +753,7 @@ class MediaProcessingJobTest extends TestCase
     private function asset(
         string $payload,
         string $mimeType = 'video/mp4',
-    ): array
-    {
+    ): array {
         $user = User::factory()->create();
         $organization = Organization::factory()->create();
 
