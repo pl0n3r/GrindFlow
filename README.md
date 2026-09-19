@@ -26,7 +26,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **1** | **+49** | **−74** | **-25** |
+| **1** | **+3** | **−16** | **-13** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -81,8 +81,7 @@ flowchart LR
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Cerrar snapshot post-merge de Distribution. |
-| **NEXT** | GF-FR-006 Traffic attribution sobre publicaciones distribuidas. |
+| **NOW** | GF-FR-006 Traffic attribution sobre publicaciones distribuidas. |
 | **NEXT** | Diseñar primer adapter real detrás de `DistributionProvider`, con sandbox y credenciales cifradas. |
 | **BLOCKED / EXTERNAL** | Migraciones Scheduling/Distribution y providers reales requieren aprobación/configuración operacional. |
 | **LATER** | Production Smoke exact-main cuando exista evidencia observable. |
@@ -91,20 +90,8 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Distribution | core v1 MERGED en `main` |
-| **NEXT** | Traffic attribution | GF-FR-006 |
+| **NOW** | Traffic attribution | GF-FR-006 |
 | **NEXT** | Distribution providers | adapters reales + auth/reconnect por plataforma |
 | **BLOCKED / EXTERNAL** | Scheduling/Distribution producción | migration approval + Smoke |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
-| **LATER** | Legacy retirement | solo tras los requisitos GF-MIG pendientes |
-
-
-
-| Lane | Frente | Estado |
-| --- | --- | --- |
-| **NOW** | Distribution | core v1 IMPLEMENTED · PR #70 abierto · review fixes en revalidación |
-| **NEXT** | Distribution providers | adapters reales + auth/reconnect por plataforma |
-| **NEXT** | Scheduling producción | migration approval + Production Smoke |
-| **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
-| **LATER** | Traffic attribution | GF-FR-006 |
 | **LATER** | Legacy retirement | solo tras los requisitos GF-MIG pendientes |
