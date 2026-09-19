@@ -106,7 +106,7 @@ def require_markers(readme: str) -> None:
         "✅ ~~Completado~~",
         "🚧 Pendiente",
         "Version",
-        "https://github.com/drpipe1098-commits/GrindFlow/issues/88",
+        "https://github.com/pl0n3r/GrindFlow/issues/2",
         "## Estado del deploy",
         "## Huella del cambio",
         "## Calidad y entrega",
@@ -165,8 +165,8 @@ def validate_roadmap(readme: str) -> None:
         fail("canonical progress convention missing or not documented")
 
     roadmap = section(readme, "## Qué sigue") + section(readme, "## Panorama general pendiente")
-    if "https://github.com/drpipe1098-commits/GrindFlow/issues/88" not in roadmap:
-        fail("roadmap must link to canonical issue #88")
+    if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
+        fail("roadmap must link to canonical issue #2")
 
     for row in roadmap.splitlines():
         if not re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", row):
