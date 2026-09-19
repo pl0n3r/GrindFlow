@@ -25,8 +25,7 @@ class ContentScheduler
     public function __construct(
         private readonly TenantContext $tenantContext,
         private readonly MediaAssetProcessor $processor,
-    ) {
-    }
+    ) {}
 
     public function schedule(
         MediaAsset $asset,
@@ -49,6 +48,7 @@ class ContentScheduler
 
     /**
      * @param Collection<int, PublishingDestination> $destinations
+     *
      * @return Collection<int, ScheduledPublication>
      */
     public function scheduleMany(
