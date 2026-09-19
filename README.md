@@ -12,11 +12,12 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-004 · Scheduling core v1** | IMPLEMENTED en rama enfocada |
-| Base exacta | ✅ **main** | `bc9694cb49a4e049f41d08b367b04903411915da` |
-| Calidad de la base | ✅ **PR #66 validado + Smoke exacto** | CI #245 completo, Sonar OK y Production Smoke pasó sobre `bc9694cb…` |
+| Work line | ✅ **GF-FR-004 · Scheduling core v1** | MERGED en `main` |
+| Base exacta | ✅ **main** | `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0` |
+| Calidad del feature | ✅ **PR #67 validado** | CI #272 completo + Sonar Quality Gate passed |
 | CI del SHA exacto de main | ⚪ **no observable por el conector** | no se atribuye evidencia que el conector no expone para eventos `push` |
-| Migraciones | 🟠 **1 nueva en este slice** | Scheduling queda migration-safe hasta aplicarla |
+| Production Smoke | 🟠 **pendiente de evidencia exact-main** | se mantiene separado de CI y del merge |
+| Migraciones | 🟠 **1 nueva sin aplicar** | Scheduler permanece migration-safe hasta aprobación explícita |
 
 ## Huella del cambio
 
@@ -24,7 +25,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **15** | **+1722** | **−54** | **+1668** |
+| **1** | **+25** | **−44** | **-19** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -34,12 +35,12 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| GrindFlow CI | `validate` exige success real para cada gate seleccionado |
-| Sonar | análisis independiente + comentario estable de detalles del PR |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| GrindFlow CI | docs-only: contratos + dashboard exacto |
+| Sonar | análisis independiente del PR documental |
 | CodeRabbit | full review sobre el head estable |
-| Migración | nunca se ejecuta automáticamente desde este PR |
-| Producción | Scheduler muestra setup seguro hasta que existan ambas tablas |
+| Migración | no se ejecuta desde este PR |
+| Producción | no se modifica desde este PR documental |
 
 ## Flujo de entrega
 
@@ -66,43 +67,23 @@ flowchart LR
 
 ## Qué se hizo
 
-- Añade `publishing_destinations` y `scheduled_publications` como tablas tenant-owned con FKs compuestas por organización.
-- Autoriza Scheduling a platform admins y memberships Admin/Studio/Editor; Model no puede crear schedules.
-- Implementa `ContentScheduler` con validación server-side del tenant, rol, destino activo y contenido elegible, revalidando el asset bajo `lockForUpdate()` y comprobando de nuevo que la hora siga en el futuro justo antes de crear el schedule.
-- Un asset solo es elegible si es canónico, está `ready` y su procesamiento terminó en la **versión actual** del procesador.
-- Rechaza procesamiento stale/failed, duplicados, destinos deshabilitados, timezone inválida y fechas pasadas.
-- Guarda y **lee** el instante debido explícitamente en UTC, independiente de `APP_TIMEZONE`, y conserva la timezone IANA original para reconstruir la hora local.
-- Expone GET/POST `/organizations/{organizationId}/scheduler` y habilita Scheduler en la navegación.
-- La UI lista destinos activos, assets elegibles y **solo próximas publicaciones activas**; elegibilidad y filtros de futuro se aplican antes del límite de 100 resultados.
-- El Scheduler es migration-safe: sin tablas, GET muestra el bloqueo y un middleware del POST responde 503 **antes** de autorización/validación del FormRequest.
-- Añade pruebas de autorización, tenant isolation de destino **y asset**, duplicados, fecha pasada, destino deshabilitado, processing failed/queued/stale, timezone explícita/no-UTC, race de elegibilidad y endpoints seguros antes de migrar.
-- GF-FR-005 queda separado: este slice no intenta publicar, reintentar ni hablar con proveedores externos.
+- Sincroniza el dashboard tras el squash merge de PR #67.
+- Fija el nuevo `main` exacto en `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0`.
+- Registra que Scheduling core v1 ya está fusionado y que los required gates del PR pasaron.
+- Mantiene **exact-main CI**, **Production Smoke** y **migración de producción** como evidencias/acciones separadas.
+- No cambia runtime, schema, secrets ni contenido de producción.
 
 ## Archivos modificados en este deploy
 
-- `README.md` — dashboard exacto de la entrega.
-- `app/Http/Controllers/Scheduling/SchedulerController.php` — lectura/escritura migration-safe del Scheduler.
-- `app/Http/Middleware/RequireSchedulingSchema.php` — garantiza 503 antes del FormRequest cuando falta el schema.
-- `app/Http/Requests/Scheduling/StoreScheduledPublicationRequest.php` — autorización y validación del formulario.
-- `app/Models/PublishingDestination.php` — destino lógico tenant-owned.
-- `app/Models/ScheduledPublication.php` — schedule tenant-owned con hora UTC + timezone.
-- `app/Models/User.php` — permiso explícito para Scheduling.
-- `app/Services/Scheduling/ContentScheduler.php` — reglas de elegibilidad y creación del schedule.
-- `database/migrations/2026_09_18_200000_create_scheduling_tables.php` — schema de Scheduling.
-- `docs/REQUIREMENTS.md` — contrato verificable GF-FR-004.
-- `resources/views/dashboard.blade.php` — navegación a Scheduler.
-- `resources/views/scheduling/index.blade.php` — workspace visual del Scheduler.
-- `resources/views/vault/index.blade.php` — navegación Vault → Scheduler.
-- `routes/web.php` — rutas tenant-scoped del Scheduler.
-- `tests/Feature/SchedulingTest.php` — regresiones funcionales y de aislamiento.
+- `README.md` — sincroniza el snapshot post-merge y el estado de entrega.
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED · PR #67 OPEN · required gates passed** en `feat/scheduling-core-v1`.
-- Base exacta: `bc9694cb49a4e049f41d08b367b04903411915da`.
+- Estado actual: **MERGED en `main`** como `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0`.
+- Commit exacto de `main`: `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0`.
 - La base fue validada en PR #66 por GrindFlow CI #245 completo + Sonar sin issues/hotspots.
-- PR #67 pasó GrindFlow CI #270 completo sobre `3b74224e…`; Sonar reporta Quality Gate passed y los findings funcionales de CodeRabbit fueron corregidos.
-- Production Smoke confirmó `/up`, login, dashboard y admin sobre el commit base exacto.
+- PR #67 pasó GrindFlow CI #272 completo sobre el head final `28926fda…`; Sonar reportó Quality Gate passed y los findings de CodeRabbit fueron corregidos antes del squash merge.
+- El último Production Smoke confirmado pertenece al `main` anterior `bc9694cb…`; el nuevo `main` `9ca8707c…` aún requiere evidencia exact-main.
 - Object storage S3-compatible sigue siendo un bloqueo externo independiente; Quick Upload continúa disponible.
 - Este slice contiene **una migración nueva**, pero no la ejecuta ni muta producción automáticamente.
 
@@ -110,8 +91,8 @@ flowchart LR
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | PR #67 abierto; código y required gates validados. Pendiente squash merge y validación exact-main. |
-| **NEXT** | Tras merge y Smoke, aplicar la migración con aprobación y verificar Scheduler en producción. |
+| **NOW** | Scheduling core v1 ya está en `main`. Pendiente validación exact-main y Production Smoke del SHA `9ca8707c…`. |
+| **NEXT** | Tras exact-main CI + Production Smoke, solicitar aprobación para aplicar la migración y verificar Scheduler en producción. |
 | **NEXT** | Añadir configuración administrable de destinos si GF-FR-005 la necesita como boundary estable. |
 | **BLOCKED / EXTERNAL** | Object storage S3-compatible y FFmpeg real en Hostinger siguen requiriendo configuración externa. |
 | **LATER** | GF-FR-005 Distribution: dispatch, clasificación de errores, retries bounded e idempotencia de publicación. |
@@ -120,8 +101,8 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Scheduling | core v1 IMPLEMENTED · PR #67 abierto · required gates passed |
-| **NEXT** | Scheduling producción | merge, migration approval y Smoke |
+| **NOW** | Scheduling | core v1 MERGED en `main` · pendiente exact-main CI + Production Smoke |
+| **NEXT** | Scheduling producción | exact-main CI, Production Smoke, migration approval y verificación |
 | **NEXT** | Distribution | contratos/provider adapters sobre schedules válidos |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
 | **LATER** | Operación | queues, scheduler worker, retries y backups |
