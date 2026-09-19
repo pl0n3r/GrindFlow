@@ -25,15 +25,18 @@ class ReadinessParser(HTMLParser):
         self.invalid = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        values = dict(attrs)
         for attr, expected, states, destination in (
             ("data-module-readiness", MODULES, MODULE_STATES, self.modules),
             ("data-media-tool", TOOLS, TOOL_STATES, self.tools),
         ):
-            if attr not in values:
+            matches = [value for name, value in attrs if name == attr]
+            if not matches:
+                continue
+            if len(matches) != 1:
+                self.invalid = True
                 continue
 
-            match = STATUS.fullmatch(values[attr] or "")
+            match = STATUS.fullmatch(matches[0] or "")
             if match is None:
                 self.invalid = True
                 continue
