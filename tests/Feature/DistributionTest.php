@@ -22,6 +22,7 @@ use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -159,6 +160,8 @@ class DistributionTest extends TestCase
                     ->save();
             },
         );
+
+        Cache::flush();
 
         $redriven = app(TenantContext::class)->runWithinOrganization(
             $user,
