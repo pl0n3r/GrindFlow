@@ -5,7 +5,7 @@
   <a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
-> **Snapshot del PR candidato v0.1.8; NO es evidencia de deploy. El contrato «solo el deploy actual» aplica al publicarse.** `main` v0.1.7 `02bdbcb3c5da234b32b06d9b140d1aa9c1f032c9`: CI #35453332338 success y Production Smoke #35453332333 success; SHA remoto Hostinger todavia no verificado.
+> **Snapshot candidato v0.1.9, no evidencia de deploy. El contrato «solo el deploy actual» requiere observacion del entorno.** Base `main` v0.1.8 `298615285a82d56df492a1216178c12b1a7842a0`: CI #35454799196 y Smoke #35454799194 success; faltaba verificar GETs de los modulos. El Git SHA remoto de Hostinger sigue sin marcador verificable.
 
 ## Progress convention
 - ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
@@ -14,33 +14,33 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-FR-006C · Traffic link lifecycle + CSV boundary** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.7 · PR #97 fusionado** | `02bdbcb3c5da234b32b06d9b140d1aa9c1f032c9` |
-| Version | 🚧 **v0.1.8** | pausa y reanudacion de links |
-| CI del PR | 🚧 **pendiente** | validar nuevo SHA |
-| Sonar | 🚧 **pendiente** | Quality Gate por SHA |
+| Work line | 🚧 **GF-OPS-009 · Smoke autentico vertical de modulos** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.8 · PR #98 fusionado** | `298615285a82d56df492a1216178c12b1a7842a0` |
+| Version | 🚧 **v0.1.9** | workspace smoke read-only |
+| CI del PR | 🚧 **pendiente** | validar SHA estable |
+| Sonar | 🚧 **pendiente** | Quality Gate |
 | CodeRabbit | 🚧 **pendiente** | full review head estable |
-| CI del SHA exacto de main | ✅ **v0.1.7 validado** | validate #35453332338 |
-| Production Smoke | ✅ **rutas autenticadas previas OK** | #35453332333; no prueba esta feature |
-| Migraciones | ✅ **no requiere SQL nuevo** | schema previo sin pendientes |
-| Deploy v0.1.8 | 🚧 **no confirmado** | no atribuir CI a Hostinger |
+| CI del SHA exacto de main | ✅ **v0.1.8 validado** | validate #35454799196 |
+| Production Smoke | ✅ **basico v0.1.8** | #35454799194 |
+| Nuevos checks en prod | 🚧 **no verificados** | Scheduler, Distribution, Traffic, Finance, CSV |
+| Migraciones | ✅ **sin SQL nuevo** | continua schema vigente |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+389** | **−44** | **+345** |
+| **8** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
-| Lifecycle | PATCH tenant-scoped + transicion bloqueada por fila |
-| Retencion | link y token estables, historial de clicks intacto |
-| Redirect | disabled → 404 sin nuevo click; active → mismo short URL |
-| CSV | maximo 366 fechas UTC inclusivas, 367 rechazadas |
-| Produccion | sin SQL nuevo, sin publicacion a plataformas |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Session | una sola sesion E2E: Vault + Scheduler + Distribution + Traffic + Finance |
+| CSV | GET agregado comprueba 200, content-type, disposition y header |
+| Release | Admin System muestra v0.1.9 observada; no equivale a SHA Hostinger |
+| Faults | modulo real roto detiene smoke sin logins repetidos |
+| Schema pendiente | conserva Vault read-only e inventario; omite probes dependientes |
 
 ## Flujo de entrega
 ```mermaid
@@ -65,43 +65,41 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Tracked links permiten Disable/Enable desde Traffic sin borrar ni rotar el enlace.
-- Deshabilitar corta redireccion y atribucion; reactivar restaura la URL corta anterior.
-- El historial diario, asociaciones programadas y reportes siguen visibles.
-- La autorizacion por rol+tenant se verifica en controller y manager, con lock en update y 503 antes de schema.
-- Se corrige finding de CodeRabbit PR #97: exactamente 366 fechas inclusivas admitidas; 367 rechazadas.
-- Tests cubren ciclo completo, idempotencia, permisos, cross-tenant, schema ausente y limite leap-year CSV.
+- Production Smoke ahora inspecciona cuatro pantallas funcionales y el CSV en una sola sesion existente.
+- Verifica las etiquetas de readiness de cada modulo y cabeceras/encabezado del reporte sin publicar filas.
+- Compara la version humana del System real con la version del workflow, sin fingir exact deployed SHA.
+- La ruta bajo migracion pendiente conserva su comportamiento previo y nunca hace mutaciones.
+- Contract mock cubre modulo 500, CSV corrupto, version desactualizada, sesion unica y schema pendiente.
+- Mensajes de issues y summary identifican GITHUB_SHA como fuente del workflow, no checkout observado.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md` — regla durable lifecycle y CSV fechas inclusivas.
-- `README.md` — snapshot del candidato v0.1.8.
-- `app/Http/Controllers/Traffic/TrafficController.php` — status patch y 366 fechas.
-- `app/Services/Traffic/TrackedLinkManager.php` — transicion tenant-scoped atomica.
-- `config/version.php` — version humana 0.1.8.
-- `docs/GRINDFLOW-SPEC.md` — contrato de status/CSV.
-- `docs/REQUIREMENTS.md` — GF-FR-006C.
-- `resources/views/traffic/index.blade.php` — acciones Disable/Enable accesibles.
-- `routes/web.php` — PATCH status migration-safe.
-- `tests/Feature/TrafficAttributionTest.php` — regresiones status y CSV.
+- `.github/workflows/production-smoke.yml` — reporta cobertura ampliada y evidencia de release.
+- `AGENTS.md` — protocolo durable del smoke vertical no destructivo.
+- `README.md` — snapshot de entrega v0.1.9.
+- `config/version.php` — version humana 0.1.9.
+- `docs/GRINDFLOW-SPEC.md` — contrato operativo de smoke.
+- `docs/REQUIREMENTS.md` — requisito GF-OPS-009.
+- `scripts/production-smoke-contract.sh` — pruebas de fake HTTP y fallos seguros.
+- `scripts/production-smoke.sh` — probes autenticados y release UI observado.
 
 ## Validación
-- Base v0.1.7: CI validate #35453332338 y read-only Production Smoke #35453332333 exitosos.
-- PR v0.1.8 requiere CI, Sonar y CodeRabbit del head final; no afirmar deploy ni produccion validada.
-- Sin migracion nueva ni borrado, cambios de estado opt-in desde UI.
+- Base v0.1.8: exact-main CI #35454799196 y Production Smoke #35454799194 success.
+- Candidato v0.1.9: CI, Sonar, CodeRabbit y luego exact-main/production pendientes.
+- No nuevo schema SQL, POST de publicaciones, clicks sinteticos ni subida de medios.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar/entregar Traffic lifecycle v0.1.8; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 Storage S3/CORS y capacidad FFmpeg #40. |
-| **LATER** | 🚧 E2E visual de Scheduler/Traffic/Distribution y Finance. |
-| **BLOCKED / EXTERNAL** | 🚧 Identidad SHA checkout Hostinger verificable. |
+| **NOW** | 🚧 Validar y entregar smoke vertical v0.1.9; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 S3/CORS y media runtime #40; diagnosticar error si modulo falla en produccion. |
+| **LATER** | 🚧 Browser E2E persistente y Finance. |
+| **BLOCKED / EXTERNAL** | 🚧 Prueba exacta del checkout Git SHA Hostinger, release humano no basta. |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Distribution audit #95 y Traffic CSV #97~~ | ✅ ~~v0.1.7 CI + Smoke~~ |
-| **NOW** | 🚧 Pausa/reanudacion de tracked links | 🚧 v0.1.8 |
-| **NEXT** | 🚧 S3 y FFmpeg runtime | 🚧 #40 |
-| **LATER** | 🚧 E2E y paridad legado | 🚧 roadmap #88 |
-| **BLOCKED / EXTERNAL** | 🚧 Observabilidad Git SHA realmente desplegado | 🚧 Hostinger |
+| **DONE** | ✅ ~~Distribution audit, Traffic CSV/lifecycle~~ | ✅ ~~v0.1.8 CI+Smoke basico~~ |
+| **NOW** | 🚧 Smoke workspace y CSV autenticos | 🚧 v0.1.9 |
+| **NEXT** | 🚧 S3/CORS y FFmpeg operacional | 🚧 #40 |
+| **LATER** | 🚧 E2E browser y Finance | 🚧 roadmap #88 |
+| **BLOCKED / EXTERNAL** | 🚧 SHA real Hostinger | 🚧 observabilidad |

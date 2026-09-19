@@ -10,6 +10,9 @@ WAIT_SECONDS="${WAIT_SECONDS:-20}"
 CURL_BIN="${CURL_BIN:-curl}"
 SMOKE_USER_AGENT="${SMOKE_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0 Safari/537.36 GrindFlowProductionSmoke/1.0}"
 SMOKE_ACCEPT="${SMOKE_ACCEPT:-text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXPECTED_RELEASE="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/p" "$script_dir/../config/version.php")"
+[[ "$EXPECTED_RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'ERROR: expected release version is unavailable.\n' >&2; exit 1; }
 
 workdir="$(mktemp -d)"
 cookie_jar="$workdir/cookies.txt"
@@ -21,6 +24,9 @@ diagnostics_json="$workdir/diagnostics.json"
 up_body="$workdir/up.body"
 up_headers="$workdir/up.headers"
 login_headers="$workdir/login.headers"
+module_html="$workdir/module.html"
+csv_body="$workdir/traffic.csv"
+csv_headers="$workdir/traffic.headers"
 
 cleanup() { rm -rf "$workdir"; }
 trap cleanup EXIT
@@ -143,8 +149,51 @@ vault_failure_status() {
   return 4
 }
 
+module_failure() {
+  local label="$1"
+  printf 'MODULE_READ_ONLY=failed\n' >&2
+  printf 'ERROR: authenticated read-only %s check failed; no repeated login requests.\n' "$label" >&2
+  print_diagnostics
+  return 5
+}
+
+# The same authenticated session already used for Vault exercises the actual
+# Scheduler/Distribution/Traffic/Finance GET controllers, then the new CSV GET.
+# No forms are submitted, no redirects are followed, and no public tracked
+# links are opened (those would record clicks).
+check_workspace_modules() {
+  local workspace_path="${1%/vault}"
+  local module marker status
+
+  for module in scheduler distribution traffic finance; do
+    case "$module" in
+      scheduler) marker="Scheduling schema ready" ;;
+      distribution) marker="Distribution ready" ;;
+      traffic) marker="Traffic schema ready" ;;
+      finance) marker="Finance schema ready" ;;
+    esac
+
+    status="$(curl_common --cookie "$cookie_jar" --output "$module_html" --write-out '%{http_code}' "$BASE_URL$workspace_path/$module" || true)"
+    if [[ "$status" != 200 ]] || ! assert_contains "$module_html" "$marker"; then
+      module_failure "$module"; return $?
+    fi
+    printf 'MODULE_READ_ONLY=%s:ok\n' "$module"
+  done
+
+  # A no-filter CSV GET uses the server's bounded default UTC window. Only
+  # inspect headers and the fixed report header; never expose data rows.
+  status="$(curl_common --cookie "$cookie_jar" --output "$csv_body" --dump-header "$csv_headers" --write-out '%{http_code}' "$BASE_URL$workspace_path/traffic/export" || true)"
+  if [[ "$status" != 200 ]] ||
+     ! grep -iEq '^content-type:[[:space:]]*text/csv([;[:space:]]|$)' "$csv_headers" ||
+     ! grep -iEq '^content-disposition:[[:space:]]*attachment;' "$csv_headers" ||
+     ! grep -Fq 'date_utc,label,short_link,channel,campaign,status,clicks' "$csv_body"; then
+    module_failure "traffic CSV"; return $?
+  fi
+  printf 'MODULE_READ_ONLY=traffic-csv:ok\n'
+}
+
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers"
+  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$module_html" "$csv_body" "$csv_headers"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
   if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers" "$up_body"; return 1; fi
@@ -198,7 +247,17 @@ run_smoke() {
 
   printf 'VAULT_READ_ONLY=ok\n'
   if [[ "$migrations_blocked" -eq 1 ]]; then return 2; fi
-  printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s\n' "$vault_path"
+
+  # A product release label proves the observed runtime serves that release,
+  # not the exact deployed Git commit (Hostinger checkout SHA remains unknown).
+  if ! assert_contains "$system_html" "GrindFlow v$EXPECTED_RELEASE"; then
+    printf 'ERROR: production release does not match candidate v%s.\n' "$EXPECTED_RELEASE" >&2
+    return 1
+  fi
+  printf 'RELEASE_UI_OBSERVED=v%s\n' "$EXPECTED_RELEASE"
+
+  check_workspace_modules "$vault_path" || return $?
+  printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
 }
 
 for attempt in $(seq 1 "$ATTEMPTS"); do
@@ -208,6 +267,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
     2) printf 'BLOCKED: production smoke stopped on pending migrations after read-only Vault verification; no automatic migration or repeated login requests.\n' >&2; exit 2 ;;
     3) printf 'ERROR: read-only Vault check failed while migrations remain pending; no automatic migration or repeated login requests.\n' >&2; exit 3 ;;
     4) printf 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.\n' >&2; exit 4 ;;
+    5) printf 'ERROR: read-only workspace module check failed; no repeated login requests.\n' >&2; exit 5 ;;
   esac
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then sleep "$WAIT_SECONDS"; fi
 done

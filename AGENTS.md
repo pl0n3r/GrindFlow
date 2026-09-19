@@ -93,6 +93,21 @@ el cambio aquí en el mismo PR que modifica el producto.
 - El limite CSV de 366 dias es INCLUSIVO: una diferencia de 366 fechas de
   medianoche abarca 367 dias y se rechaza (CodeRabbit PR #97).
 
+### Smoke de produccion vertical / version observada
+
+- Reutilizar UNA sesion E2E de produccion para GET seguros de Vault,
+  Scheduler, Distribution, Traffic, Finance y CSV diario; nunca ejecutar
+  links publicos /l/* (generan clicks) ni POST/PATCH durante el smoke.
+- Confirmar marcador de readiness de cada modulo y cabeceras/encabezado del
+  CSV sin publicar cuerpo de reportes, cookies ni datos de tenants en issues.
+- Comparar vX.Y.Z del Admin System observado contra el version.php del
+  checkout de CI, sin confundir version humana con SHA de deploy.
+- Cuando hay migraciones pendientes, preservar el inventario y check de Vault
+  read-only; no ejecutar checks nuevos que dependan del schema ni reiterar login.
+- Un modulo autentico averiado falla cerrado sin reintentos/login reiterados;
+  el diagnostico queda en artifact de corta retencion. Anotar en run/issue que
+  GITHUB_SHA es fuente del workflow, NO checkout confirmado en Hostinger.
+
 ### Regla principal: Principal Software Engineer + Technical Executor
 
 **Actuar como responsable técnico multidisciplinario de GrindFlow, con ownership

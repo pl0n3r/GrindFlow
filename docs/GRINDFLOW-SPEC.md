@@ -182,3 +182,20 @@ The execution roadmap and durable progress history live in
   link resumes at the original short URL.
 - The CSV date cap counts inclusive UTC calendar dates (366 allowed, 367
   rejected), including leap-year boundaries.
+
+## 14. Authenticated production workspace smoke
+
+- The synthetic E2E production smoke shares one login across Admin System,
+  organization Vault, Scheduler, Distribution, Traffic, Finance and the daily
+  Traffic CSV GET. It must never visit click-recording /l/* or mutate state.
+- Before deep workspace checks, the observed Admin System product version
+  must match the version committed in the running GitHub workflow. This is
+  release-level runtime evidence only, not proof of the Hostinger Git SHA.
+- Each workspace page must return 200 and its distinct ready marker. CSV must
+  return 200 with CSV Content-Type, attachment disposition and the fixed
+  aggregate header, never a leaked row in logs.
+- A genuine module failure stops without repeated login; if migrations are
+  pending, the previous inventory and Vault read-only check remain available,
+  but dependent module probing is skipped.
+- Offline/missing storage is still reported independently and does not block
+  existing small-object upload. No migration is executed by smoke.
