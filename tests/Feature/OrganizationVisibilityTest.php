@@ -38,6 +38,45 @@ class OrganizationVisibilityTest extends TestCase
         $this->assertDatabaseHas('organizations', ['id' => $foreign->id]);
     }
 
+    public function test_dashboard_hides_forbidden_traffic_link_without_hiding_distribution(): void
+    {
+        $model = User::factory()->create();
+        $editor = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        Membership::query()->create([
+            'organization_id' => $organization->getKey(),
+            'user_id' => $model->getKey(),
+            'role' => UserRole::Model,
+        ]);
+
+        Membership::query()->create([
+            'organization_id' => $organization->getKey(),
+            'user_id' => $editor->getKey(),
+            'role' => UserRole::Editor,
+        ]);
+
+        $traffic = route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+        $distribution = route('organizations.distribution.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+
+        $this->actingAs($model)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee($traffic)
+            ->assertSee($distribution)
+            ->assertSee('aria-disabled="true"', false);
+
+        $this->actingAs($editor)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee($traffic)
+            ->assertSee($distribution);
+    }
+
     public function test_guest_cannot_open_dashboard(): void
     {
         $this->get('/dashboard')->assertRedirect(route('login'));

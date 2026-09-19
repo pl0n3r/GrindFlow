@@ -39,6 +39,42 @@ class DistributionTest extends TestCase
         Queue::fake([DispatchScheduledPublication::class]);
     }
 
+    public function test_model_distribution_navigation_hides_forbidden_traffic_link(): void
+    {
+        $model = User::factory()->create();
+        $editor = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        foreach ([$model, $editor] as $actor) {
+            Membership::query()->create([
+                'organization_id' => $organization->getKey(),
+                'user_id' => $actor->getKey(),
+                'role' => $actor->is($model)
+                    ? UserRole::Model
+                    : UserRole::Editor,
+            ]);
+        }
+
+        $distribution = route('organizations.distribution.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+        $traffic = route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+        ]);
+
+        $this->actingAs($model)
+            ->get($distribution)
+            ->assertOk()
+            ->assertDontSee($traffic);
+
+        $this->actingAs($model)->get($traffic)->assertForbidden();
+
+        $this->actingAs($editor)
+            ->get($distribution)
+            ->assertOk()
+            ->assertSee($traffic);
+    }
+
     public function test_due_publication_is_queued_once(): void
     {
         [$user, $organization] = $this->identity();

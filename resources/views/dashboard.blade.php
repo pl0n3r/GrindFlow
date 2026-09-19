@@ -79,7 +79,11 @@
 
                 <span class="gf-sidebar__label">Insights</span>
 
-                @if ($organizations->isNotEmpty() && $trafficRouteAvailable)
+                @if (
+                    $organizations->isNotEmpty()
+                    && $trafficRouteAvailable
+                    && auth()->user()?->canManageTrafficOrganization($organizations->first())
+                )
                     <a
                         class="gf-navitem"
                         href="{{ route('organizations.traffic.index', ['organizationId' => $organizations->first()->id]) }}"
