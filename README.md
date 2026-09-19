@@ -12,10 +12,10 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | 🟠 **GF-FR-005 · Distribution core v1** | IMPLEMENTED en rama enfocada |
+| Work line | 🟠 **GF-FR-005 · Distribution core v1** | PR #70 abierto · review fixes aplicados |
 | Base exacta | ✅ **main** | `3a9a8229da059fddea2e7da11c4a73cd39dd27b7` |
 | Scheduling dependency | ✅ **GF-FR-004 merged** | PR #67 + snapshot post-merge #68 |
-| CI del SHA exacto de main | ⚪ **no observable por el conector** | no se atribuye evidencia de eventos `push` no expuestos |
+| Validación PR | 🟠 **rerun pendiente** | CI #283 + Sonar pasaron en `e6ea2883…`; CodeRabbit encontró 4 findings funcionales ya corregidos en el head actual |
 | Producción | ⚪ **sin cambios** | ningún provider real, secret o publicación externa habilitada |
 | Migraciones | 🟠 **1 nueva en este slice** | `publication_deliveries`; no se aplica automáticamente |
 
@@ -38,7 +38,7 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
 | GrindFlow CI | `validate` exige success real de cada gate seleccionado |
 | Sonar | análisis independiente + comentario estable del PR |
-| CodeRabbit | full review sobre el head estable |
+| CodeRabbit | full review completado; findings funcionales corregidos y nueva revisión requerida |
 | Migración | nunca se ejecuta automáticamente desde este PR |
 | Producción | providers reales permanecen deshabilitados |
 
@@ -71,11 +71,13 @@ flowchart LR
 - Cada delivery conserva una idempotency key estable reutilizada en todos los retries.
 - Añade `DistributionProvider`, registry y resultado normalizado sin credenciales reales.
 - Clasifica provider auth, rate-limit y transient sin persistir mensajes/payloads crudos.
-- Auth es terminal; rate-limit agenda retry entre 60 y 3600 segundos.
+- Auth es terminal; rate-limit agenda retry entre 60 y 3600 segundos **sin gastar intentos**.
 - Transient usa backoff persistente y máximo **4 intentos**.
 - `queued` y `processing` usan lease de 5 minutos para recuperar jobs abandonados.
 - Revalida actor, tenant, schedule, destino y processing actual inmediatamente antes de provider I/O.
-- El scheduler filtra terminales y leases activas **antes** del límite de 20 para evitar starvation.
+- El scheduler filtra terminales/leases y pagina más allá de actores inválidos para evitar starvation.
+- Los writes post-provider usan fencing por `processing + attempts`; un worker con lease vencida no puede pisar un takeover.
+- Fallos del backend de cola quedan como retry persistente, no como terminal.
 - Publicaciones ya exitosas son no-op en ejecuciones posteriores.
 - Añade comando/schedule `grindflow:dispatch-publications` cada minuto.
 - Deploy-before-migration es seguro: sin `publication_deliveries`, el tick devuelve 0.
@@ -102,19 +104,19 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED** en `feat/distribution-core-v1`.
+- Estado actual: **PR #70 OPEN · review fixes aplicados** en `feat/distribution-core-v1`.
 - Base exacta: `3a9a8229da059fddea2e7da11c4a73cd39dd27b7`.
 - Scheduling core v1 ya está fusionado; este slice solo construye distribución encima de schedules válidos.
 - La nueva migración no se ejecuta desde CI ni desde esta rama.
 - No se registran providers reales ni se usan access tokens, refresh tokens o secrets.
-- Auth, rate-limit, transient, retry exhaustion, redrive por lease, idempotencia y starvation tienen regresiones dedicadas.
+- Auth, rate-limit sin gasto de intentos, transient exhaustion, queue outage, fencing de lease, redrive, idempotencia y starvation tienen regresiones dedicadas.
 - Producción permanece sin mutaciones externas.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Abrir PR de Distribution core v1 y validar CI, Sonar y CodeRabbit sobre el head estable. |
+| **NOW** | Revalidar PR #70 tras los findings funcionales de CodeRabbit y cerrar todos los threads. |
 | **NEXT** | Squash merge + validación exact-main; mantener deploy/Production Smoke como evidencia separada. |
 | **NEXT** | Diseñar primer adapter real detrás del contrato, con credenciales cifradas y sandbox antes de producción. |
 | **BLOCKED / EXTERNAL** | Migraciones de Scheduling/Distribution y providers reales requieren aprobación/configuración operacional. |
@@ -124,7 +126,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Distribution | core v1 IMPLEMENTED · pendiente PR/gates |
+| **NOW** | Distribution | core v1 IMPLEMENTED · PR #70 abierto · review fixes en revalidación |
 | **NEXT** | Distribution providers | adapters reales + auth/reconnect por plataforma |
 | **NEXT** | Scheduling producción | migration approval + Production Smoke |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
