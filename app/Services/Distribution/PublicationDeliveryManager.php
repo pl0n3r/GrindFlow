@@ -5,6 +5,7 @@ namespace App\Services\Distribution;
 use App\Jobs\DispatchScheduledPublication;
 use App\Models\MediaAsset;
 use App\Models\PublicationDelivery;
+use App\Models\PublicationDeliveryEvent;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
 use App\Models\TrackedLink;
@@ -238,6 +239,8 @@ class PublicationDeliveryManager
                 'last_error_code' => null,
             ])->save();
 
+            $this->appendEvent($locked, 'attempt_started');
+
             return $locked->refresh();
         });
 
@@ -299,16 +302,14 @@ class PublicationDeliveryManager
             return;
         }
 
-        $this->claimedDeliveryQuery($claimed)
-            ->update([
-                'status' => PublicationDelivery::STATUS_PUBLISHED,
-                'next_attempt_at' => null,
-                'claimed_until' => null,
-                'published_at' => now('UTC'),
-                'external_publication_id' => $result->externalPublicationId,
-                'last_error_code' => null,
-                'updated_at' => now(),
-            ]);
+        $this->transition($claimed, PublicationDelivery::STATUS_PUBLISHED, [
+            'next_attempt_at' => null,
+            'claimed_until' => null,
+            'published_at' => now('UTC'),
+            'external_publication_id' => $result->externalPublicationId,
+            'last_error_code' => null,
+            'updated_at' => now(),
+        ]);
     }
 
     private function handleProviderFailure(
@@ -319,14 +320,12 @@ class PublicationDeliveryManager
             $exception->kind
             === DistributionProviderException::KIND_AUTHENTICATION
         ) {
-            $this->claimedDeliveryQuery($delivery)
-                ->update([
-                    'status' => PublicationDelivery::STATUS_AUTHENTICATION_FAILED,
-                    'next_attempt_at' => null,
-                    'claimed_until' => null,
-                    'last_error_code' => 'distribution_authentication_failed',
-                    'updated_at' => now(),
-                ]);
+            $this->transition($delivery, PublicationDelivery::STATUS_AUTHENTICATION_FAILED, [
+                'next_attempt_at' => null,
+                'claimed_until' => null,
+                'last_error_code' => 'distribution_authentication_failed',
+                'updated_at' => now(),
+            ]);
 
             return;
         }
@@ -368,42 +367,89 @@ class PublicationDeliveryManager
             : $delivery->attempts;
 
         if ($attempts >= self::MAX_ATTEMPTS) {
-            $this->claimedDeliveryQuery($delivery)
-                ->update([
-                    'status' => PublicationDelivery::STATUS_FAILED,
-                    'attempts' => $attempts,
-                    'next_attempt_at' => null,
-                    'claimed_until' => null,
-                    'last_error_code' => $safeError.'_exhausted',
-                    'updated_at' => now(),
-                ]);
+            $this->transition($delivery, PublicationDelivery::STATUS_FAILED, [
+                'attempts' => $attempts,
+                'next_attempt_at' => null,
+                'claimed_until' => null,
+                'last_error_code' => $safeError.'_exhausted',
+                'updated_at' => now(),
+            ]);
 
             return;
         }
 
-        $this->claimedDeliveryQuery($delivery)
-            ->update([
-                'status' => PublicationDelivery::STATUS_RETRY_SCHEDULED,
-                'attempts' => $attempts,
-                'next_attempt_at' => now('UTC')->addSeconds($delaySeconds),
-                'claimed_until' => null,
-                'last_error_code' => $safeError,
-                'updated_at' => now(),
-            ]);
+        $this->transition($delivery, PublicationDelivery::STATUS_RETRY_SCHEDULED, [
+            'attempts' => $attempts,
+            'next_attempt_at' => now('UTC')->addSeconds($delaySeconds),
+            'claimed_until' => null,
+            'last_error_code' => $safeError,
+            'updated_at' => now(),
+        ]);
     }
 
     private function markTerminalFailure(
         PublicationDelivery $delivery,
         string $safeError,
     ): void {
-        $this->claimedDeliveryQuery($delivery)
-            ->update([
-                'status' => PublicationDelivery::STATUS_FAILED,
-                'next_attempt_at' => null,
-                'claimed_until' => null,
-                'last_error_code' => $safeError,
-                'updated_at' => now(),
-            ]);
+        $this->transition($delivery, PublicationDelivery::STATUS_FAILED, [
+            'next_attempt_at' => null,
+            'claimed_until' => null,
+            'last_error_code' => $safeError,
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Persist a fenced result and its audit event in the same transaction.
+     * An expired worker must not add a fabricated terminal event.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function transition(
+        PublicationDelivery $delivery,
+        string $status,
+        array $attributes,
+    ): void {
+        DB::transaction(function () use ($delivery, $status, $attributes): void {
+            $updated = $this->claimedDeliveryQuery($delivery)
+                ->update(['status' => $status] + $attributes);
+
+            if ($updated !== 1) {
+                return;
+            }
+
+            $errorCode = $attributes['last_error_code'] ?? null;
+
+            $this->appendEvent(
+                $delivery,
+                $status,
+                is_string($errorCode) ? $errorCode : null,
+            );
+        });
+    }
+
+    /**
+     * Keep legacy production deliveries operating until the new table is migrated.
+     * No raw exception, provider response, credentials or HTTP payload is stored.
+     */
+    private function appendEvent(
+        PublicationDelivery $delivery,
+        string $eventType,
+        ?string $errorCode = null,
+    ): void {
+        if (Schema::hasTable('publication_delivery_events') === false) {
+            return;
+        }
+
+        PublicationDeliveryEvent::query()->create([
+            'publication_delivery_id' => $delivery->getKey(),
+            'event_type' => $eventType,
+            'provider_attempt' => $delivery->attempts,
+            'event_number' => (int) PublicationDeliveryEvent::query()
+                ->where('publication_delivery_id', $delivery->getKey())
+                ->max('event_number') + 1,
+            'error_code' => $errorCode,
+        ]);
     }
 
     /**

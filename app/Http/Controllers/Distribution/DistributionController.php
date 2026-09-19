@@ -23,6 +23,7 @@ class DistributionController extends Controller
     {
         $organization = $this->organization($request);
         $ready = $this->ready();
+        $auditReady = $ready && Schema::hasTable('publication_delivery_events');
         $destinations = collect();
         $deliveries = collect();
         $counts = collect();
@@ -47,6 +48,10 @@ class DistributionController extends Controller
             $query = PublicationDelivery::query()
                 ->with(['scheduledPublication.mediaAsset', 'scheduledPublication.destination'])
                 ->latest();
+
+            if ($auditReady) {
+                $query->with('events');
+            }
 
             $query->when(
                 $filters['status'] ?? null,
@@ -84,7 +89,7 @@ class DistributionController extends Controller
         $user = $request->user();
 
         return view('distribution.index', compact(
-            'organization', 'ready', 'destinations', 'deliveries', 'counts', 'filters',
+            'organization', 'ready', 'auditReady', 'destinations', 'deliveries', 'counts', 'filters',
         ) + ['canManageDestinations' => $user->canManageOrganization($organization)]);
     }
 

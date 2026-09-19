@@ -309,6 +309,7 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
   un retry acotado entre 60 y 3600 segundos y **no consume** el presupuesto de
   intentos. Los transitorios usan backoff persistente y maximo cuatro intentos
   de provider.
+- La auditoria `publication_delivery_events` restringe DELETE de padres (organizacion/entrega) mediante FKs RESTRICT: no usar CASCADE que eluda los triggers append-only.
 - `attempts`, `next_attempt_at`, `claimed_until` y `last_error_code`
   hacen observable el lifecycle sin exponer secretos.
 - Work queued/processing usa lease de cinco minutos. Una lease vencida puede
@@ -327,6 +328,21 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
   `publication_deliveries`, el tick de distribucion devuelve cero.
 - Ningun provider real, secreto o mutacion externa se habilita en el foundation
   de GF-FR-005; primero se valida el contrato con fakes.
+
+### Regla de auditoria de intentos de distribucion
+
+- `publication_delivery_events` conserva eventos append-only por organizacion y
+  entrega: intento iniciado, publicado, reintento, fallo de autenticacion o fallo.
+- Orden `event_number` es unico por entrega, no se deriva de timestamps ni de
+  `attempts` (rate limits no consumen presupuesto y pueden repetir numero).
+- El evento de inicio comparte transaccion con la claim; el resultado comparte
+  transaccion con la transicion protegida por status processing + attempts.
+  Workers obsoletos nunca escriben resultados de audit.
+- Persistir solo nombre de evento allowlist, numero de intento y error interno
+  seguro. No copiar excepciones, credenciales, bodies ni headers de proveedores.
+- MariaDB prohibe SQL UPDATE/DELETE sobre el ledger; el modelo prohibe
+  mutaciones normales. Antes de migrar la tabla, el flujo previo continua y
+  la UI explica que el timeline requiere migration.
 
 ### Regla de atribucion de trafico
 
