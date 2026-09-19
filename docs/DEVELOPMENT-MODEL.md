@@ -8,7 +8,7 @@ for Laravel, MariaDB and GrindFlow's staged migration.
 Leer [`GOVERNANCE.md`](GOVERNANCE.md): idioma es-CO en nuevas superficies
 humanas, título de PR objetivo `(V X.Y.Z)` validado en preflight,
 [glosario](../GLOSARIO.md), plantillas para Issues/PR,
-[roadmap](../ROADMAP.md) solo como acceso al #88 y labels sincronizados
+[roadmap](../ROADMAP.md) solo como acceso al #2 y labels sincronizados
 **aditivamente**, sin renombrar historial ni aplicar política local de COP
 a Finance multimoneda/UTC. El gate agregado continúa llamándose
 `GrindFlow CI / validate`, no se duplica el pipeline Condor.
@@ -20,14 +20,14 @@ a Finance multimoneda/UTC. El gate agregado continúa llamándose
 3. `AGENTS.md`;
 4. `docs/GRINDFLOW-SPEC.md` and `docs/REQUIREMENTS.md`;
 5. area-specific docs;
-6. [Execution roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) for priority and durable delivery history; README for the latest deploy only;
+6. [Execution roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) for priority and durable delivery history; README for the latest deploy only;
 7. chat history.
 
 ## Branch lifecycle
 
 1. Start from green exact `main`.
 2. Create one focused branch.
-3. Use the ordered roadmap #88 unless explicitly reprioritized; reference requirement IDs when product behavior changes.
+3. Use the ordered roadmap #2 unless explicitly reprioritized; reference requirement IDs when product behavior changes.
 4. Implement the smallest coherent change.
 5. Run directed tests first.
 6. Bump the deliberate human product version once in `config/version.php`; finalize the intended file set, README exact snapshot and progress convention.
@@ -44,7 +44,7 @@ a Finance multimoneda/UTC. El gate agregado continúa llamándose
 
 `AGENTS.md` is the complete session bootstrap. New ChatGPT, Work and Codex
 sessions read it first, check the current main/PR/gates, then follow issue
-[#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). They must not
+[#2](https://github.com/pl0n3r/GrindFlow/issues/2). They must not
 need old chat history to reconstruct priorities or architecture. The owner
 retains authority over product ambiguity and irreversible/protected actions.
 
@@ -80,7 +80,7 @@ separate IMPLEMENTED, VALIDATED IN CODE, DEPLOYED and VALIDATED IN PRODUCTION.
 
 - `✅ ~~Completed~~`: verified through its applicable delivery gates;
   `🚧 Pending`: pending or in progress, not struck through.
-- Keep delivered checklist items struck through in **roadmap #88**, not as
+- Keep delivered checklist items struck through in **roadmap #2**, not as
   cumulative history in README.
 - Every deploy-bound PR commits a deliberate patch bump in
   `config/version.php` before final review. Pre-1.0 minor bumps require an
@@ -98,6 +98,7 @@ separate IMPLEMENTED, VALIDATED IN CODE, DEPLOYED and VALIDATED IN PRODUCTION.
 PR / main ─> preflight ─> tests ───────┤
                     ├─> database ──────┼─> validate
                     ├─> browser ───────┤
+                    ├─> real-stack ────┤
                     └─> legacy ────────┘
 ```
 
@@ -111,7 +112,9 @@ PR / main ─> preflight ─> tests ───────┤
   Laravel/PHP surfaces require it.
 - **tests** runs the Laravel Pest/PHPUnit suite when application behavior changes.
 - **database** runs MariaDB-sensitive migrations/integration paths.
-- **browser** runs the real Chromium smoke only for UI/browser-sensitive changes.
+- **browser** runs the authenticated Chromium smoke on disposable SQLite.
+- **real-stack** runs the same flow on disposable MariaDB 11.4 for changed
+  DB/runtime/UI surfaces and contributes to stable `validate`.
 - **legacy** protects the temporary TypeScript/Node implementation until migration
   retirement.
 - **validate** is the stable aggregate check. Every selected gate must have
@@ -198,12 +201,11 @@ en modo solo lectura. El log distingue Vault correcto de Vault fallido, y el
 issue automatico no debe ocultar una segunda averia bajo el bloqueo del schema.
 No ejecutar mutaciones, backups o migraciones como parte del smoke.
 
-`GrindFlow Production Smoke` already runs independently on `main` pushes and
-performs authenticated, read-only checks. It is stronger evidence than inventing
-a deploy observer without an exact public SHA marker.
-
-Do not add a BRVTAL-style exact-SHA deploy observer until GrindFlow exposes a
-safe canonical marker for the deployed source SHA.
+`GrindFlow Deploy Observer` independently checks the public version-only
+`/_deployment` marker after main pushes; it can prove **DEPLOYED release**,
+never the exact Hostinger checkout SHA. An unavailable/mismatched marker fails.
+Production Smoke remains separate, authenticated and read-only, and fails
+when the smoke secret is absent. Neither observer nor smoke performs writes.
 
 ## Definition of done
 
@@ -216,8 +218,8 @@ These states must not be collapsed into one another.
 
 ## E2E boundary: local writes versus production observation
 
-The local CI browser job uses E2eSeeder behind a strict local/testing
-guard; a temporary same-origin login bootstrap logs into Chromium, runs
+Both local CI browser jobs use E2eSeeder behind a strict local/testing
+guard: SQLite and MariaDB 11.4 respectively; a temporary same-origin login bootstrap logs into Chromium, runs
 ten form-backed Scheduler/Traffic/Finance checks, and removes itself.
 The captured DOM has the password-bearing script removed; a second
 credential check rejects artifacts with the E2E password. Browser checks

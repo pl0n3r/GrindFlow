@@ -2,105 +2,115 @@
 
 <p align="center">
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
-<a href="https://sonarcloud.io/dashboard?id=drpipe1098-commits_GrindFlow"><img alt="Sonar Quality Gate (configuración tras traslado sin verificar)" src="https://sonarcloud.io/api/project_badges/measure?project=drpipe1098-commits_GrindFlow&metric=alert_status"></a>
+<a href="https://sonarcloud.io/dashboard?id=pl0n3r_GrindFlow"><img alt="Sonar Quality Gate por comprobar" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
+<a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-deploy-observer.yml"><img alt="Deploy Observer" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-deploy-observer.yml/badge.svg?branch=main"></a>
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot PR v0.1.20: solo el deploy actual.** Base `main` v0.1.19 `9785632d82a2ac2372af54df7bd951fe62bfdbec`. CI [#35469623096](https://github.com/pl0n3r/GrindFlow/actions/runs/35469623096) falló en release-version: traslado sin incremento (v0.1.19 → v0.1.19). Último Smoke antiguo observó v0.1.14; no hay observación nueva de Hostinger.
+> **Snapshot v0.1.21: solo el deploy actual.** Base `main` v0.1.20 `9206524801a86b4c603f802ce512b8ee01ff04b6`. [CI exact-main anterior](https://github.com/pl0n3r/GrindFlow/actions/runs/35472591631) exitoso; smoke anterior falló por secreto ausente. Sin checkout de Hostinger comprobado.
 
 ## Progress convention
-- ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
-- 🚧 Pendiente = por hacer o en curso, sin tachado.
-- ⛔ Bloqueado = dependencia externa real.
+- ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = depende del exterior.
 
 ## Fuentes de verdad
-[AGENTS.md](AGENTS.md) · [Gobierno](docs/GOVERNANCE.md) · [Especificaciones](docs/GRINDFLOW-SPEC.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+[AGENTS.md](AGENTS.md) · [Especificación](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Roadmap general #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **Gobierno GitHub tras traslado** | enlaces, CI y roadmap |
-| Base exacta | ✅ **main v0.1.19** | `9785632d82a2ac2372af54df7bd951fe62bfdbec` |
-| Version | 🚧 **v0.1.20 objetivo** | config/version.php |
-| Version observada en producción | ⛔ **sin comprobación nueva** | histórico anterior: v0.1.14 |
-| CI del PR | 🚧 **pendiente** | validate |
-| Sonar | 🚧 **integración tras traslado no verificada** | proyecto original |
-| CodeRabbit | 🚧 **revisión pendiente** | full review |
-| CI del SHA exacto de main | ⛔ **falló gate de versión** | #35469623096 |
-| Production Smoke | ⛔ **GET autenticados omitidos** | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1): falta secret |
-| Deploy v0.1.20 | 🚧 **no confirmado** | Hostinger pendiente |
-| Migraciones | ✅ **sin SQL nuevo** | cambios de gobierno/documentación |
-| ZIP | ✅ **sin entregables ZIP** | cambios GitHub |
+| Línea de trabajo | 🚧 **Paridad técnica con BRVTAL adaptada** | v0.1.21 |
+| Base exacta | ✅ **main v0.1.20** | `9206524801a86b4c603f802ce512b8ee01ff04b6` |
+| Version | 🚧 **v0.1.21 objetivo** | config/version.php |
+| CI del PR | ✅ **9 jobs exitosos en `a19401e`; revalidación del head final pendiente** | [CI #35474880373](https://github.com/pl0n3r/GrindFlow/actions/runs/35474880373) |
+| Sonar | ✅ **Quality Gate OK en `a19401e`; revalidación del head final pendiente** | `pl0n3r_GrindFlow` |
+| CodeRabbit | 🚧 **Revisión de `a19401e` recibida y dos ajustes aplicados; head final pendiente** | [PR #5](https://github.com/pl0n3r/GrindFlow/pull/5) |
+| CI del SHA exacto de main | 🚧 **posterior al merge** | base verde #35472591631 |
+| Deploy Observer | 🚧 **nuevo, solo versión** | SHA Hostinger no observado |
+| Production Smoke | ⛔ **sin credencial** | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Deploy/producción v0.1.21 | ⛔ **no verificados** | Hostinger pendiente |
+| Migraciones | ✅ **sin SQL productivo** | no hay cambios de esquema |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+107** | **−71** | **+36** |
+| **20** | **+524** | **−108** | **+416** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
-| Gobierno | Enlaces y validadores apuntan al repositorio real y al Issue #2 |
-| Release | v0.1.20 incrementa v0.1.19; no se desactiva el gate |
-| Historial | Roadmap previo #88 no se presume migrado; nueva fuente #2 |
-| Producción | Se corrige el estado del smoke; sin modificar secretos, migraciones ni checkout Hostinger |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
+| Real-stack | MariaDB 11.4 + PHP 8.5 + Chrome + seeder sintético |
+| Observer | GET `/_deployment`, `exact=false`, sin SHA remoto inferido |
+| Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
  P --> F["fast contracts"]
- A --> S["Sonar"]
- A --> C["CodeRabbit review"]
+ P --> D["MariaDB"]
+ P --> B["browser SQLite"]
+ P --> R["real-stack MariaDB"]
  F --> V["validate"]
+ D --> V
+ B --> V
+ R --> V
+ A --> S["Sonar"]
+ A --> C["CodeRabbit"]
  V --> M["Squash merge"]
  M --> X["CI exact-main"]
- X --> R["Production Smoke separado"]
+ X --> O["Observer release"]
+ O --> T["Smoke autenticado separado"]
 ```
 
 ## Qué se hizo
-- Rutas del repositorio, roadmap y validadores actualizadas después del traslado a `pl0n3r/GrindFlow`.
-- Referencias canónicas `#2` uniformes y detección de enlaces activos obsoletos al antiguo `#88`.
-- Issue #2 restablece el seguimiento técnico sin inventar historial de Issues del propietario anterior.
-- Versión humana v0.1.20 para una entrega trazable con el gate de release intacto.
-- Se explicita que un Smoke verde por credenciales ausentes no verifica rutas autenticadas.
-- Smoke de producción ahora falla explícitamente cuando falta la credencial; contrato Ruby previene una regresión.
+- Memoria y agentes alineados con Laravel/MariaDB; decisiones legadas archivadas.
+- Real-stack E2E autenticado en MariaDB complementa Chromium SQLite y es obligatorio al seleccionarse.
+- Release observer read-only y marcador público sin credenciales, DB ni SHA inventado.
+- Roadmap #2, plantilla PR, badge Sonar y contratos sincronizados.
 
 ## Archivos modificados en este deploy
-- `.coderabbit.yaml` — referencia al Issue #2.
-- `.github/workflows/production-smoke.yml` — evita éxito falso sin credenciales.
-- `AGENTS.md` — roadmap actual.
-- `GLOSARIO.md` — enlace al roadmap general.
-- `README.md` — snapshot veraz del traslado.
-- `ROADMAP.md` — acceso al Issue #2.
-- `config/version.php` — v0.1.20.
-- `docs/GOVERNANCE.md` — identidad y registro del traslado.
-- `docs/GRINDFLOW-SPEC.md` — enlace al roadmap general.
-- `scripts/readme-dashboard.py` — validar roadmap vigente.
-- `scripts/validate-governance.py` — validar enlace al roadmap vigente.
-- `scripts/workflow-syntax-check.rb` — comprueba que el smoke no pase sin autenticación.
+- `.github/agents/grindflow-test-specialist.md` — MariaDB como contrato del agente.
+- `.github/agents/grindflow-ux-accessibility.md` — agente de UI accesible.
+- `.github/copilot-instructions.md` — instrucciones actualizadas.
+- `.github/pull_request_template.md` — roadmap maestro #2.
+- `.github/workflows/grindflow-ci.yml` — real-stack MariaDB autenticado.
+- `.github/workflows/production-deploy-observer.yml` — observación read-only de release.
+- `.sonarcloud.properties` — Python de análisis declarado.
+- `AGENTS.md` — memoria vigente y legado histórico separado.
+- `README.md` — snapshot exacto del candidato.
+- `config/version.php` — v0.1.21.
+- `docs/DEPLOY-HOSTINGER.md` — release observado vs SHA.
+- `docs/DEVELOPMENT-MODEL.md` — topología y enlaces.
+- `docs/GRINDFLOW-SPEC.md` — contratos observer/E2E.
+- `docs/PRUEBAS.md` — MariaDB/Chromium.
+- `routes/web.php` — marcador público sin secretos.
+- `scripts/ci-scope-contract.sh` — selección de gates.
+- `scripts/ci-scope.sh` — flag real-stack.
+- `scripts/readme-dashboard.py` — plan actualizado.
+- `scripts/workflow-syntax-check.rb` — contrato read-only observer.
+- `tests/Feature/DeploymentMarkerTest.php` — pruebas del marcador.
 
 ## Validación
-- En base main, PHPUnit, MariaDB, PHP quality y navegador fueron verdes en #35469623096; validate falló por transición v0.1.19 → v0.1.19.
-- El nuevo candidato requiere CI/Sonar/CodeRabbit; producción se verifica por separado.
-- Smoke #35469623049 fue success con credenciales faltantes y no prueba login ni checkout Hostinger; ahora la ausencia producirá un workflow fallido.
+- Base: [CI #35472591631](https://github.com/pl0n3r/GrindFlow/actions/runs/35472591631), ocho gates exitosos.
+- Candidato: [CI #35474880373](https://github.com/pl0n3r/GrindFlow/actions/runs/35474880373) completó nueve jobs en `a19401e`; Sonar Quality Gate OK. Dos ajustes de revisión requieren nuevo CI y revisión del head final antes del merge.
+- Observer no demuestra SHA remoto ni comportamiento autenticado. Smoke real bloqueado por credencial #1.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Recuperar gates y roadmap; [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 Configurar credencial de smoke; [#1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| **LATER** | 🚧 Verificar Sonar/CodeRabbit tras traslado |
-| **BLOCKED / EXTERNAL** | 🚧 SHA de checkout Hostinger no observado |
+| **NOW** | 🚧 Validar candidato [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 Hostinger, marcadores y configuraciones |
+| **LATER** | 🚧 Paridad funcional y retiro controlado del legado |
+| **BLOCKED / EXTERNAL** | ⛔ Production Smoke autenticado, read-only y Sonar [#1](https://github.com/pl0n3r/GrindFlow/issues/1) / [#4](https://github.com/pl0n3r/GrindFlow/issues/4) |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Gobierno base restaurado en rama~~ | ✅ ~~enlaces y roadmap actualizados~~ |
-| **NOW** | 🚧 CI v0.1.20 | 🚧 pruebas y gates |
-| **NEXT** | 🚧 Smoke autenticado | 🚧 secreto de repositorio nuevo |
-| **LATER** | 🚧 Deploy reciente | 🚧 sin comprobación remota |
-| **BLOCKED / EXTERNAL** | 🚧 Checkout Hostinger | 🚧 sin prueba |
+| **DONE** | ✅ ~~CI exact-main v0.1.20~~ | ✅ ~~ocho gates verdes~~ |
+| **NOW** | 🚧 Real-stack y observer | 🚧 validación PR |
+| **NEXT** | 🚧 Vault/storage, procesamiento real, admin | 🚧 roadmap |
+| **LATER** | 🚧 Paridad legado, rendimiento y recuperación | 🚧 pendiente |
+| **BLOCKED / EXTERNAL** | 🚧 Smoke, Hostinger e integraciones reales | 🚧 sin validar |

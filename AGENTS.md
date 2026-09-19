@@ -302,8 +302,8 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 ### E2E en navegador autenticado (CI aislado)
 
 - `scripts/browser-smoke.sh` termina ejecutando
-  `scripts/browser-workflow.sh` SOLO en DB SQLite descartable del
-  browser job (`APP_ENV=testing`), usando `E2eSeeder` con 106 assets y
+  `scripts/browser-workflow.sh` en SQLite descartable del
+  browser job y MariaDB descartable del real-stack job (`APP_ENV=testing`), usando `E2eSeeder` con 106 assets y
   links sinteticos, 27 schedules, 7 clicks diarios y 2500 COP de Finance.
   Seeder prohibe entornos no local/testing y debe ser idempotente.
 - El recorrido browser descubrio 404 falso en reverse Finance: la ruta padre
@@ -722,7 +722,7 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
   agregada para branch protection.
 - Cada PR y push exacto a `main` empieza con un `preflight` corto que calcula
   el diff y ejecuta el clasificador reusable `scripts/ci-scope.sh`.
-- `fast`, `php-quality`, `tests`, `database`, `browser` y `legacy`
+- `fast`, `php-quality`, `tests`, `database`, `browser`, `real-stack` y `legacy`
   salen directamente de `preflight` cuando aplican. Ningun gate pesado espera a
   que termine otro gate independiente.
 - `fast` siempre existe despues de preflight y protege contratos operativos,
@@ -806,6 +806,18 @@ Reglas:
 - Una demora indefinida del reviewer externo, sin finding/thread accionable y con
   CI/Sonar canonicos verdes, se documenta como reviewer pendiente; no se inventa
   una aprobacion.
+
+### Observacion de deploy y real-stack
+
+- GET `/_deployment` devuelve solo version humana y no usa base de datos:
+  `exact=false`, `commit=null`, `source=release-only`. Sin secretos,
+  detalle interno de hosting ni datos de usuarios.
+- `GrindFlow Deploy Observer` observa la version en Hostinger despues de cada
+  push a main, por separado del CI y Production Smoke. Solo permite afirmar
+  **DEPLOYED release**; nunca inferir el SHA remoto por version coincidente.
+- Los gates `browser` (SQLite) y `real-stack` (MariaDB 11.4) ejecutan el
+  mismo recorrido autenticado sobre bases descartables; no usar Hostinger
+  ni datos o credenciales reales para E2E con escrituras.
 
 ### Regla de visibilidad de SonarQube Cloud
 
@@ -912,13 +924,13 @@ preguntar.
 | Multi-tenancy | `organizations` + `memberships`; `TenantContext`, scopes tenant-aware fail-closed, Policies y constraints/trigger en MariaDB |
 | Cola | Laravel Queues; backend de base MariaDB solo si aporta simplicidad y con locking transaccional validado |
 | Cumplimiento 2257 | Desde los cimientos, con bloqueo en la base |
-| Idiomas | Bilingue es/en con `next-intl` desde el inicio |
+| Idiomas | es/en según requisitos de producto; `next-intl` es dependencia solo del legado Next.js |
 | Subidas | URL prefirmada tras validar token, con vigencia y limites estrictos |
 | Acortador | `/l/[slug]` en la misma app, sin dominio aparte |
 | CI | `GrindFlow CI` con compuerta estable `validate`, gates selectivos, SonarQube Cloud y CodeRabbit asesor |
 | Secretos en reposo | AES-256-GCM con `ENCRYPTION_MASTER_KEY` del entorno |
-| Limite del acortador | Dos capas: memoria del borde y ventana de 60 s en PostgreSQL |
-| Plataformas | Telegram, X, Reddit, Bluesky y webhook generico; credenciales OAuth y API key |
+| Limite del acortador | Laravel `/l/{token}` con throttle y deduplicación HMAC de 10 minutos, sin guardar IP |
+| Integraciones previstas en el legado | No implica adaptadores externos reales habilitados en Laravel; verificar por contrato y código |
 
 ## Reglas que no se rompen
 
@@ -1040,6 +1052,10 @@ preguntar.
 
 ## Topologia de compuertas del legado TypeScript
 
+**ARCHIVO HISTÓRICO:** el diagrama siguiente no describe el GitHub Actions
+vigente. La compuerta actual es `GrindFlow CI / validate` con PHP 8.5,
+MariaDB, browser SQLite, real-stack MariaDB y pruebas legadas seleccionadas.
+
 ```
 lint ──────┐
 typecheck ─┤
@@ -1054,11 +1070,22 @@ docker ────┘
 reproduce lo que Supabase da de fabrica, corre las diecisiete migraciones y ejecuta las
 116 aserciones.
 
-La compuerta `docker` construye las dos imagenes de verdad. Existe porque el
-despliegue es por contenedores: un Dockerfile roto no se descubriria al hacer
-merge sino al intentar desplegar.
+Históricamente, el legado aspiró a construir imágenes Docker. Laravel ya no
+se despliega por contenedores: Hostinger usa el checkout Git y PHP/MariaDB.
 
-## Mapa del repositorio
+## Mapa actual del repositorio Laravel
+
+| Ruta | Contenido |
+|---|---|
+| `app/`, `routes/`, `resources/views/` | Aplicación y UI Laravel |
+| `config/`, `bootstrap/`, `database/` | Configuración, bootstrap, migraciones y seeders |
+| `tests/Feature/`, `tests/Unit/`, `tests/Browser/` | Regresiones y E2E descartable |
+| `.github/workflows/` | CI, observer de release y smoke separado |
+| `docs/`, `AGENTS.md` | Decisiones durables y especificaciones |
+| `ROADMAP.md` | Acceso al roadmap maestro, Issue #2; sin progreso paralelo |
+| `src/`, `workers/`, `supabase/` | Solo legado hasta paridad GF-MIG-003 |
+
+## Mapa del legado (referencia historica)
 
 | Ruta | Contenido |
 |---|---|
@@ -1125,17 +1152,26 @@ Preguntas abiertas para el arquitecto antes de empezar:
    algo mas cercano a la estetica del sector?
 4. ¿Hay restricciones de accesibilidad (contraste minimo, tamano de fuente)?
 
-## Estado por modulo
+## Estado por modulo y vigencia de memoria
 
-| Modulo | Estado |
-|---|---|
-| 1 — Roles y aislamiento | Completo y probado |
-| 2 — Ingesta y vault | Completo: subidas, Dropbox, Drive, triaje y escaneo automatico. Falta ejecutarlo contra las APIs reales |
-| 3 — Pipeline de medios | Workers escritos; solo la sanitizacion EXIF esta verificada |
-| 4 — Hard Rule | Motor y validador de textos completos y probados. Falta conectar un proveedor de IA real |
-| 5 — Distribucion | Laravel: dashboard, destinos sandbox y retries probados en PR #87; providers reales y produccion pendientes; legado TS aun requiere paridad |
-| 6 — Enlaces y trafico | Laravel: enlaces, filtros y panel de metricas implementados y validados por CI en PR #87; no validado en produccion pendiente de esquema |
-| 7 — Finanzas | Laravel: ledger append-only tenant-owned validado en codigo, operacion productiva bloqueada por migraciones; legacy hasta GF-MIG-003 |
+El registro actual es [roadmap general #2](https://github.com/pl0n3r/GrindFlow/issues/2),
+`docs/REQUIREMENTS.md` y código de `main`. No interpretar números de PR del
+propietario anterior como PRs abiertos del repositorio transferido.
+
+- Laravel/MariaDB cubre identidad, Vault, ingesta, procesamiento, Scheduling,
+  Distribution, Traffic y Finance con pruebas; paridad completa y producción
+  exigen evidencias independientes.
+- Dropbox/Drive están probados con respuestas sintéticas, no con cuentas reales.
+- Distribution dispone de proveedor sandbox; no afirmar conexión externa real.
+- Finance registra ledger interno; no incluye payouts ni integración bancaria.
+
+### Archivo histórico del legado: no es arquitectura vigente
+
+Los apartados siguientes conservan decisiones y riesgos de Next.js,
+PostgreSQL/Supabase y VPS/Docker. El objetivo operativo vigente es Laravel 13,
+PHP 8.5, MariaDB y Hostinger: consultar `docs/GRINDFLOW-SPEC.md` y
+`docs/DEPLOY-HOSTINGER.md` antes de planificar. Una afirmación histórica
+nunca decide nuevos gates, DB, despliegue ni credenciales.
 
 ## Riesgos cerrados
 

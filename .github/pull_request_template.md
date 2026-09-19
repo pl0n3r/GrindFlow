@@ -5,7 +5,7 @@
 ## Issue y seguimiento
 
 - Requisito/Issue:
-- [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88):
+- [Roadmap general #2](https://github.com/pl0n3r/GrindFlow/issues/2):
 
 ## Versión y evidencia
 

@@ -135,3 +135,15 @@ curl -f https://www.grindflow.com.co/up
 
 El endpoint `/up` prueba que Laravel puede arrancar. No prueba por si solo
 autenticacion, MariaDB ni comportamiento multi-tenant.
+
+## Observación de release pública (sin SHA remoto)
+
+GET `/_deployment` devuelve versión humana desde `config/version.php`, con
+`Cache-Control: no-store`, `exact=false`, `commit=null` y
+`source=release-only`, sin consultar base de datos ni revelar configuración.
+
+`GrindFlow Deploy Observer` consulta esta URL después de cada push a main.
+Cuando ve la versión esperada puede informar **DEPLOYED release observed**,
+pero el SHA mostrado por GitHub sigue siendo **fuente**, no checkout remoto
+confirmado. Una futura señal de SHA exacto requiere evidencia verificada del
+servidor, no inferencia a partir de la versión.

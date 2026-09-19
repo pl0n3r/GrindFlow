@@ -316,3 +316,17 @@ The execution roadmap and durable progress history live in
 - Filtros validados status/destino/fechas/página preservados en Previous/Next; ningún parámetro arbitrario viaja a enlaces.
 - El timeline de eventos se carga solo para la página y muestra fallback si su migración está ausente.
 - Las métricas globales por estado continúan independientes del total filtrado. Página fuera de rango muestra una ruta de recuperación; nunca mezcla tenants.
+
+## 22. Observación del release y regresión real-stack aislada
+
+El marcador público de solo lectura `/_deployment` expone únicamente la versión
+humana versionada, con `exact=false`, `commit=null`, `source=release-only` y
+`no-store`. Observar la versión esperada acredita **release desplegado
+observado**, nunca el SHA exacto del checkout Hostinger ni la validación
+funcional. El Production Smoke autenticado es una señal independiente.
+El endpoint no inicia sesión ni consulta MariaDB, aunque las sesiones
+normales estén almacenadas en la base de datos.
+
+La compuerta CI `real-stack` ejecuta Chromium autenticado sobre MariaDB 11.4
+descartable y complementa `browser` sobre SQLite. Ninguna usa credenciales
+productivas, proveedores externos ni escrituras en producción.

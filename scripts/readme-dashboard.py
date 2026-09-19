@@ -84,6 +84,7 @@ def gate_plan(scope: dict[str, str]) -> str:
             ("run_tests", "PHPUnit"),
             ("run_database", "MariaDB"),
             ("run_browser", "browser"),
+            ("run_realstack", "real-stack"),
             ("run_legacy", "legacy"),
         )
         if scope.get(key) == "true"
@@ -174,12 +175,12 @@ def validate_roadmap(readme: str) -> None:
     for row in roadmap.splitlines():
         if not re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", row):
             continue
-        if "✅" not in row and "🚧" not in row:
-            fail("roadmap row missing completed/pending symbol")
+        if "✅" not in row and "🚧" not in row and "⛔" not in row:
+            fail("roadmap row missing completed/pending/blocked symbol")
         if "✅" in row and "~~" not in row:
             fail("completed work must be struck through")
-        if "🚧" in row and "~~" in row:
-            fail("pending work must remain unstruck")
+        if ("🚧" in row or "⛔" in row) and "~~" in row:
+            fail("pending/blocked work must remain unstruck")
 
 
 def validate_version(readme: str) -> None:
