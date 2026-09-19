@@ -131,6 +131,32 @@ print(parser.path)
 PY
 }
 
+extract_pending_migrations() {
+  python3 - "$system_html" <<'PY'
+from html.parser import HTMLParser
+import sys
+
+class PendingParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.value = None
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if "data-pending-migrations" in values:
+            self.value = values["data-pending-migrations"]
+
+parser = PendingParser()
+with open(sys.argv[1], encoding="utf-8") as handle:
+    parser.feed(handle.read())
+
+if parser.value is None or not parser.value.isascii() or not parser.value.isdecimal():
+    raise SystemExit(2)
+
+print(parser.value)
+PY
+}
+
 assert_contains() {
   local file="$1"
   local expected="$2"
@@ -274,9 +300,16 @@ run_smoke() {
     return 1
   fi
 
-  if ! grep -Fq 'data-pending-migrations="0"' "$system_html"; then
-    printf 'ERROR: production has pending database migrations. Apply them from Admin > System.\n' >&2
+  local pending_migrations
+  if ! pending_migrations="$(extract_pending_migrations)"; then
+    printf 'ERROR: production migration inventory is unavailable.\n' >&2
     return 1
+  fi
+
+  if [[ "$pending_migrations" != "0" ]]; then
+    printf 'MIGRATIONS_PENDING=%s\n' "$pending_migrations"
+    printf 'BLOCKED: production has %s pending database migration(s). Review the exact batch and verified external backup in Admin > System; no migration was executed.\n' "$pending_migrations" >&2
+    return 2
   fi
 
   if grep -Fq 'data-media-storage-configured="1"' "$system_html"; then
@@ -319,6 +352,14 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
 
   if run_smoke; then
     exit 0
+  else
+    smoke_status=$?
+  fi
+
+  # An operator-controlled schema change cannot resolve through HTTP retries.
+  if [[ "$smoke_status" -eq 2 ]]; then
+    printf 'BLOCKED: production smoke stopped on pending migrations; no automatic migration or repeated login requests.\n' >&2
+    exit 2
   fi
 
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then
