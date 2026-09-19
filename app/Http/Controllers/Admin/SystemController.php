@@ -59,5 +59,4 @@ class SystemController extends Controller
             'mediaStorageMaxBytes' => $directUploads->maxBytes(),
         ]);
     }
-
 }
