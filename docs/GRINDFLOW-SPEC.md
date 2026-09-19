@@ -213,3 +213,19 @@ The execution roadmap and durable progress history live in
   destination, scheduled date, media or idempotency keys. Detach removes only
   the schedule-to-link association. The endpoint is schema-safe (503 before
   link-assignment migration), and no SQL migration is required for this slice.
+
+## 16. Scheduler calendar: full filtered pagination
+
+- Organization-owned schedules are counted by the same status/destination/
+  UTC date filters and served in stable 25-item pages ordered by
+  `scheduled_for_utc, id` (no first-100 cutoff or duplicate/omitted
+  schedules for equal timestamps).
+- Previous/Next links retain validated filters, never arbitrary request
+  parameters. Page number is validated as a bounded positive integer.
+- The calendar groups the current page only and says so; the header and
+  range report the complete matching total and visible slice separately.
+- Disabled destinations remain selectable for filtering historic schedules
+  while only active destinations appear in the New schedule selector.
+- Delivery is eagerly loaded to avoid N+1 queries for edit/cancel controls.
+  Missing schema retains the original friendly fallback and does not require
+  new migrations, providers, or external publishing.

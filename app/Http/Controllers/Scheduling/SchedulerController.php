@@ -36,6 +36,7 @@ class SchedulerController extends Controller
             && Schema::hasTable('scheduled_publication_links');
         $trackedLinks = collect();
         $destinations = collect();
+        $filterDestinations = collect();
         $eligibleAssets = collect();
         $publications = collect();
 
@@ -48,10 +49,14 @@ class SchedulerController extends Controller
                     ->get();
             }
 
-            $destinations = PublishingDestination::query()
-                ->where('status', PublishingDestination::STATUS_ACTIVE)
+            // Historical schedules remain filterable if a destination was disabled.
+            $filterDestinations = PublishingDestination::query()
                 ->orderBy('name')
+                ->orderBy('id')
                 ->get();
+            $destinations = $filterDestinations
+                ->where('status', PublishingDestination::STATUS_ACTIVE)
+                ->values();
 
             $eligibleAssets = $scheduler
                 ->eligibleAssetsQuery()
@@ -64,6 +69,7 @@ class SchedulerController extends Controller
                 'mediaAsset.blob',
                 'destination',
                 'scheduledBy',
+                'delivery',
             ];
 
             if ($linkingReady) {
@@ -75,7 +81,12 @@ class SchedulerController extends Controller
                 'destination_id' => ['nullable', 'uuid'],
                 'from' => ['nullable', 'date_format:Y-m-d'],
                 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+                'page' => ['nullable', 'integer', 'min:1', 'max:10000'],
             ]);
+
+            // The paginator owns its page parameter; only validated filters
+            // belong in previous/next links so unrelated query keys do not leak.
+            unset($filters['page']);
 
             $publications = ScheduledPublication::query()
                 ->with($relations)
@@ -96,8 +107,9 @@ class SchedulerController extends Controller
                     fn ($query, $to) => $query->whereDate('scheduled_for_utc', '<=', $to),
                 )
                 ->orderBy('scheduled_for_utc')
-                ->limit(100)
-                ->get();
+                ->orderBy('id')
+                ->paginate(25)
+                ->appends($filters);
         }
 
         return view('scheduling.index', [
@@ -106,6 +118,7 @@ class SchedulerController extends Controller
             'linkingReady' => $linkingReady,
             'trackedLinks' => $trackedLinks,
             'destinations' => $destinations,
+            'filterDestinations' => $filterDestinations,
             'eligibleAssets' => $eligibleAssets,
             'publications' => $publications,
             'canSchedule' => $schedulingReady
@@ -113,10 +126,12 @@ class SchedulerController extends Controller
             'timezones' => DateTimeZone::listIdentifiers(),
             'defaultTimezone' => (string) config('app.timezone', 'UTC'),
             'filters' => $filters ?? [],
-            'calendarDays' => $publications->groupBy(
-                fn (ScheduledPublication $publication) => $publication->scheduled_for_utc
-                    ?->format('Y-m-d'),
-            ),
+            'calendarDays' => $schedulingReady
+                ? $publications->getCollection()->groupBy(
+                    fn (ScheduledPublication $publication) => $publication->scheduled_for_utc
+                        ?->format('Y-m-d'),
+                )
+                : collect(),
         ]);
     }
 

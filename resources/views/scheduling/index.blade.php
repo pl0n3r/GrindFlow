@@ -254,13 +254,13 @@
                 <section class="gf-panel gf-panel--spaced">
                     <header class="gf-panel__head">
                         <h2>Schedule calendar · UTC</h2>
-                        <span class="gf-appbar__meta">{{ $publications->count() }} loaded</span>
+                        <span class="gf-appbar__meta">{{ $publications->total() }} matching · {{ $publications->count() }} on this page</span>
                     </header>
 
                     <div class="gf-panel__body">
                         <form class="gf-form" method="GET">
                             <div class="gf-field"><label for="filter_status">Status</label><select class="gf-input" id="filter_status" name="status"><option value="">All</option><option value="scheduled" @selected(($filters['status'] ?? '') === 'scheduled')>Scheduled</option><option value="cancelled" @selected(($filters['status'] ?? '') === 'cancelled')>Cancelled</option></select></div>
-                            <div class="gf-field"><label for="filter_destination">Destination</label><select class="gf-input" id="filter_destination" name="destination_id"><option value="">All</option>@foreach($destinations as $destination)<option value="{{ $destination->id }}" @selected(($filters['destination_id'] ?? '') === $destination->id)>{{ $destination->name }}</option>@endforeach</select></div>
+                            <div class="gf-field"><label for="filter_destination">Destination</label><select class="gf-input" id="filter_destination" name="destination_id"><option value="">All</option>@foreach($filterDestinations as $destination)<option value="{{ $destination->id }}" @selected(($filters['destination_id'] ?? '') === $destination->id)>{{ $destination->name }}{{ $destination->status !== 'active' ? ' · inactive' : '' }}</option>@endforeach</select></div>
                             <div class="gf-field"><label for="filter_from">From (UTC)</label><input class="gf-input" id="filter_from" type="date" name="from" value="{{ $filters['from'] ?? '' }}"></div>
                             <div class="gf-field"><label for="filter_to">To (UTC)</label><input class="gf-input" id="filter_to" type="date" name="to" value="{{ $filters['to'] ?? '' }}"></div>
                             <button class="gf-button gf-button--primary">Apply filters</button>
@@ -268,11 +268,14 @@
                     </div>
 
                     @if($calendarDays->isNotEmpty())
-                        <div class="gf-panel__body"><div class="gf-calendar">
+                        <div class="gf-panel__body">
+                            <p class="gf-media-meta">Calendar preview reflects this page; {{ $publications->total() }} schedules match all filters.</p>
+                            <div class="gf-calendar">
                             @foreach($calendarDays as $day => $items)
                                 <article class="gf-calendar__day"><strong>{{ \Carbon\CarbonImmutable::parse($day)->format('M d') }}</strong><span>{{ $items->count() }} publication(s)</span>@foreach($items->take(3) as $item)<small>{{ $item->scheduled_for_utc?->format('H:i') }} UTC · {{ $item->destination?->name }}</small>@endforeach</article>
                             @endforeach
-                        </div></div>
+                            </div>
+                        </div>
                     @endif
 
                     <div class="gf-panel__body gf-panel__body--flush-mobile">
@@ -280,10 +283,13 @@
                             <div class="gf-empty">
                                 <div>
                                     <div class="gf-empty__icon" aria-hidden="true">⌁</div>
-                                    <h3>No schedules yet.</h3>
+                                    <h3>{{ $publications->total() > 0 ? 'No schedules on this page.' : 'No matching schedules.' }}</h3>
                                     <p>
-                                        Las publicaciones validas apareceran aqui antes de pasar
-                                        al motor de Distribution.
+                                        @if ($publications->total() > 0)
+                                            <a href="{{ $publications->url($publications->lastPage()) }}">Go to last available page</a>
+                                        @else
+                                            Ajusta los filtros o programa nuevo contenido para Distribution.
+                                        @endif
                                     </p>
                                 </div>
                             </div>
@@ -397,6 +403,24 @@
                             </div>
                         @endif
                     </div>
+                        @if ($publications->total() > 0)
+                            <nav class="gf-panel__body" aria-label="Scheduler pagination">
+                                <div class="gf-upload__footer">
+                                    <p class="gf-media-meta">
+                                        Showing {{ $publications->firstItem() ?? 0 }}–{{ $publications->lastItem() ?? 0 }} of {{ $publications->total() }}
+                                        · Page {{ $publications->currentPage() }} of {{ $publications->lastPage() }}
+                                    </p>
+                                    <div>
+                                        @if ($publications->previousPageUrl())
+                                            <a class="gf-button gf-button--ghost" rel="prev" href="{{ $publications->previousPageUrl() }}">Previous</a>
+                                        @endif
+                                        @if ($publications->nextPageUrl())
+                                            <a class="gf-button gf-button--ghost" rel="next" href="{{ $publications->nextPageUrl() }}">Next</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </nav>
+                        @endif
                 </section>
             @endif
         </main>
