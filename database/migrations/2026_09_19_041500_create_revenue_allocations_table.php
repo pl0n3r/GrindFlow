@@ -52,7 +52,7 @@ return new class extends Migration
             )
                 ->references(['id', 'organization_id'])
                 ->on('revenue_allocations')
-                ->restrictOnDelete();
+                ->cascadeOnDelete();
         });
     }
 
