@@ -1,0 +1,33 @@
+name: Reportar error
+description: Defecto reproducible o regresión en GrindFlow.
+title: "error: [resumen breve] (V X.Y.Z)"
+labels:
+  - "tipo: error"
+body:
+  - type: markdown
+    attributes:
+      value: "Reemplaza X.Y.Z por la versión objetivo actual, sin incluir datos sensibles."
+  - type: textarea
+    id: observado
+    attributes:
+      label: Comportamiento observado
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamiento esperado
+    validations:
+      required: true
+  - type: textarea
+    id: reproduccion
+    attributes:
+      label: Pasos para reproducir
+      description: Usa datos de prueba, nunca contraseñas, tokens ni datos de terceros.
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidencia y alcance
+      description: Fecha, módulo, versión observada y logs saneados.

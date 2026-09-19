@@ -6,10 +6,14 @@ tests/decisions override stale prose.
 
 ## Working rules
 
+- Read docs/GOVERNANCE.md for the Condor-inspired human-facing es-CO,
+  new title (V X.Y.Z), add-only labels and source separation policies.
+- Never confuse the observed human release with the deployed Hostinger Git SHA.
+
 - Work on one focused issue or requirement at a time.
 - During the migration, do not rewrite working TypeScript merely for style.
 - New application code targets PHP/Laravel unless the migration plan explicitly says otherwise.
-- Preserve PostgreSQL as the canonical database.
+- MariaDB/MySQL is the canonical Laravel database; PostgreSQL belongs to the retained legacy reference.
 - Prefer a modular monolith: Laravel + Blade/Livewire + queues/scheduler.
 - Reuse Laravel conventions before introducing custom framework layers.
 - Authorization and tenant isolation must be enforced server-side.

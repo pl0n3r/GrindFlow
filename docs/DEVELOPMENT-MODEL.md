@@ -3,6 +3,16 @@
 This model is adapted from the proven BRVTAL repository workflow, but optimized
 for Laravel, MariaDB and GrindFlow's staged migration.
 
+## Gobierno importado de Condor, adaptado
+
+Leer [`GOVERNANCE.md`](GOVERNANCE.md): idioma es-CO en nuevas superficies
+humanas, título de PR objetivo `(V X.Y.Z)` validado en preflight,
+[glosario](../GLOSARIO.md), plantillas para Issues/PR,
+[roadmap](../ROADMAP.md) solo como acceso al #88 y labels sincronizados
+**aditivamente**, sin renombrar historial ni aplicar política local de COP
+a Finance multimoneda/UTC. El gate agregado continúa llamándose
+`GrindFlow CI / validate`, no se duplica el pipeline Condor.
+
 ## Source-of-truth precedence
 
 1. current merged code on `main`;
