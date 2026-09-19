@@ -235,8 +235,9 @@ within their organization.
   allocation is created.
 - Reversal rows copy amount/currency/source/beneficiary from the original,
   require an audit reason, cannot be reversed again and are unique per original.
-- Net allocation is derived from originals minus reversals instead of a mutable
-  balance column.
+- Net allocation is derived from originals minus reversals **per currency**;
+  minor units from different currencies are never combined into one total and
+  no mutable balance column is authoritative.
 - Cross-tenant listing/reversal attempts fail closed under TenantScope.
 - Missing Finance schema is deploy-safe: management GET renders
   migration-required while create/reverse writes return 503 before validation.
