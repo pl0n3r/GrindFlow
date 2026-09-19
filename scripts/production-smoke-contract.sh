@@ -27,7 +27,11 @@ case "$url" in
     if [[ "${MOCK_VAULT_MODE:-ok}" == missing_link ]]; then body='<h1>Overview</h1>Tenant isolation active'; else body='<h1>Overview</h1>Tenant isolation active <a href="/organizations/example/vault">Vault</a>'; fi;;
   http://mock/admin/system)
     release="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" "$MOCK_REPOSITORY_ROOT/config/version.php")"
-    [[ "${MOCK_RELEASE_MODE:-current}" == stale ]] && release=0.0.0
+    case "${MOCK_RELEASE_MODE:-current}" in
+      stale) release=0.0.0 ;;
+      missing) release='' ;;
+      ambiguous) release="$release GrindFlow v0.0.0" ;;
+    esac
     body="<h2>Runtime configuration</h2>GrindFlow v$release<span data-pending-migrations=\"$MOCK_PENDING\">status</span><span data-media-storage-configured=\"0\">storage</span>"
     if [[ "$MOCK_PENDING" == 3 ]]; then
       fingerprint="$(printf 'a%.0s' {1..64})"
@@ -95,7 +99,39 @@ run_case() {
       [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
       ;;
     current_stale_release)
-      grep -Fq 'ERROR: production release does not match candidate v' "$log"
+      grep -Fxq 'RELEASE_UI_OBSERVED=v0.0.0' "$log"
+      grep -Eq '^ERROR: production release mismatch: expected v[0-9]+\\.[0-9]+\\.[0-9]+, observed v0\\.0\\.0\\.    current_vault_failure|current_vault_link_missing)
+      grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; ! grep -Fq 'Production smoke attempt 2/' "$log";;
+  esac
+  printf 'PASS production smoke contract: %s\n' "$label"
+}
+
+run_case pending 3 2
+run_case pending_missing 3 2 missing
+run_case pending_mismatch 3 2 mismatch
+run_case pending_unsafe 3 2 unsafe
+run_case pending_no_fingerprint 3 2 no_fingerprint
+run_case pending_vault_failure 3 3 valid failed
+run_case pending_vault_link_missing 3 3 valid missing_link
+run_case current 0 0
+run_case current_module_failure 0 5 valid ok failed
+run_case current_csv_failure 0 5 valid ok ok failed
+run_case current_stale_release 0 1 valid ok ok ok stale
+run_case current_missing_release 0 1 valid ok ok ok missing
+run_case current_ambiguous_release 0 1 valid ok ok ok ambiguous
+run_case current_vault_failure 0 4 valid failed
+run_case current_vault_link_missing 0 4 valid missing_link
+
+if MOCK_PENDING=unknown MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/unknown.log" 2>&1; then printf 'FAIL: unknown schema passed smoke.\n' >&2; exit 1; else result=$?; fi
+[[ "$result" -eq 1 ]]
+grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unknown.log"
+! grep -q '^MIGRATIONS_PENDING=' "$workdir/unknown.log"
+printf 'PASS production smoke contract: unknown\n' "$log"
+      ! grep -q '^MODULE_READ_ONLY=' "$log"
+      ;;
+    current_missing_release|current_ambiguous_release)
+      grep -Fxq 'RELEASE_UI_OBSERVED=unknown' "$log"
+      grep -Fq 'ERROR: production release label is missing or ambiguous' "$log"
       ! grep -q '^MODULE_READ_ONLY=' "$log"
       ;;
     current_vault_failure|current_vault_link_missing)
