@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,11 +25,35 @@ class ScheduledPublication extends TenantModel
         'timezone',
     ];
 
-    protected function casts(): array
+    /**
+     * @return Attribute<?CarbonImmutable, DateTimeInterface|string|null>
+     */
+    protected function scheduledForUtc(): Attribute
     {
-        return [
-            'scheduled_for_utc' => 'immutable_datetime',
-        ];
+        return Attribute::make(
+            get: static fn (?string $value): ?CarbonImmutable => $value === null
+                ? null
+                : CarbonImmutable::createFromFormat(
+                    'Y-m-d H:i:s',
+                    $value,
+                    'UTC',
+                ),
+            set: static function (
+                DateTimeInterface|string|null $value,
+            ): ?string {
+                if ($value === null) {
+                    return null;
+                }
+
+                $date = $value instanceof DateTimeInterface
+                    ? CarbonImmutable::instance($value)
+                    : CarbonImmutable::parse($value, 'UTC');
+
+                return $date
+                    ->setTimezone('UTC')
+                    ->format('Y-m-d H:i:s');
+            },
+        );
     }
 
     /**
