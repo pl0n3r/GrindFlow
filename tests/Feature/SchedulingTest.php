@@ -11,10 +11,12 @@ use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
 use App\Models\User;
 use App\Services\Media\MediaAssetProcessor;
+use App\Services\Scheduling\ContentScheduler;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class SchedulingTest extends TestCase
@@ -486,6 +488,65 @@ class SchedulingTest extends TestCase
             $migration = require $migrationPath;
             $migration->up();
         }
+    }
+
+    public function test_scheduler_rechecks_locked_asset_before_creating_publication(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->membership($user, $organization, UserRole::Studio);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user): void {
+                $asset = $this->readyAsset();
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Primary channel',
+                    'provider' => 'provider-test',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+
+                $concurrentAsset = MediaAsset::query()
+                    ->findOrFail($asset->getKey());
+                $concurrentAsset->forceFill([
+                    'metadata' => [
+                        'processing' => [
+                            'version' => app(MediaAssetProcessor::class)
+                                ->currentVersion(),
+                            'status' => 'processing',
+                            'attempts' => 2,
+                            'last_error' => null,
+                        ],
+                    ],
+                ])->save();
+
+                try {
+                    app(ContentScheduler::class)->schedule(
+                        $asset,
+                        $destination,
+                        $user,
+                        now('UTC')->addDay()->format('Y-m-d\TH:i'),
+                        'UTC',
+                    );
+
+                    $this->fail(
+                        'A stale in-memory asset must be revalidated before scheduling.',
+                    );
+                } catch (ValidationException $exception) {
+                    $this->assertArrayHasKey(
+                        'asset_id',
+                        $exception->errors(),
+                    );
+                }
+
+                $this->assertSame(
+                    0,
+                    ScheduledPublication::query()->count(),
+                );
+            },
+        );
     }
 
     private function readyAsset(?array $metadata = null): MediaAsset
