@@ -1,0 +1,229 @@
+name: GrindFlow Production Smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: grindflow-production-smoke
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  production-smoke:
+    name: production-smoke
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://www.grindflow.com.co
+      E2E_USER_EMAIL: e2e-admin@grindflow.test
+      E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
+      ATTEMPTS: '15'
+      WAIT_SECONDS: '20'
+      FAILURE_ISSUE_TITLE: '[AUTO] Production Smoke Failure'
+      CONFIG_ISSUE_TITLE: '[AUTO] Production Smoke Not Configured'
+      MEDIA_STORAGE_ISSUE_TITLE: '[AUTO] Media Storage Not Configured'
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: credentials
+        name: Check synthetic credentials
+        shell: bash
+        run: |
+          if [[ -n "$E2E_USER_PASSWORD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Production E2E credentials are configured." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Production smoke skipped"
+              echo
+              echo "Repository secret PRODUCTION_E2E_PASSWORD is not configured."
+              echo "Configure it once in GitHub repository Actions secrets; no SSH is required."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Report missing smoke credentials
+        if: steps.credentials.outputs.configured == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          issue_number="$(gh issue list --state open --search "$CONFIG_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -z "$issue_number" ]]; then
+            cat > /tmp/grindflow-config-issue.md <<'EOF'
+          The authenticated production smoke cannot run because the repository
+          secret `PRODUCTION_E2E_PASSWORD` is not configured.
+
+          This is a one-time GitHub configuration task. No SSH is required.
+
+          Until it is configured, GrindFlow cannot automatically verify the
+          authenticated Dashboard/System routes or publish application diagnostics
+          from production failures.
+          EOF
+
+            gh issue create --title "$CONFIG_ISSUE_TITLE" --body-file /tmp/grindflow-config-issue.md
+          fi
+
+      - name: Close missing-credentials notice
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          issue_number="$(gh issue list --state open --search "$CONFIG_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body "Production E2E credentials are now configured. Closing this automatic notice."
+            gh issue close "$issue_number"
+          fi
+
+      - name: Validate smoke script
+        if: steps.credentials.outputs.configured == 'true'
+        run: bash -n scripts/production-smoke.sh
+
+      - id: smoke
+        name: Authenticated production smoke
+        if: steps.credentials.outputs.configured == 'true'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/production-smoke.sh >production-smoke.log 2>&1
+
+      - name: Report media storage readiness
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          issue_number="$(gh issue list --state open --search "$MEDIA_STORAGE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if grep -Fq 'MEDIA_STORAGE_READY=1' production-smoke.log; then
+            echo "Media object storage is configured." >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ -n "$issue_number" ]]; then
+              gh issue comment "$issue_number" --body "Media object storage is now configured on production commit $GITHUB_SHA. Closing this automatic notice."
+              gh issue close "$issue_number"
+            fi
+          else
+            {
+              echo "## Media object storage setup required"
+              echo
+              echo "Production smoke passed, but Direct upload storage is not configured."
+              echo "Quick upload remains available."
+              echo
+              echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+              echo "Target: $BASE_URL"
+              echo
+              echo "Configure the S3-compatible media storage environment and bucket CORS."
+              echo "No SSH is required if the hosting/provider UI exposes environment settings."
+            } > /tmp/grindflow-media-storage.md
+
+            cat /tmp/grindflow-media-storage.md >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ -n "$issue_number" ]]; then
+              gh issue comment "$issue_number" --body-file /tmp/grindflow-media-storage.md
+            else
+              gh issue create --title "$MEDIA_STORAGE_ISSUE_TITLE" --body-file /tmp/grindflow-media-storage.md
+            fi
+          fi
+
+      - name: Upload short-lived smoke diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke-diagnostics-${{ github.run_id }}
+          path: production-smoke.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish production failure diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            if grep -Eq '^MIGRATIONS_PENDING=[1-9][0-9]*$' production-smoke.log; then
+              pending="$(grep -E '^MIGRATIONS_PENDING=[1-9][0-9]*$' production-smoke.log | tail -1 | cut -d= -f2)"
+              echo "## Production smoke blocked by pending migrations"
+              echo
+              echo "Pending migration count: **$pending**"
+              if grep -Fxq 'VAULT_READ_ONLY=ok' production-smoke.log; then
+                echo "Authenticated read-only Vault check passed despite pending migrations."
+              elif grep -Fxq 'VAULT_READ_ONLY=failed' production-smoke.log; then
+                echo "**Additional defect:** authenticated read-only Vault check failed. Inspect the short-lived diagnostics artifact; do not classify the failure as migrations alone."
+              else
+                echo "Authenticated read-only Vault check was not completed."
+              fi
+              echo "Inspect the exact pending batch in Admin > System and verify an external restorable backup before approving migrations."
+              echo "This workflow never executes migrations."
+            else
+              echo "## Production smoke failed"
+              echo
+              echo "Cause: inspect the short-lived diagnostic artifact."
+            fi
+            echo
+            # Publish only strict allowlisted release metadata; never response HTML.
+            expected_line="$(grep -E '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' production-smoke.log | tail -n 1 || true)"
+            observed_line="$(grep -E '^RELEASE_UI_OBSERVED=(v[0-9]+[.][0-9]+[.][0-9]+|unknown)$' production-smoke.log | tail -n 1 || true)"
+            if [[ -n "$expected_line" ]]; then
+              echo "Expected human release: ${expected_line#*=}"
+              if [[ -n "$observed_line" ]]; then
+                echo "Observed human release: ${observed_line#*=}"
+              else
+                echo "Observed human release: not reached by read-only smoke"
+              fi
+              echo "Human release label does not establish the deployed Git SHA."
+              echo
+            fi
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
+            echo "Retention: 3 days"
+            echo
+            echo "The diagnostic payload is kept out of the public issue body."
+            echo "Authorized agents can retrieve the short-lived artifact through GitHub."
+          } > /tmp/grindflow-production-failure.md
+
+          cat /tmp/grindflow-production-failure.md >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body-file /tmp/grindflow-production-failure.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-production-failure.md
+          fi
+
+      - name: Publish production recovery
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "## Production smoke passed"
+            echo
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Checked: /up, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
+            echo "Observed release: $(grep -E '^RELEASE_UI_OBSERVED=' production-smoke.log | tail -1 | cut -d= -f2)"
+            echo "Exact deployed Git SHA: not established by this smoke"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
+            gh issue close "$issue_number"
+          fi
+
+      - name: Fail workflow after publishing diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        shell: bash
+        run: exit 1

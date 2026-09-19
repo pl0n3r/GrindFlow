@@ -1,0 +1,561 @@
+name: GrindFlow CI
+run-name: GrindFlow CI #${{ github.run_number }} · ${{ github.event_name }} · ${{ github.ref_name }}
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: grindflow-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COMPOSER_NO_INTERACTION: '1'
+  COMPOSER_NO_AUDIT: '1'
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      has_php: ${{ steps.scope.outputs.has_php }}
+      has_legacy: ${{ steps.scope.outputs.has_legacy }}
+      run_php_quality: ${{ steps.scope.outputs.run_php_quality }}
+      run_tests: ${{ steps.scope.outputs.run_tests }}
+      run_database: ${{ steps.scope.outputs.run_database }}
+      run_browser: ${{ steps.scope.outputs.run_browser }}
+      run_legacy: ${{ steps.scope.outputs.run_legacy }}
+      full: ${{ steps.scope.outputs.full }}
+      base_sha: ${{ steps.scope.outputs.base_sha }}
+      head_sha: ${{ steps.scope.outputs.head_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validar título PR y versión objetivo
+        if: github.event_name == 'pull_request'
+        env:
+          GF_PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 scripts/validate-governance.py --pr-title "$GF_PR_TITLE"
+
+      - id: scope
+        name: Detect validation scope
+        shell: bash
+        env:
+          GF_EVENT: ${{ github.event_name }}
+          GF_SHA: ${{ github.sha }}
+          GF_BEFORE: ${{ github.event.before }}
+          GF_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GF_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GF_RUN_NUMBER: ${{ github.run_number }}
+          GF_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GF_SERVER_URL: ${{ github.server_url }}
+          GF_REPOSITORY: ${{ github.repository }}
+          GF_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          has_php=false
+          has_legacy=false
+          [[ -f composer.json ]] && has_php=true
+          [[ -f package.json ]] && has_legacy=true
+
+          base_sha="$GF_SHA"
+          head_sha="$GF_SHA"
+          changed_file_list=""
+
+          if [[ "$GF_EVENT" == "pull_request" ]]; then
+            base_sha="$GF_PR_BASE_SHA"
+            head_sha="$GF_PR_HEAD_SHA"
+          elif [[ "$GF_EVENT" == "push" ]]; then
+            base_sha="$GF_BEFORE"
+            head_sha="$GF_SHA"
+            if [[ ! "$base_sha" =~ ^[0-9a-fA-F]{40}$ || "$base_sha" =~ ^0+$ ]]; then
+              base_sha="$(git rev-list --max-parents=0 HEAD | tail -1)"
+            fi
+          fi
+
+          if [[ "$GF_EVENT" != "workflow_dispatch" ]]; then
+            changed_file_list="$(git diff --name-only "$base_sha" "$head_sha" --)"
+          fi
+
+          changed_file_list="$(printf '%s\n' "$changed_file_list" | sed '/^[[:space:]]*$/d' | sort -u)"
+          scope_output="$(printf '%s\n' "$changed_file_list" | bash scripts/ci-scope.sh "$GF_EVENT")"
+
+          while IFS='=' read -r key value; do
+            case "$key" in
+              full|run_php_quality|run_tests|run_database|run_browser|run_legacy)
+                echo "$key=$value" >> "$GITHUB_OUTPUT"
+                ;;
+            esac
+          done <<< "$scope_output"
+
+          echo "has_php=$has_php" >> "$GITHUB_OUTPUT"
+          echo "has_legacy=$has_legacy" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+          changed_count="$(printf '%s\n' "$changed_file_list" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
+          areas="$(grep '^areas=' <<< "$scope_output" | cut -d= -f2-)"
+          gate_line="$(grep -E '^(run_|full=)' <<< "$scope_output" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+
+          {
+            echo "# GrindFlow CI / preflight"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Run | [#$GF_RUN_NUMBER]($GF_SERVER_URL/$GF_REPOSITORY/actions/runs/$GF_RUN_ID) · attempt $GF_RUN_ATTEMPT |"
+            echo "| Event | \`$GF_EVENT\` |"
+            echo "| Source SHA | \`$head_sha\` |"
+            echo "| Changed files | **$changed_count** |"
+            echo "| Change surface | $areas |"
+            echo "| Selected gates | $gate_line |"
+            echo
+            echo "Heavy gates fan out directly from preflight; they do not wait for fast."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate CI scope contract
+        run: bash scripts/ci-scope-contract.sh
+
+  fast:
+    name: fast
+    needs: preflight
+    if: needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate repository contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f AGENTS.md
+          test -f docs/GOVERNANCE.md
+          test -f GLOSARIO.md
+          test -f ROADMAP.md
+          test -f .github/labels.json
+          test -f scripts/validate-governance.py
+          test -f docs/GRINDFLOW-SPEC.md
+          test -f docs/REQUIREMENTS.md
+          test -f docs/DEVELOPMENT-MODEL.md
+          test -f .coderabbit.yaml
+          test -f .sonarcloud.properties
+          test -f scripts/ci-scope.sh
+          test -f scripts/ci-scope-contract.sh
+          test -f scripts/readme-dashboard.py
+          if [[ -f composer.json ]]; then
+            test -f composer.lock
+          fi
+
+      - name: Validate automation syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in \
+            scripts/ci-scope.sh \
+            scripts/ci-scope-contract.sh \
+            scripts/deploy-hostinger.sh \
+            scripts/browser-smoke.sh \
+            scripts/production-smoke.sh \
+            scripts/production-smoke-contract.sh \
+            scripts/fetch-production-diagnostics.sh \
+            scripts/run-production-migrations.sh
+          do
+            [[ -f "$script" ]] && bash -n "$script"
+          done
+
+          python3 -m py_compile scripts/readme-dashboard.py
+          python3 -m py_compile scripts/validate-governance.py
+          python3 scripts/validate-governance.py --self-test
+          python3 scripts/validate-governance.py
+          python3 -m py_compile scripts/release-version.py
+          python3 scripts/release-version.py --self-test
+          python3 -m py_compile scripts/production-migration-inventory.py
+          python3 -m py_compile scripts/production-migration-contract.py
+          python3 -m py_compile scripts/production-runtime-readiness.py
+          python3 -m py_compile scripts/production-runtime-readiness-contract.py
+          [[ -f scripts/sonar-pr-comment.py ]] && python3 -m py_compile scripts/sonar-pr-comment.py
+
+      - name: Validate workflow YAML and smoke shell syntax
+        run: ruby scripts/workflow-syntax-check.rb
+
+      - name: Production smoke and read-only runtime contracts
+        run: |
+          python3 scripts/production-runtime-readiness-contract.py
+          bash scripts/production-smoke-contract.sh
+          python3 scripts/production-migration-contract.py
+
+      - name: Verify deliberate product-version transition
+        if: github.event_name != 'workflow_dispatch'
+        run: >-
+          python3 scripts/release-version.py
+          --base "${{ needs.preflight.outputs.base_sha }}"
+          --head "${{ needs.preflight.outputs.head_sha }}"
+
+      - name: Verify README dashboard matches the exact delta
+        if: github.event_name != 'workflow_dispatch'
+        run: >-
+          python3 scripts/readme-dashboard.py --check
+          --base "${{ needs.preflight.outputs.base_sha }}"
+          --head "${{ needs.preflight.outputs.head_sha }}"
+
+  php-quality:
+    name: php-quality
+    needs: preflight
+    if: needs.preflight.outputs.has_php == 'true' && needs.preflight.outputs.run_php_quality == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+      - id: composer-cache
+        name: Locate Composer cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress
+      - name: Composer validation
+        run: composer validate --strict
+      - name: Laravel/PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          find app bootstrap config database routes tests -type f -name '*.php' -print0 2>/dev/null |
+            xargs -0 -r -n1 php -l
+      - name: Pint
+        run: vendor/bin/pint --test
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse --no-progress
+
+  tests:
+    name: tests
+    needs: preflight
+    if: needs.preflight.outputs.has_php == 'true' && needs.preflight.outputs.run_tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_mysql, pdo_sqlite
+          coverage: none
+      - id: composer-cache
+        name: Locate Composer cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+      - run: composer install --prefer-dist --no-progress
+      - name: Prepare Laravel environment
+        shell: bash
+        run: |
+          cp -n .env.example .env || true
+          php artisan key:generate --force
+      - name: Test suite
+        shell: bash
+        run: |
+          if [[ -x vendor/bin/pest ]]; then
+            vendor/bin/pest
+          else
+            vendor/bin/phpunit
+          fi
+
+  database:
+    name: database
+    needs: preflight
+    if: needs.preflight.outputs.has_php == 'true' && needs.preflight.outputs.run_database == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: grindflow_test
+          MARIADB_USER: grindflow
+          MARIADB_PASSWORD: grindflow
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: grindflow_test
+      DB_USERNAME: grindflow
+      DB_PASSWORD: grindflow
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_mysql, pdo_sqlite
+          coverage: none
+      - id: composer-cache
+        name: Locate Composer cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+      - run: composer install --prefer-dist --no-progress
+      - name: Migrate test database
+        shell: bash
+        run: |
+          cp -n .env.example .env || true
+          php artisan key:generate --force
+          php artisan migrate:fresh --force
+      - name: Database-sensitive tests
+        shell: bash
+        run: |
+          if [[ -x vendor/bin/pest ]]; then
+            vendor/bin/pest --group=database || vendor/bin/pest
+          else
+            vendor/bin/phpunit --group=database
+          fi
+
+  browser:
+    name: browser
+    needs: preflight
+    if: needs.preflight.outputs.has_php == 'true' && needs.preflight.outputs.run_browser == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8000
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /tmp/grindflow-browser.sqlite
+      CACHE_STORE: array
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      BASE_URL: http://127.0.0.1:8000
+      E2E_USER_EMAIL: e2e-browser@grindflow.test
+      E2E_USER_NAME: E2E Browser User
+      E2E_ORG_NAME: E2E Browser Workspace
+      E2E_ORG_SLUG: e2e-browser-workspace
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_sqlite
+          coverage: none
+      - id: composer-cache
+        name: Locate Composer cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress
+      - name: Prepare Laravel browser environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -n .env.example .env || true
+          rm -f /tmp/grindflow-browser.sqlite
+          touch /tmp/grindflow-browser.sqlite
+          php artisan key:generate --force
+          php artisan migrate:fresh --force
+          mkdir -p storage/logs tests/Browser/artifacts
+
+          E2E_PASSWORD="$(php -r 'echo bin2hex(random_bytes(24));')"
+          # Mask before GITHUB_ENV makes the temporary password visible to
+          # subsequent step environment diagnostics. Never print the value.
+          printf '::add-mask::%s\n' "$E2E_PASSWORD"
+          echo "E2E_USER_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
+          export E2E_USER_PASSWORD="$E2E_PASSWORD"
+
+          php artisan db:seed --class='Database\Seeders\E2eSeeder' --force
+      - name: Start Laravel
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan serve --host=127.0.0.1 --port=8000 --no-reload > storage/logs/browser-server.log 2>&1 &
+          echo $! > /tmp/grindflow-browser-server.pid
+
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8000/up >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$ready" != "true" ]]; then
+            cat storage/logs/browser-server.log >&2 || true
+            exit 1
+          fi
+      - name: Real browser smoke
+        run: bash scripts/browser-smoke.sh
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-diagnostics
+          path: |
+            tests/Browser/artifacts
+            storage/logs/browser-server.log
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Stop Laravel
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/grindflow-browser-server.pid ]]; then
+            kill "$(cat /tmp/grindflow-browser-server.pid)" 2>/dev/null || true
+          fi
+
+  legacy:
+    name: legacy
+    needs: preflight
+    if: needs.preflight.outputs.has_legacy == 'true' && needs.preflight.outputs.run_legacy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Legacy validation during migration
+        shell: bash
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test
+
+  validate:
+    name: validate
+    if: always()
+    needs: [preflight, fast, php-quality, tests, database, browser, legacy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Enforce validation gates
+        shell: bash
+        env:
+          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
+          FAST_RESULT: ${{ needs.fast.result }}
+          PHP_QUALITY_RESULT: ${{ needs.php-quality.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          DATABASE_RESULT: ${{ needs.database.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          LEGACY_RESULT: ${{ needs.legacy.result }}
+          RUN_PHP_QUALITY: ${{ needs.preflight.outputs.run_php_quality }}
+          RUN_TESTS: ${{ needs.preflight.outputs.run_tests }}
+          RUN_DATABASE: ${{ needs.preflight.outputs.run_database }}
+          RUN_BROWSER: ${{ needs.preflight.outputs.run_browser }}
+          RUN_LEGACY: ${{ needs.preflight.outputs.run_legacy }}
+        run: |
+          set -euo pipefail
+          failures=0
+
+          require_success() {
+            local name="$1"
+            local result="$2"
+            if [[ "$result" != "success" ]]; then
+              echo "::error::$name must succeed, got $result"
+              failures=1
+            fi
+          }
+
+          require_optional() {
+            local name="$1"
+            local selected="$2"
+            local result="$3"
+
+            if [[ "$selected" == "true" ]]; then
+              if [[ "$result" != "success" ]]; then
+                echo "::error::$name was selected and must succeed, got $result"
+                failures=1
+              fi
+              return
+            fi
+
+            case "$result" in
+              skipped|success) ;;
+              *)
+                echo "::error::$name was not selected but ended as $result"
+                failures=1
+                ;;
+            esac
+          }
+
+          require_success preflight "$PREFLIGHT_RESULT"
+          require_success fast "$FAST_RESULT"
+          require_optional php-quality "$RUN_PHP_QUALITY" "$PHP_QUALITY_RESULT"
+          require_optional tests "$RUN_TESTS" "$TESTS_RESULT"
+          require_optional database "$RUN_DATABASE" "$DATABASE_RESULT"
+          require_optional browser "$RUN_BROWSER" "$BROWSER_RESULT"
+          require_optional legacy "$RUN_LEGACY" "$LEGACY_RESULT"
+
+          if [[ "$failures" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Publish final gate summary
+        if: always()
+        shell: bash
+        env:
+          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
+          FAST_RESULT: ${{ needs.fast.result }}
+          PHP_QUALITY_RESULT: ${{ needs.php-quality.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          DATABASE_RESULT: ${{ needs.database.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          LEGACY_RESULT: ${{ needs.legacy.result }}
+        run: |
+          {
+            echo "## GrindFlow CI / validate"
+            echo
+            echo "| Gate | Result |"
+            echo "|---|---|"
+            echo "| preflight | **$PREFLIGHT_RESULT** |"
+            echo "| fast contracts | **$FAST_RESULT** |"
+            echo "| php-quality | **$PHP_QUALITY_RESULT** |"
+            echo "| PHPUnit | **$TESTS_RESULT** |"
+            echo "| MariaDB | **$DATABASE_RESULT** |"
+            echo "| browser | **$BROWSER_RESULT** |"
+            echo "| legacy | **$LEGACY_RESULT** |"
+          } >> "$GITHUB_STEP_SUMMARY"

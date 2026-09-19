@@ -1,0 +1,123 @@
+name: GrindFlow Production Migration
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: grindflow-production-migration
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  migrate:
+    name: production-migration
+    if: >-
+      github.event.issue.number == 34 &&
+      github.event.issue.title == '[AUTO] Production Migration Bridge' &&
+      (github.event.comment.body == '/production-migrate 1' ||
+       github.event.comment.body == '/production-migrate 7 backup-verified') &&
+      github.event.comment.author_association == 'OWNER'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      BASE_URL: https://www.grindflow.com.co
+      E2E_USER_EMAIL: e2e-admin@grindflow.test
+      E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
+      OUTPUT_PATH: production-migration-result.json
+      EXPECTED_PENDING: ${{ github.event.comment.body == '/production-migrate 7 backup-verified' && '7' || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize migration result
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+
+          with open("production-migration-result.json", "w", encoding="utf-8") as handle:
+              json.dump(
+                  {
+                      "generated_at": datetime.now(timezone.utc).isoformat(),
+                      "ok": False,
+                      "pending_before": None,
+                      "pending_after": None,
+                      "message": "Production migration did not complete.",
+                  },
+                  handle,
+                  indent=2,
+              )
+              handle.write("\n")
+          PY
+
+      - id: credentials
+        name: Check synthetic credentials
+        shell: bash
+        run: |
+          if [[ -n "$E2E_USER_PASSWORD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate migration script
+        if: steps.credentials.outputs.configured == 'true'
+        run: bash -n scripts/run-production-migrations.sh
+
+      - id: migrate
+        name: Execute explicitly approved migration
+        if: steps.credentials.outputs.configured == 'true'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/run-production-migrations.sh
+
+      - name: Upload migration result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-migration-${{ github.run_id }}
+          path: production-migration-result.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish migration status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        shell: bash
+        run: |
+          if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
+            state="blocked: production E2E credentials are not configured"
+          elif [[ "${{ steps.migrate.outcome }}" == "success" ]]; then
+            state="completed"
+          else
+            state="failed safely; inspect the result artifact"
+          fi
+
+          {
+            echo "Production migration request: **$state**"
+            echo
+            printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
+            printf 'Artifact: `production-migration-%s`\n' "$GITHUB_RUN_ID"
+            printf 'Approved pending count: **%s**\n' "$EXPECTED_PENDING"
+            echo "Retention: **7 days**"
+            echo
+            printf '%s\n' 'This bridge runs only for the repository OWNER exact approved command: `/production-migrate 1` or `/production-migrate 7 backup-verified`.'
+            echo "It refuses to migrate if production reports a different pending count."
+          } > /tmp/grindflow-production-migration-status.md
+
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/grindflow-production-migration-status.md
+
+      - name: Fail after publishing migration status
+        if: >-
+          always() &&
+          (
+            steps.credentials.outputs.configured != 'true' ||
+            steps.migrate.outcome != 'success'
+          )
+        run: exit 1

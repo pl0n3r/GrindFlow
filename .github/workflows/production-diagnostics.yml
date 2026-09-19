@@ -1,0 +1,122 @@
+name: GrindFlow Production Diagnostics
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: grindflow-production-diagnostics
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  diagnostics:
+    name: production-diagnostics
+    if: >-
+      github.event.issue.title == '[AUTO] Production Diagnostics Bridge' &&
+      github.event.comment.body == '/production-diagnostics' &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      )
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://www.grindflow.com.co
+      E2E_USER_EMAIL: e2e-admin@grindflow.test
+      E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
+      OUTPUT_PATH: production-diagnostics.json
+      LIMIT: '20'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize safe diagnostics artifact
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+
+          with open("production-diagnostics.json", "w", encoding="utf-8") as handle:
+              json.dump(
+                  {
+                      "generated_at": datetime.now(timezone.utc).isoformat(),
+                      "ok": False,
+                      "message": "Diagnostics capture did not complete.",
+                      "entries": [],
+                  },
+                  handle,
+                  indent=2,
+              )
+              handle.write("\n")
+          PY
+
+      - id: credentials
+        name: Check synthetic credentials
+        shell: bash
+        run: |
+          if [[ -n "$E2E_USER_PASSWORD" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate diagnostics script
+        if: steps.credentials.outputs.configured == 'true'
+        run: bash -n scripts/fetch-production-diagnostics.sh
+
+      - id: capture
+        name: Capture sanitized production diagnostics
+        if: steps.credentials.outputs.configured == 'true'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/fetch-production-diagnostics.sh >/tmp/diagnostics-status.log 2>&1
+
+      - name: Upload short-lived diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-diagnostics-${{ github.run_id }}
+          path: production-diagnostics.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish bridge status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        shell: bash
+        run: |
+          if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
+            state="blocked: production E2E credentials are not configured"
+          elif [[ "${{ steps.capture.outcome }}" == "success" ]]; then
+            state="ready"
+          else
+            state="capture failed; inspect the short-lived artifact for the safe status payload"
+          fi
+
+          {
+            echo "Production diagnostics request: **$state**"
+            echo
+            printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
+            printf 'Artifact: `production-diagnostics-%s`\n' "$GITHUB_RUN_ID"
+            echo "Retention: **3 days**"
+            echo
+            echo "The issue does not contain the diagnostic payload. Authorized agents can read the artifact through GitHub."
+          } > /tmp/grindflow-diagnostics-status.md
+
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/grindflow-diagnostics-status.md
+
+      - name: Fail after publishing bridge status
+        if: >-
+          always() &&
+          (
+            steps.credentials.outputs.configured != 'true' ||
+            steps.capture.outcome == 'failure'
+          )
+        shell: bash
+        run: exit 1

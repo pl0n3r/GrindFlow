@@ -1,0 +1,47 @@
+name: Sincronizar gobierno GitHub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/labels.json"
+      - ".github/workflows/sincronizar-gobierno.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-gobierno
+  cancel-in-progress: false
+
+jobs:
+  etiquetas:
+    name: Sincronizar etiquetas sin borrar historial
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v5
+
+      - name: Añadir o actualizar etiquetas declaradas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -c '.[]' .github/labels.json | while IFS= read -r item; do
+            nombre="$(jq -r '.name' <<< "$item")"
+            color="$(jq -r '.color' <<< "$item")"
+            descripcion="$(jq -r '.description' <<< "$item")"
+
+            gh label create "$nombre" \
+              --repo "$GITHUB_REPOSITORY" \
+              --color "$color" \
+              --description "$descripcion" \
+              --force
+          done
+
+          echo "Etiquetas declaradas sincronizadas; las demás se conservan." >> "$GITHUB_STEP_SUMMARY"
