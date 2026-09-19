@@ -44,10 +44,6 @@
                     <span class="gf-navitem__text">Distribution</span>
                 </a>
 
-                <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                    <span class="gf-navitem__icon" aria-hidden="true">↗</span>
-                    <span class="gf-navitem__text">Distribution</span>
-                </span>
             </nav>
 
             <div class="gf-sidebar__bottom">
@@ -257,7 +253,7 @@
 
                 <section class="gf-panel gf-panel--spaced">
                     <header class="gf-panel__head">
-                        <h2>Schedule calendar</h2>
+                        <h2>Schedule calendar · UTC</h2>
                         <span class="gf-appbar__meta">{{ $publications->count() }} loaded</span>
                     </header>
 
@@ -265,8 +261,8 @@
                         <form class="gf-form" method="GET">
                             <div class="gf-field"><label for="filter_status">Status</label><select class="gf-input" id="filter_status" name="status"><option value="">All</option><option value="scheduled" @selected(($filters['status'] ?? '') === 'scheduled')>Scheduled</option><option value="cancelled" @selected(($filters['status'] ?? '') === 'cancelled')>Cancelled</option></select></div>
                             <div class="gf-field"><label for="filter_destination">Destination</label><select class="gf-input" id="filter_destination" name="destination_id"><option value="">All</option>@foreach($destinations as $destination)<option value="{{ $destination->id }}" @selected(($filters['destination_id'] ?? '') === $destination->id)>{{ $destination->name }}</option>@endforeach</select></div>
-                            <div class="gf-field"><label for="filter_from">From</label><input class="gf-input" id="filter_from" type="date" name="from" value="{{ $filters['from'] ?? '' }}"></div>
-                            <div class="gf-field"><label for="filter_to">To</label><input class="gf-input" id="filter_to" type="date" name="to" value="{{ $filters['to'] ?? '' }}"></div>
+                            <div class="gf-field"><label for="filter_from">From (UTC)</label><input class="gf-input" id="filter_from" type="date" name="from" value="{{ $filters['from'] ?? '' }}"></div>
+                            <div class="gf-field"><label for="filter_to">To (UTC)</label><input class="gf-input" id="filter_to" type="date" name="to" value="{{ $filters['to'] ?? '' }}"></div>
                             <button class="gf-button gf-button--primary">Apply filters</button>
                         </form>
                     </div>
@@ -274,7 +270,7 @@
                     @if($calendarDays->isNotEmpty())
                         <div class="gf-panel__body"><div class="gf-calendar">
                             @foreach($calendarDays as $day => $items)
-                                <article class="gf-calendar__day"><strong>{{ \Carbon\CarbonImmutable::parse($day)->format('M d') }}</strong><span>{{ $items->count() }} publication(s)</span>@foreach($items->take(3) as $item)<small>{{ $item->scheduled_for_utc?->setTimezone($item->timezone)->format('H:i') }} · {{ $item->destination?->name }}</small>@endforeach</article>
+                                <article class="gf-calendar__day"><strong>{{ \Carbon\CarbonImmutable::parse($day)->format('M d') }}</strong><span>{{ $items->count() }} publication(s)</span>@foreach($items->take(3) as $item)<small>{{ $item->scheduled_for_utc?->format('H:i') }} UTC · {{ $item->destination?->name }}</small>@endforeach</article>
                             @endforeach
                         </div></div>
                     @endif
