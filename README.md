@@ -34,7 +34,7 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
 | GrindFlow CI | `validate` exige success real para cada gate seleccionado |
 | Sonar | análisis independiente + comentario estable de detalles del PR |
 | CodeRabbit | full review sobre el head estable |
