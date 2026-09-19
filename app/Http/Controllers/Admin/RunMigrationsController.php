@@ -67,10 +67,10 @@ class RunMigrationsController extends Controller
                     ]);
             }
 
-            if (! hash_equals(
+            if (hash_equals(
                 $snapshot['fingerprint'],
                 (string) $validated['migration_batch'],
-            )) {
+            ) === false) {
                 return redirect()
                     ->route('admin.system')
                     ->withErrors([
