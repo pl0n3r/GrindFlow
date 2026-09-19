@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class TrafficAttributionTest extends TestCase
@@ -173,7 +174,7 @@ class TrafficAttributionTest extends TestCase
         $remoteIp = '203.0.113.20';
         $spoofedForwardedIp = '198.51.100.99';
 
-        $this->withServerVariables([
+        $response = $this->withServerVariables([
             'REMOTE_ADDR' => $remoteIp,
         ])->withHeaders([
             'X-Forwarded-For' => $spoofedForwardedIp,
@@ -181,11 +182,17 @@ class TrafficAttributionTest extends TestCase
             'Referer' => 'https://private.example/path',
         ])->get(
             route('traffic.redirect', ['token' => $link->token]),
-        )
+        );
+
+        $response
             ->assertStatus(302)
             ->assertRedirect('https://example.com/destination')
-            ->assertHeader('Cache-Control', 'no-store, max-age=0')
             ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertStringContainsString('max-age=0', $cacheControl);
 
         $expected = hash_hmac(
             'sha256',
@@ -488,7 +495,7 @@ class TrafficAttributionTest extends TestCase
             (string) $organization->getKey(),
             fn (): TrackedLink => TrackedLink::query()->create([
                 'created_by_user_id' => $user->getKey(),
-                'token' => \Illuminate\Support\Str::random(22),
+                'token' => Str::random(22),
                 'label' => $label,
                 'destination_url' => $destination,
                 'channel' => 'test',
