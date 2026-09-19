@@ -18,11 +18,12 @@ use App\Http\Middleware\RequireDistributionSchema;
 use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Middleware\RequireTrafficSchema;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
-Route::get('/_deployment', static function (): \Illuminate\Http\JsonResponse {
+Route::get('/_deployment', static function (): JsonResponse {
     // Version humana observable, sin inferir el SHA del checkout remoto.
     return response()->json([
         'version' => (string) config('version.number'),

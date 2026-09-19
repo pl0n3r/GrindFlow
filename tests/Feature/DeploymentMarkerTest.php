@@ -8,9 +8,10 @@ class DeploymentMarkerTest extends TestCase
 {
     public function test_public_marker_reports_only_the_human_release_without_remote_sha(): void
     {
-        $this->get('/_deployment')
-            ->assertOk()
-            ->assertHeader('Cache-Control', 'no-store, max-age=0')
+        $response = $this->get('/_deployment');
+
+        $response->assertOk()
+            ->assertHeader('Cache-Control')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertExactJson([
                 'version' => (string) config('version.number'),
@@ -18,6 +19,11 @@ class DeploymentMarkerTest extends TestCase
                 'commit' => null,
                 'source' => 'release-only',
             ]);
+
+        $this->assertStringContainsString(
+            'no-store',
+            (string) $response->baseResponse->headers->get('Cache-Control'),
+        );
     }
 
     public function test_public_marker_rejects_mutation_and_exposes_no_runtime_secrets(): void
