@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Models\Membership;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,6 +33,69 @@ class AdminSystemTest extends TestCase
             ->assertSee('data-media-storage-configured=', false)
             ->assertSee('Session driver')
             ->assertSee('Queue connection');
+    }
+
+    public function test_admin_system_links_existing_workspace_modules_for_visible_organization(): void
+    {
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+        $organization = Organization::factory()->create();
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.system'))
+            ->assertOk();
+
+        foreach ([
+            'organizations.vault.index',
+            'organizations.scheduler.index',
+            'organizations.distribution.index',
+            'organizations.traffic.index',
+        ] as $name) {
+            $response->assertSee(route($name, [
+                'organizationId' => $organization->getKey(),
+            ]));
+        }
+
+        $response->assertSee('GrindFlow v'.config('version.number'));
+    }
+
+    public function test_dashboard_distribution_link_is_available_only_for_visible_organization(): void
+    {
+        $user = User::factory()->create([
+            'platform_role' => UserRole::Model,
+        ]);
+        $visible = Organization::factory()->create();
+        $other = Organization::factory()->create();
+
+        Membership::query()->create([
+            'organization_id' => $visible->getKey(),
+            'user_id' => $user->getKey(),
+            'role' => UserRole::Editor,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee(route('organizations.distribution.index', [
+                'organizationId' => $visible->getKey(),
+            ]))
+            ->assertDontSee(route('organizations.distribution.index', [
+                'organizationId' => $other->getKey(),
+            ]));
+    }
+
+    public function test_admin_system_keeps_workspace_navigation_disabled_without_organizations(): void
+    {
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.system'))
+            ->assertOk()
+            ->assertSee('gf-navitem--disabled', false)
+            ->assertDontSee('/organizations/example/vault');
     }
 
     public function test_system_status_reports_media_storage_ready_without_exposing_secrets(): void
