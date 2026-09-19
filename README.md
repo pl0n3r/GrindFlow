@@ -6,7 +6,7 @@
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Development dashboard** de **solo el deploy actual**. Implementado, CI, deploy y validación productiva son estados distintos.
+> **Snapshot del PR candidato v0.1.3; NO es evidencia de deploy.** El último main validado es v0.1.2. Implementación, revisión, merge y producción son estados distintos.
 
 ## Progress convention
 
@@ -20,9 +20,9 @@
 | Work line | 🚧 **GF-OPS · Diagnóstico de esquema y Smoke** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **v0.1.2 · PR #91 fusionado** | `main` `98ad68b32fea1e56538b7386cd32f6eb7699b1d3` |
 | Version | 🚧 **v0.1.3** | patch de observabilidad segura |
-| CI del PR | 🚧 **pendiente del head estable** | GrindFlow CI / validate |
-| Sonar | 🚧 **pendiente** | Quality Gate del PR |
-| CodeRabbit | 🚧 **pendiente** | review sobre head estable |
+| CI del PR | ✅ **validado para v0.1.3** | #35430563622 sobre `9a8ec205` |
+| Sonar | ✅ **Quality Gate OK** | 0 issues; `9a8ec205` |
+| CodeRabbit | 🚧 **hallazgo README en resolución** | revisión del head `9a8ec205` |
 | CI del SHA exacto de main | 🚧 **v0.1.3 por verificar tras merge** | v0.1.2 CI #35430357855 |
 | Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes |
 | Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + aprobación expresa |
@@ -79,7 +79,7 @@ flowchart LR
 - Si Vault responde 500 o Dashboard omite el enlace Vault, el issue distingue ambos incidentes; no reintenta logins ni aplica SQL.
 - Tests PHP/MariaDB y contrato fake HTTP para esquema parcial, enlace ausente y bloqueos; regla duradera de avances sustanciales por mensaje.
 
-## Archivos modificados en este deploy
+## Archivos modificados en este deploy propuesto (PR #92; no desplegado)
 
 - `README.md` — snapshot de v0.1.3.
 - `config/version.php` — versión humana v0.1.3.
@@ -96,7 +96,7 @@ flowchart LR
 ## Validación
 
 - v0.1.2 PR #91 fusionado; la identidad real del checkout Hostinger sigue sin verificar.
-- v0.1.3 requiere CI / validate, Sonar y CodeRabbit en head estable y exact-main tras merge.
+- v0.1.3 CI / validate #35430563622 y Sonar OK sobre el head `9a8ec205`; revisión del texto de entrega por CodeRabbit y exact-main tras merge pendientes.
 - Las migraciones, backup externo y validación productiva requieren evidencia separada.
 
 ## Qué sigue
