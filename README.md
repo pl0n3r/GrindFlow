@@ -18,12 +18,12 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **Paridad técnica con BRVTAL adaptada** | v0.1.21 |
+| Línea de trabajo | 🚧 **Paridad técnica con BRVTAL adaptada** | v0.1.21 |
 | Base exacta | ✅ **main v0.1.20** | `9206524801a86b4c603f802ce512b8ee01ff04b6` |
 | Version | 🚧 **v0.1.21 objetivo** | config/version.php |
 | CI del PR | 🚧 **pendiente** | validate |
 | Sonar | 🚧 **Quality Gate aún sin confirmar** | `pl0n3r_GrindFlow` |
-| CodeRabbit | 🚧 **full review pendiente** | head estable |
+| CodeRabbit | 🚧 **revisión completa pendiente** | head estable |
 | CI del SHA exacto de main | 🚧 **posterior al merge** | base verde #35472591631 |
 | Deploy Observer | 🚧 **nuevo, solo versión** | SHA Hostinger no observado |
 | Production Smoke | ⛔ **sin credencial** | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
@@ -34,7 +34,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **20** | **+474** | **−98** | **+376** |
+| **20** | **+512** | **−103** | **+409** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -104,7 +104,7 @@ flowchart LR
 | **NOW** | 🚧 Validar candidato [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
 | **NEXT** | 🚧 Hostinger, marcadores y configuraciones |
 | **LATER** | 🚧 Paridad funcional y retiro controlado del legado |
-| **BLOCKED / EXTERNAL** | 🚧 Smoke sintético y Sonar [#1](https://github.com/pl0n3r/GrindFlow/issues/1) / [#4](https://github.com/pl0n3r/GrindFlow/issues/4) |
+| **BLOCKED / EXTERNAL** | ⛔ Production Smoke autenticado, read-only y Sonar [#1](https://github.com/pl0n3r/GrindFlow/issues/1) / [#4](https://github.com/pl0n3r/GrindFlow/issues/4) |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
