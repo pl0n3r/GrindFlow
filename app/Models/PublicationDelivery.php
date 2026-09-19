@@ -2,9 +2,16 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $attempts
+ * @property ?CarbonImmutable $next_attempt_at
+ * @property ?CarbonImmutable $claimed_until
+ * @property ?CarbonImmutable $published_at
+ */
 class PublicationDelivery extends TenantModel
 {
     use HasUuids;
