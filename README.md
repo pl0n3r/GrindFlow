@@ -6,48 +6,42 @@
   <a href="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/drpipe1098-commits/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot del PR candidato v0.1.3; NO es evidencia de deploy.** El contrato «solo el deploy actual» aplica al publicarse; hoy el último main validado es v0.1.2 y producción requiere verificación separada.
+> **Snapshot del PR candidato v0.1.4; NO es evidencia de deploy.** El contrato «solo el deploy actual» aplica al publicarse. `main` v0.1.3 esta validado; produccion requiere evidencia separada.
 
 ## Progress convention
-
-- ✅ ~~Completado~~ = concluido y verificado por las compuertas que correspondan.
+- ✅ ~~Completado~~ = concluido y verificado por las compuertas aplicables.
 - 🚧 Pendiente = por hacer o en curso, sin tachado.
 
 ## Estado del deploy
-
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Work line | 🚧 **GF-OPS · Diagnóstico de esquema y Smoke** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
-| Base exacta | ✅ **v0.1.2 · PR #91 fusionado** | `main` `98ad68b32fea1e56538b7386cd32f6eb7699b1d3` |
-| Version | 🚧 **v0.1.3** | patch de observabilidad segura |
-| CI del PR | 🚧 **revalidando head estable** | CI #424 verificó contratos y suites; snapshot se resincroniza en este head |
-| Sonar | 🚧 **revalidación del head final pendiente** | no extrapolar Quality Gate de un SHA anterior |
-| CodeRabbit | 🚧 **revisión final pendiente** | hallazgos anteriores resueltos; requiere cobertura del head estable |
-| CI del SHA exacto de main | 🚧 **v0.1.3 por verificar tras merge** | v0.1.2 CI #35430357855 |
-| Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): 7 migraciones pendientes |
-| Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + aprobación expresa |
+| Work line | 🚧 **GF-OPS · Media runtime readiness** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
+| Base exacta | ✅ **v0.1.3 · PR #92 fusionado** | `main` `78b796746eb880367de9fccda3b9703e68846d9d` |
+| Version | 🚧 **v0.1.4** | patch de prerequisites multimedia |
+| CI del PR | 🚧 **pendiente** | se ejecutara sobre el head estable de este PR |
+| Sonar | 🚧 **pendiente** | no extrapolar Quality Gate de otro SHA |
+| CodeRabbit | 🚧 **pendiente** | requiere revision del head estable |
+| CI del SHA exacto de main | ✅ **v0.1.3 validado** | validate #35446099005 + Sonar Quality Gate passed |
+| Production Smoke | 🚧 **schema bloqueado** | migraciones pendientes; no implica fallo de codigo |
+| Migraciones | 🚧 **no ejecutadas** | backup restaurable + aprobacion expresa |
 
 ## Huella del cambio
-
 <!-- grindflow:git-delta -->
-
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+337** | **−425** | **-88** |
+| **10** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
-
 <!-- grindflow:gate-plan -->
-
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
-| Tests | Admin System, esquema parcial, Smoke bloqueado, Vault 500 y enlace ausente |
-| Autorización | solo admin; sin errores crudos, cookies ni credenciales en la UI |
-| Producción | Smoke solo lectura; nunca ejecuta migraciones |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| Runtime | presencia de FFmpeg/FFprobe, sin ejecutar subprocesses ni codecs |
+| Parser | allowlist completa: 5 modulos + 2 herramientas o fallo cerrado |
+| Seguridad | sin rutas binarias, HTML crudo, cookies, CSRF ni secretos en output |
+| Produccion | diagnostico y Smoke de solo lectura; nunca migra ni ejecuta FFmpeg |
 
 ## Flujo de entrega
-
 ```mermaid
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
@@ -67,55 +61,46 @@ flowchart LR
  L --> V
  V --> M["Squash merge"]
  M --> X["CI exact-main"]
- M --> R["Production Smoke"]
 ```
 
 ## Qué se hizo
+- Admin > System muestra FFmpeg y FFprobe como `disabled`, `binary-found` o `binary-missing` sin ejecutar comandos ni exponer rutas.
+- `MediaToolReadiness` respeta flags de configuracion y convierte errores de lookup en estado seguro.
+- Production Smoke extrae cinco estados de modulo y dos de media mediante parser con allowlist; inventarios incompletos, duplicados o falsificados fallan cerrados.
+- Contrato Python cubre inventario valido, estados invalidos, faltantes, duplicados, extras, payload falsificado, HTML sobredimensionado y no filtracion de secretos.
+- Fast CI compila ambos scripts Python y ejecuta el contrato antes del contrato Production Smoke.
+- Tests PHP cubren herramientas desactivadas, ejecutable encontrado/ausente y ausencia de paths controlados por operador en la UI.
 
-- Admin > System separa la conexión MariaDB del inventario de migraciones: sin falsos Offline.
-- Readiness de Vault, Scheduling, Distribution, Traffic y Finance según las tablas reales, incluso si otro módulo tiene migraciones pendientes.
-- Un inventario desconocido bloquea el formulario; los errores internos no se muestran.
-- Smoke reutiliza la sesión para comprobar Vault aunque haya migraciones pendientes y registra media storage sin nuevos requests.
-- Si Vault responde 500 o Dashboard omite el enlace Vault, el issue distingue ambos incidentes y el Smoke termina con estado no reintentable, sin repetir login ni aplicar SQL.
-- Tests PHP/MariaDB y contrato fake HTTP cubren esquema parcial, enlace ausente, Vault HTTP fallido, inventario inválido y la ausencia de segundo intento con `ATTEMPTS=15`.
-- Regla duradera de avances sustanciales por mensaje en AGENTS y modelo de desarrollo.
-
-## Archivos modificados en este deploy propuesto (PR #92; no desplegado)
-
-- `README.md` — snapshot de v0.1.3.
-- `config/version.php` — versión humana v0.1.3.
-- `app/Http/Controllers/Admin/SystemController.php` — conexión, inventario y módulos.
-- `resources/views/admin/system.blade.php` — panel de readiness.
-- `tests/Feature/AdminSystemTest.php` — inventario fallido y esquema parcialmente migrado.
-- `tests/Feature/AdminMigrationReadinessTest.php` — lote pendiente y módulos independientes.
-- `scripts/production-smoke.sh` — Vault solo lectura y fallos no reintentables.
-- `scripts/production-smoke-contract.sh` — bloqueo, Vault 500, enlace ausente y no-retry.
-- `.github/workflows/production-smoke.yml` — incidentes concurrentes visibles.
-- `AGENTS.md` — avance sustancial por mensaje.
-- `docs/DEVELOPMENT-MODEL.md` — contrato operativo de diagnóstico.
+## Archivos modificados en este deploy propuesto (v0.1.4; no desplegado)
+- `.github/workflows/grindflow-ci.yml` — compila y ejecuta contratos runtime.
+- `README.md` — snapshot exacto del candidato v0.1.4.
+- `app/Http/Controllers/Admin/SystemController.php` — inyecta readiness multimedia.
+- `app/Support/Operations/MediaToolReadiness.php` — deteccion segura sin subprocesses.
+- `config/version.php` — version humana v0.1.4.
+- `resources/views/admin/system.blade.php` — panel read-only de prerequisites.
+- `scripts/production-runtime-readiness-contract.py` — regresiones del parser.
+- `scripts/production-runtime-readiness.py` — parser allowlist de runtime.
+- `tests/Feature/AdminSystemTest.php` — UI y no exposicion de rutas.
+- `tests/Feature/MediaToolReadinessTest.php` — estados de herramientas.
 
 ## Validación
-
-- v0.1.2 PR #91 fusionado; la identidad real del checkout Hostinger sigue sin verificar.
-- En v0.1.3, CI #424 confirmó preflight, los 11 escenarios del contrato Production Smoke, php-quality, PHPUnit, MariaDB y browser. `fast` falló únicamente porque el snapshot escribía el signo menos tipográfico `−88`; el contrato exige literalmente `-88`. Este head corrige esa representación y debe revalidarse completo.
-- Sonar y CodeRabbit deben cubrir el head final antes del merge; no se extrapolan resultados de SHA anteriores.
-- Las migraciones, backup externo y validación productiva requieren evidencia separada.
+- `main` v0.1.3 exacto `78b796746eb880367de9fccda3b9703e68846d9d`: CI `validate` #35446099005 y Sonar Quality Gate completaron en success.
+- v0.1.4 esta implementado en rama y aun debe pasar CI, Sonar y CodeRabbit sobre el head estable antes de merge.
+- Ninguna migracion, deploy, FFmpeg, SQL ni accion sensible de produccion forma parte de esta entrega.
 
 ## Qué sigue
-
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar v0.1.3; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
-| **NEXT** | 🚧 Identidad desplegada y lote de [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69). |
-| **LATER** | 🚧 Auditoría de intentos y browser de módulos. |
-| **BLOCKED / EXTERNAL** | 🚧 Backup restaurable, aprobación, storage S3 y FFmpeg. |
+| **NOW** | 🚧 Validar y entregar v0.1.4; [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NEXT** | 🚧 Storage S3/CORS #40 y readiness operativo, sin secretos. |
+| **LATER** | 🚧 Auditoria append-only de intentos de proveedor y browser de modulos. |
+| **BLOCKED / EXTERNAL** | 🚧 Migraciones productivas: backup restaurable + aprobacion expresa. |
 
 ## Panorama general pendiente
-
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Workflow #87 y navegación #90/#91 fusionados~~ | ✅ ~~CI del PR; no implica producción~~ |
-| **NOW** | 🚧 Diagnósticos y Smoke | 🚧 v0.1.3 |
-| **NEXT** | 🚧 Migraciones y storage | 🚧 [#34](https://github.com/drpipe1098-commits/GrindFlow/issues/34) · [#40](https://github.com/drpipe1098-commits/GrindFlow/issues/40) |
-| **LATER** | 🚧 Finance y paridad legado | 🚧 Después del esquema |
-| **BLOCKED / EXTERNAL** | 🚧 Producción | 🚧 Backup/aprobación y deploy |
+| **DONE** | ✅ ~~Workflow #87, navegacion #90/#91 y diagnostico #92~~ | ✅ ~~fusionados; main v0.1.3 validado~~ |
+| **NOW** | 🚧 Runtime multimedia seguro | 🚧 v0.1.4 |
+| **NEXT** | 🚧 Storage y schema productivo | 🚧 #40 · #69 |
+| **LATER** | 🚧 Finance y paridad legado | 🚧 despues del esquema |
+| **BLOCKED / EXTERNAL** | 🚧 Produccion | 🚧 backup/aprobacion y deploy verificable |
