@@ -14,9 +14,9 @@
 | --- | --- | --- |
 | Work line | 🟡 **GF-FR-004/005/006 · Workflow integrado** | rama feature; PR pendiente |
 | Feature merge SHA | ⚪ **no fusionado** | `main` permanece en `1a33be163ca6e223dfd46650b3ad6fed5a66c74b` |
-| CI del PR | 🟠 **revalidación** | corregidos hallazgos de Pint y regresiones; comprobar `validate` del head final |
-| Sonar | ✅ **Quality Gate OK en head anterior** | 0 issues y 0 hotspots; verificar head corregido |
-| CodeRabbit | 🟠 **10 comentarios recibidos** | fixes revisados; fast gate real conservado frente a falso positivo de diagrama |
+| CI del PR | ✅ **GrindFlow CI #399 / validate** | preflight, fast, Pint/PHPStan, PHPUnit, MariaDB y browser aprobados en `d9a500a5…` |
+| Sonar | ✅ **Quality Gate OK** | PR #87: 0 issues y 0 hotspots en análisis publicado |
+| CodeRabbit | 🟡 **10 hallazgos revisados** | correcciones aplicadas y fast real verificado en CI #399; revisión incremental automática desactivada |
 | CI del SHA exacto de main | ⚪ **no aplica todavía** | se verifica después del merge |
 | Production Smoke | 🟠 **bloqueado por migraciones previas** | no se ejecutan migraciones en esta entrega |
 | Migraciones | 🟠 **no ejecutadas en producción** | nueva migración requiere backup, lote revisado y aprobación |
@@ -39,8 +39,8 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
 | Local | Node: 206 pruebas, ESLint y build pasaron; PHP no está instalado localmente |
-| GrindFlow CI | corregidos los fallos de Pint y pruebas detectados en #372/#384; CI final por comprobar |
-| Sonar / CodeRabbit | controles separados, pendientes del PR |
+| GrindFlow CI | CI #399 `validate` success; PHP quality, PHPUnit, MariaDB y browser aprobados |
+| Sonar / CodeRabbit | Sonar OK; CodeRabbit revisado con 10 hallazgos, sin revisión incremental nueva acreditada |
 | Migración | solo código y CI; ninguna ejecución productiva autorizada |
 | Producción | providers externos, secretos y publicaciones reales permanecen deshabilitados |
 
@@ -109,13 +109,13 @@ flowchart LR
 - `npm run lint`: aprobado.
 - `npm run build`: aprobado.
 - `git diff --check`: aprobado.
-- CI #372: fast, PHPUnit, MariaDB y browser OK; php-quality detectó Pint. CI #384 permitió aislar fixtures y el diff de Pint. CI #393 aisló el 404 de rutas anidadas y dos anotaciones PHPStan/Pint. Correcciones aplicadas; CI final por verificar.
+- CI #372/#384/#393: detectados y corregidos Pint, rutas anidadas, fixtures y anotaciones PHPStan. CI #399: `validate` y todos los gates seleccionados aprobados en `d9a500a5…`.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Verificar CI `validate`, Sonar y revisión de PR #87 sobre el head final. |
+| **NOW** | Integrar PR #87 tras reconfirmar CI y Sonar sobre el head final del dashboard. |
 | **NEXT** | Fusionar solo con gates verdes y comprobar CI exacto de `main`. |
 | **NEXT** | Revisar lote de migraciones; producción exige backup y aprobación explícita. |
 | **BLOCKED / EXTERNAL** | Providers reales, credenciales, object storage S3 y FFmpeg. |
@@ -125,7 +125,7 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Workflow integrado | PR #87 abierto; nueva validación de estilo pendiente |
+| **NOW** | Workflow integrado | PR #87 con CI #399 verde, Sonar OK; merge y exact-main pendientes |
 | **NEXT** | Entrega | PR, Sonar, CodeRabbit, merge y exact-main |
 | **NEXT** | Producción | migraciones solo con backup, lote exacto y aprobación |
 | **BLOCKED / EXTERNAL** | Publicación real | providers y credenciales no configurados |
