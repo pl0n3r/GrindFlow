@@ -99,6 +99,15 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Los artifacts de diagnostico de GitHub Actions existentes pueden inspeccionarse
   como entrada de lectura, sin crear ni ofrecer un ZIP de entrega.
 
+### Regla de progreso visible por hitos
+
+- Durante cada ciclo de desarrollo enviar mensajes cortos y separados de
+  progreso: inspeccion, implementacion, pruebas/gates y entrega o bloqueo.
+- Informar solo hitos reales, no repetir una respuesta gigante ni volcar logs
+  completos. Un cambio en rama no equivale a CI verde ni deploy.
+- Cuando un cambio concurrente llegue a main, reexaminar la base antes de
+  integrar para evitar sobrescribir fixes o duplicar versiones.
+
 ### Regla de avance sustancial por cada mensaje
 
 - Cuando el propietario diga "sigue", "adelante" o equivalente, ejecutar un
