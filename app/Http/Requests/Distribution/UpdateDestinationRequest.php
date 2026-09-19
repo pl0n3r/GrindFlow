@@ -7,6 +7,7 @@ use App\Models\PublishingDestination;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\In;
 
 class UpdateDestinationRequest extends FormRequest
 {
@@ -21,7 +22,7 @@ class UpdateDestinationRequest extends FormRequest
     }
 
     /**
-     * @return array<string, list<string|\Illuminate\Contracts\Validation\ValidationRule|\Illuminate\Validation\Rules\In>>
+     * @return array<string, list<string|In>>
      */
     public function rules(): array
     {
