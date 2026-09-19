@@ -22,6 +22,11 @@ class TrafficController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        abort_unless(
+            $user->canManageTrafficOrganization($organization),
+            403,
+        );
+
         $trafficReady = $this->trafficReady();
         $links = collect();
 
@@ -37,8 +42,7 @@ class TrafficController extends Controller
             'organization' => $organization,
             'trafficReady' => $trafficReady,
             'links' => $links,
-            'canManageTraffic' => $trafficReady
-                && $user->canManageTrafficOrganization($organization),
+            'canManageTraffic' => $trafficReady,
         ]);
     }
 
