@@ -81,6 +81,61 @@ class DistributionTest extends TestCase
         );
     }
 
+    public function test_manual_retry_preserves_provider_attempts_and_rejects_exhaustion(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $delivery = $this->queueAndGetDelivery($publication, $user, $organization);
+        $originalKey = $delivery->idempotency_key;
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => PublicationDelivery::query()
+                ->findOrFail($delivery->getKey())
+                ->forceFill([
+                    'status' => PublicationDelivery::STATUS_FAILED,
+                    'attempts' => PublicationDeliveryManager::MAX_ATTEMPTS - 1,
+                    'claimed_until' => null,
+                ])
+                ->save(),
+        );
+
+        $route = route('organizations.distribution.deliveries.retry', [
+            'organizationId' => $organization->getKey(),
+            'deliveryId' => $delivery->getKey(),
+        ]);
+
+        $this->actingAs($user)->post($route)->assertRedirect();
+
+        $fresh = $this->delivery($delivery, $user, $organization);
+        $this->assertSame(
+            PublicationDeliveryManager::MAX_ATTEMPTS - 1,
+            $fresh->attempts,
+        );
+        $this->assertSame($originalKey, $fresh->idempotency_key);
+        $this->assertSame(PublicationDelivery::STATUS_QUEUED, $fresh->status);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => PublicationDelivery::query()
+                ->findOrFail($delivery->getKey())
+                ->forceFill([
+                    'status' => PublicationDelivery::STATUS_FAILED,
+                    'attempts' => PublicationDeliveryManager::MAX_ATTEMPTS,
+                    'claimed_until' => null,
+                ])
+                ->save(),
+        );
+
+        $this->actingAs($user)->post($route)->assertStatus(409);
+        $this->assertSame(
+            PublicationDeliveryManager::MAX_ATTEMPTS,
+            $this->delivery($delivery, $user, $organization)->attempts,
+        );
+    }
+
     public function test_invalid_actor_history_cannot_starve_later_valid_publication(): void
     {
         [$staleUser, $organization] = $this->identity();
