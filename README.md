@@ -98,10 +98,10 @@ flowchart LR
 
 ## Validación
 
-- Estado actual: **IMPLEMENTED · PR #67 OPEN · required gates passed** en `feat/scheduling-core-v1`.
-- Base exacta: `bc9694cb49a4e049f41d08b367b04903411915da`.
+- Estado actual: **MERGED en `main`** como `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0`.
+- Commit exacto de `main`: `9ca8707cf4c78da8d14e6f64aae7cddf0fd23ce0`.
 - La base fue validada en PR #66 por GrindFlow CI #245 completo + Sonar sin issues/hotspots.
-- PR #67 pasó GrindFlow CI #270 completo sobre `3b74224e…`; Sonar reporta Quality Gate passed y los findings funcionales de CodeRabbit fueron corregidos.
+- PR #67 pasó GrindFlow CI #272 completo sobre el head final `28926fda…`; Sonar reportó Quality Gate passed y los findings de CodeRabbit fueron corregidos antes del squash merge.
 - Production Smoke confirmó `/up`, login, dashboard y admin sobre el commit base exacto.
 - Object storage S3-compatible sigue siendo un bloqueo externo independiente; Quick Upload continúa disponible.
 - Este slice contiene **una migración nueva**, pero no la ejecuta ni muta producción automáticamente.
@@ -110,8 +110,8 @@ flowchart LR
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | PR #67 abierto; código y required gates validados. Pendiente squash merge y validación exact-main. |
-| **NEXT** | Tras merge y Smoke, aplicar la migración con aprobación y verificar Scheduler en producción. |
+| **NOW** | Scheduling core v1 ya está en `main`. Pendiente validación exact-main y Production Smoke del SHA `9ca8707c…`. |
+| **NEXT** | Tras exact-main CI + Production Smoke, solicitar aprobación para aplicar la migración y verificar Scheduler en producción. |
 | **NEXT** | Añadir configuración administrable de destinos si GF-FR-005 la necesita como boundary estable. |
 | **BLOCKED / EXTERNAL** | Object storage S3-compatible y FFmpeg real en Hostinger siguen requiriendo configuración externa. |
 | **LATER** | GF-FR-005 Distribution: dispatch, clasificación de errores, retries bounded e idempotencia de publicación. |
@@ -120,8 +120,8 @@ flowchart LR
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Scheduling | core v1 IMPLEMENTED · PR #67 abierto · required gates passed |
-| **NEXT** | Scheduling producción | merge, migration approval y Smoke |
+| **NOW** | Scheduling | core v1 MERGED en `main` · pendiente exact-main CI + Production Smoke |
+| **NEXT** | Scheduling producción | exact-main CI, Production Smoke, migration approval y verificación |
 | **NEXT** | Distribution | contratos/provider adapters sobre schedules válidos |
 | **BLOCKED / EXTERNAL** | Hosting / storage | FFmpeg real + S3-compatible |
 | **LATER** | Operación | queues, scheduler worker, retries y backups |
