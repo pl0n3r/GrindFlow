@@ -33,7 +33,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+127** | **−39** | **+88** |
+| **6** | **+128** | **−40** | **+88** |
 
 ## Calidad y entrega
 
@@ -41,7 +41,7 @@
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser** |
 | Tests | enlaces reales, organización visible/ajena, empty state y versión |
 | Autorización | sin cambios de roles ni permiso por UI; rutas tenant-scoped ya protegidas |
 | Producción | migraciones y deploy siguen controles separados |
