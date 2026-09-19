@@ -38,11 +38,36 @@ class AdminSystemTest extends TestCase
             ->assertSee('Session driver')
             ->assertSee('Queue connection')
             ->assertSee('Workspace module readiness')
+            ->assertSee('Media runtime prerequisites')
+            ->assertSee('data-media-tool="ffmpeg:disabled"', false)
+            ->assertSee('data-media-tool="ffprobe:disabled"', false)
             ->assertSee('data-module-readiness="vault:ready"', false)
             ->assertSee('data-module-readiness="scheduling:ready"', false)
             ->assertSee('data-module-readiness="distribution:ready"', false)
             ->assertSee('data-module-readiness="traffic:ready"', false)
             ->assertSee('data-module-readiness="finance:ready"', false);
+    }
+
+    public function test_system_shows_enabled_media_tool_presence_without_exposing_binary_paths(): void
+    {
+        config([
+            'grindflow.media.ffmpeg.enabled' => true,
+            'grindflow.media.ffmpeg.binary' => PHP_BINARY,
+            'grindflow.media.ffprobe.enabled' => true,
+            'grindflow.media.ffprobe.binary' => 'grindflow-nonexistent-probe-9a81e2',
+        ]);
+
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.system'))
+            ->assertOk()
+            ->assertSee('data-media-tool="ffmpeg:binary-found"', false)
+            ->assertSee('data-media-tool="ffprobe:binary-missing"', false)
+            ->assertDontSee(PHP_BINARY)
+            ->assertDontSee('grindflow-nonexistent-probe-9a81e2');
     }
 
     public function test_system_identifies_partial_module_schema_without_marking_database_offline(): void

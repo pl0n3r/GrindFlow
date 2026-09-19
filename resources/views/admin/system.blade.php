@@ -254,6 +254,39 @@
 
             <section class="gf-panel gf-panel--spaced">
                 <header class="gf-panel__head">
+                    <h2>Media runtime prerequisites</h2>
+                    <span class="gf-appbar__meta">read only · no subprocesses</span>
+                </header>
+                <div class="gf-panel__body">
+                    <p class="gf-system-copy">
+                        La presencia del ejecutable no verifica codecs ni conversiones.
+                        El procesamiento sigue desactivado cuando asi esta configurado.
+                    </p>
+                    <div class="gf-system-grid">
+                        @foreach (['ffmpeg' => 'FFmpeg', 'ffprobe' => 'FFprobe'] as $tool => $label)
+                            @php
+                                $toolState = $mediaToolStatus[$tool];
+                            @endphp
+                            <article class="gf-system-item" data-media-tool="{{ $tool }}:{{ $toolState }}">
+                                <div class="gf-system-item__label">{{ $label }}</div>
+                                <div class="gf-system-item__row">
+                                    <span>Runtime</span>
+                                    <span class="gf-state {{ $toolState === 'binary-found' ? 'gf-state--ok' : 'gf-state--neutral' }}">
+                                        {{ match ($toolState) {
+                                            'binary-found' => 'Executable found',
+                                            'binary-missing' => 'Executable unavailable',
+                                            default => 'Disabled',
+                                        } }}
+                                    </span>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
+            <section class="gf-panel gf-panel--spaced">
+                <header class="gf-panel__head">
                     <h2>Workspace module readiness</h2>
                     <span class="gf-appbar__meta">read only · current schema</span>
                 </header>
