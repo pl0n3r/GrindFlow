@@ -39,6 +39,11 @@
                     <span class="gf-navitem__text">Scheduler</span>
                 </a>
 
+                <a class="gf-navitem" href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}">
+                    <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
+                    <span class="gf-navitem__text">Distribution</span>
+                </a>
+
                 <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
                     <span class="gf-navitem__icon" aria-hidden="true">↗</span>
                     <span class="gf-navitem__text">Distribution</span>
@@ -147,6 +152,7 @@
                                 action="{{ route('organizations.scheduler.store', ['organizationId' => $organization->id]) }}"
                             >
                                 @csrf
+                                <input type="hidden" name="request_key" value="{{ old('request_key', (string) \Illuminate\Support\Str::uuid()) }}">
 
                                 <div class="gf-field">
                                     <label for="asset_id">Media</label>
@@ -164,13 +170,12 @@
                                 </div>
 
                                 <div class="gf-field">
-                                    <label for="destination_id">Destination</label>
-                                    <select class="gf-input" id="destination_id" name="destination_id" required>
-                                        <option value="">Select destination</option>
+                                    <label for="destination_ids">Destinations</label>
+                                    <select class="gf-input" id="destination_ids" name="destination_ids[]" multiple required size="{{ min(6, max(2, $destinations->count())) }}">
                                         @foreach ($destinations as $destination)
                                             <option
                                                 value="{{ $destination->id }}"
-                                                @selected(old('destination_id') === $destination->id)
+                                                @selected(in_array($destination->id, old('destination_ids', []), true))
                                             >
                                                 {{ $destination->name }} · {{ $destination->provider }}
                                             </option>
@@ -252,9 +257,27 @@
 
                 <section class="gf-panel gf-panel--spaced">
                     <header class="gf-panel__head">
-                        <h2>Upcoming publications</h2>
+                        <h2>Schedule calendar</h2>
                         <span class="gf-appbar__meta">{{ $publications->count() }} loaded</span>
                     </header>
+
+                    <div class="gf-panel__body">
+                        <form class="gf-form" method="GET">
+                            <div class="gf-field"><label for="filter_status">Status</label><select class="gf-input" id="filter_status" name="status"><option value="">All</option><option value="scheduled" @selected(($filters['status'] ?? '') === 'scheduled')>Scheduled</option><option value="cancelled" @selected(($filters['status'] ?? '') === 'cancelled')>Cancelled</option></select></div>
+                            <div class="gf-field"><label for="filter_destination">Destination</label><select class="gf-input" id="filter_destination" name="destination_id"><option value="">All</option>@foreach($destinations as $destination)<option value="{{ $destination->id }}" @selected(($filters['destination_id'] ?? '') === $destination->id)>{{ $destination->name }}</option>@endforeach</select></div>
+                            <div class="gf-field"><label for="filter_from">From</label><input class="gf-input" id="filter_from" type="date" name="from" value="{{ $filters['from'] ?? '' }}"></div>
+                            <div class="gf-field"><label for="filter_to">To</label><input class="gf-input" id="filter_to" type="date" name="to" value="{{ $filters['to'] ?? '' }}"></div>
+                            <button class="gf-button gf-button--primary">Apply filters</button>
+                        </form>
+                    </div>
+
+                    @if($calendarDays->isNotEmpty())
+                        <div class="gf-panel__body"><div class="gf-calendar">
+                            @foreach($calendarDays as $day => $items)
+                                <article class="gf-calendar__day"><strong>{{ \Carbon\CarbonImmutable::parse($day)->format('M d') }}</strong><span>{{ $items->count() }} publication(s)</span>@foreach($items->take(3) as $item)<small>{{ $item->scheduled_for_utc?->setTimezone($item->timezone)->format('H:i') }} · {{ $item->destination?->name }}</small>@endforeach</article>
+                            @endforeach
+                        </div></div>
+                    @endif
 
                     <div class="gf-panel__body gf-panel__body--flush-mobile">
                         @if ($publications->isEmpty())
@@ -281,6 +304,7 @@
                                             <th>Local time</th>
                                             <th>Timezone</th>
                                             <th>Status</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -290,6 +314,12 @@
                                                     <div class="gf-media-name">
                                                         {{ $publication->mediaAsset?->original_filename ?? 'Missing media' }}
                                                     </div>
+                                                </td>
+                                                <td>
+                                                    @if($canSchedule && $publication->status === 'scheduled' && $publication->scheduled_for_utc?->isFuture() && ! $publication->delivery)
+                                                        <details><summary>Edit</summary><form class="gf-form" method="POST" action="{{ route('organizations.scheduler.update',['organizationId'=>$organization->id,'publicationId'=>$publication->id]) }}">@csrf @method('PATCH')<input class="gf-input" name="scheduled_for_local" type="datetime-local" value="{{ $publication->scheduled_for_utc->setTimezone($publication->timezone)->format('Y-m-d\\TH:i') }}" required><input type="hidden" name="timezone" value="{{ $publication->timezone }}"><button class="gf-button gf-button--ghost">Save</button></form></details>
+                                                        <form method="POST" action="{{ route('organizations.scheduler.cancel',['organizationId'=>$organization->id,'publicationId'=>$publication->id]) }}">@csrf<button class="gf-button gf-button--ghost">Cancel</button></form>
+                                                    @else — @endif
                                                 </td>
                                                 <td>
                                                     {{ $publication->destination?->name ?? 'Missing destination' }}

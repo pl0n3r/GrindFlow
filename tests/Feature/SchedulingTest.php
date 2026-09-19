@@ -695,6 +695,83 @@ class SchedulingTest extends TestCase
         );
     }
 
+    public function test_one_request_schedules_multiple_destinations_idempotently(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $this->membership($user, $organization, UserRole::Editor);
+
+        [$asset, $destinations] = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): array => [
+                $this->readyAsset(),
+                collect(['A', 'B'])->map(fn (string $name) => PublishingDestination::query()->create([
+                    'name' => $name,
+                    'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ])),
+            ],
+        );
+
+        $payload = [
+            'asset_id' => $asset->getKey(),
+            'destination_ids' => $destinations->pluck('id')->all(),
+            'request_key' => '7ee97a13-e8c9-4325-82a6-2ab64f83572d',
+            'scheduled_for_local' => now('UTC')->addDay()->format('Y-m-d\TH:i'),
+            'timezone' => 'UTC',
+        ];
+        $route = route('organizations.scheduler.store', ['organizationId' => $organization->getKey()]);
+
+        $this->actingAs($user)->post($route, $payload)->assertRedirect();
+        $this->actingAs($user)->post($route, $payload)->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(2, ScheduledPublication::query()->count()),
+        );
+    }
+
+    public function test_future_undelivered_schedule_can_be_edited_and_cancelled(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create();
+        $this->membership($user, $organization, UserRole::Studio);
+
+        $publication = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user): ScheduledPublication {
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Sandbox', 'provider' => 'sandbox',
+                    'status' => PublishingDestination::STATUS_ACTIVE,
+                ]);
+                return app(ContentScheduler::class)->schedule(
+                    $this->readyAsset(), $destination, $user,
+                    now('UTC')->addDays(2)->format('Y-m-d\TH:i'), 'UTC',
+                );
+            },
+        );
+
+        $this->actingAs($user)->patch(route('organizations.scheduler.update', [
+            'organizationId' => $organization->getKey(), 'publicationId' => $publication->getKey(),
+        ]), [
+            'scheduled_for_local' => now('UTC')->addDays(3)->format('Y-m-d\TH:i'),
+            'timezone' => 'UTC',
+        ])->assertRedirect();
+
+        $this->actingAs($user)->post(route('organizations.scheduler.cancel', [
+            'organizationId' => $organization->getKey(), 'publicationId' => $publication->getKey(),
+        ]))->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn () => $this->assertSame(ScheduledPublication::STATUS_CANCELLED, $publication->fresh()->status),
+        );
+    }
+
     private function readyAsset(?array $metadata = null): MediaAsset
     {
         $blob = MediaBlob::query()->create([

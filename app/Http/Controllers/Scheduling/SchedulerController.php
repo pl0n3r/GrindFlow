@@ -15,6 +15,7 @@ use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SchedulerController extends Controller
@@ -68,10 +69,19 @@ class SchedulerController extends Controller
                 $relations[] = 'linkAssignment.trackedLink';
             }
 
+            $filters = $request->validate([
+                'status' => ['nullable', Rule::in(['scheduled', 'cancelled'])],
+                'destination_id' => ['nullable', 'uuid'],
+                'from' => ['nullable', 'date_format:Y-m-d'],
+                'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            ]);
+
             $publications = ScheduledPublication::query()
                 ->with($relations)
-                ->where('status', ScheduledPublication::STATUS_SCHEDULED)
-                ->where('scheduled_for_utc', '>', now('UTC'))
+                ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+                ->when($filters['destination_id'] ?? null, fn ($query, $id) => $query->where('publishing_destination_id', $id))
+                ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('scheduled_for_utc', '>=', $from))
+                ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('scheduled_for_utc', '<=', $to))
                 ->orderBy('scheduled_for_utc')
                 ->limit(100)
                 ->get();
@@ -89,6 +99,9 @@ class SchedulerController extends Controller
                 && $user->canScheduleOrganization($organization),
             'timezones' => DateTimeZone::listIdentifiers(),
             'defaultTimezone' => (string) config('app.timezone', 'UTC'),
+            'filters' => $filters ?? [],
+            'calendarDays' => $publications->groupBy(fn (ScheduledPublication $publication) =>
+                $publication->scheduled_for_utc?->setTimezone($publication->timezone)->format('Y-m-d')),
         ]);
     }
 
@@ -100,28 +113,52 @@ class SchedulerController extends Controller
 
         $asset = MediaAsset::query()
             ->findOrFail((string) $validated['asset_id']);
-        $destination = PublishingDestination::query()
-            ->findOrFail((string) $validated['destination_id']);
+        $destinations = PublishingDestination::query()
+            ->whereIn('id', $validated['destination_ids'])
+            ->get();
 
         /** @var User $user */
         $user = $request->user();
 
-        $scheduler->schedule(
+        $created = $scheduler->scheduleMany(
             $asset,
-            $destination,
+            $destinations,
             $user,
             (string) $validated['scheduled_for_local'],
             (string) $validated['timezone'],
             isset($validated['tracked_link_id'])
                 ? (string) $validated['tracked_link_id']
                 : null,
+            (string) $validated['request_key'],
         );
 
         return redirect()
             ->route('organizations.scheduler.index', [
                 'organizationId' => $this->organization($request)->getKey(),
             ])
-            ->with('status', 'Contenido programado correctamente.');
+            ->with('status', $created->count().' publicación(es) programada(s).');
+    }
+
+    public function update(Request $request, string $publicationId, ContentScheduler $scheduler): RedirectResponse
+    {
+        $organization = $this->organization($request);
+        /** @var User $user */ $user = $request->user();
+        abort_unless($user->canScheduleOrganization($organization), 403);
+        $validated = $request->validate([
+            'scheduled_for_local' => ['required', 'date_format:Y-m-d\\TH:i'],
+            'timezone' => ['required', 'string', 'max:64', 'timezone'],
+        ]);
+        $scheduler->reschedule(ScheduledPublication::query()->findOrFail($publicationId), $user, $validated['scheduled_for_local'], $validated['timezone']);
+        return back()->with('status', 'Programación actualizada.');
+    }
+
+    public function cancel(Request $request, string $publicationId, ContentScheduler $scheduler): RedirectResponse
+    {
+        $organization = $this->organization($request);
+        /** @var User $user */ $user = $request->user();
+        abort_unless($user->canScheduleOrganization($organization), 403);
+        $scheduler->cancel(ScheduledPublication::query()->findOrFail($publicationId), $user);
+        return back()->with('status', 'Programación cancelada.');
     }
 
     private function schedulingReady(): bool
