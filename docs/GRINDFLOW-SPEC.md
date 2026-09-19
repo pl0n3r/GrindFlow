@@ -172,3 +172,13 @@ The execution roadmap and durable progress history live in
 - Export is bounded to 366 days, uses no-store headers and prefixes formula-like
   user-authored CSV cells to prevent spreadsheet command interpretation.
 - No raw visitor identifier, destination URL or click-level row is exported.
+
+## 13. Traffic link lifecycle and CSV calendar boundaries
+
+- Traffic managers can disable/re-enable an existing short link through a
+  tenant-scoped PATCH and explicit table action; the public token and historical
+  daily metrics survive without deletes or migrations.
+- Disabled links return public 404 and queue no new attribution; a re-enabled
+  link resumes at the original short URL.
+- The CSV date cap counts inclusive UTC calendar dates (366 allowed, 367
+  rejected), including leap-year boundaries.

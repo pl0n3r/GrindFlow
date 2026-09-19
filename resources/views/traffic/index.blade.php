@@ -287,6 +287,7 @@
                                             <th>Clicks</th>
                                             <th>Status</th>
                                             <th>Publications</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -315,7 +316,7 @@
                                                 </td>
                                                 <td>{{ number_format((int) ($link->total_clicks ?? 0)) }}</td>
                                                 <td>
-                                                    <span class="gf-state gf-state--ok">
+                                                    <span class="gf-state {{ $link->status === 'active' ? 'gf-state--ok' : '' }}">
                                                         {{ $link->status }}
                                                     </span>
                                                 </td>
@@ -323,6 +324,20 @@
                                                     @forelse($link->scheduledPublicationLinks as $assignment)
                                                         <div>{{ $assignment->scheduledPublication?->destination?->name ?? 'Unknown destination' }}</div><small class="gf-media-meta">{{ $assignment->scheduledPublication?->scheduled_for_utc?->format('Y-m-d H:i') }} UTC · shared link metric</small>
                                                     @empty — @endforelse
+                                                </td>
+                                                <td>
+                                                    @if ($canManageTraffic)
+                                                        <form method="POST" action="{{ route('organizations.traffic.links.status', ['organizationId' => $organization->id, 'linkId' => $link->id]) }}">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <input type="hidden" name="status" value="{{ $link->status === 'active' ? 'disabled' : 'active' }}">
+                                                            <button class="gf-button gf-button--ghost" type="submit" aria-label="{{ $link->status === 'active' ? 'Disable' : 'Enable' }} link {{ $link->label }}">
+                                                                {{ $link->status === 'active' ? 'Disable' : 'Enable' }}
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        —
+                                                    @endif
                                                 </td>
                                             </tr>
                                         @endforeach
