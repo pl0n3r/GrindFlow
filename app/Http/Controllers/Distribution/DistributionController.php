@@ -40,14 +40,14 @@ class DistributionController extends Controller
             'destination_id' => ['nullable', 'uuid'],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:10000'],
         ]);
 
         if ($ready) {
             $destinations = PublishingDestination::query()->orderBy('name')->get();
 
             $query = PublicationDelivery::query()
-                ->with(['scheduledPublication.mediaAsset', 'scheduledPublication.destination'])
-                ->latest();
+                ->with(['scheduledPublication.mediaAsset', 'scheduledPublication.destination']);
 
             if ($auditReady) {
                 $query->with('events');
@@ -78,7 +78,16 @@ class DistributionController extends Controller
                 fn ($query, $to) => $query->whereDate('created_at', '<=', $to),
             );
 
-            $deliveries = $query->limit(100)->get();
+            // SQL pagination retains the complete tenant-scoped history and
+            // deterministic order when several deliveries share a timestamp.
+            $pageFilters = $filters;
+            unset($pageFilters['page']);
+
+            $deliveries = $query
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->paginate(25, ['*'], 'page', (int) ($filters['page'] ?? 1))
+                ->appends($pageFilters);
             $counts = PublicationDelivery::query()
                 ->selectRaw('status, COUNT(*) as aggregate')
                 ->groupBy('status')

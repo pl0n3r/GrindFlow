@@ -310,3 +310,9 @@ The execution roadmap and durable progress history live in
   artifact. A leak detector discards any DOM containing the password.
 - Production Smoke remains a separate authenticated READ-ONLY workflow
   and must never reuse this write-capable CI test.
+
+## 21. Distribution: historial paginado por organización
+- Listado de entregas paginado en SQL de 25, total real del filtro, orden `created_at DESC, id DESC`, sin antiguo límite 100.
+- Filtros validados status/destino/fechas/página preservados en Previous/Next; ningún parámetro arbitrario viaja a enlaces.
+- El timeline de eventos se carga solo para la página y muestra fallback si su migración está ausente.
+- Las métricas globales por estado continúan independientes del total filtrado. Página fuera de rango muestra una ruta de recuperación; nunca mezcla tenants.

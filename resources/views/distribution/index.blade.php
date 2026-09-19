@@ -54,8 +54,8 @@
                     <div class="gf-table-wrap gf-panel--spaced"><table class="gf-table"><thead><tr><th>Name</th><th>Provider</th><th>Status</th><th>Action</th></tr></thead><tbody>@foreach($destinations as $destination)<tr><td>{{ $destination->name }}</td><td>{{ $destination->provider }}</td><td>{{ $destination->status }}</td><td><form method="POST" action="{{ route('organizations.distribution.destinations.update', ['organizationId'=>$organization->id,'destinationId'=>$destination->id]) }}">@csrf @method('PATCH')<input type="hidden" name="name" value="{{ $destination->name }}"><input type="hidden" name="status" value="{{ $destination->status === 'active' ? 'disabled' : 'active' }}"><button class="gf-button gf-button--ghost">{{ $destination->status === 'active' ? 'Disable' : 'Enable' }}</button></form></td></tr>@endforeach</tbody></table></div>
                 </div></section>
             @endif
-            <section class="gf-panel gf-panel--spaced"><header class="gf-panel__head"><h2>Delivery history</h2><span class="gf-appbar__meta">{{ $deliveries->count() }} loaded</span></header><div class="gf-panel__body gf-panel__body--flush-mobile">
-                @if($deliveries->isEmpty())<div class="gf-empty"><div><div class="gf-empty__icon">⇢</div><h3>No deliveries match.</h3><p>Las entregas aparecen cuando una programación vence.</p></div></div>@else
+            <section class="gf-panel gf-panel--spaced"><header class="gf-panel__head"><h2>Delivery history</h2><span class="gf-appbar__meta">{{ $deliveries->total() }} matching deliveries</span></header><div class="gf-panel__body gf-panel__body--flush-mobile">
+                @if($deliveries->isEmpty())<div class="gf-empty"><div><div class="gf-empty__icon">⇢</div><h3>{{ $deliveries->total() > 0 ? 'No deliveries on this page.' : 'No deliveries match.' }}</h3><p>{{ $deliveries->total() > 0 ? 'Esta página está fuera del historial disponible.' : 'Las entregas aparecen cuando una programación vence.' }}</p>@if ($deliveries->total() > 0)<a class="gf-button gf-button--ghost" href="{{ $deliveries->url(1) }}">Go to first page</a>@endif</div></div>@else
                 <div class="gf-table-wrap"><table class="gf-table"><thead><tr><th>Media</th><th>Destination</th><th>Status</th><th>Attempts</th><th>Result</th><th>Attempt timeline</th><th>Action</th></tr></thead><tbody>
                     @foreach($deliveries as $delivery)<tr><td>{{ $delivery->scheduledPublication?->mediaAsset?->original_filename ?? 'Missing media' }}</td><td>{{ $delivery->scheduledPublication?->destination?->name ?? 'Missing destination' }}</td><td><span class="gf-state {{ $delivery->status === 'published' ? 'gf-state--ok' : '' }}">{{ str_replace('_',' ',$delivery->status) }}</span></td><td>{{ $delivery->attempts }}</td><td><div>{{ $delivery->external_publication_id ?? '—' }}</div><div class="gf-media-meta">{{ $delivery->last_error_code ?? ($delivery->next_attempt_at ? 'Retry '.$delivery->next_attempt_at->format('Y-m-d H:i').' UTC' : 'No error') }}</div></td><td>
                         @if (! $auditReady)
@@ -78,7 +78,26 @@
                         @endif
                     </td><td>@if($canManageDestinations && in_array($delivery->status,['failed','retry_scheduled'],true))<form method="POST" action="{{ route('organizations.distribution.deliveries.retry',['organizationId'=>$organization->id,'deliveryId'=>$delivery->id]) }}">@csrf<button class="gf-button gf-button--ghost">Retry</button></form>@else — @endif</td></tr>@endforeach
                 </tbody></table></div>@endif
-            </div></section>
+            </div>
+            @if ($deliveries->total() > 0)
+                <nav class="gf-panel__body" aria-label="Distribution pagination">
+                    <div class="gf-upload__footer">
+                        <p class="gf-media-meta">
+                            Showing {{ $deliveries->firstItem() ?? 0 }}–{{ $deliveries->lastItem() ?? 0 }} of {{ $deliveries->total() }}
+                            · Page {{ $deliveries->currentPage() }} of {{ $deliveries->lastPage() }}
+                        </p>
+                        <div>
+                            @if ($deliveries->previousPageUrl())
+                                <a class="gf-button gf-button--ghost" rel="prev" href="{{ $deliveries->previousPageUrl() }}">Previous</a>
+                            @endif
+                            @if ($deliveries->nextPageUrl())
+                                <a class="gf-button gf-button--ghost" rel="next" href="{{ $deliveries->nextPageUrl() }}">Next</a>
+                            @endif
+                        </div>
+                    </div>
+                </nav>
+            @endif
+            </section>
         @endif
     </main>
 </div>

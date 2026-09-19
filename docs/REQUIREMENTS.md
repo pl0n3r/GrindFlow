@@ -574,3 +574,17 @@ regressions in the Scheduler → Traffic → Finance workflow before merge.
 **Verification:** browser job executes authenticated Chromium workflow
 against disposable migrated SQLite and checks ten behavioral milestones;
 PHP fast/quality/test/MariaDB and Sonar PR gates as applicable.
+
+### GF-FR-005D — Historial completo de entregas paginado
+**Estado:** implementado en candidato v0.1.19; validación de CI y producción independiente.
+
+**Enunciado:** Distribution permite consultar todas las entregas de la organización, no solo las primeras 100.
+
+**Criterios de aceptación:**
+- Paginación SQL de 25, total filtrado completo y orden estable `created_at DESC, id DESC`.
+- Status, destino y fechas validados, junto con página 1..10000; enlaces Prev/Next conservan únicamente filtros validados y ninguna página anterior implícita.
+- Métricas globales por estado no se confunden con el total filtrado ni las 25 filas cargadas.
+- Timeline audit de intentos carga solamente la página visible; falta de tabla conserva fallback seguro.
+- Página posterior al final explica el estado y enlaza a la primera, sin filtrar IDs de otra organización.
+
+**Verificación:** test de integración con 106 entregas locales y otra ajena, enlaces de página, historial profundo, filtros combinados, orden estable y página inválida.
