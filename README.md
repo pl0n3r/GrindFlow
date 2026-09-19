@@ -36,7 +36,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+64** | **−66** | **-2** |
+| **9** | **+93** | **−66** | **+27** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -46,7 +46,7 @@
 | Gobierno | Enlaces y validadores apuntan al repositorio real y al Issue #2 |
 | Release | v0.1.20 incrementa v0.1.19; no se desactiva el gate |
 | Historial | Roadmap previo #88 no se presume migrado; nueva fuente #2 |
-| Producción | No se modifican secretos, migraciones ni checkout Hostinger |
+| Producción | Se corrige el estado del smoke; sin modificar secretos, migraciones ni checkout Hostinger |
 
 ## Flujo de entrega
 ```mermaid
@@ -66,8 +66,10 @@ flowchart LR
 - Issue #2 restablece el seguimiento técnico sin inventar historial de Issues del propietario anterior.
 - Versión humana v0.1.20 para una entrega trazable con el gate de release intacto.
 - Se explicita que un Smoke verde por credenciales ausentes no verifica rutas autenticadas.
+- Smoke de producción ahora falla explícitamente cuando falta la credencial; contrato Ruby previene una regresión.
 
 ## Archivos modificados en este deploy
+- `.github/workflows/production-smoke.yml` — evita éxito falso sin credenciales.
 - `AGENTS.md` — roadmap actual.
 - `README.md` — snapshot veraz del traslado.
 - `ROADMAP.md` — acceso al Issue #2.
@@ -75,11 +77,12 @@ flowchart LR
 - `docs/GOVERNANCE.md` — identidad y registro del traslado.
 - `scripts/readme-dashboard.py` — validar roadmap vigente.
 - `scripts/validate-governance.py` — validar enlace al roadmap vigente.
+- `scripts/workflow-syntax-check.rb` — comprueba que el smoke no pase sin autenticación.
 
 ## Validación
 - En base main, PHPUnit, MariaDB, PHP quality y navegador fueron verdes en #35469623096; validate falló por transición v0.1.19 → v0.1.19.
 - El nuevo candidato requiere CI/Sonar/CodeRabbit; producción se verifica por separado.
-- Smoke #35469623049 fue success con credenciales faltantes y no prueba login ni checkout Hostinger.
+- Smoke #35469623049 fue success con credenciales faltantes y no prueba login ni checkout Hostinger; ahora la ausencia producirá un workflow fallido.
 
 ## Qué sigue
 | Lane | Trabajo |
