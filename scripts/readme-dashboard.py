@@ -167,6 +167,9 @@ def validate_roadmap(readme: str) -> None:
     roadmap = section(readme, "## Qué sigue") + section(readme, "## Panorama general pendiente")
     if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
         fail("roadmap must link to canonical issue #2")
+    # El #88 transferido solo puede aparecer como referencia histórica fuera del roadmap activo.
+    if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", roadmap, flags=re.I):
+        fail("legacy issue #88 cannot be an active roadmap destination")
 
     for row in roadmap.splitlines():
         if not re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", row):

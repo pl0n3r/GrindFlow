@@ -52,7 +52,7 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 1. Leer este `AGENTS.md` completo. Consultar docs especificas de la tarea,
    no releer todo el repositorio después de cada ajuste menor.
 2. Inspeccionar `main`, PRs abiertos, `GrindFlow CI / validate` del SHA exacto
-   y el roadmap [#88](https://github.com/pl0n3r/GrindFlow/issues/2).
+   y el roadmap [#2](https://github.com/pl0n3r/GrindFlow/issues/2).
 3. Si un PR activo cubre el trabajo, terminarlo y verificar sus gates antes
    de abrir otro PR dependiente. Si `main` no tiene CI verde, investigar primero.
 4. Aplicar los requisitos de `docs/GRINDFLOW-SPEC.md`, `docs/REQUIREMENTS.md`
@@ -67,10 +67,10 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 
 ### Roadmap, progreso y release humana
 
-- El issue [#88](https://github.com/pl0n3r/GrindFlow/issues/2)
+- El issue [#2](https://github.com/pl0n3r/GrindFlow/issues/2)
   es la **hoja de ruta maestra ordenada** por riesgo y dependencias; cada issue
   funcional conserva sus criterios de aceptación. Si cambia la prioridad, actualizar
-  #88 y este archivo en la próxima PR correspondiente. No duplicar roadmap en
+  #2 y este archivo en la próxima PR correspondiente. No duplicar roadmap en
   README ni guardar una segunda historia acumulativa.
 - Progreso canónico en roadmap, issues, README y handoffs: `✅ ~~Completado~~`
   solo tras las compuertas aplicables; `🚧 Pendiente` (texto normal) para
@@ -90,7 +90,7 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Cuando el último PR se fusione, dejar que su README dé paso al snapshot del
   siguiente deploy. No crear PR documental adicional por rutina para corregir
   el README después del merge; incluir release, decisiones y panorama en el PR
-  lógico, y registrar estados operativos en #88 si procede.
+  lógico, y registrar estados operativos en #2 si procede.
 
 ### Regla de entregas sin ZIP
 
@@ -395,7 +395,7 @@ indiscriminadamente el diseño editorial de BRVTAL ni inventar otra identidad.
 2. Tests y decisiones de PR fusionados más recientes.
 3. Este `AGENTS.md`.
 4. Especificación, requisitos y documentación de área.
-5. [Roadmap #88](https://github.com/pl0n3r/GrindFlow/issues/2)
+5. [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
    para orden/estado de ejecución; README para snapshot de la última entrega.
 6. Memoria o chat histórico, solo como contexto no canónico.
 

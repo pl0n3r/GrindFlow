@@ -1,6 +1,6 @@
 # GrindFlow — Glosario para producto y operaciones
 
-Este glosario explica términos presentes en el [README](README.md), el [roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) y los módulos de GrindFlow. Es una herramienta de lectura, no sustituye a los contratos técnicos ni a las pruebas.
+Este glosario explica términos presentes en el [README](README.md), el [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) y los módulos de GrindFlow. Es una herramienta de lectura, no sustituye a los contratos técnicos ni a las pruebas.
 
 | Término | Qué significa para el negocio |
 | --- | --- |

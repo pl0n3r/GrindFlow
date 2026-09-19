@@ -10,7 +10,7 @@
 | [AGENTS.md](../AGENTS.md) | Protocolo para agentes, límites de seguridad y entrega |
 | [GRINDFLOW-SPEC.md](GRINDFLOW-SPEC.md) y [REQUIREMENTS.md](REQUIREMENTS.md) | Arquitectura y criterios de aceptación funcionales |
 | Este documento | Reglas permanentes de colaboración y gobierno |
-| [Roadmap #88](https://github.com/pl0n3r/GrindFlow/issues/2) | **Solo** trabajo, orden, progreso, bloqueos y evidencia acumulativa |
+| [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) | **Solo** trabajo, orden, progreso, bloqueos y evidencia acumulativa |
 | [ROADMAP.md](../ROADMAP.md) | Acceso al Issue canónico, sin copiar su contenido |
 | [README.md](../README.md) | Foto de **una sola entrega** y sus gates; no changelog |
 | [GLOSARIO.md](../GLOSARIO.md) | Conceptos técnicos en lenguaje comprensible |
