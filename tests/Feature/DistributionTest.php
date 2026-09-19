@@ -21,9 +21,11 @@ use App\Services\Distribution\PublicationDeliveryManager;
 use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Tests\TestCase;
 
 class DistributionTest extends TestCase
@@ -76,6 +78,56 @@ class DistributionTest extends TestCase
                     $delivery->idempotency_key,
                 );
             },
+        );
+    }
+
+    public function test_invalid_actor_history_cannot_starve_later_valid_publication(): void
+    {
+        [$staleUser, $organization] = $this->identity();
+
+        for ($index = 0; $index < 20; $index++) {
+            $this->duePublication($staleUser, $organization);
+        }
+
+        Membership::query()
+            ->where('organization_id', $organization->getKey())
+            ->where('user_id', $staleUser->getKey())
+            ->delete();
+
+        $this->travel(2)->minutes();
+
+        $validUser = User::factory()->create();
+
+        Membership::query()->create([
+            'organization_id' => $organization->getKey(),
+            'user_id' => $validUser->getKey(),
+            'role' => UserRole::Studio,
+        ]);
+
+        $validPublication = $this->duePublication(
+            $validUser,
+            $organization,
+        );
+
+        $this->assertSame(
+            1,
+            app(DistributionScheduler::class)->dispatchDue(),
+        );
+
+        $delivery = app(TenantContext::class)->runWithinOrganization(
+            $validUser,
+            (string) $organization->getKey(),
+            fn (): PublicationDelivery => PublicationDelivery::query()
+                ->where(
+                    'scheduled_publication_id',
+                    $validPublication->getKey(),
+                )
+                ->sole(),
+        );
+
+        $this->assertSame(
+            PublicationDelivery::STATUS_QUEUED,
+            $delivery->status,
         );
     }
 
@@ -172,6 +224,64 @@ class DistributionTest extends TestCase
         );
     }
 
+    public function test_queue_dispatch_failure_remains_retriable(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+
+        $dispatcher = \Mockery::mock(BusDispatcher::class);
+        $dispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->andThrow(new RuntimeException('queue unavailable'));
+
+        app()->instance(BusDispatcher::class, $dispatcher);
+
+        try {
+            app(TenantContext::class)->runWithinOrganization(
+                $user,
+                (string) $organization->getKey(),
+                fn (): bool => app(PublicationDeliveryManager::class)
+                    ->queue($publication, $user),
+            );
+
+            $this->fail('Queue dispatch failure must be rethrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'queue unavailable',
+                $exception->getMessage(),
+            );
+        }
+
+        $delivery = app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            fn (): PublicationDelivery => PublicationDelivery::query()->sole(),
+        );
+
+        $this->assertSame(
+            PublicationDelivery::STATUS_RETRY_SCHEDULED,
+            $delivery->status,
+        );
+        $this->assertSame(0, $delivery->attempts);
+        $this->assertSame(
+            'distribution_dispatch_failed',
+            $delivery->last_error_code,
+        );
+        $this->assertNull($delivery->claimed_until);
+        $this->assertNotNull($delivery->next_attempt_at);
+        $this->assertTrue(
+            $delivery->next_attempt_at->isAfter(
+                now('UTC')->addSeconds(50),
+            ),
+        );
+        $this->assertTrue(
+            $delivery->next_attempt_at->isBefore(
+                now('UTC')->addSeconds(70),
+            ),
+        );
+    }
+
     public function test_authentication_failure_is_terminal_and_distinct(): void
     {
         [$user, $organization] = $this->identity();
@@ -239,7 +349,7 @@ class DistributionTest extends TestCase
             PublicationDelivery::STATUS_RETRY_SCHEDULED,
             $retry->status,
         );
-        $this->assertSame(1, $retry->attempts);
+        $this->assertSame(0, $retry->attempts);
         $this->assertSame(
             'distribution_rate_limited',
             $retry->last_error_code,
@@ -269,7 +379,7 @@ class DistributionTest extends TestCase
             PublicationDelivery::STATUS_PUBLISHED,
             $published->status,
         );
-        $this->assertSame(2, $published->attempts);
+        $this->assertSame(1, $published->attempts);
         $this->assertSame(
             'external-publication-123',
             $published->external_publication_id,
@@ -294,6 +404,123 @@ class DistributionTest extends TestCase
                 PublicationDelivery::query()->count(),
             ),
         );
+    }
+
+    public function test_rate_limits_do_not_consume_attempt_budget(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $provider = new SequenceDistributionProvider([
+            DistributionProviderException::rateLimited(60),
+            DistributionProviderException::rateLimited(60),
+            DistributionProviderException::rateLimited(60),
+            DistributionProviderException::rateLimited(60),
+            DistributionProviderException::rateLimited(60),
+        ]);
+
+        $this->provider($provider);
+        $delivery = $this->queueAndGetDelivery(
+            $publication,
+            $user,
+            $organization,
+        );
+
+        for ($index = 0; $index < 5; $index++) {
+            if ($index > 0) {
+                $this->makeRetryDue(
+                    $delivery,
+                    $user,
+                    $organization,
+                );
+            }
+
+            $this->dispatch($delivery, $user, $organization);
+            $delivery = $this->delivery(
+                $delivery,
+                $user,
+                $organization,
+            );
+
+            $this->assertSame(
+                PublicationDelivery::STATUS_RETRY_SCHEDULED,
+                $delivery->status,
+            );
+            $this->assertSame(0, $delivery->attempts);
+        }
+
+        $this->assertSame(5, $provider->calls);
+        $this->assertSame(
+            'distribution_rate_limited',
+            $delivery->last_error_code,
+        );
+    }
+
+    public function test_stale_worker_cannot_overwrite_newer_claim_on_success(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $delivery = $this->queueAndGetDelivery(
+            $publication,
+            $user,
+            $organization,
+        );
+
+        $this->provider(
+            new LeaseTakeoverDistributionProvider(
+                (string) $delivery->getKey(),
+                false,
+            ),
+        );
+
+        $this->dispatch($delivery, $user, $organization);
+
+        $fresh = $this->delivery(
+            $delivery,
+            $user,
+            $organization,
+        );
+
+        $this->assertSame(
+            PublicationDelivery::STATUS_PROCESSING,
+            $fresh->status,
+        );
+        $this->assertSame(2, $fresh->attempts);
+        $this->assertNull($fresh->external_publication_id);
+        $this->assertNull($fresh->published_at);
+    }
+
+    public function test_stale_worker_cannot_schedule_retry_over_newer_claim(): void
+    {
+        [$user, $organization] = $this->identity();
+        $publication = $this->duePublication($user, $organization);
+        $delivery = $this->queueAndGetDelivery(
+            $publication,
+            $user,
+            $organization,
+        );
+
+        $this->provider(
+            new LeaseTakeoverDistributionProvider(
+                (string) $delivery->getKey(),
+                true,
+            ),
+        );
+
+        $this->dispatch($delivery, $user, $organization);
+
+        $fresh = $this->delivery(
+            $delivery,
+            $user,
+            $organization,
+        );
+
+        $this->assertSame(
+            PublicationDelivery::STATUS_PROCESSING,
+            $fresh->status,
+        );
+        $this->assertSame(2, $fresh->attempts);
+        $this->assertNull($fresh->next_attempt_at);
+        $this->assertNull($fresh->last_error_code);
     }
 
     public function test_transient_failures_stop_after_bounded_attempts(): void
@@ -570,6 +797,36 @@ class DistributionTest extends TestCase
                     ->save();
             },
         );
+    }
+}
+
+final class LeaseTakeoverDistributionProvider implements DistributionProvider
+{
+    public function __construct(
+        private readonly string $deliveryId,
+        private readonly bool $failTransiently,
+    ) {}
+
+    public function publish(
+        ScheduledPublication $publication,
+        string $idempotencyKey,
+    ): DistributionResult {
+        PublicationDelivery::query()
+            ->whereKey($this->deliveryId)
+            ->update([
+                'status' => PublicationDelivery::STATUS_PROCESSING,
+                'attempts' => 2,
+                'claimed_until' => now('UTC')->addMinutes(5),
+                'next_attempt_at' => null,
+                'last_error_code' => null,
+                'updated_at' => now(),
+            ]);
+
+        if ($this->failTransiently) {
+            throw DistributionProviderException::transient();
+        }
+
+        return new DistributionResult('newer-claim-wins');
     }
 }
 
