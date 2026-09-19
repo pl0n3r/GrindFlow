@@ -161,3 +161,14 @@ the target environment. CI success alone means VALIDATED IN CODE.
 The execution roadmap and durable progress history live in
 [GitHub #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88);
 `README.md` remains a latest-delivery dashboard, not a changelog.
+
+## 12. Traffic daily aggregate export
+
+- Authenticated Traffic managers can download a CSV of per-link/day aggregate clicks
+  with exactly the dashboard's filter semantics; the 100-link UI preview never
+  truncates the report or the matched link count.
+- The streaming query is explicitly organization-scoped on metric and link, not
+  dependent on ambient tenant context surviving HTTP streamed-response sending.
+- Export is bounded to 366 days, uses no-store headers and prefixes formula-like
+  user-authored CSV cells to prevent spreadsheet command interpretation.
+- No raw visitor identifier, destination URL or click-level row is exported.

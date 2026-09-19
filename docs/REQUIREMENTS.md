@@ -355,3 +355,24 @@ before the old implementation is removed.
 ### GF-MIG-004 — Legacy retirement
 Node/Next/TypeScript application dependencies are removed only after all
 required modules have reached validated-in-code parity.
+
+
+### GF-FR-006B — Tenant-scoped daily Traffic CSV
+**Status:** implemented
+
+**Statement:** Authorized Traffic managers can download the same filtered daily
+aggregates as the dashboard without leaking visitor-level identifiers.
+
+**Verification notes (Laravel):**
+- Export respects the dashboard's from/to/channel/campaign/tracked-link filters,
+  scoped to the authenticated organization on both the metric and linked row.
+- Each CSV row is one link/day aggregate; the full report is streamed and is
+  not truncated by the dashboard's 100-link preview.
+- At most 366 days per request; invalid periods fail validation without export.
+- UTF-8 CSV with no-store download headers escapes spreadsheet formula prefixes
+  in user-authored labels/channels/campaigns. No IP, user agent, referrer,
+  visitor hash, dedupe row or destination URL enters the report.
+- Model-role and cross-organization export attempts are forbidden; an absent
+  Traffic schema returns 503 rather than a server error.
+- The dashboard's matched link count includes all filtered records, not merely
+  the 100-link preview.

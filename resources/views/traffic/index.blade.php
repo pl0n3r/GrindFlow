@@ -135,9 +135,9 @@
             @else
                 <section class="gf-metrics" aria-label="Metricas de Traffic">
                     <article class="gf-metric">
-                        <div class="gf-metric__label">Tracked links</div>
-                        <div class="gf-metric__value">{{ $links->count() }}</div>
-                        <div class="gf-metric__meta">Hasta 100 links recientes</div>
+                        <div class="gf-metric__label">Matched tracked links</div>
+                        <div class="gf-metric__value">{{ number_format($linkCount) }}</div>
+                        <div class="gf-metric__meta">Mostrando hasta 100 links recientes</div>
                     </article>
 
                     <article class="gf-metric">
@@ -163,7 +163,8 @@
                             <div class="gf-field"><label for="to">To</label><input class="gf-input" id="to" name="to" type="date" value="{{ $to }}" required></div>
                             <div class="gf-field"><label for="channel_filter">Channel</label><select class="gf-input" id="channel_filter" name="channel"><option value="">All channels</option>@foreach($channels as $channel)<option value="{{ $channel }}" @selected(($filters['channel'] ?? '') === $channel)>{{ $channel }}</option>@endforeach</select></div>
                             <div class="gf-field"><label for="campaign_filter">Campaign</label><input class="gf-input" id="campaign_filter" name="campaign" maxlength="128" value="{{ $filters['campaign'] ?? '' }}"></div>
-                            <button class="gf-button gf-button--primary">Apply filters</button>
+                            <button class="gf-button gf-button--primary" type="submit">Apply filters</button>
+                            <button class="gf-button gf-button--ghost" type="submit" formaction="{{ route('organizations.traffic.export', ['organizationId' => $organization->id]) }}">Export daily CSV</button>
                         </form>
                         @php($chartMax = max(1, (int) $series->max('clicks')))
                         <div class="gf-chart" role="img" aria-label="Daily clicks from {{ $from }} to {{ $to }}">

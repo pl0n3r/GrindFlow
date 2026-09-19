@@ -70,6 +70,9 @@ Route::middleware(['auth', 'tenant.user'])->group(function (): void {
                 ->name('organizations.distribution.deliveries.retry');
             Route::get('/traffic', [TrafficController::class, 'index'])
                 ->name('organizations.traffic.index');
+            Route::get('/traffic/export', [TrafficController::class, 'export'])
+                ->middleware(RequireTrafficSchema::class)
+                ->name('organizations.traffic.export');
             Route::post('/traffic', [TrafficController::class, 'store'])
                 ->middleware(RequireTrafficSchema::class)
                 ->name('organizations.traffic.store');

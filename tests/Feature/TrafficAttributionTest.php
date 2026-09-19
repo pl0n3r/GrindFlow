@@ -519,6 +519,193 @@ class TrafficAttributionTest extends TestCase
             ->assertDontSee('Other');
     }
 
+    public function test_daily_csv_export_applies_filters_and_never_leaks_another_tenant(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Studio);
+        [$otherUser, $otherOrganization] = $this->identity(UserRole::Studio);
+
+        $local = $this->link(
+            $user,
+            $organization,
+            '=SUM(1,1)',
+            'https://example.com/private-destination',
+        );
+        $excluded = $this->link(
+            $user,
+            $organization,
+            'Excluded local campaign',
+            'https://example.com/excluded',
+        );
+        $foreign = $this->link(
+            $otherUser,
+            $otherOrganization,
+            'Foreign confidential campaign',
+            'https://example.com/foreign',
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($local, $excluded): void {
+                $local->forceFill(['channel' => '@hidden'])->save();
+
+                foreach ([
+                    [$local, '2026-09-10', 7],
+                    [$local, '2026-09-11', 3],
+                    [$local, '2026-08-31', 70],
+                    [$excluded, '2026-09-10', 99],
+                ] as [$link, $date, $clicks]) {
+                    TrackedLinkDailyMetric::query()->create([
+                        'tracked_link_id' => $link->getKey(),
+                        'metric_date' => $date,
+                        'clicks' => $clicks,
+                    ]);
+                }
+            },
+        );
+
+        app(TenantContext::class)->runWithinOrganization(
+            $otherUser,
+            (string) $otherOrganization->getKey(),
+            fn () => TrackedLinkDailyMetric::query()->create([
+                'tracked_link_id' => $foreign->getKey(),
+                'metric_date' => '2026-09-10',
+                'clicks' => 999,
+            ]),
+        );
+
+        $response = $this->actingAs($user)->get(
+            route('organizations.traffic.export', [
+                'organizationId' => $organization->getKey(),
+                'from' => '2026-09-01',
+                'to' => '2026-09-19',
+                'channel' => '@hidden',
+                'campaign' => 'feature',
+                'tracked_link_id' => $local->getKey(),
+            ]),
+        );
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->assertHeader(
+                'Content-Disposition',
+                'attachment; filename=grindflow-traffic-2026-09-01-2026-09-19.csv',
+            );
+
+        $this->assertStringContainsString(
+            'no-store',
+            (string) $response->headers->get('Cache-Control'),
+        );
+
+        $csv = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
+        $this->assertStringContainsString("'=SUM(1,1)", $csv);
+        $this->assertStringContainsString("'@hidden", $csv);
+        $this->assertStringContainsString('2026-09-10', $csv);
+        $this->assertStringContainsString('2026-09-11', $csv);
+        $this->assertStringNotContainsString('2026-08-31', $csv);
+        $this->assertStringNotContainsString('Foreign confidential', $csv);
+        $this->assertStringNotContainsString('Excluded local', $csv);
+        $this->assertStringNotContainsString('private-destination', $csv);
+        $this->assertStringNotContainsString('visitor_hash', $csv);
+        $this->assertSame(3, count(explode("\n", trim($csv))));
+    }
+
+    public function test_daily_csv_export_rejects_unprivileged_invalid_or_unbounded_requests(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Model);
+
+        $this->actingAs($user)->get(
+            route('organizations.traffic.export', [
+                'organizationId' => $organization->getKey(),
+            ]),
+        )->assertForbidden();
+
+        [$editor, $editorOrganization] = $this->identity(UserRole::Editor);
+        $url = route('organizations.traffic.export', [
+            'organizationId' => $editorOrganization->getKey(),
+        ]);
+
+        $this->actingAs($editor)->get($url.'?from=2026-09-19&to=2026-09-01')
+            ->assertSessionHasErrors('to');
+        $this->actingAs($editor)->get($url.'?from=2024-01-01&to=2026-09-19')
+            ->assertSessionHasErrors('to');
+        $this->actingAs($editor)->get($url.'?tracked_link_id=not-a-uuid')
+            ->assertSessionHasErrors('tracked_link_id');
+    }
+
+    public function test_daily_csv_export_is_migration_safe(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Studio);
+        Schema::dropIfExists('tracked_link_dedupes');
+        Schema::dropIfExists('tracked_link_daily_metrics');
+        Schema::dropIfExists('tracked_links');
+
+        $migrationPath = database_path(
+            'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
+        );
+
+        try {
+            $this->actingAs($user)
+                ->get(route('organizations.traffic.export', [
+                    'organizationId' => $organization->getKey(),
+                ]))
+                ->assertStatus(503);
+        } finally {
+            $migration = require $migrationPath;
+            $migration->up();
+        }
+    }
+
+    public function test_daily_csv_exports_all_filtered_links_beyond_dashboard_preview(): void
+    {
+        [$user, $organization] = $this->identity(UserRole::Editor);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user): void {
+                for ($index = 0; $index < 101; $index++) {
+                    $link = TrackedLink::query()->create([
+                        'created_by_user_id' => $user->getKey(),
+                        'token' => Str::random(22),
+                        'label' => 'Link '.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
+                        'destination_url' => 'https://example.com/report',
+                        'channel' => 'test',
+                        'campaign' => 'feature',
+                        'status' => TrackedLink::STATUS_ACTIVE,
+                    ]);
+
+                    TrackedLinkDailyMetric::query()->create([
+                        'tracked_link_id' => $link->getKey(),
+                        'metric_date' => '2026-09-10',
+                        'clicks' => 1,
+                    ]);
+                }
+            },
+        );
+
+        $url = route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+            'from' => '2026-09-01',
+            'to' => '2026-09-19',
+        ]);
+
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('101')
+            ->assertSee('Export daily CSV');
+
+        $csv = $this->actingAs($user)
+            ->get(route('organizations.traffic.export', [
+                'organizationId' => $organization->getKey(),
+                'from' => '2026-09-01',
+                'to' => '2026-09-19',
+            ]))->assertOk()->streamedContent();
+
+        $this->assertSame(102, count(explode("\n", trim($csv))));
+    }
+
     /**
      * @return array{User, Organization}
      */
