@@ -289,6 +289,54 @@ class FinanceTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_finance_totals_never_mix_currencies(): void
+    {
+        [$studio, $organization] = $this->identity(UserRole::Studio);
+
+        app(TenantContext::class)->runWithinOrganization(
+            $studio,
+            (string) $organization->getKey(),
+            function () use ($studio): void {
+                $manager = app(FinanceLedgerManager::class);
+
+                $manager->create(
+                    $studio,
+                    'COP revenue',
+                    100000,
+                    'COP',
+                    CarbonImmutable::parse('2026-09-19', 'UTC'),
+                    null,
+                    null,
+                );
+
+                $manager->create(
+                    $studio,
+                    'USD revenue',
+                    2500,
+                    'USD',
+                    CarbonImmutable::parse('2026-09-19', 'UTC'),
+                    null,
+                    null,
+                );
+            },
+        );
+
+        $response = $this->actingAs($studio)
+            ->get(
+                route('organizations.finance.index', [
+                    'organizationId' => $organization->getKey(),
+                ]),
+            )
+            ->assertOk();
+
+        $response
+            ->assertSee('COP')
+            ->assertSee('100,000')
+            ->assertSee('USD')
+            ->assertSee('2,500')
+            ->assertDontSee('102,500');
+    }
+
     public function test_finance_index_does_not_leak_foreign_entries(): void
     {
         [$user, $organization] = $this->identity(UserRole::Studio);
