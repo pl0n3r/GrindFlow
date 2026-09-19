@@ -20,9 +20,9 @@
 | Work line | 🚧 **GF-OPS · Operating model** | [Roadmap #88](https://github.com/drpipe1098-commits/GrindFlow/issues/88) |
 | Base exacta | ✅ **VALIDATED IN CODE** | #87 squash en `9a1b2525b6d6eae5a15fbb3ab2c3a02844c82f5a`; PR #87 CI #400 `validate` verde |
 | Version | 🚧 **v0.1.0** | bootstrap de versión humana; SHA desplegado independiente |
-| CI del PR | 🚧 **por verificar** | core CI modificado: matriz completa del head final |
-| Sonar | 🚧 **por verificar** | Quality Gate sobre head final |
-| CodeRabbit | 🚧 **por revisar** | full review sobre head estable |
+| CI del PR | ✅ **GrindFlow CI #402 / validate** | matriz completa verde en `b5a30bf2…`; revalidar head documental final |
+| Sonar | ✅ **Quality Gate OK** | PR #89: 0 issues nuevos y 0 hotspots observados |
+| CodeRabbit | 🚧 **revisión pendiente** | resumen automático en proceso; sin threads visibles al actualizar |
 | CI del SHA exacto de main | 🚧 **por verificar** | independiente del CI del PR |
 | Production Smoke | 🚧 **schema bloqueado** | [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69): seis pendientes en Smoke #35427532347 del SHA #87 |
 | Migraciones | 🚧 **no ejecutadas** | backup externo restaurable + lote + aprobación explícita |
@@ -96,14 +96,14 @@ flowchart LR
 ## Validación
 
 - Bootstrap de versión inicial: `0.1.0`; ningún dato productivo modificado.
-- Cambios de CI core fuerzan matriz completa; revisión del PR y validaciones exact-main se registran por separado.
+- CI #402: preflight, fast (contratos/versión/dashboard), Pint/PHPStan, PHPUnit, MariaDB, browser, legacy y `validate` en success; revalidar head final tras actualizar snapshot. Exact-main y producción son independientes.
 - El último Production Smoke verificado para #87 indica **seis** migraciones pendientes; la nueva política no las ejecuta.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar el PR de operación, Sonar, CodeRabbit y exact-main; cerrar fase 0 en [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
+| **NOW** | 🚧 Completar CodeRabbit, revalidar head final y fusionar el PR de operación; registrar evidencias en [#88](https://github.com/drpipe1098-commits/GrindFlow/issues/88). |
 | **NEXT** | 🚧 Auditar artefactos [#69](https://github.com/drpipe1098-commits/GrindFlow/issues/69), backup y lote de migraciones. |
 | **LATER** | 🚧 Providers reales en sandbox y auditoría por intento. |
 | **BLOCKED / EXTERNAL** | 🚧 Backup/aprobación del esquema, S3/FFmpeg y validación productiva. |
