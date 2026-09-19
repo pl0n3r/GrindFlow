@@ -1132,7 +1132,7 @@ class TrafficAttributionTest extends TestCase
         $this->assertSame(105, $first->viewData('totalClicks'));
         $this->assertSame(25, $first->viewData('links')->count());
         $this->assertSame(
-            array_slice($ids, 80, 25),
+            array_reverse(array_slice($ids, 80, 25)),
             $first->viewData('links')->getCollection()->pluck('id')->all(),
         );
 
@@ -1147,7 +1147,7 @@ class TrafficAttributionTest extends TestCase
             ->assertOk()
             ->assertSee('Showing 26–50 of 105');
         $this->assertSame(
-            array_slice($ids, 55, 25),
+            array_reverse(array_slice($ids, 55, 25)),
             $second->viewData('links')->getCollection()->pluck('id')->all(),
         );
 
