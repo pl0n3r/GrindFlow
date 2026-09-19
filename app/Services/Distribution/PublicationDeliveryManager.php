@@ -12,7 +12,6 @@ use App\Services\Media\MediaAssetProcessor;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
-use LogicException;
 use Throwable;
 
 class PublicationDeliveryManager
