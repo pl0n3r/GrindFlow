@@ -12,14 +12,14 @@
 
 | Señal | Estado actual | Evidencia |
 | --- | --- | --- |
-| Work line | ✅ **GF-OPS · Production Smoke workflow repair** | PR #83 MERGED en `main` |
-| Feature merge SHA | ✅ **main** | `de61c59723584da30412db389a6e2382406371aa` |
-| CI del PR | ✅ **GrindFlow CI #354 / validate** | fast, php-quality, PHPUnit, MariaDB, browser y legacy pasaron en head `7b5bd7f4…` |
-| Sonar | ✅ **Quality Gate OK** | PR #83: 0 issues y 0 hotspots |
-| CodeRabbit | 🟠 **revisión advisory sin aprobación final constatada** | 0 threads visibles en revisión |
-| CI del SHA exacto de main | ⚪ **sin evidencia confirmada aquí** | no sustituir por CI de PR |
-| Production Smoke | 🟠 **BLOCKED: 6 migraciones pendientes** | run #35422737561 contra producción, asociado a `de61c597…`; issue #69 |
-| Migraciones | 🟠 **sin ejecutar por este cambio** | backup externo restaurable y aprobación explícita pendientes |
+| Work line | 🟠 **GF-OPS · Migration manifest read-only** | rama `feat/safe-production-migration-manifest` |
+| Base exacta | ✅ **main** | `04de9f1aba5be44558b04b40433ad43ed7048e64` |
+| Diagnóstico | ✅ **seis migraciones pendientes en producción** | Smoke #35422829857 / issue #69 |
+| CI del PR | ⚪ **por validar** | ejecutar sobre head final |
+| Sonar / CodeRabbit | ⚪ **por validar** | evidencias del head final |
+| CI del SHA exacto de main | ⚪ **sin evidencia confirmada** | independiente del CI de PR |
+| Production Smoke | 🟠 **bloqueado por esquema** | el cambio añade manifiesto en el próximo Smoke |
+| Migraciones | 🟠 **no ejecutadas** | requieren backup externo restaurable y aprobación explícita |
 
 ## Huella del cambio
 
@@ -27,7 +27,7 @@
 
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **1** | **+32** | **−33** | **-1** |
+| **5** | **+202** | **−34** | **+168** |
 
 La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si queda desactualizado.
 
@@ -37,11 +37,11 @@ La huella se calcula con `git diff --numstat`; CI rechaza este dashboard si qued
 
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
-| GrindFlow CI | docs-only: dashboard y contratos, sin cambios de runtime |
-| Sonar / CodeRabbit | controles del PR documental separados de la evidencia del PR #83 |
-| Migración | solo por acción explícita del operador, nunca desde este PR |
-| Producción | Smoke nuevo informa seis migraciones; no acredita esquema actualizado |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · legacy** |
+| GrindFlow CI | compila parser Python, prueba offline seis escenarios y valida dashboard |
+| Sonar / CodeRabbit | evaluación independiente sobre el head exacto |
+| Migración | el manifiesto es solo lectura; CI/Smoke no migran |
+| Producción | la evidencia del nuevo manifiesto requiere Smoke sobre el SHA fusionado |
 
 ## Flujo de entrega
 
@@ -70,41 +70,44 @@ flowchart LR
 
 ## Qué se hizo
 
-- Registró el merge de la reparación de Smoke de PR #83 en el SHA `de61c597…`.
-- Conservó el CI #354 y Sonar del head del PR como evidencias de código, distintas del SHA de `main`.
-- El primer reporte de Smoke visible del SHA fusionado clasifica **seis migraciones pendientes**, no una aplicación HTTP 500.
-- Smoke detiene los reintentos ante esquema pendiente; el workflow conserva diagnóstico en artefacto de tres días y no migra automáticamente.
-- Este PR solo documenta evidencias operativas, sin ejecutar migraciones, tocar backups, secretos o datos productivos.
+- Extrae del HTML autenticado de Admin > System el nombre exacto de cada migración pendiente y el SHA-256 del lote, sin un request HTTP adicional.
+- Valida sintaxis de nombres, conteo, duplicados y fingerprint antes de emitir líneas `MIGRATION_NAME` / `MIGRATION_BATCH_SHA256`.
+- Si el manifiesto no es verificable, escribe `MIGRATION_INVENTORY_STATUS=unavailable` sin datos parciales, conservando el bloqueo del Smoke.
+- Mantiene el issue público con solo el conteo; el manifiesto detallado queda en el artefacto de diagnóstico de tres días, accesible a colaboradores autorizados.
+- Prueba extracción válida, ausencia, discrepancia, contenido no permitido y fingerprint inválido con curl simulado. Nunca ejecuta migraciones.
 
 ## Archivos modificados en este deploy
 
-- `README.md` — actualiza evidencia del merge, Smoke bloqueado y secuencia operativa.
+- `.github/workflows/grindflow-ci.yml` — compila el parser en fast.
+- `README.md` — dashboard del deploy actual.
+- `scripts/production-migration-inventory.py` — extrae manifiesto con lista permitida.
+- `scripts/production-smoke-contract.sh` — regresiones sin red ni DB.
+- `scripts/production-smoke.sh` — incorpora manifiesto al diagnóstico bloqueado.
 
 ## Validación
 
-- PR #83 fusionado: `de61c59723584da30412db389a6e2382406371aa`.
-- CI #354 del head `7b5bd7f47de5eb8b506ee7186029f5dc9022c030`: `validate` y todos los gates seleccionados en success.
-- Sonar reportó Quality Gate OK, 0 issues y 0 hotspots. CodeRabbit seguía sin revisión final verificada ni threads visibles.
-- Issue #69 contiene run de Smoke `35422737561` para el merge SHA y marcador seguro `Pending migration count: 6`.
-- No hay prueba disponible aquí de backup restaurable, aplicación de migraciones ni recuperación del Smoke.
+- En el último Smoke de `main` se informó `Pending migration count: 6` (run #35422829857); no se conocen aún los seis nombres por ese run previo.
+- El nuevo parser se ejecuta únicamente al observar count positivo y verifica la misma respuesta System usada por Smoke.
+- Las pruebas offline cubren seis escenarios: inventario válido, faltante, conteo distinto, nombre rechazado, fingerprint inválido y schema actual; el inventario desconocido conserva su prueba.
+- No hay evidencia aquí de respaldo restaurable, ejecución de migraciones ni recuperación de producción.
 
 ## Qué sigue
 
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | Confirmar CI exact-main y estado del despliegue del SHA `de61c597…` en Hostinger. |
-| **NEXT** | Revisar los seis nombres y fingerprint en Admin > System; verificar un backup externo realmente restaurable. |
-| **NEXT** | Migrar solo tras aprobación explícita del operador, y después repetir Smoke autenticado. |
-| **BLOCKED / EXTERNAL** | Aprobación/backup de migración, S3, FFmpeg y configuración de hosting. |
+| **NOW** | Validar PR / Sonar / CodeRabbit y fusionar tras gates aprobados. |
+| **NEXT** | Consultar el artefacto Smoke exact-main para leer los seis nombres y el fingerprint sin SSH. |
+| **NEXT** | Verificar backup externo restaurable y obtener aprobación explícita antes de ejecutar el lote revisado. |
+| **BLOCKED / EXTERNAL** | Migración productiva, storage S3 y FFmpeg. |
 | **LATER** | Providers reales en sandbox y conciliación Finance. |
 
 ## Panorama general pendiente
 
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | Exact-main delivery | PR #83 MERGED; CI de merge por comprobar |
-| **NEXT** | Migraciones productivas | seis pendientes en Smoke; inventario + backup + aprobación |
-| **NEXT** | Scheduling/Distribution/Traffic/Finance | confirmar schema productivo tras migraciones |
+| **NOW** | Manifiesto de migraciones | parser + Smoke en PR |
+| **NEXT** | Migraciones productivas | seis pendientes; nombres/backup/aprobación |
+| **NEXT** | Scheduling/Distribution/Traffic/Finance | confirmar schema productivo tras migración |
 | **BLOCKED / EXTERNAL** | Hosting/storage | S3 + FFmpeg |
 | **LATER** | Provider adapters | sandbox y credenciales cifradas |
 | **LATER** | Legacy retirement | tras GF-MIG |
