@@ -37,7 +37,7 @@ class FinanceController extends Controller
 
         if ($financeReady) {
             $allocations = RevenueAllocation::query()
-                ->with(['beneficiary', 'createdBy', 'reversalOf'])
+                ->with(['beneficiary', 'createdBy', 'reversalOf', 'reversal'])
                 ->orderByDesc('occurred_on')
                 ->latest()
                 ->limit(100)
