@@ -74,6 +74,9 @@ class PublicationDeliveryManager
                         (string) $lockedPublication->getKey(),
                     ),
                     'status' => PublicationDelivery::STATUS_QUEUED,
+                    'claimed_until' => now('UTC')->addSeconds(
+                        self::CLAIM_SECONDS,
+                    ),
                 ]);
             }
 
@@ -81,7 +84,6 @@ class PublicationDeliveryManager
                 in_array(
                     $delivery->status,
                     [
-                        PublicationDelivery::STATUS_QUEUED,
                         PublicationDelivery::STATUS_PUBLISHED,
                         PublicationDelivery::STATUS_AUTHENTICATION_FAILED,
                         PublicationDelivery::STATUS_FAILED,
@@ -93,7 +95,14 @@ class PublicationDeliveryManager
             }
 
             if (
-                $delivery->status === PublicationDelivery::STATUS_PROCESSING
+                in_array(
+                    $delivery->status,
+                    [
+                        PublicationDelivery::STATUS_QUEUED,
+                        PublicationDelivery::STATUS_PROCESSING,
+                    ],
+                    true,
+                )
                 && $delivery->claimed_until !== null
                 && $delivery->claimed_until->isFuture()
             ) {
@@ -122,7 +131,9 @@ class PublicationDeliveryManager
             $delivery->forceFill([
                 'status' => PublicationDelivery::STATUS_QUEUED,
                 'next_attempt_at' => null,
-                'claimed_until' => null,
+                'claimed_until' => now('UTC')->addSeconds(
+                    self::CLAIM_SECONDS,
+                ),
             ])->save();
 
             return $delivery;
