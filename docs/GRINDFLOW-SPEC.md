@@ -11,6 +11,68 @@ GrindFlow is a multi-tenant SaaS for teams that manage sensitive digital media,
 content workflows, scheduled distribution, traffic attribution and revenue
 operations across multiple accounts and platforms.
 
+## 1A. Especificación complementaria de producto y modelo de negocio
+
+> **Proyecto:** GrindFlow.
+> **Documento de origen:** especificación complementaria de producto y negocio.
+> **Fecha de definiciones:** 19 de septiembre de 2026.
+> **Estado:** visión y modelo de suscripción acordados; piloto y prueba comercial sujetos a validación en los términos indicados.
+> **Alcance de esta transcripción:** se conserva únicamente el texto facilitado hasta el punto 4.3. El original recibido termina literalmente en «No se ha aprobado»; no se infiere qué condición adicional iba a continuar esa frase.
+
+### 1A.1. Visión del proyecto
+
+GrindFlow es una plataforma SaaS de gestión, reutilización y distribución automatizada de contenido multimedia. Su propósito es ayudar a creadores de contenido y estudios de producción a reducir el tiempo dedicado a administrar sus redes sociales, mantener una presencia digital constante y atraer audiencia hacia sus canales oficiales y plataformas de monetización.
+
+La plataforma debe permitir que un creador cargue su contenido una sola vez, configure cómo desea utilizarlo y delegue en GrindFlow las tareas repetitivas de selección, organización, programación, adaptación y publicación.
+
+**Principio fundamental:** el creador aporta el contenido y define las reglas. GrindFlow se encarga de gestionarlo, reutilizarlo y distribuirlo automáticamente.
+
+La automatización debe reducir la necesidad de intervención diaria sin eliminar el control del usuario sobre su contenido.
+
+Esta visión complementa, sin sustituir, los límites de aislamiento por organización, autorización, cumplimiento y entrega segura definidos en las demás secciones de esta especificación.
+
+### 1A.2. Problema que buscamos resolver
+
+Los creadores independientes y los estudios pequeños y medianos deben crear y organizar contenido, seleccionar recursos, escribir textos, publicar en varias redes, mantener una frecuencia, promocionar transmisiones, reutilizar material y revisar estadísticas. Estas tareas consumen tiempo que podrían dedicar a sus actividades principales.
+
+GrindFlow busca reducir esa carga operativa. Su propuesta **no es únicamente publicar a la vez en múltiples redes: es gestionar el ciclo de vida del contenido**.
+
+### 1A.3. Público objetivo
+
+- **Creadores independientes:** personas que producen y administran su propio contenido y quieren mantener varias redes sin publicar manualmente cada pieza.
+- **Estudios pequeños y medianos:** organizaciones que necesitan centralizar contenido, administrar publicaciones y supervisar cuentas de múltiples creadores.
+- **Productoras y agencias:** organizaciones que gestionan mayores cantidades de recursos y perfiles.
+
+La arquitectura debe permitir el crecimiento hacia estos segmentos sin construir una plataforma distinta para cada uno.
+
+### 1A.4. Modelo de negocio
+
+#### 1A.4.1. SaaS por suscripción
+
+El negocio principal será cobrar **suscripciones periódicas** por las funciones de gestión y automatización. La propuesta de valor es ahorrar tiempo operativo, mantener presencia digital y facilitar la atracción de audiencia. GrindFlow **no basará su modelo principal en apropiarse de un porcentaje de los ingresos de los creadores**.
+
+#### 1A.4.2. Piloto inicial
+
+Se realizará un **piloto gratuito con cinco creadoras** para medir:
+
+- tiempo ahorrado;
+- volumen y éxito de publicaciones;
+- costos técnicos;
+- uso de funciones;
+- problemas observados;
+- tráfico medible hacia los destinos configurados.
+
+Esta información servirá para validar alcance y precios. El piloto es un experimento de producto y negocio, no evidencia de resultados comerciales obtenidos todavía.
+
+#### 1A.4.3. Prueba gratuita comercial
+
+Se contempla como ejemplo inicial una prueba limitada de **30 días**, con **hasta dos redes sociales**, biblioteca y automatización básicas limitadas, seguida de la opción de suscripción.
+
+**Decisión pendiente:** la duración, el límite de redes, las funcionalidades incluidas y demás condiciones no están cerrados; se decidirán tras el piloto. Los 30 días y las dos redes son parámetros propuestos, no un paquete o precio comercial aprobado.
+
+**Nota de integridad del origen:** el fragmento recibido finalizó después de «No se ha aprobado». No se completa ni atribuye a la conversación una decisión adicional que no conste en el texto recibido.
+
+---
 ## 2. Canonical stack
 
 | Layer | Decision |
