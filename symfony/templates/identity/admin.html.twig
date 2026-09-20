@@ -1,18 +1,22 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ organization.name }} · GrindFlow{% endblock %}
+{% block head %}
+<meta name="robots" content="noindex,nofollow">
+{% for stylesheet in build.css %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
+{% endblock %}
 {% block body %}
-<main id="contenido" class="identity-shell">
-<section class="identity-card" aria-labelledby="admin-title">
-    <span class="eyebrow">S1 · ESPACIO PRIVADO · DEMOSTRACIÓN AISLADA</span>
-    <h1 id="admin-title">{{ organization.name }}</h1>
-    <p>Hola, {{ display_name }}. Rol en esta organización: {{ organization.role }}.</p>
-    <p role="status">Tu sesión y la selección de organización funcionan. La biblioteca y la automatización
-        todavía no están conectadas a este entorno Symfony.</p>
+<div id="grindflow-admin" data-version="{{ app_version }}">
+    <main id="contenido" class="identity-shell"><section class="identity-card">
+        <h1>{{ organization.name }}</h1><p>Hola, {{ display_name }}. Rol: {{ organization.role }}.</p>
+        <p role="status">Cargando administración privada…</p>
+    </section></main>
+</div>
+<div class="admin-session-actions">
     <a class="button ghost" href="{{ path('grindflow_organizations') }}">Cambiar organización</a>
     <form method="post" action="{{ path('grindflow_logout') }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
         <button class="button ghost" type="submit">Cerrar sesión</button>
     </form>
-</section>
-</main>
+</div>
+<script type="module" src="{{ build.js }}"></script>
 {% endblock %}
