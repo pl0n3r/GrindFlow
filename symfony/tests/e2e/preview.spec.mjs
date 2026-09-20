@@ -526,3 +526,41 @@ test('S2 mobile upload distinguishes an active duplicate from a recoverable tras
   expect(uploads).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+
+test('S1 revocation hides tenant workspace, while a recoverable CSRF error keeps it visible', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000045';
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Usuario S1' },
+      organization: { id, name: 'Espacio revocable', role: 'admin' },
+      permissions: { workspace_view: true, organization_manage: true, content_prepare: false, content_review: false },
+      organization_name_csrf: 'csrf-s1', profile_name_csrf: 'profile-s1',
+      vault_upload_csrf: null, vault_manage_csrf: null,
+    } }),
+  }));
+  let writes = 0;
+  await page.route('**/api/admin/organization/name', (route) => {
+    writes += 1;
+    return route.fulfill({ status: 403, contentType: 'application/json',
+      body: JSON.stringify({ error: writes === 1
+        ? { code: 'invalid_csrf', message: 'La solicitud ha caducado o es inválida.' }
+        : { code: 'organization_access_changed', message: 'Tu acceso a esta organización ha cambiado.' } }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?session-s1=1', type: 'module' });
+  await expect(page.getByText('Espacio revocable').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByText('La solicitud ha caducado o es inválida.')).toBeVisible();
+  await expect(page.getByText('Espacio revocable').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByRole('link', { name: 'Volver a seleccionar organización' })).toBeVisible();
+  await expect(page.getByText('Espacio revocable')).toHaveCount(0);
+  expect(writes).toBe(2);
+});
