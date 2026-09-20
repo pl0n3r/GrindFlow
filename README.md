@@ -62,7 +62,7 @@ flowchart LR
 - El test DB detecta el grupo `database` y evita repetir toda la suite tras un fallo real. Contrato automatizado verifica ambas rutas.
 - Chromium se cachea por sistema operativo y lockfile, con instalación segura en cache miss; sintaxis PHP Symfony usa 4 procesos.
 - Health diario de Actions calcula mediana/p90 y alertas de deterioro por evento, sin cambiar pruebas ni ramas por sí solo. Política durable en AGENTS y [guía](docs/CI-PERFORMANCE.md).
-- No se cambiaron Laravel, datos de producción ni el cutover Symfony.
+- Los fixtures Laravel de schema ausente evitan DDL incompatible con FKs en MariaDB descartable. No se cambió el runtime Laravel, datos productivos ni el cutover Symfony.
 
 ## Archivos modificados en este deploy
 - `.github/workflows/ci-health.yml`
@@ -76,6 +76,9 @@ flowchart LR
 - `scripts/ci-scope.sh`
 - `scripts/database-test-runner-contract.sh`
 - `scripts/database-test-runner.sh`
+- `tests/Feature/DistributionTest.php`
+- `tests/Feature/SchedulingTest.php`
+- `tests/Feature/TrafficAttributionTest.php`
 
 ## Validación
 - Scripts tienen self-test y contratos; CI completo de PR, Sonar/CodeRabbit y CI exact-main se verifican por separado.
