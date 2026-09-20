@@ -15,13 +15,25 @@ final readonly class AssetManifest
     /** @return array{js: string, css: list<string>} */
     public function preview(): array
     {
+        return $this->entry('frontend/admin/main.tsx');
+    }
+
+    /** @return array{js: string, css: list<string>} */
+    public function admin(): array
+    {
+        return $this->entry('frontend/admin/admin.tsx');
+    }
+
+    /** @return array{js: string, css: list<string>} */
+    private function entry(string $source): array
+    {
         $path = $this->projectDir.'/public/build/.vite/manifest.json';
         if (!is_file($path)) {
             throw new ServiceUnavailableHttpException(null, 'La vista previa todavía no está compilada.');
         }
 
         $json = json_decode((string) file_get_contents($path), true);
-        $entry = is_array($json) ? ($json['frontend/admin/main.tsx'] ?? null) : null;
+        $entry = is_array($json) ? ($json[$source] ?? null) : null;
         if (!is_array($entry) || !is_string($entry['file'] ?? null) || !$this->isAllowedFile($entry['file'], 'js')) {
             throw new ServiceUnavailableHttpException(null, 'El manifiesto de la vista previa es inválido.');
         }
