@@ -420,6 +420,63 @@ test('S2 mobile never retries ambiguous HTTP 201 or permanent 422 with malformed
   expect(attempts).toBe(2);
 });
 
+
+test('S2 private mobile image preview loads only inside active details, then disappears', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000050';
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOokDsBAAJwAV+M1KYSAAAAAElFTkSuQmCC', 'base64');
+  let previewRequests = 0;
+  const asset = { id, name: 'imagen-privada.png', mime_type: 'image/png',
+    size_bytes: png.length, created_at: '2026-09-20 00:00:00',
+    download_url: '/api/admin/vault/' + id + '/download' };
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id, name: 'Vista previa privada', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'test', vault_manage_csrf: 'test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const trash = new URL(route.request().url()).searchParams.get('view') === 'trash';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { assets: trash ? [] : [asset],
+        page: 1, pages: trash ? 0 : 1, total: trash ? 0 : 1,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: png.length,
+          max_bytes: 128 * 1024 * 1024 } } }) });
+  });
+  await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { asset } }),
+  }));
+  await page.route('**/api/admin/vault/' + id + '/preview', (route) => {
+    previewRequests++;
+    expect(route.request().method()).toBe('GET');
+    return route.fulfill({ status: 200, contentType: 'image/png',
+      headers: { 'cache-control': 'no-store, private',
+        'cross-origin-resource-policy': 'same-origin' }, body: png });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-private-preview-e2e=1', type: 'module' });
+  await expect(page.getByText('imagen-privada.png', { exact: true })).toBeVisible();
+  const image = page.getByRole('img', { name: 'Vista previa privada de imagen-privada.png' });
+  await expect(image).toHaveCount(0);
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0)).toBe(true);
+  await expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
+  expect(previewRequests).toBe(1);
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  await expect(image).toHaveCount(0);
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
+  await expect(page.getByRole('img', { name: /Vista previa privada/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
 test('S2 mobile does not offer retry for a duplicate or invalid format', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/preview');

@@ -115,6 +115,12 @@ final class VaultTrashTest extends WebTestCase
             self::assertStringContainsString('nueva-imagen.png',
                 (string) $client->getResponse()->headers->get('Content-Disposition'));
 
+            $client->request('GET', '/api/admin/vault/'.$mineAsset.'/preview');
+            self::assertResponseIsSuccessful();
+            self::assertSame('image/png', $client->getResponse()->headers->get('Content-Type'));
+            $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/preview');
+            self::assertResponseStatusCodeSame(404);
+
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => 'wrong']);
             self::assertResponseStatusCodeSame(403);
             self::assertNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
@@ -151,6 +157,8 @@ final class VaultTrashTest extends WebTestCase
             self::assertStringNotContainsString('ajena.png', (string) $client->getResponse()->getContent());
 
             $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertResponseStatusCodeSame(404);
+            $client->request('GET', '/api/admin/vault/'.$mineAsset.'/preview');
             self::assertResponseStatusCodeSame(404);
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
             self::assertResponseStatusCodeSame(404);

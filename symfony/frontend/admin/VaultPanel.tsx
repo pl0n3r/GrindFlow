@@ -53,6 +53,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [detail, setDetail] = useState<Asset | null>(null);
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -89,6 +90,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   }, [page, refresh, view, search, format, sort]);
 
   async function inspect(id: string) {
+    setPreviewFailed(false);
     if (detail?.id === id) {
       setDetail(null);
       return;
@@ -431,12 +433,22 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             </button>
             <button type="button" disabled={!!busyId} onClick={() => setConfirmId(null)}>Cancelar</button>
           </div>}
-          {detail?.id === asset.id && <dl className="vault-metadata">
-            <dt>Nombre</dt><dd>{detail.name}</dd>
-            <dt>Tipo</dt><dd>{detail.mime_type}</dd>
-            <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
-            <dt>Guardada</dt><dd>{detail.created_at}</dd>
-          </dl>}
+          {detail?.id === asset.id && <>
+            <dl className="vault-metadata">
+              <dt>Nombre</dt><dd>{detail.name}</dd>
+              <dt>Tipo</dt><dd>{detail.mime_type}</dd>
+              <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
+              <dt>Guardada</dt><dd>{detail.created_at}</dd>
+            </dl>
+            <figure className="vault-preview">
+              {previewFailed
+                ? <p role="status">La vista previa no está disponible. Puedes descargar el original si conservas acceso.</p>
+                : <img src={'/api/admin/vault/' + detail.id + '/preview'}
+                    alt={'Vista previa privada de ' + detail.name} loading="lazy" decoding="async"
+                    referrerPolicy="no-referrer" onError={() => setPreviewFailed(true)} />}
+              <figcaption>Vista previa privada, visible solo con acceso a esta organización.</figcaption>
+            </figure>
+          </>}
         </li>)}
       </ul>
       {pages > 1 && <nav className="vault-pages" aria-label="Páginas de la biblioteca">
