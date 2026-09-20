@@ -75,6 +75,13 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 7. Usar la sesión E2E sintética en PHP/MariaDB/Chromium para flujos autenticados
    cuando sea viable; producción solo en pruebas autorizadas de lectura.
 
+### Continuidad de desarrollo sin Codex Tasks
+
+- Codex Tasks es un ejecutor opcional, **no un requisito de avance**. Si no tiene entornos registrados, falla su conexión o agota crédito, continuar mediante el conector GitHub con permiso de escritura, ramas acotadas, PR y los mismos controles de calidad.
+- No pedir al propietario autenticaciones reiteradas cuando GitHub ya permite implementar. No atribuir al usuario un bloqueo de Codex distinto del bloqueo real del entorno.
+- Cuando no haya checkout local, GitHub Actions en el head del PR valida build, PHP y pruebas; documentar qué no pudo ejecutarse localmente. Si CI falla, diagnosticar y corregir en la rama antes de fusionar. No llamar a código escrito «probado» por solo subirlo.
+- Si GitHub tampoco permite escritura, entregar diagnóstico concreto y cambios reproducibles; nunca crear una versión falsa ni afirmar deploy. Las autorizaciones adicionales solo se solicitan cuando son realmente indispensables.
+
 ### Roadmap, progreso y release humana
 
 - El issue [#2](https://github.com/pl0n3r/GrindFlow/issues/2)
