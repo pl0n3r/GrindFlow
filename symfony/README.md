@@ -35,3 +35,8 @@ La migración adicional `Version20260920095500` instala en MariaDB **aislada** u
 ## S1 acceso y selección de organizaciones, v0.1.33
 
 El entorno Symfony aislado incorpora login/logout mediante Symfony Security, protección CSRF, limitación de intentos y comprobación de cuenta activa. Solo se listan organizaciones con membresía del usuario; la elección exige CSRF y revalidación servidor, y cada GET al admin vuelve a comprobarla. El admin anuncia expresamente que Vault/automatización todavía no están conectados. Ninguna cuenta ni tabla productiva Laravel se modifica o migra; la protección de membresías inmutables de v0.1.32 permanece.
+
+
+## S1 panel React protegido, v0.1.34
+
+El admin privado monta React desde el manifiesto Vite existente y obtiene su contexto de `GET /api/admin/context`. La API responde JSON explícito para sesión ausente, organización no seleccionada o membresía revocada; vuelve a consultar MariaDB por usuario y organización en cada petición y calcula permisos conservadores por rol. La interfaz muestra la organización y las capacidades reales de la membresía, mantiene S2+ deshabilitado y no inventa datos operativos. PHPUnit cubre aislamiento, revocación y permisos; Playwright cubre el bundle responsive y el contrato de error sin sesión. No agrega migraciones ni cambia producción.
