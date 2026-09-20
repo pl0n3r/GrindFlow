@@ -103,9 +103,9 @@
     assert(loggedIn.ok && new URL(loggedIn.url).pathname === '/dashboard', 'Login must reach dashboard');
     const dashboard = parse(await loggedIn.text());
     assert(text(dashboard).includes(organizationName), 'E2E organization visible on dashboard');
-    const menuLabels = [...dashboard.querySelectorAll('.gf-sidebar__nav .gf-navitem__text')]
-      .map(node => node.textContent.trim());
-    assert(['Resumen', 'Biblioteca', 'Programación', 'Distribución'].every(label => menuLabels.includes(label)),
+    const menuLabels = new Set([...dashboard.querySelectorAll('.gf-sidebar__nav .gf-navitem__text')]
+      .map(node => node.textContent.trim()));
+    assert(['Resumen', 'Biblioteca', 'Programación', 'Distribución'].every(label => menuLabels.has(label)),
       'Workspace menu must show readable Spanish labels');
     assert(dashboard.querySelectorAll('.gf-sidebar__nav .gf-navitem__icon').length === 0,
       'Workspace menu must not depend on decorative Unicode symbols');
