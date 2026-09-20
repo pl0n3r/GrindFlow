@@ -80,7 +80,7 @@ test('React admin renders role capabilities from its tenant context contract', a
     }),
   }));
   await page.setContent('<div class="admin-page"><div id="grindflow-admin"></div></div>');
-  await page.addScriptTag({ url: new URL(asset, page.url()).toString(), type: 'module' });
+  await page.addScriptTag({ url: new URL(asset, 'http://127.0.0.1:8765').toString(), type: 'module' });
 
   await expect(page.getByRole('heading', { name: /Tu espacio/ })).toBeVisible();
   await expect(page.getByText('Estudio seguro').first()).toBeVisible();
