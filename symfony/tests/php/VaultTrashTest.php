@@ -217,6 +217,13 @@ final class VaultTrashTest extends WebTestCase
             self::assertResponseIsSuccessful();
             self::assertSame('missing',
                 json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+            // A symbolic link must never be followed or exposed as a missing original.
+            self::assertTrue(symlink($root.'/'.$foreignAsset.'.blob', $path));
+            $client->request('GET', $integrityUrl);
+            self::assertResponseIsSuccessful();
+            self::assertSame('unavailable',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+            self::assertTrue(unlink($path));
             file_put_contents($path, $bytes);
             self::assertNotNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             $client->request('GET', $integrityUrl);
