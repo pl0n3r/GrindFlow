@@ -95,7 +95,7 @@ final class VaultTrashTest extends WebTestCase
                 self::assertResponseStatusCodeSame(422);
             }
             // Reject invisible Unicode names, format controls and non-ASCII line separators.
-            foreach (["\\u{00A0}\\u{00A0}", "a\\u{200B}b", "a\\u{2028}b", "a\\u{2029}b"] as $invisibleName) {
+            foreach (["\u{00A0}\u{00A0}", "a\u{200B}b", "a\u{2028}b", "a\u{2029}b"] as $invisibleName) {
                 $client->request('POST', $renaming, server: $renameHeaders,
                     content: json_encode(['name' => $invisibleName], JSON_THROW_ON_ERROR));
                 self::assertResponseStatusCodeSame(422);
