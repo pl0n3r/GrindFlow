@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.40: solo el deploy actual, detalle privado del Vault S2 en código, Symfony aún sin despliegue.** Base `main` v0.1.39 `cc661deb75bd96f7ccf622197ed6b298b4320f95`. Consulta individual de metadatos autorizada por organización y panel de detalles móvil. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas o archivos**.
+> **Snapshot v0.1.41: solo el deploy actual, cuotas reales de Vault S2 en código, Symfony aún sin despliegue.** Base `main` v0.1.40 `d96d93339eb6e05130fd9b596c4a03961cb2b1c9`. El panel muestra uso por organización y la API bloquea simultáneamente subidas que excedan 100 imágenes o 128 MiB. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas o archivos**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.40** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.39~~ | `cc661deb75bd96f7ccf622197ed6b298b4320f95` |
+| Version objetivo | 🚧 **v0.1.41** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.40~~ | `d96d93339eb6e05130fd9b596c4a03961cb2b1c9` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+117** | **−15** | **+102** |
+| **7** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Vault S2: consulta individual tenant-safe, metadatos móviles, prueba de aislamiento y revocación |
+| Alcance | Vault S2: cuota real tenant-safe, bloqueo de cargas concurrentes, rechazos 409 y UX móvil |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,9 +58,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- GET privado de detalle con autorización de sesión, membresía activa y organización, 404 sin filtración entre tenants.
-- Panel de metadatos móvil: nombre, tipo, tamaño exacto y fecha; controles accesibles.
-- Pruebas PHP de IDOR/revocación y Chromium de detalle en 360 px. Sin migraciones ni cambios productivos.
+- El listado privado incluye cuota acumulada y límites por organización sin sumar archivos ajenos; el panel móvil presenta bytes y cantidad.
+- El guardado serializa subidas del mismo tenant con lock SQL y revalida permiso dentro de la transacción; 409 explícito cuando se llega a cualquier límite.
+- Archivos rechazados se retiran del almacenamiento privado; el selector múltiple conserva éxitos anteriores y muestra errores por archivo.
+- PHPUnit verifica ambos límites y el blob limpio; Chromium verifica cuota y cargas parcialmente exitosas. Sin migraciones ni cambios productivos.
 
 ## Archivos modificados en este deploy
 - `README.md`
@@ -73,7 +74,7 @@ flowchart LR
 - `symfony/tests/php/VaultTest.php`
 
 ## Validación
-- CI Symfony PHP/MariaDB/Chromium y Sonar/CodeRabbit deben verificarse sobre el head final; exact-main y Hostinger son independientes.
+- CI Symfony PHP/MariaDB/Chromium, Sonar/CodeRabbit, exact-main y Hostinger se comprueban por separado.
 - No se acredita despliegue Symfony ni migración productiva.
 
 ## Qué sigue
@@ -81,8 +82,8 @@ flowchart LR
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar detalle privado Vault S2 v0.1.40 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Cuotas y gestión segura de archivos | 🚧 Después de validar detalle |
+| **NOW** | 🚧 Validar cuotas Vault S2 v0.1.41 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Eliminación segura con autorización y restauración | 🚧 Después de validar cuotas |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -90,7 +91,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar detalle privado Vault S2 v0.1.40 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Cuotas de almacenamiento y errores parciales | 🚧 Después de validar detalle |
+| **NOW** | 🚧 Validar cuotas Vault S2 v0.1.41 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Eliminación segura y deduplicación | 🚧 Después de validar cuotas |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
