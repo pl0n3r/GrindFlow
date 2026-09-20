@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { VaultPanel } from './VaultPanel';
 
 type Context = {
   user: { display_name: string };
   organization_name_csrf: string | null;
   profile_name_csrf: string | null;
+  vault_upload_csrf: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -156,7 +158,7 @@ export function AdminApp() {
         <a className="admin-brand" href="/" aria-label="GrindFlow, inicio">GRIND<span>FLOW</span></a>
         <nav aria-label="Navegación administrativa">
           <a className="active" href="/admin" aria-current="page"><span>01</span>Resumen</a>
-          <span aria-disabled="true"><span>02</span>Biblioteca <small>S2</small></span>
+          <a href="#biblioteca"><span>02</span>Biblioteca <small>S2</small></a>
           <span aria-disabled="true"><span>03</span>Programación <small>S3</small></span>
         </nav>
         <div className="admin-tenant">
@@ -230,9 +232,10 @@ export function AdminApp() {
             </form>
             {profileFeedback && <p role="status">{profileFeedback}</p>}
           </section>
+          <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf} />
           <section className="admin-notice" role="status">
-            <strong>Alcance S1</strong>
-            <p>Biblioteca, programación y conexiones externas todavía no están habilitadas en Symfony. No se muestran datos simulados como si fueran reales.</p>
+            <strong>Alcance S2 inicial</strong>
+            <p>La biblioteca privada admite imágenes; los videos, la programación y las conexiones externas todavía no están habilitados en Symfony.</p>
           </section>
         </main>
       </section>
