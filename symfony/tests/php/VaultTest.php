@@ -177,6 +177,32 @@ final class VaultTest extends WebTestCase
             self::assertNotContains($foreignAsset, array_merge(
                 array_column($first['assets'], 'id'), array_column($second['assets'], 'id'),
             ));
+            // Filename search is tenant-scoped, shares count/page filters and never changes physical quota.
+            $client->request('GET', '/api/admin/vault?q=imagen-prueba&page=1');
+            self::assertResponseIsSuccessful();
+            $found = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(1, $found['total']);
+            self::assertSame(1, $found['pages']);
+            self::assertSame($mineAsset, $found['assets'][0]['id']);
+            self::assertSame(31, $found['quota']['used_assets']);
+            self::assertSame(strlen($bytes) + 30 * 69, $found['quota']['used_bytes']);
+            $client->request('GET', '/api/admin/vault?q=pagina-');
+            self::assertResponseIsSuccessful();
+            self::assertSame(30, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            $client->request('GET', '/api/admin/vault?view=trash&q=pagina-');
+            self::assertSame(0, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            foreach (['%', '_', '!', 'ajena', 'no-existe'] as $literal) {
+                $client->request('GET', '/api/admin/vault?q='.rawurlencode($literal));
+                self::assertResponseIsSuccessful();
+                self::assertSame(0, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            }
+            $client->request('GET', '/api/admin/vault?q[]=archivo');
+            self::assertResponseStatusCodeSame(422);
+            $client->request('GET', '/api/admin/vault?q='.str_repeat('x', 81));
+            self::assertResponseStatusCodeSame(422);
+            $client->request('GET', '/api/admin/vault?q='.rawurlencode("a\u{200B}b"));
+            self::assertResponseStatusCodeSame(422);
+
             $client->request('GET', '/api/admin/vault?page=3');
             self::assertResponseIsSuccessful();
             self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);

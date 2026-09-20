@@ -18,6 +18,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [page, setPage] = useState(1);
   const [view, setView] = useState<'active' | 'trash'>('active');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [search, setSearch] = useState('');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
@@ -40,7 +42,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/admin/vault?page=' + page + '&view=' + view, {
+    fetch('/api/admin/vault?page=' + page + '&view=' + view +
+      (search ? '&q=' + encodeURIComponent(search) : ''), {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
@@ -68,7 +71,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [page, refresh, view]);
+  }, [page, refresh, view, search]);
 
   async function inspect(id: string) {
     if (detail?.id === id) {
@@ -89,6 +92,25 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar la imagen.');
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  function searchAssets(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = searchDraft.trim();
+    if (query === search && page === 1) return;
+    setLoading(true);
+    setPage(1);
+    setSearch(query);
+  }
+
+  function clearSearch() {
+    if (!search && !searchDraft) return;
+    setSearchDraft('');
+    if (search || page !== 1) {
+      setLoading(true);
+      setPage(1);
+      setSearch('');
     }
   }
 
@@ -227,6 +249,16 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         onClick={() => switchView('trash')}>Papelera</button>
     </nav>
     {view === 'trash' && <p>Las imágenes en papelera no se pueden descargar y conservan su original privado. No se borran definitivamente en esta versión.</p>}
+    <form className="vault-search" role="search" onSubmit={searchAssets}>
+      <label htmlFor="vault-search-name">Buscar imágenes por nombre</label>
+      <input id="vault-search-name" type="search" value={searchDraft} maxLength={80}
+        onChange={(event) => setSearchDraft(event.currentTarget.value)}
+        placeholder="Nombre de imagen" />
+      <button type="submit" disabled={loading}>Buscar</button>
+      {(search || searchDraft) && <button type="button" disabled={loading}
+        onClick={clearSearch}>Limpiar búsqueda</button>}
+    </form>
+    {search && <p className="vault-search-status" role="status">Resultados para «{search}» en {view === 'trash' ? 'papelera' : 'biblioteca'}.</p>}
     {quota && <div className="vault-quota" aria-label="Cuota de almacenamiento">
       <strong>Espacio utilizado: {(quota.used_bytes / (1024 * 1024)).toFixed(2)} de {(quota.max_bytes / (1024 * 1024)).toFixed(0)} MiB</strong>
       <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
@@ -254,7 +286,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     {loading && <p role="status">Cargando biblioteca…</p>}
     {error && <p role="alert">{error}</p>}
     {!loading && !error && assets.length === 0 &&
-      <p role="status">{view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
+      <p role="status">{search ? 'No hay imágenes que coincidan con tu búsqueda.' :
+        view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
       <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
       <ul className="vault-list">

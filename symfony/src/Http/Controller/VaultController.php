@@ -45,6 +45,17 @@ final class VaultController extends AbstractController
         if (!is_string($view) || !in_array($view, ['active', 'trash'], true)) {
             return $this->error(422, 'invalid_view', 'Selecciona biblioteca o papelera.');
         }
+        // Search remains scoped to the selected tenant and is not allowed to alter quota.
+        $rawSearch = $request->query->all()['q'] ?? '';
+        if (!is_string($rawSearch)) {
+            return $this->error(422, 'invalid_search', 'Indica una búsqueda de hasta 80 caracteres.');
+        }
+        $search = trim($rawSearch);
+        if ($search !== '' && (preg_match('/\\A.{1,80}\\z/usD', $search) !== 1
+            || preg_match('/[\\p{C}\\p{Zl}\\p{Zp}]/u', $search) === 1
+            || preg_match('/[^\\p{Z}\\p{C}]/u', $search) !== 1)) {
+            return $this->error(422, 'invalid_search', 'Indica una búsqueda de hasta 80 caracteres visibles.');
+        }
         $params = ['organization' => $context['organization']['id'], 'user' => $context['user']->id()];
         $scope = <<<'SQL'
             FROM gf_vault_assets asset
@@ -59,12 +70,19 @@ final class VaultController extends AbstractController
             .$scope, $params,
         );
         $filter = $view === 'trash' ? ' AND asset.deleted_at IS NOT NULL' : ' AND asset.deleted_at IS NULL';
-        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter, $params);
+        $searchParams = $params;
+        $searchFilter = '';
+        if ($search !== '') {
+            // Escape LIKE wildcards, including the escape character itself.
+            $searchFilter = " AND asset.original_name LIKE :name_search ESCAPE '!'";
+            $searchParams['name_search'] = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+        }
+        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$searchFilter, $searchParams);
         $order = $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC';
         $assets = $db->fetchAllAssociative(
             'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at '
-            .$scope.$filter.' ORDER BY '.$order.', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
-            $params,
+            .$scope.$filter.$searchFilter.' ORDER BY '.$order.', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
+            $searchParams,
         );
 
         return $this->privateJson(['data' => [
