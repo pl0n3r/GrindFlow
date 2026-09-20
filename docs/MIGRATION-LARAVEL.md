@@ -1,5 +1,7 @@
 # GrindFlow Laravel Migration Plan
 
+> **DOCUMENTO HISTÓRICO:** esta fue la transición aprobada el 17/09/2026 de Next.js/Supabase hacia Laravel/MariaDB, cuya aplicación sigue operativa en el repositorio. **El destino arquitectónico fue sustituido el 20/09/2026** por Symfony/Doctrine + React/Vite + Twig/SSR, según [STACK-TRANSITION-SYMFONY.md](STACK-TRANSITION-SYMFONY.md). No ejecutar nuevas fases Laravel como si todavía fueran el objetivo final; conservar este documento y sus criterios de paridad para evitar pérdida de requisitos.
+
 ## Goal
 
 Move GrindFlow from Next.js/TypeScript/Supabase-oriented application code to a
