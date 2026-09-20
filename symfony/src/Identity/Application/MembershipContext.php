@@ -23,7 +23,10 @@ final readonly class MembershipContext
                 FROM gf_identity_memberships membership
                 INNER JOIN gf_identity_organizations organization
                     ON organization.id = membership.organization_id
+                INNER JOIN gf_identity_users actor
+                    ON actor.id = membership.user_id
                 WHERE membership.user_id = :user AND membership.organization_id = :organization
+                  AND actor.is_active = 1
                 SQL,
             ['user' => $userId, 'organization' => $organizationId],
         );

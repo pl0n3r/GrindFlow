@@ -95,3 +95,43 @@ test('admin context API is explicit JSON when no session exists', async ({ reque
   expect(payload.error.code).toBe('authentication_required');
   expect(JSON.stringify(payload)).not.toContain('organization_id');
 });
+
+
+test('organization manager can rename selected tenant in mobile React without an ID from the browser', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        user: { display_name: 'Persona sintética' },
+        organization: { id: '00000000-0000-7000-8000-000000000010', name: 'Organización inicial', role: 'studio' },
+        permissions: { workspace_view: true, organization_manage: true, content_prepare: true, content_review: true },
+        organization_name_csrf: 'synthetic-csrf-token',
+      },
+      meta: { version: '0.1.35' },
+    }),
+  }));
+
+  await page.route('**/api/admin/organization/name', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('synthetic-csrf-token');
+    expect(route.request().postDataJSON()).toEqual({ name: 'Nuevo nombre' });
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        data: { organization: { id: '00000000-0000-7000-8000-000000000010', name: 'Nuevo nombre', role: 'studio' } }
+      }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?settings-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Nombre de la organización' })).toBeVisible();
+  await page.getByLabel('Nombre visible').fill('Nuevo nombre');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByText('Nombre de la organización actualizado.')).toBeVisible();
+  await expect(page.getByText('Nuevo nombre').first()).toBeVisible();
+});

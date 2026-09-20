@@ -40,3 +40,7 @@ El entorno Symfony aislado incorpora login/logout mediante Symfony Security, pro
 ## S1 panel React protegido, v0.1.34
 
 El admin privado monta React desde el manifiesto Vite existente y obtiene su contexto de `GET /api/admin/context`. La API responde JSON explícito para sesión ausente, organización no seleccionada o membresía revocada; vuelve a consultar MariaDB por usuario y organización en cada petición y calcula permisos conservadores por rol. La interfaz muestra la organización y las capacidades reales de la membresía, mantiene S2+ deshabilitado y no inventa datos operativos. PHPUnit cubre aislamiento, revocación y permisos; Playwright cubre el bundle responsive y el contrato de error sin sesión. No agrega migraciones ni cambia producción.
+
+## S1 · Ajustes de organización (v0.1.35)
+
+La administración React incorpora un formulario real para renombrar la organización activa. El permiso `organization_manage` emitido por el servidor autoriza solo las membresías `admin` y `studio`. La API `POST /api/admin/organization/name` exige sesión, selección de tenant, CSRF, nombre Unicode visible de 2 a 120 caracteres y revalida usuario activo, membresía y rol en la sentencia SQL. Se rechaza todo identificador de organización suministrado por el cliente. La API de contexto entrega el token únicamente a gestores. Pruebas PHP sobre MariaDB descartable y Playwright verifican permisos, IDOR, revocación, respuesta móvil y caché privada. Sin cambio de tablas ni datos de Laravel; Symfony no está desplegado en Hostinger.

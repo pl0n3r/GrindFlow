@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.34: solo el deploy actual.** Base `main` v0.1.33 `1a923542151da0897d0b883815c5cf4145663a34`. S1 aislado: admin React protegido, API JSON tenant-safe y permisos derivados de membresía revalidada. Laravel sigue siendo runtime de Hostinger. **Symfony no se ha desplegado ni se han importado cuentas.**
+> **Snapshot v0.1.35: solo el deploy actual, pendiente de validación.** Base `main` v0.1.34 `3597ab5735e2f84713b69b0f4b6aec54782d952d`. S1 suma ajustes reales por rol con CSRF y revalidación de organización en SQL. Laravel sigue como runtime productivo; **Symfony no se ha desplegado ni se han migrado cuentas**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.34** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.33~~ | `1a923542151da0897d0b883815c5cf4145663a34` |
+| Version objetivo | 🚧 **v0.1.35** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.34~~ | `3597ab5735e2f84713b69b0f4b6aec54782d952d` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+368** | **−63** | **+305** |
+| **11** | **+372** | **−25** | **+347** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Admin React protegido, contexto API tenant-safe, permisos por rol y pruebas negativas |
+| Alcance | Ajustes reales de organización, CSRF, rol en SQL, usuario activo y UI móvil |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,35 +58,32 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Admin React privado y responsive, montado desde el manifiesto Vite existente, con estados claros de carga/error y navegación S2+ rotulada como pendiente.
-- `GET /api/admin/context` revalida sesión, usuario, organización y membresía en cada petición; entrega solo nombre visible, organización, rol y permisos conservadores.
-- Permisos por acción para `admin`, `studio`, `editor` y `model`; roles desconocidos y membresías revocadas fallan cerrados sin exponer otro tenant.
-- Versión humana consecutiva **0.1.33 → 0.1.34**. Sin migraciones, datos productivos, credenciales externas ni despliegue Symfony.
+- Formulario React para que solo `admin` y `studio` renombren su organización activa, con confirmación y errores visibles en móvil.
+- `POST /api/admin/organization/name` no acepta IDs de tenant del cliente: CSRF, membresía y rol se verifican en HTTP y durante el UPDATE SQL.
+- La consulta de membresía comprueba también `is_active` en DB, sin confiar únicamente en el usuario serializado en sesión.
+- Documentado el camino de entrega vía GitHub + Actions cuando Codex Tasks no tiene entorno. CSS común versionado con el release.
 
 ## Archivos modificados en este deploy
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `symfony/README.md`
-- `symfony/config/packages/security.yaml`
 - `symfony/frontend/admin/AdminApp.tsx`
 - `symfony/frontend/admin/admin.css`
-- `symfony/frontend/admin/main.tsx`
 - `symfony/src/Http/Controller/AdminContextController.php`
-- `symfony/src/Http/Controller/AdminController.php`
 - `symfony/src/Identity/Application/MembershipContext.php`
-- `symfony/templates/identity/admin.html.twig`
+- `symfony/templates/base.html.twig`
 - `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/IdentityLoginTest.php`
-- `symfony/tests/php/PreviewTest.php`
+- `symfony/tests/php/OrganizationSettingsTest.php`
 
 ## Validación
-- Gates seleccionados: contratos de gobernanza y corte Symfony completo con PHP 8.5, MariaDB descartable, TypeScript/Vite, PHPUnit, smoke HTTP y Chromium.
-- CI/Sonar/CodeRabbit del PR, CI exact-main y estado productivo se verifican por separado. Este cambio no autoriza cutover ni migraciones productivas.
+- PHPUnit aislado prueba roles `editor`/`studio`, CSRF, IDOR, revocación de rol, cuenta inactiva y ausencia de selección.
+- Playwright simula flujo móvil de formulario y verifica que no envía un ID de tenant. CI/Sonar/CodeRabbit y exact-main pendientes de comprobar.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar admin React S1 v0.1.34, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NOW** | 🚧 Validar ajustes de organización S1 v0.1.35, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
 | **NEXT** | 🚧 Vault móvil real sobre el contexto tenant-safe |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial |
@@ -95,7 +92,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Admin React S1 v0.1.34 | 🚧 Validación y revisión |
+| **NOW** | 🚧 Ajustes S1 v0.1.35 | 🚧 Validación y revisión |
 | **NEXT** | 🚧 Vault móvil | 🚧 S2 |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
