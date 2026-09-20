@@ -18,16 +18,14 @@
                 <span class="gf-sidebar__label">Workspace</span>
 
                 <a class="gf-navitem" href="{{ route('dashboard') }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">◫</span>
-                    <span class="gf-navitem__text">Overview</span>
+                    <span class="gf-navitem__text">Resumen</span>
                 </a>
 
                 <a
                     class="gf-navitem"
                     href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
                 >
-                    <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                    <span class="gf-navitem__text">Vault</span>
+                    <span class="gf-navitem__text">Biblioteca</span>
                 </a>
 
                 <a
@@ -35,13 +33,11 @@
                     href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
                     aria-current="page"
                 >
-                    <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                    <span class="gf-navitem__text">Scheduler</span>
+                    <span class="gf-navitem__text">Programación</span>
                 </a>
 
                 <a class="gf-navitem" href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
-                    <span class="gf-navitem__text">Distribution</span>
+                    <span class="gf-navitem__text">Distribución</span>
                 </a>
 
             </nav>

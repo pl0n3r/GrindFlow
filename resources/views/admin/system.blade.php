@@ -18,8 +18,7 @@
                 <span class="gf-sidebar__label">Workspace</span>
 
                 <a class="gf-navitem" href="{{ route('dashboard') }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">◫</span>
-                    <span class="gf-navitem__text">Overview</span>
+                    <span class="gf-navitem__text">Resumen</span>
                 </a>
 
                 @if ($workspaceOrganization)
@@ -27,13 +26,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.vault.index', ['organizationId' => $workspaceOrganization->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                        <span class="gf-navitem__text">Vault</span>
+                        <span class="gf-navitem__text">Biblioteca</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                        <span class="gf-navitem__text">Vault</span>
+                        <span class="gf-navitem__text">Biblioteca</span>
                     </span>
                 @endif
 
@@ -42,13 +39,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.scheduler.index', ['organizationId' => $workspaceOrganization->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                        <span class="gf-navitem__text">Scheduler</span>
+                        <span class="gf-navitem__text">Programación</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                        <span class="gf-navitem__text">Scheduler</span>
+                        <span class="gf-navitem__text">Programación</span>
                     </span>
                 @endif
 
@@ -57,13 +52,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.distribution.index', ['organizationId' => $workspaceOrganization->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
-                        <span class="gf-navitem__text">Distribution</span>
+                        <span class="gf-navitem__text">Distribución</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
-                        <span class="gf-navitem__text">Distribution</span>
+                        <span class="gf-navitem__text">Distribución</span>
                     </span>
                 @endif
 
@@ -72,26 +65,22 @@
                         class="gf-navitem"
                         href="{{ route('organizations.traffic.index', ['organizationId' => $workspaceOrganization->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                        <span class="gf-navitem__text">Traffic</span>
+                        <span class="gf-navitem__text">Tráfico</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                        <span class="gf-navitem__text">Traffic</span>
+                        <span class="gf-navitem__text">Tráfico</span>
                     </span>
                 @endif
 
                 <span class="gf-sidebar__label">Admin</span>
 
                 <a class="gf-navitem gf-navitem--active" href="{{ route('admin.system') }}" aria-current="page">
-                    <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
-                    <span class="gf-navitem__text">System</span>
+                    <span class="gf-navitem__text">Sistema</span>
                 </a>
 
                 <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">!</span>
-                    <span class="gf-navitem__text">Diagnostics</span>
+                    <span class="gf-navitem__text">Diagnósticos</span>
                 </a>
             </nav>
 

@@ -623,14 +623,13 @@ a {
 .gf-navitem {
   display: flex;
   align-items: center;
-  gap: 11px;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid transparent;
   border-radius: 12px;
-  padding: 0 11px;
+  padding: 0 14px;
   color: var(--gf-muted);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -650,15 +649,6 @@ a {
   cursor: default;
 }
 
-.gf-navitem__icon {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.04);
-  font-size: 11px;
-}
 
 .gf-sidebar__bottom {
   margin-top: auto;

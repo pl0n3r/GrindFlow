@@ -18,20 +18,17 @@
                 <span class="gf-sidebar__label">Workspace</span>
 
                 <a class="gf-navitem" href="{{ route('dashboard') }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">◫</span>
-                    <span class="gf-navitem__text">Overview</span>
+                    <span class="gf-navitem__text">Resumen</span>
                 </a>
 
                 <span class="gf-sidebar__label">Admin</span>
 
                 <a class="gf-navitem" href="{{ route('admin.system') }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
-                    <span class="gf-navitem__text">System</span>
+                    <span class="gf-navitem__text">Sistema</span>
                 </a>
 
                 <a class="gf-navitem gf-navitem--active" href="{{ route('admin.diagnostics') }}" aria-current="page">
-                    <span class="gf-navitem__icon" aria-hidden="true">!</span>
-                    <span class="gf-navitem__text">Diagnostics</span>
+                    <span class="gf-navitem__text">Diagnósticos</span>
                 </a>
             </nav>
 

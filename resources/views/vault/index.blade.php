@@ -19,8 +19,7 @@
                 <span class="gf-sidebar__label">Workspace</span>
 
                 <a class="gf-navitem" href="{{ route('dashboard') }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">◫</span>
-                    <span class="gf-navitem__text">Overview</span>
+                    <span class="gf-navitem__text">Resumen</span>
                 </a>
 
                 <a
@@ -28,36 +27,31 @@
                     href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
                     aria-current="page"
                 >
-                    <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                    <span class="gf-navitem__text">Vault</span>
+                    <span class="gf-navitem__text">Biblioteca</span>
                 </a>
 
                 <a
                     class="gf-navitem"
                     href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
                 >
-                    <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                    <span class="gf-navitem__text">Scheduler</span>
+                    <span class="gf-navitem__text">Programación</span>
                 </a>
 
                 <a class="gf-navitem" href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}">
-                    <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
-                    <span class="gf-navitem__text">Distribution</span>
+                    <span class="gf-navitem__text">Distribución</span>
                 </a>
 
                 <span class="gf-sidebar__label">Insights</span>
 
                 @if (auth()->user()?->canManageTrafficOrganization($organization))
                     <a class="gf-navitem" href="{{ route('organizations.traffic.index', ['organizationId' => $organization->id]) }}">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                        <span class="gf-navitem__text">Traffic</span>
+                        <span class="gf-navitem__text">Tráfico</span>
                     </a>
                 @endif
 
                 @if (auth()->user()?->canManageFinanceOrganization($organization))
                     <a class="gf-navitem" href="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}">
-                        <span class="gf-navitem__icon" aria-hidden="true">$</span>
-                        <span class="gf-navitem__text">Finance</span>
+                        <span class="gf-navitem__text">Finanzas</span>
                     </a>
                 @endif
 
@@ -65,13 +59,11 @@
                     <span class="gf-sidebar__label">Admin</span>
 
                     <a class="gf-navitem" href="{{ route('admin.system') }}">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
-                        <span class="gf-navitem__text">System</span>
+                        <span class="gf-navitem__text">Sistema</span>
                     </a>
 
                     <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
-                        <span class="gf-navitem__icon" aria-hidden="true">!</span>
-                        <span class="gf-navitem__text">Diagnostics</span>
+                        <span class="gf-navitem__text">Diagnósticos</span>
                     </a>
                 @endif
             </nav>
