@@ -173,7 +173,16 @@ test('editor can update only their own profile name from a 360px React panel', a
   await expect(page.getByText('Nombre de tu perfil actualizado.')).toBeVisible();
   await expect(page.locator('.admin-profile-current')).toContainText('Nombre actual: Persona actualizada');
   await expect(page.getByText('Organización sin cambios').first()).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  const overflow = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth,
+    offenders: Array.from(document.querySelectorAll('body *'))
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 8).map((element) => ({
+        element: element.tagName + '.' + element.className,
+        right: Math.round(element.getBoundingClientRect().right),
+      })),
+  }));
+  expect(overflow.page, JSON.stringify(overflow)).toBeLessThanOrEqual(360);
 });
 
 test('profile API never redirects anonymous writes to a private HTML page', async ({ request }) => {
