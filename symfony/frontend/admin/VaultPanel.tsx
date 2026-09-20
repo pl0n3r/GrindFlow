@@ -13,6 +13,10 @@ type Props = { canUpload: boolean; csrf: string | null };
 
 export function VaultPanel({ canUpload, csrf }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<File[]>([]);
@@ -21,15 +25,21 @@ export function VaultPanel({ canUpload, csrf }: Props) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/admin/vault', {
+    fetch('/api/admin/vault?page=' + page, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     }).then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo abrir la biblioteca.');
-      return body.data.assets as Asset[];
-    }).then(setAssets).catch((cause: unknown) => {
+      return body.data as { assets: Asset[]; total: number; pages: number };
+    }).then((data) => {
+      if (controller.signal.aborted) return;
+      setAssets(data.assets);
+      setTotal(data.total);
+      setPages(data.pages);
+      setError('');
+    }).catch((cause: unknown) => {
       if (!controller.signal.aborted) {
         setError(cause instanceof Error ? cause.message : 'No se pudo cargar la biblioteca.');
       }
@@ -37,7 +47,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, []);
+  }, [page, refresh]);
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,8 +77,8 @@ export function VaultPanel({ canUpload, csrf }: Props) {
         if (!response.ok) {
           throw new Error(body?.error?.message ?? 'No se pudo guardar esta imagen.');
         }
-        const asset = body.data.asset as Asset;
-        setAssets((previous) => [asset, ...previous].slice(0, 30));
+        // Server is the source of truth for ordering and total after this batch.
+        if (!body.data.asset) throw new Error('Respuesta incompleta del servidor.');
         completed += 1;
       } catch (cause) {
         failures.push(file.name + ': ' +
@@ -76,6 +86,10 @@ export function VaultPanel({ canUpload, csrf }: Props) {
       }
     }
 
+    if (completed > 0) {
+      setPage(1);
+      setRefresh((previous) => previous + 1);
+    }
     setSelected([]);
     form.reset();
     setFeedback(completed + ' de ' + selected.length + ' imágenes guardadas.' +
@@ -104,7 +118,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     {!loading && !error && assets.length === 0 &&
       <p role="status">Todavía no hay imágenes en esta organización.</p>}
     {!loading && !error && assets.length > 0 && <>
-      <p className="vault-count" role="status">Mostrando {assets.length} imágenes recientes.</p>
+      <p className="vault-count" role="status">{total} imágenes en esta organización · página {page} de {pages}.</p>
       <ul className="vault-list">
         {assets.map((asset) => <li key={asset.id}>
           <span className="vault-image-mark" aria-hidden="true">▧</span>
@@ -115,6 +129,13 @@ export function VaultPanel({ canUpload, csrf }: Props) {
           <a href={asset.download_url} download>Descargar</a>
         </li>)}
       </ul>
+      {pages > 1 && <nav className="vault-pages" aria-label="Páginas de la biblioteca">
+        <button type="button" disabled={loading || page === 1}
+          onClick={() => { setLoading(true); setPage((current) => current - 1); }}>Anterior</button>
+        <span>Página {page} de {pages}</span>
+        <button type="button" disabled={loading || page >= pages}
+          onClick={() => { setLoading(true); setPage((current) => current + 1); }}>Siguiente</button>
+      </nav>}
     </>}
   </section>;
 }
