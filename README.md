@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+481** | **−44** | **+437** |
+| **15** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -63,6 +63,7 @@ flowchart LR
 - API anónima 401; sin selección 409; sin permiso 403; entrada inválida 422. Laravel sigue siendo el runtime productivo.
 
 ## Archivos modificados en este deploy
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `symfony/frontend/admin/admin.tsx`
