@@ -105,3 +105,8 @@
 .vault-preview img{display:block;max-width:100%;width:auto;height:auto;max-height:440px;object-fit:contain;border-radius:7px;justify-self:center}
 .vault-preview figcaption{color:#bfb8cd;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .vault-preview p{margin:0}
+
+/* S2: an on-demand integrity result belongs to one asset, never a shared tenant banner. */
+.vault-integrity-ok,.vault-integrity-warning{flex:1 0 100%;min-width:0;padding:10px 12px;border-radius:10px;margin:8px 0;overflow-wrap:anywhere}
+.vault-integrity-ok{border:1px solid #5cb8a0;background:#14362f;color:#d6fff1}
+.vault-integrity-warning{border:1px solid #d6a765;background:#422d19;color:#fff0d7}

@@ -396,6 +396,68 @@ final class VaultController extends AbstractController
     }
 
     /**
+     * On-demand, read-only integrity check for retained originals in either
+     * view. Never disclose storage keys, paths or the raw stored fingerprint.
+     */
+    #[Route('/api/admin/vault/{id}/integrity', name: 'grindflow_vault_integrity', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function integrity(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        $asset = $db->fetchAssociative(
+            <<<'SQL'
+                SELECT asset.storage_key, asset.size_bytes, asset.sha256
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.id = :id AND asset.organization_id = :organization
+                  AND membership.user_id = :user AND actor.is_active = 1
+                SQL,
+            ['id' => $id, 'organization' => $context['organization']['id'], 'user' => $context['user']->id()],
+        );
+        if ($asset === false) {
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
+        }
+        $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
+        $key = (string) $asset['storage_key'];
+        $expectedSize = (int) $asset['size_bytes'];
+        $expectedHash = (string) $asset['sha256'];
+        $status = 'unavailable';
+        // Corrupted keys and unsafe storage structures must never be traversed.
+        if (preg_match('/\\A[0-9a-fA-F-]{36}\\z/D', $key) === 1 && !is_link($root) && is_dir($root)) {
+            $path = $root.'/'.$key.'.blob';
+            clearstatcache(true, $path);
+            if (is_link($path)) {
+                $status = 'unavailable';
+            } elseif (!is_file($path)) {
+                $status = 'missing';
+            } elseif (!is_readable($path)) {
+                $status = 'unavailable';
+            } elseif ($expectedSize < 1 || $expectedSize > self::MAX_BYTES
+                || preg_match('/\\A[a-fA-F0-9]{64}\\z/D', $expectedHash) !== 1) {
+                $status = 'mismatch';
+            } else {
+                $actualSize = @filesize($path);
+                if ($actualSize === false) {
+                    $status = 'unavailable';
+                } elseif ($actualSize !== $expectedSize) {
+                    $status = 'mismatch';
+                } else {
+                    $actualHash = @hash_file('sha256', $path);
+                    // An unreadable file does not become a false mismatch.
+                    $status = $actualHash === false ? 'unavailable'
+                        : (hash_equals(strtolower($expectedHash), $actualHash) ? 'verified' : 'mismatch');
+                }
+            }
+        }
+
+        return $this->privateJson(['data' => ['id' => $id, 'status' => $status]]);
+    }
+
+    /**
      * Update only the private display/attachment name, never the opaque storage key.
      * Reauthorize the acting membership in the SQL write under the tenant lock.
      */

@@ -1,12 +1,12 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice v0.1.50, rama del próximo PR (sin merge):** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice objetivo v0.1.51, PR pendiente de integración:** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.50 preparada en rama sobre main v0.1.49: vista previa privada en el detalle de imagen activa. |
-| VALIDADO EN CÓDIGO | CI del nuevo PR y Sonar deben pasar en el head final; CI exact-main de v0.1.49 success. |
-| DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel v0.1.48 no certifica Symfony ni SHA remoto. |
+| IMPLEMENTADO | v0.1.51 preparada sobre main v0.1.50: verificación privada de tamaño y SHA-256 de originales en biblioteca y papelera. |
+| VALIDADO EN CÓDIGO | CI del head final y Sonar pendientes de reconfirmar tras correcciones; CI exact-main de v0.1.50 success. |
+| DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
 Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
@@ -113,3 +113,7 @@ La biblioteca incorpora en `GET /api/admin/vault` los parámetros opcionales `fo
 `GET /api/admin/vault/{id}/preview` devuelve los bytes inline únicamente al miembro activo de la organización elegida y solo mientras la imagen esté en biblioteca, no en papelera. Revalida acceso en cada petición; no utiliza rutas físicas ni nombres aportados por el cliente para emitir contenido. JPEG/PNG/WebP con `nosniff`, `no-store, private`, `Cross-Origin-Resource-Policy: same-origin` y `Referrer-Policy: no-referrer`. Si falta el original o su tamaño difiere de metadatos, responde 404. El detalle React renderiza la imagen desde la API privada con texto alternativo, estado de error y contención a 360 px. La descarga conserva `attachment`: no se generan enlaces externos, thumbnails persistentes ni tablas nuevas. PHPUnit y Chromium comprueban autorización, cabeceras, bytes reales y ocultación en papelera.
 
 El suscriptor global de cabeceras conserva cualquier `Referrer-Policy` más estricto fijado por un endpoint privado; la página pública continúa usando la política predeterminada. La prueba PHP verifica la cabecera efectiva después de pasar por el suscriptor.
+
+## S2 · Verificación privada de integridad (v0.1.51)
+
+La API `GET /api/admin/vault/{id}/integrity` verifica bajo sesión/organización/membresía vigente un original privado **a petición del usuario**. Puede revisar imágenes activas y en papelera, sin restaurar ni modificar nada. Compara tamaño físico y SHA-256 con los metadatos de MariaDB sobre archivos de máximo 8 MiB y clave de almacenamiento de formato acotado. Devuelve exclusivamente `id` y `status=verified|missing|mismatch|unavailable`, con `Cache-Control: no-store, private`; no devuelve la huella, ruta, contenido ni clave privada. Rechaza otras organizaciones y actores revocados sin revelar el estado de su almacenamiento; un enlace simbólico o un original ilegible produce `unavailable`. El panel móvil incluye botón «Verificar integridad» por fila en biblioteca y papelera, resultado/alerta específica y cuota independiente de la comprobación. PHPUnit/MariaDB y Chromium cubren bytes correctos, cambio de tamaño, alteración de bytes con tamaño igual, ausencia, papelera y aislamiento. No constituye backup, restauración automática, monitoreo continuo ni certificación del despliegue Hostinger.
