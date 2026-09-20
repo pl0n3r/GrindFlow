@@ -61,6 +61,8 @@ final class IdentityLoginTest extends WebTestCase
                 'updated_at' => $at,
             ]);
 
+            $login = $client->request('GET', '/login');
+            self::assertSelectorExists('form.identity-form');
             $client->request('GET', '/admin');
             self::assertResponseRedirects('/login');
 
