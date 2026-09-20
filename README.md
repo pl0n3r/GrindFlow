@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+498** | **−43** | **+455** |
+| **17** | **+529** | **−43** | **+486** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -78,6 +78,7 @@ flowchart LR
 - `symfony/tests/contract/smoke.sh`
 - `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/AdminContextTest.php`
+- `symfony/tests/php/PreviewTest.php`
 - `symfony/vite.config.ts`
 
 ## Validación
