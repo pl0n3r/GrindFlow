@@ -6,6 +6,7 @@ type Context = {
   organization_name_csrf: string | null;
   profile_name_csrf: string | null;
   vault_upload_csrf: string | null;
+  vault_manage_csrf: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -232,7 +233,8 @@ export function AdminApp() {
             </form>
             {profileFeedback && <p role="status">{profileFeedback}</p>}
           </section>
-          <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf} />
+          <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf}
+            manageCsrf={context.vault_manage_csrf} />
           <section className="admin-notice" role="status">
             <strong>Alcance S2 inicial</strong>
             <p>La biblioteca privada admite imágenes; los videos, la programación y las conexiones externas todavía no están habilitados en Symfony.</p>
