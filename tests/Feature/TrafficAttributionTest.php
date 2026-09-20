@@ -465,8 +465,10 @@ class TrafficAttributionTest extends TestCase
                 app(TrafficAttributionRecorder::class)->pruneExpired(),
             );
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
@@ -662,8 +664,10 @@ class TrafficAttributionTest extends TestCase
                 ]))
                 ->assertStatus(503);
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
@@ -899,8 +903,10 @@ class TrafficAttributionTest extends TestCase
                 ['status' => TrackedLink::STATUS_DISABLED],
             )->assertStatus(503);
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
@@ -1204,10 +1210,12 @@ class TrafficAttributionTest extends TestCase
                 'destination_url' => 'https://example.com/',
             ])->assertStatus(503);
         } finally {
-            $migration = require database_path(
-                'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
-            );
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function (): void {
+                $migration = require database_path(
+                    'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
+                );
+                $migration->up();
+            });
         }
     }
 
