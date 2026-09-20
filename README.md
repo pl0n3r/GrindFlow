@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.36: solo el deploy actual; entrega de infraestructura CI, todavía no fusionada ni desplegada.** Base `main` v0.1.35 `f0340d26a3dc4e89ff01292383f434e64d2eac44`. El selector de pruebas se ajusta por rutas; Chromium reutiliza binarios según lockfile, las suites DB no repiten un fallo y el reporte diario muestra tiempo/fallos. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas**.
+> **Snapshot v0.1.37: protección de vistas privadas Symfony S1 en desarrollo, no desplegada.** Base `main` v0.1.36 `429532ca177998c26a2a7de49722ee4639140237`, CI exact-main verde. El selector y el admin Symfony no permiten caché del HTML privado, y React retira el panel si se revoca la sesión o membresía durante un guardado. Laravel continúa como runtime público; **Symfony no está desplegado ni se migraron cuentas**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.36** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.35~~ | `f0340d26a3dc4e89ff01292383f434e64d2eac44` |
+| Version objetivo | 🚧 **v0.1.37** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.36~~ | `429532ca177998c26a2a7de49722ee4639140237` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -58,36 +58,27 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Selector de gates preserva matriz completa al editar CI nuclear o pedir workflow manual, pero omite Symfony pesado para documentación Symfony aislada.
-- El test DB detecta el grupo `database` y evita repetir toda la suite tras un fallo real. Contrato automatizado verifica ambas rutas.
-- Chromium se cachea por sistema operativo y lockfile, con instalación segura en cache miss; sintaxis PHP Symfony usa 4 procesos.
-- Health diario de Actions calcula mediana/p90 y alertas de deterioro por evento, sin cambiar pruebas ni ramas por sí solo. Política durable en AGENTS y [guía](docs/CI-PERFORMANCE.md).
-- Los fixtures Laravel de schema ausente evitan DDL incompatible con FKs al borrar y reconstruir tablas en MariaDB descartable. No se cambió el runtime Laravel, datos productivos ni el cutover Symfony.
+- Selector y panel privados Symfony envían `Cache-Control: no-store, private` para impedir que el navegador reutilice HTML de otra sesión.
+- React retira el panel y los datos de organización cuando un guardado devuelve 401/403/409 por sesión o permisos cambiados.
+- Test de integración Symfony verifica cabeceras de selector, panel y contexto JSON; CI valida PHP, TypeScript y navegador.
+- No hay cutover ni escritura sobre bases de datos productivas.
 
 ## Archivos modificados en este deploy
-- `.github/workflows/ci-health.yml`
-- `.github/workflows/grindflow-ci.yml`
-- `AGENTS.md`
-- `README.md`
+- `symfony/src/Http/Controller/AdminController.php`
+- `symfony/src/Http/Controller/OrganizationController.php`
+- `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/tests/php/IdentityLoginTest.php`
 - `config/version.php`
-- `docs/CI-PERFORMANCE.md`
-- `scripts/ci-performance-report.py`
-- `scripts/ci-scope-contract.sh`
-- `scripts/ci-scope.sh`
-- `scripts/database-test-runner-contract.sh`
-- `scripts/database-test-runner.sh`
-- `tests/Feature/DistributionTest.php`
-- `tests/Feature/SchedulingTest.php`
-- `tests/Feature/TrafficAttributionTest.php`
+- `README.md`
 
 ## Validación
-- Scripts tienen self-test y contratos; CI completo de PR, Sonar/CodeRabbit y CI exact-main se verifican por separado.
-- Telemetría de Actions es read-only y no equivale a funcionamiento productivo de Hostinger.
+- CI del PR y Sonar pendientes en este snapshot; comprobar exact-main tras fusionar.
+- Symfony S1 sigue aislado de Hostinger y sin cuentas productivas.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Verificar CI adaptable v0.1.36, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NOW** | 🚧 Protección de sesión Symfony S1 v0.1.37, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
 | **NEXT** | 🚧 Vault móvil real con contexto tenant-safe |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial |
@@ -96,7 +87,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Infraestructura CI v0.1.36 | 🚧 CI completo y revisión |
+| **NOW** | 🚧 Protección de vistas privadas Symfony v0.1.37 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Vault móvil | 🚧 S2 |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
