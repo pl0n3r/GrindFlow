@@ -33,6 +33,7 @@ jobs:
       run_browser: ${{ steps.scope.outputs.run_browser }}
       run_realstack: ${{ steps.scope.outputs.run_realstack }}
       run_legacy: ${{ steps.scope.outputs.run_legacy }}
+      run_symfony: ${{ steps.scope.outputs.run_symfony }}
       full: ${{ steps.scope.outputs.full }}
       base_sha: ${{ steps.scope.outputs.base_sha }}
       head_sha: ${{ steps.scope.outputs.head_sha }}
@@ -93,7 +94,7 @@ jobs:
 
           while IFS='=' read -r key value; do
             case "$key" in
-              full|run_php_quality|run_tests|run_database|run_browser|run_realstack|run_legacy)
+              full|run_php_quality|run_tests|run_database|run_browser|run_realstack|run_legacy|run_symfony)
                 echo "$key=$value" >> "$GITHUB_OUTPUT"
                 ;;
             esac
@@ -561,6 +562,107 @@ jobs:
             kill "$(cat /tmp/grindflow-browser-server.pid)" 2>/dev/null || true
           fi
 
+  symfony-preview:
+    name: symfony-preview
+    needs: preflight
+    if: needs.preflight.outputs.run_symfony == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: grindflow_symfony_ci
+          MARIADB_USER: grindflow
+          MARIADB_PASSWORD: grindflow
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      APP_ENV: test
+      APP_DEBUG: '0'
+      APP_SECRET: s0-ci-disposable-not-for-production
+      DATABASE_URL: 'mysql://grindflow:grindflow@127.0.0.1:3306/grindflow_symfony_ci?serverVersion=mariadb-11.4.0&charset=utf8mb4'
+      S0_BASE_URL: 'http://127.0.0.1:8765'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: ctype, iconv, mbstring, pdo_mysql, dom
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: symfony/package-lock.json
+      - name: Install isolated Symfony dependencies
+        run: |
+          composer validate --working-dir=symfony --strict
+          composer install --working-dir=symfony --prefer-dist --no-progress --no-interaction
+      - name: PHP syntax and isolated MariaDB connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          find symfony/src symfony/config symfony/public symfony/tests/php symfony/bin -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+          cd symfony
+          php bin/console doctrine:query:sql 'SELECT 1'
+      - name: Build TypeScript and Vite preview
+        working-directory: symfony
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+          test -s public/build/.vite/manifest.json
+      - name: Symfony HTTP test suite
+        working-directory: symfony
+        run: php vendor/bin/simple-phpunit -c phpunit.xml.dist
+      - name: Start isolated Symfony server
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p symfony/var/log
+          cd symfony
+          php -S 127.0.0.1:8765 -t public public/router.php > var/log/s0-server.log 2>&1 &
+          echo $! > /tmp/grindflow-s0-server.pid
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8765/health >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == true ]]
+      - name: Real Symfony HTTP and static asset contracts
+        working-directory: symfony
+        run: bash tests/contract/smoke.sh
+      - name: Chromium mobile and desktop workflow
+        working-directory: symfony
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - name: Upload S0 diagnostics only on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: symfony-s0-diagnostics
+          path: |
+            symfony/tests/e2e/artifacts
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [[ -f /tmp/grindflow-s0-server.pid ]]; then
+            kill "$(cat /tmp/grindflow-s0-server.pid)" 2>/dev/null || true
+          fi
+
   legacy:
     name: legacy
     needs: preflight
@@ -584,7 +686,7 @@ jobs:
   validate:
     name: validate
     if: always()
-    needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy]
+    needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy, symfony-preview]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -599,12 +701,14 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser.result }}
           REALSTACK_RESULT: ${{ needs.realstack.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
+          SYMFONY_RESULT: ${{ needs.symfony-preview.result }}
           RUN_PHP_QUALITY: ${{ needs.preflight.outputs.run_php_quality }}
           RUN_TESTS: ${{ needs.preflight.outputs.run_tests }}
           RUN_DATABASE: ${{ needs.preflight.outputs.run_database }}
           RUN_BROWSER: ${{ needs.preflight.outputs.run_browser }}
           RUN_REALSTACK: ${{ needs.preflight.outputs.run_realstack }}
           RUN_LEGACY: ${{ needs.preflight.outputs.run_legacy }}
+          RUN_SYMFONY: ${{ needs.preflight.outputs.run_symfony }}
         run: |
           set -euo pipefail
           failures=0
@@ -648,6 +752,7 @@ jobs:
           require_optional browser "$RUN_BROWSER" "$BROWSER_RESULT"
           require_optional real-stack "$RUN_REALSTACK" "$REALSTACK_RESULT"
           require_optional legacy "$RUN_LEGACY" "$LEGACY_RESULT"
+          require_optional symfony-preview "$RUN_SYMFONY" "$SYMFONY_RESULT"
 
           if [[ "$failures" -ne 0 ]]; then
             exit 1
@@ -665,6 +770,7 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser.result }}
           REALSTACK_RESULT: ${{ needs.realstack.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
+          SYMFONY_RESULT: ${{ needs.symfony-preview.result }}
         run: |
           {
             echo "## GrindFlow CI / validate"
@@ -679,4 +785,5 @@ jobs:
             echo "| browser | **$BROWSER_RESULT** |"
             echo "| real-stack MariaDB | **$REALSTACK_RESULT** |"
             echo "| legacy | **$LEGACY_RESULT** |"
+            echo "| Symfony S0 preview | **$SYMFONY_RESULT** |"
           } >> "$GITHUB_STEP_SUMMARY"

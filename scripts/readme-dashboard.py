@@ -86,6 +86,7 @@ def gate_plan(scope: dict[str, str]) -> str:
             ("run_browser", "browser"),
             ("run_realstack", "real-stack"),
             ("run_legacy", "legacy"),
+            ("run_symfony", "symfony-preview"),
         )
         if scope.get(key) == "true"
     )
