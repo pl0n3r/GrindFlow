@@ -966,7 +966,7 @@ test('S2 mobile checks retained private original without leaking a fingerprint o
   const script = await page.locator('script[type="module"]').getAttribute('src');
   expect(script).toBeTruthy();
   const id = '00000000-0000-7000-8000-000000000051';
-  const results = ['verified', 'mismatch', 'missing'];
+  const results = ['verified', 'mismatch', 'missing', 'unavailable'];
   const requests = [];
   await page.route('**/api/admin/context', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
@@ -1009,8 +1009,10 @@ test('S2 mobile checks retained private original without leaking a fingerprint o
   await expect(page.getByText('Alerta: el tamaño o la huella SHA-256 no coinciden.')).toHaveCount(0);
   await button.click();
   await expect(page.getByRole('alert').getByText('El original privado no está disponible: archivo ausente.')).toBeVisible();
+  await button.click();
+  await expect(page.getByRole('alert').getByText('No se puede verificar el almacenamiento privado en este momento.')).toBeVisible();
   await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
-  expect(requests).toHaveLength(3);
+  expect(requests).toHaveLength(4);
   expect(requests.every((request) => request.method === 'GET' &&
     request.url.endsWith('/api/admin/vault/' + id + '/integrity'))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
