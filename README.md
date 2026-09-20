@@ -78,12 +78,12 @@ flowchart LR
 - No se acredita despliegue Symfony ni migración productiva.
 
 ## Qué sigue
-| Lane | Trabajo |
-| --- | --- |
+| Lane | Trabajo | Estado |
+| --- | --- | --- |
 | **NOW** | 🚧 Validar paginación Vault S2 v0.1.39 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Cuotas de almacenamiento y errores parciales | 🚧 Después de validar paginación |
-| **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
-| **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial |
+| **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
+| **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
