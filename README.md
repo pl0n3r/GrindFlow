@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **18** | **+194** | **−203** | **-9** |
+| **18** | **+204** | **−213** | **-9** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -60,7 +60,7 @@ flowchart LR
 ## Qué se hizo
 - Home sustituido: visión SaaS, carga → reglas → distribución → tráfico, dirigido a creadores y estudios; botones al login real.
 - Home, login y panel con footer de versión central desde `config/version.php`; no hardcoded.
-- Patch consecutivo **0.1.24 → 0.1.25**. Sin datos, migraciones, conectores ni Hostinger modificados.
+- Patch consecutivo **0.1.24 → 0.1.25**, CSS con cache-busting por versión. Sin datos, migraciones, conectores ni Hostinger modificados.
 
 ## Archivos modificados en este deploy
 - `AGENTS.md`
