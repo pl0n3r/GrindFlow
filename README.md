@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.44: solo el deploy actual, duplicados privados de imágenes en Vault S2.** Base `main` v0.1.43 `58088963e695d71608c2349db133d6a53a10365a`. Evita guardar el mismo SHA-256 dos veces dentro de una organización, distingue duplicado activo/en papelera, limpia el intento rechazado y ofrece restaurar sin duplicar almacenamiento. Symfony aún no desplegado en Hostinger.
+> **Snapshot v0.1.45: solo el deploy actual, protección de sesión y vistas privadas Symfony S1.** Base `main` v0.1.44 `788204a5fc18064acf0a259e55c53f90cb9d4bd8`. Selector y panel privados prohíben caché; al revocarse la sesión o membresía durante un guardado React oculta el workspace. CSRF inválido muestra error recuperable sin ocultarlo. Symfony aún no desplegado en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.44** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.43~~ | `58088963e695d71608c2349db133d6a53a10365a` |
+| Version objetivo | 🚧 **v0.1.45** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.44~~ | `788204a5fc18064acf0a259e55c53f90cb9d4bd8` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+305** | **−29** | **+276** |
+| **7** | **+84** | **−24** | **+60** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Vault S2: rechazar bytes duplicados con respuesta específica y acceso móvil a restaurar |
+| Alcance | Symfony S1: no-store/private y acceso revocado frente a CSRF recuperable |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,31 +58,31 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- La subida revalida permiso dentro de la transacción, toma el bloqueo por organización y comprueba SHA-256 entre imágenes activas y papelera solo de ese tenant.
-- Dos respuestas 409 distintas: duplicado ya activo o duplicado retenido en papelera; nunca copia blobs ni expone hashes/IDs de otros tenants.
-- Un intento duplicado descarta su blob privado temporal, conserva el original y mantiene la cuota física. Cuando procede, React ofrece «Ver papelera para restaurar».
-- Test PHP/MariaDB aislado cubre cambio de nombre con bytes idénticos, no contaminación entre organizaciones, rol revocado y limpieza; Chromium cubre el flujo móvil.
+- Selector y panel Symfony envían `Cache-Control: no-store, private`; la API de contexto conserva ambas directivas.
+- Ante 401/403/409 por pérdida de acceso al cambiar nombres de perfil u organización, React oculta el workspace y ofrece volver al selector.
+- Un `invalid_csrf` 403 conserva el panel y muestra el error recuperable sin confundirlo con revocación.
+- Pruebas PHP verifican las cabeceras y Chromium móvil recorre CSRF y revocación; no se cambian datos productivos.
 
 ## Archivos modificados en este deploy
 - `README.md`
 - `config/version.php`
-- `symfony/README.md`
-- `symfony/frontend/admin/VaultPanel.tsx`
-- `symfony/src/Http/Controller/VaultController.php`
+- `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/src/Http/Controller/AdminController.php`
+- `symfony/src/Http/Controller/OrganizationController.php`
 - `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/VaultDeduplicationTest.php`
+- `symfony/tests/php/IdentityLoginTest.php`
 
 ## Validación
-- El CI Symfony PHP/MariaDB y Chromium, Sonar del head, CI exact-main y Hostinger se comprueban como señales separadas.
-- No se añadió migración ni se modificaron el runtime Laravel o los datos productivos.
+- Los tests PHP/MariaDB y Chromium se comprueban en CI del PR; sin checkout local en esta sesión.
+- Sonar, CodeRabbit, CI exact-main y validación remota son señales independientes; no hay cutover ni migración productiva.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar deduplicación Vault S2 v0.1.44 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Almacenamiento durable, backup y purga con política explícita | 🚧 Después de validar deduplicación |
+| **NOW** | 🚧 Validar protección de sesión Symfony S1 v0.1.45 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -90,7 +90,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar deduplicación Vault S2 v0.1.44 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Gestión durable de storage, backup y retención | 🚧 Después de validar deduplicación |
+| **NOW** | 🚧 Validar protección de sesión Symfony S1 v0.1.45 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
