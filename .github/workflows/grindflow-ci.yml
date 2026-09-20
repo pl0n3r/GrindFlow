@@ -167,6 +167,8 @@ jobs:
           for script in \
             scripts/ci-scope.sh \
             scripts/ci-scope-contract.sh \
+            scripts/database-test-runner.sh \
+            scripts/database-test-runner-contract.sh \
             scripts/deploy-hostinger.sh \
             scripts/browser-smoke.sh \
             scripts/production-smoke.sh \
@@ -177,6 +179,9 @@ jobs:
             [[ -f "$script" ]] && bash -n "$script"
           done
 
+          bash scripts/database-test-runner-contract.sh
+          python3 -m py_compile scripts/ci-performance-report.py
+          python3 scripts/ci-performance-report.py --self-test
           python3 -m py_compile scripts/readme-dashboard.py
           python3 -m py_compile scripts/validate-governance.py
           python3 scripts/validate-governance.py --self-test
@@ -340,14 +345,9 @@ jobs:
           cp -n .env.example .env || true
           php artisan key:generate --force
           php artisan migrate:fresh --force
-      - name: Database-sensitive tests
+      - name: Database-sensitive tests without blind retry
         shell: bash
-        run: |
-          if [[ -x vendor/bin/pest ]]; then
-            vendor/bin/pest --group=database || vendor/bin/pest
-          else
-            vendor/bin/phpunit --group=database
-          fi
+        run: bash scripts/database-test-runner.sh
 
   browser:
     name: browser
@@ -612,7 +612,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          find symfony/src symfony/config symfony/public symfony/tests/php symfony/bin -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+          find symfony/src symfony/config symfony/public symfony/tests/php symfony/bin -type f -name '*.php' -print0 | xargs -0 -r -P 4 -n1 php -l
           cd symfony
           php bin/console doctrine:query:sql 'SELECT 1'
           php bin/console doctrine:migrations:migrate --no-interaction
@@ -655,10 +655,22 @@ jobs:
       - name: Real Symfony HTTP and static asset contracts
         working-directory: symfony
         run: bash tests/contract/smoke.sh
+      - id: chromium-cache
+        name: Cache Playwright Chromium by locked dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-chromium-${{ hashFiles('symfony/package-lock.json') }}
       - name: Chromium mobile and desktop workflow
         working-directory: symfony
+        shell: bash
         run: |
-          npx playwright install --with-deps chromium
+          set -euo pipefail
+          if [[ "${{ steps.chromium-cache.outputs.cache-hit }}" == "true" ]]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
           npm run test:e2e
       - name: Upload S0 diagnostics only on failure
         if: failure()
