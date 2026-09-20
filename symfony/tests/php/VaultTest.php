@@ -83,6 +83,11 @@ final class VaultTest extends WebTestCase
             $client->request('GET', '/api/admin/vault');
             self::assertResponseIsSuccessful();
             self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);
+            $emptyQuota = json_decode((string) $client->getResponse()->getContent(), true)['data']['quota'];
+            self::assertSame(0, $emptyQuota['used_assets']);
+            self::assertSame(0, $emptyQuota['used_bytes']);
+            self::assertSame(100, $emptyQuota['max_assets']);
+            self::assertSame(128 * 1024 * 1024, $emptyQuota['max_bytes']);
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
 
             $client->request('GET', '/api/admin/context');
@@ -154,6 +159,9 @@ final class VaultTest extends WebTestCase
             self::assertResponseIsSuccessful();
             $first = json_decode((string) $client->getResponse()->getContent(), true)['data'];
             self::assertSame(31, $first['total']);
+            self::assertSame(31, $first['quota']['used_assets']);
+            self::assertSame(strlen($bytes) + 30 * 69, $first['quota']['used_bytes']);
+            self::assertSame(128 * 1024 * 1024, $first['quota']['max_bytes']);
             self::assertSame(2, $first['pages']);
             self::assertSame(1, $first['page']);
             self::assertCount(30, $first['assets']);
@@ -199,6 +207,69 @@ final class VaultTest extends WebTestCase
             self::assertStringContainsString('attachment', (string) $client->getResponse()->headers->get('Content-Disposition'));
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertSame('nosniff', $client->getResponse()->headers->get('X-Content-Type-Options'));
+
+            // Byte limit: 16 real metadata rows of 8 MiB exceed 128 MiB once
+            // the remaining 15 records are included. Another tenant is ignored.
+            $largeIds = $db->fetchFirstColumn(
+                'SELECT id FROM gf_vault_assets WHERE organization_id = :org AND id <> :own ORDER BY id LIMIT 16',
+                ['org' => $mine, 'own' => $mineAsset],
+            );
+            self::assertCount(16, $largeIds);
+            foreach ($largeIds as $id) {
+                $db->update('gf_vault_assets', ['size_bytes' => 8 * 1024 * 1024], ['id' => $id]);
+            }
+            $client->request('GET', '/api/admin/vault');
+            $fullQuota = json_decode((string) $client->getResponse()->getContent(), true)['data']['quota'];
+            self::assertSame(31, $fullQuota['used_assets']);
+            self::assertGreaterThan(128 * 1024 * 1024, $fullQuota['used_bytes']);
+
+            $vaultRoot = (string) static::getContainer()->getParameter('kernel.project_dir').'/var/vault/';
+            $blobsBefore = glob($vaultRoot.'*.blob');
+            $tmp = tempnam(sys_get_temp_dir(), 'gf-vault-');
+            $temp[] = $tmp;
+            file_put_contents($tmp, $bytes);
+            $client->request('POST', '/api/admin/vault', [], [
+                'file' => new UploadedFile($tmp, 'sobre-cuota.png', 'image/png', null, true),
+            ], ['HTTP_X_CSRF_TOKEN' => $token]);
+            self::assertResponseStatusCodeSame(409);
+            self::assertSame('vault_quota_exceeded',
+                json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+            self::assertSame($blobsBefore, glob($vaultRoot.'*.blob'), 'Un rechazo de cuota no debe dejar un blob huérfano.');
+            self::assertSame(31, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = ?', [$mine],
+            ));
+
+            // Count limit is independent of bytes; no extra row may be inserted
+            // when the organization reaches exactly 100 images.
+            foreach ($largeIds as $id) {
+                $db->update('gf_vault_assets', ['size_bytes' => 69], ['id' => $id]);
+            }
+            for ($i = 0; $i < 69; ++$i) {
+                $id = Uuid::v7()->toRfc4122();
+                $db->insert('gf_vault_assets', [
+                    'id' => $id, 'organization_id' => $mine, 'uploaded_by' => $user,
+                    'original_name' => 'cuota-'.$i.'.png', 'mime_type' => 'image/png',
+                    'size_bytes' => 69, 'sha256' => str_repeat('b', 64),
+                    'storage_key' => $id, 'created_at' => $at,
+                ]);
+            }
+            $client->request('GET', '/api/admin/vault?page=1');
+            $atLimit = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(100, $atLimit['quota']['used_assets']);
+            self::assertSame(100, $atLimit['total']);
+            $tmp = tempnam(sys_get_temp_dir(), 'gf-vault-');
+            $temp[] = $tmp;
+            file_put_contents($tmp, $bytes);
+            $client->request('POST', '/api/admin/vault', [], [
+                'file' => new UploadedFile($tmp, 'extra.png', 'image/png', null, true),
+            ], ['HTTP_X_CSRF_TOKEN' => $token]);
+            self::assertResponseStatusCodeSame(409);
+            self::assertSame(100, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = ?', [$mine],
+            ));
+            self::assertSame(1, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = ?', [$foreign],
+            ));
 
             $db->update('gf_identity_memberships', ['role' => 'model'], [
                 'user_id' => $user, 'organization_id' => $mine,

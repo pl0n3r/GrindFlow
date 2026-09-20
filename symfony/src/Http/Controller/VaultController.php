@@ -23,6 +23,8 @@ use Symfony\Component\Uid\Uuid;
 final class VaultController extends AbstractController
 {
     private const MAX_BYTES = 8 * 1024 * 1024;
+    private const MAX_ORGANIZATION_ASSETS = 100;
+    private const MAX_ORGANIZATION_BYTES = 128 * 1024 * 1024;
     private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 
     #[Route('/api/admin/vault', name: 'grindflow_vault_list', methods: ['GET'])]
@@ -48,7 +50,8 @@ final class VaultController extends AbstractController
             WHERE asset.organization_id = :organization
               AND membership.user_id = :user AND actor.is_active = 1
             SQL;
-        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope, $params);
+        $usage = $db->fetchAssociative('SELECT COUNT(*) AS count_assets, COALESCE(SUM(asset.size_bytes), 0) AS used_bytes '.$scope, $params);
+        $total = (int) $usage['count_assets'];
         $assets = $db->fetchAllAssociative(
             'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at '
             .$scope.' ORDER BY asset.created_at DESC, asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
@@ -61,6 +64,12 @@ final class VaultController extends AbstractController
             'page' => $page,
             'total' => $total,
             'pages' => (int) ceil($total / 30),
+            'quota' => [
+                'used_bytes' => (int) $usage['used_bytes'],
+                'max_bytes' => self::MAX_ORGANIZATION_BYTES,
+                'used_assets' => $total,
+                'max_assets' => self::MAX_ORGANIZATION_ASSETS,
+            ],
         ]]);
     }
 
@@ -115,38 +124,59 @@ final class VaultController extends AbstractController
             if ($actualSize === false || $sha256 === false || $actualSize !== $size) {
                 return $this->error(422, 'invalid_upload', 'La imagen no pudo verificarse.');
             }
-            // Authorization is checked again atomically at the moment of the insert.
-            $written = $db->executeStatement(
-                <<<'SQL'
-                    INSERT INTO gf_vault_assets (
-                        id, organization_id, uploaded_by, original_name, mime_type,
-                        size_bytes, sha256, storage_key, created_at
-                    )
-                    SELECT :id, membership.organization_id, actor.id, :name, :mime,
-                           :size, :sha, :storage, :created
-                    FROM gf_identity_memberships membership
-                    INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
-                    WHERE membership.organization_id = :organization AND actor.id = :user
-                      AND actor.is_active = 1 AND membership.role IN ('admin', 'studio', 'editor')
-                    SQL,
-                [
-                    'id' => $id,
-                    'name' => $filename,
-                    'mime' => $mime,
-                    'size' => $size,
-                    'sha' => $sha256,
-                    'storage' => $id,
-                    'created' => gmdate('Y-m-d H:i:s'),
-                    'organization' => $context['organization']['id'],
-                    'user' => $context['user']->id(),
-                ],
-            );
-            if ($written !== 1) {
+            // Every cooperating upload locks the same organization row before counting.
+            // File IO and hashing have finished before the transaction starts.
+            $uploadStatus = $db->transactional(function (Connection $db) use ($context, $id, $filename, $mime, $size, $sha256): string {
+                $locked = $db->fetchOne(
+                    'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                    ['organization' => $context['organization']['id']],
+                );
+                if ($locked === false) {
+                    return 'revoked';
+                }
+                $usage = $db->fetchAssociative(
+                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization',
+                    ['organization' => $context['organization']['id']],
+                );
+                if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
+                    || (int) $usage['used_bytes'] + $size > self::MAX_ORGANIZATION_BYTES) {
+                    return 'quota';
+                }
+
+                // Permission and active account are checked again inside the write.
+                $written = $db->executeStatement(
+                    <<<'SQL'
+                        INSERT INTO gf_vault_assets (
+                            id, organization_id, uploaded_by, original_name, mime_type,
+                            size_bytes, sha256, storage_key, created_at
+                        )
+                        SELECT :id, membership.organization_id, actor.id, :name, :mime,
+                               :size, :sha, :storage, :created
+                        FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = :organization AND actor.id = :user
+                          AND actor.is_active = 1 AND membership.role IN ('admin', 'studio', 'editor')
+                        SQL,
+                    [
+                        'id' => $id, 'name' => $filename, 'mime' => $mime, 'size' => $size,
+                        'sha' => $sha256, 'storage' => $id, 'created' => gmdate('Y-m-d H:i:s'),
+                        'organization' => $context['organization']['id'],
+                        'user' => $context['user']->id(),
+                    ],
+                );
+
+                return $written === 1 ? 'stored' : 'revoked';
+            });
+
+            if ($uploadStatus === 'quota') {
+                return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 imágenes o 128 MiB por organización.');
+            }
+            if ($uploadStatus !== 'stored') {
                 return $this->error(403, 'organization_access_changed', 'Tu permiso para guardar cambió.');
             }
         } finally {
-            // Do not keep an orphaned file on validation, SQL failure, or revoked membership.
-            if (!isset($written) || $written !== 1) {
+            // A rejected write cannot leave a private blob orphaned.
+            if (($uploadStatus ?? null) !== 'stored') {
                 @unlink($path);
             }
         }
