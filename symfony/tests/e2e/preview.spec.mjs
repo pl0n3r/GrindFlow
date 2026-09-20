@@ -1015,3 +1015,71 @@ test('S2 mobile checks retained private original without leaking a fingerprint o
     request.url.endsWith('/api/admin/vault/' + id + '/integrity'))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+
+test('S2 ignores a stale integrity response after switching views, without blocking a new check', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000061';
+  let releaseOld;
+  const oldRequestHeld = new Promise((resolve) => { releaseOld = resolve; });
+  let firstStarted;
+  const firstRequestStarted = new Promise((resolve) => { firstStarted = resolve; });
+  let checks = 0;
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor test' },
+      organization: { id, name: 'Organización de pruebas', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const view = new URL(route.request().url()).searchParams.get('view');
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: [{
+          id, name: 'foto.png', mime_type: 'image/png', size_bytes: 69,
+          created_at: '2026-09-20 00:00:00', deleted_at: view === 'trash' ? '2026-09-20 01:00:00' : null,
+          download_url: '/api/admin/vault/' + id + '/download',
+        }],
+        page: 1, pages: 1, limit: 30, total: 1,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: 69, max_bytes: 128 * 1024 * 1024 },
+      } }),
+    });
+  });
+  await page.route('**/api/admin/vault/' + id + '/integrity', async (route) => {
+    const call = ++checks;
+    if (call === 1) {
+      firstStarted();
+      await oldRequestHeld;
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, status: call === 1 ? 'mismatch' : 'verified' } }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-integrity-stale-e2e=1', type: 'module' });
+  const button = page.getByRole('button', { name: 'Verificar integridad de foto.png' });
+  await expect(button).toBeVisible();
+  await button.click();
+  await firstRequestStarted;
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(page.getByText('Original íntegro: tamaño y SHA-256 coinciden.')).toBeVisible();
+  const staleResponse = page.waitForResponse((response) =>
+    response.url().endsWith('/api/admin/vault/' + id + '/integrity') &&
+    response.status() === 200 && response.request().method() === 'GET' &&
+    response.request().timing().startTime > 0);
+  releaseOld();
+  await staleResponse;
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await expect(page.getByText('Original íntegro: tamaño y SHA-256 coinciden.')).toBeVisible();
+  await expect(page.getByText('Alerta: el tamaño o la huella SHA-256 no coinciden.')).toHaveCount(0);
+  expect(checks).toBe(2);
+});
