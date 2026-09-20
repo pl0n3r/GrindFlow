@@ -159,7 +159,7 @@
         <main class="gf-main">
             <header class="gf-appbar">
                 <div class="gf-appbar__meta">
-                    GF / WORKSPACE / OVERVIEW
+                    GF / WORKSPACE / TU OPERACIÓN
                 </div>
 
                 <div class="gf-avatar" aria-label="Usuario autenticado">
@@ -171,42 +171,40 @@
                 <div>
                     <span class="gf-kicker">
                         <span class="gf-kicker__dot"></span>
-                        Core online
+                        Tu espacio de trabajo
                     </span>
-                    <h1>Overview</h1>
+                    <h1>Tu operación</h1>
                     <p>
-                        Hola, {{ auth()->user()?->name }}. Este es el nuevo shell
-                        operativo de GrindFlow.
+                        Hola, {{ auth()->user()?->name }}. Un resumen del contenido
+                        y las publicaciones en tus organizaciones visibles.
                     </p>
                 </div>
 
-                <span class="gf-badge">Tenant isolation active</span>
+                <span class="gf-badge">Datos de tus organizaciones visibles</span>
             </section>
 
-            <section class="gf-metrics" aria-label="Metricas base">
-                <article class="gf-metric">
-                    <div class="gf-metric__label">Organizations</div>
+            <section class="gf-metrics" aria-label="Resumen operativo">
+                <article class="gf-metric" data-dashboard-metric="organizations">
+                    <div class="gf-metric__label">Organizaciones</div>
                     <div class="gf-metric__value">{{ $organizations->count() }}</div>
-                    <div class="gf-metric__meta">Visibles para esta cuenta</div>
+                    <div class="gf-metric__meta">A las que tienes acceso</div>
                 </article>
-
-                <article class="gf-metric">
-                    <div class="gf-metric__label">Identity</div>
-                    <div class="gf-metric__value">Active</div>
-                    <div class="gf-metric__meta">Laravel session auth</div>
+                <article class="gf-metric" data-dashboard-metric="ready-media">
+                    <div class="gf-metric__label">Contenido listo</div>
+                    <div class="gf-metric__value">{{ $readyMediaCount ?? '—' }}</div>
+                    <div class="gf-metric__meta">{{ $readyMediaCount === null ? 'Módulo no disponible' : 'Recursos listos en tus organizaciones' }}</div>
                 </article>
-
-                <article class="gf-metric">
-                    <div class="gf-metric__label">Isolation</div>
-                    <div class="gf-metric__value">Scoped</div>
-                    <div class="gf-metric__meta">Laravel + MariaDB integrity</div>
+                <article class="gf-metric" data-dashboard-metric="scheduled-publications">
+                    <div class="gf-metric__label">Publicaciones programadas</div>
+                    <div class="gf-metric__value">{{ $scheduledPublicationCount ?? '—' }}</div>
+                    <div class="gf-metric__meta">{{ $scheduledPublicationCount === null ? 'Módulo no disponible' : 'Pendientes en tus organizaciones' }}</div>
                 </article>
             </section>
 
             <section class="gf-panel">
                 <header class="gf-panel__head">
-                    <h2>Organizations</h2>
-                    <span class="gf-appbar__meta">{{ $organizations->count() }} available</span>
+                    <h2>Tus organizaciones</h2>
+                    <span class="gf-appbar__meta">{{ $organizations->count() }} disponibles</span>
                 </header>
 
                 <div class="gf-panel__body">
@@ -216,9 +214,8 @@
                                 <div class="gf-empty__icon" aria-hidden="true">◇</div>
                                 <h3>Aun no hay organizaciones disponibles.</h3>
                                 <p>
-                                    La interfaz ya esta lista. El siguiente paso de produccion
-                                    es conectar MariaDB y cargar las memberships reales
-                                    de esta cuenta.
+                                    Tu cuenta todavía no tiene organizaciones asignadas.
+                                    Cuando te inviten a una, aparecerá aquí.
                                 </p>
                             </div>
                         </div>
@@ -235,7 +232,7 @@
                                             <h3 class="gf-org__name">{{ $organization->name }}</h3>
                                             <div class="gf-org__id">{{ $organization->id }}</div>
                                         </div>
-                                        <span class="gf-org__action">Open Vault →</span>
+                                        <span class="gf-org__action">Abrir biblioteca →</span>
                                     </a>
                                 @else
                                     <article class="gf-org" data-organization-id="{{ $organization->id }}">
