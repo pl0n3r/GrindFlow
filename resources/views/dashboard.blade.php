@@ -331,6 +331,54 @@
                     @endif
                 </div>
             </section>
+            <section class="gf-panel gf-panel--spaced" aria-label="Programaciones con fecha pasada">
+                <header class="gf-panel__head">
+                    <h2>Programaciones con fecha pasada</h2>
+                    <span class="gf-appbar__meta">Últimas 5 · horario UTC</span>
+                </header>
+                <div class="gf-panel__body">
+                    <p class="gf-agenda__help">
+                        Fechas anteriores que todavía figuran como programadas.
+                        Verifica su estado en el Scheduler; esto no confirma un fallo de entrega.
+                    </p>
+                    @if ($pastDuePublications === null)
+                        <div class="gf-empty gf-empty--compact">
+                            <div>
+                                <h3>Historial no disponible</h3>
+                                <p>El módulo de programación no está disponible en esta base de datos.</p>
+                            </div>
+                        </div>
+                    @elseif ($pastDuePublications->isEmpty())
+                        <div class="gf-empty gf-empty--compact">
+                            <div>
+                                <h3>Sin fechas pasadas pendientes</h3>
+                                <p>No hay programaciones con fecha pasada en tus organizaciones visibles.</p>
+                            </div>
+                        </div>
+                    @else
+                        <div class="gf-agenda">
+                            @foreach ($pastDuePublications as $publication)
+                                <article class="gf-agenda__item" data-past-due-publication="{{ $publication->id }}">
+                                    <div class="gf-agenda__when">
+                                        <span>Fecha pasada · UTC</span>
+                                        <time datetime="{{ str_replace(' ', 'T', $publication->scheduled_for_utc) }}Z">
+                                            {{ $publication->scheduled_for_utc }} UTC
+                                        </time>
+                                    </div>
+                                    <div class="gf-agenda__content">
+                                        <strong>{{ $publication->media_name }}</strong>
+                                        <span>{{ $publication->destination_name }}</span>
+                                    </div>
+                                    <a class="gf-button gf-button--ghost"
+                                        href="{{ route('organizations.scheduler.index', ['organizationId' => $publication->organization_id]) }}">
+                                        Revisar agenda →
+                                    </a>
+                                </article>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </section>
             <x-release-footer />
         </main>
     </div>

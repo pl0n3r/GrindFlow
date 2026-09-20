@@ -1551,3 +1551,6 @@ a {
 .gf-agenda__when time{font-size:12px;font-variant-numeric:tabular-nums}
 .gf-agenda__content strong{overflow-wrap:anywhere;font-size:13px}
 @media(max-width:680px){.gf-agenda__item{grid-template-columns:minmax(0,1fr);gap:12px}.gf-agenda__item .gf-button{justify-self:start}}
+
+/* v0.1.30: indicate that a past scheduled date is not a delivery failure. */
+.gf-agenda__help{margin:0 0 16px;color:var(--gf-muted);font-size:12px;line-height:1.6}

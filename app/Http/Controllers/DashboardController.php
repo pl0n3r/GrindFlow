@@ -50,19 +50,22 @@ class DashboardController extends Controller
                 : array_sum($scheduledByOrganization),
             'readyMediaByOrganization' => $readyMediaByOrganization,
             'scheduledByOrganization' => $scheduledByOrganization,
-            'upcomingPublications' => $this->upcomingForVisibleOrganizations($organizationIds),
+            'upcomingPublications' => $this->agendaForVisibleOrganizations($organizationIds),
+            'pastDuePublications' => $this->agendaForVisibleOrganizations($organizationIds, true),
         ]);
     }
 
     /**
-     * Five upcoming rows are selected with a bounded tenant filter and
-     * organization-safe joins. Null means a partial schema, not an empty queue.
+     * Five future (or past-due) rows are selected with a bounded tenant filter
+     * and organization-safe joins. Null means missing schema, not zero activity.
      *
      * @param  list<string>  $organizationIds
      * @return Collection<int, \stdClass>|null
      */
-    private function upcomingForVisibleOrganizations(array $organizationIds): ?Collection
-    {
+    private function agendaForVisibleOrganizations(
+        array $organizationIds,
+        bool $pastDue = false,
+    ): ?Collection {
         if ($organizationIds === []) {
             return collect();
         }
@@ -87,8 +90,8 @@ class DashboardController extends Controller
                 })
                 ->whereIn('schedule.organization_id', $organizationIds)
                 ->where('schedule.status', ScheduledPublication::STATUS_SCHEDULED)
-                ->where('schedule.scheduled_for_utc', '>=', $nowUtc)
-                ->orderBy('schedule.scheduled_for_utc')
+                ->where('schedule.scheduled_for_utc', $pastDue ? '<' : '>=', $nowUtc)
+                ->orderBy('schedule.scheduled_for_utc', $pastDue ? 'desc' : 'asc')
                 ->orderBy('schedule.id')
                 ->limit(5)
                 ->get([

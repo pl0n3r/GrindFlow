@@ -228,7 +228,6 @@ class OrganizationVisibilityTest extends TestCase
             ->assertOk()
             ->assertSee('Próximas publicaciones')
             ->assertSee('next-visible.jpg')
-            ->assertDontSee('past-visible.jpg')
             ->assertDontSee('hidden-next.jpg')
             ->assertSee(route('organizations.scheduler.index', [
                 'organizationId' => $visible->getKey(),
@@ -236,6 +235,12 @@ class OrganizationVisibilityTest extends TestCase
             ->assertDontSee(route('organizations.scheduler.index', [
                 'organizationId' => $foreign->getKey(),
             ]));
+
+        $html = $this->actingAs($user)->get('/dashboard')->getContent();
+        $this->assertIsString($html);
+        $upcoming = explode('aria-label="Programaciones con fecha pasada"', $html, 2)[0];
+        $this->assertStringContainsString('next-visible.jpg', $upcoming);
+        $this->assertStringNotContainsString('past-visible.jpg', $upcoming);
     }
 
     public function test_upcoming_publications_has_true_empty_state(): void
@@ -246,7 +251,41 @@ class OrganizationVisibilityTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('Sin próximas publicaciones')
+            ->assertSee('Sin fechas pasadas pendientes')
             ->assertDontSee('Agenda no disponible');
+    }
+
+    public function test_past_due_agenda_excludes_future_and_foreign_tenant_rows(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $visible = Organization::factory()->create();
+        $foreign = Organization::factory()->create();
+
+        foreach ([[$user, $visible], [$other, $foreign]] as [$member, $organization]) {
+            Membership::query()->create([
+                'organization_id' => $organization->getKey(),
+                'user_id' => $member->getKey(),
+                'role' => UserRole::Studio,
+            ]);
+        }
+
+        $this->makeScheduledMedia($user, $visible, 'past-own.jpg', -2);
+        $this->makeScheduledMedia($user, $visible, 'future-own.jpg', 2);
+        $this->makeScheduledMedia($other, $foreign, 'past-foreign.jpg', -3);
+
+        $response = $this->actingAs($user)->get('/dashboard')->assertOk()
+            ->assertSee('Programaciones con fecha pasada')
+            ->assertSee('data-past-due-publication=', false)
+            ->assertSee('past-own.jpg')
+            ->assertDontSee('past-foreign.jpg')
+            ->assertSee('esto no confirma un fallo de entrega');
+
+        $html = $response->getContent();
+        $this->assertIsString($html);
+        $pastDue = explode('aria-label="Programaciones con fecha pasada"', $html, 2)[1];
+        $this->assertStringContainsString('past-own.jpg', $pastDue);
+        $this->assertStringNotContainsString('future-own.jpg', $pastDue);
     }
 
     private function makeScheduledMedia(
