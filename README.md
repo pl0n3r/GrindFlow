@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.33: solo el deploy actual.** Base `main` v0.1.31 `b6cf03b08d158ea517d41615644eae32299d38a6`. S1 aislado: login/logout y selección explícita de organización con Symfony Security, Doctrine y sesiones; admin solo con membresía vigente. Laravel sigue siendo runtime de Hostinger. **Symfony no se ha desplegado ni se han importado cuentas.**
+> **Snapshot v0.1.33: solo el deploy actual.** Base `main` v0.1.32 `b6cf03b08d158ea517d41615644eae32299d38a6`. S1 aislado: login/logout y selección explícita de organización con Symfony Security, Doctrine y sesiones; admin solo con membresía vigente. Laravel sigue siendo runtime de Hostinger. **Symfony no se ha desplegado ni se han importado cuentas.**
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -68,6 +68,7 @@ flowchart LR
 - `config/version.php`
 - `symfony/README.md`
 - `symfony/config/packages/security.yaml`
+- `symfony/config/packages/test/framework.yaml`
 - `symfony/public/assets/grindflow.css`
 - `symfony/src/Http/Controller/AdminController.php`
 - `symfony/src/Http/Controller/LoginController.php`
