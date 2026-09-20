@@ -78,6 +78,8 @@ flowchart LR
 - No se acredita despliegue Symfony ni migración productiva.
 
 ## Qué sigue
+[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
 | **NOW** | 🚧 Validar paginación Vault S2 v0.1.39 | 🚧 CI y revisión |
