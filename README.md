@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+205** | **−23** | **+182** |
+| **6** | **+254** | **−25** | **+229** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -61,7 +61,7 @@ flowchart LR
 - La carga múltiple informa avance y resultado individual por archivo, incluso si uno de los envíos falla.
 - Los originales subidos correctamente se excluyen del reintento: solo se reenvían archivos fallidos temporalmente cuando el usuario pulsa «Reintentar».
 - Los rechazos por formato, duplicado, cuota o permisos no generan reintentos inútiles; los pendientes se pueden descartar. Nueva selección los reemplaza.
-- Pruebas Chromium de error temporal/recuperación y rechazo no reintentable a 360 px.
+- Pruebas Chromium de recuperación, rechazo y respuestas HTTP malformadas no reintentables a 360 px.
 
 ## Archivos modificados en este deploy
 - `README.md`
