@@ -1,4 +1,4 @@
 doctrine_migrations:
   migrations_paths:
-    'GrindFlow\\Migrations': '%kernel.project_dir%/migrations'
+    'GrindFlow\Migrations': '%kernel.project_dir%/migrations'
   enable_profiler: false

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GrindFlow\Tests;
 
 use GrindFlow\Kernel;
+use GrindFlow\Shared\Version\ProductVersion;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 final class PreviewTest extends WebTestCase
@@ -21,7 +22,7 @@ final class PreviewTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $data = json_decode((string) $client->getResponse()->getContent(), true);
         self::assertSame('s0-preview', $data['stage']);
-        self::assertSame('0.1.24', $data['version']);
+        self::assertSame((new ProductVersion(dirname(__DIR__, 3)))->human(), $data['version']);
         self::assertArrayNotHasKey('release_sha', $data);
         self::assertNotEmpty($client->getResponse()->headers->get('X-Request-Id'));
         self::assertNotEmpty($client->getResponse()->headers->get('Content-Security-Policy'));
@@ -35,7 +36,8 @@ final class PreviewTest extends WebTestCase
         self::assertSelectorTextContains('h1', 'Una carga.');
         $client->request('GET', '/preview');
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('#grindflow-preview[data-version="0.1.24"]');
+        $release = (new ProductVersion(dirname(__DIR__, 3)))->human();
+        self::assertSelectorExists('#grindflow-preview[data-version="'.$release.'"]');
         self::assertSelectorExists('script[src^="/build/assets/preview-"]');
     }
 

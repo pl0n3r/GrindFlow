@@ -1,0 +1,5 @@
+# CI Symfony uses PHP 8.5. Native lazy objects avoid deprecated generated
+# Doctrine ORM proxies. Production PHP compatibility is checked before cutover.
+doctrine:
+  orm:
+    enable_native_lazy_objects: true

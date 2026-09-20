@@ -615,6 +615,8 @@ jobs:
           find symfony/src symfony/config symfony/public symfony/tests/php symfony/bin -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
           cd symfony
           php bin/console doctrine:query:sql 'SELECT 1'
+          php bin/console doctrine:migrations:migrate --no-interaction
+          php bin/console doctrine:schema:validate --skip-sync
       - name: Build TypeScript and Vite preview
         working-directory: symfony
         run: |
@@ -625,6 +627,13 @@ jobs:
       - name: Symfony HTTP test suite
         working-directory: symfony
         run: php vendor/bin/simple-phpunit -c phpunit.xml.dist
+      - name: Verify migration reversibility on disposable MariaDB
+        working-directory: symfony
+        run: |
+          set -euo pipefail
+          php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260920093100' --down --no-interaction
+          php bin/console doctrine:migrations:migrate --no-interaction
+          php bin/console doctrine:schema:validate --skip-sync
       - name: Start isolated Symfony server
         shell: bash
         run: |
