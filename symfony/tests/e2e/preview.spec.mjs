@@ -214,14 +214,19 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
       },
     }),
   }));
+  const stored = [];
   await page.route('**/api/admin/vault', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: { assets: [], limit: 30, page: 1, pages: 0, total: 0 } }) });
+        body: JSON.stringify({ data: { assets: stored, limit: 30, page: 1,
+          pages: stored.length ? 1 : 0, total: stored.length } }) });
     }
     expect(route.request().method()).toBe('POST');
     expect(route.request().headers()['x-csrf-token']).toBe('vault-csrf-test');
     expect(route.request().postDataBuffer().includes(png)).toBe(true);
+    const saved = { id, name: 'foto-ejemplo.png', mime_type: 'image/png', size_bytes: png.length,
+      created_at: '2026-09-20 00:00:00', download_url: '/api/admin/vault/' + id + '/download' };
+    stored.unshift(saved);
     return route.fulfill({
       status: 201, contentType: 'application/json',
       body: JSON.stringify({ data: { asset: {
