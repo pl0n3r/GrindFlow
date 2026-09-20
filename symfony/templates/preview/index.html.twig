@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+{% block title %}Vista previa · GrindFlow{% endblock %}
+{% block head %}
+<meta name="robots" content="noindex,nofollow">
+{% for stylesheet in build.css %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
+{% endblock %}
+{% block body %}
+<main id="contenido">
+    <div id="grindflow-preview" data-version="{{ app_version }}">
+        <section class="preview-loading" aria-live="polite"><h1>Preparando GrindFlow…</h1><p>Cargando interfaz de vista previa.</p></section>
+    </div>
+</main>
+<script type="module" src="{{ build.js }}"></script>
+{% endblock %}

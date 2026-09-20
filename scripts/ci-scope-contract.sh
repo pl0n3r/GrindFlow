@@ -30,6 +30,7 @@ expect_flag "$docs" "run_database=false" "docs skip database"
 expect_flag "$docs" "run_browser=false" "docs skip browser"
 expect_flag "$docs" "run_realstack=false" "docs skip real-stack"
 expect_flag "$docs" "run_legacy=false" "docs skip legacy"
+expect_flag "$docs" "run_symfony=false" "docs skip Symfony"
 
 release="$(run_scope pull_request README.md AGENTS.md config/version.php)"
 expect_flag "$release" "run_php_quality=false" "human release metadata stays fast-only"
@@ -38,6 +39,7 @@ expect_flag "$release" "run_database=false" "human release metadata skips MariaD
 expect_flag "$release" "run_browser=false" "human release metadata skips browser"
 expect_flag "$release" "run_realstack=false" "human release metadata skips real-stack"
 expect_flag "$release" "run_legacy=false" "human release metadata skips legacy"
+expect_flag "$release" "run_symfony=false" "human release metadata skips Symfony"
 
 service="$(run_scope pull_request app/Services/Media/MediaAssetProcessor.php)"
 expect_flag "$service" "run_php_quality=true" "Laravel service selects php-quality"
@@ -57,17 +59,22 @@ view="$(run_scope pull_request resources/views/vault/index.blade.php)"
 expect_flag "$view" "run_browser=true" "view selects browser"
 expect_flag "$view" $RUN_REALSTACK_ENABLED "view selects real-stack"
 
+symfony="$(run_scope pull_request symfony/src/Kernel.php)"
+expect_flag "$symfony" "run_symfony=true" "Symfony source selects its gate"
+expect_flag "$symfony" "run_legacy=false" "Symfony source does not select legacy Node"
+expect_flag "$symfony" "run_php_quality=false" "Symfony source does not select Laravel quality"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
 ci_core="$(run_scope pull_request .github/workflows/grindflow-ci.yml)"
-for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy; do
+for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy run_symfony; do
   expect_flag "$ci_core" "$flag=true" "CI core forces $flag"
 done
 expect_flag "$ci_core" "full=true" "CI core marks full validation"
 
 manual="$(run_scope workflow_dispatch)"
-for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy; do
+for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy run_symfony; do
   expect_flag "$manual" "$flag=true" "manual dispatch forces $flag"
 done
 expect_flag "$manual" "full=true" "manual dispatch marks full validation"
@@ -78,5 +85,9 @@ expect_flag "$mixed" "run_tests=true" "mixed keeps tests"
 expect_flag "$mixed" "run_browser=true" "mixed unions browser"
 expect_flag "$mixed" $RUN_REALSTACK_ENABLED "mixed unions real-stack"
 expect_flag "$mixed" "run_legacy=true" "mixed unions legacy"
+
+new_mixed="$(run_scope pull_request symfony/src/Kernel.php src/lib/example.ts)"
+expect_flag "$new_mixed" "run_symfony=true" "new stack selected alongside legacy"
+expect_flag "$new_mixed" "run_legacy=true" "legacy remains selected alongside Symfony"
 
 printf 'GrindFlow CI scope contract passed.\n'

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101019">
+    <title>{% block title %}GrindFlow · Crea y sigue creando{% endblock %}</title>
+    <link rel="stylesheet" href="/assets/grindflow.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    {% block body %}{% endblock %}
+    <footer class="footer">
+        <a class="brand brand-small" href="{{ path('grindflow_home') }}">GRIND<span>FLOW</span></a>
+        <span>Versión {{ app_version }}</span>
+        <span>S0 · Entorno de vista previa aislado</span>
+    </footer>
+</body>
+</html>

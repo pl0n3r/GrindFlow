@@ -14,6 +14,7 @@ grindflow_ci_scope_reset() {
   GRINDFLOW_SCOPE_RUN_BROWSER=false
   GRINDFLOW_SCOPE_RUN_REALSTACK=false
   GRINDFLOW_SCOPE_RUN_LEGACY=false
+  GRINDFLOW_SCOPE_RUN_SYMFONY=false
   GRINDFLOW_SCOPE_AREAS=""
 }
 
@@ -33,6 +34,7 @@ grindflow_ci_scope_all() {
   GRINDFLOW_SCOPE_RUN_BROWSER=true
   GRINDFLOW_SCOPE_RUN_REALSTACK=true
   GRINDFLOW_SCOPE_RUN_LEGACY=true
+  GRINDFLOW_SCOPE_RUN_SYMFONY=true
 }
 
 grindflow_ci_classify_files() {
@@ -75,6 +77,10 @@ grindflow_ci_classify_files() {
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
         GRINDFLOW_SCOPE_RUN_TESTS=true
         GRINDFLOW_SCOPE_RUN_REALSTACK=true
+        ;;
+      symfony/*)
+        grindflow_ci_scope_add_area "Symfony S0 preview"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
         ;;
       config/version.php)
         grindflow_ci_scope_add_area "Product release metadata"
@@ -146,6 +152,7 @@ grindflow_ci_scope_print() {
   printf 'run_browser=%s\n' "$GRINDFLOW_SCOPE_RUN_BROWSER"
   printf 'run_realstack=%s\n' "$GRINDFLOW_SCOPE_RUN_REALSTACK"
   printf 'run_legacy=%s\n' "$GRINDFLOW_SCOPE_RUN_LEGACY"
+  printf 'run_symfony=%s\n' "$GRINDFLOW_SCOPE_RUN_SYMFONY"
   printf 'areas=%s\n' "$GRINDFLOW_SCOPE_AREAS"
 }
 
