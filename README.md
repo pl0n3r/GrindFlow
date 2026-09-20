@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.35: solo el deploy actual, pendiente de validación.** Base `main` v0.1.34 `3597ab5735e2f84713b69b0f4b6aec54782d952d`. S1 suma ajustes reales por rol con CSRF y revalidación de organización en SQL. Laravel sigue como runtime productivo; **Symfony no se ha desplegado ni se han migrado cuentas**.
+> **Snapshot v0.1.36: entrega de infraestructura CI, todavía no fusionada ni desplegada.** Base `main` v0.1.35 `f0340d26a3dc4e89ff01292383f434e64d2eac44`. El selector de pruebas se ajusta por rutas; Chromium reutiliza binarios según lockfile, las suites DB no repiten un fallo y el reporte diario muestra tiempo/fallos. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.35** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.34~~ | `3597ab5735e2f84713b69b0f4b6aec54782d952d` |
+| Version objetivo | 🚧 **v0.1.36** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.35~~ | `f0340d26a3dc4e89ff01292383f434e64d2eac44` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+372** | **−25** | **+347** |
+| **11** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Ajustes reales de organización, CSRF, rol en SQL, usuario activo y UI móvil |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Alcance | CI completo por cambios al core; prueba de selección de gates, grupo DB, cache Chromium y reporte diario |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,33 +58,34 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Formulario React para que solo `admin` y `studio` renombren su organización activa, con confirmación y errores visibles en móvil.
-- `POST /api/admin/organization/name` no acepta IDs de tenant del cliente: CSRF, membresía y rol se verifican en HTTP y durante el UPDATE SQL.
-- La consulta de membresía comprueba también `is_active` en DB, sin confiar únicamente en el usuario serializado en sesión.
-- Documentado el camino de entrega vía GitHub + Actions cuando Codex Tasks no tiene entorno. CSS común versionado con el release.
+- Selector de gates preserva matriz completa al editar CI nuclear o pedir workflow manual, pero omite Symfony pesado para documentación Symfony aislada.
+- El test DB detecta el grupo `database` y evita repetir toda la suite tras un fallo real. Contrato automatizado verifica ambas rutas.
+- Chromium se cachea por sistema operativo y lockfile, con instalación segura en cache miss; sintaxis PHP Symfony usa 4 procesos.
+- Health diario de Actions calcula mediana/p90 y alertas de deterioro por evento, sin cambiar pruebas ni ramas por sí solo. Política durable en AGENTS y [guía](docs/CI-PERFORMANCE.md).
+- No se cambiaron Laravel, datos de producción ni el cutover Symfony.
 
 ## Archivos modificados en este deploy
+- `.github/workflows/ci-health.yml`
+- `.github/workflows/grindflow-ci.yml`
 - `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `symfony/README.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/src/Http/Controller/AdminContextController.php`
-- `symfony/src/Identity/Application/MembershipContext.php`
-- `symfony/templates/base.html.twig`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/OrganizationSettingsTest.php`
+- `docs/CI-PERFORMANCE.md`
+- `scripts/ci-performance-report.py`
+- `scripts/ci-scope-contract.sh`
+- `scripts/ci-scope.sh`
+- `scripts/database-test-runner-contract.sh`
+- `scripts/database-test-runner.sh`
 
 ## Validación
-- PHPUnit aislado prueba roles `editor`/`studio`, CSRF, IDOR, revocación de rol, cuenta inactiva y ausencia de selección.
-- Playwright simula flujo móvil de formulario y verifica que no envía un ID de tenant. CI/Sonar/CodeRabbit y exact-main pendientes de comprobar.
+- Scripts tienen self-test y contratos; CI completo de PR, Sonar/CodeRabbit y CI exact-main se verifican por separado.
+- Telemetría de Actions es read-only y no equivale a funcionamiento productivo de Hostinger.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar ajustes de organización S1 v0.1.35, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 Vault móvil real sobre el contexto tenant-safe |
+| **NOW** | 🚧 Verificar CI adaptable v0.1.36, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 Vault móvil real con contexto tenant-safe |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial |
 
@@ -92,7 +93,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Ajustes S1 v0.1.35 | 🚧 Validación y revisión |
+| **NOW** | 🚧 Infraestructura CI v0.1.36 | 🚧 CI completo y revisión |
 | **NEXT** | 🚧 Vault móvil | 🚧 S2 |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
