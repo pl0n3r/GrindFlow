@@ -564,3 +564,59 @@ test('S1 revocation hides tenant workspace, while a recoverable CSRF error keeps
   await expect(page.getByText('Espacio revocable')).toHaveCount(0);
   expect(writes).toBe(2);
 });
+
+
+test('S2 mobile renames a private image without changing its download identity', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000046';
+  let name = 'original.png';
+  let failFirst = true;
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id, name: 'Biblioteca editable', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      assets: [{ id, name, mime_type: 'image/png', size_bytes: 69,
+        created_at: '2026-09-20 00:00:00',
+        download_url: '/api/admin/vault/' + id + '/download' }],
+      page: 1, pages: 1, limit: 30, total: 1,
+    } }),
+  }));
+  await page.route('**/api/admin/vault/' + id + '/name', (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('manage-test');
+    expect(route.request().postDataJSON()).toEqual({ name: 'nueva.png' });
+    if (failFirst) {
+      failFirst = false;
+      return route.fulfill({ status: 403, contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'invalid_csrf', message: 'La solicitud ha caducado.' } }) });
+    }
+    name = 'nueva.png';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, name } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?vault-rename-e2e=1', type: 'module' });
+  await expect(page.getByText('original.png')).toBeVisible();
+  await page.getByRole('button', { name: 'Renombrar' }).click();
+  await page.getByLabel('Nombre de la imagen').fill('nueva.png');
+  await page.getByRole('button', { name: 'Guardar nombre' }).click();
+  await expect(page.getByText('La solicitud ha caducado.')).toBeVisible();
+  await expect(page.getByText('original.png')).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar nombre' }).click();
+  await expect(page.getByText('Nombre de imagen actualizado.')).toBeVisible();
+  await expect(page.getByText('nueva.png')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Descargar' }))
+    .toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
