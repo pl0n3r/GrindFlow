@@ -433,9 +433,11 @@ class TrafficAttributionTest extends TestCase
     {
         [$user, $organization] = $this->identity(UserRole::Studio);
 
-        Schema::dropIfExists('tracked_link_dedupes');
-        Schema::dropIfExists('tracked_link_daily_metrics');
-        Schema::dropIfExists('tracked_links');
+        Schema::withoutForeignKeyConstraints(function (): void {
+            Schema::dropIfExists('tracked_link_dedupes');
+            Schema::dropIfExists('tracked_link_daily_metrics');
+            Schema::dropIfExists('tracked_links');
+        });
 
         $migrationPath = database_path(
             'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
@@ -463,8 +465,10 @@ class TrafficAttributionTest extends TestCase
                 app(TrafficAttributionRecorder::class)->pruneExpired(),
             );
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
@@ -643,9 +647,11 @@ class TrafficAttributionTest extends TestCase
     public function test_daily_csv_export_is_migration_safe(): void
     {
         [$user, $organization] = $this->identity(UserRole::Studio);
-        Schema::dropIfExists('tracked_link_dedupes');
-        Schema::dropIfExists('tracked_link_daily_metrics');
-        Schema::dropIfExists('tracked_links');
+        Schema::withoutForeignKeyConstraints(function (): void {
+            Schema::dropIfExists('tracked_link_dedupes');
+            Schema::dropIfExists('tracked_link_daily_metrics');
+            Schema::dropIfExists('tracked_links');
+        });
 
         $migrationPath = database_path(
             'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
@@ -658,8 +664,10 @@ class TrafficAttributionTest extends TestCase
                 ]))
                 ->assertStatus(503);
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
@@ -876,9 +884,11 @@ class TrafficAttributionTest extends TestCase
     {
         [$user, $organization] = $this->identity(UserRole::Studio);
 
-        Schema::dropIfExists('tracked_link_dedupes');
-        Schema::dropIfExists('tracked_link_daily_metrics');
-        Schema::dropIfExists('tracked_links');
+        Schema::withoutForeignKeyConstraints(function (): void {
+            Schema::dropIfExists('tracked_link_dedupes');
+            Schema::dropIfExists('tracked_link_daily_metrics');
+            Schema::dropIfExists('tracked_links');
+        });
 
         $migrationPath = database_path(
             'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
@@ -893,8 +903,10 @@ class TrafficAttributionTest extends TestCase
                 ['status' => TrackedLink::STATUS_DISABLED],
             )->assertStatus(503);
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
@@ -1183,9 +1195,11 @@ class TrafficAttributionTest extends TestCase
     public function test_link_detail_update_is_schema_safe(): void
     {
         [$actor, $organization] = $this->identity(UserRole::Studio);
-        Schema::dropIfExists('tracked_link_dedupes');
-        Schema::dropIfExists('tracked_link_daily_metrics');
-        Schema::dropIfExists('tracked_links');
+        Schema::withoutForeignKeyConstraints(function (): void {
+            Schema::dropIfExists('tracked_link_dedupes');
+            Schema::dropIfExists('tracked_link_daily_metrics');
+            Schema::dropIfExists('tracked_links');
+        });
 
         try {
             $this->actingAs($actor)->patch(route('organizations.traffic.links.update', [
@@ -1196,10 +1210,12 @@ class TrafficAttributionTest extends TestCase
                 'destination_url' => 'https://example.com/',
             ])->assertStatus(503);
         } finally {
-            $migration = require database_path(
-                'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
-            );
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function (): void {
+                $migration = require database_path(
+                    'migrations/2026_09_19_033000_create_traffic_attribution_tables.php',
+                );
+                $migration->up();
+            });
         }
     }
 

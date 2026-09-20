@@ -616,8 +616,10 @@ class SchedulingTest extends TestCase
         $this->membership($user, $organization, UserRole::Editor);
         $this->membership($modelUser, $organization, UserRole::Model);
 
-        Schema::dropIfExists('scheduled_publications');
-        Schema::dropIfExists('publishing_destinations');
+        Schema::withoutForeignKeyConstraints(function (): void {
+            Schema::dropIfExists('scheduled_publications');
+            Schema::dropIfExists('publishing_destinations');
+        });
 
         $migrationPath = database_path(
             'migrations/2026_09_18_200000_create_scheduling_tables.php',
@@ -641,8 +643,10 @@ class SchedulingTest extends TestCase
                 ->post($route, [])
                 ->assertStatus(503);
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 

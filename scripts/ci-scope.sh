@@ -53,7 +53,7 @@ grindflow_ci_classify_files() {
     [[ -z "$file" ]] && continue
 
     case "$file" in
-      .github/workflows/grindflow-ci.yml|scripts/ci-scope.sh|scripts/ci-scope-contract.sh|scripts/readme-dashboard.py)
+      .github/workflows/grindflow-ci.yml|scripts/ci-scope.sh|scripts/ci-scope-contract.sh|scripts/database-test-runner.sh|scripts/database-test-runner-contract.sh|scripts/readme-dashboard.py)
         grindflow_ci_scope_add_area "CI/CD core"
         grindflow_ci_scope_all
         ;;
@@ -78,8 +78,11 @@ grindflow_ci_classify_files() {
         GRINDFLOW_SCOPE_RUN_TESTS=true
         GRINDFLOW_SCOPE_RUN_REALSTACK=true
         ;;
+      symfony/*.md)
+        grindflow_ci_scope_add_area "Symfony documentation"
+        ;;
       symfony/*)
-        grindflow_ci_scope_add_area "Symfony S0 preview"
+        grindflow_ci_scope_add_area "Symfony runtime and tests"
         GRINDFLOW_SCOPE_RUN_SYMFONY=true
         ;;
       config/version.php)

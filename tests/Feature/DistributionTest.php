@@ -1053,7 +1053,9 @@ class DistributionTest extends TestCase
 
     public function test_distribution_scheduler_is_safe_before_delivery_migration(): void
     {
-        Schema::dropIfExists('publication_deliveries');
+        Schema::withoutForeignKeyConstraints(function (): void {
+            Schema::dropIfExists('publication_deliveries');
+        });
 
         $migrationPath = database_path(
             'migrations/2026_09_19_021500_create_publication_deliveries_table.php',
@@ -1065,8 +1067,10 @@ class DistributionTest extends TestCase
                 app(DistributionScheduler::class)->dispatchDue(),
             );
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
