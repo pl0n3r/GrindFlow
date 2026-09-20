@@ -78,7 +78,7 @@ final class VaultController extends AbstractController
                 // Retained originals in trash continue to occupy private storage.
                 'used_bytes' => (int) $usage['used_bytes'],
                 'max_bytes' => self::MAX_ORGANIZATION_BYTES,
-                'used_assets' => $total,
+                'used_assets' => (int) $usage['count_assets'],
                 'max_assets' => self::MAX_ORGANIZATION_ASSETS,
             ],
         ]]);
