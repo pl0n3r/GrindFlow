@@ -162,7 +162,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
             <dt>Tipo</dt><dd>{detail.mime_type}</dd>
             <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
             <dt>Guardada</dt><dd>{detail.created_at}</dd>
-          </dl>
+          </dl>}
         </li>)}
       </ul>
       {pages > 1 && <nav className="vault-pages" aria-label="Páginas de la biblioteca">
