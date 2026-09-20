@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.43: corrección visual del menú Laravel, sin fuentes de iconos ni glifos decorativos.** Base `main` v0.1.42 `58cbc80153eb2492d1db33f3b57595b10cbea86c`. Los ocho menús de workspace usan etiquetas legibles en español; versión de stylesheet renovada por `config/version.php`. Symfony permanece aislado; el release humano no prueba un deploy remoto.
+> **Snapshot v0.1.43: solo el deploy actual, corrección visual del menú Laravel, sin fuentes de iconos ni glifos decorativos.** Base `main` v0.1.42 `58cbc80153eb2492d1db33f3b57595b10cbea86c`. Los ocho menús de workspace usan etiquetas legibles en español; versión de stylesheet renovada por `config/version.php`. Symfony permanece aislado; el release humano no prueba un deploy remoto.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
