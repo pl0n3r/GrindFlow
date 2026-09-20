@@ -62,9 +62,8 @@ test('Symfony login entrypoint has CSRF and accessible error states on mobile', 
 
 
 test('React admin renders role capabilities from its tenant context contract', async ({ page, request }) => {
-  const preview = await request.get('/preview');
-  const source = await preview.text();
-  const asset = source.match(/<script type="module" src="([^"]+)"/)?.[1];
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
   expect(asset).toBeTruthy();
 
   await page.route('**/api/admin/context', (route) => route.fulfill({
@@ -79,8 +78,8 @@ test('React admin renders role capabilities from its tenant context contract', a
       meta: { version: '0.1.34' },
     }),
   }));
-  await page.setContent('<div class="admin-page"><div id="grindflow-admin"></div></div>');
-  await page.addScriptTag({ url: new URL(asset, 'http://127.0.0.1:8765').toString(), type: 'module' });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?admin-e2e=1', type: 'module' });
 
   await expect(page.getByRole('heading', { name: /Tu espacio/ })).toBeVisible();
   await expect(page.getByText('Estudio seguro').first()).toBeVisible();
