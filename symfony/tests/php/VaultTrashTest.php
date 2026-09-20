@@ -41,6 +41,8 @@ final class VaultTrashTest extends WebTestCase
         self::assertResponseStatusCodeSame(401);
         $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore');
         self::assertResponseStatusCodeSame(401);
+        $client->request('GET', '/api/admin/vault/'.$mineAsset.'/integrity');
+        self::assertResponseStatusCodeSame(401);
 
         $db->insert('gf_identity_users', [
             'id' => $user, 'name' => 'S2 reversible actor',
@@ -80,6 +82,18 @@ final class VaultTrashTest extends WebTestCase
             $context = json_decode((string) $client->getResponse()->getContent(), true);
             $csrf = $context['data']['vault_manage_csrf'];
             self::assertNotEmpty($csrf);
+
+            // Read-only verification returns a status without exposing a path, key or hash.
+            $integrityUrl = '/api/admin/vault/'.$mineAsset.'/integrity';
+            $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/integrity');
+            self::assertResponseStatusCodeSame(404);
+            $client->request('GET', $integrityUrl);
+            self::assertResponseIsSuccessful();
+            $integrity = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(['id' => $mineAsset, 'status' => 'verified'], $integrity);
+            self::assertStringNotContainsString($root, (string) $client->getResponse()->getContent());
+            self::assertStringNotContainsString(hash('sha256', $bytes), (string) $client->getResponse()->getContent());
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
 
             // Rename changes only display metadata; it must never move or duplicate private bytes.
             $renaming = '/api/admin/vault/'.$mineAsset.'/name';
@@ -141,6 +155,12 @@ final class VaultTrashTest extends WebTestCase
             self::assertSame($bytes, file_get_contents($path));
             self::assertSame($user, $db->fetchOne('SELECT deleted_by FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             self::assertNotNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            // Trashed originals remain retained and may be checked without restoring.
+            $client->request('GET', $integrityUrl);
+            self::assertResponseIsSuccessful();
+            self::assertSame('verified',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+
 
             $client->request('GET', '/api/admin/vault');
             $active = json_decode((string) $client->getResponse()->getContent(), true)['data'];
@@ -181,6 +201,28 @@ final class VaultTrashTest extends WebTestCase
             self::assertResponseStatusCodeSame(403);
             $db->update('gf_identity_memberships', ['role' => 'editor'], ['user_id' => $user, 'organization_id' => $mine]);
 
+            // Both size mismatch and same-size SHA corruption must be reported read-only.
+            file_put_contents($path, 'bad');
+            $client->request('GET', $integrityUrl);
+            self::assertResponseIsSuccessful();
+            self::assertSame('mismatch',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+            file_put_contents($path, substr_replace($bytes, 'X', 0, 1));
+            $client->request('GET', $integrityUrl);
+            self::assertResponseIsSuccessful();
+            self::assertSame('mismatch',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+            @unlink($path);
+            $client->request('GET', $integrityUrl);
+            self::assertResponseIsSuccessful();
+            self::assertSame('missing',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+            file_put_contents($path, $bytes);
+            self::assertNotNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            $client->request('GET', $integrityUrl);
+            self::assertSame('verified',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+
             // Detect missing/corrupted blobs before returning them to the active library.
             file_put_contents($path, 'bad');
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
@@ -199,11 +241,14 @@ final class VaultTrashTest extends WebTestCase
             $client->request('GET', '/api/admin/vault?view=trash');
             self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);
 
+            // A revoked account cannot inspect retained originals either.
             // The same CSRF cannot override a revoked membership.
             $db->delete('gf_identity_memberships', ['user_id' => $user, 'organization_id' => $mine]);
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
             self::assertResponseStatusCodeSame(403);
             self::assertNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            $client->request('GET', $integrityUrl);
+            self::assertResponseStatusCodeSame(403);
         } finally {
             $db->delete('gf_vault_assets', ['organization_id' => $mine]);
             $db->delete('gf_vault_assets', ['organization_id' => $foreign]);
