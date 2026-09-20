@@ -191,3 +191,64 @@ test('profile API never redirects anonymous writes to a private HTML page', asyn
   expect((await response.json()).error.code).toBe('authentication_required');
   expect(response.headers()['cache-control']).toContain('no-store');
 });
+
+
+test('S2 photo library allows a mobile editor to upload and see a private asset', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000038';
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOokDsBAAJwAV+M1KYSAAAAAElFTkSuQmCC', 'base64');
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        user: { display_name: 'Editor de prueba' },
+        organization: { id, name: 'Mi biblioteca', role: 'editor' },
+        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+        organization_name_csrf: null, profile_name_csrf: 'profile-test',
+        vault_upload_csrf: 'vault-csrf-test',
+      },
+    }),
+  }));
+  await page.route('**/api/admin/vault', (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { assets: [], limit: 30 } }) });
+    }
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('vault-csrf-test');
+    expect(route.request().postDataBuffer().includes(png)).toBe(true);
+    return route.fulfill({
+      status: 201, contentType: 'application/json',
+      body: JSON.stringify({ data: { asset: {
+        id, name: 'foto-ejemplo.png', mime_type: 'image/png', size_bytes: png.length,
+        created_at: '2026-09-20 00:00:00', download_url: '/api/admin/vault/' + id + '/download',
+      } } }),
+    });
+  });
+
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?vault-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
+  await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
+    name: 'foto-ejemplo.png', mimeType: 'image/png', buffer: png,
+  });
+  await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
+  await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
+  await expect(page.getByText('foto-ejemplo.png')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Descargar' })).toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test('S2 vault API is JSON protected without a session', async ({ request }) => {
+  const list = await request.get('/api/admin/vault', { maxRedirects: 0 });
+  expect(list.status()).toBe(401);
+  expect((await list.json()).error.code).toBe('authentication_required');
+  const upload = await request.post('/api/admin/vault', { maxRedirects: 0 });
+  expect(upload.status()).toBe(401);
+  expect(upload.headers()['cache-control']).toContain('no-store');
+});
