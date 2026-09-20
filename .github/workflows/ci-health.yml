@@ -1,0 +1,29 @@
+name: GrindFlow CI Health
+run-name: CI Health #${{ github.run_number }} · ${{ github.event_name }}
+
+on:
+  schedule:
+    - cron: '15 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: grindflow-ci-health
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: ci-health
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verificar cálculos de salud CI
+        run: python3 scripts/ci-performance-report.py --self-test
+      - name: Tendencias de velocidad y fallos de PR/main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci-performance-report.py >> "$GITHUB_STEP_SUMMARY"
