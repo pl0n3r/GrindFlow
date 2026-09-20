@@ -34,3 +34,9 @@
 .vault-details small{color:#aaa9bd;overflow-wrap:anywhere;font-size:11px}
 .vault-list a{font-size:12px;color:#a8ffd5;white-space:nowrap}
 @media(max-width:520px){.vault-list li{flex-wrap:wrap}.vault-list a{margin-left:50px}}
+
+/* S2 paginated library controls, usable on narrow screens. */
+.vault-pages{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;font-size:12px;color:#c8c4d6}
+.vault-pages button{min-height:44px;padding:9px 14px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;cursor:pointer}
+.vault-pages button:disabled{opacity:.45;cursor:not-allowed}
+.vault-pages button:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}

@@ -214,14 +214,19 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
       },
     }),
   }));
-  await page.route('**/api/admin/vault', (route) => {
+  const stored = [];
+  await page.route('**/api/admin/vault**', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: { assets: [], limit: 30 } }) });
+        body: JSON.stringify({ data: { assets: stored, limit: 30, page: 1,
+          pages: stored.length ? 1 : 0, total: stored.length } }) });
     }
     expect(route.request().method()).toBe('POST');
     expect(route.request().headers()['x-csrf-token']).toBe('vault-csrf-test');
     expect(route.request().postDataBuffer().includes(png)).toBe(true);
+    const saved = { id, name: 'foto-ejemplo.png', mime_type: 'image/png', size_bytes: png.length,
+      created_at: '2026-09-20 00:00:00', download_url: '/api/admin/vault/' + id + '/download' };
+    stored.unshift(saved);
     return route.fulfill({
       status: 201, contentType: 'application/json',
       body: JSON.stringify({ data: { asset: {
@@ -252,4 +257,46 @@ test('S2 vault API is JSON protected without a session', async ({ request }) => 
   const upload = await request.post('/api/admin/vault', { maxRedirects: 0 });
   expect(upload.status()).toBe(401);
   expect(upload.headers()['cache-control']).toContain('no-store');
+});
+
+test('S2 mobile vault navigates real paginated API metadata', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000039';
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id, name: 'Biblioteca paginada', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'vault-test',
+    } }),
+  }));
+  const visited = [];
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const number = Number(new URL(route.request().url()).searchParams.get('page'));
+    visited.push(number);
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: [{ id, name: 'pagina-' + number + '.png', mime_type: 'image/png',
+          size_bytes: 100, created_at: '2026-09-20 00:00:00',
+          download_url: '/api/admin/vault/' + id + '/download' }],
+        page: number, pages: 2, total: 31, limit: 30,
+      } }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?vault-pages-e2e=1', type: 'module' });
+  await expect(page.getByText('31 imágenes en esta organización')).toBeVisible();
+  await expect(page.getByText('pagina-1.png')).toBeVisible();
+  await page.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(page.getByText('pagina-2.png')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Páginas de la biblioteca' }).getByText('Página 2 de 2')).toBeVisible();
+  await page.getByRole('button', { name: 'Anterior' }).click();
+  await expect(page.getByText('pagina-1.png')).toBeVisible();
+  expect(visited).toEqual([1, 2, 1]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
