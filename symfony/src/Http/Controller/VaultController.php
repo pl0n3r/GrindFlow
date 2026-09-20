@@ -439,13 +439,18 @@ final class VaultController extends AbstractController
             } elseif ($expectedSize < 1 || $expectedSize > self::MAX_BYTES
                 || preg_match('/\\A[a-fA-F0-9]{64}\\z/D', $expectedHash) !== 1) {
                 $status = 'mismatch';
-            } elseif (filesize($path) !== $expectedSize) {
-                $status = 'mismatch';
             } else {
-                $actualHash = @hash_file('sha256', $path);
-                // An unreadable file does not become a false mismatch.
-                $status = $actualHash === false ? 'unavailable'
-                    : (hash_equals(strtolower($expectedHash), $actualHash) ? 'verified' : 'mismatch');
+                $actualSize = @filesize($path);
+                if ($actualSize === false) {
+                    $status = 'unavailable';
+                } elseif ($actualSize !== $expectedSize) {
+                    $status = 'mismatch';
+                } else {
+                    $actualHash = @hash_file('sha256', $path);
+                    // An unreadable file does not become a false mismatch.
+                    $status = $actualHash === false ? 'unavailable'
+                        : (hash_equals(strtolower($expectedHash), $actualHash) ? 'verified' : 'mismatch');
+                }
             }
         }
 
