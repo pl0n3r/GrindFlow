@@ -325,7 +325,9 @@ final class VaultController extends AbstractController
             return $this->error(422, 'invalid_name', 'Indica únicamente un nombre de imagen válido.');
         }
         $name = trim($body['name']);
-        if (preg_match('/\\A[^\\x00-\\x1F\\x7F]{2,180}\\z/uD', $name) !== 1) {
+        if (preg_match('/\\A.{2,180}\\z/usD', $name) !== 1
+            || preg_match('/[\\p{C}\\p{Zl}\\p{Zp}]/u', $name) === 1
+            || preg_match('/[^\\p{Z}\\p{C}]/u', $name) !== 1) {
             return $this->error(422, 'invalid_name', 'El nombre debe tener entre 2 y 180 caracteres visibles.');
         }
 
