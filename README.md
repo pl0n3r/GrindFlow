@@ -7,40 +7,40 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.26: solo el deploy actual.** Base `main` v0.1.25 `fe0eea406de8b3325ff9bc37e5add85cafbdf7c9`. El home nuevo ya estaba fusionado en v0.1.25; este cambio fuerza a cargar su CSS nuevo y el estilo de los footers en cada versión. **No se declara Hostinger actualizado sin observarlo.**
+> **Snapshot v0.1.27: solo el deploy actual.** Base `main` v0.1.26 `f444475020c9310a71530af3174cfa69db26e9be`. Entrega pequeña y verificable: dashboard con recuentos reales tenant-safe de contenido listo y publicaciones programadas. CSS cache-busting de v0.1.26 preservado. Symfony S0 continúa aislado y Laravel atiende el sitio remoto; **no se infiere despliegue Hostinger del merge**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
 
 ## Fuentes de verdad
-[AGENTS.md](AGENTS.md) · [Especificación](docs/GRINDFLOW-SPEC.md) · [Transición](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+[AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Transición](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.26** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.25~~ | `fe0eea406de8b3325ff9bc37e5add85cafbdf7c9` |
-| CI del PR | 🚧 Pendiente de head final | Gate `validate` |
-| Sonar | 🚧 Pendiente de head final | PR nuevo |
-| CodeRabbit | 🚧 Revisión por comprobar | PR nuevo |
-| CI del SHA exacto de main | 🚧 Después de fusión | No inferir del PR |
-| Deploy Observer | ⛔ No verificado en Hostinger | Release remoto independiente |
-| Production Smoke | ⛔ Credencial E2E ausente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Producción v0.1.26 | ⛔ No confirmada | CI ≠ despliegue |
-| Migraciones | ✅ ~~Sin cambios de esquema~~ | CSS/Blade/metadatos |
+| Version objetivo | 🚧 **v0.1.27** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.26~~ | `f444475020c9310a71530af3174cfa69db26e9be` |
+| CI del PR | 🚧 Pendiente de head final | `GrindFlow CI / validate` |
+| Sonar | 🚧 Pendiente de head final | SonarCloud PR |
+| CodeRabbit | 🚧 Pendiente | PR de dashboard |
+| CI del SHA exacto de main | 🚧 Después del merge | No inferir del PR |
+| Deploy Observer | ⛔ Release remoto v0.1.27 no observado | Hostinger independiente |
+| Production Smoke | ⛔ Credencial de lectura E2E pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Producción v0.1.27 | ⛔ No verificada | CI ≠ deploy |
+| Migraciones | ✅ ~~Ningún cambio de esquema~~ | Solo consultas de lectura |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+56** | **−45** | **+11** |
+| **6** | **+191** | **−72** | **+119** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
-| Alcance | Cache-busting de CSS en home, login, workspace y módulos; versionado y tests |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack** |
+| Alcance | Consultas tenant-safe de dashboard + UI de métricas + navegador y pruebas PHP |
 | Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
 ## Flujo de entrega
@@ -58,43 +58,35 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Los estilos de home/login y backend usan `css/grindflow.css?v=0.1.26` generado desde la configuración: cada release refresca CSS, sin cambiar endpoints ni datos.
-- La versión humana sigue visible en front y backend, mediante un único `config/version.php`; incremento consecutivo **0.1.25 → 0.1.26**.
-- AGENTS.md registra entregas pequeñas, visibles y verificables; prueba PHP obliga a mantener la URL CSS versionada.
+- Dashboard deja de mostrar métricas técnicas como si fueran datos de negocio y ahora cuenta media ready y schedules pendientes de las organizaciones visibles.
+- Los contadores usan explícitamente IDs de organizaciones visibles del usuario, con fallback «—/Módulo no disponible» cuando el esquema falla; sin tocar contenido real.
+- Se preserva CSS versionado de v0.1.26 y se incrementa patch **0.1.26 → 0.1.27** con versión ya visible en el footer.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md`
 - `README.md`
+- `app/Http/Controllers/DashboardController.php`
 - `config/version.php`
-- `resources/views/admin/diagnostics.blade.php`
-- `resources/views/admin/system.blade.php`
-- `resources/views/auth/login.blade.php`
 - `resources/views/dashboard.blade.php`
-- `resources/views/distribution/index.blade.php`
-- `resources/views/finance/index.blade.php`
-- `resources/views/scheduling/index.blade.php`
-- `resources/views/traffic/index.blade.php`
-- `resources/views/vault/index.blade.php`
-- `resources/views/welcome.blade.php`
-- `tests/Feature/VisualShellTest.php`
+- `scripts/browser-smoke.sh`
+- `tests/Feature/OrganizationVisibilityTest.php`
 
 ## Validación
-- Comprobar CI/Sonar del PR y CI exact-main tras merge, luego presencia de v0.1.26 en Hostinger.
-- El footer informa versión humana, **no** demuestra el SHA del checkout remoto.
+- CI y Sonar PR, CI exact-main postmerge y observación Hostinger son pruebas separadas.
+- Dashboard es Laravel existente, no paridad del nuevo Symfony. No afirmar publicación externa real.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Confirmar CSS y footer v0.1.26, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 Primer avance pequeño S1 Symfony: login/tenant |
-| **LATER** | 🚧 Biblioteca → reglas → distribución → Traffic |
-| **BLOCKED / EXTERNAL** | ⛔ Observación Hostinger y credenciales E2E |
+| **NOW** | 🚧 Validar dashboard v0.1.27, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 S1 autenticación/tenant Symfony en slice pequeño |
+| **LATER** | 🚧 Vault móvil → reglas → distribución real autorizada → piloto |
+| **BLOCKED / EXTERNAL** | ⛔ Observar Hostinger y configurar smoke de solo lectura |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Home producto v0.1.25 fusionado~~ | ✅ ~~CI exact-main v0.1.25~~ |
-| **NOW** | 🚧 CSS/footers sin caché vieja | 🚧 Confirmación remota |
-| **NEXT** | 🚧 S1 identidad | 🚧 Backend Symfony |
-| **LATER** | 🚧 Piloto | 🚧 Recorrido completo |
-| **BLOCKED / EXTERNAL** | ⛔ Producción | ⛔ Sin verificación |
+| **DONE** | ✅ ~~Home SaaS + footer visible v0.1.25~~ | ✅ ~~CSS cache-busting v0.1.26~~ |
+| **NOW** | 🚧 Dashboard con datos reales v0.1.27 | 🚧 CI/observación remota |
+| **NEXT** | 🚧 Identidad real Symfony | 🚧 S1 |
+| **LATER** | 🚧 Automatización completa | 🚧 S2–S5 |
+| **BLOCKED / EXTERNAL** | ⛔ Producción v0.1.27 | ⛔ Sin verificar |

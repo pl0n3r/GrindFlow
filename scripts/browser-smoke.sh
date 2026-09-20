@@ -176,10 +176,11 @@ PY
     --dump-dom \
     "$BASE_URL/__grindflow_e2e_login.html" > "$dom"
 
-  assert_contains "$dom" "Overview"
+  assert_contains "$dom" "Tu operación"
   assert_contains "$dom" "$E2E_USER_NAME"
   assert_contains "$dom" "$E2E_ORG_NAME"
-  assert_contains "$dom" "Tenant isolation active"
+  assert_contains "$dom" "Contenido listo"
+  assert_contains "$dom" "Publicaciones programadas"
   assert_contains "$dom" "data-grindflow-version="
 
   printf 'PASS %-20s %s\n' "dashboard-auth" "/dashboard"
