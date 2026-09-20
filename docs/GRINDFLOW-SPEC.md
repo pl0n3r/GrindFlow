@@ -166,6 +166,21 @@ Una regla debe registrar `platform`, categoría, formatos afectados, estado, raz
 
 **Alcance:** este baseline sirve para diseño y prevención técnica; no constituye asesoría legal ni garantiza que una plataforma acepte una publicación concreta. La decisión final de moderación pertenece al proveedor externo.
 
+#### 1A.5.2A. Baseline de cumplimiento multired
+
+GrindFlow debe tratar las políticas de cada plataforma como restricciones de ejecución versionadas. El baseline inicial cubre X, Instagram, Facebook y TikTok.
+
+Para cada combinación de recurso, texto, enlace, formato y destino, Compliance debe devolver: `allowed`, `allowed_with_constraints`, `limited_distribution`, `blocked` o `manual_review`. Cada regla registra plataforma, categoría, formatos, estado, razón, fuente oficial, fecha de revisión y versión interna.
+
+- **X:** respetar políticas de automatización, autenticidad, anti-spam, enlaces, privacidad y propiedad intelectual. Evitar publicaciones duplicadas a escala y manipulación artificial de interacción.
+- **Instagram:** respetar Community Guidelines, autenticidad, anti-spam, derechos sobre el material, privacidad y seguridad. Una publicación permitida no implica necesariamente recomendación o alcance.
+- **Facebook:** aplicar Community Standards y distinguir cumplimiento de distribución/recomendación. Las infracciones conocidas deben bloquearse antes de publicar.
+- **TikTok:** representar expresamente la diferencia entre contenido eliminado y contenido permitido pero no elegible para For You. Respetar autenticidad, anti-spam, propiedad intelectual y requisitos de disclosure aplicables.
+
+Reglas derivadas: Compliance se ejecuta antes de entregar; `blocked` falla cerrado; `manual_review` requiere decisión humana; textos, hashtags y enlaces se evalúan junto con el recurso; la reutilización limita repetición; se conserva la versión de reglas aplicada; y los permisos/capacidades de cada API constituyen una compuerta independiente. Si una fuente queda desactualizada, la decisión puede degradarse a revisión manual.
+
+Este baseline orienta diseño y prevención técnica; la moderación final corresponde a cada proveedor externo.
+
 #### 1A.5.2. Reglas de publicación
 
 El creador puede definir reglas diferentes por plataforma: frecuencia diaria o semanal, días, horarios, tipos de contenido y destinos. Las reglas pueden cambiarse posteriormente sin reconstruir toda la planificación.
