@@ -413,7 +413,7 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
   ]);
   await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
   await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
-  await expect(page.getByText(/2 archivo\(s\) requiere\(n\) revisión/)).toBeVisible();
+  await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
   expect(attempts).toBe(1);

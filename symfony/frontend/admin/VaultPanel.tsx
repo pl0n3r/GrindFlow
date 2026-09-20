@@ -220,9 +220,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       try {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
           file.size < 1 || file.size > 8 * 1024 * 1024) {
+          retryable = false;
           rejected += 1;
-          results.push({ name: file.name, success: false, message: 'Se aceptan imágenes JPEG, PNG o WebP de hasta 8 MiB.' });
-          continue;
+          throw new Error('Se aceptan imágenes JPEG, PNG o WebP de hasta 8 MiB.');
         }
         const data = new FormData();
         data.append('file', file);
@@ -240,7 +240,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           throw new Error(body?.error?.message ?? 'No se pudo guardar esta imagen.');
         }
         // Server is the source of truth for ordering and total after this batch.
-        if (!body.data.asset) {
+        if (!body?.data?.asset) {
           // The server replied success: reuploading may duplicate a saved file.
           retryable = false;
           rejected += 1;
@@ -269,7 +269,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     form.reset();
     setFeedback(completed + ' de ' + selected.length + ' imágenes guardadas.' +
       (failures.length ? ' ' + failures.join(' ') : '') +
-      (rejected ? ' ' + rejected + ' archivo(s) requiere(n) revisión antes de volver a enviarse.' : ''));
+      (rejected ? ' ' + rejected + (rejected === 1
+        ? ' archivo requiere revisión antes de volver a enviarse.'
+        : ' archivos requieren revisión antes de volver a enviarse.') : ''));
     setHasTrashDuplicate(trashDuplicate);
     setUploading(false);
   }
