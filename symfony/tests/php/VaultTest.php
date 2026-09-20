@@ -216,8 +216,10 @@ final class VaultTest extends WebTestCase
             ]);
             $client->request('GET', '/api/admin/vault/'.$mineAsset);
             self::assertResponseStatusCodeSame(403);
+            self::assertSame('organization_access_changed', json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+            // Revocation clears the selected tenant, so the next call needs a new selection.
             $client->request('GET', '/api/admin/vault');
-            self::assertResponseStatusCodeSame(403);
+            self::assertResponseStatusCodeSame(409);
         } finally {
             $db->delete('gf_vault_assets', ['organization_id' => $mine]);
             $db->delete('gf_vault_assets', ['organization_id' => $foreign]);
