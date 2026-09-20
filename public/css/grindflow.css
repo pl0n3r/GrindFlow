@@ -1541,3 +1541,13 @@ a {
 .gf-org__summary{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;color:var(--gf-muted);font-size:12px}
 .gf-org__summary span{display:inline-flex;align-items:center;gap:5px}
 .gf-org__summary strong{color:var(--gf-text);font-variant-numeric:tabular-nums}
+
+/* Upcoming publications are readable on mobile without a horizontal scroll. */
+.gf-empty--compact{min-height:150px}
+.gf-agenda{display:grid;gap:10px}
+.gf-agenda__item{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:20px;align-items:center;border:1px solid var(--gf-line);border-radius:14px;padding:15px;background:rgba(255,255,255,.025)}
+.gf-agenda__when,.gf-agenda__content{display:grid;min-width:0;gap:6px}
+.gf-agenda__when>span,.gf-agenda__content>span{color:var(--gf-muted);font-size:11px}
+.gf-agenda__when time{font-size:12px;font-variant-numeric:tabular-nums}
+.gf-agenda__content strong{overflow-wrap:anywhere;font-size:13px}
+@media(max-width:680px){.gf-agenda__item{grid-template-columns:minmax(0,1fr);gap:12px}.gf-agenda__item .gf-button{justify-self:start}}

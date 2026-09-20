@@ -287,6 +287,50 @@
                     @endif
                 </div>
             </section>
+            <section class="gf-panel gf-panel--spaced" aria-label="Próximas publicaciones">
+                <header class="gf-panel__head">
+                    <h2>Próximas publicaciones</h2>
+                    <span class="gf-appbar__meta">Las siguientes 5 · horario UTC</span>
+                </header>
+                <div class="gf-panel__body">
+                    @if ($upcomingPublications === null)
+                        <div class="gf-empty gf-empty--compact">
+                            <div>
+                                <h3>Agenda no disponible</h3>
+                                <p>El módulo de programación aún no está disponible en esta base de datos.</p>
+                            </div>
+                        </div>
+                    @elseif ($upcomingPublications->isEmpty())
+                        <div class="gf-empty gf-empty--compact">
+                            <div>
+                                <h3>Sin próximas publicaciones</h3>
+                                <p>No hay publicaciones pendientes para tus organizaciones visibles.</p>
+                            </div>
+                        </div>
+                    @else
+                        <div class="gf-agenda">
+                            @foreach ($upcomingPublications as $publication)
+                                <article class="gf-agenda__item" data-upcoming-publication="{{ $publication->id }}">
+                                    <div class="gf-agenda__when">
+                                        <span>Fecha programada · UTC</span>
+                                        <time datetime="{{ str_replace(' ', 'T', $publication->scheduled_for_utc) }}Z">
+                                            {{ $publication->scheduled_for_utc }} UTC
+                                        </time>
+                                    </div>
+                                    <div class="gf-agenda__content">
+                                        <strong>{{ $publication->media_name }}</strong>
+                                        <span>{{ $publication->destination_name }}</span>
+                                    </div>
+                                    <a class="gf-button gf-button--ghost"
+                                        href="{{ route('organizations.scheduler.index', ['organizationId' => $publication->organization_id]) }}">
+                                        Ver agenda →
+                                    </a>
+                                </article>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </section>
             <x-release-footer />
         </main>
     </div>

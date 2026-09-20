@@ -7,8 +7,11 @@ use App\Models\MediaAsset;
 use App\Models\MediaBlob;
 use App\Models\Membership;
 use App\Models\Organization;
+use App\Models\PublishingDestination;
+use App\Models\ScheduledPublication;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -196,6 +199,93 @@ class OrganizationVisibilityTest extends TestCase
                     'original_filename' => $filename,
                     'source_type' => 'manual_upload',
                     'status' => MediaAsset::STATUS_READY,
+                ]);
+            },
+        );
+    }
+
+    public function test_upcoming_publications_only_show_future_rows_for_visible_organizations(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $visible = Organization::factory()->create();
+        $foreign = Organization::factory()->create();
+
+        foreach ([[$user, $visible], [$other, $foreign]] as [$member, $organization]) {
+            Membership::query()->create([
+                'organization_id' => $organization->getKey(),
+                'user_id' => $member->getKey(),
+                'role' => UserRole::Studio,
+            ]);
+        }
+
+        $this->makeScheduledMedia($user, $visible, 'next-visible.jpg', 2);
+        $this->makeScheduledMedia($user, $visible, 'past-visible.jpg', -2);
+        $this->makeScheduledMedia($other, $foreign, 'hidden-next.jpg', 1);
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Próximas publicaciones')
+            ->assertSee('next-visible.jpg')
+            ->assertDontSee('past-visible.jpg')
+            ->assertDontSee('hidden-next.jpg')
+            ->assertSee(route('organizations.scheduler.index', [
+                'organizationId' => $visible->getKey(),
+            ]))
+            ->assertDontSee(route('organizations.scheduler.index', [
+                'organizationId' => $foreign->getKey(),
+            ]));
+    }
+
+    public function test_upcoming_publications_has_true_empty_state(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Sin próximas publicaciones')
+            ->assertDontSee('Agenda no disponible');
+    }
+
+    private function makeScheduledMedia(
+        User $user,
+        Organization $organization,
+        string $filename,
+        int $daysFromNow,
+    ): void {
+        app(TenantContext::class)->runWithinOrganization(
+            $user,
+            (string) $organization->getKey(),
+            function () use ($user, $filename, $daysFromNow): void {
+                $blob = MediaBlob::query()->create([
+                    'storage_disk' => 'local',
+                    'storage_key' => 'synthetic/schedule/'.$filename,
+                    'sha256' => hash('sha256', 'schedule-'.$filename),
+                    'byte_size' => 10,
+                    'mime_type' => 'image/jpeg',
+                ]);
+                $media = MediaAsset::query()->create([
+                    'media_blob_id' => $blob->getKey(),
+                    'original_filename' => $filename,
+                    'source_type' => 'manual_upload',
+                    'status' => MediaAsset::STATUS_READY,
+                ]);
+                $destination = PublishingDestination::query()->create([
+                    'name' => 'Canal de prueba',
+                    'provider' => 'provider-test',
+                    'status' => 'active',
+                ]);
+                ScheduledPublication::query()->create([
+                    'media_asset_id' => $media->getKey(),
+                    'publishing_destination_id' => $destination->getKey(),
+                    'scheduled_by_user_id' => $user->getKey(),
+                    'status' => 'scheduled',
+                    'timezone' => 'UTC',
+                    'scheduled_for_utc' => CarbonImmutable::now('UTC')
+                        ->addDays($daysFromNow)
+                        ->startOfMinute(),
                 ]);
             },
         );

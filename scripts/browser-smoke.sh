@@ -181,6 +181,7 @@ PY
   assert_contains "$dom" "$E2E_ORG_NAME"
   assert_contains "$dom" "Contenido listo"
   assert_contains "$dom" "Publicaciones programadas"
+  assert_contains "$dom" "Próximas publicaciones"
   assert_contains "$dom" "data-organization-summary="
   assert_contains "$dom" "data-grindflow-version="
 
