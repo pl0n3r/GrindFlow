@@ -28,8 +28,7 @@
                 <span class="gf-sidebar__label">Workspace</span>
 
                 <a class="gf-navitem gf-navitem--active" href="{{ route('dashboard') }}" aria-current="page">
-                    <span class="gf-navitem__icon" aria-hidden="true">◫</span>
-                    <span class="gf-navitem__text">Overview</span>
+                    <span class="gf-navitem__text">Resumen</span>
                 </a>
 
                 @if ($organizations->isNotEmpty() && $vaultRouteAvailable)
@@ -37,13 +36,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.vault.index', ['organizationId' => $organizations->first()->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                        <span class="gf-navitem__text">Vault</span>
+                        <span class="gf-navitem__text">Biblioteca</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">◇</span>
-                        <span class="gf-navitem__text">Vault</span>
+                        <span class="gf-navitem__text">Biblioteca</span>
                     </span>
                 @endif
 
@@ -52,13 +49,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.scheduler.index', ['organizationId' => $organizations->first()->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                        <span class="gf-navitem__text">Scheduler</span>
+                        <span class="gf-navitem__text">Programación</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌁</span>
-                        <span class="gf-navitem__text">Scheduler</span>
+                        <span class="gf-navitem__text">Programación</span>
                     </span>
                 @endif
 
@@ -67,13 +62,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.distribution.index', ['organizationId' => $organizations->first()->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
-                        <span class="gf-navitem__text">Distribution</span>
+                        <span class="gf-navitem__text">Distribución</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">⇢</span>
-                        <span class="gf-navitem__text">Distribution</span>
+                        <span class="gf-navitem__text">Distribución</span>
                     </span>
                 @endif
 
@@ -88,13 +81,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.traffic.index', ['organizationId' => $organizations->first()->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                        <span class="gf-navitem__text">Traffic</span>
+                        <span class="gf-navitem__text">Tráfico</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">⌗</span>
-                        <span class="gf-navitem__text">Traffic</span>
+                        <span class="gf-navitem__text">Tráfico</span>
                     </span>
                 @endif
 
@@ -107,13 +98,11 @@
                         class="gf-navitem"
                         href="{{ route('organizations.finance.index', ['organizationId' => $organizations->first()->id]) }}"
                     >
-                        <span class="gf-navitem__icon" aria-hidden="true">$</span>
-                        <span class="gf-navitem__text">Finance</span>
+                        <span class="gf-navitem__text">Finanzas</span>
                     </a>
                 @else
                     <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                        <span class="gf-navitem__icon" aria-hidden="true">$</span>
-                        <span class="gf-navitem__text">Finance</span>
+                        <span class="gf-navitem__text">Finanzas</span>
                     </span>
                 @endif
 
@@ -122,25 +111,21 @@
 
                     @if ($systemRouteAvailable)
                         <a class="gf-navitem" href="{{ route('admin.system') }}">
-                            <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
-                            <span class="gf-navitem__text">System</span>
+                            <span class="gf-navitem__text">Sistema</span>
                         </a>
                     @else
                         <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                            <span class="gf-navitem__icon" aria-hidden="true">⌘</span>
-                            <span class="gf-navitem__text">System</span>
+                            <span class="gf-navitem__text">Sistema</span>
                         </span>
                     @endif
 
                     @if ($diagnosticsRouteAvailable)
                         <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
-                            <span class="gf-navitem__icon" aria-hidden="true">!</span>
-                            <span class="gf-navitem__text">Diagnostics</span>
+                            <span class="gf-navitem__text">Diagnósticos</span>
                         </a>
                     @else
                         <span class="gf-navitem gf-navitem--disabled" aria-disabled="true">
-                            <span class="gf-navitem__icon" aria-hidden="true">!</span>
-                            <span class="gf-navitem__text">Diagnostics</span>
+                            <span class="gf-navitem__text">Diagnósticos</span>
                         </span>
                     @endif
                 @endif
