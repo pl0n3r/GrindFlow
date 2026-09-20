@@ -99,6 +99,7 @@
             @endif
             </section>
         @endif
+        <x-release-footer />
     </main>
 </div>
 </body></html>

@@ -250,6 +250,7 @@
                     @endif
                 </div>
             </section>
+            <x-release-footer />
         </main>
     </div>
 </body>

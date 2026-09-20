@@ -187,8 +187,11 @@ PY
 capture_page \
   "landing" \
   "/" \
-  "Control operativo" \
-  "Laravel core online" \
+  "Tu contenido." \
+  "En movimiento." \
+  "Carga y organiza" \
+  "Define tus reglas" \
+  "GrindFlow · v" \
   "css/grindflow.css"
 
 capture_page \
