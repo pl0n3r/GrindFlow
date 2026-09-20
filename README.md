@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+0** | **−0** | **+0** |
+| **9** | **+184** | **−22** | **+162** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
