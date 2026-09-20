@@ -667,7 +667,7 @@ test('S2 mobile searches private filenames in library and trash without changing
   await expect(page.getByText('ensayo.png')).toHaveCount(0);
   await expect(page.getByText('Resultados para «festival» en biblioteca.')).toBeVisible();
   await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
-  await page.getByRole('button', { name: 'Papelera' }).click();
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
   await expect(page.getByText('No hay imágenes que coincidan con tu búsqueda.')).toBeVisible();
   await expect(page.getByText('Resultados para «festival» en papelera.')).toBeVisible();
   await page.getByRole('button', { name: 'Biblioteca', exact: true }).click();
