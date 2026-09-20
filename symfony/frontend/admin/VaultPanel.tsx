@@ -20,6 +20,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [view, setView] = useState<'active' | 'trash'>('active');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState('');
   const [actionFeedback, setActionFeedback] = useState('');
   const [actionError, setActionError] = useState('');
   const [pages, setPages] = useState(0);
@@ -52,6 +54,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetail(null);
       setDetailError('');
       setConfirmId(null);
+      setRenameId(null);
       setTotal(data.total);
       setQuota(data.quota ?? null);
       setPages(data.pages);
@@ -95,6 +98,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setPage(1);
     setView(next);
     setConfirmId(null);
+    setRenameId(null);
     setDetail(null);
     setActionFeedback('');
     setActionError('');
@@ -123,6 +127,38 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetail(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'No se pudo actualizar el archivo.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function rename(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    if (!canUpload || !manageCsrf || busyId || !renameName.trim()) return;
+    setBusyId(id);
+    setActionError('');
+    setActionFeedback('');
+    try {
+      const response = await fetch('/api/admin/vault/' + id + '/name', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': manageCsrf,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ name: renameName }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo renombrar la imagen.');
+      const updated = body.data.name as string;
+      setAssets((previous) => previous.map((asset) =>
+        asset.id === id ? { ...asset, name: updated } : asset));
+      setDetail((previous) => previous?.id === id ? { ...previous, name: updated } : previous);
+      setActionFeedback('Nombre de imagen actualizado.');
+      setRenameId(null);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo renombrar la imagen.');
     } finally {
       setBusyId(null);
     }
@@ -233,6 +269,23 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               onClick={() => void inspect(asset.id)}>Detalles</button>
             <a href={asset.download_url} download>Descargar</a>
           </>}
+          {view === 'active' && canUpload && manageCsrf &&
+            <button type="button" disabled={!!busyId} aria-expanded={renameId === asset.id}
+              onClick={() => {
+                setRenameId((current) => current === asset.id ? null : asset.id);
+                setRenameName(asset.name);
+                setConfirmId(null);
+              }}>Renombrar</button>}
+          {view === 'active' && renameId === asset.id && canUpload && manageCsrf &&
+            <form className="vault-rename" onSubmit={(event) => void rename(event, asset.id)}>
+              <label htmlFor={'vault-rename-' + asset.id}>Nombre de la imagen</label>
+              <input id={'vault-rename-' + asset.id} value={renameName} minLength={2} maxLength={180}
+                required disabled={!!busyId} onChange={(event) => setRenameName(event.currentTarget.value)} />
+              <button type="submit" disabled={!!busyId || renameName.trim().length < 2}>
+                {busyId === asset.id ? 'Guardando…' : 'Guardar nombre'}
+              </button>
+              <button type="button" disabled={!!busyId} onClick={() => setRenameId(null)}>Cancelar nombre</button>
+            </form>}
           {view === 'trash' && <small className="vault-removed-date">En papelera: {asset.deleted_at}</small>}
           {canUpload && manageCsrf && (view === 'trash'
             ? <button type="button" disabled={!!busyId} onClick={() => void changeState(asset.id, 'restore')}>
