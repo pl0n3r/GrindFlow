@@ -1,12 +1,12 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice v0.1.50, rama del próximo PR (sin merge):** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice objetivo v0.1.51, PR pendiente de integración:** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.50 preparada en rama sobre main v0.1.49: vista previa privada en el detalle de imagen activa. |
-| VALIDADO EN CÓDIGO | CI del nuevo PR y Sonar deben pasar en el head final; CI exact-main de v0.1.49 success. |
-| DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel v0.1.48 no certifica Symfony ni SHA remoto. |
+| IMPLEMENTADO | v0.1.51 preparada sobre main v0.1.50: verificación privada de tamaño y SHA-256 de originales en biblioteca y papelera. |
+| VALIDADO EN CÓDIGO | CI del head final y Sonar pendientes de reconfirmar tras correcciones; CI exact-main de v0.1.50 success. |
+| DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
 Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
