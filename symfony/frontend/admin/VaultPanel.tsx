@@ -29,6 +29,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [view, setView] = useState<'active' | 'trash'>('active');
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
+  const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp'>('all');
+  const [sort, setSort] = useState<'recent' | 'oldest' | 'name_asc' | 'name_desc' | 'size_asc' | 'size_desc'>('recent');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
@@ -55,7 +57,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/admin/vault?page=' + page + '&view=' + view +
-      (search ? '&q=' + encodeURIComponent(search) : ''), {
+      (search ? '&q=' + encodeURIComponent(search) : '') +
+      '&format=' + format + '&sort=' + sort, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
@@ -83,7 +86,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [page, refresh, view, search]);
+  }, [page, refresh, view, search, format, sort]);
 
   async function inspect(id: string) {
     if (detail?.id === id) {
@@ -299,6 +302,34 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         onClick={clearSearch}>Limpiar búsqueda</button>}
     </form>
     {search && <p className="vault-search-status" role="status">Resultados para «{search}» en {view === 'trash' ? 'papelera' : 'biblioteca'}.</p>}
+    <div className="vault-filters" role="group" aria-label="Filtrar y ordenar imágenes">
+      <label htmlFor="vault-format">Formato</label>
+      <select id="vault-format" value={format} disabled={loading}
+        onChange={(event) => {
+          setLoading(true);
+          setPage(1);
+          setFormat(event.currentTarget.value as typeof format);
+        }}>
+        <option value="all">Todos los formatos</option>
+        <option value="jpeg">JPEG</option>
+        <option value="png">PNG</option>
+        <option value="webp">WebP</option>
+      </select>
+      <label htmlFor="vault-sort">Ordenar por</label>
+      <select id="vault-sort" value={sort} disabled={loading}
+        onChange={(event) => {
+          setLoading(true);
+          setPage(1);
+          setSort(event.currentTarget.value as typeof sort);
+        }}>
+        <option value="recent">Más recientes</option>
+        <option value="oldest">Más antiguos</option>
+        <option value="name_asc">Nombre A-Z</option>
+        <option value="name_desc">Nombre Z-A</option>
+        <option value="size_asc">Menor tamaño</option>
+        <option value="size_desc">Mayor tamaño</option>
+      </select>
+    </div>
     {quota && <div className="vault-quota" aria-label="Cuota de almacenamiento">
       <strong>Espacio utilizado: {(quota.used_bytes / (1024 * 1024)).toFixed(2)} de {(quota.max_bytes / (1024 * 1024)).toFixed(0)} MiB</strong>
       <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
@@ -353,7 +384,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     {loading && <p role="status">Cargando biblioteca…</p>}
     {error && <p role="alert">{error}</p>}
     {!loading && !error && assets.length === 0 &&
-      <p role="status">{search ? 'No hay imágenes que coincidan con tu búsqueda.' :
+      <p role="status">{search || format !== 'all' ? 'No hay imágenes que coincidan con los filtros.' :
         view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
       <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
