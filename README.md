@@ -18,7 +18,7 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Objetivo | 🚧 **v0.1.22** | `config/version.php` |
+| Version objetivo | 🚧 **v0.1.22** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.21~~ | `b30f088ceefa0b580c6da9ccd7c1f16617e38bc2` |
 | CI del PR | 🚧 Por verificar en head final | [PR #8](https://github.com/pl0n3r/GrindFlow/pull/8) |
 | Sonar | 🚧 Por confirmar en head final | [PR #8](https://github.com/pl0n3r/GrindFlow/pull/8) |
