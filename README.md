@@ -61,13 +61,14 @@ flowchart LR
 - Formulario real de perfil propio visible en panel React incluso con rol editor, sin otorgar permisos de administración de organización.
 - POST JSON solo con `name`: actor derivado de sesión, CSRF independiente, 401/403/422 explícitos y cuenta activa revalidada en SQL.
 - Contexto Symfony consulta el nombre vigente para evitar mostrar identidad desactualizada después de guardar.
-- Pruebas PHPUnit/Chromium para CSRF, IDs ajenos, cuentas revocadas y experiencia móvil. Sin migraciones ni cutover.
+- Pruebas PHPUnit/Chromium para CSRF, IDs ajenos, cuentas revocadas y experiencia móvil y navegación responsive sin desborde horizontal. Sin migraciones ni cutover.
 
 ## Archivos modificados en este deploy
 - `README.md`
 - `config/version.php`
 - `symfony/README.md`
 - `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/frontend/admin/admin.css`
 - `symfony/src/Http/Controller/AdminContextController.php`
 - `symfony/src/Http/Controller/ProfileController.php`
 - `symfony/src/Identity/Application/MembershipContext.php`
