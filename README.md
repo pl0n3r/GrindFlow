@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.24: solo el deploy actual.** Base `main` v0.1.23 `8b0cf563af5bcbae4fa230ede22117b99642b071`. Primer Symfony aislado y vista React/Vite para validación de código; **Laravel continúa como runtime productivo** y la demo nueva no está desplegada en Hostinger.
+> **Snapshot v0.1.25: solo el deploy actual.** Base `main` v0.1.24 `2b36e4e7d9a4232816e363e6e34b8c5139674791`. Pequeña entrega visual: home del SaaS y versión compartida en footer público y privado. La arquitectura objetivo continúa siendo Symfony/React. **Sin prueba de despliegue Hostinger hasta observar el release remoto.**
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.24** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.23~~ | `8b0cf563af5bcbae4fa230ede22117b99642b071` |
-| CI del PR | 🚧 Validación del head final pendiente | [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12) |
-| Sonar | 🚧 Por revisar | [PR del slice S0](https://github.com/pl0n3r/GrindFlow/pulls) |
-| CodeRabbit | 🚧 Revisión pendiente | PR del slice S0 |
-| CI del SHA exacto de main | 🚧 Posterior a merge | No inferir del CI de PR |
-| Deploy Observer | ⛔ Entorno remoto sin validar | Observación de producción independiente |
-| Production Smoke | ⛔ Credencial E2E ausente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Producción Symfony S0 | ⛔ NO desplegada | Directorio `symfony/` aislado |
-| Migraciones | ✅ ~~Cero cambios de esquema productivo~~ | Doctrine configurado sin ejecutar migraciones |
+| Version objetivo | 🚧 **v0.1.25** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.24~~ | `2b36e4e7d9a4232816e363e6e34b8c5139674791` |
+| CI del PR | 🚧 Pendiente de head final | `GrindFlow CI / validate` |
+| Sonar | 🚧 Pendiente de head final | SonarCloud PR |
+| CodeRabbit | 🚧 Revisión por comprobar | PR de home |
+| CI del SHA exacto de main | 🚧 Después del merge | No inferir del PR |
+| Deploy Observer | ⛔ Release remoto v0.1.25 no observado | Sin evidencia de Hostinger |
+| Production Smoke | ⛔ Autenticación E2E pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Producción v0.1.25 | ⛔ No verificada | CI ≠ deploy |
+| Migraciones | ✅ ~~Ningún cambio de esquema~~ | UI/release solamente |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **53** | **+9309** | **−46** | **+9263** |
+| **18** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | Nuevo Symfony y CI paralelo: PHP/Doctrine/MariaDB, Twig, React/TS/Vite, Chromium y contratos HTTP |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
+| Alcance | Landing Blade/CSS responsive, versión compartida en footers, pruebas Chromium y PHP |
 | Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
 ## Flujo de entrega
@@ -58,82 +58,47 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- S0: home Twig real y demo React interactiva con navegación y versión; `/admin` protegido con 403 hasta identidad real en S1.
-- Vite genera assets con manifiesto validado; health sin inventar SHA desplegado; headers de seguridad y request ID.
-- Nuevo gate Symfony/MariaDB/TypeScript/Playwright, en paralelo a pruebas Laravel/legado; sin borrar datos ni tocar Hostinger.
+- Home sustituido: visión SaaS, carga → reglas → distribución → tráfico, dirigido a creadores y estudios; botones al login real.
+- Home, login y panel con footer de versión central desde `config/version.php`; no hardcoded.
+- Patch consecutivo **0.1.24 → 0.1.25**. Sin datos, migraciones, conectores ni Hostinger modificados.
 
 ## Archivos modificados en este deploy
-- `.github/workflows/grindflow-ci.yml`
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `eslint.config.mjs`
-- `pint.json`
-- `scripts/ci-scope-contract.sh`
-- `scripts/ci-scope.sh`
-- `scripts/readme-dashboard.py`
-- `symfony/.env.example`
-- `symfony/.gitignore`
-- `symfony/README.md`
-- `symfony/bin/console`
-- `symfony/composer.json`
-- `symfony/composer.lock`
-- `symfony/config/bootstrap.php`
-- `symfony/config/bundles.php`
-- `symfony/config/packages/doctrine.yaml`
-- `symfony/config/packages/doctrine_migrations.yaml`
-- `symfony/config/packages/framework.yaml`
-- `symfony/config/packages/security.yaml`
-- `symfony/config/packages/test/framework.yaml`
-- `symfony/config/packages/twig.yaml`
-- `symfony/config/routes.yaml`
-- `symfony/config/services.yaml`
-- `symfony/frontend/admin/PreviewApp.tsx`
-- `symfony/frontend/admin/main.tsx`
-- `symfony/frontend/admin/preview.css`
-- `symfony/package-lock.json`
-- `symfony/package.json`
-- `symfony/phpunit.xml.dist`
-- `symfony/playwright.config.mjs`
-- `symfony/public/.htaccess`
-- `symfony/public/assets/grindflow.css`
-- `symfony/public/index.php`
-- `symfony/public/router.php`
-- `symfony/src/Http/AssetManifest.php`
-- `symfony/src/Http/Controller/AdminController.php`
-- `symfony/src/Http/Controller/HealthController.php`
-- `symfony/src/Http/Controller/HomeController.php`
-- `symfony/src/Http/Controller/PreviewController.php`
-- `symfony/src/Infrastructure/Http/RequestIdSubscriber.php`
-- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
-- `symfony/src/Kernel.php`
-- `symfony/src/Shared/Version/ProductVersion.php`
-- `symfony/templates/base.html.twig`
-- `symfony/templates/home/index.html.twig`
-- `symfony/templates/preview/index.html.twig`
-- `symfony/tests/contract/smoke.sh`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/PreviewTest.php`
-- `symfony/tsconfig.json`
-- `symfony/vite.config.ts`
-- `tsconfig.json`
+- `public/css/grindflow.css`
+- `resources/views/admin/diagnostics.blade.php`
+- `resources/views/admin/system.blade.php`
+- `resources/views/auth/login.blade.php`
+- `resources/views/components/release-footer.blade.php`
+- `resources/views/dashboard.blade.php`
+- `resources/views/distribution/index.blade.php`
+- `resources/views/finance/index.blade.php`
+- `resources/views/scheduling/index.blade.php`
+- `resources/views/traffic/index.blade.php`
+- `resources/views/vault/index.blade.php`
+- `resources/views/welcome.blade.php`
+- `scripts/browser-smoke.sh`
+- `tests/Feature/AdminSystemTest.php`
+- `tests/Feature/VisualShellTest.php`
 
 ## Validación
-- [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12): CI y Sonar sobre head final por comprobar.
-- Las URLs S0 son de entorno aislado de pruebas, **no** de producción.
+- Verificar CI/Sonar del head y CI exact-main tras fusión; observación Hostinger independiente.
+- Footer indica versión humana y **no** demuestra SHA remoto por sí mismo.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 S0 validar CI, fusionar y comprobar SHA [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 S1 identidad/tenant y onboarding real |
-| **LATER** | 🚧 S2 Vault móvil → S3 reglas → S4 distribución → S5 Traffic/piloto |
-| **BLOCKED / EXTERNAL** | ⛔ Producción Hostinger/Smoke pendiente; claves de proveedores externos aún no verificadas |
+| **NOW** | 🚧 Validar home + footer v0.1.25, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 S1 login real Symfony con entrega visual pequeña |
+| **LATER** | 🚧 S2 biblioteca móvil → S3 reglas → S4 distribution → S5 piloto |
+| **BLOCKED / EXTERNAL** | ⛔ Hostinger y credencial smoke de solo lectura |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Arquitectura Symfony aprobada~~ | ✅ ~~PR #11 fusionado~~ |
-| **NOW** | 🚧 UI S0 en rama | 🚧 Por validar gates |
-| **NEXT** | 🚧 Onboarding/tenant | 🚧 Por portar |
-| **LATER** | 🚧 Biblioteca y reglas | 🚧 Por migrar |
-| **BLOCKED / EXTERNAL** | ⛔ Producción | ⛔ Sin verificación |
+| **DONE** | ✅ ~~Symfony S0 validado en código~~ | ✅ ~~CI exact-main v0.1.24~~ |
+| **NOW** | 🚧 Home y footer v0.1.25 | 🚧 CI y observación remota |
+| **NEXT** | 🚧 Primer login Symfony | 🚧 Tenant y permisos |
+| **LATER** | 🚧 Automatización completa | 🚧 Por integrar |
+| **BLOCKED / EXTERNAL** | ⛔ Producción v0.1.25 | ⛔ No observada |
