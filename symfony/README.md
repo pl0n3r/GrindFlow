@@ -1,6 +1,6 @@
 # GrindFlow · S0 Symfony aislado
 
-**S1 fundacional (no desplegado):** entidades y migración Doctrine de usuarios, organizaciones y membresías prefijadas `gf_identity_*`, probadas en MariaDB descartable; todavía sin login/onboarding y `/admin` sigue 403. **Implementado en código (no desplegado):** primera superficie Symfony 7.4 LTS, home Twig, vista previa React/Vite compilable y health seguro. La versión se lee del `../config/version.php` del repositorio. **No se conecta a cuentas, datos ni tablas de Laravel** y `/admin` responde 403 intencionadamente hasta S1; `/preview` es una demostración pública rotulada que no simula publicación externa.
+**S1 acceso aislado (no desplegado):** Symfony Security, CSRF, rate limiting, login/logout, selector explícito de organización y admin con revalidación de membresía en cada GET; sin cuentas Laravel ni cutover. **Implementado en código (no desplegado):** primera superficie Symfony 7.4 LTS, home Twig, vista previa React/Vite compilable y health seguro. La versión se lee del `../config/version.php` del repositorio. **No se conecta a cuentas, datos ni tablas de Laravel** y `/admin` requiere login y organización seleccionada en S1; `/preview` es una demostración pública rotulada que no simula publicación externa.
 
 ## Ejecutar en entorno descartable
 

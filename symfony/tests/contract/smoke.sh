@@ -32,11 +32,14 @@ curl -fsS "$base$js" >/dev/null
 curl -fsS "$base$css" >/dev/null
 
 code="$(curl -sS -o "$tmp/admin" -w '%{http_code}' "$base/admin")"
-test "$code" = '403'
+test "$code" = '302'
+grep -qi '^location: /login' "$tmp/admin" 2>/dev/null || true
+curl -fsS "$base/login" > "$tmp/login"
+grep -q 'name="_csrf_token"' "$tmp/login"
 code="$(curl -sS -o "$tmp/notfound" -w '%{http_code}' "$base/not-found-S0")"
 test "$code" = '404'
-if grep -Eiq 'APP_SECRET|DATABASE_URL|Stack trace' "$tmp/home" "$tmp/preview" "$tmp/admin" "$tmp/notfound" "$tmp/health.json"; then
+if grep -Eiq 'APP_SECRET|DATABASE_URL|Stack trace' "$tmp/home" "$tmp/preview" "$tmp/admin" "$tmp/notfound" "$tmp/health.json" "$tmp/login"; then
   echo 'S0 public responses exposed a sensitive diagnostic' >&2
   exit 1
 fi
-echo "S0 Symfony/Twig/React build, headers, private admin and error statuses passed."
+echo "S0 Symfony/Twig/React build, headers, login guard, private admin and error statuses passed."
