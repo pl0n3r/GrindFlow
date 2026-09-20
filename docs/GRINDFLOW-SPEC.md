@@ -73,43 +73,32 @@ Se contempla como ejemplo inicial una prueba limitada de **30 días**, con **has
 **Nota de integridad del origen:** el fragmento recibido finalizó después de «No se ha aprobado». No se completa ni atribuye a la conversación una decisión adicional que no conste en el texto recibido.
 
 ---
-## 2. Canonical stack
+## 2. Arquitectura objetivo confirmada el 20/09/2026
 
-| Layer | Decision |
+> **Nueva decisión que prevalece sobre la adopción Laravel del 17/09/2026:** el propietario aprobó adoptar para GrindFlow el stack tecnológico de Condor. Véase [plan técnico, alcance y matriz de paridad](STACK-TRANSITION-SYMFONY.md). `main` sigue funcionando con Laravel hasta que un cambio de código, pruebas y despliegue verificable efectúe la transición; **objetivo ≠ implementado**.
+
+| Capa | Decisión objetivo |
 |---|---|
-| Runtime | PHP 8.5 |
-| Framework | Laravel 13 |
-| UI | Blade + Livewire |
-| Styling | Tailwind CSS |
-| Database | MariaDB through Laravel `mysql` driver |
-| Background work | Laravel Queues |
-| Scheduling | Laravel Scheduler |
-| Object storage | S3-compatible storage |
-| Cache/queue accelerator | Redis only when justified by measured need |
-| Testing | Pest/PHPUnit + Laravel feature tests; browser tests where behavior requires them |
-| CI | GitHub Actions, stable `GrindFlow CI / validate` aggregate |
-| Static analysis | SonarQube Cloud automatic analysis |
-| AI PR review | CodeRabbit, advisory during calibration |
+| PHP | **PHP 8.5**, condicionado a verificar compatibilidad del hosting real |
+| Backend | **Symfony 7.4 LTS**, monolito modular propio de GrindFlow |
+| Persistencia | **MariaDB + Doctrine ORM/DBAL + Doctrine Migrations** |
+| Administración | **React 19 + TypeScript + Vite** compilado a estáticos |
+| Sitio público | **Twig/Symfony SSR** e islas React solo cuando aporten interacción |
+| API | REST/DTO con validación y autorización en servidor; API-first/mobile-ready |
+| Autenticación | Symfony Security, sesiones de web seguras y CSRF; API tokens solo cuando proceda |
+| Almacenamiento | Abstracción privada con adaptador S3-compatible cuando se configure |
+| Jobs | Trabajos idempotentes y cron/colas compatibles con Hostinger observado; sin daemon Node requerido |
+| CI y análisis | GitHub Actions gate estable `GrindFlow CI / validate`, SonarQube Cloud, CodeRabbit |
+| Tests | Contratos + PHPUnit/Symfony, integración MariaDB, Playwright Chromium; WebKit selectivo |
+| Infraestructura | Hostinger inicial, portable a AWS sin rehacer dominios |
 
-## 3. Architecture
+Node solo build/CI. No introducir microservicios, Docker de runtime obligatorio, segunda base de datos ni SPA global pública. No importar reglas de facturación, catálogo, sedes, moneda COP o dominio de Condor; conservar UTC/multimoneda y derechos/permiso de contenido propios de GrindFlow.
 
-GrindFlow is a **modular monolith**. The default is one Laravel application,
-one MariaDB database and explicit modules inside the application.
+## 3. Arquitectura y límites funcionales
 
-Do not introduce microservices, a separate SPA, a second authentication system,
-or duplicated APIs unless a measured constraint requires them.
+El destino es una **aplicación Symfony monolítica modular**, una MariaDB con módulos separados por contratos de dominio, y React como cliente administrativo de servicios/APIs. Límites recomendados: Identity & Organizations, Media Vault, Ingestion, Processing, Content Eligibility/Compliance, Scheduling, Distribution, Traffic, Finance y Administration/System.
 
-Suggested domain boundaries:
-
-- Identity & Organizations
-- Media Vault
-- Ingestion
-- Media Processing
-- Scheduling
-- Publishing
-- Traffic & Attribution
-- Finance
-- Administration / System
+Se **conserva** la aplicación Laravel y su CI como referencia operativa durante la transición. Cada módulo se traslada con migraciones y pruebas de paridad de usuarios/organizaciones, IDs, permisos, estados, URLs, auditoría e históricos; por módulo existe un propietario único de escritura para evitar dos runtimes mutando el mismo estado sin coordinación. No modificar/borrar tablas Laravel automáticamente desde Doctrine.
 
 ## 4. Non-negotiable invariants
 
@@ -129,8 +118,8 @@ Suggested domain boundaries:
 ## 5. Data model principles
 
 - Every tenant-owned record carries an explicit `organization_id`.
-- Tenant-owned Laravel models use the project tenant scope and fail closed when
-  no organization context is active.
+- El backend Symfony objetivo revalida tenant y autorización en cada lectura/escritura.
+  Mientras Laravel esté activo, los scopes actuales siguen fallando cerrado sin TenantContext.
 - Cross-tenant access is covered by negative tests.
 - MariaDB foreign keys, unique indexes, ENUMs and targeted triggers protect
   structural invariants that should survive application bugs.
@@ -141,33 +130,22 @@ Suggested domain boundaries:
 
 ## 6. UI principles
 
-- Server-rendered Blade is the default.
-- Livewire is used when interaction benefits from incremental server state.
-- Avoid React/SPA state unless a concrete requirement cannot be met cleanly.
-- Mobile and keyboard behavior are first-class.
-- Components should remain understandable without framework-specific indirection.
+- El backoffice objetivo es React + TypeScript con contratos REST versionables cuando sea necesario, sin duplicar lógica de negocio en el navegador.
+- Twig/Symfony SSR es la base para landing, auth y rutas públicas; React solo donde aporte interacción.
+- Construcción mobile-first, teclado y estados accesibles de carga, vacío, error y permisos, con compatibilidad dirigida Safari/iOS.
+- El shell Blade/Livewire existente es legado funcional hasta la conmutación probada, no patrón para nuevas pantallas Symfony.
 
 ## 7. Quality model
 
-Every deploy-bound PR must pass the applicable subset of GrindFlow CI.
-The stable merge boundary is always `GrindFlow CI / validate`.
+Todos los PR deploy-bound pasan las compuertas aplicables y el agregado estable `GrindFlow CI / validate`. Durante coexistencia siguen activos Laravel/MariaDB/legado; el primer slice Symfony agrega Composer, Doctrine/MariaDB, Vite/TypeScript y Playwright con cobertura real antes de retirar gates antiguos.
 
-The database gate runs MariaDB and is authoritative for MariaDB-specific
-migrations/invariants. SQLite is only a fast-test convenience.
-
-SonarQube Cloud and CodeRabbit add independent signals. They do not replace the
-project's executable tests.
+MariaDB real es el contrato de integridad; SQLite solo acelera pruebas cuando aplica. SonarQube Cloud y CodeRabbit complementan los tests. Versiones humanas, CI, observación de deploy y validación productiva permanecen separados.
 
 ## 8. Migration rule
 
-The current TypeScript/Next.js/Supabase implementation is a functional reference
-during migration. PostgreSQL-specific mechanisms such as RLS are legacy
-implementation details and are not copied into Laravel when MariaDB requires a
-different mechanism to preserve the same invariant.
+La referencia histórica Next.js/Supabase/PostgreSQL y la implementación actual Laravel/MariaDB **se preservan** mientras se desarrolla Symfony. Los mecanismos específicos de RLS/ORM/trigger no se copian a ciegas: se conservan **invariantes funcionales** mediante Doctrine, Symfony Security, permisos y restricciones MariaDB comprobables.
 
-Features move module-by-module. A module is not removed from the legacy
-implementation until its Laravel replacement is **VALIDATED IN CODE** and the
-migration requirement for that module is satisfied.
+La conmutación se hace módulo a módulo con inventario de datos, dueño único de escritura, pruebas negativas y navegador, backup/reversión y validación del runtime. No retirar Laravel, Next.js, tablas ni tests hasta satisfacer los contratos de paridad y una decisión explícita de cutover. Fuente operativa: [STACK-TRANSITION-SYMFONY.md](STACK-TRANSITION-SYMFONY.md).
 
 ## 9. Finance core contract
 

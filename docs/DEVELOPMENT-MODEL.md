@@ -1,7 +1,8 @@
 # GrindFlow Development Model
 
-This model is adapted from the proven BRVTAL repository workflow, but optimized
-for Laravel, MariaDB and GrindFlow's staged migration.
+> **Cambio objetivo confirmado el 20/09/2026:** [transición segura al stack Condor/Symfony](STACK-TRANSITION-SYMFONY.md). Esta guía conserva contratos operativos del runtime Laravel **existente**, pero el desarrollo nuevo hacia el producto objetivo usa Symfony 7.4 LTS + Doctrine/MariaDB, React/TypeScript/Vite y Twig/SSR. No borrar rutas o gates Laravel hasta la verificación de paridad. La secuencia funcional y el trabajo pendiente viven en [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+
+Este modelo hereda las prácticas de BRVTAL y Condor y se aplica durante la coexistencia; el objetivo vigente ya no es ampliar Laravel como destino final.
 
 ## Gobierno importado de Condor, adaptado
 

@@ -14,6 +14,39 @@ Each requirement should contain:
 - **Status**: planned / implemented / validated-in-code / deployed /
   validated-in-production
 
+## Transición al stack Symfony aprobada · nuevos contratos
+
+> **Decisión:** 20/09/2026, [plan técnico](STACK-TRANSITION-SYMFONY.md), [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Estos criterios no invalidan la implementación Laravel verificada que documentan los GF-FR-* de abajo: pasan a ser **contratos de comportamiento a conservar**, no prueba automática de equivalencia Symfony.
+
+### GF-ARCH-001 — Runtime objetivo y entrega visible
+**Estado:** definido, Symfony pendiente de implementación.
+
+**Enunciado:** GrindFlow migra progresivamente hacia PHP 8.5 + Symfony 7.4 LTS, Doctrine/MariaDB, React/TS/Vite en admin y Twig/SSR público, manteniendo Node fuera de producción.
+
+**Aceptación:** primer slice aislado S0 ofrece home Twig, assets React reales, versión y health seguros, sin reemplazar Laravel/Hostinger actual; Composer/Vite reproducibles; tests de rutas + asset + integración MariaDB + navegador; PHP de hosting observado antes de cutover.
+
+### GF-ARCH-002 — Paridad de datos y tenencia
+**Estado:** definido, pendiente de ejecución.
+
+**Aceptación:** inventario completo de tablas/IDs/índices/triggers de Laravel y legado, contrato de migración reversible y backup; un único dueño de escritura por módulo; prueba de cross-tenant/IDOR de lectura y mutación con Symfony+Doctrine; no usar `schema:update --force` ni auto-migrar producción.
+
+### GF-ARCH-003 — Pruebas y operación en coexistencia
+**Estado:** definido, pendiente de ejecución.
+
+**Aceptación:** mantener gate agregado `GrindFlow CI / validate` y jobs Laravel/legado mientras existan; añadir Composer/Symfony, Doctrine/MariaDB, TypeScript/Vite y Playwright; CI del PR, Sonar y CI exact-main independientes; release identity y smoke de solo lectura sin credenciales ni contenido sensible en logs; deploy no se infiere por version.php.
+
+### GF-FR-008 — Primer ciclo de valor del piloto
+**Estado:** definido a nivel de recorrido, funcionalidad integral pendiente.
+
+**Enunciado:** persona autorizada selecciona organización, carga varios recursos móviles, clasifica usos/destinos, define reglas, previsualiza y aprueba o autoriza, entrega a un destino compatible o requiere acción manual explícita y consulta resultados/Traffic.
+
+**Aceptación:** recorrido E2E aislado con datos descartables, rol/tenant negativo, fallo parcial/reintento, material retirado/incompatible bloqueado, estados accesibles y métricas verificables. Nunca llamar publicación real a resultado sandbox.
+
+### GF-FR-009 — Evaluación comercial del piloto
+**Estado:** piloto acordado, no ejecutado.
+
+**Aceptación:** cinco participantes con línea base definida; registrar tiempo operativo, entregas y errores, costos de infraestructura, funciones usadas y tráfico medible. Prueba comercial de 30 días/dos redes y precios quedan pendientes de resultado y aprobación.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation

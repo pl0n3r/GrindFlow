@@ -6,6 +6,16 @@ previos. El `README.md` es solo la foto de la entrega actual; las decisiones
 durables viven aqui y en las especificaciones. Si una decisión cambia, registrar
 el cambio aquí en el mismo PR que modifica el producto.
 
+## Decisión vigente y obligatoria · transición de stack 20/09/2026
+
+**El propietario confirmó adoptar el stack de Condor como objetivo tecnológico de GrindFlow:** PHP 8.5 + Symfony 7.4 LTS, Doctrine ORM/DBAL/Migrations + MariaDB, React/TypeScript/Vite para administración, Twig/SSR para público, monolito modular, API-first/mobile-ready, Node solo en build/CI, Hostinger inicial portable a AWS. Ver [decisión y plan de transición](docs/STACK-TRANSITION-SYMFONY.md), [especificación](docs/GRINDFLOW-SPEC.md) e [Issue de arquitectura #10](https://github.com/pl0n3r/GrindFlow/issues/10).
+
+**Precedencia temporal:** esta decisión nueva **sustituye** el stack objetivo Laravel 13/Blade/Livewire del apartado histórico del 17/09/2026, PERO no convierte en falso el estado actual del código: Laravel y el legado Next.js siguen presentes y se conservan hasta paridad+cutover probados. Las reglas Laravel de este archivo rigen ese runtime mientras continúe en uso; no se importan como APIs de Symfony. No empezar módulos nuevos en Laravel por inercia cuando sean parte de la migración aprobada.
+
+**Reglas de desarrollo inmediato:** seguir el [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) por vertical slices visibles S0→S5, con CI exact-main y Sonar del head estable; mantener gate `GrindFlow CI / validate` e introducir nuevos gates Symfony/React sin apagar tests existentes; no cambiar `public_html`, migrar SQL productivo, borrar Laravel ni activar integraciones externas como efecto de este PR documental. Reconciliar PR #7 (paridad) y #9 (experiencia de piloto) con esta decisión antes de fusionarlos.
+
+**No copiar Condor indiscriminadamente:** heredar patrones técnicos, calidad, seguridad, diagnóstico, accesibilidad y entrega; GrindFlow conserva su dominio de media, UTC, multi-moneda, derechos, permisos por tenant, publicación responsable y modelo SaaS propios. Condor no define precios ni módulos de GrindFlow.
+
 ---
 
 ## Prácticas compartidas con Condor: gobierno operativo de GrindFlow
