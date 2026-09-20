@@ -94,21 +94,22 @@ def report(runs: list[dict]) -> str:
 
 
 def self_test() -> None:
+    start = "2026-09-20T10:00:00Z"
     assert percentile([7, 2, 3, 6, 1], .9) == 7
     assert seconds({
-        "run_started_at": "2026-09-20T10:00:00Z",
+        "run_started_at": start,
         "updated_at": "2026-09-20T10:00:25Z",
     }) == 25
     assert seconds({"run_started_at": None, "updated_at": None}) is None
     synthetic = [
         {
             "event": "pull_request", "status": "completed", "conclusion": "success",
-            "run_started_at": "2026-09-20T10:00:00Z",
+            "run_started_at": start,
             "updated_at": "2026-09-20T10:01:00Z",
         },
         {
             "event": "pull_request", "status": "completed", "conclusion": "cancelled",
-            "run_started_at": "2026-09-20T10:00:00Z",
+            "run_started_at": start,
             "updated_at": "2026-09-20T10:10:00Z",
         },
     ]
