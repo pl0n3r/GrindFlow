@@ -39,12 +39,16 @@ final class OrganizationController extends AbstractController
             $selected = null;
         }
 
-        return $this->render('identity/organizations.html.twig', [
+        $response = $this->render('identity/organizations.html.twig', [
             'app_version' => $version->human(),
             'organizations' => $organizations,
             'selected_id' => $selected,
             'display_name' => $user->displayName(),
-        ])->setPrivate();
+        ]);
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'no-store, private');
+
+        return $response;
     }
 
     #[Route('/organizations/select', name: 'grindflow_organization_select', methods: ['POST'])]
