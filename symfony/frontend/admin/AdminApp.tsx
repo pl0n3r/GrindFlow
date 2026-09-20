@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 type Context = {
   user: { display_name: string };
+  organization_name_csrf: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -25,6 +26,9 @@ const roleNames: Record<string, string> = {
 
 export function AdminApp() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -41,7 +45,10 @@ export function AdminApp() {
         }
         return body.data as Context;
       })
-      .then((context) => setState({ kind: 'ready', context }))
+      .then((context) => {
+        setName(context.organization.name);
+        setState({ kind: 'ready', context });
+      })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         setState({
@@ -52,6 +59,40 @@ export function AdminApp() {
 
     return () => controller.abort();
   }, []);
+
+
+  async function rename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (state.kind !== 'ready' || !state.context.permissions.organization_manage ||
+        !state.context.organization_name_csrf || saving) return;
+
+    setSaving(true);
+    setFeedback('');
+    try {
+      const response = await fetch('/api/admin/organization/name', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': state.context.organization_name_csrf,
+        },
+        body: JSON.stringify({ name }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo guardar el nombre.');
+      }
+      const organization = body.data.organization as Context['organization'];
+      setState((previous) => previous.kind === 'ready'
+        ? { kind: 'ready', context: { ...previous.context, organization } } : previous);
+      setName(organization.name);
+      setFeedback('Nombre de la organización actualizado.');
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'No se pudo guardar el nombre.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (state.kind === 'loading') {
     return <section className="admin-state" role="status"><span className="admin-pulse" />Cargando contexto seguro…</section>;
@@ -117,6 +158,21 @@ export function AdminApp() {
                 {context.permissions.organization_manage ? 'Permitido' : 'Sin permiso'}
               </strong>
             </article>
+          </section>
+          <section className="admin-settings" aria-labelledby="organization-settings-title">
+            <span className="admin-kicker">AJUSTES DEL ESPACIO</span>
+            <h2 id="organization-settings-title">Nombre de la organización</h2>
+            {context.permissions.organization_manage && context.organization_name_csrf
+              ? <form onSubmit={rename} className="admin-rename-form">
+                  <label htmlFor="organization-name">Nombre visible</label>
+                  <div className="admin-rename-controls">
+                    <input id="organization-name" value={name} minLength={2} maxLength={120}
+                      required onChange={(event) => setName(event.target.value)} />
+                    <button type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>
+                  </div>
+                </form>
+              : <p>Tu rol permite consultar este espacio, pero no cambiar el nombre de la organización.</p>}
+            {feedback && <p role="status">{feedback}</p>}
           </section>
           <section className="admin-notice" role="status">
             <strong>Alcance S1</strong>
