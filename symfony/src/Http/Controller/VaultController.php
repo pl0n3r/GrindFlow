@@ -145,6 +145,20 @@ final class VaultController extends AbstractController
                 if ($locked === false) {
                     return 'revoked';
                 }
+                // Do not disclose even a duplicate state to a revoked actor.
+                $allowed = $db->fetchOne(
+                    <<<'SQL'
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = :organization
+                          AND actor.id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                        SQL,
+                    ['organization' => $context['organization']['id'], 'user' => $context['user']->id()],
+                );
+                if ($allowed === false) {
+                    return 'revoked';
+                }
                 $usage = $db->fetchAssociative(
                     'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization',
                     ['organization' => $context['organization']['id']],
