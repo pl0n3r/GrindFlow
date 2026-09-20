@@ -171,7 +171,7 @@ test('editor can update only their own profile name from a 360px React panel', a
   await page.getByLabel('Nombre en tu perfil').fill('Persona actualizada');
   await page.getByRole('button', { name: 'Guardar perfil' }).click();
   await expect(page.getByText('Nombre de tu perfil actualizado.')).toBeVisible();
-  await expect(page.getByText('Persona actualizada').first()).toBeVisible();
+  await expect(page.locator('.admin-profile-current')).toContainText('Nombre actual: Persona actualizada');
   await expect(page.getByText('Organización sin cambios').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
