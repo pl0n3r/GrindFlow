@@ -33,24 +33,34 @@ final class VaultController extends AbstractController
             return $context;
         }
 
+        // Bound the offset to avoid unbounded scans and reject ambiguous query values.
+        $rawPage = $request->query->get('page', '1');
+        if (!is_string($rawPage) || !preg_match('/^[1-9][0-9]{0,3}$/D', $rawPage) || (int) $rawPage > 1000) {
+            return $this->error(422, 'invalid_page', 'Selecciona una página válida (1 a 1000).');
+        }
+        $page = (int) $rawPage;
+        $params = ['organization' => $context['organization']['id'], 'user' => $context['user']->id()];
+        $scope = <<<'SQL'
+            FROM gf_vault_assets asset
+            INNER JOIN gf_identity_memberships membership
+                ON membership.organization_id = asset.organization_id
+            INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+            WHERE asset.organization_id = :organization
+              AND membership.user_id = :user AND actor.is_active = 1
+            SQL;
+        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope, $params);
         $assets = $db->fetchAllAssociative(
-            <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at
-                FROM gf_vault_assets asset
-                INNER JOIN gf_identity_memberships membership
-                    ON membership.organization_id = asset.organization_id
-                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
-                WHERE asset.organization_id = :organization
-                  AND membership.user_id = :user AND actor.is_active = 1
-                ORDER BY asset.created_at DESC, asset.id DESC
-                LIMIT 30
-                SQL,
-            ['organization' => $context['organization']['id'], 'user' => $context['user']->id()],
+            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at '
+            .$scope.' ORDER BY asset.created_at DESC, asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
+            $params,
         );
 
         return $this->privateJson(['data' => [
             'assets' => array_map($this->publicAsset(...), $assets),
             'limit' => 30,
+            'page' => $page,
+            'total' => $total,
+            'pages' => (int) ceil($total / 30),
         ]]);
     }
 
