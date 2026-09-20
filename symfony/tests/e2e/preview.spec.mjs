@@ -85,7 +85,8 @@ test('React admin renders role capabilities from its tenant context contract', a
   await expect(page.getByText('Estudio seguro').first()).toBeVisible();
   await expect(page.getByText('Edición').first()).toBeVisible();
   await expect(page.getByText('Sin permiso')).toBeVisible();
-  await expect(page.getByText(/datos simulados/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
+  await expect(page.getByText(/los videos, la programación y las conexiones externas/)).toBeVisible();
 });
 
 test('admin context API is explicit JSON when no session exists', async ({ request }) => {
