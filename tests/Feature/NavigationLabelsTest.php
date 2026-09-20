@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 final class NavigationLabelsTest extends TestCase
 {
-    public function testWorkspaceMenusUseReadableSpanishLabelsWithoutDecorativeGlyphs(): void
+    public function test_workspace_menus_use_readable_spanish_labels_without_decorative_glyphs(): void
     {
         $views = [
             'dashboard.blade.php',
