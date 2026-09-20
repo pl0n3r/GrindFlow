@@ -82,6 +82,60 @@ Se contempla como ejemplo inicial una prueba limitada de **30 días**, con **has
 
 **Nota de integridad del origen:** el fragmento recibido finalizó después de «No se ha aprobado». No se completa ni atribuye a la conversación una decisión adicional que no conste en el texto recibido.
 
+### 1A.5. MVP del piloto: experiencia operativa acordada
+
+El MVP debe probar la promesa **«el creador crea; GrindFlow gestiona»**. El trabajo principal del creador es producir y cargar contenido. Después configura reglas que GrindFlow ejecuta y que puede modificar en cualquier momento.
+
+#### 1A.5.1. Biblioteca y carga mobile-first
+
+- La biblioteca acepta, como mínimo, fotos y videos y debe permitir carga múltiple.
+- La experiencia de carga es **mobile-first**: debe funcionar de forma cómoda desde navegadores móviles en iPhone y Android desde el piloto. Una aplicación nativa y su eventual distribución en App Store/Play Store quedan como evolución posterior, no como bloqueo del MVP web.
+- Tras cargar contenido, GrindFlow pregunta cómo desea utilizarlo en lugar de asumir el destino.
+- Una pieza puede marcarse para publicaciones normales, contenido temporal/estado, alertas de directo o varios usos permitidos.
+- El contenido no utilizado permanece en la biblioteca para uso posterior.
+- GrindFlow registra su historial de uso para evitar repeticiones excesivas y permitir reutilización controlada.
+- Debe existir una colección lógica de material preaprobado para alertas de directo. Si no hay material nuevo, GrindFlow puede escoger material antiguo elegible que lleve suficiente tiempo sin utilizarse, respetando las reglas del creador.
+
+#### 1A.5.2. Reglas de publicación
+
+El creador puede definir reglas diferentes por plataforma: frecuencia diaria o semanal, días, horarios, tipos de contenido y destinos. Las reglas pueden cambiarse posteriormente sin reconstruir toda la planificación.
+
+Se contemplan dos modos de horario:
+
+- **Manual:** el creador fija horas concretas.
+- **Asistido/automático:** GrindFlow recomienda horarios usando datos disponibles. Al inicio las recomendaciones deben presentarse como sugerencias, no como certezas; mejoran con datos reales de la cuenta y del producto.
+
+La selección de contenido también admite dos niveles de control:
+
+- **Automático con aprobación:** GrindFlow propone el plan y el creador lo revisa antes de publicar.
+- **Automático:** GrindFlow selecciona y publica según reglas y contenido previamente autorizado.
+
+#### 1A.5.3. Destinos y alertas de directo
+
+El creador puede configurar uno o varios destinos para el tráfico y establecer prioridades. Las publicaciones pueden perseguir objetivos distintos según el contexto.
+
+Las **alertas de directo** forman parte del MVP: el creador configura en qué redes desea avisar, qué clase de material puede utilizarse y el destino del aviso. Cuando una integración permita detectar el estado de transmisión, GrindFlow podrá activar la regla automáticamente; también debe existir un disparador manual como respaldo.
+
+Mientras el creador esté en directo, el destino de transmisión puede convertirse temporalmente en prioritario según sus reglas. Al terminar, la planificación vuelve a su comportamiento normal.
+
+#### 1A.5.4. Ciclo semanal y métricas útiles
+
+Un flujo objetivo del piloto es:
+
+1. El creador carga contenido y clasifica sus usos permitidos.
+2. Define o ajusta reglas de publicación por plataforma.
+3. GrindFlow prepara la planificación y, según el modo elegido, solicita aprobación o continúa automáticamente.
+4. Durante la semana ejecuta publicaciones y alertas de directo, reutilizando material autorizado cuando corresponda.
+5. Al cierre del periodo presenta un resumen sencillo de publicaciones, tráfico medible y señales útiles para ajustar reglas.
+
+Las métricas para el creador deben priorizar decisiones prácticas sobre cantidad de gráficos: clics hacia destinos configurados, publicaciones que generaron más tráfico y horarios/formats que mostraron mejores resultados cuando esos datos estén disponibles. Las capacidades concretas dependen de las APIs y permisos de cada plataforma.
+
+Para el piloto, los datos también sirven para evaluar ahorro de tiempo, funcionamiento de la automatización y calidad de futuras recomendaciones. No se debe prometer causalidad de ingresos ni métricas que una plataforma externa no permita obtener de forma fiable.
+
+#### 1A.5.5. Fuera del alcance inmediato
+
+La edición automática avanzada de fotos o videos se conserva como capacidad futura. También queda fuera del MVP inicial cualquier marketplace, venta directa o entrega de contenido restringido desde GrindFlow. Estas ideas no deben bloquear la validación del núcleo de biblioteca, reglas, programación, alertas y tráfico.
+
 ---
 ## 2. Canonical stack
 
