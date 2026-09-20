@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.36: entrega de infraestructura CI, todavía no fusionada ni desplegada.** Base `main` v0.1.35 `f0340d26a3dc4e89ff01292383f434e64d2eac44`. El selector de pruebas se ajusta por rutas; Chromium reutiliza binarios según lockfile, las suites DB no repiten un fallo y el reporte diario muestra tiempo/fallos. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas**.
+> **Snapshot v0.1.36: solo el deploy actual; entrega de infraestructura CI, todavía no fusionada ni desplegada.** Base `main` v0.1.35 `f0340d26a3dc4e89ff01292383f434e64d2eac44`. El selector de pruebas se ajusta por rutas; Chromium reutiliza binarios según lockfile, las suites DB no repiten un fallo y el reporte diario muestra tiempo/fallos. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
