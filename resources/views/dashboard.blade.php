@@ -192,12 +192,20 @@
                 <article class="gf-metric" data-dashboard-metric="ready-media">
                     <div class="gf-metric__label">Contenido listo</div>
                     <div class="gf-metric__value">{{ $readyMediaCount ?? '—' }}</div>
-                    <div class="gf-metric__meta">{{ $readyMediaCount === null ? 'Módulo no disponible' : 'Recursos listos en tus organizaciones' }}</div>
+                    <div class="gf-metric__meta">
+                        {{ $readyMediaCount === null
+                            ? 'Módulo no disponible'
+                            : 'Recursos listos en tus organizaciones' }}
+                    </div>
                 </article>
                 <article class="gf-metric" data-dashboard-metric="scheduled-publications">
                     <div class="gf-metric__label">Publicaciones programadas</div>
                     <div class="gf-metric__value">{{ $scheduledPublicationCount ?? '—' }}</div>
-                    <div class="gf-metric__meta">{{ $scheduledPublicationCount === null ? 'Módulo no disponible' : 'Pendientes en tus organizaciones' }}</div>
+                    <div class="gf-metric__meta">
+                        {{ $scheduledPublicationCount === null
+                            ? 'Módulo no disponible'
+                            : 'Pendientes en tus organizaciones' }}
+                    </div>
                 </article>
             </section>
 
