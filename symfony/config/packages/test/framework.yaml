@@ -1,2 +1,5 @@
 framework:
   test: true
+  session:
+    # Use test-only storage; native PHP sessions fail after PHPUnit writes output.
+    storage_factory_id: session.storage.factory.mock_file
