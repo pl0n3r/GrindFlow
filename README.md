@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.42: solo el deploy actual, papelera reversible de Vault S2 en código, Symfony aún sin despliegue.** Base `main` v0.1.41 `a17c53e4ee7edf9140726453c4de72b64b610dc8`. Movimientos con confirmación y CSRF, restauración desde la papelera y aislamiento por organización. Los originales siguen privados y contando en la cuota; **Laravel permanece como runtime**.
+> **Snapshot v0.1.43: corrección visual del menú Laravel, sin fuentes de iconos ni glifos decorativos.** Base `main` v0.1.42 `58cbc80153eb2492d1db33f3b57595b10cbea86c`. Los ocho menús de workspace usan etiquetas legibles en español; versión de stylesheet renovada por `config/version.php`. Symfony permanece aislado; el release humano no prueba un deploy remoto.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.42** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.41~~ | `a17c53e4ee7edf9140726453c4de72b64b610dc8` |
+| Version objetivo | 🚧 **v0.1.43** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.42~~ | `58cbc80153eb2492d1db33f3b57595b10cbea86c` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+539** | **−43** | **+496** |
+| **13** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | Vault S2: papelera/restauración tenant-safe, CSRF, bloqueo transaccional y originales privados |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
+| Alcance | Laravel: etiquetas de navegación textuales en todas las vistas del workspace; sin glifos dependientes de fuentes |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,36 +58,37 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- POST separados para mover a papelera y restaurar, autorizados por tenant/rol/CSRF, con transacción y bloqueo por organización.
-- Listado activo/papelera paginado y ocultación de descarga/detalle tras mover. El panel de 360 px pide confirmación antes de mover y permite restaurar.
-- Los originales se conservan sin purga permanente; cuota de 100 imágenes/128 MiB incluye los archivos retenidos en papelera, sin crear espacio ficticio.
-- Migración Doctrine reversible y tests PHP/MariaDB/Chromium para estado, IDOR, revocación, rechazo de parámetros y recuperación.
+- Se retiraron los caracteres usados como iconos del menú lateral Laravel en Dashboard, Vault, Scheduling, Distribution, Traffic, Finance, System y Diagnostics, también en opciones sin permiso.
+- Menú exclusivamente textual y en español: Resumen, Biblioteca, Programación, Distribución, Tráfico, Finanzas, Sistema y Diagnósticos.
+- CSS de navegación simplificado con blancos de 44 px y tipografía legible; no se agregó ningún paquete ni fuente externa.
+- PHPUnit comprueba las ocho plantillas y sus etiquetas; el navegador E2E autenticado verifica los textos del Dashboard y la ausencia de iconos Unicode. Sin cambios en rutas, permisos ni bases de datos.
 
 ## Archivos modificados en este deploy
-- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
-- `symfony/README.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/VaultPanel.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/migrations/Version20260920194000.php`
-- `symfony/src/Http/Controller/AdminContextController.php`
-- `symfony/src/Http/Controller/VaultController.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/VaultTrashTest.php`
+- `public/css/grindflow.css`
+- `resources/views/admin/diagnostics.blade.php`
+- `resources/views/admin/system.blade.php`
+- `resources/views/dashboard.blade.php`
+- `resources/views/distribution/index.blade.php`
+- `resources/views/finance/index.blade.php`
+- `resources/views/scheduling/index.blade.php`
+- `resources/views/traffic/index.blade.php`
+- `resources/views/vault/index.blade.php`
+- `tests/Browser/workflow-template.html`
+- `tests/Feature/NavigationLabelsTest.php`
 
 ## Validación
-- CI Symfony PHP/MariaDB/Chromium y reversión de migración, Sonar/CodeRabbit, exact-main y Hostinger se comprueban de forma independiente.
-- No se acredita despliegue Symfony ni modificación de datos productivos.
+- CI PHPUnit/Blade, navegador real y Sonar del PR; CI exact-main y Hostinger se comprueban por separado.
+- El cambio afecta las vistas del runtime Laravel, no Symfony ni datos productivos.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar papelera reversible Vault S2 v0.1.42 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Almacenamiento durable, backup y purga con política explícita | 🚧 Después de validar papelera |
+| **NOW** | 🚧 Validar menú textual Laravel v0.1.43 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Almacenamiento durable, backup y purga con política explícita | 🚧 Después de corregir navegación |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -95,7 +96,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar papelera reversible Vault S2 v0.1.42 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar menú textual Laravel v0.1.43 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Deduplicación y gestión de retención | 🚧 Después de validar papelera |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
