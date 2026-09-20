@@ -1067,8 +1067,10 @@ class DistributionTest extends TestCase
                 app(DistributionScheduler::class)->dispatchDue(),
             );
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
