@@ -7,40 +7,40 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.23: solo el deploy actual.** Base `main` v0.1.22 `7c9bdda75efd831e2a50f14e8770a59c3b957870`. Decisión de stack objetivo Condor y ruta de migración; **Laravel sigue en el código, Symfony no se ha implementado**. No afirmar Hostinger validado.
+> **Snapshot v0.1.24: solo el deploy actual.** Base `main` v0.1.23 `8b0cf563af5bcbae4fa230ede22117b99642b071`. Primer Symfony aislado y vista React/Vite para validación de código; **Laravel continúa como runtime productivo** y la demo nueva no está desplegada en Hostinger.
 
 ## Progress convention
-- ✅ ~~Completado~~ = verificado; 🚧 Pendiente = por terminar; ⛔ bloqueado = dependencia externa.
+- ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
 
 ## Fuentes de verdad
-[AGENTS.md](AGENTS.md) · [Especificación](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Transición Symfony](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+[AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Transición](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.23** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.22~~ | `7c9bdda75efd831e2a50f14e8770a59c3b957870` |
-| CI del PR | 🚧 Pendiente de head estable | [Issue #10](https://github.com/pl0n3r/GrindFlow/issues/10) |
-| Sonar | 🚧 Pendiente de head estable | Proyecto `pl0n3r_GrindFlow` |
-| CodeRabbit | 🚧 Revisión del PR por comprobar | [Issue #10](https://github.com/pl0n3r/GrindFlow/issues/10) |
-| CI del SHA exacto de main | 🚧 Posterior al squash merge | No inferir del PR |
-| Deploy Observer | ⛔ Sin release productivo corroborado | Falló en v0.1.22 |
-| Production Smoke | ⛔ Sin credencial E2E configurada | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Producción v0.1.23 | ⛔ No verificada | Cambio documental ≠ cutover |
-| Migraciones | ✅ ~~Sin modificaciones de esquema~~ | Solo plan, no SQL productivo |
+| Version objetivo | 🚧 **v0.1.24** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.23~~ | `8b0cf563af5bcbae4fa230ede22117b99642b071` |
+| CI del PR | 🚧 Validación del head final pendiente | [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12) |
+| Sonar | 🚧 Por revisar | [PR del slice S0](https://github.com/pl0n3r/GrindFlow/pulls) |
+| CodeRabbit | 🚧 Revisión pendiente | PR del slice S0 |
+| CI del SHA exacto de main | 🚧 Posterior a merge | No inferir del CI de PR |
+| Deploy Observer | ⛔ Entorno remoto sin validar | Observación de producción independiente |
+| Production Smoke | ⛔ Credencial E2E ausente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Producción Symfony S0 | ⛔ NO desplegada | Directorio `symfony/` aislado |
+| Migraciones | ✅ ~~Cero cambios de esquema productivo~~ | Doctrine configurado sin ejecutar migraciones |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+214** | **−92** | **+122** |
+| **48** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
-| Arquitectura | Symfony 7.4 LTS + Doctrine/MariaDB + React/Vite + Twig/SSR como objetivo; Laravel es runtime existente |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Alcance | Nuevo Symfony y CI paralelo: PHP/Doctrine/MariaDB, Twig, React/TS/Vite, Chromium y contratos HTTP |
 | Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
 ## Flujo de entrega
@@ -58,38 +58,77 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Se adoptó el stack tecnológico objetivo de Condor **sin trasladar su modelo de negocio**.
-- Se documentó transición incremental, matriz de paridad, seguridad/operación y primer slice visual Symfony/Twig + React/Vite.
-- Se ordenó el roadmap #2 por el flujo del piloto y dependencias, conservando el historial.
-- Symfony todavía no ejecuta código en GrindFlow; esta entrega solo cambia las fuentes de verdad para dirigir el desarrollo.
+- S0: home Twig real y demo React interactiva con navegación y versión; `/admin` protegido con 403 hasta identidad real en S1.
+- Vite genera assets con manifiesto validado; health sin inventar SHA desplegado; headers de seguridad y request ID.
+- Nuevo gate Symfony/MariaDB/TypeScript/Playwright, en paralelo a pruebas Laravel/legado; sin borrar datos ni tocar Hostinger.
 
 ## Archivos modificados en este deploy
-- `AGENTS.md` — instrucción canónica sobre la nueva arquitectura.
-- `README.md` — snapshot documental v0.1.23.
-- `config/version.php` — versión humana objetivo.
-- `docs/DEVELOPMENT-MODEL.md` — coexistencia y contratos de entrega.
-- `docs/GRINDFLOW-SPEC.md` — nuevo stack objetivo Symfony/React.
-- `docs/MIGRATION-LARAVEL.md` — histórica; supersedida sin borrarla.
-- `docs/REQUIREMENTS.md` — GF-ARCH-001..003 y GF-FR-008..009.
-- `docs/STACK-TRANSITION-SYMFONY.md` — matriz de transición y vertical slices.
+- `.github/workflows/grindflow-ci.yml`
+- `README.md`
+- `config/version.php`
+- `scripts/ci-scope-contract.sh`
+- `scripts/ci-scope.sh`
+- `scripts/readme-dashboard.py`
+- `symfony/.env.example`
+- `symfony/.gitignore`
+- `symfony/README.md`
+- `symfony/bin/console`
+- `symfony/composer.json`
+- `symfony/composer.lock`
+- `symfony/config/bootstrap.php`
+- `symfony/config/bundles.php`
+- `symfony/config/packages/doctrine.yaml`
+- `symfony/config/packages/doctrine_migrations.yaml`
+- `symfony/config/packages/framework.yaml`
+- `symfony/config/packages/twig.yaml`
+- `symfony/config/routes.yaml`
+- `symfony/config/services.yaml`
+- `symfony/frontend/admin/PreviewApp.tsx`
+- `symfony/frontend/admin/main.tsx`
+- `symfony/frontend/admin/preview.css`
+- `symfony/package-lock.json`
+- `symfony/package.json`
+- `symfony/phpunit.xml.dist`
+- `symfony/playwright.config.mjs`
+- `symfony/public/.htaccess`
+- `symfony/public/assets/grindflow.css`
+- `symfony/public/index.php`
+- `symfony/public/router.php`
+- `symfony/src/Http/AssetManifest.php`
+- `symfony/src/Http/Controller/AdminController.php`
+- `symfony/src/Http/Controller/HealthController.php`
+- `symfony/src/Http/Controller/HomeController.php`
+- `symfony/src/Http/Controller/PreviewController.php`
+- `symfony/src/Infrastructure/Http/RequestIdSubscriber.php`
+- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
+- `symfony/src/Kernel.php`
+- `symfony/src/Shared/Version/ProductVersion.php`
+- `symfony/templates/base.html.twig`
+- `symfony/templates/home/index.html.twig`
+- `symfony/templates/preview/index.html.twig`
+- `symfony/tests/contract/smoke.sh`
+- `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/PreviewTest.php`
+- `symfony/tsconfig.json`
+- `symfony/vite.config.ts`
 
 ## Validación
-- [CI exact-main anterior v0.1.22](https://github.com/pl0n3r/GrindFlow/actions/runs/35489330564): success; no prueba Symfony.
-- Entrega documental: comprobar `validate` y Sonar sobre head final antes de merge; producción sigue independiente.
+- [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12): CI y Sonar sobre head final por comprobar.
+- Las URLs S0 son de entorno aislado de pruebas, **no** de producción.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar documentación y preparar S0 Symfony/React, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 S1 identidad + S2 Vault web móvil |
-| **LATER** | 🚧 S3 reglas → S4 entrega → S5 piloto → comercialización |
-| **BLOCKED / EXTERNAL** | ⛔ Hostinger/smoke y permisos de proveedores reales sin corroborar |
+| **NOW** | 🚧 S0 validar CI, fusionar y comprobar SHA [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 S1 identidad/tenant y onboarding real |
+| **LATER** | 🚧 S2 Vault móvil → S3 reglas → S4 distribución → S5 Traffic/piloto |
+| **BLOCKED / EXTERNAL** | ⛔ Producción Hostinger/Smoke pendiente; claves de proveedores externos aún no verificadas |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Stack objetivo definido~~ | ✅ ~~Plan de transición documentado en rama~~ |
-| **NOW** | 🚧 Primer slice visible | 🚧 Symfony aún no implementado |
-| **NEXT** | 🚧 Onboarding y Vault móvil | 🚧 Por construir/portar |
-| **LATER** | 🚧 Distribución externa y piloto | 🚧 Requiere permisos/medición |
-| **BLOCKED / EXTERNAL** | ⛔ Producción | ⛔ Sin validación |
+| **DONE** | ✅ ~~Arquitectura Symfony aprobada~~ | ✅ ~~PR #11 fusionado~~ |
+| **NOW** | 🚧 UI S0 en rama | 🚧 Por validar gates |
+| **NEXT** | 🚧 Onboarding/tenant | 🚧 Por portar |
+| **LATER** | 🚧 Biblioteca y reglas | 🚧 Por migrar |
+| **BLOCKED / EXTERNAL** | ⛔ Producción | ⛔ Sin verificación |
