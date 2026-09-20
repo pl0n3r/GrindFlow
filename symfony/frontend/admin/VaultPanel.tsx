@@ -54,6 +54,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [integrity, setIntegrity] = useState<{ id: string; message: string; warning: boolean } | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -74,6 +76,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetailError('');
       setConfirmId(null);
       setRenameId(null);
+      setIntegrity(null);
       setTotal(data.total);
       setQuota(data.quota ?? null);
       setPages(data.pages);
@@ -88,6 +91,38 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     });
     return () => controller.abort();
   }, [page, refresh, view, search, format, sort]);
+
+  async function verifyOriginal(asset: Asset) {
+    if (checkingId || busyId) return;
+    setCheckingId(asset.id);
+    setIntegrity(null);
+    try {
+      const response = await fetch('/api/admin/vault/' + asset.id + '/integrity', {
+        credentials: 'same-origin', headers: { Accept: 'application/json' },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo comprobar el original.');
+      const status = body?.data?.status;
+      const labels: Record<string, string> = {
+        verified: 'Original íntegro: tamaño y SHA-256 coinciden.',
+        missing: 'El original privado no está disponible: archivo ausente.',
+        mismatch: 'Alerta: el tamaño o la huella SHA-256 no coinciden.',
+        unavailable: 'No se puede verificar el almacenamiento privado en este momento.',
+      };
+      if (typeof status !== 'string' || !Object.hasOwn(labels, status)) {
+        throw new Error('El resultado de verificación no es válido.');
+      }
+      setIntegrity({ id: asset.id, message: labels[status], warning: status !== 'verified' });
+    } catch (cause) {
+      setIntegrity({
+        id: asset.id,
+        message: cause instanceof Error ? cause.message : 'No se pudo comprobar el original.',
+        warning: true,
+      });
+    } finally {
+      setCheckingId(null);
+    }
+  }
 
   async function inspect(id: string) {
     setPreviewFailed(false);
@@ -139,6 +174,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setConfirmId(null);
     setRenameId(null);
     setDetail(null);
+    setIntegrity(null);
     setActionFeedback('');
     setActionError('');
     setHasTrashDuplicate(false);
@@ -397,6 +433,15 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
           </span>
+          <button type="button" disabled={!!checkingId || !!busyId || loading}
+            onClick={() => void verifyOriginal(asset)}
+            aria-label={'Verificar integridad de ' + asset.name}>
+            {checkingId === asset.id ? 'Comprobando…' : 'Verificar integridad'}
+          </button>
+          {integrity?.id === asset.id && <p role={integrity.warning ? 'alert' : 'status'}
+            className={integrity.warning ? 'vault-integrity-warning' : 'vault-integrity-ok'}>
+            {integrity.message}
+          </p>}
           {view === 'active' && <>
             <button type="button" disabled={detailLoading || !!busyId} aria-expanded={detail?.id === asset.id}
               onClick={() => void inspect(asset.id)}>Detalles</button>
