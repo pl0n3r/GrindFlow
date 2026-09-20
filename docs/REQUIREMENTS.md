@@ -588,3 +588,36 @@ PHP fast/quality/test/MariaDB and Sonar PR gates as applicable.
 - Página posterior al final explica el estado y enlaza a la primera, sin filtrar IDs de otra organización.
 
 **Verificación:** test de integración con 106 entregas locales y otra ajena, enlaces de página, historial profundo, filtros combinados, orden estable y página inválida.
+
+
+## Historical parity reconciliation: proposed general-purpose requirements
+
+> **Audit proposals, not approved scope and not implemented.** The historical
+> evidence matrix is [Issue #6](https://github.com/pl0n3r/GrindFlow/issues/6);
+> the master execution plan is [Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+> These candidates do not replace, renumber or weaken existing GF-* requirements.
+> Assign stable GF-* IDs after each preserve/redesign/defer/drop decision.
+
+| Audit IDs | Candidate behavior | Minimum acceptance and verification |
+| --- | --- | --- |
+| HIST-01, HIST-15 | Navigation reflects the selected organization and actual user permissions. | Distinguish no membership, forbidden action, missing schema and unavailable route without presenting fake clickable links; test keyboard, mobile and direct-URL denial. |
+| HIST-02 | Workspace metrics represent actual queryable state. | Define time window and entity; distinguish zero records from query failure and data not available; test distinct fixtures. |
+| HIST-03, HIST-04 | User, membership, organization and operational profile are not conflated. | Decide whether to retain a separate profile; document ownership and authorization; negative cross-tenant tests. |
+| HIST-05 | Ambiguous resource assignment is reviewable rather than guessed. | Preserve source provenance and require authorized human resolution if the capability is adopted. |
+| HIST-06 | A limited-duration guest file submission is distinct from authenticated direct upload. | If adopted, specify token lifecycle, limits, consent, audit and invalid/revoked-token tests before exposing a public route. |
+| HIST-09 | Localized general UI. | Decide supported locales; test menus, validation errors and date/number formats. |
+| HIST-10 | Responsive and accessible core UI. | Test 375/768/1440 px, 200% zoom, keyboard access and explicit error/empty states. |
+| HIST-12, HIST-13 | File provenance and tenant safety survive migration. | Differentiate asset owner/assignment from uploader; verify read/write restrictions and recovery plan. |
+
+Current observed gap: `DashboardController` loads all `Organization::visibleTo`
+records, while the dashboard constructs its module URLs from
+`$organizations->first()->id`. An empty organization collection or a failed
+route check renders a disabled span. Traffic/Finance apply additional
+role checks. This is a **code-level hypothesis** for fewer clickable links, not
+a verified diagnosis of a particular account or production checkout.
+
+Each accepted candidate needs an observable acceptance criterion, role and
+tenant scope, Laravel route/data mapping, negative tests, browser evidence and
+a recorded status. The old issue history that was not transferred cannot be
+reconstructed from the first commit. Never mark GF-MIG-003 complete from
+the presence of old source files or only CI green.

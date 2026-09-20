@@ -81,3 +81,22 @@ A legacy module can be retired only when:
 5. UI/browser coverage exists when needed;
 6. the PR passes `GrindFlow CI / validate`;
 7. any data migration is reversible or has an explicit recovery plan.
+
+
+## Historical parity reconciliation checkpoint (audit, not implementation)
+
+See [historical inventory #6](https://github.com/pl0n3r/GrindFlow/issues/6)
+and [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+Legacy `profiles` and `upload_links` appear in the initial PostgreSQL
+migrations, but are absent from the current Laravel identity/media migration
+contract. The current `media_assets.ingested_by_user_id` is not a substitute
+for legacy `media_assets.profile_id`; authenticated direct upload is not
+proof of parity with legacy guest upload. Legacy navigation and dashboard
+pages remain in `src/` and should be compared against Laravel routes
+**per accepted behavior**, not by similar module names.
+
+Do not retire the legacy implementation until accepted functionality is
+mapped to Laravel behavior, authorized per organization and role, verified
+with negative and browser tests, and accompanied by an explicit data
+migration/recovery decision. No production migrations are implied by this
+documentation checkpoint.

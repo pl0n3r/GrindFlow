@@ -330,3 +330,48 @@ normales estén almacenadas en la base de datos.
 La compuerta CI `real-stack` ejecuta Chromium autenticado sobre MariaDB 11.4
 descartable y complementa `browser` sobre SQLite. Ninguna usa credenciales
 productivas, proveedores externos ni escrituras en producción.
+
+
+## 23. Historical product parity and general-purpose workspace semantics
+
+**Status: audit recorded, adoption of individual legacy behaviors pending.** Evidence:
+[historical parity inventory #6](https://github.com/pl0n3r/GrindFlow/issues/6),
+[master roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2), initial
+commit `2c76f0d3ccad69cd0572f1dfe41c5dabd0410c33`, and Laravel
+baseline `b30f088ceefa0b580c6da9ccd7c1f16617e38bc2`.
+
+The first product implementation and current Laravel application have overlapping
+names but different concepts and user experiences. **A legacy module remaining
+in `src/`, a similarly named Laravel service, and a passing synthetic CI test
+are three different kinds of evidence.** Historical navigation entries alone
+are not evidence that all their destination pages were implemented.
+
+General-purpose domain distinctions, subject to a documented adoption decision:
+
+- **User:** authenticated account and acting principal.
+- **Organization:** boundary for data and permissions.
+- **Membership:** user's role in one organization, not an operational profile.
+- **Operational profile:** potentially separate resource identity within an
+  organization; the legacy schema included `profiles` but the current Laravel
+  identity migration does not.
+- **Asset:** logical file record and provenance; `ingested_by_user_id` denotes
+  who ingested it, **not necessarily ownership or assignment**.
+- **Blob:** physical deduplicated bytes, distinct from an asset record.
+
+Do not infer a data relationship or authorize a mutation based on the visual
+placement of a menu item. If any missing domain concept is adopted, first record
+its lifecycle, foreign keys, tenant and role rules, migration/recovery approach
+and negative authorization tests. In particular, no PostgreSQL RLS guarantee is
+automatically transferred to MariaDB merely because Laravel uses tenant scopes.
+
+General-purpose UI parity has its own gate: real, authorized destinations and
+explicit unavailable states; selected organization context rather than an
+implicit first record; role-appropriate information; accessible keyboard/mobile
+navigation; honest empty/error/loading states; consistent approved locales.
+A browser run using one privileged fixture does not prove no-membership or
+restricted-role behavior.
+
+The complete historical inventory and **proposed, unapproved** acceptance tests
+live in #6; execution sequencing and decisions live in #2. Existing sections
+1–22 remain in force. This section does not assert deployment or launch
+readiness and does not approve every historical feature for reimplementation.
