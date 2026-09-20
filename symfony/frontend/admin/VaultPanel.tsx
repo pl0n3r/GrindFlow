@@ -140,6 +140,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     </form>}
     {!canUpload && <p>Tu rol permite consultar los archivos, pero no añadir nuevos.</p>}
     {feedback && <p role="status" className="vault-feedback">{feedback}</p>}
+    {detailLoading && <p role="status">Cargando detalles…</p>}
     {detailError && <p role="alert">{detailError}</p>}
     {loading && <p role="status">Cargando biblioteca…</p>}
     {error && <p role="alert">{error}</p>}
