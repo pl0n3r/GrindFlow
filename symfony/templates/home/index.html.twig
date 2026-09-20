@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+{% block title %}GrindFlow · Una carga, más posibilidades{% endblock %}
+{% block body %}
+<header class="navbar">
+    <a class="brand" href="{{ path('grindflow_home') }}" aria-label="GrindFlow, inicio">GRIND<span>FLOW</span><span class="brand-dot">●</span></a>
+    <nav aria-label="Principal">
+        <a href="#flujo">Cómo funciona</a>
+        <a class="nav-cta" href="{{ path('grindflow_preview') }}">Explorar vista previa <span aria-hidden="true">↗</span></a>
+    </nav>
+</header>
+<main id="contenido">
+    <section class="hero">
+        <div class="hero-copy">
+            <span class="eyebrow"><span class="pulse"></span> Tu contenido sigue trabajando</span>
+            <h1>Una carga.<br><em>Más posibilidades.</em></h1>
+            <p class="lead">Crea a tu ritmo. GrindFlow organiza tus recursos, prepara la programación y hace que cada publicación tenga un destino medible.</p>
+            <div class="hero-actions"><a class="button primary" href="{{ path('grindflow_preview') }}">Ver el primer avance <span aria-hidden="true">↗</span></a><a class="button ghost" href="#flujo">Conocer el recorrido</a></div>
+            <p class="small-note">Vista previa técnica. La automatización externa y el piloto todavía no están habilitados.</p>
+        </div>
+        <div class="flow-art" aria-label="Vista conceptual del recorrido del contenido">
+            <div class="flow-top"><span class="mini-orb"></span> CONTENIDO EN MOVIMIENTO <span class="flow-mono">GF / 01</span></div>
+            <div class="flow-card featured"><span class="pill">01 / INGRESA</span><strong>Tu biblioteca</strong><span>Un lugar para lo que creas.</span><div class="media-tiles"><i></i><i></i><i></i></div></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-row"><div class="flow-card"><span class="pill">02 / PREPARA</span><strong>Tus reglas</strong><span>El control sigue siendo tuyo.</span></div><div class="flow-card"><span class="pill">03 / MIDE</span><strong>Tu tráfico</strong><span>Resultados claros, sin adivinar.</span></div></div>
+        </div>
+    </section>
+    <section class="path-section" id="flujo" aria-labelledby="path-heading">
+        <div class="section-intro"><span class="eyebrow">TU FLUJO, MÁS SIMPLE</span><h2 id="path-heading">El contenido lo creas tú.<br><em>El trabajo repetitivo, no.</em></h2></div>
+        <div class="steps"><article><span>01 /</span><h3>Carga</h3><p>Reúne fotos y videos en una biblioteca organizada.</p></article><article><span>02 /</span><h3>Decide</h3><p>Establece usos, destinos y horarios a tu manera.</p></article><article><span>03 /</span><h3>Distribuye</h3><p>Prepara publicaciones autorizadas y sigue su estado.</p></article><article><span>04 /</span><h3>Aprende</h3><p>Consulta enlaces y tráfico para orientar tus próximos pasos.</p></article></div>
+    </section>
+    <section class="closing"><span class="eyebrow">EN CONSTRUCCIÓN</span><h2>La primera pieza<br>ya tiene forma.</h2><p>Conoce la interfaz de S0. Las funciones de los próximos módulos se habilitarán a medida que estén implementadas y probadas.</p><a class="button primary" href="{{ path('grindflow_preview') }}">Abrir vista previa <span aria-hidden="true">↗</span></a></section>
+</main>
+{% endblock %}
