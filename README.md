@@ -59,9 +59,9 @@ flowchart LR
 
 ## Qué se hizo
 - La carga múltiple informa avance y resultado individual por archivo, incluso si uno de los envíos falla.
-- Los originales subidos correctamente se excluyen del reintento: solo se reenvían archivos fallidos cuando el usuario pulsa «Reintentar».
-- Nueva selección reemplaza la lista pendiente; el backend conserva validaciones de tamaño, tipo, CSRF, cuota y tenant en cada solicitud.
-- Prueba Chromium móvil de error temporal, recuperación y ausencia de duplicados al reintentar a 360 px.
+- Los originales subidos correctamente se excluyen del reintento: solo se reenvían archivos fallidos temporalmente cuando el usuario pulsa «Reintentar».
+- Los rechazos por formato, duplicado, cuota o permisos no generan reintentos inútiles; los pendientes se pueden descartar. Nueva selección los reemplaza.
+- Pruebas Chromium de error temporal/recuperación y rechazo no reintentable a 360 px.
 
 ## Archivos modificados en este deploy
 - `README.md`

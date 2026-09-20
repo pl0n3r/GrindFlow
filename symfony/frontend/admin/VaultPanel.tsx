@@ -15,6 +15,14 @@ type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_a
 type Props = { canUpload: boolean; csrf: string | null; manageCsrf?: string | null };
 type UploadResult = { name: string; success: boolean; message: string };
 
+// A rejection with no usable corrective action must not be retried blindly.
+// Network and server failures can be retried; a second upload of an already
+// saved resource is prevented by the backend's SHA-256 tenant-scoped guard.
+function isRetryableUploadFailure(status: number, code: string | undefined): boolean {
+  if (code?.startsWith('vault_duplicate_') || code === 'vault_quota_exceeded') return false;
+  return status === 408 || status === 429 || status >= 500;
+}
+
 export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [page, setPage] = useState(1);
@@ -204,13 +212,17 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     const failures: string[] = [];
     const failedFiles: File[] = [];
     const results: UploadResult[] = [];
+    let rejected = 0;
 
     // One image per request, so a failure leaves earlier successes visible.
     for (const file of selected) {
+      let retryable = true;
       try {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
           file.size < 1 || file.size > 8 * 1024 * 1024) {
-          throw new Error('Se aceptan imágenes JPEG, PNG o WebP de hasta 8 MiB.');
+          rejected += 1;
+          results.push({ name: file.name, success: false, message: 'Se aceptan imágenes JPEG, PNG o WebP de hasta 8 MiB.' });
+          continue;
         }
         const data = new FormData();
         data.append('file', file);
@@ -223,15 +235,22 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         const body = await response.json();
         if (!response.ok) {
           if (body?.error?.code === 'vault_duplicate_trash') trashDuplicate = true;
+          retryable = isRetryableUploadFailure(response.status, body?.error?.code);
+          if (!retryable) rejected += 1;
           throw new Error(body?.error?.message ?? 'No se pudo guardar esta imagen.');
         }
         // Server is the source of truth for ordering and total after this batch.
-        if (!body.data.asset) throw new Error('Respuesta incompleta del servidor.');
+        if (!body.data.asset) {
+          // The server replied success: reuploading may duplicate a saved file.
+          retryable = false;
+          rejected += 1;
+          throw new Error('La respuesta de guardado es incompleta; revisa la biblioteca antes de reintentar.');
+        }
         completed += 1;
         results.push({ name: file.name, success: true, message: 'Guardada.' });
       } catch (cause) {
         const message = cause instanceof Error ? cause.message : 'No se pudo guardar.';
-        failedFiles.push(file);
+        if (retryable) failedFiles.push(file);
         failures.push(file.name + ': ' + message);
         results.push({ name: file.name, success: false, message });
       }
@@ -249,7 +268,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setRetryPending(failedFiles.length > 0);
     form.reset();
     setFeedback(completed + ' de ' + selected.length + ' imágenes guardadas.' +
-      (failures.length ? ' ' + failures.join(' ') : ''));
+      (failures.length ? ' ' + failures.join(' ') : '') +
+      (rejected ? ' ' + rejected + ' archivo(s) requiere(n) revisión antes de volver a enviarse.' : ''));
     setHasTrashDuplicate(trashDuplicate);
     setUploading(false);
   }
@@ -294,6 +314,14 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         }} />
       <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual y no crea copias de imágenes idénticas.</small>
       {retryPending && selected.length > 0 && <small role="status">{selected.length} {selected.length === 1 ? 'archivo pendiente' : 'archivos pendientes'}. Solo se reenviarán los que fallaron; seleccionar nuevos archivos reemplaza esta lista.</small>}
+      {retryPending && <button type="button" disabled={uploading} onClick={() => {
+        setSelected([]);
+        setRetryPending(false);
+        setUploadProgress(null);
+        setUploadResults([]);
+        setFeedback('');
+        setHasTrashDuplicate(false);
+      }}>Descartar pendientes</button>}
       <button type="submit" disabled={uploading || loading || selected.length === 0}>
         {uploading ? 'Guardando imágenes…' : retryPending
           ? 'Reintentar ' + selected.length + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')

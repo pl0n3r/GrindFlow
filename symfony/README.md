@@ -90,3 +90,5 @@ La biblioteca Symfony incorpora `GET /api/admin/vault?view=active|trash&page=N&q
 ## S2 · carga múltiple con recuperación parcial (v0.1.48)
 
 El selector móvil procesa imágenes secuencialmente mediante el contrato actual de un archivo por petición. Informa progreso y estado por archivo, conserva solamente los `File` fallidos para reintento explícito y no vuelve a enviar éxitos. El backend valida cuota, tipo, CSRF y organización en cada intento. Cambiar la selección reemplaza los pendientes; el contenido no se publica externamente. La prueba Chromium cubre fallo transitorio, recuperación y ausencia de duplicados al reintentar.
+
+Los errores de validación local, cuota, duplicados y rechazo de autorización no se dejan en la cola de reintento. Solo se conserva la selección para fallos temporales de red, HTTP 408/429/5xx. La interfaz permite descartar los pendientes sin afectar originales almacenados; no se reenvían resultados HTTP exitosos sin metadatos porque pueden haberse guardado realmente.
