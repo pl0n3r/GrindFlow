@@ -203,6 +203,72 @@ final class VaultTest extends WebTestCase
             $client->request('GET', '/api/admin/vault?q='.rawurlencode("a\u{200B}b"));
             self::assertResponseStatusCodeSame(422);
 
+            // Format + sort use the same tenant-scoped SQL and pagination as name search.
+            $db->update('gf_vault_assets', ['mime_type' => 'image/jpeg'],
+                ['organization_id' => $mine, 'original_name' => 'pagina-0.png']);
+            $db->update('gf_vault_assets', ['mime_type' => 'image/webp'],
+                ['organization_id' => $mine, 'original_name' => 'pagina-1.png']);
+            $client->request('GET', '/api/admin/vault?format=jpeg');
+            self::assertResponseIsSuccessful();
+            $jpeg = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame('jpeg', $jpeg['format']);
+            self::assertSame('recent', $jpeg['sort']);
+            self::assertSame(1, $jpeg['total']);
+            self::assertSame('pagina-0.png', $jpeg['assets'][0]['name']);
+            self::assertSame(31, $jpeg['quota']['used_assets']);
+            self::assertSame(strlen($bytes) + 30 * 69, $jpeg['quota']['used_bytes']);
+
+            $client->request('GET', '/api/admin/vault?view=trash&format=webp&sort=name_asc');
+            self::assertResponseIsSuccessful();
+            $emptyTrash = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(0, $emptyTrash['total']);
+            self::assertSame(31, $emptyTrash['quota']['used_assets']);
+            self::assertSame('name_asc', $emptyTrash['sort']);
+            $client->request('GET', '/api/admin/vault?q=pagina-&format=png&sort=name_asc');
+            self::assertResponseIsSuccessful();
+            $png = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(28, $png['total']);
+            self::assertSame('pagina-10.png', $png['assets'][0]['name']);
+
+            $client->request('GET', '/api/admin/vault?sort=name_asc&page=1');
+            self::assertResponseIsSuccessful();
+            $alphaFirst = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame('imagen-prueba.png', $alphaFirst['assets'][0]['name']);
+            self::assertSame(31, $alphaFirst['total']);
+            self::assertCount(30, $alphaFirst['assets']);
+            $client->request('GET', '/api/admin/vault?sort=name_asc&page=2');
+            self::assertResponseIsSuccessful();
+            $alphaLast = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertCount(1, $alphaLast['assets']);
+            self::assertSame('pagina-9.png', $alphaLast['assets'][0]['name']);
+            $client->request('GET', '/api/admin/vault?sort=name_desc');
+            self::assertResponseIsSuccessful();
+            self::assertSame('pagina-9.png',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['assets'][0]['name']);
+
+            $db->update('gf_vault_assets', ['size_bytes' => 71],
+                ['organization_id' => $mine, 'original_name' => 'pagina-0.png']);
+            $db->update('gf_vault_assets', ['size_bytes' => 70],
+                ['organization_id' => $mine, 'original_name' => 'pagina-1.png']);
+            $client->request('GET', '/api/admin/vault?sort=size_desc');
+            self::assertResponseIsSuccessful();
+            self::assertSame('pagina-0.png',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['assets'][0]['name']);
+            $client->request('GET', '/api/admin/vault?sort=size_asc');
+            self::assertResponseIsSuccessful();
+            self::assertSame(69,
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['assets'][0]['size_bytes']);
+            foreach (['pagina-0.png', 'pagina-1.png'] as $original) {
+                $db->update('gf_vault_assets', ['size_bytes' => 69],
+                    ['organization_id' => $mine, 'original_name' => $original]);
+            }
+
+            foreach (['?format=gif', '?format[]=jpeg', '?sort=random()', '?sort[]=name_asc',
+                '?sort=name_asc%20DESC'] as $invalidFilter) {
+                $client->request('GET', '/api/admin/vault'.$invalidFilter);
+                self::assertResponseStatusCodeSame(422);
+            }
+
             $client->request('GET', '/api/admin/vault?page=3');
             self::assertResponseIsSuccessful();
             self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);
