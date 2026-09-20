@@ -430,7 +430,7 @@ test('S2 mobile retries only failed files after a partial multi-upload', async (
   await expect(page.getByText(/1 de 2 imágenes guardadas/)).toContainText('dos.png: Error temporal.');
   await expect(page.getByText('Procesadas 2 de 2 imágenes.')).toBeVisible();
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
-  await expect(page.getByText('1 archivos pendientes.')).toBeVisible();
+  await expect(page.getByText('1 archivo pendiente.')).toBeVisible();
   await page.getByRole('button', { name: 'Reintentar 1 imagen' }).click();
   await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
   await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();

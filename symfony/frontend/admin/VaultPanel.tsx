@@ -293,7 +293,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           setHasTrashDuplicate(false);
         }} />
       <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual y no crea copias de imágenes idénticas.</small>
-      {retryPending && selected.length > 0 && <small role="status">{selected.length} archivos pendientes. Solo se reenviarán los que fallaron; seleccionar nuevos archivos reemplaza esta lista.</small>}
+      {retryPending && selected.length > 0 && <small role="status">{selected.length} {selected.length === 1 ? 'archivo pendiente' : 'archivos pendientes'}. Solo se reenviarán los que fallaron; seleccionar nuevos archivos reemplaza esta lista.</small>}
       <button type="submit" disabled={uploading || loading || selected.length === 0}>
         {uploading ? 'Guardando imágenes…' : retryPending
           ? 'Reintentar ' + selected.length + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')
