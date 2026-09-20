@@ -260,7 +260,7 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
     } } }),
   }));
   await page.getByRole('button', { name: 'Detalles' }).click();
-  await expect(page.getByText('Guardada')).toBeVisible();
+  await expect(page.locator('.vault-metadata').getByText('Guardada', { exact: true })).toBeVisible();
   await expect(page.getByText(png.length + ' bytes')).toBeVisible();
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
