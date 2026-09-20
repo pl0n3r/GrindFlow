@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **13** | **+480** | **−44** | **+436** |
+| **14** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -72,6 +72,7 @@ flowchart LR
 - `symfony/src/Http/AssetManifest.php`
 - `symfony/src/Http/Controller/AdminContextController.php`
 - `symfony/src/Http/Controller/AdminController.php`
+- `symfony/templates/base.html.twig`
 - `symfony/templates/identity/admin.html.twig`
 - `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/AdminContextTest.php`
