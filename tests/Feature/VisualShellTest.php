@@ -25,7 +25,7 @@ class VisualShellTest extends TestCase
             ->assertDontSee('Laravel core online')
             ->assertDontSee('PostgreSQL RLS')
             ->assertDontSee('Hostinger runtime')
-            ->assertSee('css/grindflow.css');
+            ->assertSee('css/grindflow.css?v='.config('version.number'));
 
         $this->assertFileExists(public_path('css/grindflow.css'));
     }
@@ -68,6 +68,6 @@ class VisualShellTest extends TestCase
             ->assertSee('MariaDB active')
             ->assertDontSee('PostgreSQL')
             ->assertDontSee('RLS enabled')
-            ->assertSee('css/grindflow.css');
+            ->assertSee('css/grindflow.css?v='.config('version.number'));
     }
 }
