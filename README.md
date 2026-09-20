@@ -39,7 +39,7 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack** |
 | Alcance | Consultas tenant-safe de dashboard + UI de métricas + navegador y pruebas PHP |
 | Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
