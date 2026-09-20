@@ -64,6 +64,12 @@ expect_flag "$symfony" "run_symfony=true" "Symfony source selects its gate"
 expect_flag "$symfony" "run_legacy=false" "Symfony source does not select legacy Node"
 expect_flag "$symfony" "run_php_quality=false" "Symfony source does not select Laravel quality"
 
+symfony_docs="$(run_scope pull_request symfony/README.md symfony/docs/operations.md)"
+expect_flag "$symfony_docs" "run_symfony=false" "Symfony documentation skips heavy Symfony gate"
+
+symfony_mixed="$(run_scope pull_request symfony/README.md symfony/src/Kernel.php)"
+expect_flag "$symfony_mixed" "run_symfony=true" "Symfony source cannot be masked by docs"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
@@ -72,6 +78,11 @@ for flag in run_php_quality run_tests run_database run_browser run_realstack run
   expect_flag "$ci_core" "$flag=true" "CI core forces $flag"
 done
 expect_flag "$ci_core" "full=true" "CI core marks full validation"
+
+database_runner="$(run_scope pull_request scripts/database-test-runner.sh)"
+for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy run_symfony; do
+  expect_flag "$database_runner" "$flag=true" "database runner changes force $flag"
+done
 
 manual="$(run_scope workflow_dispatch)"
 for flag in run_php_quality run_tests run_database run_browser run_realstack run_legacy run_symfony; do
