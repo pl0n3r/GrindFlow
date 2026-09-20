@@ -43,11 +43,35 @@ final readonly class AssetManifest
             throw new ServiceUnavailableHttpException(null, 'El manifiesto de estilos es inválido.');
         }
 
+        // With multiple Vite entries, shared CSS can be emitted as its own
+        // manifest asset instead of living in either entry's css array.
+        if ($css === []) {
+            foreach ($json as $asset) {
+                if (!is_array($asset)) {
+                    continue;
+                }
+
+                $file = $asset['file'] ?? null;
+                if (is_string($file) && $this->isAllowedFile($file, 'css')) {
+                    $css[] = $file;
+                }
+                foreach ($asset['css'] ?? [] as $style) {
+                    $css[] = $style;
+                }
+            }
+        }
+
+        if ($css === []) {
+            throw new ServiceUnavailableHttpException(null, 'La hoja de estilos aún no está compilada.');
+        }
+
         foreach ($css as $file) {
             if (!is_string($file) || !$this->isAllowedFile($file, 'css')) {
                 throw new ServiceUnavailableHttpException(null, 'El manifiesto de estilos es inválido.');
             }
         }
+
+        $css = array_values(array_unique($css));
 
         return [
             'js' => '/build/'.$entry['file'],
