@@ -3,142 +3,83 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#070a12">
-    <meta
-        name="description"
-        content="GrindFlow organiza operaciones de contenido, automatizacion y trabajo multi-tenant desde un solo lugar."
-    >
-    <title>GrindFlow · Content Operations</title>
+    <meta name="theme-color" content="#101019">
+    <meta name="description" content="GrindFlow ayuda a creadores y estudios a organizar, reutilizar y programar contenido, con control sobre sus destinos y resultados.">
+    <title>GrindFlow · Tu contenido, en movimiento</title>
     <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
 </head>
-<body>
-    <div class="gf-grid" aria-hidden="true"></div>
-    <div class="gf-glow gf-glow--cyan" aria-hidden="true"></div>
-    <div class="gf-glow gf-glow--violet" aria-hidden="true"></div>
+<body class="gf-landing">
+    <a class="gf-skip-link" href="#contenido">Saltar al contenido</a>
+    <div class="gf-landing__halo" aria-hidden="true"></div>
 
-    <div class="gf-container">
-        <header class="gf-topbar">
+    <div class="gf-landing__wrap">
+        <header class="gf-landing__header">
             <x-brand />
-
-            <nav class="gf-nav" aria-label="Navegacion principal">
-                <a class="gf-button gf-button--ghost" href="#foundation">Estado</a>
-                <a class="gf-button gf-button--primary" href="{{ route('login') }}">Entrar</a>
+            <nav class="gf-landing__nav" aria-label="Navegación principal">
+                <a class="gf-landing__nav-link" href="#como-funciona">Cómo funciona</a>
+                <a class="gf-landing__nav-link" href="#para-quien">Para quién</a>
+                <a class="gf-landing__nav-login" href="{{ route('login') }}">Entrar al workspace <span aria-hidden="true">↗</span></a>
             </nav>
         </header>
 
-        <main>
-            <section class="gf-hero">
-                <div>
-                    <span class="gf-kicker">
-                        <span class="gf-kicker__dot"></span>
-                        Laravel core online
-                    </span>
-
-                    <h1 class="gf-hero__title">
-                        Control operativo
-                        <span class="gf-gradient-text">sin ruido.</span>
-                    </h1>
-
-                    <p class="gf-hero__copy">
-                        GrindFlow concentra identidad, espacios de trabajo y automatizacion
-                        en una base multi-tenant preparada para crecer modulo por modulo.
-                        Menos piezas sueltas. Mas trazabilidad.
-                    </p>
-
-                    <div class="gf-hero__actions">
-                        <a class="gf-button gf-button--primary" href="{{ route('login') }}">
-                            Abrir GrindFlow
-                            <span aria-hidden="true">↗</span>
-                        </a>
-                        <a class="gf-button gf-button--ghost" href="#foundation">
-                            Ver foundation
-                        </a>
+        <main id="contenido">
+            <section class="gf-landing__hero" aria-labelledby="gf-hero-title">
+                <div class="gf-landing__hero-copy">
+                    <span class="gf-landing__eyebrow"><span class="gf-landing__pulse" aria-hidden="true"></span> CONTENT OPERATIONS, SIMPLIFIED</span>
+                    <h1 id="gf-hero-title">Tu contenido.<br><span>En movimiento.</span></h1>
+                    <p>Creas una vez. Organizas, programas y aprovechas mejor cada recurso. GrindFlow reúne tu operación de contenido en un solo lugar para que dediques menos tiempo a lo repetitivo.</p>
+                    <div class="gf-landing__actions">
+                        <a class="gf-landing__button gf-landing__button--primary" href="{{ route('login') }}">Abrir mi workspace <span aria-hidden="true">↗</span></a>
+                        <a class="gf-landing__button gf-landing__button--outline" href="#como-funciona">Descubrir el flujo <span aria-hidden="true">↓</span></a>
                     </div>
+                    <p class="gf-landing__hero-note">Plataforma en desarrollo · Piloto inicial en preparación</p>
                 </div>
 
-                <aside class="gf-terminal" aria-label="Estado tecnico actual">
-                    <div class="gf-terminal__bar">
-                        <span>GF / SYSTEM STATUS</span>
-                        <span class="gf-terminal__lights" aria-hidden="true">
-                            <span></span><span></span><span></span>
-                        </span>
+                <div class="gf-landing__visual" aria-label="Vista conceptual del flujo de contenido de GrindFlow">
+                    <div class="gf-landing__visual-top"><span><span class="gf-landing__pulse" aria-hidden="true"></span> EL FLUJO DE TU CONTENIDO</span><span>GF / 001</span></div>
+                    <div class="gf-landing__media">
+                        <div class="gf-landing__media-art" aria-hidden="true"><span></span><span></span><span></span></div>
+                        <div><small>01 / BIBLIOTECA</small><strong>Todo empieza aquí.</strong><span>Tu contenido, organizado.</span></div>
+                        <span class="gf-landing__media-arrow" aria-hidden="true">↗</span>
                     </div>
-
-                    <div class="gf-terminal__body">
-                        <div class="gf-status-line">
-                            <span class="gf-status-line__icon">✓</span>
-                            <span class="gf-status-line__label">Laravel 13 foundation</span>
-                            <span class="gf-status-line__meta">online</span>
-                        </div>
-
-                        <div class="gf-status-line">
-                            <span class="gf-status-line__icon">✓</span>
-                            <span class="gf-status-line__label">Identity + tenancy</span>
-                            <span class="gf-status-line__meta">validated</span>
-                        </div>
-
-                        <div class="gf-status-line">
-                            <span class="gf-status-line__icon">✓</span>
-                            <span class="gf-status-line__label">PostgreSQL RLS</span>
-                            <span class="gf-status-line__meta">CI verified</span>
-                        </div>
-
-                        <div class="gf-status-line">
-                            <span class="gf-status-line__icon">✓</span>
-                            <span class="gf-status-line__label">Hostinger runtime</span>
-                            <span class="gf-status-line__meta">PHP 8.5</span>
-                        </div>
+                    <div class="gf-landing__visual-path" aria-hidden="true"><span></span><span></span> UN SOLO FLUJO <span></span><span></span></div>
+                    <div class="gf-landing__visual-bottom">
+                        <div class="gf-landing__mini-card"><small>02 / PROGRAMACIÓN</small><strong>A tu ritmo.</strong><span>Decide cuándo y dónde.</span><div class="gf-landing__mini-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
+                        <div class="gf-landing__mini-card gf-landing__mini-card--green"><small>03 / TRÁFICO</small><strong>Con perspectiva.</strong><span>Resultados medibles.</span><div class="gf-landing__mini-line" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
                     </div>
-                </aside>
+                    <p class="gf-landing__visual-note">Representación del recorrido del producto, no datos de una cuenta real.</p>
+                </div>
             </section>
 
-            <section class="gf-section" id="foundation">
-                <div class="gf-section__header">
-                    <div>
-                        <span class="gf-kicker">Foundation / 01</span>
-                        <h2 class="gf-section__title">La base ya no es una maqueta.</h2>
-                        <p class="gf-section__copy">
-                            El frontend ahora se apoya en una arquitectura Laravel validada
-                            y deja preparado el terreno para los modulos operativos siguientes.
-                        </p>
-                    </div>
+            <section class="gf-landing__section" id="como-funciona" aria-labelledby="gf-flow-heading">
+                <div class="gf-landing__section-heading">
+                    <div><span class="gf-landing__eyebrow">01 / CÓMO FUNCIONA</span><h2 id="gf-flow-heading">Menos tareas repetidas.<br><span>Más espacio para crear.</span></h2></div>
+                    <p>No se trata solo de publicar en varias redes. Se trata de acompañar el ciclo de vida de tu contenido con control y trazabilidad.</p>
                 </div>
-
-                <div class="gf-cards">
-                    <article class="gf-card">
-                        <span class="gf-card__eyebrow">Access</span>
-                        <h3 class="gf-card__title">Identidad aislada</h3>
-                        <p class="gf-card__copy">
-                            Usuarios, organizaciones y memberships con autorizacion de
-                            aplicacion y aislamiento en PostgreSQL.
-                        </p>
-                    </article>
-
-                    <article class="gf-card">
-                        <span class="gf-card__eyebrow">Delivery</span>
-                        <h3 class="gf-card__title">Deploy reproducible</h3>
-                        <p class="gf-card__copy">
-                            PHP 8.5, Composer bloqueado y un flujo de Hostinger que mantiene
-                            los cambios de codigo separados de las migraciones.
-                        </p>
-                    </article>
-
-                    <article class="gf-card">
-                        <span class="gf-card__eyebrow">Next</span>
-                        <h3 class="gf-card__title">Shell modular</h3>
-                        <p class="gf-card__copy">
-                            Esta capa visual sera la superficie estable donde ir aterrizando
-                            Vault, scheduling, distribucion y analitica.
-                        </p>
-                    </article>
+                <div class="gf-landing__steps">
+                    <article><span>01</span><h3>Carga y organiza</h3><p>Reúne tus fotos y videos en una biblioteca pensada para encontrar y reutilizar cada recurso.</p></article>
+                    <article><span>02</span><h3>Define tus reglas</h3><p>Decide qué contenido utilizar, dónde y con qué frecuencia. Tú conservas el control.</p></article>
+                    <article><span>03</span><h3>Prepara y distribuye</h3><p>Programa entregas y revisa su estado en los destinos compatibles y autorizados.</p></article>
+                    <article><span>04</span><h3>Observa resultados</h3><p>Relaciona publicaciones con enlaces medibles para aprender del tráfico generado.</p></article>
                 </div>
+            </section>
+
+            <section class="gf-landing__audience" id="para-quien" aria-labelledby="gf-audience-heading">
+                <div><span class="gf-landing__eyebrow">02 / PARA QUIÉN</span><h2 id="gf-audience-heading">Tu operación crece.<br><span>El control se queda contigo.</span></h2><p>Una misma plataforma, distintas formas de crear y trabajar con contenido.</p></div>
+                <div class="gf-landing__audience-cards">
+                    <article><span>INDIVIDUAL</span><h3>Creadores</h3><p>Una biblioteca para tus recursos y un flujo que libera tiempo para crear.</p></article>
+                    <article><span>COLABORATIVO</span><h3>Estudios y agencias</h3><p>Organiza trabajo, perfiles y entregas con responsabilidades claras.</p></article>
+                </div>
+            </section>
+
+            <section class="gf-landing__last" aria-labelledby="gf-last-heading">
+                <span class="gf-landing__eyebrow">GRINDFLOW / EN CONSTRUCCIÓN</span>
+                <h2 id="gf-last-heading">Tu próxima publicación empieza<br><span>mucho antes de publicar.</span></h2>
+                <p>Estamos construyendo el recorrido completo y preparando el piloto. Puedes acceder al workspace actual para explorar lo que ya está disponible.</p>
+                <a class="gf-landing__button gf-landing__button--primary" href="{{ route('login') }}">Ir al workspace <span aria-hidden="true">↗</span></a>
             </section>
         </main>
-
-        <footer class="gf-footer">
-            <span>GrindFlow · Modular operations engine</span>
-            <span>Laravel 13 / PHP 8.5</span>
-        </footer>
+        <x-release-footer context="public" />
     </div>
 </body>
 </html>

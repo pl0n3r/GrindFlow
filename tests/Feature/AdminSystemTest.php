@@ -32,6 +32,7 @@ class AdminSystemTest extends TestCase
             ->assertOk()
             ->assertSee('System')
             ->assertSee('Runtime configuration')
+            ->assertSee('data-grindflow-version="'.config('version.number').'"', false)
             ->assertSee('data-grindflow-release="'.config('version.number').'"', false)
             ->assertSee('Database connection')
             ->assertSee('Media object storage')

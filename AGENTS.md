@@ -87,8 +87,16 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   pendiente/en curso. Conservar entregas finalizadas tachadas en roadmap durable,
   **no** convertir el README efímero en changelog.
 - `config/version.php` guarda `number` y `released_at`, empezando por
-  `0.1.0`. Cada PR deploy-bound incrementa patch exactamente una unidad;
-  un hito minor explícito `0.x.y -> 0.(x+1).0` es deliberado. `1.0.0`
+  `0.1.0`. Cada PR deploy-bound incrementa patch exactamente una unidad
+  y cada entrega visible debe mostrar esa version desde la misma fuente
+  `config('version.number')` en el footer del home y del workspace/backend.
+  Nunca escribir versiones manualmente en las plantillas; en la fase de
+  coexistencia el home Symfony lee el mismo `config/version.php`.
+  Por ejemplo: `0.1.24 → 0.1.25 → 0.1.26` (sin saltos por PR desplegable).
+  Los cambios de marketing del home Laravel actual están permitidos como
+  mejoras visibles acotadas sin ampliar lógica de negocio del runtime legado.
+  La versión en pantalla **no prueba** por sí sola el SHA remoto ni el deploy.
+  Un hito minor explícito `0.x.y -> 0.(x+1).0` es deliberado. `1.0.0`
   requiere decisión expresa del propietario. No usar la versión humana como
   certificado del Git SHA que está desplegado.
 - `scripts/release-version.py` verifica transiciones, no altera Git ni

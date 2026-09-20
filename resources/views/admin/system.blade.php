@@ -420,6 +420,7 @@
                     </p>
                 </div>
             </section>
+            <x-release-footer />
         </main>
     </div>
 </body>

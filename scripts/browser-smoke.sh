@@ -180,6 +180,7 @@ PY
   assert_contains "$dom" "$E2E_USER_NAME"
   assert_contains "$dom" "$E2E_ORG_NAME"
   assert_contains "$dom" "Tenant isolation active"
+  assert_contains "$dom" "data-grindflow-version="
 
   printf 'PASS %-20s %s\n' "dashboard-auth" "/dashboard"
 }
@@ -187,8 +188,11 @@ PY
 capture_page \
   "landing" \
   "/" \
-  "Control operativo" \
-  "Laravel core online" \
+  "Tu contenido." \
+  "En movimiento." \
+  "Carga y organiza" \
+  "Define tus reglas" \
+  "data-grindflow-version=" \
   "css/grindflow.css"
 
 capture_page \

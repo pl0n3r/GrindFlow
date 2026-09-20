@@ -32,6 +32,7 @@
             <div class="gf-footer">
                 <span>Tenant isolation / GF-MIG-002</span>
                 <span>MariaDB active</span>
+                <span data-grindflow-version="{{ config('version.number', 'unknown') }}">GrindFlow · v{{ config('version.number', 'unknown') }}</span>
             </div>
         </section>
 

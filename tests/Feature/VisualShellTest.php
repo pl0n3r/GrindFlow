@@ -10,11 +10,35 @@ class VisualShellTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Control operativo')
-            ->assertSee('Laravel core online')
+            ->assertSee('Tu contenido.')
+            ->assertSee('En movimiento.')
+            ->assertSee('Carga y organiza')
+            ->assertSee('Define tus reglas')
+            ->assertSee('Prepara y distribuye')
+            ->assertSee('Observa resultados')
+            ->assertSee('Creadores')
+            ->assertSee('Estudios y agencias')
+            ->assertSee(route('login'))
+            ->assertSee('data-grindflow-version="'.config('version.number').'"', false)
+            ->assertSee('GrindFlow ·')
+            ->assertSee('v'.config('version.number'))
+            ->assertDontSee('Laravel core online')
+            ->assertDontSee('PostgreSQL RLS')
+            ->assertDontSee('Hostinger runtime')
             ->assertSee('css/grindflow.css');
 
         $this->assertFileExists(public_path('css/grindflow.css'));
+    }
+
+    public function test_release_footer_is_identical_on_public_login_and_authenticated_workspace(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('data-grindflow-version="'.config('version.number').'"', false);
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('data-grindflow-version="'.config('version.number').'"', false);
     }
 
     public function test_mobile_workspace_navigation_keeps_all_links_scrollable_and_named(): void
