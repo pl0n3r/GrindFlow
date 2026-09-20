@@ -1,0 +1,12 @@
+security:
+  password_hashers:
+    Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+  providers:
+    s0_no_accounts:
+      memory:
+        users: {}
+  firewalls:
+    main:
+      lazy: true
+      provider: s0_no_accounts
+# /admin remains explicitly 403 in S0. S1 supplies real users and authorization.
