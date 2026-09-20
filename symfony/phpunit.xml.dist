@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="config/bootstrap.php" colors="true">
+  <testsuites>
+    <testsuite name="S0 Symfony"><directory>tests/php</directory></testsuite>
+  </testsuites>
+  <php>
+    <env name="APP_ENV" value="test"/>
+    <env name="APP_DEBUG" value="0"/>
+    <env name="APP_SECRET" value="s0-test-only-not-for-production"/>
+  </php>
+</phpunit>

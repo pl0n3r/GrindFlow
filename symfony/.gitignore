@@ -1,0 +1,10 @@
+/vendor/
+/node_modules/
+/var/
+/public/build/
+/.phpunit.cache/
+/.phpunit-watcher.yml
+/.env
+/.env.local
+/.env.*.local
+/tests/e2e/artifacts/
