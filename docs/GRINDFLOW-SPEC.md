@@ -96,6 +96,20 @@ El MVP debe probar la promesa **«el creador crea; GrindFlow gestiona»**. El tr
 - GrindFlow registra su historial de uso para evitar repeticiones excesivas y permitir reutilización controlada.
 - Debe existir una colección lógica de material preaprobado para alertas de directo. Si no hay material nuevo, GrindFlow puede escoger material antiguo elegible que lleve suficiente tiempo sin utilizarse, respetando las reglas del creador.
 
+#### 1A.5.2. Elegibilidad de contenido por destino
+
+GrindFlow debe separar la **clasificación del recurso** de la **compatibilidad del destino**. No todo contenido almacenado es elegible para todas las plataformas.
+
+- Cada recurso puede recibir una clasificación de distribución y usos autorizados.
+- Cada destino/integración declara las categorías de contenido que admite según sus reglas y capacidades.
+- Scheduler y Publishing solo pueden ofrecer o ejecutar combinaciones recurso-destino compatibles; ante incompatibilidad, el sistema falla cerrado y explica el motivo al usuario.
+- Una misma cuenta puede mantener circuitos de distribución distintos sin mezclar accidentalmente contenido entre destinos con políticas diferentes.
+- La clasificación debe integrarse con las reglas de publicación, reutilización, alertas de directo y aprobación previa.
+- La arquitectura debe permitir incorporar en el futuro destinos con políticas de contenido restringido sin construir un segundo producto ni debilitar las validaciones de cumplimiento.
+- Esta capacidad es genérica y reutilizable para cualquier plataforma con restricciones particulares de contenido.
+
+**Alcance del piloto:** se prepara el modelo de clasificación/compatibilidad desde el diseño, pero la publicación automatizada de categorías restringidas no forma parte del MVP inicial. Su habilitación futura requerirá revisar las reglas, APIs, permisos y requisitos aplicables de cada proveedor antes de activar una integración.
+
 #### 1A.5.2. Reglas de publicación
 
 El creador puede definir reglas diferentes por plataforma: frecuencia diaria o semanal, días, horarios, tipos de contenido y destinos. Las reglas pueden cambiarse posteriormente sin reconstruir toda la planificación.
