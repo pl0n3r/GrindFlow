@@ -294,7 +294,7 @@ test('S2 mobile vault navigates real paginated API metadata', async ({ page }) =
   await expect(page.getByText('pagina-1.png')).toBeVisible();
   await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(page.getByText('pagina-2.png')).toBeVisible();
-  await expect(page.getByText('Página 2 de 2')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Páginas de la biblioteca' }).getByText('Página 2 de 2')).toBeVisible();
   await page.getByRole('button', { name: 'Anterior' }).click();
   await expect(page.getByText('pagina-1.png')).toBeVisible();
   expect(visited).toEqual([1, 2, 1]);
