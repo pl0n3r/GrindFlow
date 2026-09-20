@@ -39,6 +39,7 @@ final class PreviewTest extends WebTestCase
         $release = (new ProductVersion(dirname(__DIR__, 3)))->human();
         self::assertSelectorExists('#grindflow-preview[data-version="'.$release.'"]');
         self::assertSelectorExists('script[src^="/build/assets/preview-"]');
+        self::assertSelectorExists('link[href^="/build/assets/"][href$=".css"]');
     }
 
     public function testAdminRequiresAuthenticationAndUnknownRoutesStayNotFound(): void
