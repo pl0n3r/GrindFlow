@@ -82,7 +82,7 @@ flowchart LR
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
 | **NOW** | 🚧 Validar protección de sesión Symfony S1 v0.1.45 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Después de validar deduplicación |
+| **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -91,6 +91,6 @@ flowchart LR
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
 | **NOW** | 🚧 Validar protección de sesión Symfony S1 v0.1.45 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Después de validar deduplicación |
+| **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
