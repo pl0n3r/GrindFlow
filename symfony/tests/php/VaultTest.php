@@ -139,6 +139,44 @@ final class VaultTest extends WebTestCase
             self::assertSame($mineAsset, $list[0]['id']);
             self::assertStringNotContainsString('ajena.png', (string) $client->getResponse()->getContent());
 
+            // More than one page with identical timestamps must not truncate
+            // the organization catalog or include the foreign asset.
+            for ($i = 0; $i < 30; ++$i) {
+                $id = Uuid::v7()->toRfc4122();
+                $db->insert('gf_vault_assets', [
+                    'id' => $id, 'organization_id' => $mine, 'uploaded_by' => $user,
+                    'original_name' => 'pagina-'.$i.'.png', 'mime_type' => 'image/png',
+                    'size_bytes' => 69, 'sha256' => str_repeat('b', 64),
+                    'storage_key' => $id, 'created_at' => $at,
+                ]);
+            }
+            $client->request('GET', '/api/admin/vault?page=1');
+            self::assertResponseIsSuccessful();
+            $first = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(31, $first['total']);
+            self::assertSame(2, $first['pages']);
+            self::assertSame(1, $first['page']);
+            self::assertCount(30, $first['assets']);
+            $client->request('GET', '/api/admin/vault?page=2');
+            self::assertResponseIsSuccessful();
+            $second = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(31, $second['total']);
+            self::assertSame(2, $second['page']);
+            self::assertCount(1, $second['assets']);
+            self::assertCount(31, array_unique(array_merge(
+                array_column($first['assets'], 'id'), array_column($second['assets'], 'id'),
+            )));
+            self::assertNotContains($foreignAsset, array_merge(
+                array_column($first['assets'], 'id'), array_column($second['assets'], 'id'),
+            ));
+            $client->request('GET', '/api/admin/vault?page=3');
+            self::assertResponseIsSuccessful();
+            self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);
+            foreach (['0', '-1', '1001', '1 OR 1=1', '1.5'] as $invalidPage) {
+                $client->request('GET', '/api/admin/vault?page='.rawurlencode($invalidPage));
+                self::assertResponseStatusCodeSame(422);
+            }
+
             $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/download');
             self::assertResponseStatusCodeSame(404);
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
