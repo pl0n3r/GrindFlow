@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101019">
     <meta name="description" content="GrindFlow ayuda a creadores y estudios a organizar, reutilizar y programar contenido, con control sobre sus destinos y resultados.">
     <title>GrindFlow · Tu contenido, en movimiento</title>
-    <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}?v={{ config('version.number') }}">
 </head>
 <body class="gf-landing">
     <a class="gf-skip-link" href="#contenido">Saltar al contenido</a>

@@ -126,6 +126,21 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Cuando un cambio concurrente llegue a main, reexaminar la base antes de
   integrar para evitar sobrescribir fixes o duplicar versiones.
 
+### Regla de releases pequeñas, visibles y comprobables
+
+- Entregar cambios acotados que el propietario pueda comprobar en cada
+  deploy desde el home o el workspace; no esperar a completar varios
+  módulos grandes para mostrar progreso. Una pantalla visible debe usar
+  backend real cuando su función lo requiera, y nunca inventar entregas,
+  métricas ni integraciones.
+- Cada PR desplegable incrementa el último número de versión una unidad
+  y la muestra en footers desde `config/version.php`. Versionar el CSS de las
+  pantallas afectadas con `?v=` seguido del mismo release para evitar que el
+  navegador siga mostrando estilos del deploy anterior.
+- Reportar en una frase qué cambió, dónde verlo y qué estado está confirmado:
+  CI, main, deploy observado o validación productiva. No llamar deploy a un
+  PR fusionado si Hostinger no confirmó la versión.
+
 ### Regla de avance sustancial por cada mensaje
 
 - Cuando el propietario diga "sigue", "adelante" o equivalente, ejecutar un

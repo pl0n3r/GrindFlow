@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#070a12">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Vault · {{ $organization->name }} · GrindFlow</title>
-    <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}?v={{ config('version.number') }}">
 </head>
 <body>
     <div class="gf-grid" aria-hidden="true"></div>
