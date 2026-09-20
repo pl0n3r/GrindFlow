@@ -1,6 +1,15 @@
-# GrindFlow · S0 Symfony aislado
+# GrindFlow · Runtime Symfony aislado
 
-**S1 fundacional (no desplegado):** entidades y migración Doctrine de usuarios, organizaciones y membresías prefijadas `gf_identity_*`, probadas en MariaDB descartable; todavía sin login/onboarding y `/admin` sigue 403. **Implementado en código (no desplegado):** primera superficie Symfony 7.4 LTS, home Twig, vista previa React/Vite compilable y health seguro. La versión se lee del `../config/version.php` del repositorio. **No se conecta a cuentas, datos ni tablas de Laravel** y `/admin` responde 403 intencionadamente hasta S1; `/preview` es una demostración pública rotulada que no simula publicación externa.
+> **Estado del slice v0.1.49, rama del PR #42 (aún sin merge):** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+
+| Etapa | Evidencia separada |
+| --- | --- |
+| IMPLEMENTADO | v0.1.49 preparada en rama; filtros MIME/orden de main v0.1.48 se conservan junto con la recuperación de cargas. |
+| VALIDADO EN CÓDIGO | CI del PR #42 y Sonar deben pasar en el head final; CI exact-main de v0.1.48 success. |
+| DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel v0.1.48 no certifica Symfony ni SHA remoto. |
+| VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
+
+Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
 
 ## Ejecutar en entorno descartable
 
@@ -26,7 +35,7 @@ Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React) y `/health` (estado 
 - Los assets se sirven desde `public/build` con manifiesto Vite validado. Si falta, `/preview` devuelve 503 explícito.
 - `php -S` y `APP_SECRET` del ejemplo son solo para desarrollo; no usar en Hostinger productivo.
 
-Plan de transición y criterios completos: [STACK-TRANSITION-SYMFONY.md](../../docs/STACK-TRANSITION-SYMFONY.md); [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12).
+Plan de transición y criterios completos: [STACK-TRANSITION-SYMFONY.md](../docs/STACK-TRANSITION-SYMFONY.md); [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12).
 
 ## S1 · Integridad reversible de membresías (v0.1.32)
 
@@ -86,6 +95,14 @@ Subir a `POST /api/admin/vault` sigue validando CSRF, MIME/imagen real, bytes, r
 ## S2 · Búsqueda privada por nombre (v0.1.47)
 
 La biblioteca Symfony incorpora `GET /api/admin/vault?view=active|trash&page=N&q=texto` y un buscador móvil de nombre de archivo en ambas vistas. El backend valida hasta 80 caracteres visibles, parametriza `LIKE` y escapa literalmente `%`, `_` y `!`; todos los recuentos, páginas y nombres siguen limitados al tenant de la sesión y al estado elegido. La cuota de bytes e imágenes permanece **global para el tenant**, también cuando la búsqueda devuelve cero resultados. La UI mantiene el filtro al alternar biblioteca/papelera y lo limpia explícitamente. Pruebas MariaDB y Chromium cubren términos que coinciden, que no coinciden, comodines como texto literal, actor ajeno y formato inválido. Sin migración, indexación pública ni despliegue Symfony a Hostinger.
+
+## S2 · carga múltiple con recuperación parcial (v0.1.49)
+
+El selector móvil procesa imágenes secuencialmente mediante el contrato actual de un archivo por petición. Informa progreso y estado por archivo, conserva solamente los `File` fallidos para reintento explícito y no vuelve a enviar éxitos. El backend valida cuota, tipo, CSRF y organización en cada intento. Cambiar la selección reemplaza los pendientes; el contenido no se publica externamente. La prueba Chromium cubre fallo transitorio, recuperación y ausencia de duplicados al reintentar.
+
+Los errores de validación local, cuota, duplicados y rechazo de autorización no se dejan en la cola de reintento. Solo se conserva la selección para fallos temporales de red, HTTP 408/429/5xx. La interfaz permite descartar los pendientes sin afectar originales almacenados; no se reenvían resultados HTTP exitosos sin metadatos porque pueden haberse guardado realmente.
+
+La clasificación de reintento ocurre **antes** de decodificar el JSON: HTTP 2xx o 4xx definitivo con cuerpo malformado no se reenvía, porque un 2xx puede haber persistido ya el archivo. Tests Chromium comprueban este contrato y usan selectores exactos para distinguir resultados de carga de nombres en la biblioteca.
 
 ## S2 · Filtrar por formato y ordenar en servidor (v0.1.48)
 
