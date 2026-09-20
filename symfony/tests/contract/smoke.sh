@@ -2,6 +2,7 @@
 set -euo pipefail
 base="${S0_BASE_URL:-http://127.0.0.1:8765}"
 tmp="$(mktemp -d)"
+trap 'echo "Symfony HTTP contract failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 trap 'rm -rf "$tmp"' EXIT
 
 echo "S0 smoke: health response"
