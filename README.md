@@ -39,7 +39,7 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · tests · database · browser · realstack · legacy · symfony-preview** |
 | Alcance | Vault S2: papelera/restauración tenant-safe, CSRF, bloqueo transaccional y originales privados |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
