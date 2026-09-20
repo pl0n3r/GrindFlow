@@ -73,6 +73,8 @@ final class IdentityLoginTest extends WebTestCase
             $list = $client->request('GET', '/organizations');
             self::assertResponseIsSuccessful();
             self::assertSelectorTextContains('h1', 'Elige tu organización');
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+            self::assertStringContainsString('private', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertSelectorTextContains('.identity-orgs', 'My isolated org');
             self::assertSelectorTextNotContains('body', 'Unassigned org');
 
@@ -99,12 +101,16 @@ final class IdentityLoginTest extends WebTestCase
             $client->request('GET', '/admin');
             self::assertResponseIsSuccessful();
             self::assertSelectorExists('#grindflow-admin[data-organization="'.$mine.'"]');
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+            self::assertStringContainsString('private', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertSelectorExists('script[src^="/build/assets/preview-"]');
 
             $client->request('GET', '/api/admin/context', server: ['HTTP_ACCEPT' => 'application/json']);
             self::assertResponseIsSuccessful();
             $context = json_decode((string) $client->getResponse()->getContent(), true);
             self::assertSame($mine, $context['data']['organization']['id']);
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+            self::assertStringContainsString('private', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertSame('editor', $context['data']['organization']['role']);
             self::assertTrue($context['data']['permissions']['content_prepare']);
             self::assertFalse($context['data']['permissions']['organization_manage']);
