@@ -154,6 +154,23 @@ final class VaultController extends AbstractController
                     return 'quota';
                 }
 
+                // The same organization row lock serializes concurrent uploads.
+                // Check retained originals in both views, scoped to this tenant only.
+                // An active match wins if old data contains both states.
+                $duplicate = $db->fetchAssociative(
+                    <<<'SQL'
+                        SELECT deleted_at
+                        FROM gf_vault_assets
+                        WHERE organization_id = :organization AND sha256 = :sha
+                        ORDER BY (deleted_at IS NULL) DESC, id DESC
+                        LIMIT 1
+                        SQL,
+                    ['organization' => $context['organization']['id'], 'sha' => $sha256],
+                );
+                if ($duplicate !== false) {
+                    return $duplicate['deleted_at'] === null ? 'duplicate_active' : 'duplicate_trash';
+                }
+
                 // Permission and active account are checked again inside the write.
                 $written = $db->executeStatement(
                     <<<'SQL'
@@ -181,6 +198,12 @@ final class VaultController extends AbstractController
 
             if ($uploadStatus === 'quota') {
                 return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 imágenes o 128 MiB por organización.');
+            }
+            if ($uploadStatus === 'duplicate_active') {
+                return $this->error(409, 'vault_duplicate_active', 'Esta imagen ya está en tu biblioteca; no se guardó otra copia.');
+            }
+            if ($uploadStatus === 'duplicate_trash') {
+                return $this->error(409, 'vault_duplicate_trash', 'Esta imagen ya está en tu papelera; puedes restaurarla.');
             }
             if ($uploadStatus !== 'stored') {
                 return $this->error(403, 'organization_access_changed', 'Tu permiso para guardar cambió.');
