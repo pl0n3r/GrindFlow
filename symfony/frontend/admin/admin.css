@@ -48,3 +48,9 @@
 .vault-metadata{flex:1 0 100%;display:grid;grid-template-columns:minmax(75px,auto) minmax(0,1fr);gap:7px 12px;margin:8px 0 0;padding:12px;border-top:1px solid #39384d;font-size:12px}
 .vault-metadata dt{color:#aaa9bd}.vault-metadata dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:520px){.vault-list li>button{margin-left:50px}.vault-metadata{margin-left:0}}
+
+/* S2: quota usage remains readable at narrow mobile widths. */
+.vault-quota{display:grid;gap:8px;padding:14px 16px;margin:14px 0;border:1px solid #47405f;border-radius:12px;background:#121521;min-width:0}
+.vault-quota strong{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.vault-quota meter{width:100%;height:16px}
+.vault-quota small{color:#bfb8cd;line-height:1.5}
