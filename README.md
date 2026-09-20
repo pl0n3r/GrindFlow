@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **48** | **+9275** | **−44** | **+9231** |
+| **52** | **+9297** | **−46** | **+9251** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -66,6 +66,8 @@ flowchart LR
 - `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
+- `eslint.config.mjs`
+- `pint.json`
 - `scripts/ci-scope-contract.sh`
 - `scripts/ci-scope.sh`
 - `scripts/readme-dashboard.py`
@@ -80,6 +82,7 @@ flowchart LR
 - `symfony/config/packages/doctrine.yaml`
 - `symfony/config/packages/doctrine_migrations.yaml`
 - `symfony/config/packages/framework.yaml`
+- `symfony/config/packages/security.yaml`
 - `symfony/config/packages/twig.yaml`
 - `symfony/config/routes.yaml`
 - `symfony/config/services.yaml`
@@ -111,6 +114,7 @@ flowchart LR
 - `symfony/tests/php/PreviewTest.php`
 - `symfony/tsconfig.json`
 - `symfony/vite.config.ts`
+- `tsconfig.json`
 
 ## Validación
 - [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12): CI y Sonar sobre head final por comprobar.
