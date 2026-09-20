@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.36: solo el deploy actual; entrega de infraestructura CI, todavía no fusionada ni desplegada.** Base `main` v0.1.35 `f0340d26a3dc4e89ff01292383f434e64d2eac44`. El selector de pruebas se ajusta por rutas; Chromium reutiliza binarios según lockfile, las suites DB no repiten un fallo y el reporte diario muestra tiempo/fallos. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas**.
+> **Snapshot v0.1.37: solo el deploy actual, perfil personal Symfony S1 en código, aún sin despliegue Symfony.** Base `main` v0.1.36 `429532ca177998c26a2a7de49722ee4639140237`. Usuario autenticado puede editar el nombre de su perfil sin permisos sobre su organización; CSRF propio, validación servidor y datos reales en MariaDB aislada. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.36** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.35~~ | `f0340d26a3dc4e89ff01292383f434e64d2eac44` |
+| Version objetivo | 🚧 **v0.1.37** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.36~~ | `429532ca177998c26a2a7de49722ee4639140237` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+439** | **−64** | **+375** |
+| **10** | **+374** | **−29** | **+345** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | CI completo por cambios al core; prueba de selección de gates, grupo DB, cache Chromium y reporte diario |
+| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Alcance | Perfil propio React y API real con CSRF, pruebas de usuario ajeno/revocación y móvil |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,36 +58,31 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Selector de gates preserva matriz completa al editar CI nuclear o pedir workflow manual, pero omite Symfony pesado para documentación Symfony aislada.
-- El test DB detecta el grupo `database` y evita repetir toda la suite tras un fallo real. Contrato automatizado verifica ambas rutas.
-- Chromium se cachea por sistema operativo y lockfile, con instalación segura en cache miss; sintaxis PHP Symfony usa 4 procesos.
-- Health diario de Actions calcula mediana/p90 y alertas de deterioro por evento, sin cambiar pruebas ni ramas por sí solo. Política durable en AGENTS y [guía](docs/CI-PERFORMANCE.md).
-- Los fixtures Laravel de schema ausente evitan DDL incompatible con FKs al borrar y reconstruir tablas en MariaDB descartable. No se cambió el runtime Laravel, datos productivos ni el cutover Symfony.
+- Formulario real de perfil propio visible en panel React incluso con rol editor, sin otorgar permisos de administración de organización.
+- POST JSON solo con `name`: actor derivado de sesión, CSRF independiente, 401/403/422 explícitos y cuenta activa revalidada en SQL.
+- Contexto Symfony consulta el nombre vigente para evitar mostrar identidad desactualizada después de guardar.
+- Pruebas PHPUnit/Chromium para CSRF, IDs ajenos, cuentas revocadas y experiencia móvil y navegación responsive sin desborde horizontal. Sin migraciones ni cutover.
 
 ## Archivos modificados en este deploy
-- `.github/workflows/ci-health.yml`
-- `.github/workflows/grindflow-ci.yml`
-- `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `docs/CI-PERFORMANCE.md`
-- `scripts/ci-performance-report.py`
-- `scripts/ci-scope-contract.sh`
-- `scripts/ci-scope.sh`
-- `scripts/database-test-runner-contract.sh`
-- `scripts/database-test-runner.sh`
-- `tests/Feature/DistributionTest.php`
-- `tests/Feature/SchedulingTest.php`
-- `tests/Feature/TrafficAttributionTest.php`
+- `symfony/README.md`
+- `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/frontend/admin/admin.css`
+- `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/src/Http/Controller/ProfileController.php`
+- `symfony/src/Identity/Application/MembershipContext.php`
+- `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/ProfileSettingsTest.php`
 
 ## Validación
-- Scripts tienen self-test y contratos; CI completo de PR, Sonar/CodeRabbit y CI exact-main se verifican por separado.
-- Telemetría de Actions es read-only y no equivale a funcionamiento productivo de Hostinger.
+- PHPUnit aislado comprueba cuenta propia/ajena, CSRF, nombre inválido, sesión revocada y persistencia. Chromium comprueba formulario y API anónima.
+- CI de PR, Sonar/CodeRabbit, CI exact-main y Hostinger se verifican independientemente.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Verificar CI adaptable v0.1.36, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NOW** | 🚧 Validar perfil personal S1 v0.1.37, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
 | **NEXT** | 🚧 Vault móvil real con contexto tenant-safe |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial |
@@ -96,7 +91,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Infraestructura CI v0.1.36 | 🚧 CI completo y revisión |
+| **NOW** | 🚧 Perfil personal S1 v0.1.37 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Vault móvil | 🚧 S2 |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

@@ -8,3 +8,11 @@
 .admin-rename-controls button{min-height:46px;padding:10px 18px;border:0;border-radius:9px;background:#b896ff;color:#171124;font:inherit;font-weight:780;cursor:pointer}
 .admin-rename-controls button:disabled{opacity:.6;cursor:wait}
 .admin-rename-controls :focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+
+/* Mobile nav labels must scroll inside the sidebar, not expand the CSS grid. */
+@media(max-width:900px){
+  .admin-layout{grid-template-columns:minmax(0,1fr)}
+  .admin-sidebar{min-width:0;width:100%;max-width:100%}
+  .admin-sidebar nav{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+  .admin-tenant{min-width:0}
+}

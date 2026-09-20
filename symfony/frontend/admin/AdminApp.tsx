@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 type Context = {
   user: { display_name: string };
   organization_name_csrf: string | null;
+  profile_name_csrf: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -27,6 +28,9 @@ const roleNames: Record<string, string> = {
 export function AdminApp() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [name, setName] = useState('');
+  const [profileName, setProfileName] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileFeedback, setProfileFeedback] = useState('');
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
 
@@ -47,6 +51,7 @@ export function AdminApp() {
       })
       .then((context) => {
         setName(context.organization.name);
+        setProfileName(context.user.display_name);
         setState({ kind: 'ready', context });
       })
       .catch((error: unknown) => {
@@ -91,6 +96,40 @@ export function AdminApp() {
       setFeedback(error instanceof Error ? error.message : 'No se pudo guardar el nombre.');
     } finally {
       setSaving(false);
+    }
+  }
+
+
+  async function renameProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (state.kind !== 'ready' || !state.context.profile_name_csrf || savingProfile) return;
+
+    setSavingProfile(true);
+    setProfileFeedback('');
+    try {
+      const response = await fetch('/api/admin/profile/name', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': state.context.profile_name_csrf,
+        },
+        body: JSON.stringify({ name: profileName }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo actualizar tu perfil.');
+      }
+      const updated = body.data.user.display_name as string;
+      setState((previous) => previous.kind === 'ready'
+        ? { kind: 'ready', context: { ...previous.context, user: { display_name: updated } } }
+        : previous);
+      setProfileName(updated);
+      setProfileFeedback('Nombre de tu perfil actualizado.');
+    } catch (error) {
+      setProfileFeedback(error instanceof Error ? error.message : 'No se pudo actualizar tu perfil.');
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -173,6 +212,23 @@ export function AdminApp() {
                 </form>
               : <p>Tu rol permite consultar este espacio, pero no cambiar el nombre de la organización.</p>}
             {feedback && <p role="status">{feedback}</p>}
+          </section>
+          <section className="admin-settings" aria-labelledby="profile-settings-title">
+            <span className="admin-kicker">TU CUENTA</span>
+            <h2 id="profile-settings-title">Perfil personal</h2>
+            <p>Este nombre aparece en tu sesión y no modifica ninguna organización.</p>
+            <p className="admin-profile-current">Nombre actual: <strong>{context.user.display_name}</strong></p>
+            <form onSubmit={renameProfile} className="admin-rename-form">
+              <label htmlFor="profile-name">Nombre en tu perfil</label>
+              <div className="admin-rename-controls">
+                <input id="profile-name" value={profileName} minLength={2} maxLength={120}
+                  required onChange={(event) => setProfileName(event.target.value)} />
+                <button type="submit" disabled={savingProfile || !context.profile_name_csrf}>
+                  {savingProfile ? 'Guardando…' : 'Guardar perfil'}
+                </button>
+              </div>
+            </form>
+            {profileFeedback && <p role="status">{profileFeedback}</p>}
           </section>
           <section className="admin-notice" role="status">
             <strong>Alcance S1</strong>

@@ -36,9 +36,16 @@ final class AdminContextController extends AbstractController
             return $this->error(403, 'organization_access_changed', 'Tu acceso a esta organización ha cambiado.');
         }
 
+        // The session user can lag behind a profile edit. Read the live name.
+        $liveName = $memberships->displayName($user->id());
+        if ($liveName === null) {
+            return $this->error(403, 'account_access_changed', 'Tu cuenta ya no está activa.');
+        }
+
         return $this->privateJson([
             'data' => [
-                'user' => ['display_name' => $user->displayName()],
+                'user' => ['display_name' => $liveName],
+                'profile_name_csrf' => (string) $csrf->getToken('grindflow_profile_name')->getValue(),
                 'organization' => $organization,
                 'permissions' => $memberships->permissions($organization['role']),
                 'organization_name_csrf' => $memberships->permissions($organization['role'])['organization_manage']

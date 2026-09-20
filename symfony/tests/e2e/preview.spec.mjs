@@ -135,3 +135,59 @@ test('organization manager can rename selected tenant in mobile React without an
   await expect(page.getByText('Nombre de la organización actualizado.')).toBeVisible();
   await expect(page.getByText('Nuevo nombre').first()).toBeVisible();
 });
+
+test('editor can update only their own profile name from a 360px React panel', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        user: { display_name: 'Persona original' },
+        organization: { id: '00000000-0000-7000-8000-000000000033', name: 'Organización sin cambios', role: 'editor' },
+        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+        organization_name_csrf: null,
+        profile_name_csrf: 'profile-csrf-test',
+      },
+      meta: { version: '0.1.37' },
+    }),
+  }));
+  await page.route('**/api/admin/profile/name', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('profile-csrf-test');
+    expect(route.request().postDataJSON()).toEqual({ name: 'Persona actualizada' });
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { user: { display_name: 'Persona actualizada' } } }),
+    });
+  });
+
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?profile-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Perfil personal' })).toBeVisible();
+  await page.getByLabel('Nombre en tu perfil').fill('Persona actualizada');
+  await page.getByRole('button', { name: 'Guardar perfil' }).click();
+  await expect(page.getByText('Nombre de tu perfil actualizado.')).toBeVisible();
+  await expect(page.locator('.admin-profile-current')).toContainText('Nombre actual: Persona actualizada');
+  await expect(page.getByText('Organización sin cambios').first()).toBeVisible();
+  const overflow = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth,
+    offenders: Array.from(document.querySelectorAll('body *'))
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 8).map((element) => ({
+        element: element.tagName + '.' + element.className,
+        right: Math.round(element.getBoundingClientRect().right),
+      })),
+  }));
+  expect(overflow.page, JSON.stringify(overflow)).toBeLessThanOrEqual(360);
+});
+
+test('profile API never redirects anonymous writes to a private HTML page', async ({ request }) => {
+  const response = await request.post('/api/admin/profile/name', { data: { name: 'No autorizado' }, maxRedirects: 0 });
+  expect(response.status()).toBe(401);
+  expect((await response.json()).error.code).toBe('authentication_required');
+  expect(response.headers()['cache-control']).toContain('no-store');
+});

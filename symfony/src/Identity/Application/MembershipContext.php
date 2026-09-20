@@ -42,6 +42,16 @@ final readonly class MembershipContext
         ];
     }
 
+    public function displayName(string $userId): ?string
+    {
+        $name = $this->db->fetchOne(
+            'SELECT name FROM gf_identity_users WHERE id = :user AND is_active = 1',
+            ['user' => $userId],
+        );
+
+        return is_string($name) ? $name : null;
+    }
+
     /** @return array{workspace_view: bool, organization_manage: bool, content_prepare: bool, content_review: bool} */
     public function permissions(string $role): array
     {
