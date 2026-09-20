@@ -64,7 +64,17 @@ Se realizará un **piloto gratuito con cinco creadoras** para medir:
 
 Esta información servirá para validar alcance y precios. El piloto es un experimento de producto y negocio, no evidencia de resultados comerciales obtenidos todavía.
 
-#### 1A.4.3. Prueba gratuita comercial
+#### 1A.4.3. Propuesta de valor operativa y estrategia de expansión
+
+GrindFlow no se posiciona únicamente como un programador de publicaciones. Su propuesta de valor es **automatizar la gestión del contenido y del tráfico del creador**: el creador produce y carga contenido, define reglas de frecuencia, horarios, destinos y plataformas, y GrindFlow mantiene una presencia digital constante mediante organización, reutilización, programación y distribución automatizadas.
+
+El objetivo es reducir el tiempo operativo que el creador dedica a mantener sus canales activos, sin sustituir la creación original ni quitarle control sobre las reglas de distribución. La plataforma debe poder sostener actividad tanto durante transmisiones como fuera de ellas y, cuando existan integraciones compatibles, contemplar avisos automáticos de inicio de transmisión.
+
+**Estrategia de producto acordada:** el piloto inicial mantiene el foco actual y no se amplía todavía a múltiples verticales. Sin embargo, el núcleo del producto se diseñará desde el principio para poder extenderse posteriormente a creadores de contenido en general, incluidos streamers, sin reconstruir la plataforma ni duplicar su arquitectura. Las particularidades de cada vertical deberán resolverse como flujos, integraciones o capacidades específicas sobre una base común.
+
+**Principio de diseño derivado:** ninguna decisión técnica específica del piloto debe cerrar innecesariamente la posibilidad de expansión futura a otros tipos de creadores. La expansión se validará como una fase posterior y no forma parte del alcance comercial inmediato del piloto actual.
+
+#### 1A.4.4. Prueba gratuita comercial
 
 Se contempla como ejemplo inicial una prueba limitada de **30 días**, con **hasta dos redes sociales**, biblioteca y automatización básicas limitadas, seguida de la opción de suscripción.
 
