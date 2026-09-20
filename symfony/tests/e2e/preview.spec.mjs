@@ -247,6 +247,17 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
   await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
   await expect(page.getByText('foto-ejemplo.png')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Descargar' })).toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
+  await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { asset: {
+      id, name: 'foto-ejemplo.png', mime_type: 'image/png', size_bytes: png.length,
+      created_at: '2026-09-20 00:00:00', download_url: '/api/admin/vault/' + id + '/download',
+    } } }),
+  }));
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  await expect(page.getByText('Guardada')).toBeVisible();
+  await expect(page.getByText(png.length + ' bytes')).toBeVisible();
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 

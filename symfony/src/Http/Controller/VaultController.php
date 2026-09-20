@@ -159,6 +159,33 @@ final class VaultController extends AbstractController
         return $this->privateJson(['data' => ['asset' => $this->publicAsset($asset)]], 201);
     }
 
+    #[Route('/api/admin/vault/{id}', name: 'grindflow_vault_detail', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function detail(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+
+        $asset = $db->fetchAssociative(
+            <<<'SQL'
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.id = :id AND asset.organization_id = :organization
+                  AND membership.user_id = :user AND actor.is_active = 1
+                SQL,
+            ['id' => $id, 'organization' => $context['organization']['id'], 'user' => $context['user']->id()],
+        );
+        if ($asset === false) {
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
+        }
+
+        return $this->privateJson(['data' => ['asset' => $this->publicAsset($asset)]]);
+    }
+
     #[Route('/api/admin/vault/{id}/download', name: 'grindflow_vault_download', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function download(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse|BinaryFileResponse
     {

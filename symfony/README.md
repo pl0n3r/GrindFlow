@@ -58,3 +58,7 @@ Este primer slice **no** incluye videos, miniaturas, procesamiento, URLs públic
 ## S2 · Biblioteca paginada (v0.1.39)
 
 El listado privado acepta `GET /api/admin/vault?page=1..1000` y devuelve `assets`, `page`, `limit=30`, `total` y `pages`. El total y cada página usan la misma membresía tenant-safe revalidada, con orden `created_at DESC, id DESC`. El panel móvil ofrece anterior/siguiente y vuelve a consultar el servidor tras subir archivos para no inventar totales. Las páginas inválidas responden JSON 422; fuera del total responden lista vacía sin acceder a otra organización. La cuota acumulada, la eliminación y los videos siguen pendientes. No se migró ni desplegó Symfony en Hostinger.
+
+## S2 · Detalle privado de imagen (v0.1.40)
+
+La biblioteca móvil permite abrir los metadatos de cada imagen con GET /api/admin/vault/{id}. La API revalida sesión, organización y membresía activa y responde 404 para un archivo de otra organización, sin revelar hashes ni rutas físicas. La vista muestra nombre, MIME, bytes y fecha con controles accesibles. Pruebas PHP y Chromium verifican consulta, aislamiento, revocación y vista móvil. Sin migraciones, eliminación ni despliegue Symfony productivo.
