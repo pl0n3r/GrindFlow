@@ -77,6 +77,12 @@ final class AdminContextTest extends WebTestCase
             $client->submit($selector->filter('.identity-orgs form')->form());
             self::assertResponseRedirects('/admin');
 
+            $client->request('GET', '/admin');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorExists('#grindflow-admin');
+            self::assertSelectorExists('script[src^="/build/assets/admin-"]');
+            self::assertSelectorExists('link[href^="/build/assets/"][href$=".css"]');
+
             $client->request('GET', '/api/admin/context');
             self::assertResponseIsSuccessful();
             $context = json_decode((string) $client->getResponse()->getContent(), true);
