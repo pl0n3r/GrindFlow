@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
+use GrindFlow\Http\AssetManifest;
 use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Shared\Version\ProductVersion;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class AdminController extends AbstractController
 {
     #[Route('/admin', name: 'grindflow_admin', methods: ['GET'])]
-    public function __invoke(Request $request, Connection $db, ProductVersion $version): Response
+    public function __invoke(Request $request, Connection $db, ProductVersion $version, AssetManifest $assets): Response
     {
         $user = $this->getUser();
         if (!$user instanceof IdentityUser || !$user->isActive()) {
@@ -50,6 +51,7 @@ final class AdminController extends AbstractController
             'app_version' => $version->human(),
             'display_name' => $user->displayName(),
             'organization' => $organization,
+            'build' => $assets->admin(),
         ])->setPrivate();
     }
 }
