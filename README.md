@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+413** | **−50** | **+363** |
+| **14** | **+439** | **−64** | **+375** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -62,7 +62,7 @@ flowchart LR
 - El test DB detecta el grupo `database` y evita repetir toda la suite tras un fallo real. Contrato automatizado verifica ambas rutas.
 - Chromium se cachea por sistema operativo y lockfile, con instalación segura en cache miss; sintaxis PHP Symfony usa 4 procesos.
 - Health diario de Actions calcula mediana/p90 y alertas de deterioro por evento, sin cambiar pruebas ni ramas por sí solo. Política durable en AGENTS y [guía](docs/CI-PERFORMANCE.md).
-- Los fixtures Laravel de schema ausente evitan DDL incompatible con FKs en MariaDB descartable. No se cambió el runtime Laravel, datos productivos ni el cutover Symfony.
+- Los fixtures Laravel de schema ausente evitan DDL incompatible con FKs al borrar y reconstruir tablas en MariaDB descartable. No se cambió el runtime Laravel, datos productivos ni el cutover Symfony.
 
 ## Archivos modificados en este deploy
 - `.github/workflows/ci-health.yml`
