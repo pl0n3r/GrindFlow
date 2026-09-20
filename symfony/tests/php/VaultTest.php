@@ -223,6 +223,8 @@ final class VaultTest extends WebTestCase
             self::assertSame(31, $fullQuota['used_assets']);
             self::assertGreaterThan(128 * 1024 * 1024, $fullQuota['used_bytes']);
 
+            $vaultRoot = (string) static::getContainer()->getParameter('kernel.project_dir').'/var/vault/';
+            $blobsBefore = glob($vaultRoot.'*.blob');
             $tmp = tempnam(sys_get_temp_dir(), 'gf-vault-');
             $temp[] = $tmp;
             file_put_contents($tmp, $bytes);
@@ -232,6 +234,7 @@ final class VaultTest extends WebTestCase
             self::assertResponseStatusCodeSame(409);
             self::assertSame('vault_quota_exceeded',
                 json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+            self::assertSame($blobsBefore, glob($vaultRoot.'*.blob'), 'Un rechazo de cuota no debe dejar un blob huérfano.');
             self::assertSame(31, (int) $db->fetchOne(
                 'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = ?', [$mine],
             ));
