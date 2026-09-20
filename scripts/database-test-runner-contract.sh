@@ -9,14 +9,14 @@ cat > "$tmp/runner" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "$GF_TEST_CALLS"
-if [[ "$1" == "--list-groups" ]]; then
+if [[ "${1:-}" == "--list-groups" ]]; then
   case "$GF_TEST_MODE" in
     database) printf 'Available test group(s):\n - default\n - database\n'; exit 0 ;;
     absent) printf 'Available test group(s):\n - default\n'; exit 0 ;;
     unlisted) exit 2 ;;
   esac
 fi
-if [[ "$GF_TEST_MODE" == "database" && "$1" == "--group=database" ]]; then
+if [[ "$GF_TEST_MODE" == "database" && "${1:-}" == "--group=database" ]]; then
   exit 7
 fi
 SH
