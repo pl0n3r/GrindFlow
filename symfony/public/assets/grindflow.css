@@ -13,3 +13,6 @@
 .identity-orgs li{border:1px solid #514462;border-radius:12px;padding:16px}
 .identity-orgs li form{gap:10px}
 .identity-orgs span{color:var(--muted);font-size:13px}
+
+.admin-session-actions{display:flex;gap:14px;padding:20px max(5vw,24px);flex-wrap:wrap;border-top:1px solid #303044}
+.admin-session-actions form{display:flex}.admin-session-actions button{background:transparent;color:inherit;cursor:pointer}
