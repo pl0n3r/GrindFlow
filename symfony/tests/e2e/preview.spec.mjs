@@ -620,3 +620,60 @@ test('S2 mobile renames a private image without changing its download identity',
     .toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+
+test('S2 mobile searches private filenames in library and trash without changing quota', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000047';
+  const names = ['festival.png', 'ensayo.png'];
+  const seen = [];
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor prueba' },
+      organization: { id, name: 'Mi biblioteca', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const url = new URL(route.request().url());
+    const q = url.searchParams.get('q') ?? '';
+    const view = url.searchParams.get('view') ?? 'active';
+    seen.push([view, q, url.searchParams.get('page')]);
+    const matching = view === 'trash' ? [] : names.filter((value) => value.includes(q));
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: matching.map((name, index) => ({
+          id: index === 0 ? id : '00000000-0000-7000-8000-000000000048',
+          name, mime_type: 'image/png', size_bytes: 69, created_at: '2026-09-20 00:00:00',
+          download_url: '/api/admin/vault/' + id + '/download',
+        })),
+        page: 1, pages: matching.length ? 1 : 0, limit: 30, total: matching.length,
+        quota: { used_assets: 2, max_assets: 100, used_bytes: 138, max_bytes: 128 * 1024 * 1024 },
+      } }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-search-e2e=1', type: 'module' });
+  await expect(page.getByText('festival.png')).toBeVisible();
+  await expect(page.getByText('ensayo.png')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Buscar imágenes por nombre' }).fill('festival');
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await expect(page.getByText('festival.png')).toBeVisible();
+  await expect(page.getByText('ensayo.png')).toHaveCount(0);
+  await expect(page.getByText('Resultados para «festival» en biblioteca.')).toBeVisible();
+  await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await page.getByRole('button', { name: 'Papelera' }).click();
+  await expect(page.getByText('No hay imágenes que coincidan con tu búsqueda.')).toBeVisible();
+  await expect(page.getByText('Resultados para «festival» en papelera.')).toBeVisible();
+  await page.getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  await page.getByRole('button', { name: 'Limpiar búsqueda' }).click();
+  await expect(page.getByText('ensayo.png')).toBeVisible();
+  expect(seen).toEqual([['active', '', '1'], ['active', 'festival', '1'],
+    ['trash', 'festival', '1'], ['active', 'festival', '1'], ['active', '', '1']]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
