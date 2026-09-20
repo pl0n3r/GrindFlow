@@ -1,6 +1,6 @@
-# GrindFlow · S0 Symfony aislado
+# GrindFlow · Symfony aislado S1
 
-**S1 fundacional (no desplegado):** entidades y migración Doctrine de usuarios, organizaciones y membresías prefijadas `gf_identity_*`, probadas en MariaDB descartable; todavía sin login/onboarding y `/admin` sigue 403. **Implementado en código (no desplegado):** primera superficie Symfony 7.4 LTS, home Twig, vista previa React/Vite compilable y health seguro. La versión se lee del `../config/version.php` del repositorio. **No se conecta a cuentas, datos ni tablas de Laravel** y `/admin` responde 403 intencionadamente hasta S1; `/preview` es una demostración pública rotulada que no simula publicación externa.
+**v0.1.34 implementada en código, no desplegada:** acceso Symfony Security y selección explícita de organización v0.1.33 más administración React protegida con API JSON que revalida la membresía y el rol al consultar o modificar. Solo una membresía `admin` puede renombrar su organización seleccionada; exige CSRF y guardia SQL del actor+tenant+rol. No hay migración de usuarios ni uso de la base Laravel. La biblioteca, automatización y publicación no tienen paridad Symfony todavía. El home y preview S0 públicos se conservan como demostraciones separadas.
 
 ## Ejecutar en entorno descartable
 
@@ -15,12 +15,12 @@ npm run build
 APP_ENV=test APP_DEBUG=0 APP_SECRET="$(php -r 'echo bin2hex(random_bytes(32));')" php -S 127.0.0.1:8765 -t public public/router.php
 ```
 
-Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React) y `/health` (estado S0, solo versión humana). No publicar este directorio en `public_html` mientras Laravel continúe en producción. Desde otra terminal, con `APP_SECRET` de pruebas y servidor local, ejecutar `bash tests/contract/smoke.sh`, `php vendor/bin/simple-phpunit -c phpunit.xml.dist` y `npm run test:e2e` si Chromium está instalado.
+Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React público) y `/health` (estado S0, solo versión humana). El `/admin` React exige login, organización seleccionada y membresía vigente. No publicar este directorio en `public_html` mientras Laravel continúe en producción. Desde otra terminal, con `APP_SECRET` de pruebas y servidor local, ejecutar `bash tests/contract/smoke.sh`, `php vendor/bin/simple-phpunit -c phpunit.xml.dist` y `npm run test:e2e` si Chromium está instalado.
 
 ## Fronteras de seguridad
 
 - Preview **no pide login, no expone contenido ni hace escrituras**; no confundir con el verdadero dashboard administrativo.
-- S1 establecerá Symfony Security, sesiones/CSRF y modelo de tenant antes de habilitar rutas privadas.
+- S1 utiliza Symfony Security, sesiones/CSRF y modelo de tenant para proteger rutas privadas; cada acción API revalida su rol.
 - Contraseñas, tokens de proveedores, blobs y migraciones de producción nunca entran en esta demo.
 - Twig público y React admin no duplican dominio; Node solamente compila archivos, **no** es runtime productivo.
 - Los assets se sirven desde `public/build` con manifiesto Vite validado. Si falta, `/preview` devuelve 503 explícito.
@@ -35,3 +35,7 @@ La migración adicional `Version20260920095500` instala en MariaDB **aislada** u
 ## S1 acceso y selección de organizaciones, v0.1.33
 
 El entorno Symfony aislado incorpora login/logout mediante Symfony Security, protección CSRF, limitación de intentos y comprobación de cuenta activa. Solo se listan organizaciones con membresía del usuario; la elección exige CSRF y revalidación servidor, y cada GET al admin vuelve a comprobarla. El admin anuncia expresamente que Vault/automatización todavía no están conectados. Ninguna cuenta ni tabla productiva Laravel se modifica o migra; la protección de membresías inmutables de v0.1.32 permanece.
+
+## S1 · Administración React y API tenant-safe (v0.1.34)
+
+Tras autenticarse, se elige una organización propia y se abre `/admin`. React obtiene contexto real desde `GET /api/admin/context`, sin incrustar IDs no autorizados. El renombrado `POST /api/admin/organization/name` solo opera sobre la organización de la sesión para una membresía admin vigente; exige cabecera `X-CSRF-Token`. La API responde 401 sin sesión, 409 sin selección, 403 sin permiso o membresía revocada y 422 ante entrada inválida. PHP y Playwright comprueban estos límites en base aislada. El panel no muestra activos ni métricas que aún no se hayan portado a Symfony.
