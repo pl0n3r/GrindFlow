@@ -41,6 +41,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!canUpload || !csrf || uploading || !selected.length) return;
     setUploading(true);
     setFeedback('');
@@ -76,7 +77,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     }
 
     setSelected([]);
-    (event.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null)?.setAttribute('value', '');
+    form.reset();
     setFeedback(completed + ' de ' + selected.length + ' imágenes guardadas.' +
       (failures.length ? ' ' + failures.join(' ') : ''));
     setUploading(false);
