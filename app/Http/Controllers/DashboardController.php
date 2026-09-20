@@ -65,8 +65,7 @@ class DashboardController extends Controller
     private function agendaForVisibleOrganizations(
         array $organizationIds,
         bool $pastDue = false,
-    ): ?Collection
-    {
+    ): ?Collection {
         if ($organizationIds === []) {
             return collect();
         }
