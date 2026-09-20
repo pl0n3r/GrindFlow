@@ -39,7 +39,7 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
 | Alcance | Vault S2: paginación tenant-safe con total SQL, navegación móvil, prueba de 31 recursos y entradas inválidas |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
