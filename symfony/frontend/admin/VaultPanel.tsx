@@ -221,7 +221,6 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
           file.size < 1 || file.size > 8 * 1024 * 1024) {
           retryable = false;
-          rejected += 1;
           throw new Error('Se aceptan imágenes JPEG, PNG o WebP de hasta 8 MiB.');
         }
         const data = new FormData();
@@ -232,18 +231,20 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           headers: { 'X-CSRF-Token': csrf },
           body: data,
         });
+        // An HTTP success might already have persisted the original. Even when
+        // JSON decoding fails, never re-upload an ambiguous successful response.
+        // Definitive 4xx errors must not enter the temporary retry queue.
+        retryable = !response.ok && isRetryableUploadFailure(response.status, undefined);
         const body = await response.json();
         if (!response.ok) {
           if (body?.error?.code === 'vault_duplicate_trash') trashDuplicate = true;
           retryable = isRetryableUploadFailure(response.status, body?.error?.code);
-          if (!retryable) rejected += 1;
           throw new Error(body?.error?.message ?? 'No se pudo guardar esta imagen.');
         }
         // Server is the source of truth for ordering and total after this batch.
         if (!body?.data?.asset) {
           // The server replied success: reuploading may duplicate a saved file.
           retryable = false;
-          rejected += 1;
           throw new Error('La respuesta de guardado es incompleta; revisa la biblioteca antes de reintentar.');
         }
         completed += 1;
@@ -251,6 +252,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       } catch (cause) {
         const message = cause instanceof Error ? cause.message : 'No se pudo guardar.';
         if (retryable) failedFiles.push(file);
+        else rejected += 1;
         failures.push(file.name + ': ' + message);
         results.push({ name: file.name, success: false, message });
       }
