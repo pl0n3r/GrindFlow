@@ -9,6 +9,8 @@ type Asset = {
   download_url: string;
 };
 
+type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
+
 type Props = { canUpload: boolean; csrf: string | null };
 
 export function VaultPanel({ canUpload, csrf }: Props) {
@@ -16,6 +18,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
+  const [quota, setQuota] = useState<Quota | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,17 +38,19 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     }).then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo abrir la biblioteca.');
-      return body.data as { assets: Asset[]; total: number; pages: number };
+      return body.data as { assets: Asset[]; total: number; pages: number; quota?: Quota };
     }).then((data) => {
       if (controller.signal.aborted) return;
       setAssets(data.assets);
       setDetail(null);
       setDetailError('');
       setTotal(data.total);
+      setQuota(data.quota ?? null);
       setPages(data.pages);
       setError('');
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) {
+        setQuota(null);
         setError(cause instanceof Error ? cause.message : 'No se pudo cargar la biblioteca.');
       }
     }).finally(() => {
@@ -128,6 +133,12 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     <span className="admin-kicker">S2 · BIBLIOTECA PRIVADA</span>
     <h2 id="vault-title">Biblioteca de imágenes</h2>
     <p>Imágenes privadas de la organización seleccionada. Nada se publica externamente.</p>
+    {quota && <div className="vault-quota" aria-label="Cuota de almacenamiento">
+      <strong>Espacio utilizado: {(quota.used_bytes / (1024 * 1024)).toFixed(2)} de {(quota.max_bytes / (1024 * 1024)).toFixed(0)} MiB</strong>
+      <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
+        value={Math.min(quota.used_bytes, quota.max_bytes)} />
+      <small>{quota.used_assets} de {quota.max_assets} imágenes. El límite se comprueba al guardar.</small>
+    </div>}
     {canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir imágenes desde tu dispositivo</label>
       <input id="vault-files" type="file" multiple accept="image/jpeg,image/png,image/webp"
