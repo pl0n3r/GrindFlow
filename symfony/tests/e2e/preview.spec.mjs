@@ -374,3 +374,80 @@ test('S2 móvil conserva éxitos parciales cuando la cuota rechaza otra imagen',
   expect(uploads).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+
+test('S2 mobile trash requires confirmation, keeps quota and restores without exposing downloads', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000042';
+  let trashed = false;
+  let changes = 0;
+  const item = {
+    id, name: 'foto-recuperable.png', mime_type: 'image/png',
+    size_bytes: 69, created_at: '2026-09-20 00:00:00',
+    download_url: '/api/admin/vault/' + id + '/download',
+  };
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id, name: 'Organización papelera', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'vault-test',
+      vault_manage_csrf: 'trash-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const view = new URL(route.request().url()).searchParams.get('view') ?? 'active';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: (view === 'trash' ? trashed : !trashed)
+          ? [{ ...item, deleted_at: trashed ? '2026-09-20 01:00:00' : null }] : [],
+        view, page: 1, pages: 1, limit: 30, total: 1,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: 69, max_bytes: 128 * 1024 * 1024 },
+      } }) });
+  });
+  await page.route('**/api/admin/vault/' + id + '/trash', (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('trash-test');
+    expect(route.request().postData()).toBeNull();
+    changes += 1;
+    trashed = true;
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, state: 'trash' } }) });
+  });
+  await page.route('**/api/admin/vault/' + id + '/restore', (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('trash-test');
+    changes += 1;
+    trashed = false;
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, state: 'active' } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?vault-trash-e2e=1', type: 'module' });
+  await expect(page.getByText('foto-recuperable.png')).toBeVisible();
+  await page.getByRole('button', { name: 'Mover a papelera' }).click();
+  await expect(page.getByText(/¿Mover «foto-recuperable.png» a la papelera/)).toBeVisible();
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  expect(changes).toBe(0);
+  await page.getByRole('button', { name: 'Mover a papelera' }).click();
+  await page.getByRole('button', { name: 'Confirmar movimiento' }).click();
+  await expect(page.getByText('Imagen movida a la papelera. Puedes restaurarla.')).toBeVisible();
+  await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
+  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await page.getByRole('button', { name: 'Papelera' }).click();
+  await expect(page.getByText('foto-recuperable.png')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Descargar' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Detalles' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Restaurar' }).click();
+  await expect(page.getByText('Imagen restaurada en la biblioteca.')).toBeVisible();
+  await expect(page.getByText('La papelera está vacía.')).toBeVisible();
+  await page.getByRole('button', { name: 'Biblioteca' }).click();
+  await expect(page.getByText('foto-recuperable.png')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Descargar' })).toBeVisible();
+  expect(changes).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
