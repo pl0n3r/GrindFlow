@@ -242,14 +242,14 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
   await page.addScriptTag({ url: asset + '?vault-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
   await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
-  await expect(page.getByText('0 de 100 imágenes.')).toBeVisible();
+  await expect(page.getByText('0 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('Espacio utilizado: 0.00 de 128 MiB')).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
     name: 'foto-ejemplo.png', mimeType: 'image/png', buffer: png,
   });
   await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
   await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
-  await expect(page.getByText('1 de 100 imágenes.')).toBeVisible();
+  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('foto-ejemplo.png')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Descargar' })).toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
   await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
@@ -362,14 +362,14 @@ test('S2 móvil conserva éxitos parciales cuando la cuota rechaza otra imagen',
 
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
   await page.addScriptTag({ url: asset + '?vault-quota-e2e=1', type: 'module' });
-  await expect(page.getByText('99 de 100 imágenes.')).toBeVisible();
+  await expect(page.getByText('99 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
     { name: 'uno.png', mimeType: 'image/png', buffer: png },
     { name: 'dos.png', mimeType: 'image/png', buffer: png },
   ]);
   await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
   await expect(page.getByText(/1 de 2 imágenes guardadas/)).toContainText('dos.png: La biblioteca alcanzó su cuota.');
-  await expect(page.getByText('100 de 100 imágenes.')).toBeVisible();
+  await expect(page.getByText('100 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('uno.png')).toBeVisible();
   expect(uploads).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
