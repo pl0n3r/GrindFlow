@@ -247,8 +247,11 @@ final class VaultTrashTest extends WebTestCase
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
             self::assertResponseStatusCodeSame(403);
             self::assertNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            // The preceding revoked write already cleared the selected tenant.
             $client->request('GET', $integrityUrl);
-            self::assertResponseStatusCodeSame(403);
+            self::assertResponseStatusCodeSame(409);
+            self::assertSame('organization_required',
+                json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
         } finally {
             $db->delete('gf_vault_assets', ['organization_id' => $mine]);
             $db->delete('gf_vault_assets', ['organization_id' => $foreign]);
