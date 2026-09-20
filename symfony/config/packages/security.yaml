@@ -30,4 +30,5 @@ security:
         enable_csrf: true
         csrf_token_id: logout
   access_control:
+    - { path: '^/api/admin/context$', roles: PUBLIC_ACCESS }
     - { path: '^/(organizations|admin)', roles: ROLE_USER }

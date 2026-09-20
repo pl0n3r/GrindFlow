@@ -59,3 +59,39 @@ test('Symfony login entrypoint has CSRF and accessible error states on mobile', 
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(360);
 });
+
+
+test('React admin renders role capabilities from its tenant context contract', async ({ page, request }) => {
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        user: { display_name: 'Persona de prueba' },
+        organization: { id: '00000000-0000-7000-8000-000000000001', name: 'Estudio seguro', role: 'editor' },
+        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      },
+      meta: { version: '0.1.34' },
+    }),
+  }));
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?admin-e2e=1', type: 'module' });
+
+  await expect(page.getByRole('heading', { name: /Tu espacio/ })).toBeVisible();
+  await expect(page.getByText('Estudio seguro').first()).toBeVisible();
+  await expect(page.getByText('Edición').first()).toBeVisible();
+  await expect(page.getByText('Sin permiso')).toBeVisible();
+  await expect(page.getByText(/datos simulados/)).toBeVisible();
+});
+
+test('admin context API is explicit JSON when no session exists', async ({ request }) => {
+  const response = await request.get('/api/admin/context', { headers: { Accept: 'application/json' } });
+  expect(response.status()).toBe(401);
+  const payload = await response.json();
+  expect(payload.error.code).toBe('authentication_required');
+  expect(JSON.stringify(payload)).not.toContain('organization_id');
+});

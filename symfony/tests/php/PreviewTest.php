@@ -52,6 +52,11 @@ final class PreviewTest extends WebTestCase
         self::assertSelectorExists('input[name="_csrf_token"]');
         $client->request('GET', '/organizations');
         self::assertResponseRedirects('/login');
+        $client->request('GET', '/api/admin/context', server: ['HTTP_ACCEPT' => 'application/json']);
+        self::assertResponseStatusCodeSame(401);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        self::assertSame('authentication_required', $payload['error']['code']);
+        self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
         $client->request('GET', '/inexistente');
         self::assertResponseStatusCodeSame(404);
     }

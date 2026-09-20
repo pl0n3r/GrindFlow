@@ -98,14 +98,30 @@ final class IdentityLoginTest extends WebTestCase
 
             $client->request('GET', '/admin');
             self::assertResponseIsSuccessful();
-            self::assertSelectorTextContains('h1', 'My isolated org');
+            self::assertSelectorExists('#grindflow-admin[data-organization="'.$mine.'"]');
+            self::assertSelectorExists('script[src^="/build/assets/preview-"]');
+
+            $client->request('GET', '/api/admin/context', server: ['HTTP_ACCEPT' => 'application/json']);
+            self::assertResponseIsSuccessful();
+            $context = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertSame($mine, $context['data']['organization']['id']);
+            self::assertSame('editor', $context['data']['organization']['role']);
+            self::assertTrue($context['data']['permissions']['content_prepare']);
+            self::assertFalse($context['data']['permissions']['organization_manage']);
+            self::assertArrayNotHasKey('email', $context['data']['user']);
 
             $db->delete('gf_identity_memberships', [
                 'user_id' => $user,
                 'organization_id' => $mine,
             ]);
-            $client->request('GET', '/admin');
+            $client->request('GET', '/api/admin/context', server: ['HTTP_ACCEPT' => 'application/json']);
             self::assertResponseStatusCodeSame(403);
+            $error = json_decode((string) $client->getResponse()->getContent(), true);
+            self::assertSame('organization_access_changed', $error['error']['code']);
+            self::assertStringNotContainsString($mine, (string) $client->getResponse()->getContent());
+
+            $client->request('GET', '/admin');
+            self::assertResponseRedirects('/organizations');
         } finally {
             $db->delete('gf_identity_memberships', ['user_id' => $user]);
             $db->delete('gf_identity_organizations', ['id' => $mine]);
