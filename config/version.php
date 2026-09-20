@@ -3,6 +3,6 @@
 // Deliberate human-readable GrindFlow product release.
 // This is NOT proof of the Git commit deployed on Hostinger.
 return [
-    'number' => '0.1.39',
+    'number' => '0.1.40',
     'released_at' => '2026-09-20',
 ];
