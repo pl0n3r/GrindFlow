@@ -1,4 +1,4 @@
-# GrindFlow — Estado de entrega
+# GrindFlow — Último deploy
 
 <p align="center">
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.51: cambio objetivo todavía no desplegado, comprobación privada de integridad de originales Vault S2.** Base `main` v0.1.50 `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28`, CI exact-main success. Verifica tamaño y SHA-256 a petición del usuario, tanto en biblioteca como en papelera, sin borrar, mover, ni divulgar archivos privados. Symfony aún no desplegado en Hostinger.
+> **Candidato v0.1.51: comprobación privada de integridad de originales Vault S2, todavía no desplegada.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; los cambios Symfony se registran como candidato, nunca como prueba de despliegue. Base `main` v0.1.50 `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28`, CI exact-main success. Verifica tamaño y SHA-256 a petición del usuario, tanto en biblioteca como en papelera, sin borrar, mover, ni divulgar archivos privados. Symfony aún no desplegado en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -15,7 +15,7 @@
 ## Fuentes de verdad
 [AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Transición](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-## Estado del cambio y del deploy
+## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.51** | `config/version.php` |
@@ -63,7 +63,9 @@ flowchart LR
 - React móvil añade «Verificar integridad» por imagen, feedback accesible y aviso si faltan originales o no coincide su huella.
 - PHPUnit/MariaDB prueba estado sano, tamaño alterado, corrupción de mismo tamaño, desaparición y actor ajeno/revocado; Chromium 360 px recorre ambos estados y cuota.
 
-## Archivos modificados en este cambio
+## Archivos modificados en este deploy
+
+Este inventario corresponde al **cambio candidato en el PR**, no a archivos desplegados en Hostinger.
 - `README.md`
 - `config/version.php`
 - `symfony/README.md`
