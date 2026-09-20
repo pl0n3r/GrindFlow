@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+471** | **−40** | **+431** |
+| **13** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -68,6 +68,7 @@ flowchart LR
 - `symfony/frontend/admin/admin.tsx`
 - `symfony/frontend/admin/preview.css`
 - `symfony/public/assets/grindflow.css`
+- `symfony/README.md`
 - `symfony/src/Http/AssetManifest.php`
 - `symfony/src/Http/Controller/AdminContextController.php`
 - `symfony/src/Http/Controller/AdminController.php`
