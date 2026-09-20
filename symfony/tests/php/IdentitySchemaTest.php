@@ -5,23 +5,21 @@ declare(strict_types=1);
 namespace GrindFlow\Tests;
 
 use Doctrine\DBAL\Connection;
-use GrindFlow\Kernel;
-use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
 /**
  * Runs only in a disposable S1 MariaDB database migrated in CI.
  */
-final class IdentitySchemaTest extends TestCase
+final class IdentitySchemaTest extends KernelTestCase
 {
     private Connection $db;
-    private Kernel $kernel;
-
     protected function setUp(): void
     {
-        $this->kernel = new Kernel('test', false);
-        $this->kernel->boot();
-        $this->db = $this->kernel->getContainer()->get('doctrine.dbal.default_connection');
+        static::bootKernel();
+        $connection = static::getContainer()->get(Connection::class);
+        self::assertInstanceOf(Connection::class, $connection);
+        $this->db = $connection;
     }
 
     protected function tearDown(): void
@@ -29,7 +27,7 @@ final class IdentitySchemaTest extends TestCase
         $this->db->executeStatement('DELETE FROM gf_memberships');
         $this->db->executeStatement('DELETE FROM gf_organizations');
         $this->db->executeStatement('DELETE FROM gf_users');
-        $this->kernel->shutdown();
+        parent::tearDown();
     }
 
     public function testUniqueMembershipAndForeignTenantAreEnforcedByMariaDb(): void

@@ -27,3 +27,9 @@ Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React) y `/health` (estado 
 - `php -S` y `APP_SECRET` del ejemplo son solo para desarrollo; no usar en Hostinger productivo.
 
 Plan de transición y criterios completos: [STACK-TRANSITION-SYMFONY.md](../../docs/STACK-TRANSITION-SYMFONY.md); [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12).
+
+## S1 · Primera pieza de identidad (v0.1.31)
+
+La migración versionada `migrations/Version20260920095000.php` prepara **gf_users**, **gf_organizations** y **gf_memberships** en una base Symfony **independiente**. Incluye claves UUID compatibles por formato con el modelo Laravel, membresía única por pareja organización/usuario, FK, rol, cuenta activa y trigger que impide cambiar la identidad de una membresía. No importa personas ni contraseñas existentes y no se ejecuta en la MariaDB de Hostinger.
+
+El gate `symfony-preview` crea el esquema en MariaDB descartable, lo revierte y lo vuelve a crear antes de las pruebas de aislamiento. `/admin` sigue 403 hasta implementar Symfony Security, login/logout, selección y permisos en un próximo slice; esta entrega **no presenta una pantalla de login falsa**. El marcador S0/preview conserva su significado.
