@@ -31,6 +31,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [selected, setSelected] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [hasTrashDuplicate, setHasTrashDuplicate] = useState(false);
   const [detail, setDetail] = useState<Asset | null>(null);
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
@@ -97,6 +98,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setDetail(null);
     setActionFeedback('');
     setActionError('');
+    setHasTrashDuplicate(false);
   }
 
   async function changeState(id: string, action: 'trash' | 'restore') {
@@ -132,7 +134,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     if (!canUpload || !csrf || uploading || !selected.length) return;
     setUploading(true);
     setFeedback('');
+    setHasTrashDuplicate(false);
     let completed = 0;
+    let trashDuplicate = false;
     const failures: string[] = [];
 
     // One image per request, so a failure leaves earlier successes visible.
@@ -152,6 +156,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         });
         const body = await response.json();
         if (!response.ok) {
+          if (body?.error?.code === 'vault_duplicate_trash') trashDuplicate = true;
           throw new Error(body?.error?.message ?? 'No se pudo guardar esta imagen.');
         }
         // Server is the source of truth for ordering and total after this batch.
@@ -171,6 +176,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     form.reset();
     setFeedback(completed + ' de ' + selected.length + ' imágenes guardadas.' +
       (failures.length ? ' ' + failures.join(' ') : ''));
+    setHasTrashDuplicate(trashDuplicate);
     setUploading(false);
   }
 
@@ -196,13 +202,15 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       <input id="vault-files" type="file" multiple accept="image/jpeg,image/png,image/webp"
         disabled={uploading || loading} onChange={(event) =>
           setSelected(Array.from(event.currentTarget.files ?? []))} />
-      <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual.</small>
+      <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual y no crea copias de imágenes idénticas.</small>
       <button type="submit" disabled={uploading || loading || selected.length === 0}>
         {uploading ? 'Guardando imágenes…' : 'Guardar ' + (selected.length || '') + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')}
       </button>
     </form>}
     {view === 'active' && !canUpload && <p>Tu rol permite consultar los archivos, pero no añadir nuevos.</p>}
     {feedback && <p role="status" className="vault-feedback">{feedback}</p>}
+    {hasTrashDuplicate && view === 'active' && <button type="button" disabled={loading}
+      onClick={() => switchView('trash')}>Ver papelera para restaurar</button>}
     {actionFeedback && <p role="status" className="vault-feedback">{actionFeedback}</p>}
     {actionError && <p role="alert">{actionError}</p>}
     {detailLoading && <p role="status">Cargando detalles…</p>}

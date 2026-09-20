@@ -145,6 +145,20 @@ final class VaultController extends AbstractController
                 if ($locked === false) {
                     return 'revoked';
                 }
+                // Do not disclose even a duplicate state to a revoked actor.
+                $allowed = $db->fetchOne(
+                    <<<'SQL'
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = :organization
+                          AND actor.id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                        SQL,
+                    ['organization' => $context['organization']['id'], 'user' => $context['user']->id()],
+                );
+                if ($allowed === false) {
+                    return 'revoked';
+                }
                 $usage = $db->fetchAssociative(
                     'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization',
                     ['organization' => $context['organization']['id']],
@@ -152,6 +166,23 @@ final class VaultController extends AbstractController
                 if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
                     || (int) $usage['used_bytes'] + $size > self::MAX_ORGANIZATION_BYTES) {
                     return 'quota';
+                }
+
+                // The same organization row lock serializes concurrent uploads.
+                // Check retained originals in both views, scoped to this tenant only.
+                // An active match wins if old data contains both states.
+                $duplicate = $db->fetchAssociative(
+                    <<<'SQL'
+                        SELECT deleted_at
+                        FROM gf_vault_assets
+                        WHERE organization_id = :organization AND sha256 = :sha
+                        ORDER BY (deleted_at IS NULL) DESC, id DESC
+                        LIMIT 1
+                        SQL,
+                    ['organization' => $context['organization']['id'], 'sha' => $sha256],
+                );
+                if ($duplicate !== false) {
+                    return $duplicate['deleted_at'] === null ? 'duplicate_active' : 'duplicate_trash';
                 }
 
                 // Permission and active account are checked again inside the write.
@@ -181,6 +212,12 @@ final class VaultController extends AbstractController
 
             if ($uploadStatus === 'quota') {
                 return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 imágenes o 128 MiB por organización.');
+            }
+            if ($uploadStatus === 'duplicate_active') {
+                return $this->error(409, 'vault_duplicate_active', 'Esta imagen ya está en tu biblioteca; no se guardó otra copia.');
+            }
+            if ($uploadStatus === 'duplicate_trash') {
+                return $this->error(409, 'vault_duplicate_trash', 'Esta imagen ya está en tu papelera; puedes restaurarla.');
             }
             if ($uploadStatus !== 'stored') {
                 return $this->error(403, 'organization_access_changed', 'Tu permiso para guardar cambió.');

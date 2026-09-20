@@ -451,3 +451,78 @@ test('S2 mobile trash requires confirmation, keeps quota and restores without ex
   expect(changes).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+
+test('S2 mobile upload distinguishes an active duplicate from a recoverable trash duplicate', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const assetScript = await page.locator('script[type="module"]').getAttribute('src');
+  expect(assetScript).toBeTruthy();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOokDsBAAJwAV+M1KYSAAAAAElFTkSuQmCC', 'base64');
+  const id = '00000000-0000-7000-8000-000000000044';
+  let trashed = false;
+  let uploads = 0;
+  const own = { id, name: 'guardada.png', mime_type: 'image/png', size_bytes: png.length,
+    created_at: '2026-09-20 00:00:00',
+    download_url: '/api/admin/vault/' + id + '/download' };
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id, name: 'Biblioteca sin duplicados', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const view = new URL(route.request().url()).searchParams.get('view');
+    const visible = view === 'trash' ? trashed : !trashed;
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: visible ? [{ ...own, deleted_at: trashed ? '2026-09-20 01:00:00' : null }] : [],
+        page: 1, pages: visible ? 1 : 0, total: visible ? 1 : 0,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: png.length, max_bytes: 128 * 1024 * 1024 },
+      } }) });
+  });
+  await page.route('**/api/admin/vault', (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('upload-test');
+    uploads += 1;
+    return route.fulfill({ status: 409, contentType: 'application/json',
+      body: JSON.stringify({ error: {
+        code: trashed ? 'vault_duplicate_trash' : 'vault_duplicate_active',
+        message: trashed ? 'Esta imagen ya está en tu papelera; puedes restaurarla.'
+          : 'Esta imagen ya está en tu biblioteca; no se guardó otra copia.',
+      } }) });
+  });
+  await page.route('**/api/admin/vault/' + id + '/restore', (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('manage-test');
+    trashed = false;
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, state: 'active' } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: assetScript + '?vault-dedup-e2e=1', type: 'module' });
+  await expect(page.getByText('guardada.png')).toBeVisible();
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
+    name: 'otra-copia.png', mimeType: 'image/png', buffer: png,
+  });
+  await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
+  await expect(page.getByText(/0 de 1 imágenes guardadas/)).toContainText('ya está en tu biblioteca');
+  await expect(page.getByRole('button', { name: 'Ver papelera para restaurar' })).toHaveCount(0);
+  trashed = true;
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
+    name: 'imagen-retirada.png', mimeType: 'image/png', buffer: png,
+  });
+  await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
+  await expect(page.getByText(/0 de 1 imágenes guardadas/)).toContainText('ya está en tu papelera');
+  await page.getByRole('button', { name: 'Ver papelera para restaurar' }).click();
+  await expect(page.getByText('guardada.png')).toBeVisible();
+  await page.getByRole('button', { name: 'Restaurar' }).click();
+  await expect(page.getByText('Imagen restaurada en la biblioteca.')).toBeVisible();
+  await page.getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  await expect(page.getByText('guardada.png')).toBeVisible();
+  expect(uploads).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
