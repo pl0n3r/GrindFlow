@@ -44,6 +44,7 @@ final class PreviewTest extends WebTestCase
     public function testAdminRequiresAuthenticationAndUnknownRoutesStayNotFound(): void
     {
         $client = static::createClient();
+        $client->catchExceptions(false);
         $client->request('GET', '/admin');
         self::assertResponseRedirects('/login');
         $client->request('GET', '/login');

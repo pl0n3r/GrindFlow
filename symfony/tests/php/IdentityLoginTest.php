@@ -20,6 +20,7 @@ final class IdentityLoginTest extends WebTestCase
     public function testLoginSelectTenantReauthorizeAndLogout(): void
     {
         $client = static::createClient();
+        $client->catchExceptions(false);
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
 
@@ -117,6 +118,7 @@ final class IdentityLoginTest extends WebTestCase
     public function testInactiveUserCannotLogIn(): void
     {
         $client = static::createClient();
+        $client->catchExceptions(false);
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $id = Uuid::v7()->toRfc4122();
@@ -149,6 +151,7 @@ final class IdentityLoginTest extends WebTestCase
     public function testAuthenticatedAccountWithoutMembershipSeesHonestEmptyState(): void
     {
         $client = static::createClient();
+        $client->catchExceptions(false);
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $id = Uuid::v7()->toRfc4122();
