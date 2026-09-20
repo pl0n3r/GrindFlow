@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 type Asset = {
   id: string;
@@ -56,9 +56,15 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [previewFailed, setPreviewFailed] = useState(false);
   const [integrity, setIntegrity] = useState<{ id: string; message: string; warning: boolean } | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const integrityRequest = useRef(0);
+
+  useEffect(() => () => { integrityRequest.current += 1; }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    integrityRequest.current += 1;
+    setCheckingId(null);
+    setIntegrity(null);
     fetch('/api/admin/vault?page=' + page + '&view=' + view +
       (search ? '&q=' + encodeURIComponent(search) : '') +
       '&format=' + format + '&sort=' + sort, {
@@ -94,6 +100,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   async function verifyOriginal(asset: Asset) {
     if (checkingId || busyId) return;
+    const request = ++integrityRequest.current;
     setCheckingId(asset.id);
     setIntegrity(null);
     try {
@@ -112,15 +119,17 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (typeof status !== 'string' || !Object.hasOwn(labels, status)) {
         throw new Error('El resultado de verificación no es válido.');
       }
-      setIntegrity({ id: asset.id, message: labels[status], warning: status !== 'verified' });
+      if (request === integrityRequest.current) {
+        setIntegrity({ id: asset.id, message: labels[status], warning: status !== 'verified' });
+      }
     } catch (cause) {
-      setIntegrity({
+      if (request === integrityRequest.current) setIntegrity({
         id: asset.id,
         message: cause instanceof Error ? cause.message : 'No se pudo comprobar el original.',
         warning: true,
       });
     } finally {
-      setCheckingId(null);
+      if (request === integrityRequest.current) setCheckingId(null);
     }
   }
 
@@ -174,6 +183,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setConfirmId(null);
     setRenameId(null);
     setDetail(null);
+    integrityRequest.current += 1;
+    setCheckingId(null);
     setIntegrity(null);
     setActionFeedback('');
     setActionError('');
