@@ -41,11 +41,18 @@ final class PreviewTest extends WebTestCase
         self::assertSelectorExists('script[src^="/build/assets/preview-"]');
     }
 
-    public function testAdminIsNotPublicWithoutIdentitySlice(): void
+    public function testAdminRequiresAuthenticationAndUnknownRoutesStayNotFound(): void
     {
         $client = static::createClient();
+        $client->catchExceptions(false);
         $client->request('GET', '/admin');
-        self::assertResponseStatusCodeSame(403);
+        self::assertResponseRedirects('/login');
+        $client->request('GET', '/login');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'Ingresa a tu espacio');
+        self::assertSelectorExists('input[name="_csrf_token"]');
+        $client->request('GET', '/organizations');
+        self::assertResponseRedirects('/login');
         $client->request('GET', '/inexistente');
         self::assertResponseStatusCodeSame(404);
     }
