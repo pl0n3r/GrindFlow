@@ -177,6 +177,9 @@ final class VaultTest extends WebTestCase
                 self::assertResponseStatusCodeSame(422);
             }
 
+            $client->request('GET', '/api/admin/vault?page[]=1');
+            self::assertResponseStatusCodeSame(422);
+
             $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/download');
             self::assertResponseStatusCodeSame(404);
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
