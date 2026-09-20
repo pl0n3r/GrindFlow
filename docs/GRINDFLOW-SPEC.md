@@ -110,6 +110,62 @@ GrindFlow debe separar la **clasificación del recurso** de la **compatibilidad 
 
 **Alcance del piloto:** se prepara el modelo de clasificación/compatibilidad desde el diseño, pero la publicación automatizada de categorías restringidas no forma parte del MVP inicial. Su habilitación futura requerirá revisar las reglas, APIs, permisos y requisitos aplicables de cada proveedor antes de activar una integración.
 
+#### 1A.5.2A. Baseline de cumplimiento para plataformas sociales generales
+
+GrindFlow debe tratar las políticas de cada plataforma como una **restricción de ejecución**, no como documentación decorativa. El baseline inicial revisado cubre X, Instagram, Facebook y TikTok y debe mantenerse versionado porque las políticas externas cambian.
+
+**Modelo de decisión común**
+
+Para cada combinación recurso + texto + enlace + formato + destino, Compliance debe poder devolver al menos uno de estos estados:
+
+- `allowed`: compatible con las reglas conocidas del destino;
+- `allowed_with_constraints`: requiere etiqueta, disclosure, configuración o condición adicional;
+- `limited_distribution`: puede permanecer publicado, pero la plataforma puede limitar recomendación/descubrimiento;
+- `blocked`: GrindFlow no debe enviarlo;
+- `manual_review`: no existe suficiente certeza para automatizar la decisión.
+
+Una regla debe registrar `platform`, categoría, formatos afectados, estado, razón, URL de fuente oficial, fecha de revisión y una versión interna. Ninguna regla se considera permanente.
+
+**X**
+
+- La automatización autorizada debe respetar las reglas de X y su política para desarrolladores; automatización no autorizada, spam, publicaciones duplicadas o sustancialmente similares a escala y manipulación artificial de interacción son incompatibles con GrindFlow.
+- Los enlaces engañosos o maliciosos se bloquean.
+- El contenido sensible puede requerir configuración/etiquetado específico de la cuenta o de la publicación; la existencia de una etiqueta no convierte en permitido contenido que viole otras reglas.
+- Deben respetarse privacidad, consentimiento y propiedad intelectual.
+
+**Instagram**
+
+- Aplican las Normas de la comunidad de Meta/Instagram. GrindFlow debe distinguir contenido publicable de contenido no apto para la plataforma y no intentar evadir moderación.
+- El producto debe impedir automatizaciones de spam: interacción artificial, contenido/comentarios repetitivos a escala o contacto comercial repetido sin consentimiento.
+- Solo se debe distribuir material propio o material para el cual el usuario tenga derechos suficientes.
+- Violencia, amenazas, acoso, privacidad, bienes/servicios regulados y demás categorías de seguridad deben pasar por la misma compuerta de cumplimiento.
+
+**Facebook**
+
+- Las Community Standards definen qué está permitido y pueden producir eliminación o restricciones de cuenta. GrindFlow debe tratar una infracción conocida como bloqueo de publicación, no como advertencia opcional.
+- Deben contemplarse spam, autenticidad, propiedad intelectual, seguridad, violencia, privacidad y categorías de contenido restringido.
+- La elegibilidad de una publicación no implica que vaya a recibir distribución o recomendación; alcance y cumplimiento son señales distintas.
+
+**TikTok**
+
+- Las Community Guidelines vigentes distinguen entre contenido eliminado y contenido permitido pero no elegible para recomendación en For You; GrindFlow debe representar esa diferencia explícitamente.
+- Deben bloquearse automatizaciones que constituyan spam, operación masiva engañosa o manipulación artificial de engagement/recomendaciones.
+- Contenido no original o que infrinja propiedad intelectual puede ser eliminado o perder elegibilidad de recomendación.
+- Las categorías maduras/sensibles, seguridad, violencia, privacidad, desinformación y contenido generado/editado por IA pueden tener reglas adicionales, incluyendo disclosure, restricción o inelegibilidad para recomendación.
+
+**Reglas de producto derivadas**
+
+1. Compliance se ejecuta antes de crear/confirmar una entrega externa y vuelve a evaluarse antes de publicar si la regla aplicable cambió.
+2. Ante `blocked` o incompatibilidad conocida, Publishing falla cerrado y no intenta variantes para eludir la política.
+3. `manual_review` requiere decisión humana; GrindFlow no debe adivinar.
+4. Las sugerencias automáticas de títulos, hashtags y enlaces pasan por la misma evaluación que el recurso multimedia.
+5. Reutilización y rotación deben limitar duplicación/repetición para no convertir automatización legítima en spam.
+6. El sistema debe conservar evidencia de qué versión de reglas autorizó o bloqueó una entrega, sin almacenar datos sensibles innecesarios.
+7. Las integraciones API tienen una segunda compuerta independiente: que el contenido sea permitido no significa que la API autorice ese formato, acción o nivel de automatización.
+8. Las reglas se revisan periódicamente y cuando un proveedor anuncie cambios relevantes; una fuente desactualizada debe poder degradar la decisión a `manual_review`.
+
+**Alcance:** este baseline sirve para diseño y prevención técnica; no constituye asesoría legal ni garantiza que una plataforma acepte una publicación concreta. La decisión final de moderación pertenece al proveedor externo.
+
 #### 1A.5.2. Reglas de publicación
 
 El creador puede definir reglas diferentes por plataforma: frecuencia diaria o semanal, días, horarios, tipos de contenido y destinos. Las reglas pueden cambiarse posteriormente sin reconstruir toda la planificación.
