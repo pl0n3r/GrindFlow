@@ -302,6 +302,93 @@ final class VaultController extends AbstractController
         return $response;
     }
 
+    /**
+     * Update only the private display/attachment name, never the opaque storage key.
+     * Reauthorize the acting membership in the SQL write under the tenant lock.
+     */
+    #[Route('/api/admin/vault/{id}/name', name: 'grindflow_vault_rename', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function rename(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite renombrar archivos.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        $body = json_decode($request->getContent(), true);
+        if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
+            || array_keys($body) !== ['name'] || !is_string($body['name'])) {
+            return $this->error(422, 'invalid_name', 'Indica únicamente un nombre de imagen válido.');
+        }
+        $name = trim($body['name']);
+        if (preg_match('/\\A.{2,180}\\z/usD', $name) !== 1
+            || preg_match('/[\\p{C}\\p{Zl}\\p{Zp}]/u', $name) === 1
+            || preg_match('/[^\\p{Z}\\p{C}]/u', $name) !== 1) {
+            return $this->error(422, 'invalid_name', 'El nombre debe tener entre 2 y 180 caracteres visibles.');
+        }
+
+        $result = $db->transactional(function (Connection $db) use ($context, $id, $name): string {
+            $organization = $context['organization']['id'];
+            if ($db->fetchOne(
+                'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                ['organization' => $organization],
+            ) === false) {
+                return 'revoked';
+            }
+            $asset = $db->fetchAssociative(
+                'SELECT id, original_name FROM gf_vault_assets WHERE id = :id AND organization_id = :organization AND deleted_at IS NULL',
+                ['id' => $id, 'organization' => $organization],
+            );
+            if ($asset === false) {
+                return 'not_found';
+            }
+            $allowed = $db->fetchOne(
+                <<<'SQL'
+                    SELECT 1 FROM gf_identity_memberships membership
+                    INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                    WHERE membership.organization_id = :organization
+                      AND actor.id = :user AND actor.is_active = 1
+                      AND membership.role IN ('admin', 'studio', 'editor')
+                    SQL,
+                ['organization' => $organization, 'user' => $context['user']->id()],
+            );
+            if ($allowed === false) {
+                return 'revoked';
+            }
+            if ($asset['original_name'] === $name) {
+                return 'updated';
+            }
+
+            $written = $db->executeStatement(
+                <<<'SQL'
+                    UPDATE gf_vault_assets asset SET asset.original_name = :name
+                    WHERE asset.id = :id AND asset.organization_id = :organization AND asset.deleted_at IS NULL
+                      AND EXISTS (
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = asset.organization_id
+                          AND membership.user_id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                      )
+                    SQL,
+                ['name' => $name, 'id' => $id, 'organization' => $organization, 'user' => $context['user']->id()],
+            );
+            return $written === 1 ? 'updated' : 'revoked';
+        });
+        if ($result === 'not_found') {
+            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+        }
+        if ($result !== 'updated') {
+            return $this->error(403, 'organization_access_changed', 'Tu permiso para renombrar cambió.');
+        }
+
+        return $this->privateJson(['data' => ['id' => $id, 'name' => $name]]);
+    }
+
     #[Route('/api/admin/vault/{id}/trash', name: 'grindflow_vault_trash', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function trash(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
     {

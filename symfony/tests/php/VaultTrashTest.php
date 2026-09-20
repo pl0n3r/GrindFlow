@@ -81,6 +81,40 @@ final class VaultTrashTest extends WebTestCase
             $csrf = $context['data']['vault_manage_csrf'];
             self::assertNotEmpty($csrf);
 
+            // Rename changes only display metadata; it must never move or duplicate private bytes.
+            $renaming = '/api/admin/vault/'.$mineAsset.'/name';
+            $renameHeaders = ['HTTP_X_CSRF_TOKEN' => $csrf, 'CONTENT_TYPE' => 'application/json'];
+            $client->request('POST', $renaming, server: ['HTTP_X_CSRF_TOKEN' => 'wrong', 'CONTENT_TYPE' => 'application/json'],
+                content: '{"name":"nuevo.png"}');
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', '/api/admin/vault/'.$foreignAsset.'/name', server: $renameHeaders,
+                content: '{"name":"ajena-renombrada.png"}');
+            self::assertResponseStatusCodeSame(404);
+            foreach (['{"name":""}', '{"name":"valido.png","organization_id":"'.$foreign.'"}', '{"name":12}'] as $invalidName) {
+                $client->request('POST', $renaming, server: $renameHeaders, content: $invalidName);
+                self::assertResponseStatusCodeSame(422);
+            }
+            // Reject invisible Unicode names, format controls and non-ASCII line separators.
+            foreach (["\u{00A0}\u{00A0}", "a\u{200B}b", "a\u{2028}b", "a\u{2029}b"] as $invisibleName) {
+                $client->request('POST', $renaming, server: $renameHeaders,
+                    content: json_encode(['name' => $invisibleName], JSON_THROW_ON_ERROR));
+                self::assertResponseStatusCodeSame(422);
+                self::assertSame('propia.png', $db->fetchOne(
+                    'SELECT original_name FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            }
+            $client->request('POST', $renaming, server: $renameHeaders, content: '{"name":"nueva-imagen.png"}');
+            self::assertResponseIsSuccessful();
+            self::assertSame('nueva-imagen.png',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['name']);
+            self::assertSame('nueva-imagen.png', $db->fetchOne(
+                'SELECT original_name FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            self::assertFileExists($path);
+            self::assertSame($bytes, file_get_contents($path));
+            $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
+            self::assertResponseIsSuccessful();
+            self::assertStringContainsString('nueva-imagen.png',
+                (string) $client->getResponse()->headers->get('Content-Disposition'));
+
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => 'wrong']);
             self::assertResponseStatusCodeSame(403);
             self::assertNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
@@ -94,6 +128,8 @@ final class VaultTrashTest extends WebTestCase
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
             self::assertResponseIsSuccessful();
             self::assertSame('trash', json_decode((string) $client->getResponse()->getContent(), true)['data']['state']);
+            $client->request('POST', $renaming, server: $renameHeaders, content: '{"name":"en-papelera.png"}');
+            self::assertResponseStatusCodeSame(404);
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertFileExists($path);
             self::assertSame($bytes, file_get_contents($path));
@@ -131,6 +167,8 @@ final class VaultTrashTest extends WebTestCase
             $db->update('gf_identity_memberships', ['role' => 'model'], ['user_id' => $user, 'organization_id' => $mine]);
             $client->request('GET', '/api/admin/context');
             self::assertNull(json_decode((string) $client->getResponse()->getContent(), true)['data']['vault_manage_csrf']);
+            $client->request('POST', $renaming, server: $renameHeaders, content: '{"name":"prohibida.png"}');
+            self::assertResponseStatusCodeSame(403);
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
             self::assertResponseStatusCodeSame(403);
             $db->update('gf_identity_memberships', ['role' => 'editor'], ['user_id' => $user, 'organization_id' => $mine]);
