@@ -239,6 +239,22 @@
                                         <div>
                                             <h3 class="gf-org__name">{{ $organization->name }}</h3>
                                             <div class="gf-org__id">{{ $organization->id }}</div>
+                                            <div
+                                                class="gf-org__summary"
+                                                data-organization-summary="{{ $organization->id }}"
+                                            >
+                                                <span>Contenido listo:
+                                                    <strong>{{ $readyMediaByOrganization === null
+                                                        ? '—'
+                                                        : ($readyMediaByOrganization[$organization->id] ?? 0)
+                                                    }}</strong>
+                                                </span>
+                                                <span>Programadas:
+                                                    <strong>{{ $scheduledByOrganization === null
+                                                        ? '—'
+                                                        : ($scheduledByOrganization[$organization->id] ?? 0) }}</strong>
+                                                </span>
+                                            </div>
                                         </div>
                                         <span class="gf-org__action">Abrir biblioteca →</span>
                                     </a>
@@ -247,6 +263,22 @@
                                         <div>
                                             <h3 class="gf-org__name">{{ $organization->name }}</h3>
                                             <div class="gf-org__id">{{ $organization->id }}</div>
+                                            <div
+                                                class="gf-org__summary"
+                                                data-organization-summary="{{ $organization->id }}"
+                                            >
+                                                <span>Contenido listo:
+                                                    <strong>{{ $readyMediaByOrganization === null
+                                                        ? '—'
+                                                        : ($readyMediaByOrganization[$organization->id] ?? 0)
+                                                    }}</strong>
+                                                </span>
+                                                <span>Programadas:
+                                                    <strong>{{ $scheduledByOrganization === null
+                                                        ? '—'
+                                                        : ($scheduledByOrganization[$organization->id] ?? 0) }}</strong>
+                                                </span>
+                                            </div>
                                         </div>
                                     </article>
                                 @endif

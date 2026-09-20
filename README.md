@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.27: solo el deploy actual.** Base `main` v0.1.26 `f444475020c9310a71530af3174cfa69db26e9be`. Entrega pequeña y verificable: dashboard con recuentos reales tenant-safe de contenido listo y publicaciones programadas. CSS cache-busting de v0.1.26 preservado. Symfony S0 continúa aislado y Laravel atiende el sitio remoto; **no se infiere despliegue Hostinger del merge**.
+> **Snapshot v0.1.28: solo el deploy actual.** Base `main` v0.1.27 `773eb4b6fc12ca0ecb43ce1800713867fa01e0fb`. Las tarjetas de cada organización tienen contadores de contenido listo y publicaciones programadas con datos propios. Laravel atiende el sitio actual; Symfony S0 está aislado. **CI ≠ deploy en Hostinger**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.27** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.26~~ | `f444475020c9310a71530af3174cfa69db26e9be` |
-| CI del PR | 🚧 Pendiente de head final | `GrindFlow CI / validate` |
-| Sonar | 🚧 Pendiente de head final | SonarCloud PR |
-| CodeRabbit | 🚧 Pendiente | PR de dashboard |
-| CI del SHA exacto de main | 🚧 Después del merge | No inferir del PR |
-| Deploy Observer | ⛔ Release remoto v0.1.27 no observado | Hostinger independiente |
-| Production Smoke | ⛔ Credencial de lectura E2E pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Producción v0.1.27 | ⛔ No verificada | CI ≠ deploy |
-| Migraciones | ✅ ~~Ningún cambio de esquema~~ | Solo consultas de lectura |
+| Version objetivo | 🚧 **v0.1.28** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.27~~ | `773eb4b6fc12ca0ecb43ce1800713867fa01e0fb` |
+| CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
+| Sonar | 🚧 Pendiente | SonarCloud PR |
+| CodeRabbit | 🚧 Revisión por comprobar | PR |
+| CI del SHA exacto de main | 🚧 Después del merge | Sin inferir del PR |
+| Deploy Observer | ⛔ Release remoto no observado | #7 regresó HTTP 404 en `/_deployment` |
+| Production Smoke | ⛔ Credencial E2E de solo lectura pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Producción v0.1.28 | ⛔ Sin verificar | CI ≠ Hostinger |
+| Migraciones | ✅ ~~Sin cambios de esquema~~ | Solo lecturas SQL agrupadas |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+191** | **−72** | **+119** |
+| **7** | **+156** | **−45** | **+111** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack** |
-| Alcance | Consultas tenant-safe de dashboard + UI de métricas + navegador y pruebas PHP |
+| Alcance | Backend por organización, HTML responsive, CSS versionado y pruebas multi-tenant/Chromium |
 | Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
 ## Flujo de entrega
@@ -58,35 +58,36 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Dashboard deja de mostrar métricas técnicas como si fueran datos de negocio y ahora cuenta media ready y schedules pendientes de las organizaciones visibles.
-- Los contadores usan explícitamente IDs de organizaciones visibles del usuario, con fallback «—/Módulo no disponible» cuando el esquema falla; sin tocar contenido real.
-- Se preserva CSS versionado de v0.1.26 y se incrementa patch **0.1.26 → 0.1.27** con versión ya visible en el footer.
+- Dos recuentos por tarjeta de organización desde filas reales de su tenant. No se muestran organizaciones ajenas ni se hacen consultas por tarjeta.
+- Totales globales reutilizan la misma consulta agrupada: no inconsistencias ni N+1. Estado no disponible muestra «—», no cero falso.
+- Footer y CSS versionados desde fuente única `config/version.php`: **0.1.27 → 0.1.28**.
 
 ## Archivos modificados en este deploy
 - `README.md`
 - `app/Http/Controllers/DashboardController.php`
 - `config/version.php`
+- `public/css/grindflow.css`
 - `resources/views/dashboard.blade.php`
 - `scripts/browser-smoke.sh`
 - `tests/Feature/OrganizationVisibilityTest.php`
 
 ## Validación
-- CI y Sonar PR, CI exact-main postmerge y observación Hostinger son pruebas separadas.
-- Dashboard es Laravel existente, no paridad del nuevo Symfony. No afirmar publicación externa real.
+- CI y Sonar de PR, CI exact-main, observación Hostinger y smoke autenticado son comprobaciones distintas.
+- No se ha tocado public_html, datos productivos ni migraciones.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Validar dashboard v0.1.27, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 S1 autenticación/tenant Symfony en slice pequeño |
-| **LATER** | 🚧 Vault móvil → reglas → distribución real autorizada → piloto |
-| **BLOCKED / EXTERNAL** | ⛔ Observar Hostinger y configurar smoke de solo lectura |
+| **NOW** | 🚧 Validar resumen por organización v0.1.28, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 S1 identidad y tenant Symfony |
+| **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
+| **BLOCKED / EXTERNAL** | ⛔ Hostinger: marcador 404; Smoke: credencial ausente |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Home SaaS + footer visible v0.1.25~~ | ✅ ~~CSS cache-busting v0.1.26~~ |
-| **NOW** | 🚧 Dashboard con datos reales v0.1.27 | 🚧 CI/observación remota |
-| **NEXT** | 🚧 Identidad real Symfony | 🚧 S1 |
-| **LATER** | 🚧 Automatización completa | 🚧 S2–S5 |
-| **BLOCKED / EXTERNAL** | ⛔ Producción v0.1.27 | ⛔ Sin verificar |
+| **DONE** | ✅ ~~Home SaaS, footers y CSS versionado~~ | ✅ ~~Dashboard operativo v0.1.27~~ |
+| **NOW** | 🚧 Detalle por organización v0.1.28 | 🚧 CI/Hostinger |
+| **NEXT** | 🚧 Identidad Symfony | 🚧 S1 |
+| **LATER** | 🚧 Automatización | 🚧 S2–S5 |
+| **BLOCKED / EXTERNAL** | ⛔ Producción no observada | ⛔ Release marker 404 |

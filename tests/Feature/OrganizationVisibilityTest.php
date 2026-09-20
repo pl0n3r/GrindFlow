@@ -112,6 +112,55 @@ class OrganizationVisibilityTest extends TestCase
             ->assertDontSee('>3</div>', false);
     }
 
+    public function test_workspace_shows_per_organization_counts_without_foreign_data(): void
+    {
+        $user = User::factory()->create();
+        $foreignUser = User::factory()->create();
+        $alpha = Organization::factory()->create(['name' => 'Alpha visible']);
+        $beta = Organization::factory()->create(['name' => 'Beta visible']);
+        $foreign = Organization::factory()->create(['name' => 'Private foreign']);
+
+        foreach ([$alpha, $beta] as $organization) {
+            Membership::query()->create([
+                'organization_id' => $organization->getKey(),
+                'user_id' => $user->getKey(),
+                'role' => UserRole::Studio,
+            ]);
+        }
+
+        Membership::query()->create([
+            'organization_id' => $foreign->getKey(),
+            'user_id' => $foreignUser->getKey(),
+            'role' => UserRole::Studio,
+        ]);
+
+        $this->makeReadyMedia($user, $alpha, 'alpha.jpg');
+        $this->makeReadyMedia($user, $beta, 'beta-one.jpg');
+        $this->makeReadyMedia($user, $beta, 'beta-two.jpg');
+        $this->makeReadyMedia($foreignUser, $foreign, 'foreign.jpg');
+
+        $response = $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('data-organization-summary="'.$alpha->getKey().'"', false)
+            ->assertSee('data-organization-summary="'.$beta->getKey().'"', false)
+            ->assertDontSee('data-organization-summary="'.$foreign->getKey().'"', false)
+            ->assertDontSee('Private foreign');
+
+        $html = $response->getContent();
+
+        $this->assertIsString($html);
+        $this->assertMatchesRegularExpression(
+            '/Alpha visible.*?Contenido listo:.*?<strong>1<\/strong>/s',
+            $html,
+        );
+        $this->assertMatchesRegularExpression(
+            '/Beta visible.*?Contenido listo:.*?<strong>2<\/strong>/s',
+            $html,
+        );
+        $this->assertDatabaseCount('media_assets', 4);
+    }
+
     public function test_dashboard_without_organizations_has_genuine_zero_counts(): void
     {
         $user = User::factory()->create();
