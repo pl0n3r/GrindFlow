@@ -239,11 +239,15 @@
                                         <div>
                                             <h3 class="gf-org__name">{{ $organization->name }}</h3>
                                             <div class="gf-org__id">{{ $organization->id }}</div>
-                                            <div class="gf-org__summary" data-organization-summary="{{ $organization->id }}">
+                                            <div
+                                                class="gf-org__summary"
+                                                data-organization-summary="{{ $organization->id }}"
+                                            >
                                                 <span>Contenido listo:
                                                     <strong>{{ $readyMediaByOrganization === null
                                                         ? '—'
-                                                        : ($readyMediaByOrganization[$organization->id] ?? 0) }}</strong>
+                                                        : ($readyMediaByOrganization[$organization->id] ?? 0)
+                                                    }}</strong>
                                                 </span>
                                                 <span>Programadas:
                                                     <strong>{{ $scheduledByOrganization === null
@@ -259,11 +263,15 @@
                                         <div>
                                             <h3 class="gf-org__name">{{ $organization->name }}</h3>
                                             <div class="gf-org__id">{{ $organization->id }}</div>
-                                            <div class="gf-org__summary" data-organization-summary="{{ $organization->id }}">
+                                            <div
+                                                class="gf-org__summary"
+                                                data-organization-summary="{{ $organization->id }}"
+                                            >
                                                 <span>Contenido listo:
                                                     <strong>{{ $readyMediaByOrganization === null
                                                         ? '—'
-                                                        : ($readyMediaByOrganization[$organization->id] ?? 0) }}</strong>
+                                                        : ($readyMediaByOrganization[$organization->id] ?? 0)
+                                                    }}</strong>
                                                 </span>
                                                 <span>Programadas:
                                                     <strong>{{ $scheduledByOrganization === null
