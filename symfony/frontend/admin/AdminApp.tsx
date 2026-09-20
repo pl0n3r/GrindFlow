@@ -80,6 +80,10 @@ export function AdminApp() {
       });
       const body = await response.json();
       if (!response.ok) {
+        if ([401, 403, 409].includes(response.status)) {
+          setState({ kind: 'error', message: body?.error?.message ?? 'Tu acceso al espacio ha cambiado.' });
+          return;
+        }
         throw new Error(body?.error?.message ?? 'No se pudo guardar el nombre.');
       }
       const organization = body.data.organization as Context['organization'];
