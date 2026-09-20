@@ -20,7 +20,7 @@ Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React) y `/health` (estado 
 ## Fronteras de seguridad
 
 - Preview **no pide login, no expone contenido ni hace escrituras**; no confundir con el verdadero dashboard administrativo.
-- S1 establecerá Symfony Security, sesiones/CSRF y modelo de tenant antes de habilitar rutas privadas.
+- S1 usa Symfony Security, password hash nativo, sesiones/CSRF y reautoriza la membresía para el admin en cada request; login solo en DB aislada, sin migración de usuarios reales.
 - Contraseñas, tokens de proveedores, blobs y migraciones de producción nunca entran en esta demo.
 - Twig público y React admin no duplican dominio; Node solamente compila archivos, **no** es runtime productivo.
 - Los assets se sirven desde `public/build` con manifiesto Vite validado. Si falta, `/preview` devuelve 503 explícito.

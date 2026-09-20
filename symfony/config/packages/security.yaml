@@ -22,6 +22,7 @@ security:
         enable_csrf: true
         csrf_token_id: authenticate
         default_target_path: grindflow_organizations
+        always_use_default_target_path: true
       logout:
         path: grindflow_logout
         target: grindflow_home

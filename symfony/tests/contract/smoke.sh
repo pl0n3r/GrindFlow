@@ -33,7 +33,6 @@ curl -fsS "$base$css" >/dev/null
 
 code="$(curl -sS -o "$tmp/admin" -w '%{http_code}' "$base/admin")"
 test "$code" = '302'
-grep -qi '^location: /login' "$tmp/admin" 2>/dev/null || true
 curl -fsS "$base/login" > "$tmp/login"
 grep -q 'name="_csrf_token"' "$tmp/login"
 code="$(curl -sS -o "$tmp/notfound" -w '%{http_code}' "$base/not-found-S0")"
