@@ -200,7 +200,7 @@ final class VaultTest extends WebTestCase
             self::assertResponseStatusCodeSame(422);
             $client->request('GET', '/api/admin/vault?q='.str_repeat('x', 81));
             self::assertResponseStatusCodeSame(422);
-            $client->request('GET', '/api/admin/vault?q='.rawurlencode("a\\u{200B}b"));
+            $client->request('GET', '/api/admin/vault?q='.rawurlencode("a\u{200B}b"));
             self::assertResponseStatusCodeSame(422);
 
             $client->request('GET', '/api/admin/vault?page=3');
