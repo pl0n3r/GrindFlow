@@ -24,8 +24,14 @@ test('mobile viewport keeps home and React preview usable', async ({ page }) => 
   await expect(page.getByRole('link', { name: /Explorar vista previa/ })).toBeVisible();
   await page.getByRole('link', { name: /Explorar vista previa/ }).click();
   await expect(page.getByRole('button', { name: /Biblioteca/ })).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-  expect(overflow).toBe(false);
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+    offenders: Array.from(document.querySelectorAll('body *'))
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 8).map((element) => element.tagName + '.' + element.className)
+  }));
+  expect(overflow.scrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewportWidth);
 });
 
 test('private admin is not accidentally exposed through S0', async ({ request }) => {
