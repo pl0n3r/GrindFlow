@@ -44,7 +44,7 @@ class DashboardController extends Controller
     /**
      * Tenant models need an explicit org scope outside TenantContext.
      *
-     * @param list<string> $organizationIds
+     * @param  list<string>  $organizationIds
      */
     private function countForVisibleOrganizations(
         string $table,
