@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **15** | **+489** | **−44** | **+445** |
+| **16** | **+497** | **−44** | **+453** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -75,6 +75,7 @@ flowchart LR
 - `symfony/src/Http/Controller/AdminController.php`
 - `symfony/templates/base.html.twig`
 - `symfony/templates/identity/admin.html.twig`
+- `symfony/tests/contract/smoke.sh`
 - `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/AdminContextTest.php`
 - `symfony/vite.config.ts`
