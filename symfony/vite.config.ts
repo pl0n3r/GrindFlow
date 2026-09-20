@@ -9,9 +9,9 @@ export default defineConfig({
     manifest: true,
     sourcemap: false,
     rollupOptions: {
-      input: 'frontend/admin/main.tsx',
+      input: { preview: 'frontend/admin/main.tsx', admin: 'frontend/admin/admin.tsx' },
       output: {
-        entryFileNames: 'assets/preview-[hash].js',
+        entryFileNames: (chunk) => chunk.name === 'admin' ? 'assets/admin-[hash].js' : 'assets/preview-[hash].js',
         chunkFileNames: 'assets/chunk-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]'
       }
