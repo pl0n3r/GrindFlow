@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+184** | **−22** | **+162** |
+| **10** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -70,6 +70,7 @@ flowchart LR
 - `symfony/frontend/admin/VaultPanel.tsx`
 - `symfony/frontend/admin/admin.css`
 - `symfony/src/Http/Controller/VaultController.php`
+- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
 - `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/VaultTest.php`
 - `symfony/tests/php/VaultTrashTest.php`
