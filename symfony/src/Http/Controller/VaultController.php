@@ -41,6 +41,10 @@ final class VaultController extends AbstractController
             return $this->error(422, 'invalid_page', 'Selecciona una página válida (1 a 1000).');
         }
         $page = (int) $rawPage;
+        $view = $request->query->all()['view'] ?? 'active';
+        if (!is_string($view) || !in_array($view, ['active', 'trash'], true)) {
+            return $this->error(422, 'invalid_view', 'Selecciona biblioteca o papelera.');
+        }
         $params = ['organization' => $context['organization']['id'], 'user' => $context['user']->id()];
         $scope = <<<'SQL'
             FROM gf_vault_assets asset
@@ -50,11 +54,17 @@ final class VaultController extends AbstractController
             WHERE asset.organization_id = :organization
               AND membership.user_id = :user AND actor.is_active = 1
             SQL;
-        $usage = $db->fetchAssociative('SELECT COUNT(*) AS count_assets, COALESCE(SUM(asset.size_bytes), 0) AS used_bytes '.$scope, $params);
-        $total = (int) $usage['count_assets'];
+        $usage = $db->fetchAssociative(
+            'SELECT COUNT(*) AS count_assets, COALESCE(SUM(asset.size_bytes), 0) AS used_bytes '
+            .$scope.' AND asset.deleted_at IS NULL', $params,
+        );
+        $filter = $view === 'trash' ? ' AND asset.deleted_at IS NOT NULL' : ' AND asset.deleted_at IS NULL';
+        $total = $view === 'active' ? (int) $usage['count_assets']
+            : (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter, $params);
+        $order = $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC';
         $assets = $db->fetchAllAssociative(
-            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at '
-            .$scope.' ORDER BY asset.created_at DESC, asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
+            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at '
+            .$scope.$filter.' ORDER BY '.$order.', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
             $params,
         );
 
@@ -62,6 +72,7 @@ final class VaultController extends AbstractController
             'assets' => array_map($this->publicAsset(...), $assets),
             'limit' => 30,
             'page' => $page,
+            'view' => $view,
             'total' => $total,
             'pages' => (int) ceil($total / 30),
             'quota' => [
@@ -135,7 +146,7 @@ final class VaultController extends AbstractController
                     return 'revoked';
                 }
                 $usage = $db->fetchAssociative(
-                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization',
+                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
                     ['organization' => $context['organization']['id']],
                 );
                 if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
@@ -205,7 +216,7 @@ final class VaultController extends AbstractController
                     ON membership.organization_id = asset.organization_id
                 INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
                 WHERE asset.id = :id AND asset.organization_id = :organization
-                  AND membership.user_id = :user AND actor.is_active = 1
+                  AND membership.user_id = :user AND actor.is_active = 1 AND asset.deleted_at IS NULL
                 SQL,
             ['id' => $id, 'organization' => $context['organization']['id'], 'user' => $context['user']->id()],
         );
@@ -232,7 +243,7 @@ final class VaultController extends AbstractController
                     ON membership.organization_id = asset.organization_id
                 INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
                 WHERE asset.id = :id AND asset.organization_id = :organization
-                  AND membership.user_id = :user AND actor.is_active = 1
+                  AND membership.user_id = :user AND actor.is_active = 1 AND asset.deleted_at IS NULL
                 SQL,
             ['id' => $id, 'organization' => $context['organization']['id'], 'user' => $context['user']->id()],
         );
@@ -252,6 +263,113 @@ final class VaultController extends AbstractController
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $asset['original_name']);
 
         return $response;
+    }
+
+    #[Route('/api/admin/vault/{id}/trash', name: 'grindflow_vault_trash', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function trash(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        return $this->transition($request, $memberships, $db, $id, 'trash');
+    }
+
+    #[Route('/api/admin/vault/{id}/restore', name: 'grindflow_vault_restore', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function restore(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        return $this->transition($request, $memberships, $db, $id, 'restore');
+    }
+
+    /**
+     * Reversible only. No unlink/physical deletion: the original remains private
+     * until a separately audited retention policy is implemented and approved.
+     */
+    private function transition(Request $request, MembershipContext $memberships, Connection $db, string $id, string $action): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite gestionar estos archivos.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        // No tenant, uploader, storage key or other fields are accepted from the browser.
+        if ($request->getContent() !== '' || $request->request->all() !== [] || $request->files->all() !== []) {
+            return $this->error(422, 'invalid_action', 'La acción no acepta parámetros de archivo u organización.');
+        }
+
+        $result = $db->transactional(function (Connection $db) use ($context, $id, $action): string {
+            $locked = $db->fetchOne(
+                'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                ['organization' => $context['organization']['id']],
+            );
+            if ($locked === false) {
+                return 'revoked';
+            }
+            $asset = $db->fetchAssociative(
+                'SELECT id, size_bytes, storage_key, deleted_at FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
+                ['id' => $id, 'organization' => $context['organization']['id']],
+            );
+            if ($asset === false) {
+                return 'not_found';
+            }
+            if ($action === 'trash' && $asset['deleted_at'] !== null) {
+                return 'already_trashed';
+            }
+            if ($action === 'restore' && $asset['deleted_at'] === null) {
+                return 'already_active';
+            }
+            if ($action === 'restore') {
+                $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
+                $path = $root.'/'.$asset['storage_key'].'.blob';
+                if (is_link($root) || !is_file($path) || is_link($path)) {
+                    return 'missing_blob';
+                }
+                $usage = $db->fetchAssociative(
+                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes '
+                    .'FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
+                    ['organization' => $context['organization']['id']],
+                );
+                if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
+                    || (int) $usage['used_bytes'] + (int) $asset['size_bytes'] > self::MAX_ORGANIZATION_BYTES) {
+                    return 'quota';
+                }
+            }
+
+            $written = $db->executeStatement(
+                <<<'SQL'
+                    UPDATE gf_vault_assets asset
+                    SET asset.deleted_at = :deleted, asset.deleted_by = :deleter
+                    WHERE asset.id = :id AND asset.organization_id = :organization
+                      AND EXISTS (
+                          SELECT 1 FROM gf_identity_memberships membership
+                          INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                          WHERE membership.organization_id = asset.organization_id
+                            AND membership.user_id = :user AND actor.is_active = 1
+                            AND membership.role IN ('admin', 'studio', 'editor')
+                      )
+                    SQL,
+                [
+                    'deleted' => $action === 'trash' ? gmdate('Y-m-d H:i:s') : null,
+                    'deleter' => $action === 'trash' ? $context['user']->id() : null,
+                    'id' => $id, 'organization' => $context['organization']['id'],
+                    'user' => $context['user']->id(),
+                ],
+            );
+
+            return $written === 1 ? 'updated' : 'revoked';
+        });
+
+        return match ($result) {
+            'updated' => $this->privateJson(['data' => [
+                'id' => $id, 'state' => $action === 'trash' ? 'trash' : 'active',
+            ]]),
+            'not_found' => $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.'),
+            'quota' => $this->error(409, 'vault_quota_exceeded', 'No se puede restaurar: la biblioteca alcanzó su cuota.'),
+            'missing_blob' => $this->error(409, 'file_unavailable', 'No se puede restaurar un archivo sin su original privado.'),
+            'already_active', 'already_trashed' => $this->error(409, 'vault_state_changed', 'El estado del archivo ya cambió. Actualiza la biblioteca.'),
+            default => $this->error(403, 'organization_access_changed', 'Tu permiso para gestionar el archivo cambió.'),
+        };
     }
 
     /** @return array{user: IdentityUser, organization: array{id:string,name:string,role:string}}|JsonResponse */
@@ -275,7 +393,7 @@ final class VaultController extends AbstractController
     }
 
     /** @param array<string, mixed> $asset
-     * @return array{id:string,name:string,mime_type:string,size_bytes:int,created_at:string,download_url:string}
+     * @return array{id:string,name:string,mime_type:string,size_bytes:int,created_at:string,deleted_at:?string,download_url:string}
      */
     private function publicAsset(array $asset): array
     {
@@ -285,6 +403,7 @@ final class VaultController extends AbstractController
             'mime_type' => (string) $asset['mime_type'],
             'size_bytes' => (int) $asset['size_bytes'],
             'created_at' => (string) $asset['created_at'],
+            'deleted_at' => isset($asset['deleted_at']) ? (string) $asset['deleted_at'] : null,
             'download_url' => '/api/admin/vault/'.$asset['id'].'/download',
         ];
     }
