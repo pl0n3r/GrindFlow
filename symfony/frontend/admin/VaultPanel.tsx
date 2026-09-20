@@ -189,7 +189,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       <strong>Espacio utilizado: {(quota.used_bytes / (1024 * 1024)).toFixed(2)} de {(quota.max_bytes / (1024 * 1024)).toFixed(0)} MiB</strong>
       <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
         value={Math.min(quota.used_bytes, quota.max_bytes)} />
-      <small>{quota.used_assets} de {quota.max_assets} imágenes. El límite se comprueba al guardar.</small>
+      <small>{quota.used_assets} de {quota.max_assets} imágenes, incluida la papelera. Los originales retenidos siguen ocupando espacio.</small>
     </div>}
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir imágenes desde tu dispositivo</label>
