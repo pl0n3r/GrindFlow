@@ -31,3 +31,7 @@ Plan de transición y criterios completos: [STACK-TRANSITION-SYMFONY.md](../../d
 ## S1 · Integridad reversible de membresías (v0.1.32)
 
 La migración adicional `Version20260920095500` instala en MariaDB **aislada** una garantía DB que impide reasignar el usuario o la organización de una membresía existente. Cambiar el rol sigue permitido; cambiar de usuario u organización requiere reemplazar la membresía. PHPUnit verifica ambas prohibiciones con dos usuarios y dos organizaciones sintéticos; CI revierte primero el trigger y después las tablas, luego reaplica ambas migraciones. `/admin` Symfony continúa 403, todavía no hay inicio de sesión. No aplicar estas migraciones a la MariaDB de Laravel/Hostinger.
+
+## S1 acceso y selección de organizaciones, v0.1.33
+
+El entorno Symfony aislado incorpora login/logout mediante Symfony Security, protección CSRF, limitación de intentos y comprobación de cuenta activa. Solo se listan organizaciones con membresía del usuario; la elección exige CSRF y revalidación servidor, y cada GET al admin vuelve a comprobarla. El admin anuncia expresamente que Vault/automatización todavía no están conectados. Ninguna cuenta ni tabla productiva Laravel se modifica o migra; la protección de membresías inmutables de v0.1.32 permanece.

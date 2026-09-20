@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+{% block title %}Seleccionar organización · GrindFlow{% endblock %}
+{% block body %}
+<main id="contenido" class="identity-shell">
+<section class="identity-card" aria-labelledby="organizations-title">
+    <span class="eyebrow">ENTORNO S1 · ACCESO PRIVADO</span>
+    <h1 id="organizations-title">Elige tu organización</h1>
+    <p>Hola, {{ display_name }}. El espacio se selecciona explícitamente, sin asumir cuál quieres utilizar.</p>
+    {% if organizations is empty %}
+        <p role="status">Tu cuenta no tiene organizaciones asignadas. Solicita una invitación a un administrador.</p>
+    {% else %}
+        <ul class="identity-orgs">
+            {% for organization in organizations %}
+                <li>
+                    <form method="post" action="{{ path('grindflow_organization_select') }}">
+                        <strong>{{ organization.name }}</strong>
+                        <span>{{ organization.role }}</span>
+                        {% if organization.id == selected_id %}<span>Actual</span>{% endif %}
+                        <input type="hidden" name="organization_id" value="{{ organization.id }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('select_organization') }}">
+                        <button class="button primary" type="submit">Entrar a este espacio</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <form method="post" action="{{ path('grindflow_logout') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+        <button class="button ghost" type="submit">Cerrar sesión</button>
+    </form>
+</section>
+</main>
+{% endblock %}
