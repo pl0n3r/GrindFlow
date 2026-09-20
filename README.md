@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.39: solo el deploy actual, paginación real del Vault S2 en código, Symfony aún sin despliegue.** Base `main` v0.1.38 `8256cf0725a6981681d798ca3917238a41bd960b`. Biblioteca privada con 30 imágenes por página, total SQL por organización, navegación móvil y actualización tras subir. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas o archivos**.
+> **Snapshot v0.1.40: solo el deploy actual, detalle privado del Vault S2 en código, Symfony aún sin despliegue.** Base `main` v0.1.39 `cc661deb75bd96f7ccf622197ed6b298b4320f95`. Consulta individual de metadatos autorizada por organización y panel de detalles móvil. Laravel sigue como runtime; **Symfony no está desplegado ni se migraron cuentas o archivos**.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.39** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.38~~ | `8256cf0725a6981681d798ca3917238a41bd960b` |
+| Version objetivo | 🚧 **v0.1.40** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.39~~ | `cc661deb75bd96f7ccf622197ed6b298b4320f95` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -40,7 +40,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Vault S2: paginación tenant-safe con total SQL, navegación móvil, prueba de 31 recursos y entradas inválidas |
+| Alcance | Vault S2: consulta individual tenant-safe, metadatos móviles, prueba de aislamiento y revocación |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,10 +58,9 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- API privada del Vault: 30 imágenes por página, total real y orden determinista `created_at DESC, id DESC` para la organización autorizada.
-- Navegación anterior/siguiente móvil; tras subir imágenes vuelve a consultar la página 1 para refrescar el total.
-- Pruebas PHP con 31 recursos propios y uno ajeno, segunda página, página fuera de rango y entrada malformada; Playwright móvil con cambio de página.
-- Sin nuevas migraciones, archivos productivos ni conexiones externas.
+- GET privado de detalle con autorización de sesión, membresía activa y organización, 404 sin filtración entre tenants.
+- Panel de metadatos móvil: nombre, tipo, tamaño exacto y fecha; controles accesibles.
+- Pruebas PHP de IDOR/revocación y Chromium de detalle en 360 px. Sin migraciones ni cambios productivos.
 
 ## Archivos modificados en este deploy
 - `README.md`
@@ -82,8 +81,8 @@ flowchart LR
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar paginación Vault S2 v0.1.39 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Cuotas de almacenamiento y errores parciales | 🚧 Después de validar paginación |
+| **NOW** | 🚧 Validar detalle privado Vault S2 v0.1.40 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Cuotas y gestión segura de archivos | 🚧 Después de validar detalle |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -91,7 +90,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar paginación Vault S2 v0.1.39 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar paginación Vault S2 v0.1.40 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Cuotas de almacenamiento y errores parciales | 🚧 Después de validar paginación |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
