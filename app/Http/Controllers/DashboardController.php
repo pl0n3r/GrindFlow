@@ -6,7 +6,9 @@ use App\Models\MediaAsset;
 use App\Models\Organization;
 use App\Models\ScheduledPublication;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
@@ -48,7 +50,57 @@ class DashboardController extends Controller
                 : array_sum($scheduledByOrganization),
             'readyMediaByOrganization' => $readyMediaByOrganization,
             'scheduledByOrganization' => $scheduledByOrganization,
+            'upcomingPublications' => $this->upcomingForVisibleOrganizations($organizationIds),
         ]);
+    }
+
+    /**
+     * Five upcoming rows are selected with a bounded tenant filter and
+     * organization-safe joins. Null means a partial schema, not an empty queue.
+     *
+     * @param  list<string>  $organizationIds
+     * @return Collection<int, \stdClass>|null
+     */
+    private function upcomingForVisibleOrganizations(array $organizationIds): ?Collection
+    {
+        if ($organizationIds === []) {
+            return collect();
+        }
+
+        try {
+            foreach (['scheduled_publications', 'publishing_destinations', 'media_assets'] as $table) {
+                if (Schema::hasTable($table) === false) {
+                    return null;
+                }
+            }
+
+            $nowUtc = CarbonImmutable::now('UTC')->format('Y-m-d H:i:s');
+
+            return DB::table('scheduled_publications as schedule')
+                ->join('publishing_destinations as destination', function ($join): void {
+                    $join->on('destination.id', '=', 'schedule.publishing_destination_id')
+                        ->on('destination.organization_id', '=', 'schedule.organization_id');
+                })
+                ->join('media_assets as media', function ($join): void {
+                    $join->on('media.id', '=', 'schedule.media_asset_id')
+                        ->on('media.organization_id', '=', 'schedule.organization_id');
+                })
+                ->whereIn('schedule.organization_id', $organizationIds)
+                ->where('schedule.status', ScheduledPublication::STATUS_SCHEDULED)
+                ->where('schedule.scheduled_for_utc', '>=', $nowUtc)
+                ->orderBy('schedule.scheduled_for_utc')
+                ->orderBy('schedule.id')
+                ->limit(5)
+                ->get([
+                    'schedule.id',
+                    'schedule.organization_id',
+                    'schedule.scheduled_for_utc',
+                    'destination.name as destination_name',
+                    'media.original_filename as media_name',
+                ]);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
