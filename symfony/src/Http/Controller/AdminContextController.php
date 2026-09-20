@@ -49,6 +49,9 @@ final class AdminContextController extends AbstractController
                 'vault_upload_csrf' => $memberships->permissions($organization['role'])['content_prepare']
                     ? (string) $csrf->getToken('grindflow_vault_upload')->getValue()
                     : null,
+                'vault_manage_csrf' => $memberships->permissions($organization['role'])['content_prepare']
+                    ? (string) $csrf->getToken('grindflow_vault_manage')->getValue()
+                    : null,
                 'organization' => $organization,
                 'permissions' => $memberships->permissions($organization['role']),
                 'organization_name_csrf' => $memberships->permissions($organization['role'])['organization_manage']

@@ -6,16 +6,22 @@ type Asset = {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  deleted_at?: string | null;
   download_url: string;
 };
 
 type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
 
-type Props = { canUpload: boolean; csrf: string | null };
+type Props = { canUpload: boolean; csrf: string | null; manageCsrf?: string | null };
 
-export function VaultPanel({ canUpload, csrf }: Props) {
+export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<'active' | 'trash'>('active');
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState('');
+  const [actionError, setActionError] = useState('');
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
   const [quota, setQuota] = useState<Quota | null>(null);
@@ -31,7 +37,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/admin/vault?page=' + page, {
+    fetch('/api/admin/vault?page=' + page + '&view=' + view, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
@@ -44,6 +50,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
       setAssets(data.assets);
       setDetail(null);
       setDetailError('');
+      setConfirmId(null);
       setTotal(data.total);
       setQuota(data.quota ?? null);
       setPages(data.pages);
@@ -57,7 +64,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [page, refresh]);
+  }, [page, refresh, view]);
 
   async function inspect(id: string) {
     if (detail?.id === id) {
@@ -78,6 +85,44 @@ export function VaultPanel({ canUpload, csrf }: Props) {
       setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar la imagen.');
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  function switchView(next: 'active' | 'trash') {
+    if (view === next) return;
+    setLoading(true);
+    setPage(1);
+    setView(next);
+    setConfirmId(null);
+    setDetail(null);
+    setActionFeedback('');
+    setActionError('');
+  }
+
+  async function changeState(id: string, action: 'trash' | 'restore') {
+    if (!canUpload || !manageCsrf || busyId) return;
+    setBusyId(id);
+    setActionError('');
+    setActionFeedback('');
+    try {
+      const response = await fetch('/api/admin/vault/' + id + '/' + action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': manageCsrf, Accept: 'application/json' },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo actualizar el archivo.');
+      setActionFeedback(action === 'trash'
+        ? 'Imagen movida a la papelera. Puedes restaurarla.'
+        : 'Imagen restaurada en la biblioteca.');
+      setPage((current) => current > 1 && assets.length === 1 ? current - 1 : current);
+      setRefresh((previous) => previous + 1);
+      setConfirmId(null);
+      setDetail(null);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo actualizar el archivo.');
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -133,13 +178,20 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     <span className="admin-kicker">S2 · BIBLIOTECA PRIVADA</span>
     <h2 id="vault-title">Biblioteca de imágenes</h2>
     <p>Imágenes privadas de la organización seleccionada. Nada se publica externamente.</p>
+    <nav className="vault-tabs" aria-label="Vistas de biblioteca">
+      <button type="button" aria-pressed={view === 'active'} disabled={loading || !!busyId}
+        onClick={() => switchView('active')}>Biblioteca</button>
+      <button type="button" aria-pressed={view === 'trash'} disabled={loading || !!busyId}
+        onClick={() => switchView('trash')}>Papelera</button>
+    </nav>
+    {view === 'trash' && <p>Las imágenes en papelera no se pueden descargar y conservan su original privado. No se borran definitivamente en esta versión.</p>}
     {quota && <div className="vault-quota" aria-label="Cuota de almacenamiento">
       <strong>Espacio utilizado: {(quota.used_bytes / (1024 * 1024)).toFixed(2)} de {(quota.max_bytes / (1024 * 1024)).toFixed(0)} MiB</strong>
       <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
         value={Math.min(quota.used_bytes, quota.max_bytes)} />
-      <small>{quota.used_assets} de {quota.max_assets} imágenes. El límite se comprueba al guardar.</small>
+      <small>{quota.used_assets} de {quota.max_assets} imágenes, incluida la papelera. Los originales retenidos siguen ocupando espacio.</small>
     </div>}
-    {canUpload && csrf && <form onSubmit={upload} className="vault-upload">
+    {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir imágenes desde tu dispositivo</label>
       <input id="vault-files" type="file" multiple accept="image/jpeg,image/png,image/webp"
         disabled={uploading || loading} onChange={(event) =>
@@ -149,16 +201,18 @@ export function VaultPanel({ canUpload, csrf }: Props) {
         {uploading ? 'Guardando imágenes…' : 'Guardar ' + (selected.length || '') + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')}
       </button>
     </form>}
-    {!canUpload && <p>Tu rol permite consultar los archivos, pero no añadir nuevos.</p>}
+    {view === 'active' && !canUpload && <p>Tu rol permite consultar los archivos, pero no añadir nuevos.</p>}
     {feedback && <p role="status" className="vault-feedback">{feedback}</p>}
+    {actionFeedback && <p role="status" className="vault-feedback">{actionFeedback}</p>}
+    {actionError && <p role="alert">{actionError}</p>}
     {detailLoading && <p role="status">Cargando detalles…</p>}
     {detailError && <p role="alert">{detailError}</p>}
     {loading && <p role="status">Cargando biblioteca…</p>}
     {error && <p role="alert">{error}</p>}
     {!loading && !error && assets.length === 0 &&
-      <p role="status">Todavía no hay imágenes en esta organización.</p>}
+      <p role="status">{view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
-      <p className="vault-count" role="status">{total} imágenes en esta organización · página {page} de {pages}.</p>
+      <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
       <ul className="vault-list">
         {assets.map((asset) => <li key={asset.id}>
           <span className="vault-image-mark" aria-hidden="true">▧</span>
@@ -166,9 +220,25 @@ export function VaultPanel({ canUpload, csrf }: Props) {
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
           </span>
-          <button type="button" disabled={detailLoading} aria-expanded={detail?.id === asset.id}
-            onClick={() => void inspect(asset.id)}>Detalles</button>
-          <a href={asset.download_url} download>Descargar</a>
+          {view === 'active' && <>
+            <button type="button" disabled={detailLoading || !!busyId} aria-expanded={detail?.id === asset.id}
+              onClick={() => void inspect(asset.id)}>Detalles</button>
+            <a href={asset.download_url} download>Descargar</a>
+          </>}
+          {view === 'trash' && <small className="vault-removed-date">En papelera: {asset.deleted_at}</small>}
+          {canUpload && manageCsrf && (view === 'trash'
+            ? <button type="button" disabled={!!busyId} onClick={() => void changeState(asset.id, 'restore')}>
+                {busyId === asset.id ? 'Restaurando…' : 'Restaurar'}
+              </button>
+            : <button type="button" disabled={!!busyId} aria-expanded={confirmId === asset.id}
+                onClick={() => setConfirmId((current) => current === asset.id ? null : asset.id)}>Mover a papelera</button>)}
+          {view === 'active' && confirmId === asset.id && canUpload && manageCsrf && <div className="vault-confirm">
+            <p>¿Mover «{asset.name}» a la papelera? Podrás restaurarla después.</p>
+            <button type="button" disabled={!!busyId} onClick={() => void changeState(asset.id, 'trash')}>
+              {busyId === asset.id ? 'Moviendo…' : 'Confirmar movimiento'}
+            </button>
+            <button type="button" disabled={!!busyId} onClick={() => setConfirmId(null)}>Cancelar</button>
+          </div>}
           {detail?.id === asset.id && <dl className="vault-metadata">
             <dt>Nombre</dt><dd>{detail.name}</dd>
             <dt>Tipo</dt><dd>{detail.mime_type}</dd>

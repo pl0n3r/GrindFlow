@@ -54,3 +54,14 @@
 .vault-quota strong{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
 .vault-quota meter{width:100%;height:16px}
 .vault-quota small{color:#bfb8cd;line-height:1.5}
+
+/* S2 reversible trash: touch targets and inline confirmation on 360px devices. */
+.vault-tabs{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.vault-tabs button,.vault-confirm button{min-height:44px;padding:9px 14px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;cursor:pointer}
+.vault-tabs button[aria-pressed="true"]{background:#b896ff;color:#171124;border-color:#b896ff;font-weight:700}
+.vault-tabs button:disabled,.vault-confirm button:disabled{opacity:.55;cursor:not-allowed}
+.vault-tabs button:focus-visible,.vault-confirm button:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+.vault-confirm{display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1 0 100%;min-width:0;padding:14px;border:1px solid #8170a0;border-radius:10px}
+.vault-confirm p{flex:1 0 100%;margin:0;overflow-wrap:anywhere}
+.vault-removed-date{font-size:11px;color:#bfb8cd;overflow-wrap:anywhere}
+@media(max-width:520px){.vault-list li>button{margin-left:0}.vault-list a{margin-left:0}.vault-confirm button{flex:1 1 100%}}
