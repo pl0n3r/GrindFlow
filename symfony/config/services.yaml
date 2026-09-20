@@ -1,0 +1,17 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  GrindFlow\:
+    resource: '../src/'
+    exclude:
+      - '../src/Kernel.php'
+
+  GrindFlow\Shared\Version\ProductVersion:
+    arguments:
+      $repositoryDir: '%kernel.project_dir%/..'
+
+  GrindFlow\Http\AssetManifest:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
