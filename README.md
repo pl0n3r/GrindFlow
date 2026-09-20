@@ -33,13 +33,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **18** | **+598** | **−47** | **+551** |
+| **18** | **+595** | **−47** | **+548** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
 | Alcance | Symfony Security, CSRF/rate limit, selector tenant, HTML responsive, pruebas negativas |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
