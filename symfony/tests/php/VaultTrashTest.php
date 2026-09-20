@@ -94,6 +94,14 @@ final class VaultTrashTest extends WebTestCase
                 $client->request('POST', $renaming, server: $renameHeaders, content: $invalidName);
                 self::assertResponseStatusCodeSame(422);
             }
+            // Reject invisible Unicode names, format controls and non-ASCII line separators.
+            foreach (["\\u{00A0}\\u{00A0}", "a\\u{200B}b", "a\\u{2028}b", "a\\u{2029}b"] as $invisibleName) {
+                $client->request('POST', $renaming, server: $renameHeaders,
+                    content: json_encode(['name' => $invisibleName], JSON_THROW_ON_ERROR));
+                self::assertResponseStatusCodeSame(422);
+                self::assertSame('propia.png', $db->fetchOne(
+                    'SELECT original_name FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            }
             $client->request('POST', $renaming, server: $renameHeaders, content: '{"name":"nueva-imagen.png"}');
             self::assertResponseIsSuccessful();
             self::assertSame('nueva-imagen.png',
