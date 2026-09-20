@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **13** | **+371** | **−37** | **+334** |
+| **14** | **+376** | **−37** | **+339** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -77,6 +77,8 @@ flowchart LR
 - `symfony/templates/base.html.twig`
 - `symfony/tests/php/IdentitySchemaTest.php`
 - `symfony/tests/php/PreviewTest.php`
+
+- `symfony/config/packages/test/doctrine.yaml`
 
 ## Validación
 - CI del PR y SHA exact-main, después observación de release Hostinger, después Smoke autenticado.
