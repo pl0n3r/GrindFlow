@@ -1,11 +1,11 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice v0.1.49, rama del PR #42 (aún sin merge):** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice v0.1.50, rama del próximo PR (sin merge):** Symfony 7.4 + MariaDB descartable, login/logout, organizaciones y permisos reales, y Vault privado móvil de imágenes con búsqueda, filtros y carga múltiple recuperable. Laravel sigue atendiendo el sitio productivo. El panel Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.49 preparada en rama; filtros MIME/orden de main v0.1.48 se conservan junto con la recuperación de cargas. |
-| VALIDADO EN CÓDIGO | CI del PR #42 y Sonar deben pasar en el head final; CI exact-main de v0.1.48 success. |
+| IMPLEMENTADO | v0.1.50 preparada en rama sobre main v0.1.49: vista previa privada en el detalle de imagen activa. |
+| VALIDADO EN CÓDIGO | CI del nuevo PR y Sonar deben pasar en el head final; CI exact-main de v0.1.49 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel v0.1.48 no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
@@ -107,3 +107,7 @@ La clasificación de reintento ocurre **antes** de decodificar el JSON: HTTP 2xx
 ## S2 · Filtrar por formato y ordenar en servidor (v0.1.48)
 
 La biblioteca incorpora en `GET /api/admin/vault` los parámetros opcionales `format=all|jpeg|png|webp` y `sort=recent|oldest|name_asc|name_desc|size_asc|size_desc`. Los filtros de MIME y nombre se aplican **antes** del conteo/paginación y siempre dentro del tenant/vista autorizados. El orden de fechas se interpreta contra `created_at` para biblioteca y `deleted_at` para papelera; `id DESC` deshace empates sin perder ni repetir archivos entre páginas. SQL de `ORDER BY` proviene exclusivamente de una lista fija, y MIME se parametriza. La cuota de 100 imágenes/128 MiB sigue calculándose sobre todos los originales retenidos de la organización sin importar los filtros. La interfaz React permite combinar formato, nombre, vista y orden desde móvil con actualización del backend y restablecimiento de página; PHPUnit/MariaDB y Chromium 360 px verifican orden, combinaciones, cuota e entradas inválidas. No añade esquema, migración, acceso público, borrado definitivo ni deploy Symfony en Hostinger.
+
+## S2 · vista previa privada de imágenes (v0.1.50)
+
+`GET /api/admin/vault/{id}/preview` devuelve los bytes inline únicamente al miembro activo de la organización elegida y solo mientras la imagen esté en biblioteca, no en papelera. Revalida acceso en cada petición; no utiliza rutas físicas ni nombres aportados por el cliente para emitir contenido. JPEG/PNG/WebP con `nosniff`, `no-store, private`, `Cross-Origin-Resource-Policy: same-origin` y `Referrer-Policy: no-referrer`. Si falta el original o su tamaño difiere de metadatos, responde 404. El detalle React renderiza la imagen desde la API privada con texto alternativo, estado de error y contención a 360 px. La descarga conserva `attachment`: no se generan enlaces externos, thumbnails persistentes ni tablas nuevas. PHPUnit y Chromium comprueban autorización, cabeceras, bytes reales y ocultación en papelera.

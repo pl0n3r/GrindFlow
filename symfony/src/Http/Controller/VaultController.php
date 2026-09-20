@@ -343,6 +343,58 @@ final class VaultController extends AbstractController
         return $response;
     }
 
+
+    /**
+     * Browser-only inline image preview. The original stays outside public/,
+     * and every request rechecks the user, tenant and active file state.
+     */
+    #[Route('/api/admin/vault/{id}/preview', name: 'grindflow_vault_preview', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function preview(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse|BinaryFileResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+
+        $asset = $db->fetchAssociative(
+            <<<'SQL'
+                SELECT asset.storage_key, asset.mime_type, asset.size_bytes
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.id = :id AND asset.organization_id = :organization
+                  AND membership.user_id = :user AND actor.is_active = 1 AND asset.deleted_at IS NULL
+                SQL,
+            ['id' => $id, 'organization' => $context['organization']['id'], 'user' => $context['user']->id()],
+        );
+        if ($asset === false) {
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
+        }
+        $mime = (string) $asset['mime_type'];
+        if (!in_array($mime, self::MIMES, true)) {
+            return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
+        }
+        $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
+        $path = $root.'/'.$asset['storage_key'].'.blob';
+        if (is_link($root) || !is_file($path) || is_link($path)
+            || filesize($path) !== (int) $asset['size_bytes']) {
+            return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
+        }
+
+        $response = new BinaryFileResponse($path);
+        $response->headers->set('Content-Type', $mime);
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        // Never use a user-controlled filename for inline content.
+        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime];
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, 'preview.'.$extension);
+
+        return $response;
+    }
+
     /**
      * Update only the private display/attachment name, never the opaque storage key.
      * Reauthorize the acting membership in the SQL write under the tenant lock.

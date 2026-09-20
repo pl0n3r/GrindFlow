@@ -99,3 +99,9 @@
 .vault-filters select:disabled{opacity:.55;cursor:not-allowed}
 .vault-filters :focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
 @media(max-width:520px){.vault-filters{grid-template-columns:minmax(0,1fr)}}
+
+/* S2 in-browser preview: protected, responsive image inside details. */
+.vault-preview{flex:1 0 100%;min-width:0;margin:0;padding:12px;border:1px solid #39384d;border-radius:10px;background:#0d0e17;display:grid;gap:10px}
+.vault-preview img{display:block;max-width:100%;width:auto;height:auto;max-height:440px;object-fit:contain;border-radius:7px;justify-self:center}
+.vault-preview figcaption{color:#bfb8cd;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.vault-preview p{margin:0}

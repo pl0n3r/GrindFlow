@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.49: solo el deploy actual, reintento selectivo de cargas móviles en Vault S2.** Base `main` v0.1.48 `68e05e7ff9baf6b201da0ecf6efa4fb385895276`, CI exact-main success. Carga múltiple con progreso, errores individualizados y reintento solo de fallidos. Symfony aún no desplegado en Hostinger.
+> **Snapshot v0.1.50: solo el deploy actual, vista previa privada de imágenes desde el detalle S2.** Base `main` v0.1.49 `069fac6a7ce82a9a17b9084ca33d03bd3690d3ae`, CI exact-main success. Vista previa bajo sesión y tenant; solo imágenes activas con originales disponibles. Symfony aún no desplegado en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.49** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.48~~ | `68e05e7ff9baf6b201da0ecf6efa4fb385895276` |
+| Version objetivo | 🚧 **v0.1.50** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.49~~ | `069fac6a7ce82a9a17b9084ca33d03bd3690d3ae` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión por comprobar | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+267** | **−29** | **+238** |
+| **9** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: carga móvil parcial recuperable sin volver a enviar archivos guardados |
+| Alcance | S2: vista previa de imágenes privadas activas, API y móvil |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,10 +58,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- La carga múltiple informa avance y resultado individual por archivo, incluso si uno de los envíos falla.
-- Los originales subidos correctamente se excluyen del reintento: solo se reenvían archivos fallidos temporalmente cuando el usuario pulsa «Reintentar».
-- Los rechazos por formato, duplicado, cuota o permisos no generan reintentos inútiles; los pendientes se pueden descartar. Nueva selección los reemplaza.
-- Pruebas Chromium de recuperación, rechazo y respuestas HTTP malformadas no reintentables a 360 px.
+- API autenticada `GET /api/admin/vault/{id}/preview` permite solo lectura inline de originales activos en el tenant; no expone rutas físicas ni nombres editables en cabeceras.
+- Cabeceras `no-store`, `nosniff`, `same-origin` y `no-referrer`; verifica tamaño real, MIME admitido, ausencia de enlaces simbólicos y pertenencia antes de servir.
+- El detalle React muestra vista previa con texto alternativo y mensaje accesible ante error; oculta la imagen al cerrar detalle o alternar a papelera.
+- PHPUnit/MariaDB y Chromium 360 px comprueban autorización, contenido binario, cabeceras, papelera y controles móviles.
 
 ## Archivos modificados en este deploy
 - `README.md`
@@ -69,18 +69,21 @@ flowchart LR
 - `symfony/README.md`
 - `symfony/frontend/admin/VaultPanel.tsx`
 - `symfony/frontend/admin/admin.css`
+- `symfony/src/Http/Controller/VaultController.php`
 - `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/VaultTest.php`
+- `symfony/tests/php/VaultTrashTest.php`
 
 ## Validación
 - Los tests PHP/MariaDB y Chromium se comprueban en CI del PR; sin checkout local en esta sesión.
-- CI exact-main v0.1.48 success; CI/Sonar/CodeRabbit del nuevo head y Hostinger son señales separadas. Sin migración ni cutover Symfony.
+- CI exact-main v0.1.49 success; CI/Sonar/CodeRabbit del nuevo head y Hostinger son señales separadas. Sin migración ni cutover Symfony.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar reintento parcial Vault S2 v0.1.49 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar vista previa privada Vault S2 v0.1.50 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
@@ -89,7 +92,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar reintento parcial Vault S2 v0.1.49 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar vista previa privada Vault S2 v0.1.50 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

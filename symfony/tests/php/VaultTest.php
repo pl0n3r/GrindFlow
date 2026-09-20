@@ -292,6 +292,26 @@ final class VaultTest extends WebTestCase
             self::assertArrayNotHasKey('sha256', $detail);
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
 
+            // Inline preview checks tenant, real bytes and privacy headers.
+            $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/preview');
+            self::assertResponseStatusCodeSame(404);
+            $client->request('GET', '/api/admin/vault/'.$mineAsset.'/preview');
+            self::assertResponseIsSuccessful();
+            self::assertSame('image/png', $client->getResponse()->headers->get('Content-Type'));
+            self::assertStringContainsString('inline', (string) $client->getResponse()->headers->get('Content-Disposition'));
+            self::assertStringNotContainsString('imagen-prueba.png', (string) $client->getResponse()->headers->get('Content-Disposition'));
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+            self::assertSame('nosniff', $client->getResponse()->headers->get('X-Content-Type-Options'));
+            self::assertSame('same-origin', $client->getResponse()->headers->get('Cross-Origin-Resource-Policy'));
+            self::assertSame('no-referrer', $client->getResponse()->headers->get('Referrer-Policy'));
+            self::assertSame($bytes, file_get_contents($client->getResponse()->getFile()->getPathname()));
+            $unavailable = (string) $db->fetchOne(
+                'SELECT id FROM gf_vault_assets WHERE organization_id = ? AND original_name = ?',
+                [$mine, 'pagina-0.png'],
+            );
+            $client->request('GET', '/api/admin/vault/'.$unavailable.'/preview');
+            self::assertResponseStatusCodeSame(404);
+
             $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/download');
             self::assertResponseStatusCodeSame(404);
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
