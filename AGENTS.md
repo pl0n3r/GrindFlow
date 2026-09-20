@@ -82,6 +82,15 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Si falta un checkout local, GitHub Actions ejecuta PHP/TypeScript/Chromium en el head; declarar expresamente que no hubo prueba local. Una rama escrita no se considera validada hasta pasar CI.
 - Si el conector GitHub tampoco puede escribir, informar el bloqueo técnico preciso sin prometer un deploy ni modificar datos productivos.
 
+### Optimización continua del CI sin debilitar compuertas
+
+- El selector `scripts/ci-scope.sh` adapta gates según rutas modificadas. Documentación Symfony no dispara el stack pesado por sí sola; una mezcla de docs y código conserva **unión** de gates. Cambios al core del CI y ejecución manual disparan matriz completa.
+- `GrindFlow CI / validate` sigue exigiendo éxito real en todos los gates seleccionados; saltarse un gate que correspondía, reinterpretar un fallo como verde o alterar cobertura por tendencias históricas está prohibido.
+- Las dependencias y el navegador pueden reutilizar caché con claves ligadas a lockfiles. Un cache miss instala el navegador de manera normal; no reutilizar bases, sesiones, resultados de test ni datos sintéticos entre ejecuciones.
+- Probar rutas y regresiones significativas con fixtures descartables. Nunca reintentar la suite completa porque falle un test acotado: preservar la primera causa, el exit code y los artifacts de diagnóstico sin secretos.
+- El workflow `GrindFlow CI Health` observa diariamente latencia y fallos por tipo de evento. Sus umbrales sirven para investigar cuellos de botella y actualizar scripts/gates mediante PR probado, **no** autoriza autoeditar ramas, reducir seguridad ni ejecutar migraciones productivas.
+- Antes de proponer más paralelismo, comprobar si tests comparten estado mutable. Medir p50/p90 y tasa de fallos, comparar el mismo tipo de evento; conservar reportes legibles y distinguir CI de deploy/Hostinger.
+
 ### Roadmap, progreso y release humana
 
 - El issue [#2](https://github.com/pl0n3r/GrindFlow/issues/2)
