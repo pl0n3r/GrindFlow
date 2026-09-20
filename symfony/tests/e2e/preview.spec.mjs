@@ -215,7 +215,7 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
     }),
   }));
   const stored = [];
-  await page.route('**/api/admin/vault', (route) => {
+  await page.route('**/api/admin/vault**', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ data: { assets: stored, limit: 30, page: 1,
