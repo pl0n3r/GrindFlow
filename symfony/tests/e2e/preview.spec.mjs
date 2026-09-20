@@ -958,3 +958,60 @@ test('S2 mobile combines MIME filters, backend ordering and search while keeping
     entry.sort === 'size_desc' && entry.page === '1')).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+
+test('S2 mobile checks retained private original without leaking a fingerprint or changing quota', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000051';
+  const results = ['verified', 'mismatch', 'missing'];
+  const requests = [];
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor test' },
+      organization: { id, name: 'Archivos propios', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const url = new URL(route.request().url());
+    const view = url.searchParams.get('view') ?? 'active';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: [{
+          id, name: 'foto.png', mime_type: 'image/png', size_bytes: 69,
+          created_at: '2026-09-20 00:00:00', deleted_at: view === 'trash' ? '2026-09-20 01:00:00' : null,
+          download_url: '/api/admin/vault/' + id + '/download',
+        }],
+        page: 1, pages: 1, limit: 30, total: 1,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: 69, max_bytes: 128 * 1024 * 1024 },
+      } }),
+    });
+  });
+  await page.route('**/api/admin/vault/' + id + '/integrity', (route) => {
+    requests.push({ method: route.request().method(), url: route.request().url() });
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, status: results.shift() } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-integrity-e2e=1', type: 'module' });
+  await expect(page.getByText('foto.png')).toBeVisible();
+  const button = page.getByRole('button', { name: 'Verificar integridad de foto.png' });
+  await button.click();
+  await expect(page.getByText('Original íntegro: tamaño y SHA-256 coinciden.')).toBeVisible();
+  await button.click();
+  await expect(page.getByRole('alert').getByText('Alerta: el tamaño o la huella SHA-256 no coinciden.')).toBeVisible();
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
+  await expect(page.getByText('Alerta: el tamaño o la huella SHA-256 no coinciden.')).toHaveCount(0);
+  await button.click();
+  await expect(page.getByRole('alert').getByText('El original privado no está disponible: archivo ausente.')).toBeVisible();
+  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  expect(requests).toHaveLength(3);
+  expect(requests.every((request) => request.method === 'GET' &&
+    request.url.endsWith('/api/admin/vault/' + id + '/integrity'))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
