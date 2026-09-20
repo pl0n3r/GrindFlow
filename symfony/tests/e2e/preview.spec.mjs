@@ -250,7 +250,7 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
   await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
   await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
   await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
-  await expect(page.getByText('foto-ejemplo.png')).toBeVisible();
+  await expect(page.getByText('foto-ejemplo.png', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Descargar' })).toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
   await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
     status: 200, contentType: 'application/json',
@@ -260,7 +260,7 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
     } } }),
   }));
   await page.getByRole('button', { name: 'Detalles' }).click();
-  await expect(page.getByText('Guardada')).toBeVisible();
+  await expect(page.locator('.vault-metadata').getByText('Guardada', { exact: true })).toBeVisible();
   await expect(page.getByText(png.length + ' bytes')).toBeVisible();
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
@@ -370,11 +370,160 @@ test('S2 móvil conserva éxitos parciales cuando la cuota rechaza otra imagen',
   await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
   await expect(page.getByText(/1 de 2 imágenes guardadas/)).toContainText('dos.png: La biblioteca alcanzó su cuota.');
   await expect(page.getByText('100 de 100 imágenes, incluida la papelera.')).toBeVisible();
-  await expect(page.getByText('uno.png')).toBeVisible();
+  await expect(page.getByText('uno.png', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   expect(uploads).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
+
+
+
+test('S2 mobile never retries ambiguous HTTP 201 or permanent 422 with malformed JSON', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOokDsBAAJwAV+M1KYSAAAAAElFTkSuQmCC', 'base64');
+  let attempts = 0;
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id: '00000000-0000-7000-8000-000000000048', name: 'Lote ambiguo', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'retry-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { assets: [], page: 1, pages: 0, total: 0,
+      quota: { used_assets: 0, max_assets: 100, used_bytes: 0,
+        max_bytes: 128 * 1024 * 1024 } } }),
+  }));
+  await page.route('**/api/admin/vault', (route) => {
+    attempts++;
+    return route.fulfill({ status: attempts === 1 ? 201 : 422,
+      contentType: 'text/plain', body: 'invalid json' });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-ambiguous-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+    { name: 'recibida.png', mimeType: 'image/png', buffer: png },
+    { name: 'rechazada.png', mimeType: 'image/png', buffer: png },
+  ]);
+  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
+  await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
+  expect(attempts).toBe(2);
+});
+
+test('S2 mobile does not offer retry for a duplicate or invalid format', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOokDsBAAJwAV+M1KYSAAAAAElFTkSuQmCC', 'base64');
+  let attempts = 0;
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id: '00000000-0000-7000-8000-000000000048', name: 'Lote con rechazos', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'retry-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { assets: [], page: 1, pages: 0, total: 0,
+      quota: { used_assets: 1, max_assets: 100, used_bytes: 69,
+        max_bytes: 128 * 1024 * 1024 } } }),
+  }));
+  await page.route('**/api/admin/vault', (route) => {
+    attempts++;
+    return route.fulfill({ status: 409, contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'vault_duplicate_active', message: 'Ya existe esta imagen.' } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-reject-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+    { name: 'guardada.png', mimeType: 'image/png', buffer: png },
+    { name: 'texto.txt', mimeType: 'text/plain', buffer: Buffer.from('no es imagen') },
+  ]);
+  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
+  await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
+  expect(attempts).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test('S2 mobile retries only failed files after a partial multi-upload', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const assetScript = await page.locator('script[type="module"]').getAttribute('src');
+  expect(assetScript).toBeTruthy();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOokDsBAAJwAV+M1KYSAAAAAElFTkSuQmCC', 'base64');
+  const stored = [];
+  const attempts = [];
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de prueba' },
+      organization: { id: '00000000-0000-7000-8000-000000000048', name: 'Lote móvil', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'retry-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      assets: stored, page: 1, pages: stored.length ? 1 : 0, total: stored.length,
+      quota: { used_assets: stored.length, max_assets: 100,
+        used_bytes: stored.length * png.length, max_bytes: 128 * 1024 * 1024 },
+    } }),
+  }));
+  await page.route('**/api/admin/vault', (route) => {
+    expect(route.request().headers()['x-csrf-token']).toBe('retry-test');
+    const payload = route.request().postDataBuffer().toString('latin1');
+    const name = ['uno.png', 'dos.png'].find((file) => payload.includes(file));
+    expect(name).toBeTruthy();
+    attempts.push(name);
+    if (name === 'dos.png' && attempts.length === 2) {
+      return route.fulfill({ status: 503, contentType: 'application/json',
+        body: JSON.stringify({ error: { message: 'Error temporal. Intenta de nuevo.' } }) });
+    }
+    const item = { id: '00000000-0000-7000-8000-0000000000' + (48 + stored.length),
+      name, mime_type: 'image/png', size_bytes: png.length,
+      created_at: '2026-09-20 00:00:00', download_url: '/api/admin/vault/ejemplo/download' };
+    stored.unshift(item);
+    return route.fulfill({ status: 201, contentType: 'application/json',
+      body: JSON.stringify({ data: { asset: item } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: assetScript + '?vault-retry-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+    { name: 'uno.png', mimeType: 'image/png', buffer: png },
+    { name: 'dos.png', mimeType: 'image/png', buffer: png },
+  ]);
+  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await expect(page.getByText(/1 de 2 imágenes guardadas/)).toContainText('dos.png: Error temporal.');
+  await expect(page.getByText('Procesadas 2 de 2 imágenes.')).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByText('1 archivo pendiente.')).toBeVisible();
+  await page.getByRole('button', { name: 'Reintentar 1 imagen' }).click();
+  await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
+  await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reintentar 1 imagen' })).toHaveCount(0);
+  expect(attempts).toEqual(['uno.png', 'dos.png', 'dos.png']);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
 
 test('S2 mobile trash requires confirmation, keeps quota and restores without exposing downloads', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
