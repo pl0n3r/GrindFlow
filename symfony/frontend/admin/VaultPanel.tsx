@@ -13,6 +13,7 @@ type Asset = {
 type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
 
 type Props = { canUpload: boolean; csrf: string | null; manageCsrf?: string | null };
+type UploadResult = { name: string; success: boolean; message: string };
 
 export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -34,6 +35,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; name: string } | null>(null);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [retryPending, setRetryPending] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [hasTrashDuplicate, setHasTrashDuplicate] = useState(false);
   const [detail, setDetail] = useState<Asset | null>(null);
@@ -193,9 +197,13 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setUploading(true);
     setFeedback('');
     setHasTrashDuplicate(false);
+    setUploadResults([]);
+    setUploadProgress({ done: 0, total: selected.length, name: selected[0].name });
     let completed = 0;
     let trashDuplicate = false;
     const failures: string[] = [];
+    const failedFiles: File[] = [];
+    const results: UploadResult[] = [];
 
     // One image per request, so a failure leaves earlier successes visible.
     for (const file of selected) {
@@ -220,17 +228,25 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         // Server is the source of truth for ordering and total after this batch.
         if (!body.data.asset) throw new Error('Respuesta incompleta del servidor.');
         completed += 1;
+        results.push({ name: file.name, success: true, message: 'Guardada.' });
       } catch (cause) {
-        failures.push(file.name + ': ' +
-          (cause instanceof Error ? cause.message : 'No se pudo guardar.'));
+        const message = cause instanceof Error ? cause.message : 'No se pudo guardar.';
+        failedFiles.push(file);
+        failures.push(file.name + ': ' + message);
+        results.push({ name: file.name, success: false, message });
       }
+      setUploadResults([...results]);
+      setUploadProgress({ done: results.length, total: selected.length, name: file.name });
     }
 
     if (completed > 0) {
       setPage(1);
       setRefresh((previous) => previous + 1);
     }
-    setSelected([]);
+    // Keep only failed File objects in memory for a deliberate retry. Already-saved
+    // images must never be resubmitted just because another file failed.
+    setSelected(failedFiles);
+    setRetryPending(failedFiles.length > 0);
     form.reset();
     setFeedback(completed + ' de ' + selected.length + ' imágenes guardadas.' +
       (failures.length ? ' ' + failures.join(' ') : ''));
@@ -268,12 +284,31 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir imágenes desde tu dispositivo</label>
       <input id="vault-files" type="file" multiple accept="image/jpeg,image/png,image/webp"
-        disabled={uploading || loading} onChange={(event) =>
-          setSelected(Array.from(event.currentTarget.files ?? []))} />
+        disabled={uploading || loading} onChange={(event) => {
+          setSelected(Array.from(event.currentTarget.files ?? []));
+          setRetryPending(false);
+          setUploadProgress(null);
+          setUploadResults([]);
+          setFeedback('');
+          setHasTrashDuplicate(false);
+        }} />
       <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual y no crea copias de imágenes idénticas.</small>
+      {retryPending && selected.length > 0 && <small role="status">{selected.length} archivos pendientes. Solo se reenviarán los que fallaron; seleccionar nuevos archivos reemplaza esta lista.</small>}
       <button type="submit" disabled={uploading || loading || selected.length === 0}>
-        {uploading ? 'Guardando imágenes…' : 'Guardar ' + (selected.length || '') + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')}
+        {uploading ? 'Guardando imágenes…' : retryPending
+          ? 'Reintentar ' + selected.length + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')
+          : 'Guardar ' + (selected.length || '') + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')}
       </button>
+      {uploadProgress && <div className="vault-upload-progress" role="status" aria-live="polite">
+        <span>Procesadas {uploadProgress.done} de {uploadProgress.total} imágenes.</span>
+        <progress aria-label="Progreso de la carga por archivo" max={uploadProgress.total} value={uploadProgress.done} />
+      </div>}
+      {uploadResults.length > 0 && <ul className="vault-upload-results" aria-label="Resultado por archivo">
+        {uploadResults.map((result, index) => <li key={index}>
+          <span aria-hidden="true">{result.success ? '✓' : '!'}</span>
+          <span>{result.name}: {result.message}</span>
+        </li>)}
+      </ul>}
     </form>}
     {view === 'active' && !canUpload && <p>Tu rol permite consultar los archivos, pero no añadir nuevos.</p>}
     {feedback && <p role="status" className="vault-feedback">{feedback}</p>}

@@ -86,3 +86,7 @@ Subir a `POST /api/admin/vault` sigue validando CSRF, MIME/imagen real, bytes, r
 ## S2 · Búsqueda privada por nombre (v0.1.47)
 
 La biblioteca Symfony incorpora `GET /api/admin/vault?view=active|trash&page=N&q=texto` y un buscador móvil de nombre de archivo en ambas vistas. El backend valida hasta 80 caracteres visibles, parametriza `LIKE` y escapa literalmente `%`, `_` y `!`; todos los recuentos, páginas y nombres siguen limitados al tenant de la sesión y al estado elegido. La cuota de bytes e imágenes permanece **global para el tenant**, también cuando la búsqueda devuelve cero resultados. La UI mantiene el filtro al alternar biblioteca/papelera y lo limpia explícitamente. Pruebas MariaDB y Chromium cubren términos que coinciden, que no coinciden, comodines como texto literal, actor ajeno y formato inválido. Sin migración, indexación pública ni despliegue Symfony a Hostinger.
+
+## S2 · carga múltiple con recuperación parcial (v0.1.48)
+
+El selector móvil procesa imágenes secuencialmente mediante el contrato actual de un archivo por petición. Informa progreso y estado por archivo, conserva solamente los `File` fallidos para reintento explícito y no vuelve a enviar éxitos. El backend valida cuota, tipo, CSRF y organización en cada intento. Cambiar la selección reemplaza los pendientes; el contenido no se publica externamente. La prueba Chromium cubre fallo transitorio, recuperación y ausencia de duplicados al reintentar.
