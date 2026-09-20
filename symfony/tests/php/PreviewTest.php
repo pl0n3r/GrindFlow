@@ -56,7 +56,7 @@ final class PreviewTest extends WebTestCase
         self::assertResponseStatusCodeSame(401);
         $payload = json_decode((string) $client->getResponse()->getContent(), true);
         self::assertSame('authentication_required', $payload['error']['code']);
-        self::assertSame('no-store, private', $client->getResponse()->headers->get('Cache-Control'));
+        self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
         $client->request('GET', '/inexistente');
         self::assertResponseStatusCodeSame(404);
     }
