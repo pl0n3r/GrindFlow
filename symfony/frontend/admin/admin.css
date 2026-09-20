@@ -16,3 +16,21 @@
   .admin-sidebar nav{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
   .admin-tenant{min-width:0}
 }
+
+/* S2 private library: mobile-first file picker and scoped listing. */
+.vault-section{scroll-margin-top:24px;min-width:0}
+.vault-upload{display:grid;gap:12px;margin:24px 0;min-width:0}
+.vault-upload label{font-size:13px;font-weight:750}
+.vault-upload input{width:100%;min-width:0;max-width:100%;padding:13px;border:1px dashed #8170a0;border-radius:10px;background:#11111c;color:#f8f8ff;font:inherit}
+.vault-upload small,.vault-count{font-size:12px;color:#aca5c0}
+.vault-upload button{justify-self:start;min-height:46px;padding:10px 18px;border:0;border-radius:9px;background:#b896ff;color:#171124;font:inherit;font-weight:780;cursor:pointer}
+.vault-upload button:disabled{opacity:.6;cursor:not-allowed}
+.vault-feedback{overflow-wrap:anywhere}
+.vault-list{padding:0;list-style:none;display:grid;gap:10px}
+.vault-list li{display:flex;gap:14px;align-items:center;min-width:0;padding:15px;border:1px solid #39384d;border-radius:11px;background:#11131e}
+.vault-image-mark{flex:0 0 36px;font-size:29px;color:#b896ff;text-align:center}
+.vault-details{display:grid;gap:6px;min-width:0;flex:1}
+.vault-details strong{font-size:13px;overflow-wrap:anywhere}
+.vault-details small{color:#aaa9bd;overflow-wrap:anywhere;font-size:11px}
+.vault-list a{font-size:12px;color:#a8ffd5;white-space:nowrap}
+@media(max-width:520px){.vault-list li{flex-wrap:wrap}.vault-list a{margin-left:50px}}
