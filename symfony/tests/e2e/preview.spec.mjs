@@ -59,3 +59,15 @@ test('Symfony login entrypoint has CSRF and accessible error states on mobile', 
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(360);
 });
+
+test('S1 API denies anonymous reads and writes without redirecting to login HTML', async ({ request }) => {
+  const context = await request.get('/api/admin/context', { maxRedirects: 0 });
+  expect(context.status()).toBe(401);
+  expect((await context.json()).error).toContain('iniciar sesión');
+  expect(context.headers()['cache-control']).toContain('no-store');
+  const write = await request.post('/api/admin/organization/name', {
+    data: { name: 'Denied' },
+    maxRedirects: 0
+  });
+  expect(write.status()).toBe(401);
+});
