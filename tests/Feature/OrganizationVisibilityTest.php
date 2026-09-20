@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Models\MediaAsset;
+use App\Models\MediaBlob;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -127,23 +130,23 @@ class OrganizationVisibilityTest extends TestCase
         Organization $organization,
         string $filename,
     ): void {
-        app(\App\Support\Tenancy\TenantContext::class)->runWithinOrganization(
+        app(TenantContext::class)->runWithinOrganization(
             $user,
             (string) $organization->getKey(),
             function () use ($filename): void {
-                $blob = \App\Models\MediaBlob::query()->create([
+                $blob = MediaBlob::query()->create([
                     'storage_disk' => 'local',
-                    'storage_key' => 'synthetic/'. $filename,
+                    'storage_key' => 'synthetic/'.$filename,
                     'sha256' => hash('sha256', $filename),
                     'byte_size' => 10,
                     'mime_type' => 'image/jpeg',
                 ]);
 
-                \App\Models\MediaAsset::query()->create([
+                MediaAsset::query()->create([
                     'media_blob_id' => $blob->getKey(),
                     'original_filename' => $filename,
                     'source_type' => 'manual_upload',
-                    'status' => \App\Models\MediaAsset::STATUS_READY,
+                    'status' => MediaAsset::STATUS_READY,
                 ]);
             },
         );

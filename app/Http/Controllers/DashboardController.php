@@ -56,7 +56,7 @@ class DashboardController extends Controller
         }
 
         try {
-            if (!Schema::hasTable($table)) {
+            if (! Schema::hasTable($table)) {
                 return null;
             }
 
