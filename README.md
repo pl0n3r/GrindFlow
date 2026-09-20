@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **52** | **+9297** | **−46** | **+9251** |
+| **53** | **+9300** | **−46** | **+9254** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -83,6 +83,7 @@ flowchart LR
 - `symfony/config/packages/doctrine_migrations.yaml`
 - `symfony/config/packages/framework.yaml`
 - `symfony/config/packages/security.yaml`
+- `symfony/config/packages/test/framework.yaml`
 - `symfony/config/packages/twig.yaml`
 - `symfony/config/routes.yaml`
 - `symfony/config/services.yaml`
