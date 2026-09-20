@@ -180,6 +180,18 @@ final class VaultTest extends WebTestCase
             $client->request('GET', '/api/admin/vault?page[]=1');
             self::assertResponseStatusCodeSame(422);
 
+            $client->request('GET', '/api/admin/vault/'.$foreignAsset);
+            self::assertResponseStatusCodeSame(404);
+            self::assertSame('file_not_found', json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+            $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertResponseIsSuccessful();
+            $detail = json_decode((string) $client->getResponse()->getContent(), true)['data']['asset'];
+            self::assertSame($mineAsset, $detail['id']);
+            self::assertSame('imagen-prueba.png', $detail['name']);
+            self::assertArrayNotHasKey('storage_key', $detail);
+            self::assertArrayNotHasKey('sha256', $detail);
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+
             $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/download');
             self::assertResponseStatusCodeSame(404);
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
@@ -202,6 +214,8 @@ final class VaultTest extends WebTestCase
             $db->delete('gf_identity_memberships', [
                 'user_id' => $user, 'organization_id' => $mine,
             ]);
+            $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertResponseStatusCodeSame(403);
             $client->request('GET', '/api/admin/vault');
             self::assertResponseStatusCodeSame(403);
         } finally {
