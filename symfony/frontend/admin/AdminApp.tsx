@@ -217,6 +217,7 @@ export function AdminApp() {
             <span className="admin-kicker">TU CUENTA</span>
             <h2 id="profile-settings-title">Perfil personal</h2>
             <p>Este nombre aparece en tu sesión y no modifica ninguna organización.</p>
+            <p className="admin-profile-current">Nombre actual: <strong>{context.user.display_name}</strong></p>
             <form onSubmit={renameProfile} className="admin-rename-form">
               <label htmlFor="profile-name">Nombre en tu perfil</label>
               <div className="admin-rename-controls">
