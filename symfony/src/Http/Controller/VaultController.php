@@ -56,6 +56,23 @@ final class VaultController extends AbstractController
             || preg_match('/[^\\p{Z}\\p{C}]/u', $search) !== 1)) {
             return $this->error(422, 'invalid_search', 'Indica una búsqueda de hasta 80 caracteres visibles.');
         }
+        $format = $request->query->all()['format'] ?? 'all';
+        $formats = ['all' => null, 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+        if (!is_string($format) || !array_key_exists($format, $formats)) {
+            return $this->error(422, 'invalid_format', 'Selecciona todos los formatos, JPEG, PNG o WebP.');
+        }
+        $sort = $request->query->all()['sort'] ?? 'recent';
+        $sortOrders = [
+            'recent' => $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC',
+            'oldest' => $view === 'trash' ? 'asset.deleted_at ASC' : 'asset.created_at ASC',
+            'name_asc' => 'asset.original_name ASC',
+            'name_desc' => 'asset.original_name DESC',
+            'size_asc' => 'asset.size_bytes ASC',
+            'size_desc' => 'asset.size_bytes DESC',
+        ];
+        if (!is_string($sort) || !array_key_exists($sort, $sortOrders)) {
+            return $this->error(422, 'invalid_sort', 'Selecciona un orden válido.');
+        }
         $params = ['organization' => $context['organization']['id'], 'user' => $context['user']->id()];
         $scope = <<<'SQL'
             FROM gf_vault_assets asset
@@ -70,19 +87,23 @@ final class VaultController extends AbstractController
             .$scope, $params,
         );
         $filter = $view === 'trash' ? ' AND asset.deleted_at IS NOT NULL' : ' AND asset.deleted_at IS NULL';
-        $searchParams = $params;
-        $searchFilter = '';
+        $listParams = $params;
+        $listFilter = '';
         if ($search !== '') {
             // Escape LIKE wildcards, including the escape character itself.
-            $searchFilter = " AND asset.original_name LIKE :name_search ESCAPE '!'";
-            $searchParams['name_search'] = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+            $listFilter .= " AND asset.original_name LIKE :name_search ESCAPE '!'";
+            $listParams['name_search'] = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
         }
-        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$searchFilter, $searchParams);
-        $order = $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC';
+        if ($formats[$format] !== null) {
+            $listFilter .= ' AND asset.mime_type = :mime_filter';
+            $listParams['mime_filter'] = $formats[$format];
+        }
+        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$listFilter, $listParams);
+        // Order-by is strictly selected from trusted SQL constants above; never interpolate client text.
         $assets = $db->fetchAllAssociative(
             'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at '
-            .$scope.$filter.$searchFilter.' ORDER BY '.$order.', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
-            $searchParams,
+            .$scope.$filter.$listFilter.' ORDER BY '.$sortOrders[$sort].', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
+            $listParams,
         );
 
         return $this->privateJson(['data' => [
@@ -90,6 +111,8 @@ final class VaultController extends AbstractController
             'limit' => 30,
             'page' => $page,
             'view' => $view,
+            'format' => $format,
+            'sort' => $sort,
             'total' => $total,
             'pages' => (int) ceil($total / 30),
             'quota' => [
