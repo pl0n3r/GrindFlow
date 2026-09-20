@@ -40,10 +40,14 @@ final class AdminController extends AbstractController
             throw new AccessDeniedHttpException('Tu acceso a esta organización ha cambiado.');
         }
 
-        return $this->render('identity/admin.html.twig', [
+        $response = $this->render('identity/admin.html.twig', [
             'app_version' => $version->human(),
             'organization' => $organization,
             'build' => $assets->preview(),
-        ])->setPrivate();
+        ]);
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'no-store, private');
+
+        return $response;
     }
 }
