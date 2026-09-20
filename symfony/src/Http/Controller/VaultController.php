@@ -56,11 +56,10 @@ final class VaultController extends AbstractController
             SQL;
         $usage = $db->fetchAssociative(
             'SELECT COUNT(*) AS count_assets, COALESCE(SUM(asset.size_bytes), 0) AS used_bytes '
-            .$scope.' AND asset.deleted_at IS NULL', $params,
+            .$scope, $params,
         );
         $filter = $view === 'trash' ? ' AND asset.deleted_at IS NOT NULL' : ' AND asset.deleted_at IS NULL';
-        $total = $view === 'active' ? (int) $usage['count_assets']
-            : (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter, $params);
+        $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter, $params);
         $order = $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC';
         $assets = $db->fetchAllAssociative(
             'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at '
@@ -76,6 +75,7 @@ final class VaultController extends AbstractController
             'total' => $total,
             'pages' => (int) ceil($total / 30),
             'quota' => [
+                // Retained originals in trash continue to occupy private storage.
                 'used_bytes' => (int) $usage['used_bytes'],
                 'max_bytes' => self::MAX_ORGANIZATION_BYTES,
                 'used_assets' => $total,
@@ -146,7 +146,7 @@ final class VaultController extends AbstractController
                     return 'revoked';
                 }
                 $usage = $db->fetchAssociative(
-                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
+                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization',
                     ['organization' => $context['organization']['id']],
                 );
                 if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
@@ -322,18 +322,11 @@ final class VaultController extends AbstractController
             if ($action === 'restore') {
                 $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
                 $path = $root.'/'.$asset['storage_key'].'.blob';
-                if (is_link($root) || !is_file($path) || is_link($path)) {
+                if (is_link($root) || !is_file($path) || is_link($path)
+                    || filesize($path) !== (int) $asset['size_bytes']) {
                     return 'missing_blob';
                 }
-                $usage = $db->fetchAssociative(
-                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes '
-                    .'FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
-                    ['organization' => $context['organization']['id']],
-                );
-                if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
-                    || (int) $usage['used_bytes'] + (int) $asset['size_bytes'] > self::MAX_ORGANIZATION_BYTES) {
-                    return 'quota';
-                }
+                // Quota covers retained blobs in both views; restoration adds no bytes.
             }
 
             $written = $db->executeStatement(
@@ -365,7 +358,6 @@ final class VaultController extends AbstractController
                 'id' => $id, 'state' => $action === 'trash' ? 'trash' : 'active',
             ]]),
             'not_found' => $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.'),
-            'quota' => $this->error(409, 'vault_quota_exceeded', 'No se puede restaurar: la biblioteca alcanzó su cuota.'),
             'missing_blob' => $this->error(409, 'file_unavailable', 'No se puede restaurar un archivo sin su original privado.'),
             'already_active', 'already_trashed' => $this->error(409, 'vault_state_changed', 'El estado del archivo ya cambió. Actualiza la biblioteca.'),
             default => $this->error(403, 'organization_access_changed', 'Tu permiso para gestionar el archivo cambió.'),
