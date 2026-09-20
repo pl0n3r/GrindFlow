@@ -59,7 +59,7 @@ class DashboardController extends Controller
      * organization-safe joins. Null means a partial schema, not an empty queue.
      *
      * @param  list<string>  $organizationIds
-     * @return Collection<int, object>|null
+     * @return Collection<int, \stdClass>|null
      */
     private function upcomingForVisibleOrganizations(array $organizationIds): ?Collection
     {
