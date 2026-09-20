@@ -34,7 +34,7 @@ final class VaultController extends AbstractController
         }
 
         // Bound the offset to avoid unbounded scans and reject ambiguous query values.
-        $rawPage = $request->query->get('page', '1');
+        $rawPage = $request->query->all()['page'] ?? '1';
         if (!is_string($rawPage) || !preg_match('/^[1-9][0-9]{0,3}$/D', $rawPage) || (int) $rawPage > 1000) {
             return $this->error(422, 'invalid_page', 'Selecciona una página válida (1 a 1000).');
         }
