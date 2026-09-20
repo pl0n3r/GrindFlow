@@ -90,7 +90,7 @@ flowchart LR
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar paginación Vault S2 v0.1.40 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Cuotas de almacenamiento y errores parciales | 🚧 Después de validar paginación |
+| **NOW** | 🚧 Validar detalle privado Vault S2 v0.1.40 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Cuotas de almacenamiento y errores parciales | 🚧 Después de validar detalle |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
