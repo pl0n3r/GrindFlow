@@ -1,4 +1,4 @@
-# GrindFlow — Último deploy
+# GrindFlow — Estado de entrega
 
 <p align="center">
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.51: solo el deploy actual, comprobación privada de integridad de originales Vault S2.** Base `main` v0.1.50 `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28`, CI exact-main success. Verifica tamaño y SHA-256 a petición del usuario, tanto en biblioteca como en papelera, sin borrar, mover, ni divulgar archivos privados. Symfony aún no desplegado en Hostinger.
+> **Candidato v0.1.51: cambio objetivo todavía no desplegado, comprobación privada de integridad de originales Vault S2.** Base `main` v0.1.50 `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28`, CI exact-main success. Verifica tamaño y SHA-256 a petición del usuario, tanto en biblioteca como en papelera, sin borrar, mover, ni divulgar archivos privados. Symfony aún no desplegado en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -15,14 +15,14 @@
 ## Fuentes de verdad
 [AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Transición](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-## Estado del deploy
+## Estado del cambio y del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.51** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.50~~ | `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28` |
-| CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
+| CI del PR | 🚧 Revalidación del head corregido pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
-| CodeRabbit | 🚧 Revisión por comprobar | PR |
+| CodeRabbit | 🚧 Hallazgos atendidos; revalidación pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
 | Deploy Observer | 🚧 Release humano por observar | No prueba Symfony en remoto |
 | Production Smoke | ⛔ Credencial E2E productiva pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
@@ -63,7 +63,7 @@ flowchart LR
 - React móvil añade «Verificar integridad» por imagen, feedback accesible y aviso si faltan originales o no coincide su huella.
 - PHPUnit/MariaDB prueba estado sano, tamaño alterado, corrupción de mismo tamaño, desaparición y actor ajeno/revocado; Chromium 360 px recorre ambos estados y cuota.
 
-## Archivos modificados en este deploy
+## Archivos modificados en este cambio
 - `README.md`
 - `config/version.php`
 - `symfony/README.md`
