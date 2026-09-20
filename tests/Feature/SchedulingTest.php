@@ -643,8 +643,10 @@ class SchedulingTest extends TestCase
                 ->post($route, [])
                 ->assertStatus(503);
         } finally {
-            $migration = require $migrationPath;
-            $migration->up();
+            Schema::withoutForeignKeyConstraints(function () use ($migrationPath): void {
+                $migration = require $migrationPath;
+                $migration->up();
+            });
         }
     }
 
