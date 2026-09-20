@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+323** | **−22** | **+301** |
+| **8** | **+332** | **−22** | **+310** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -61,7 +61,7 @@ flowchart LR
 - Nueva API `GET /api/admin/vault/{id}/integrity` confirma estado `verified|missing|mismatch|unavailable` tras validar sesión, pertenencia, bytes y huella SHA-256, incluso en papelera.
 - La respuesta no contiene clave, ruta, hash ni bytes; el chequeo es explícito y de solo lectura, sin política destructiva ni backup engañoso.
 - React móvil añade «Verificar integridad» por imagen, feedback accesible y aviso si faltan originales o no coincide su huella.
-- PHPUnit/MariaDB prueba estado sano, tamaño alterado, corrupción de mismo tamaño, desaparición y actor ajeno/revocado; Chromium 360 px recorre ambos estados y cuota.
+- PHPUnit/MariaDB prueba original sano, tamaño o hash alterado, desaparición, enlaces simbólicos y actor ajeno/revocado; Chromium 360 px comprueba cuatro estados, cambios de vista y cuota.
 
 ## Archivos modificados en este deploy
 
