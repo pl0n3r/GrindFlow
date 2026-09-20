@@ -18,7 +18,7 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Versión objetivo | 🚧 **v0.1.32** | `config/version.php` |
+| Version objetivo | 🚧 **v0.1.32** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.31~~ | `1514e8084a6c87f1d4fcfeb2df369d2f8c500ad2` |
 | CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
