@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace GrindFlow\Identity\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'gf_identity_users')]
 #[ORM\UniqueConstraint(name: 'uq_gf_identity_users_email', columns: ['email'])]
-class IdentityUser
+class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\Column(type: 'string', length: 36)]
@@ -35,4 +37,39 @@ class IdentityUser
 
     #[ORM\Column(name: 'updated_at', type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
+    public function getUserIdentifier(): string
+    {
+        return $this->email;
+    }
+
+    public function getPassword(): ?string
+    {
+        return $this->passwordHash;
+    }
+
+    public function getRoles(): array
+    {
+        // Platform account != membership-based organization permission.
+        return ['ROLE_USER'];
+    }
+
+    public function eraseCredentials(): void
+    {
+        // No plaintext credentials are persisted in this entity.
+    }
+
+    public function isActive(): bool
+    {
+        return $this->active;
+    }
+
+    public function id(): string
+    {
+        return $this->id;
+    }
+
+    public function displayName(): string
+    {
+        return $this->name;
+    }
 }

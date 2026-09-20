@@ -2,11 +2,30 @@ security:
   password_hashers:
     Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
   providers:
-    s0_no_accounts:
-      memory:
-        users: {}
+    grindflow_identity:
+      entity:
+        class: GrindFlow\Identity\Entity\IdentityUser
+        property: email
   firewalls:
     main:
       lazy: true
-      provider: s0_no_accounts
-# /admin remains explicitly 403 in S0. S1 supplies real users and authorization.
+      provider: grindflow_identity
+      user_checker: GrindFlow\Identity\Security\ActiveUserChecker
+      login_throttling:
+        max_attempts: 5
+        interval: '1 minute'
+      form_login:
+        login_path: grindflow_login
+        check_path: grindflow_login
+        username_parameter: email
+        password_parameter: password
+        enable_csrf: true
+        csrf_token_id: authenticate
+        default_target_path: grindflow_organizations
+      logout:
+        path: grindflow_logout
+        target: grindflow_home
+        enable_csrf: true
+        csrf_token_id: logout
+  access_control:
+    - { path: '^/(organizations|admin)', roles: ROLE_USER }
