@@ -22,6 +22,9 @@ export function VaultPanel({ canUpload, csrf }: Props) {
   const [selected, setSelected] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [detail, setDetail] = useState<Asset | null>(null);
+  const [detailError, setDetailError] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -36,6 +39,8 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     }).then((data) => {
       if (controller.signal.aborted) return;
       setAssets(data.assets);
+      setDetail(null);
+      setDetailError('');
       setTotal(data.total);
       setPages(data.pages);
       setError('');
@@ -48,6 +53,28 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     });
     return () => controller.abort();
   }, [page, refresh]);
+
+  async function inspect(id: string) {
+    if (detail?.id === id) {
+      setDetail(null);
+      return;
+    }
+    setDetail(null);
+    setDetailError('');
+    setDetailLoading(true);
+    try {
+      const response = await fetch('/api/admin/vault/' + id, {
+        credentials: 'same-origin', headers: { Accept: 'application/json' },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo consultar la imagen.');
+      setDetail(body.data.asset as Asset);
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar la imagen.');
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,6 +140,7 @@ export function VaultPanel({ canUpload, csrf }: Props) {
     </form>}
     {!canUpload && <p>Tu rol permite consultar los archivos, pero no añadir nuevos.</p>}
     {feedback && <p role="status" className="vault-feedback">{feedback}</p>}
+    {detailError && <p role="alert">{detailError}</p>}
     {loading && <p role="status">Cargando biblioteca…</p>}
     {error && <p role="alert">{error}</p>}
     {!loading && !error && assets.length === 0 &&
@@ -126,7 +154,15 @@ export function VaultPanel({ canUpload, csrf }: Props) {
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
           </span>
+          <button type="button" disabled={detailLoading} aria-expanded={detail?.id === asset.id}
+            onClick={() => void inspect(asset.id)}>Detalles</button>
           <a href={asset.download_url} download>Descargar</a>
+          {detail?.id === asset.id && <dl className="vault-metadata">
+            <dt>Nombre</dt><dd>{detail.name}</dd>
+            <dt>Tipo</dt><dd>{detail.mime_type}</dd>
+            <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
+            <dt>Guardada</dt><dd>{detail.created_at}</dd>
+          </dl>
         </li>)}
       </ul>
       {pages > 1 && <nav className="vault-pages" aria-label="Páginas de la biblioteca">
