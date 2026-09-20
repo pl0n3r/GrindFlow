@@ -27,3 +27,7 @@ Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React) y `/health` (estado 
 - `php -S` y `APP_SECRET` del ejemplo son solo para desarrollo; no usar en Hostinger productivo.
 
 Plan de transición y criterios completos: [STACK-TRANSITION-SYMFONY.md](../../docs/STACK-TRANSITION-SYMFONY.md); [Issue #12](https://github.com/pl0n3r/GrindFlow/issues/12).
+
+## S1 · Integridad reversible de membresías (v0.1.32)
+
+La migración adicional `Version20260920095500` instala en MariaDB **aislada** una garantía DB que impide reasignar el usuario o la organización de una membresía existente. Cambiar el rol sigue permitido; cambiar de usuario u organización requiere reemplazar la membresía. PHPUnit verifica ambas prohibiciones con dos usuarios y dos organizaciones sintéticos; CI revierte primero el trigger y después las tablas, luego reaplica ambas migraciones. `/admin` Symfony continúa 403, todavía no hay inicio de sesión. No aplicar estas migraciones a la MariaDB de Laravel/Hostinger.

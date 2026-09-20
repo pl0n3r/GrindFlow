@@ -37,6 +37,91 @@ final class IdentitySchemaTest extends KernelTestCase
         self::assertCount(3, $entityManager->getMetadataFactory()->getAllMetadata());
     }
 
+    public function testMembershipIdentityCannotChangeButRoleCan(): void
+    {
+        self::bootKernel();
+
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $actor = Uuid::v7()->toRfc4122();
+        $otherActor = Uuid::v7()->toRfc4122();
+        $organization = Uuid::v7()->toRfc4122();
+        $otherOrganization = Uuid::v7()->toRfc4122();
+        $membership = Uuid::v7()->toRfc4122();
+        $at = gmdate('Y-m-d H:i:s');
+
+        $db->beginTransaction();
+
+        try {
+            foreach ([$actor, $otherActor] as $id) {
+                $db->insert('gf_identity_users', [
+                    'id' => $id,
+                    'name' => 'Synthetic test',
+                    'email' => $id.'@example.test',
+                    'password_hash' => 'not-a-real-password',
+                    'platform_role' => 'model',
+                    'is_active' => 1,
+                    'created_at' => $at,
+                    'updated_at' => $at,
+                ]);
+            }
+
+            foreach ([$organization, $otherOrganization] as $id) {
+                $db->insert('gf_identity_organizations', [
+                    'id' => $id,
+                    'name' => 'Synthetic tenant',
+                    'slug' => 'fixture-'.$id,
+                    'type' => 'independent',
+                    'created_at' => $at,
+                    'updated_at' => $at,
+                ]);
+            }
+
+            $db->insert('gf_identity_memberships', [
+                'id' => $membership,
+                'user_id' => $actor,
+                'organization_id' => $organization,
+                'role' => 'model',
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+
+            foreach ([
+                ['user_id', $otherActor],
+                ['organization_id', $otherOrganization],
+            ] as [$column, $replacement]) {
+                try {
+                    $db->executeStatement(
+                        'UPDATE gf_identity_memberships SET '.$column.' = ? WHERE id = ?',
+                        [$replacement, $membership],
+                    );
+                    self::fail('Identity update was not rejected: '.$column);
+                } catch (\Doctrine\DBAL\Exception $exception) {
+                    self::assertStringContainsString(
+                        'membership identity is immutable',
+                        $exception->getMessage(),
+                    );
+                }
+            }
+
+            $db->executeStatement(
+                'UPDATE gf_identity_memberships SET role = ? WHERE id = ?',
+                ['editor', $membership],
+            );
+
+            self::assertSame([
+                'user_id' => $actor,
+                'organization_id' => $organization,
+                'role' => 'editor',
+            ], $db->fetchAssociative(
+                'SELECT user_id, organization_id, role FROM gf_identity_memberships WHERE id = ?',
+                [$membership],
+            ));
+        } finally {
+            $db->rollBack();
+        }
+    }
+
     public function testMembershipCannotReferenceForeignIdentityOrDuplicateAssignment(): void
     {
         self::bootKernel();

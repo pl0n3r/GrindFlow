@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Snapshot v0.1.31: solo el deploy actual.** Base `main` v0.1.30 `6507ea2631aea5b485b3238b1c1dc7f4ca8fff4b`. S1: identidad, organizaciones y membresías Doctrine sobre MariaDB **aislada**. No se migran datos Laravel ni se habilita un login falso. Symfony continúa sin deploy/cutover, Laravel atiende producción.
+> **Snapshot v0.1.32: solo el deploy actual.** Base `main` v0.1.31 `1514e8084a6c87f1d4fcfeb2df369d2f8c500ad2`. La identidad S1 Symfony ahora rechaza en DB cambios de usuario u organización de una membresía, conservando el cambio de rol. **Laravel sigue siendo el runtime público; Symfony S1 es aislado y no tiene login habilitado.** CI ≠ Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,30 +18,30 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.31** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.30~~ | `6507ea2631aea5b485b3238b1c1dc7f4ca8fff4b` |
-| CI del PR | 🚧 Pendiente head final | `GrindFlow CI / validate` |
+| Versión objetivo | 🚧 **v0.1.32** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.31~~ | `1514e8084a6c87f1d4fcfeb2df369d2f8c500ad2` |
+| CI del PR | 🚧 Head final pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
-| CodeRabbit | 🚧 Revisión por comprobar | PR |
+| CodeRabbit | 🚧 Pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | No inferir del PR |
-| Deploy Observer | 🚧 Release v0.1.31 por observar | v0.1.30 observado como release humana |
-| Production Smoke | ⛔ Sin credencial E2E de solo lectura | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Symfony S1 desplegado | ⛔ NO | Solo entorno aislado de código/CI |
-| Migraciones | 🚧 Solo MariaDB CI descartable | No producción |
+| Deploy Observer | ⛔ Release remoto v0.1.32 no observado | Hostinger independiente |
+| Production Smoke | ⛔ Credencial E2E de solo lectura ausente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Producción v0.1.32 | ⛔ Sin verificar | CI ≠ deploy |
+| Migraciones productivas | ✅ ~~Ninguna~~ | DB Symfony descartable solo CI |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+378** | **−37** | **+341** |
+| **6** | **+152** | **−38** | **+114** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | Entidades Doctrine, migración reversible, pruebas MariaDB y versión pública |
-| Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
+| Alcance | Trigger reversible en esquema de identidad Symfony, PHP test con dos tenants y CI de migración |
+| Revisiones | CI/Sonar/CodeRabbit y exact-main independientes |
 
 ## Flujo de entrega
 ```mermaid
@@ -58,45 +58,35 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- S1 de arquitectura objetivo: entidades para usuarios globales, organizaciones y membresías, más índices, unicidad y FKs.
-- Tablas `gf_identity_*` nuevas, nunca las `users/organizations/memberships` actuales de Laravel; no compartir escritor o migrar producción.
-- CI inicia y revierte Doctrine Migrations exclusivamente sobre MariaDB descartable y prueba aislamiento/duplicados; PHP de Symfony lee versión dinámica, no quedó fijo en 0.1.24.
-- Version humana consecutiva **0.1.30 → 0.1.31** en footer; sin prometer login/admin Symfony operativo hasta S1 siguiente slice.
+- Migración adicional aislada impide actualizar `user_id` o `organization_id` de una membresía ya asignada; las FK y unicidad existentes siguen vigentes.
+- Dos usuarios y dos organizaciones sintéticos validan ambos rechazos y que el rol sí puede cambiar. Rollback retira el trigger antes de las tablas y CI reaplica el esquema.
+- Versión única **0.1.31 → 0.1.32** desde `config/version.php`; no se copian cuentas ni datos reales, ni se despliega Symfony en Hostinger.
 
 ## Archivos modificados en este deploy
 - `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
 - `symfony/README.md`
-- `symfony/config/packages/doctrine.yaml`
-- `symfony/config/packages/doctrine_migrations.yaml`
-- `symfony/migrations/Version20260920093100.php`
-- `symfony/src/Identity/Entity/IdentityMembership.php`
-- `symfony/src/Identity/Entity/IdentityOrganization.php`
-- `symfony/src/Identity/Entity/IdentityUser.php`
-- `symfony/templates/base.html.twig`
+- `symfony/migrations/Version20260920095500.php`
 - `symfony/tests/php/IdentitySchemaTest.php`
-- `symfony/tests/php/PreviewTest.php`
-
-- `symfony/config/packages/test/doctrine.yaml`
 
 ## Validación
-- CI del PR y SHA exact-main, después observación de release Hostinger, después Smoke autenticado.
-- Nunca lanzar migración Doctrine contra la base Laravel actual o Hostinger.
+- CI de Symfony sobre MariaDB desechable, gate global y Sonar; CI exact-main y Hostinger son comprobaciones separadas.
+- Sin login/admin, sin credenciales reales, sin mutaciones productivas.
 
 ## Qué sigue
 | Lane | Trabajo |
 | --- | --- |
-| **NOW** | 🚧 Comprobar migración identidad y revertir en CI, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
-| **NEXT** | 🚧 S1 sesión/login seguro y selector explícito de tenant Symfony |
-| **LATER** | 🚧 S2 Vault móvil → reglas → distribución autorizada → piloto |
-| **BLOCKED / EXTERNAL** | ⛔ Cutover Symfony sin paridad; credencial Smoke |
+| **NOW** | 🚧 Validar inmutabilidad S1 v0.1.32, [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) |
+| **NEXT** | 🚧 Symfony Security con login/logout, CSRF, sesiones y selector tenant |
+| **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto |
+| **BLOCKED / EXTERNAL** | ⛔ Producción Symfony no desplegada; smoke autenticado sin credencial |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Home y dashboard Laravel v0.1.30~~ | ✅ ~~Observer release v0.1.30~~ |
-| **NOW** | 🚧 Esquema aislado S1 v0.1.31 | 🚧 Pruebas/revisión |
-| **NEXT** | 🚧 Login y organizaciones Symfony | 🚧 Sin cuentas productivas |
-| **LATER** | 🚧 Automatización completa | 🚧 S2–S5 |
-| **BLOCKED / EXTERNAL** | ⛔ No cutover Symfony | ⛔ Sin credencial Smoke |
+| **DONE** | ✅ ~~Home SaaS, dashboard Laravel~~ | ✅ ~~Tablas de identidad aisladas S1~~ |
+| **NOW** | 🚧 Inmutabilidad de membresía Symfony | 🚧 CI / observación remota |
+| **NEXT** | 🚧 Login Symfony y selector de organización | 🚧 S1 |
+| **LATER** | 🚧 Automatización | 🚧 S2–S5 |
+| **BLOCKED / EXTERNAL** | ⛔ Symfony no desplegado | ⛔ Smoke sin credencial |
