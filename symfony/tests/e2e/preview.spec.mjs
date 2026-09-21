@@ -1675,7 +1675,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Revisión humana pendiente')).toBeVisible();
   await page.getByRole('button', { name: 'Aprobar revisión' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Revisión humana aprobada');
-  await expect(page.getByText('Revisión humana aprobada')).toBeVisible();
+  await expect(page.getByText('Revisión humana aprobada', { exact: true })).toBeVisible();
   await expect(page.getByText('Requiere revisión de contenido')).toHaveCount(0);
   await expect(page.getByText('Distribución sin autorizar')).toBeVisible();
   await page.getByRole('button', { name: 'Autorizar distribución' }).click();
