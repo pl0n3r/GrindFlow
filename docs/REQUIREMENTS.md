@@ -71,6 +71,17 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit contra MariaDB Symfony descartable para anónimo, CSRF, campos extra/IDOR, contraseña errónea, reuso, confirmación, éxito, cierre de sesión y nuevo login; Chromium con respuestas sintéticas para errores y recorrido móvil. Sin tocar usuarios ni sesiones Laravel.
 
+### GF-FR-011 — Clasificación conservadora y filtro privado del Vault Symfony
+**Estado:** candidato v0.1.61; integración, CI y despliegue se verifican por separado.
+
+**Enunciado:** cada imagen conserva una clasificación interna obligatoria con valor inicial `unclassified`; un miembro autorizado puede elegir `internal_only` o `needs_review`. Ningún valor confirma derechos, conformidad o autorización de publicación.
+
+**Aceptación:**
+- Listado paginado de biblioteca y papelera filtra por estado exacto sin variar la cuota global. Se rechazan filtros y cuerpos ambiguos, y no se usa la clasificación como condición suficiente para distribuir.
+- Una edición exige sesión, organización seleccionada, permiso `content_prepare`, CSRF y reautorización SQL bajo bloqueo por organización; no edita recursos ajenos ni de papelera. Los roles de lectura ven la clasificación sin poder cambiarla.
+- Clasificación y nota permanecen en papelera y tras restaurar. El manifiesto Vault y el cotejo de recuperación detectan estados omitidos o alterados, sin exponer datos de otros tenants.
+- UI móvil de 360 px muestra filtro, estado y edición accesible con feedback; no cambia bytes, SHA-256, cuotas ni descarga. PHPUnit/MariaDB y Chromium con datos descartables.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation

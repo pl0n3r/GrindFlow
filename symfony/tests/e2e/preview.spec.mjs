@@ -937,6 +937,89 @@ test('S2 mobile edits a tenant-private note, handles CSRF, clears and reads it a
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
+test('S2 mobile classifies private originals with CSRF, scoped filter and viewer-only mode', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000061';
+  let usage = 'unclassified';
+  let role = 'editor';
+  let firstDenied = true;
+  let writes = 0;
+  const seen = [];
+  const asset = { id, name: 'interno.png', mime_type: 'image/png', size_bytes: 69,
+    created_at: '2026-09-21 00:00:00', download_url: '/api/admin/vault/' + id + '/download' };
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+      user: { display_name: 'Perfil ficticio' },
+      organization: { id, name: 'Prueba clasificación', role },
+      permissions: { workspace_view: true, organization_manage: false,
+        content_prepare: role === 'editor', content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const url = new URL(route.request().url());
+    const filter = url.searchParams.get('usage');
+    const view = url.searchParams.get('view');
+    seen.push([filter, view]);
+    const matches = (filter === 'all' || filter === usage) && view !== 'trash';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { assets: matches ? [{ ...asset, usage_scope: usage }] : [],
+        page: 1, pages: matches ? 1 : 0, total: matches ? 1 : 0,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: 69, max_bytes: 128 * 1024 * 1024 } } }),
+    });
+  });
+  await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { asset: { ...asset, usage_scope: usage } } }),
+  }));
+  await page.route('**/api/admin/vault/' + id + '/usage', (route) => {
+    writes += 1;
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('manage-test');
+    expect(route.request().postDataJSON()).toEqual({ usage_scope: 'internal_only' });
+    if (firstDenied) {
+      firstDenied = false;
+      return route.fulfill({ status: 403, contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'invalid_csrf', message: 'Token inválido.' } }) });
+    }
+    usage = 'internal_only';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, usage_scope: usage } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-classification-editor-e2e=1', type: 'module' });
+  await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
+  await expect(page.getByText('Clasificación: Sin clasificar')).toBeVisible();
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  await page.getByRole('combobox', { name: 'Clasificar imagen para uso interno' }).selectOption('internal_only');
+  await page.getByRole('button', { name: 'Guardar clasificación' }).click();
+  await expect(page.getByText('Token inválido.')).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar clasificación' }).click();
+  await expect(page.getByText('Clasificación interna actualizada. No autoriza distribución.')).toBeVisible();
+  await expect(page.getByText('Clasificación: Solo uso interno')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Clasificación interna' }).selectOption('internal_only');
+  await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Clasificación interna' }).selectOption('needs_review');
+  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
+  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  expect(writes).toBe(2);
+  expect(seen).toContainEqual(['internal_only', 'active']);
+  expect(seen).toContainEqual(['needs_review', 'trash']);
+  role = 'model';
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-classification-viewer-e2e=1', type: 'module' });
+  await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  await expect(page.getByRole('combobox', { name: 'Clasificar imagen para uso interno' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Guardar clasificación' })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
 test('S2 mobile renames a private image without changing its download identity', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/preview');
