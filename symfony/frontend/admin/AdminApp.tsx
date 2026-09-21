@@ -342,10 +342,10 @@ export function AdminApp() {
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
               ? <>
-                  <strong>Alcance S4 · agenda interna</strong>
+                  <strong>Alcance S4 · agenda y cola manual</strong>
                   <p>
-                    La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony.
-                    La agenda permite borradores cancelables y handoff manual auditado, sin llamadas a proveedores.
+                    Symfony ya permite borradores, destinos internos y una cola humana auditable.
+                    Ninguno de estos estados llama proveedores ni equivale a una publicación externa.
                   </p>
                 </>
               : <>
