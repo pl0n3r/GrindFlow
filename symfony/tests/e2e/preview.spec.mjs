@@ -1963,3 +1963,39 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   expect(overflow.scrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewportWidth);
 });
 
+
+test('preview and private workspace share responsive navigation without horizontal page overflow', async ({ page }) => {
+  for (const width of [820, 360]) {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto('/preview');
+    const previewNav = page.getByRole('navigation', { name: 'Explorador de secciones' });
+    await expect(previewNav.getByRole('button', { name: /Programación/ })).toBeVisible();
+    await previewNav.getByRole('button', { name: /Programación/ }).click();
+    await expect(previewNav.getByRole('button', { name: /Programación/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('heading', { name: 'Programación' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+
+    const asset = await page.locator('script[type="module"]').getAttribute('src');
+    expect(asset).toBeTruthy();
+    await page.route('**/api/admin/context', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        user: { display_name: 'Persona de prueba' },
+        organization: { id: '00000000-0000-7000-8000-000000000001', name: 'Estudio seguro', role: 'editor' },
+        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      } }),
+    }));
+    await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+    await page.addScriptTag({ url: asset + '?shared-navigation-e2e=' + width, type: 'module' });
+    const adminNav = page.getByRole('navigation', { name: 'Navegación administrativa' });
+    await expect(adminNav.getByRole('link', { name: /Biblioteca/ })).toHaveAttribute('href', '#biblioteca');
+    await expect(adminNav.getByRole('link', { name: /Programación/ })).toHaveAttribute('href', '#programacion');
+    await expect(adminNav.getByRole('link', { name: /Resumen/ })).toHaveAttribute('aria-current', 'page');
+    await adminNav.getByRole('link', { name: /Biblioteca/ }).click();
+    await expect(adminNav.getByRole('link', { name: /Biblioteca/ })).toHaveAttribute('aria-current', 'location');
+    await expect(adminNav.getByRole('link', { name: /Resumen/ })).not.toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#contenido')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.unroute('**/api/admin/context');
+  }
+});

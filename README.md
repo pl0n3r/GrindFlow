@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.75: resiliencia de CI.** Base exacta `main` v0.1.74 `351cdeba9f9f23914b5c271453afa765dd3467ff`; la entrega añade reintentos seguros para dependencias externas sin ocultar fallos de producto.
+> **Candidato v0.1.76: navegación coherente en Symfony.** Base exacta `main` v0.1.75 `6edf72165b45785f9b0acb023347ce157266aab4`. Interfaz aislada; NO implica deploy ni cutover en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.75** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.73~~ | `97dd3018e1c6b478217353455de6e203c6337c51` |
-| CI del PR | 🚧 Head v0.1.75 por validar | `GrindFlow CI / validate` |
-| Sonar | 🚧 Pendiente | SonarCloud PR |
-| CodeRabbit | 🚧 Pendiente | PR |
-| CI del SHA exacto de main | ✅ ~~v0.1.73 success~~ | run `35643400862` |
-| Deploy Observer | ✅ ~~v0.1.73 observado~~ | run `35643400887`; versión humana, no prueba Symfony ni SHA remoto |
-| Production Smoke | ⛔ Credencial E2E productiva pendiente | run `35643400895`; [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Symfony S3 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | 🚧 Catálogo de destinos + FK de handoff + invariantes SQL en MariaDB descartable | Producción intacta |
+| Version objetivo | 🚧 **v0.1.76** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.75~~ | `6edf72165b45785f9b0acb023347ce157266aab4` |
+| CI del PR | 🚧 Head v0.1.76 por validar | `GrindFlow CI / validate` |
+| Sonar | 🚧 Pendiente del head estable | SonarCloud PR |
+| CodeRabbit | 🚧 Pendiente del head estable | PR |
+| CI del SHA exacto de main | ✅ ~~v0.1.75 success~~ | run `35662263071` |
+| Deploy Observer | ✅ ~~v0.1.75 release observado~~ | run `35662263082`; versión humana, NO SHA Hostinger |
+| Production Smoke | ⛔ Credencial E2E productiva pendiente | run `35662263001`; [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| Symfony en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
+| Migraciones | 🚧 Ninguna migración nueva en este candidato | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+120** | **−35** | **+85** |
+| **9** | **+213** | **−62** | **+151** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | S4: destinos internos explícitos + cola humana tenant-safe; sin proveedor real |
+| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Alcance | GF-UX-001: componente único de navegación React + escritorio/tablet/móvil + foco y skip link |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,40 +58,43 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Catálogo tenant-owned de destinos manuales, con alta, desactivación/reactivación, nombre inmutable y DELETE bloqueado en MariaDB.
-- Cada `prepare` posterior a la migración exige un destino activo del mismo tenant; `complete`/`fail` heredan ese destino y cambiarlo requiere fallo + nuevo intento.
-- Compatibilidad expand-before-migrate: mientras la tabla nueva aún no exista, el endpoint conserva temporalmente el contrato v0.1.73; un `prepare` legado sin destino puede ganar destino después sin borrar su evento original.
-- Cola interna GET deriva hasta 30 handoffs `prepared/failed`, ordena vencidos primero y expone total tenant-scoped. React móvil administra destinos, exige selección por borrador y muestra trabajo pendiente.
-- Todos los contratos permanecen sin proveedor: `provider_calls=false`; no hay delivery, exportación de media ni publicación automática.
+- Componente `WorkspaceNavigation` compartido por preview conceptual y admin real: marca, etiqueta de espacio, números, secciones, estados activos y pie contextual.
+- Menús sincronizados a breakpoint de 900 px, con barra horizontal desplazable dentro del menú a 820/360 px y rail más compacto a 901–1120 px, sin agrandar el documento.
+- Admin: accesos «Biblioteca» y «Programación» conservan anclas reales, «Resumen» y las secciones siguen el hash activo, y «Saltar al contenido» llega al `main` correcto.
+- Acciones de sesión fuera de posicionamiento absoluto sobre la cabecera. Estados accesibles en preview mediante `aria-pressed`, en admin mediante `aria-current` (`page`/`location`); pruebas Chromium a 820 y 360 px.
+- No hay publicación externa ni cambios productivos. Los módulos S4 y la biblioteca no alteran sus contratos.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual de mejora continua; no prueba despliegue Symfony en Hostinger.
-- `.github/workflows/grindflow-ci.yml`
-- `AGENTS.md`
+Inventario de solo el deploy actual candidato; no prueba despliegue Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
-- `scripts/ci_retry.py`
-- `tests/test_ci_retry.py`
+- `docs/REQUIREMENTS.md`
+- `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/frontend/admin/PreviewApp.tsx`
+- `symfony/frontend/admin/WorkspaceNavigation.tsx`
+- `symfony/frontend/admin/main.tsx`
+- `symfony/frontend/admin/workspace-navigation.css`
+- `symfony/tests/e2e/preview.spec.mjs`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.75 por verificar; la base v0.1.74 tiene CI exact-main success.
-- El gate Symfony debe probar migración reversible, PHPUnit/MariaDB, TypeScript/Vite y Chromium móvil. Producción permanece intacta.
+- CI/Sonar/CodeRabbit del candidato v0.1.76 aún sin confirmar.
+- `symfony-preview` debe ejecutar PHPUnit/MariaDB, TypeScript/Vite y Chromium real a 360/820 px. No se ha probado el proyecto localmente en esta entrega.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar resiliencia CI v0.1.75 | 🚧 CI y revisión |
-| **NEXT** | 🚧 S4 salida manual con evidencia interna más rica / preparación operativa | 🚧 Sin proveedor real |
-| **LATER** | 🚧 Distribución autorizada + Traffic Symfony | 🚧 S4–S5 |
+| **NOW** | 🚧 Validar navegación consistente v0.1.76 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Seguir S4 con evidencia interna y preparación operativa | 🚧 Sin proveedor real |
+| **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
-| **NOW** | 🚧 Reintentos seguros de CI v0.1.75 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Preparación operativa S4 | 🚧 Sin proveedor real |
+| **DONE** | ✅ ~~S4 cola y destinos manuales v0.1.74~~ | ✅ ~~CI exact-main v0.1.75~~ |
+| **NOW** | 🚧 Navegación unificada v0.1.76 | 🚧 Pruebas y revisión |
+| **NEXT** | 🚧 S4 preparación operativa | 🚧 Sin proveedor real |
 | **LATER** | 🚧 Distribución + Traffic Symfony | 🚧 S4–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

@@ -15,3 +15,5 @@ const adminRoot = document.getElementById('grindflow-admin');
 if (adminRoot) {
   createRoot(adminRoot).render(<StrictMode><AdminApp /></StrictMode>);
 }
+
+import './workspace-navigation.css';
