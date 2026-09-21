@@ -74,7 +74,7 @@ final class WeeklyRulePreviewTest extends WebTestCase
                 'created_at' => $at, 'deleted_at' => $at,
             ]);
             $db->insert('gf_vault_assets', [
-                'id' => $foreignAsset, 'organization_id' => $foreign, 'uploaded_by' => null,
+                'id' => $foreignAsset, 'organization_id' => $foreign, 'uploaded_by' => $user,
                 'original_name' => 'ajena.png', 'mime_type' => 'image/png',
                 'size_bytes' => 69, 'sha256' => hash('sha256', $foreignAsset),
                 'storage_key' => $foreignAsset, 'usage_scope' => 'unclassified',
