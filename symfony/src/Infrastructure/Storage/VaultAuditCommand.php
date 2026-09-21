@@ -83,7 +83,11 @@ final class VaultAuditCommand extends Command
                     'deleted_by' => $asset['deleted_by'] === null ? null : (string) $asset['deleted_by'],
                 ];
                 hash_update($manifest, json_encode($canonical, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)."\n");
-                $asset['deleted_at'] === null ? ++$active : ++$trash;
+                if ($asset['deleted_at'] === null) {
+                    ++$active;
+                } else {
+                    ++$trash;
+                }
                 ++$counts[$this->verifier->status($asset)];
             }
             $digest = hash_final($manifest);
