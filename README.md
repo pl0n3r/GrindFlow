@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+146** | **−48** | **+98** |
+| **11** | **+149** | **−49** | **+100** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -67,7 +67,7 @@ flowchart LR
 - La configuración del secreto E2E cerró #1, pero el smoke de producción v0.1.76 falló con HTTP 302 en Dashboard; diagnóstico registrado en #73. Sin publicación externa, deploy de Symfony ni migraciones productivas.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual candidato; no prueba despliegue Symfony en Hostinger.
+Inventario del candidato v0.1.77; no prueba despliegue Symfony en Hostinger.
 - `AGENTS.md`
 - `README.md`
 - `config/version.php`
