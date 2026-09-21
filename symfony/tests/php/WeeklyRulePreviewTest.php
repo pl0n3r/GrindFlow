@@ -131,6 +131,14 @@ final class WeeklyRulePreviewTest extends WebTestCase
             self::assertContains('internal_only', $byScope['internal_only']['blocking_reasons']);
             self::assertContains('content_review_required', $byScope['needs_review']['blocking_reasons']);
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+
+            $db->delete('gf_identity_memberships', ['user_id' => $user, 'organization_id' => $mine]);
+            $client->request('GET', '/api/admin/rules/weekly/preview');
+            self::assertResponseStatusCodeSame(403);
+            self::assertSame('organization_access_changed',
+                json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+            $client->request('GET', '/api/admin/rules/weekly/preview');
+            self::assertResponseStatusCodeSame(409);
         } finally {
             $db->delete('gf_content_rules', ['organization_id' => $mine]);
             $db->delete('gf_vault_assets', ['organization_id' => $mine]);
