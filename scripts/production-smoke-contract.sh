@@ -118,7 +118,7 @@ run_case() {
     current_vault_failure|current_vault_link_missing)
       grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; ! grep -Fq 'Production smoke attempt 2/' "$log";;
     auth_post_login|auth_dashboard_login|auth_dashboard_other|auth_dashboard_secret|auth_post_419)
-      grep -Fq 'ERROR: authentication redirect is deterministic; do not retry credentials.' "$log"
+      grep -Fq 'ERROR: authentication failure is deterministic; do not retry credentials.' "$log"
       ! grep -Fq 'private-query-do-not-print' "$log"
       ! grep -Fq 'Production smoke attempt 2/' "$log"
       [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
