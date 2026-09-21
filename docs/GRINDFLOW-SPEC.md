@@ -120,6 +120,21 @@ La selección nunca comprende automáticamente páginas no visibles, requiere
 confirmación y se limpia al cambiar página/vista/filtros o tras guardar.
 Ningún estado de clasificación constituye permiso para distribución.
 
+### S3 · Revisión humana y readiness interno
+
+La clasificación S2 sigue siendo descriptiva y no autoriza nada. Cuando un original está
+en `needs_review`, una persona con permiso de preparación editorial puede registrar una
+decisión humana `approve/revoke` en un ledger append-only, separado de la autorización
+de distribución. El preview S3 solo marca el original como **listo para programar
+internamente** cuando existe una regla semanal, la revisión humana vigente está aprobada
+y la autorización de distribución vigente está concedida, sin otros bloqueos.
+
+Este readiness no crea una publicación, un schedule persistido, un job ni una llamada a
+proveedor. `can_publish=false` continúa siendo el contrato global hasta que S4 implemente
+programación y una entrega permitida con sus propias compuertas. La aprobación de revisión
+tampoco prueba titularidad, mayoría de edad, consentimiento, licencia o aceptación de una
+plataforma.
+
 ## 4. Non-negotiable invariants
 
 1. Tenant data must not cross organization boundaries.
