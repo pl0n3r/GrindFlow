@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\User;
 use App\Support\Diagnostics\DiagnosticLog;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ class DiagnosticsController extends Controller
 
         return view('admin.diagnostics', [
             'entries' => $diagnostics->recent(50),
+            'workspaceOrganization' => Organization::query()->orderBy('name')->first(),
         ]);
     }
 
