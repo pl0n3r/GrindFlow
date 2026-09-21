@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
- > **Candidato v0.1.66: preview semanal S3 con bloqueos explícitos.** El runtime desplegado sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.65 `ef4ed47636c040243ba008310308be18f658682f`. El preview es read-only, tenant-safe y no publica ni llama plataformas externas.
+> **Candidato v0.1.66: preview semanal S3 con bloqueos explícitos.** El runtime desplegado sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.65 `ef4ed47636c040243ba008310308be18f658682f`. El preview es read-only, tenant-safe y no publica ni llama plataformas externas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+264** | **−37** | **+227** |
+| **3** | **+80** | **−17** | **+63** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
