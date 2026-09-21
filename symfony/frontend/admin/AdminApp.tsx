@@ -336,7 +336,7 @@ export function AdminApp() {
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
               ? <>
-                  <strong>Alcance S3 en revisión</strong>
+                  <strong>Alcance S4 · agenda interna</strong>
                   <p>
                     La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony.
                     La agenda permite borradores cancelables, sin envíos ni publicaciones externas.
