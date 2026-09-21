@@ -1,3 +1,4 @@
+import { ScheduleDraftPanel } from './ScheduleDraftPanel';
 import { useEffect, useState, type FormEvent } from 'react';
 
 type WeeklyRule = {
@@ -47,6 +48,7 @@ type Props = {
   csrf: string | null;
   canReview: boolean;
   reviewCsrf: string | null;
+  scheduleCsrf: string | null;
   canAuthorize: boolean;
   authorizationCsrf: string | null;
 };
@@ -77,7 +79,9 @@ function browserTimezone(): string {
   }
 }
 
-export function WeeklyPlannerPanel({ canEdit, csrf, canReview, reviewCsrf, canAuthorize, authorizationCsrf }: Props) {
+export function WeeklyPlannerPanel({
+  canEdit, csrf, canReview, reviewCsrf, scheduleCsrf, canAuthorize, authorizationCsrf,
+}: Props) {
   const [rule, setRule] = useState<WeeklyRule | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [timezone, setTimezone] = useState(browserTimezone());
@@ -381,6 +385,10 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canReview, reviewCsrf, canAu
               </li>
             )}
           </ul>}
+
+        {!loading && preview &&
+          <ScheduleDraftPanel slots={preview.slots ?? []} assets={preview.assets}
+            canEdit={canEdit} csrf={scheduleCsrf} />}
 
         <p className="weekly-safety">
           <strong>Publicación bloqueada.</strong> “Listo para programar” solo confirma los contratos internos S3:
