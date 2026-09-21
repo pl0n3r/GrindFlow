@@ -421,12 +421,13 @@ productivas, proveedores externos ni escrituras en producción.
 - The endpoint returns at most 30 recent active assets plus the complete active
   count. Trash and foreign-tenant assets are excluded.
 - Each visible asset carries stable blocking reasons. Missing rule,
-  unclassified/internal-only/needs-review state and missing distribution
-  authorization are surfaced explicitly rather than guessed.
-- S2 classification never grants publishing permission. Until a separate
-  distribution-authorization contract exists, every preview item remains
-  `eligible=false`, the response remains `can_publish=false`, and mode is
-  `review_only`.
+  unclassified/internal-only classification, pending human review and missing
+  distribution authorization are surfaced explicitly rather than guessed.
+- S2 classification never grants publishing permission. The preview marks
+  `eligible=true` solely for internal scheduling readiness when the saved rule,
+  current human-review approval and current distribution authorization all
+  exist without remaining blockers. `can_publish=false` and mode `review_only`
+  remain mandatory regardless of an item's internal eligibility.
 - This preview is read-only: it creates no schedule, performs no provider call
   and changes no production data.
 - The authenticated React workspace exposes this rule and preview as a mobile-first
@@ -448,7 +449,8 @@ productivas, proveedores externos ni escrituras en producción.
   It does not reserve assets, consume capacity or authorize publication.
 - A same-day occurrence that already passed is rolled to that weekday's next
   future occurrence rather than fabricating a past schedule.
-- Missing rules yield no slots. The response continues to fail closed with
-  `can_publish=false` and `review_only` until the independent distribution
-  authorization contract exists.
+- Missing rules yield no slots. Internal readiness is independent of a
+  publishing capability: the response continues to fail closed with
+  `can_publish=false` and `review_only` even after distribution authorization
+  and human review are granted.
 
