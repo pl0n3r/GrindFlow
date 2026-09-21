@@ -414,4 +414,10 @@ productivas, proveedores externos ni escrituras en producción.
   `review_only`.
 - This preview is read-only: it creates no schedule, performs no provider call
   and changes no production data.
+- The authenticated React workspace exposes this rule and preview as a mobile-first
+  S3 panel. Editors with `content_prepare` may save timezone, weekdays, local
+  time and daily maximum through the existing CSRF-protected rule endpoint;
+  read-only members see the plan without a mutation control. The UI repeats
+  the review-only boundary and renders backend blocking reasons rather than
+  recomputing eligibility in the browser.
 
