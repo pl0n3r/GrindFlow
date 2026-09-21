@@ -22,8 +22,6 @@ use Symfony\Component\Uid\Uuid;
  */
 final class ScheduleDraftController extends AbstractController
 {
-    private const MUTATING_ROLES = ['admin', 'studio', 'editor'];
-
     /** Read a bounded tenant-scoped agenda, including cancelled draft history. */
     #[Route('/api/admin/schedules', name: 'grindflow_schedule_drafts_list', methods: ['GET'])]
     public function list(Request $request, MembershipContext $memberships, Connection $db): JsonResponse
