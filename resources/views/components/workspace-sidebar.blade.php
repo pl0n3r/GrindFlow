@@ -4,8 +4,6 @@
 ])
 
 @php
-    use Illuminate\Support\Facades\Route;
-
     $user = auth()->user();
     $organizationId = $organization?->getKey();
     $hasOrganization = is_string($organizationId) && $organizationId !== '';
@@ -15,13 +13,13 @@
         [
             'key' => 'summary',
             'label' => 'Resumen',
-            'href' => Route::has('dashboard') ? route('dashboard') : null,
+            'href' => \Illuminate\Support\Facades\Route::has('dashboard') ? route('dashboard') : null,
             'disabled_reason' => 'Resumen no disponible.',
         ],
         [
             'key' => 'vault',
             'label' => 'Biblioteca',
-            'href' => $hasOrganization && Route::has('organizations.vault.index')
+            'href' => $hasOrganization && \Illuminate\Support\Facades\Route::has('organizations.vault.index')
                 ? route('organizations.vault.index', $organizationParams)
                 : null,
             'disabled_reason' => $hasOrganization ? 'Biblioteca no disponible.' : 'Selecciona una organización.',
@@ -29,7 +27,7 @@
         [
             'key' => 'scheduler',
             'label' => 'Programación',
-            'href' => $hasOrganization && Route::has('organizations.scheduler.index')
+            'href' => $hasOrganization && \Illuminate\Support\Facades\Route::has('organizations.scheduler.index')
                 ? route('organizations.scheduler.index', $organizationParams)
                 : null,
             'disabled_reason' => $hasOrganization ? 'Programación no disponible.' : 'Selecciona una organización.',
@@ -37,7 +35,7 @@
         [
             'key' => 'distribution',
             'label' => 'Distribución',
-            'href' => $hasOrganization && Route::has('organizations.distribution.index')
+            'href' => $hasOrganization && \Illuminate\Support\Facades\Route::has('organizations.distribution.index')
                 ? route('organizations.distribution.index', $organizationParams)
                 : null,
             'disabled_reason' => $hasOrganization ? 'Distribución no disponible.' : 'Selecciona una organización.',
@@ -53,7 +51,7 @@
         [
             'key' => 'traffic',
             'label' => 'Tráfico',
-            'href' => $canTraffic && Route::has('organizations.traffic.index')
+            'href' => $canTraffic && \Illuminate\Support\Facades\Route::has('organizations.traffic.index')
                 ? route('organizations.traffic.index', $organizationParams)
                 : null,
             'disabled_reason' => ! $hasOrganization
@@ -63,7 +61,7 @@
         [
             'key' => 'finance',
             'label' => 'Finanzas',
-            'href' => $canFinance && Route::has('organizations.finance.index')
+            'href' => $canFinance && \Illuminate\Support\Facades\Route::has('organizations.finance.index')
                 ? route('organizations.finance.index', $organizationParams)
                 : null,
             'disabled_reason' => ! $hasOrganization
@@ -76,13 +74,13 @@
         [
             'key' => 'system',
             'label' => 'Sistema',
-            'href' => Route::has('admin.system') ? route('admin.system') : null,
+            'href' => \Illuminate\Support\Facades\Route::has('admin.system') ? route('admin.system') : null,
             'disabled_reason' => 'Sistema no disponible.',
         ],
         [
             'key' => 'diagnostics',
             'label' => 'Diagnósticos',
-            'href' => Route::has('admin.diagnostics') ? route('admin.diagnostics') : null,
+            'href' => \Illuminate\Support\Facades\Route::has('admin.diagnostics') ? route('admin.diagnostics') : null,
             'disabled_reason' => 'Diagnósticos no disponibles.',
         ],
     ] : [];
