@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.61: cambio de contraseña personal en Symfony aislado, no desplegado.** El alcance «solo el deploy actual» corresponde al runtime Laravel observado. Base `main` v0.1.60 `04af1f3ad52630e9345db0934a0f59ec29b02f5c`, CI exact-main success; sin migraciones ni cambios productivos.
+> **Candidato v0.1.62: clasificar y filtrar originales privados del Vault, sin autorización de publicación.** El alcance «solo el deploy actual» es el runtime Laravel observado; Symfony NO desplegado en Hostinger. Base exacta `main` v0.1.60 `8004c397d5e379366e9cc83a9dcb019910842f0e` y CI exact-main success (run 35571177256). El cambio de contraseña de v0.1.61 se conserva; no se ejecutaron migraciones ni operaciones sobre datos productivos.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,13 +18,13 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.61** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.60~~ | `04af1f3ad52630e9345db0934a0f59ec29b02f5c` |
-| CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.62** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.61~~ | `8004c397d5e379366e9cc83a9dcb019910842f0e` |
+| CI del PR | 🚧 Nuevo head por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
-| CodeRabbit | 🚧 Revisión pendiente | PR |
+| CodeRabbit | 🚧 Pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
-| Deploy Observer | 🚧 Release humano por observar | No prueba Symfony en remoto |
+| Deploy Observer | 🚧 Release humano por observar | No prueba Symfony remoto |
 | Production Smoke | ⛔ Credencial E2E productiva pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
 | Symfony S2 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
 | Migraciones | ✅ ~~Ningún esquema productivo modificado~~ | DB Symfony descartable |
@@ -33,15 +33,15 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+442** | **−31** | **+411** |
+| **18** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Identidad: rotación de contraseña propia, CSRF, cierre de sesión y React móvil |
-| Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
+| Alcance | S2: clasificación conservadora, filtro por tenant, preservación en recuperación |
+| Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
 ```mermaid
@@ -58,34 +58,43 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Cambio de contraseña exclusivamente personal: clave actual, confirmación, validación y hash del servicio Symfony. Relee el hash bajo bloqueo SQL; evita reutilización y campos de IDs.
-- CSRF dedicado, cuenta activa y cierre de la sesión actual tras éxito; el formulario React limpia contraseñas incluso tras error.
-- Pruebas PHPUnit con MariaDB descartable para sesión, CSRF, no reutilización, cuenta ajena, clave vieja/nueva y nueva autenticación; Chromium sintético a 360 px.
-- No se cambiaron esquemas, archivos multimedia, integración externa, runtime Laravel ni Hostinger.
+- Clasificación privada por imagen con estado inicial sin clasificar, solo uso interno o requiere revisión. Ninguna opción autoriza distribuir ni acredita derechos.
+- API de edición con sesión, CSRF, rol y tenant revalidados en transacción; papelera, recurso ajeno y revocaciones rechazan escritura. API de biblioteca filtra por estado también en papelera, sin distorsionar cuota.
+- React móvil muestra clasificación y filtro, permite guardar/deshacer con errores y conserva opción de solo lectura. Migración Doctrine reversible solo para Symfony descartable.
+- Auditoría, etapa, verificación offline y recuperación contrastan clasificación y detectan alteración del catálogo. Regresiones PHPUnit/MariaDB y Chromium 360px con aislamiento y permisos.
+
 ## Archivos modificados en este deploy
-Inventario del **cambio candidato en el PR**, no archivos desplegados en Hostinger.
+Inventario del **cambio candidato en PR**, NO evidencia de archivos desplegados en Hostinger.
 - `README.md`
 - `config/version.php`
 - `docs/GRINDFLOW-SPEC.md`
 - `docs/REQUIREMENTS.md`
+- `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/README.md`
-- `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/frontend/admin/VaultPanel.tsx`
 - `symfony/frontend/admin/admin.css`
-- `symfony/src/Http/Controller/AccountSecurityController.php`
-- `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/migrations/Version20260921070000.php`
+- `symfony/src/Http/Controller/VaultController.php`
+- `symfony/src/Infrastructure/Storage/VaultAuditCommand.php`
+- `symfony/src/Infrastructure/Storage/VaultManifest.php`
+- `symfony/src/Infrastructure/Storage/VaultStageCommand.php`
+- `symfony/src/Infrastructure/Storage/VaultVerifyRestoreCommand.php`
+- `symfony/src/Infrastructure/Storage/VaultVerifyStageCommand.php`
 - `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/AccountSecurityTest.php`
+- `symfony/tests/php/VaultAuditCommandTest.php`
+- `symfony/tests/php/VaultTrashTest.php`
+
 ## Validación
-- Base exact-main v0.1.60 success; CI/Sonar/CodeRabbit del head v0.1.61 y exact-main posterior son independientes.
-- Sin checkout local: PHP/MariaDB, TypeScript y Chromium deben verificarse en CI del PR. Producción no se tocó.
+- Pruebas Symfony PHP/MariaDB, TypeScript y Chromium se comprueban con CI de PR; no hubo checkout local en esta sesión.
+- `main` v0.1.60 tiene CI exact-main success; CI/Sonar/CodeRabbit del candidato aún no se atribuyen como éxito. No se tocó producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar cambio de contraseña v0.1.61 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Ensayo restauración aislada MariaDB + blobs; seguridad de sesiones | 🚧 Pendiente |
+| **NOW** | 🚧 Comprobar clasificación v0.1.62 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Reglas de uso y elegibilidad comprobables; ensayo real backup MariaDB + blobs | 🚧 Sin autorización implícita |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -93,7 +102,7 @@ Inventario del **cambio candidato en el PR**, no archivos desplegados en Hosting
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Seguridad de cuenta v0.1.61 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Política de backups y ensayo integral de restauración | 🚧 Retención pendiente |
+| **NOW** | 🚧 Clasificación S2 y preservación del catálogo v0.1.62 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Backup MariaDB y ensayo integral de restauración | 🚧 Retención y operación pendientes |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
