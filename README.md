@@ -64,7 +64,7 @@ flowchart LR
 - El panel móvil permite la decisión explícita y muestra que la autorización interna no acredita derechos ni publicación.
 
 ## Archivos modificados en este deploy
-Inventario de solo el candidato actual; no prueba despliegue Symfony en Hostinger.
+Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
