@@ -50,16 +50,15 @@ final class ManualHandoffController extends AbstractController
         if (!Uuid::isValid($draftId)) {
             return $this->error(404, 'draft_not_found', 'El borrador no existe en tu organización.');
         }
-        if (!$db->createSchemaManager()->tablesExist([
-            'gf_manual_handoff_events',
-            'gf_manual_destinations',
-        ])) {
+        $schema = $db->createSchemaManager();
+        if (!$schema->tablesExist(['gf_manual_handoff_events'])) {
             return $this->error(
                 503,
                 'manual_handoff_schema_required',
-                'La auditoría de salida manual y sus destinos todavía no están migrados.',
+                'La auditoría de salida manual todavía no está migrada.',
             );
         }
+        $destinationReady = $schema->tablesExist(['gf_manual_destinations']);
 
         $body = json_decode($request->getContent(), true);
         if (!is_array($body) || !isset($body['action']) || !is_string($body['action'])
@@ -72,13 +71,17 @@ final class ManualHandoffController extends AbstractController
         if ($desired === 'prepare') {
             $keys = array_keys($body);
             sort($keys);
-            if ($keys !== ['action', 'destination_id']
-                || !is_string($body['destination_id']) || !Uuid::isValid($body['destination_id'])) {
-                return $this->invalidBody();
+            if ($destinationReady) {
+                if ($keys !== ['action', 'destination_id']
+                    || !is_string($body['destination_id']) || !Uuid::isValid($body['destination_id'])) {
+                    return $this->invalidBody();
+                }
+                $destinationId = $body['destination_id'];
+            } elseif ($keys !== ['action']) {
+                return $this->invalidLegacyBody();
             }
-            $destinationId = $body['destination_id'];
         } elseif (array_keys($body) !== ['action']) {
-            return $this->invalidBody();
+            return $destinationReady ? $this->invalidBody() : $this->invalidLegacyBody();
         }
 
         $result = $db->transactional(function (Connection $db) use (
@@ -86,6 +89,7 @@ final class ManualHandoffController extends AbstractController
             $draftId,
             $desired,
             $destinationId,
+            $destinationReady,
         ): array {
             $organization = $context['organization']['id'];
             $user = $context['user']->id();
@@ -124,17 +128,25 @@ final class ManualHandoffController extends AbstractController
             }
 
             $latest = $db->fetchAssociative(
-                <<<'SQL'
-                    SELECT action, destination_id, created_at
-                    FROM gf_manual_handoff_events
-                    WHERE organization_id = :organization AND draft_id = :draft
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 1
-                    SQL,
+                $destinationReady
+                    ? <<<'SQL'
+                        SELECT action, destination_id, created_at
+                        FROM gf_manual_handoff_events
+                        WHERE organization_id = :organization AND draft_id = :draft
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                        SQL
+                    : <<<'SQL'
+                        SELECT action, created_at
+                        FROM gf_manual_handoff_events
+                        WHERE organization_id = :organization AND draft_id = :draft
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                        SQL,
                 ['organization' => $organization, 'draft' => $draftId],
             );
             $current = $latest === false ? 'none' : (string) $latest['action'];
-            $currentDestination = $latest === false || $latest['destination_id'] === null
+            $currentDestination = !$destinationReady || $latest === false || ($latest['destination_id'] ?? null) === null
                 ? null
                 : (string) $latest['destination_id'];
 
@@ -146,6 +158,15 @@ final class ManualHandoffController extends AbstractController
                         'changed' => false,
                         'action' => $current,
                         'destination_id' => $currentDestination,
+                        'updated_at' => $latest === false ? null : (string) $latest['created_at'],
+                    ];
+                }
+                if (!$destinationReady) {
+                    return [
+                        'status' => 'ok',
+                        'changed' => false,
+                        'action' => $current,
+                        'destination_id' => null,
                         'updated_at' => $latest === false ? null : (string) $latest['created_at'],
                     ];
                 }
@@ -165,26 +186,28 @@ final class ManualHandoffController extends AbstractController
                     return ['status' => 'invalid_transition'];
                 }
 
-                $destination = $db->fetchOne(
-                    <<<'SQL'
-                        SELECT id
-                        FROM gf_manual_destinations
-                        WHERE id = :destination
-                          AND organization_id = :organization
-                          AND disabled_at IS NULL
-                        FOR UPDATE
-                        SQL,
-                    ['destination' => $destinationId, 'organization' => $organization],
-                );
-                if ($destination === false) {
-                    return ['status' => 'destination_missing'];
+                if ($destinationReady) {
+                    $destination = $db->fetchOne(
+                        <<<'SQL'
+                            SELECT id
+                            FROM gf_manual_destinations
+                            WHERE id = :destination
+                              AND organization_id = :organization
+                              AND disabled_at IS NULL
+                            FOR UPDATE
+                            SQL,
+                        ['destination' => $destinationId, 'organization' => $organization],
+                    );
+                    if ($destination === false) {
+                        return ['status' => 'destination_missing'];
+                    }
+                    $eventDestination = $destinationId;
                 }
-                $eventDestination = $destinationId;
             } else {
                 if ($current !== 'prepare') {
                     return ['status' => 'not_prepared'];
                 }
-                if ($currentDestination === null) {
+                if ($destinationReady && $currentDestination === null) {
                     return ['status' => 'destination_required'];
                 }
                 if ((string) $draft['scheduled_at_utc'] > gmdate('Y-m-d H:i:s')) {
@@ -193,15 +216,18 @@ final class ManualHandoffController extends AbstractController
             }
 
             $now = gmdate('Y-m-d H:i:s');
-            $db->insert('gf_manual_handoff_events', [
+            $event = [
                 'id' => Uuid::v7()->toRfc4122(),
                 'organization_id' => $organization,
                 'draft_id' => $draftId,
-                'destination_id' => $eventDestination,
                 'actor_id' => $user,
                 'action' => $desired,
                 'created_at' => $now,
-            ]);
+            ];
+            if ($destinationReady) {
+                $event['destination_id'] = $eventDestination;
+            }
+            $db->insert('gf_manual_handoff_events', $event);
 
             return [
                 'status' => 'ok',
@@ -258,6 +284,15 @@ final class ManualHandoffController extends AbstractController
             422,
             'invalid_manual_handoff',
             'Usa prepare con destination_id, o complete/fail sin campos adicionales.',
+        );
+    }
+
+    private function invalidLegacyBody(): JsonResponse
+    {
+        return $this->error(
+            422,
+            'invalid_manual_handoff',
+            'Mientras el catálogo no esté migrado usa únicamente action.',
         );
     }
 
