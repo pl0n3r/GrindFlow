@@ -1649,7 +1649,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       return route.fulfill({
         status: 201,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { destination, changed: true } }),
+        body: JSON.stringify({ data: { destination, changed: true, provider_calls: false } }),
       });
     }
 
