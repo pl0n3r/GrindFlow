@@ -9,6 +9,7 @@ use App\Support\Diagnostics\DiagnosticLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Throwable;
 
 class DiagnosticsController extends Controller
 {
@@ -16,9 +17,17 @@ class DiagnosticsController extends Controller
     {
         $this->authorizePlatformAdmin($request);
 
+        $workspaceOrganization = null;
+
+        try {
+            $workspaceOrganization = Organization::query()->orderBy('name')->first();
+        } catch (Throwable) {
+            // Diagnostics must remain usable when the application database is unavailable.
+        }
+
         return view('admin.diagnostics', [
             'entries' => $diagnostics->recent(50),
-            'workspaceOrganization' => Organization::query()->orderBy('name')->first(),
+            'workspaceOrganization' => $workspaceOrganization,
         ]);
     }
 
