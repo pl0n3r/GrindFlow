@@ -12,15 +12,17 @@ from collections.abc import Sequence
 
 MAX_ATTEMPTS = 5
 MAX_DELAY_SECONDS = 30.0
-TRANSIENT = (
-    re.compile(r"\b(?:timed?\s*out|timeout|econnreset|etimedout|econnrefused)\b", re.I),
+TRANSIENT_PATTERNS = (
+    re.compile(r"\b(?:timed?\s*out|econnreset|etimedout|econnrefused)\b", re.I),
     re.compile(r"\b(?:HTTP|status|response)(?: code)?[: /]+(?:429|502|503|504)\b", re.I),
     re.compile(r"connection reset|socket hang up", re.I),
 )
 
 
 def transient(returncode: int, output: str) -> bool:
-    return returncode == 75 or any(pattern.search(output) for pattern in TRANSIENT)
+    return returncode == 75 or "timeout" in output.lower() or any(
+        pattern.search(output) for pattern in TRANSIENT_PATTERNS
+    )
 
 
 def validate(command: Sequence[str], attempts: int, delay: float) -> None:
