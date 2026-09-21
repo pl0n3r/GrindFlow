@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.69: autorización explícita de distribución S3.** El runtime productivo continúa siendo Laravel en Hostinger; Symfony sigue aislado. Base exacta `main` v0.1.68 `bef8e234154fc4dcecdb7d5cca12ae605911036a`. La autorización es un evento interno, tenant-safe y revocable; no programa ni publica contenido externo.
+> **Candidato v0.1.70: shell de navegación unificado y responsive.** El runtime productivo continúa siendo Laravel en Hostinger mientras Symfony migra por slices. Base exacta `main` v0.1.69 `0632dc89a30b95e3d8b00ce82f3f380644dde9e0`. Este cambio corrige la navegación inconsistente entre páginas y el rail vacío en ventanas medianas sin ampliar permisos.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.69** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.68~~ | `bef8e234154fc4dcecdb7d5cca12ae605911036a` |
-| CI del PR | 🚧 Head v0.1.69 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.70** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.69~~ | `0632dc89a30b95e3d8b00ce82f3f380644dde9e0` |
+| CI del PR | 🚧 Head v0.1.70 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
-| CI del SHA exacto de main | ✅ ~~v0.1.67 success~~ | run `35604659763` |
-| Deploy Observer | ✅ ~~v0.1.67 observado~~ | run `35604659532`; no prueba Symfony remoto ni SHA Hostinger |
+| CI del SHA exacto de main | 🚧 v0.1.69 por observar | SHA `0632dc89a30b95e3d8b00ce82f3f380644dde9e0` |
+| Deploy Observer | 🚧 v0.1.69 por observar | No prueba SHA remoto ni Symfony |
 | Production Smoke | ⛔ Credencial E2E productiva pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
 | Symfony S3 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | 🚧 Ledger append-only S3 en MariaDB descartable | Producción intacta |
+| Migraciones | ✅ ~~Sin migración nueva en este candidato~~ | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+569** | **−38** | **+531** |
+| **16** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | S3: derivar y mostrar el próximo slot futuro por cada día configurado, con hora IANA y UTC |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
+| Alcance | Shell Laravel compartido + responsive 820 px + consistencia entre módulos |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,39 +58,41 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo ledger append-only de eventos `grant/revoke` por recurso y organización, con actor y fecha UTC.
-- Admin/Studio pueden autorizar o revocar con CSRF dedicado y revalidación tenant/rol dentro de la transacción; Editor/Model permanecen sin permiso.
-- El preview S3 refleja la autorización explícita, pero conserva `can_publish=false`: autorizar no crea schedules, jobs ni llamadas a proveedores.
-- El panel móvil permite la decisión explícita y muestra que la autorización interna no acredita derechos ni publicación.
+- Un único componente Blade define la navegación de Dashboard, Biblioteca, Programación, Distribución, Tráfico, Finanzas, Sistema y Diagnósticos.
+- El rail entre 681–960 px conserva iconos visibles y nombres accesibles; el cierre de sesión ya no parte texto ni deja botones vacíos.
+- En móvil continúa la barra inferior horizontal con icono + texto; los módulos sin permiso/ruta/organización muestran estado deshabilitado con razón accesible.
+- Se añadió prueba de contrato para impedir que las vistas vuelvan a copiar sidebars privados y smoke real de navegador a 820 px para el fallo reportado.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
-- `.github/workflows/grindflow-ci.yml`
+Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy en Hostinger.
 - `README.md`
+- `app/Http/Controllers/Admin/DiagnosticsController.php`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/WeeklyPlannerPanel.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/migrations/Version20260921135500.php`
-- `symfony/src/Http/Controller/AdminContextController.php`
-- `symfony/src/Http/Controller/ContentRuleController.php`
-- `symfony/src/Http/Controller/DistributionAuthorizationController.php`
-- `symfony/src/Identity/Application/MembershipContext.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/DistributionAuthorizationTest.php`
+- `public/css/grindflow.css`
+- `resources/views/admin/diagnostics.blade.php`
+- `resources/views/admin/system.blade.php`
+- `resources/views/components/workspace-sidebar.blade.php`
+- `resources/views/dashboard.blade.php`
+- `resources/views/distribution/index.blade.php`
+- `resources/views/finance/index.blade.php`
+- `resources/views/scheduling/index.blade.php`
+- `resources/views/traffic/index.blade.php`
+- `resources/views/vault/index.blade.php`
+- `scripts/browser-smoke.sh`
+- `tests/Feature/WorkspaceSidebarTest.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.69 por verificar; la base v0.1.68 está fusionada.
-- Sin checkout local; GitHub Actions valida Symfony/MariaDB, TypeScript/Vite y Chromium. Producción intacta.
+- CI/Sonar/CodeRabbit del candidato v0.1.70 por verificar; la base v0.1.69 está fusionada.
+- El cambio exige PHPUnit, análisis PHP, navegador Laravel y real-stack MariaDB; el smoke de navegador incluye el breakpoint de 820 px. Producción no se modifica desde esta rama.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar autorización explícita S3 v0.1.69 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Persistencia de schedules Symfony sobre contratos S3 | 🚧 Sin publicación externa |
+| **NOW** | 🚧 Validar shell unificado v0.1.70 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Scheduler Symfony persistido tenant-safe | 🚧 S3, sin publicación externa |
 | **LATER** | 🚧 Scheduler Symfony + distribución autorizada + Traffic | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -98,7 +100,7 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
-| **NOW** | 🚧 Autorización explícita S3 v0.1.69 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Scheduler persistido tenant-safe | 🚧 S3 |
+| **NOW** | 🚧 Shell de navegación unificado v0.1.70 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Scheduler Symfony persistido tenant-safe | 🚧 S3 |
 | **LATER** | 🚧 Paridad del monolito modular | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
