@@ -35,7 +35,9 @@ final class ScheduleDraftController extends AbstractController
             'organization' => $context['organization']['id'],
             'user' => $context['user']->id(),
         ];
-        $handoffReady = $db->createSchemaManager()->tablesExist(['gf_manual_handoff_events']);
+        $schema = $db->createSchemaManager();
+        $handoffReady = $schema->tablesExist(['gf_manual_handoff_events']);
+        $destinationReady = $schema->tablesExist(['gf_manual_destinations']);
         $handoffSelect = $handoffReady
             ? <<<'SQL'
                 , (
@@ -56,6 +58,29 @@ final class ScheduleDraftController extends AbstractController
                 ) AS manual_handoff_updated_at
                 SQL
             : ', NULL AS manual_handoff_action, NULL AS manual_handoff_updated_at';
+        $destinationSelect = $handoffReady && $destinationReady
+            ? <<<'SQL'
+                , (
+                    SELECT handoff.destination_id
+                    FROM gf_manual_handoff_events handoff
+                    WHERE handoff.organization_id = draft.organization_id
+                      AND handoff.draft_id = draft.id
+                    ORDER BY handoff.created_at DESC, handoff.id DESC
+                    LIMIT 1
+                ) AS manual_destination_id,
+                (
+                    SELECT destination.label
+                    FROM gf_manual_handoff_events handoff
+                    LEFT JOIN gf_manual_destinations destination
+                      ON destination.id = handoff.destination_id
+                     AND destination.organization_id = handoff.organization_id
+                    WHERE handoff.organization_id = draft.organization_id
+                      AND handoff.draft_id = draft.id
+                    ORDER BY handoff.created_at DESC, handoff.id DESC
+                    LIMIT 1
+                ) AS manual_destination_label
+                SQL
+            : ', NULL AS manual_destination_id, NULL AS manual_destination_label';
         $scope = <<<'SQL'
             FROM gf_schedule_drafts draft
             INNER JOIN gf_vault_assets asset
@@ -67,7 +92,7 @@ final class ScheduleDraftController extends AbstractController
               AND actor.is_active = 1
             SQL;
         $rows = $db->fetchAllAssociative(
-            'SELECT draft.*, asset.original_name AS asset_name'.$handoffSelect.' '.$scope
+            'SELECT draft.*, asset.original_name AS asset_name'.$handoffSelect.$destinationSelect.' '.$scope
             .' ORDER BY draft.created_at DESC, draft.id DESC LIMIT 30',
             $params,
         );
@@ -78,6 +103,7 @@ final class ScheduleDraftController extends AbstractController
             'total' => $total,
             'limit' => 30,
             'manual_handoff_ready' => $handoffReady,
+            'manual_destination_ready' => $destinationReady,
             'mode' => 'review_only',
             'can_publish' => false,
         ]]);
@@ -468,6 +494,12 @@ final class ScheduleDraftController extends AbstractController
             'manual_handoff_updated_at' => ($row['manual_handoff_updated_at'] ?? null) === null
                 ? null
                 : (string) $row['manual_handoff_updated_at'],
+            'manual_destination' => ($row['manual_destination_id'] ?? null) === null
+                ? null
+                : [
+                    'id' => (string) $row['manual_destination_id'],
+                    'label' => (string) ($row['manual_destination_label'] ?? ''),
+                ],
             'created_at' => (string) $row['created_at'],
             'cancelled_at' => $row['cancelled_at'] === null ? null : (string) $row['cancelled_at'],
         ];
