@@ -135,6 +135,25 @@ programación y una entrega permitida con sus propias compuertas. La aprobación
 tampoco prueba titularidad, mayoría de edad, consentimiento, licencia o aceptación de una
 plataforma.
 
+### S4 · Agenda interna persistida y cancelable
+
+Un recurso con readiness S3 puede reservar uno de los próximos slots derivados de
+la regla semanal en una tabla tenant-owned de borradores. La operación vuelve a
+validar membresía activa, rol, recurso activo, revisión humana, autorización de
+distribución, regla y slot dentro de la transacción. La capacidad se serializa por
+organización para impedir sobre-reservas concurrentes.
+
+El borrador conserva el snapshot temporal del slot (UTC, zona IANA, fecha/hora
+local), actor creador y estado. Cancelar no elimina la fila: registra actor y hora,
+libera capacidad y deja historial. MariaDB restringe el ciclo a
+`draft → cancelled` y bloquea DELETE/rewrite posteriores. Repetir creación del
+mismo recurso+slot activo o cancelar nuevamente es idempotente.
+
+S4 sigue siendo **review-only**. Persistir un borrador no crea un delivery,
+distribution attempt, provider job ni publicación. Cualquier futura entrega deberá
+revalidar sus propias compuertas y nunca interpretar un borrador histórico como
+autorización vigente.
+
 ## 4. Non-negotiable invariants
 
 1. Tenant data must not cross organization boundaries.

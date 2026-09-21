@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Scheduling\WeeklySlotCalculator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -139,7 +140,7 @@ final class ContentRuleController extends AbstractController
     }
 
     #[Route('/api/admin/rules/weekly/preview', name: 'grindflow_weekly_rule_preview', methods: ['GET'])]
-    public function preview(Request $request, MembershipContext $memberships, Connection $db): JsonResponse
+    public function preview(Request $request, MembershipContext $memberships, Connection $db, WeeklySlotCalculator $calculator): JsonResponse
     {
         $context = $this->context($request, $memberships);
         if ($context instanceof JsonResponse) {
@@ -263,7 +264,7 @@ final class ContentRuleController extends AbstractController
 
         return $this->privateJson(['data' => [
             'rule' => $rule === false ? null : $this->publicRule($rule),
-            'slots' => $this->weeklySlots($rule),
+            'slots' => $calculator->upcoming($rule),
             'assets' => $items,
             'visible' => count($items),
             'total_active_assets' => $total,
@@ -271,53 +272,6 @@ final class ContentRuleController extends AbstractController
             'can_publish' => false,
             'mode' => 'review_only',
         ]]);
-    }
-
-    /**
-     * @param array<string, mixed>|false $rule
-     * @return list<array{local_date: string, weekday: string, local_time: string, timezone: string, capacity: int, scheduled_at_utc: string}>
-     */
-    private function weeklySlots(array|false $rule): array
-    {
-        if ($rule === false) {
-            return [];
-        }
-
-        $timezoneName = (string) $rule['timezone'];
-        $timezone = new \DateTimeZone($timezoneName);
-        $now = new \DateTimeImmutable('now', $timezone);
-        $dayStart = $now->setTime(0, 0);
-        $weekdays = $rule['weekdays'] === '' ? [] : explode(',', (string) $rule['weekdays']);
-        [$hour, $minute] = array_map('intval', explode(':', (string) $rule['local_time']));
-        $seen = [];
-        $slots = [];
-
-        for ($offset = 0; $offset <= 7 && count($seen) < count($weekdays); ++$offset) {
-            $date = $dayStart->modify(sprintf('+%d days', $offset));
-            $weekday = strtolower($date->format('D'));
-            if (!in_array($weekday, $weekdays, true) || isset($seen[$weekday])) {
-                continue;
-            }
-
-            $candidate = $date->setTime($hour, $minute);
-            if ($candidate <= $now) {
-                continue;
-            }
-
-            $seen[$weekday] = true;
-            $slots[] = [
-                'local_date' => $candidate->format('Y-m-d'),
-                'weekday' => $weekday,
-                'local_time' => (string) $rule['local_time'],
-                'timezone' => $timezoneName,
-                'capacity' => (int) $rule['max_per_day'],
-                'scheduled_at_utc' => $candidate
-                    ->setTimezone(new \DateTimeZone('UTC'))
-                    ->format('Y-m-d\\TH:i:s\\Z'),
-            ];
-        }
-
-        return $slots;
     }
 
     /** @return array{user: IdentityUser, organization: array{id: string, name: string, role: string}}|JsonResponse */

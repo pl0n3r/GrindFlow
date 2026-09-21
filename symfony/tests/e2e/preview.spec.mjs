@@ -1514,6 +1514,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   let savedRule = null;
   let contentReviewApproved = false;
   let distributionAuthorized = false;
+  let scheduleDrafts = [];
   await page.route('**/api/admin/context', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -1528,6 +1529,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         vault_manage_csrf: 'vault-manage-token',
         weekly_rule_csrf: 'weekly-rule-token',
         content_review_csrf: 'content-review-token',
+        schedule_draft_csrf: 'schedule-token',
         distribution_authorization_csrf: 'distribution-token',
         organization_name_csrf: 'organization-token',
       },
@@ -1609,6 +1611,71 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       }),
     });
   });
+  await page.route((url) => url.pathname === '/api/admin/schedules'
+    || url.pathname.startsWith('/api/admin/schedules/'), async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname === '/api/admin/schedules' && request.method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            drafts: scheduleDrafts,
+            total: scheduleDrafts.length,
+            limit: 30,
+            mode: 'review_only',
+            can_publish: false,
+          },
+        }),
+      });
+    }
+
+    expect(request.method()).toBe('POST');
+    expect(request.headers()['x-csrf-token']).toBe('schedule-token');
+
+    if (url.pathname === '/api/admin/schedules') {
+      const payload = request.postDataJSON();
+      expect(payload).toEqual({
+        asset_id: '00000000-0000-7000-8000-000000000099',
+        scheduled_at_utc: '2026-09-22T14:30:00Z',
+      });
+      const draft = {
+        id: '00000000-0000-7000-8000-000000000172',
+        asset_id: payload.asset_id,
+        asset_name: 'campaña.png',
+        scheduled_at_utc: payload.scheduled_at_utc,
+        timezone: 'America/Bogota',
+        local_date: '2026-09-22',
+        local_time: '09:30',
+        status: 'draft',
+      };
+      const existing = scheduleDrafts.find((item) =>
+        item.asset_id === payload.asset_id && item.scheduled_at_utc === payload.scheduled_at_utc
+          && item.status === 'draft');
+      if (!existing) scheduleDrafts = [draft, ...scheduleDrafts];
+      return route.fulfill({
+        status: existing ? 200 : 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { draft: existing ?? draft, changed: !existing, publishes: false },
+        }),
+      });
+    }
+
+    expect(url.pathname).toBe('/api/admin/schedules/00000000-0000-7000-8000-000000000172/cancel');
+    scheduleDrafts = scheduleDrafts.map((draft) => draft.id === '00000000-0000-7000-8000-000000000172'
+      ? { ...draft, status: 'cancelled', cancelled_at: '2026-09-21 18:30:00' }
+      : draft);
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: { draft: scheduleDrafts[0], changed: true, publishes: false },
+      }),
+    });
+  });
+
   await page.route((url) => url.pathname === '/api/admin/rules/weekly/preview', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -1684,6 +1751,21 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Falta autorización explícita de distribución')).toHaveCount(0);
   await expect(page.getByText('Listo para programar internamente')).toBeVisible();
   await expect(page.getByText('Publicación bloqueada.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Borradores persistidos' })).toBeVisible();
+  await page.getByLabel('Recurso listo').selectOption('00000000-0000-7000-8000-000000000099');
+  await page.getByLabel('Horario').selectOption('2026-09-22T14:30:00Z');
+  await page.getByRole('button', { name: 'Guardar borrador' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Borrador interno guardado. No se ha publicado nada.',
+  );
+  await expect(page.getByText('Historial interno · 1 borradores')).toBeVisible();
+  await expect(page.getByText('Borrador reservado')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancelar borrador de campaña.png' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Borrador cancelado. El registro se conserva en el historial.',
+  );
+  await expect(page.getByText('Borrador cancelado', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Revocar autorización' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
   await expect(page.getByText('Distribución sin autorizar')).toBeVisible();

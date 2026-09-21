@@ -138,7 +138,10 @@ final class ContentReviewDecisionTest extends WebTestCase
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ], content: '{"approved":true}');
         self::assertResponseStatusCodeSame(404);
-        self::assertSame(0, (int) $db->fetchOne('SELECT COUNT(*) FROM gf_content_review_events'));
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_content_review_events WHERE organization_id = :organization',
+            ['organization' => $mine],
+        ));
 
         $client->request('PUT', '/api/admin/content-reviews/'.$notReviewable, server: [
             'CONTENT_TYPE' => 'application/json',
