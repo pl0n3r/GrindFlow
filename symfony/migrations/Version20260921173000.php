@@ -51,10 +51,50 @@ final class Version20260921173000 extends AbstractMigration
                     )
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             SQL);
+
+        $this->addSql(<<<'SQL'
+            CREATE TRIGGER gf_schedule_drafts_lifecycle_update
+            BEFORE UPDATE ON gf_schedule_drafts
+            FOR EACH ROW
+            BEGIN
+                IF NOT (
+                    OLD.id <=> NEW.id
+                    AND OLD.organization_id <=> NEW.organization_id
+                    AND OLD.asset_id <=> NEW.asset_id
+                    AND OLD.created_by <=> NEW.created_by
+                    AND OLD.scheduled_at_utc <=> NEW.scheduled_at_utc
+                    AND OLD.timezone <=> NEW.timezone
+                    AND OLD.local_date <=> NEW.local_date
+                    AND OLD.local_time <=> NEW.local_time
+                    AND OLD.created_at <=> NEW.created_at
+                    AND OLD.status = 'draft'
+                    AND NEW.status = 'cancelled'
+                    AND OLD.cancelled_at IS NULL
+                    AND OLD.cancelled_by IS NULL
+                    AND NEW.cancelled_at IS NOT NULL
+                    AND NEW.cancelled_by IS NOT NULL
+                ) THEN
+                    SIGNAL SQLSTATE '45000'
+                        SET MESSAGE_TEXT = 'schedule drafts only allow draft-to-cancelled transition';
+                END IF;
+            END
+            SQL);
+
+        $this->addSql(<<<'SQL'
+            CREATE TRIGGER gf_schedule_drafts_no_delete
+            BEFORE DELETE ON gf_schedule_drafts
+            FOR EACH ROW
+            BEGIN
+                SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'schedule draft history cannot be deleted';
+            END
+            SQL);
     }
 
     public function down(Schema $schema): void
     {
+        $this->addSql('DROP TRIGGER IF EXISTS gf_schedule_drafts_lifecycle_update');
+        $this->addSql('DROP TRIGGER IF EXISTS gf_schedule_drafts_no_delete');
         $this->addSql('DROP TABLE gf_schedule_drafts');
     }
 }
