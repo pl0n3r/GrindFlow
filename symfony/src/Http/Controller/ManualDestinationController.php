@@ -42,6 +42,11 @@ final class ManualDestinationController extends AbstractController
             ['organization' => $context['organization']['id']],
         );
 
+        $total = (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_manual_destinations WHERE organization_id = :organization',
+            ['organization' => $context['organization']['id']],
+        );
+
         return $this->privateJson(['data' => [
             'ready' => true,
             'destinations' => array_map(static fn (array $row): array => [
@@ -51,7 +56,8 @@ final class ManualDestinationController extends AbstractController
                 'created_at' => (string) $row['created_at'],
                 'disabled_at' => $row['disabled_at'] === null ? null : (string) $row['disabled_at'],
             ], $rows),
-            'total' => count($rows),
+            'total' => $total,
+            'limit' => 100,
         ]]);
     }
 
