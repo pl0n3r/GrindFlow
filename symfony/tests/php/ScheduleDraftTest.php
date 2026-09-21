@@ -295,6 +295,26 @@ final class ScheduleDraftTest extends WebTestCase
             ['id' => $draftId, 'organization' => $mine],
         ));
 
+        $rewriteBlocked = false;
+        try {
+            $db->update(
+                'gf_schedule_drafts',
+                ['status' => 'draft', 'cancelled_at' => null, 'cancelled_by' => null],
+                ['id' => $draftId],
+            );
+        } catch (\Doctrine\DBAL\Exception) {
+            $rewriteBlocked = true;
+        }
+        self::assertTrue($rewriteBlocked, 'MariaDB must reject rewriting cancelled schedule history.');
+
+        $deleteBlocked = false;
+        try {
+            $db->delete('gf_schedule_drafts', ['id' => $draftId]);
+        } catch (\Doctrine\DBAL\Exception) {
+            $deleteBlocked = true;
+        }
+        self::assertTrue($deleteBlocked, 'MariaDB must reject deleting schedule history.');
+
         $client->request('POST', '/api/admin/schedules', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
