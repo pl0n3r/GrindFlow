@@ -91,6 +91,22 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit con MariaDB sintética para 401/403/422, rol, tenant, papelera, ID inválido/duplicado, lote mixto y repetición; Chromium a 360 px con fallo, reintento, filtros y lectura. Sin migraciones ni datos productivos.
 
+
+
+### GF-FR-013 — Autorización explícita de distribución Symfony
+**Estado:** candidato v0.1.69; validación, merge y producción se verifican por separado.
+
+**Enunciado:** una persona con rol Admin o Studio puede conceder o revocar explícitamente una autorización interna de distribución para un recurso activo de su organización. Esta decisión es independiente de la clasificación del Vault y no publica, programa ni acredita derechos, consentimiento o aceptación de una plataforma.
+
+**Aceptación:**
+- El actor y la organización provienen exclusivamente de la sesión y membresía vigentes; Editor/Model no pueden autorizar y un ID de otro tenant no revela ni muta datos.
+- Cada cambio se registra como evento append-only `grant`/`revoke`, con actor y fecha UTC; repetir el mismo estado es idempotente y no agrega eventos.
+- El endpoint exige CSRF dedicado y revalida rol, cuenta, organización y recurso activo dentro de la transacción.
+- El preview S3 puede retirar el bloqueo `distribution_authorization_missing` cuando el último evento es `grant`, pero conserva `can_publish=false`; reglas, clasificación y autorización siguen siendo contratos distintos.
+- Papelera o recurso inexistente no pueden recibir una nueva autorización. Ningún proveedor externo, schedule o job de publicación se crea desde esta acción.
+
+**Verificación:** PHPUnit/MariaDB con autenticación, CSRF, rol, cross-tenant, grant, idempotencia, revoke y preview; React/Chromium móvil para control explícito y estado visible. Datos sintéticos únicamente.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation
