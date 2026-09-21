@@ -119,6 +119,17 @@ final class WeeklyRulePreviewTest extends WebTestCase
             self::assertSame('America/Bogota', $preview['rule']['timezone']);
             self::assertSame(['mon', 'wed', 'fri'], $preview['rule']['weekdays']);
             self::assertFalse($preview['can_publish']);
+            self::assertCount(3, $preview['slots']);
+            $slotWeekdays = array_column($preview['slots'], 'weekday');
+            sort($slotWeekdays);
+            self::assertSame(['fri', 'mon', 'wed'], $slotWeekdays);
+            foreach ($preview['slots'] as $slot) {
+                self::assertSame('America/Bogota', $slot['timezone']);
+                self::assertSame('10:30', $slot['local_time']);
+                self::assertSame(2, $slot['capacity']);
+                self::assertMatchesRegularExpression('/^\\d{4}-\\d{2}-\\d{2}$/', $slot['local_date']);
+                self::assertMatchesRegularExpression('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/', $slot['scheduled_at_utc']);
+            }
 
             $byScope = [];
             foreach ($preview['assets'] as $asset) {
