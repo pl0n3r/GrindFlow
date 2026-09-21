@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.58: contraste de la copia privada con los datos restaurados del Vault Symfony, todavía no desplegado.** El alcance «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.57 `bada22080a5a4bac5ba6365644f446a270f6e08b`, CI exact-main success. No se hacen backups ni migraciones productivas.
+> **Candidato v0.1.59: revisar imágenes locales y descartar archivos antes de cargar al Vault móvil, todavía no desplegado.** El alcance «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.58 `d99153673f090201b31fcb1c0a0110069ccda2b1`, CI exact-main success en segundo intento tras interrupción del workflow. No se activan proveedores ni migraciones productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.58** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.57~~ | `bada22080a5a4bac5ba6365644f446a270f6e08b` |
+| Version objetivo | 🚧 **v0.1.59** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.58~~ | `d99153673f090201b31fcb1c0a0110069ccda2b1` |
 | CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión pendiente | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+256** | **−22** | **+234** |
+| **6** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: comparación read-only de stage con MariaDB y originales restaurados en entorno descartable |
+| Alcance | S2: selección y previsualización local de imágenes, descarte antes de enviar y UX responsive |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,28 +58,28 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- CLI `grindflow:vault:verify-restore`: compara una copia íntegra del Vault con la organización, metadatos y originales de la base restaurada; exige huella previa independiente, escrituras detenidas y organización explícita.
-- Detecta copia adulterada, catálogo SQL diferente, recurso original corrupto y organización incorrecta; ningún dato privado en el JSON de respuesta.
-- PHPUnit/MariaDB y guía de ensayo de recuperación sin restauraciones automáticas ni uso de Hostinger. Corrige cronología documental de S2.
+- El Vault móvil muestra miniaturas privadas locales de hasta ocho imágenes seleccionadas antes del primer POST; muestra formato y tamaño, señaliza formatos no admitidos y permite retirar cada archivo del lote.
+- Object URLs se revocan al reemplazar/descartar/enviar archivos o desmontar React; los previews no crean requests al servidor y el backend mantiene sus validaciones de bytes, MIME, cuota y tenant.
+- Playwright en 360 px prueba selección con dos PNG y SVG no admitido, retiro de archivos sin cargarlos, único POST aprobado y limpieza de miniaturas.
 ## Archivos modificados en este deploy
 Inventario del **cambio candidato en el PR**, no archivos desplegados en Hostinger.
 - `README.md`
 - `config/version.php`
-- `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/README.md`
-- `symfony/src/Infrastructure/Storage/VaultVerifyRestoreCommand.php`
-- `symfony/tests/php/VaultAuditCommandTest.php`
+- `symfony/frontend/admin/VaultPanel.tsx`
+- `symfony/frontend/admin/admin.css`
+- `symfony/tests/e2e/preview.spec.mjs`
 ## Validación
 - PHP/MariaDB, TypeScript y Chromium se comprueban mediante CI del PR; sin checkout local disponible en esta sesión.
-- CI exact-main v0.1.57 success; CI/Sonar/CodeRabbit del head v0.1.58 y Hostinger son señales separadas. No se tocó producción.
+- CI exact-main v0.1.58 success tras reejecutar los jobs fallidos por cancelación; CI/Sonar/CodeRabbit del head v0.1.59 y Hostinger son señales separadas. No se tocó producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar cotejo de restauración v0.1.58 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Copia completa y ensayo real de MariaDB + blobs en entorno aislado | 🚧 Operación y política de retención pendientes |
+| **NOW** | 🚧 Validar selección visual móvil v0.1.59 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Completar Vault móvil y ensayo real de backup MariaDB + blobs | 🚧 Retención y operación pendientes |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -87,7 +87,7 @@ Inventario del **cambio candidato en el PR**, no archivos desplegados en Hosting
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Cotejo stage ↔ base y originales restaurados v0.1.58 | 🚧 CI y revisión |
+| **NOW** | 🚧 Vista local antes de carga móvil v0.1.59 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Backup de MariaDB y ensayo integral de restauración | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
