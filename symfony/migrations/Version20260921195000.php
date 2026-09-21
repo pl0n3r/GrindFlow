@@ -59,10 +59,40 @@ final class Version20260921195000 extends AbstractMigration
                     REFERENCES gf_manual_destinations (organization_id, id)
                     ON DELETE RESTRICT
             SQL);
+
+        $this->addSql(<<<'SQL'
+            CREATE TRIGGER gf_manual_destinations_lifecycle_update
+            BEFORE UPDATE ON gf_manual_destinations
+            FOR EACH ROW
+            BEGIN
+                IF NOT (
+                    OLD.id <=> NEW.id
+                    AND OLD.organization_id <=> NEW.organization_id
+                    AND OLD.label <=> NEW.label
+                    AND OLD.created_by <=> NEW.created_by
+                    AND OLD.created_at <=> NEW.created_at
+                ) THEN
+                    SIGNAL SQLSTATE '45000'
+                        SET MESSAGE_TEXT = 'manual destination identity is immutable';
+                END IF;
+            END
+            SQL);
+
+        $this->addSql(<<<'SQL'
+            CREATE TRIGGER gf_manual_destinations_no_delete
+            BEFORE DELETE ON gf_manual_destinations
+            FOR EACH ROW
+            BEGIN
+                SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'manual destinations cannot be deleted';
+            END
+            SQL);
     }
 
     public function down(Schema $schema): void
     {
+        $this->addSql('DROP TRIGGER IF EXISTS gf_manual_destinations_lifecycle_update');
+        $this->addSql('DROP TRIGGER IF EXISTS gf_manual_destinations_no_delete');
         $this->addSql('ALTER TABLE gf_manual_handoff_events DROP FOREIGN KEY fk_gf_manual_handoff_destination_org');
         $this->addSql('ALTER TABLE gf_manual_handoff_events DROP INDEX ix_gf_manual_handoff_destination');
         $this->addSql('ALTER TABLE gf_manual_handoff_events DROP COLUMN destination_id');
