@@ -1,11 +1,11 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice candidato v0.1.61:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice candidato v0.1.62:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
 | IMPLEMENTADO | v0.1.61 en rama: rotación personal de contraseña y reingreso con CSRF, hash actual bloqueado y panel React móvil. |
-| VALIDADO EN CÓDIGO | CI/Sonar del head v0.1.61 por verificar; base exact-main v0.1.60 success. |
+| VALIDADO EN CÓDIGO | CI/Sonar del head v0.1.62 por verificar; base exact-main v0.1.60 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
@@ -135,3 +135,7 @@ El suscriptor global de cabeceras conserva cualquier `Referrer-Policy` más estr
 La API `GET /api/admin/vault/{id}/integrity` verifica bajo sesión/organización/membresía vigente un original privado **a petición del usuario**. Puede revisar imágenes activas y en papelera, sin restaurar ni modificar nada. Compara tamaño físico y SHA-256 con los metadatos de MariaDB sobre archivos de máximo 8 MiB y clave de almacenamiento de formato acotado. Devuelve exclusivamente `id` y `status=verified|missing|mismatch|unavailable`, con `Cache-Control: no-store, private`; no devuelve la huella, ruta, contenido ni clave privada. Rechaza otras organizaciones y actores revocados sin revelar el estado de su almacenamiento; un enlace simbólico o un original ilegible produce `unavailable`. El panel móvil incluye botón «Verificar integridad» por fila en biblioteca y papelera, resultado/alerta específica y cuota independiente de la comprobación. PHPUnit/MariaDB y Chromium cubren bytes correctos, cambio de tamaño, alteración de bytes con tamaño igual, ausencia, papelera y aislamiento. No constituye backup, restauración automática, monitoreo continuo ni certificación del despliegue Hostinger.
 
 **v0.1.57, preparación operativa sin migraciones:** comandos manuales `grindflow:vault:stage` y `grindflow:vault:verify-stage` crean una copia privada nueva por organización, comparan SHA-256/tamaños y huella canónica de los metadatos. El manifiesto se escribe tras verificar los bytes; nunca se sobreescribe un destino. Requieren confirmación de escrituras detenidas. No constituyen respaldo total de la plataforma porque no hacen dump/restauración de MariaDB. [Procedimiento y límites](../docs/SYMFONY-VAULT-STORAGE.md).
+
+## S2 · Clasificación conservadora y filtro interno (v0.1.61 candidato)
+
+`POST /api/admin/vault/{id}/usage` permite definir solo `unclassified`, `internal_only` o `needs_review` a quien tenga `content_prepare`; requiere sesión, CSRF y membresía vigente. `GET /api/admin/vault?usage=...` filtra sin alterar cuotas y funciona en biblioteca y papelera. `usage_scope` también se conserva y comprueba en el manifiesto de restauración. No da derechos ni permiso para distribuir y no se activa en producción mediante este cambio.

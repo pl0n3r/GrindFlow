@@ -55,7 +55,7 @@ final class VaultAuditCommand extends Command
             $assets = $this->db->fetchAllAssociative(
                 <<<'SQL'
                     SELECT id, uploaded_by, original_name, mime_type, size_bytes,
-                           sha256, storage_key, created_at, deleted_at, deleted_by, private_note
+                           sha256, storage_key, created_at, deleted_at, deleted_by, private_note, usage_scope
                     FROM gf_vault_assets
                     WHERE organization_id = :organization
                     ORDER BY id ASC

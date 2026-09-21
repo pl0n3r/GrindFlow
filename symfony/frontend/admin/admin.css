@@ -150,3 +150,5 @@
 .admin-password-form button,.admin-signin-link{justify-self:start;min-height:46px;padding:12px 18px;border:0;border-radius:9px;background:#b896ff;color:#171124;font:inherit;font-weight:780;text-decoration:none;cursor:pointer}
 .admin-password-form button:disabled{opacity:.55;cursor:not-allowed}
 .admin-password-form :focus-visible,.admin-signin-link:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+
+.vault-note select{flex:1 1 180px;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #8170a0;border-radius:9px;background:#0d0e17;color:#f8f8ff;font:inherit}
