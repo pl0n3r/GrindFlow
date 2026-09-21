@@ -110,3 +110,10 @@
 .vault-integrity-ok,.vault-integrity-warning{flex:1 0 100%;min-width:0;padding:10px 12px;border-radius:10px;margin:8px 0;overflow-wrap:anywhere}
 .vault-integrity-ok{border:1px solid #5cb8a0;background:#14362f;color:#d6fff1}
 .vault-integrity-warning{border:1px solid #d6a765;background:#422d19;color:#fff0d7}
+
+/* S2 page-scoped read-only integrity checks: 360 px safe, no automatic scanning. */
+.vault-audit{display:grid;gap:8px;min-width:0;margin:12px 0 18px}
+.vault-audit button{justify-self:start;min-height:44px;max-width:100%;padding:9px 14px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;font-size:12px;cursor:pointer}
+.vault-audit button:disabled{opacity:.55;cursor:wait}
+.vault-audit button:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+.vault-audit small,.vault-audit p{font-size:12px;line-height:1.5;overflow-wrap:anywhere;margin:0}
