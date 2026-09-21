@@ -66,23 +66,9 @@ final class VaultAuditCommand extends Command
             $counts = ['verified' => 0, 'missing' => 0, 'mismatch' => 0, 'unavailable' => 0];
             $active = 0;
             $trash = 0;
-            $manifest = hash_init('sha256');
+            // One canonical digest shared with the portable staging workflow.
+            $digest = VaultManifest::digest($assets);
             foreach ($assets as $asset) {
-                // Stable serialization of *catalog metadata*, not a digest of
-                // only the count. Restoration can compare entire inventories.
-                $canonical = [
-                    'id' => (string) $asset['id'],
-                    'uploaded_by' => (string) $asset['uploaded_by'],
-                    'original_name' => (string) $asset['original_name'],
-                    'mime_type' => (string) $asset['mime_type'],
-                    'size_bytes' => (int) $asset['size_bytes'],
-                    'sha256' => strtolower((string) $asset['sha256']),
-                    'storage_key' => (string) $asset['storage_key'],
-                    'created_at' => (string) $asset['created_at'],
-                    'deleted_at' => $asset['deleted_at'] === null ? null : (string) $asset['deleted_at'],
-                    'deleted_by' => $asset['deleted_by'] === null ? null : (string) $asset['deleted_by'],
-                ];
-                hash_update($manifest, json_encode($canonical, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)."\n");
                 if ($asset['deleted_at'] === null) {
                     ++$active;
                 } else {
@@ -90,7 +76,6 @@ final class VaultAuditCommand extends Command
                 }
                 ++$counts[$this->verifier->status($asset)];
             }
-            $digest = hash_final($manifest);
             $matches = $expect === null ? null : hash_equals(strtolower($expect), $digest);
             // An empty catalog is a dangerous false-positive for restore checks.
             $healthy = count($assets) !== 0 && $counts['verified'] === count($assets) && $matches !== false;

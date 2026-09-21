@@ -83,3 +83,60 @@ Symfony y su MariaDB siguen aislados; Production Smoke de Laravel y
 el marcador del Observer no prueban que el storage Symfony funcione en
 Hostinger. No activar variable, migraciones o movimiento de archivos
 productivos por efecto de un PR de código.
+
+## Preparación manual de una copia y verificación independiente (v0.1.57)
+
+Los comandos siguientes **solo preparan una copia privada por organización**
+de los originales y sus metadatos de Vault. No respaldan MariaDB, cuentas,
+membresías, otras tablas, claves ni configuración. Por tanto **no constituyen un
+backup íntegro ni autorizan un cutover o purga**. No se ejecutan automáticamente
+en CI ni en Hostinger; CI los prueba únicamente con datos sintéticos.
+
+Antes de usarlos, el operador debe detener toda escritura en Vault, incluidos
+uploads, renombres, movimientos y jobs; mantenerla detenida durante la captura
+del estado de la BD compatible con los blobs. Elegir una carpeta nueva bajo
+un **padre ya existente y privado (0700)**, fuera del release y de
+`GRINDFLOW_VAULT_ROOT`. No reutilizar un destino, no exponerlo en el webroot
+ni usar una carpeta compartida como `/tmp` directamente: preparar un subdirectorio
+privado primero. Los ejemplos representan una operación deliberada en un
+**entorno Symfony autorizado**, nunca una instrucción de migración productiva.
+
+```bash
+cd symfony
+php bin/console grindflow:vault:audit --organization=UUID-ORGANIZACION
+php bin/console grindflow:vault:stage \
+  --organization=UUID-ORGANIZACION \
+  --target=/volumen-privado-0700/copia-nueva \
+  --confirm-writes-stopped
+php bin/console grindflow:vault:verify-stage \
+  --directory=/volumen-privado-0700/copia-nueva \
+  --expect=HUELLA_SHA256_DE_AUDIT
+```
+
+La carpeta contiene `manifest.json` con metadatos sensibles (ID de la
+organización, nombres, actores, claves opacas y hashes) y `blobs/*.blob`.
+Carpetas en modo 0700 y archivos en 0600; proteger con cifrado, control de
+acceso y retención del operador. Los comandos **no imprimen nombres, IDs de
+recursos, rutas ni excepciones internas**. El manifiesto se escribe **al final**
+solo tras copiar cada archivo, validar tamaño y SHA-256 y volver a contrastar
+que el catálogo no cambió. Ante un fallo, puede quedar una carpeta parcial
+**sin manifiesto final**; inspeccionarla y gestionarla de forma explícita,
+nunca tratarla como copia válida ni sobrescribirla automáticamente.
+
+`verify-stage` verifica sin consultar la BD viva: estructura, huella
+del catálogo, número exacto de archivos y tamaño/SHA de cada original.
+`--expect` compara la huella que devolvió `audit`. Exit `0` significa
+preparación íntegra **de Vault en ese punto**, `2` significa entrada inválida
+o copia incompleta y `3` significa fallo operativo. La huella puede coincidir
+aunque otros datos de MariaDB falten: para una recuperación completa, hacer
+**otro** backup consistente de todas las tablas/dependencias de Symfony y
+ensayar una restauración real en un entorno aislado. Ninguno de los comandos
+ejecuta SQL de restauración, cambia la raíz activa, purga ni modifica archivos
+existentes del Vault.
+
+### Operación pendiente antes de producción
+
+Definir política aprobada de retención y eliminación, almacenamiento durable
+con permisos/volumen verificables, backup cifrado de MariaDB y originales,
+restauración integral ensayada (incluidos usuarios/tenants/permisos), rotación de
+claves y monitoreo. Una copia en el mismo host no cubre pérdida de host o disco.

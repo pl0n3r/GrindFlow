@@ -7,6 +7,8 @@ namespace GrindFlow\Tests;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultAuditCommand;
+use GrindFlow\Infrastructure\Storage\VaultStageCommand;
+use GrindFlow\Infrastructure\Storage\VaultVerifyStageCommand;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -103,6 +105,79 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame(0, $exit);
             self::assertTrue($matching['expected_manifest_matches']);
 
+            // A staging copy is explicit, never automatic, and refuses an
+            // existing directory or a target under the release.
+            $stagePath = $base.'/stage';
+            $stage = new CommandTester(new VaultStageCommand($db, $storage, new VaultBlobVerifier($storage), $project));
+            $verify = new CommandTester(new VaultVerifyStageCommand($project));
+            self::assertSame(2, $stage->execute([
+                '--organization' => $mine, '--target' => $stagePath,
+            ]), 'Operator acknowledgement of frozen writes is required.');
+            self::assertSame(2, $stage->execute([
+                '--organization' => $mine, '--target' => $project.'/unsafe-copy',
+                '--confirm-writes-stopped' => true,
+            ]));
+            self::assertSame(2, $stage->execute([
+                '--organization' => $mine, '--target' => $root.'/unsafe-copy',
+                '--confirm-writes-stopped' => true,
+            ]));
+            self::assertSame(0, $stage->execute([
+                '--organization' => $mine, '--target' => $stagePath,
+                '--confirm-writes-stopped' => true,
+            ]));
+            $stageResult = json_decode($stage->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertSame('staged', $stageResult['status']);
+            self::assertSame(2, $stageResult['assets']);
+            self::assertSame(strlen($bytes) * 2, $stageResult['bytes']);
+            self::assertSame($good['manifest_sha256'], $stageResult['manifest_sha256']);
+            self::assertSame(0700, fileperms($stagePath) & 0777);
+            self::assertSame(0700, fileperms($stagePath.'/blobs') & 0777);
+            self::assertSame(0600, fileperms($stagePath.'/manifest.json') & 0777);
+            $stagedManifest = json_decode(
+                (string) file_get_contents($stagePath.'/manifest.json'), true, 512, JSON_THROW_ON_ERROR,
+            );
+            self::assertSame($mine, $stagedManifest['organization_id']);
+            self::assertSame(2, count($stagedManifest['assets']));
+            self::assertSame($good['manifest_sha256'], $stagedManifest['manifest_sha256']);
+            self::assertStringNotContainsString($foreign, $stage->getDisplay());
+            self::assertStringNotContainsString($root, $stage->getDisplay());
+
+            $check = static function (?string $expected = null) use ($verify, $stagePath): array {
+                $opts = ['--directory' => $stagePath];
+                if ($expected !== null) {
+                    $opts['--expect'] = $expected;
+                }
+                $code = $verify->execute($opts);
+                return [$code, json_decode($verify->getDisplay(), true, 512, JSON_THROW_ON_ERROR)];
+            };
+            [$exit, $verifiedStage] = $check($good['manifest_sha256']);
+            self::assertSame(0, $exit);
+            self::assertSame('verified', $verifiedStage['status']);
+            self::assertTrue($verifiedStage['expected_manifest_matches']);
+            self::assertSame(2, $verifiedStage['assets']);
+            [$exit, $wrongManifest] = $check(str_repeat('0', 64));
+            self::assertSame(2, $exit);
+            self::assertSame('manifest_mismatch', $wrongManifest['code']);
+            self::assertSame(2, $stage->execute([
+                '--organization' => $mine, '--target' => $stagePath,
+                '--confirm-writes-stopped' => true,
+            ]), 'Existing stage must never be overwritten.');
+
+            $stagedFirst = $stagePath.'/blobs/'.$first.'.blob';
+            file_put_contents($stagedFirst, substr_replace($bytes, 'X', 0, 1));
+            [$exit, $damagedStage] = $check($good['manifest_sha256']);
+            self::assertSame(2, $exit);
+            self::assertSame('blob_integrity_failed', $damagedStage['code']);
+            file_put_contents($stagedFirst, $bytes);
+            file_put_contents($stagePath.'/blobs/unexpected.txt', 'unreferenced');
+            [$exit, $unexpected] = $check();
+            self::assertSame(2, $exit);
+            self::assertSame('blob_count_mismatch', $unexpected['code']);
+            unlink($stagePath.'/blobs/unexpected.txt');
+            [$exit, $recoveredStage] = $check($good['manifest_sha256']);
+            self::assertSame(0, $exit);
+            self::assertSame('verified', $recoveredStage['status']);
+
             file_put_contents($root.'/'.$first.'.blob', substr_replace($bytes, 'X', 0, 1));
             [$exit, $tampered] = $run($mine, $good['manifest_sha256']);
             self::assertSame(2, $exit);
@@ -115,6 +190,11 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame(2, $exit);
             self::assertSame(1, $missing['checks']['missing']);
             self::assertSame(1, $missing['checks']['mismatch']);
+            self::assertSame(2, $stage->execute([
+                '--organization' => $mine, '--target' => $base.'/invalid-stage',
+                '--confirm-writes-stopped' => true,
+            ]));
+            self::assertFileDoesNotExist($base.'/invalid-stage/manifest.json');
 
             file_put_contents($root.'/'.$first.'.blob', $bytes);
             file_put_contents($root.'/'.$second.'.blob', $bytes);
@@ -141,6 +221,12 @@ final class VaultAuditCommandTest extends KernelTestCase
                 $db->delete('gf_identity_organizations', ['id' => $organization]);
             }
             $db->delete('gf_identity_users', ['id' => $user]);
+            foreach (glob($base.'/stage/blobs/*') ?: [] as $stagedFile) {
+                @unlink($stagedFile);
+            }
+            @unlink($base.'/stage/manifest.json');
+            @rmdir($base.'/stage/blobs');
+            @rmdir($base.'/stage');
             @unlink($root.'/'.$first.'.blob');
             @unlink($root.'/'.$second.'.blob');
             @rmdir($root);
