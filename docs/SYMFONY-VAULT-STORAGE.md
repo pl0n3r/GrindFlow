@@ -40,6 +40,42 @@ probada en entorno descartable, cifrado/control de acceso y alertas. Los
 originales en papelera siguen contando para almacenamiento. No hay purga
 automática ni política de retención asumida.
 
+## Auditoría no destructiva y comprobación tras restaurar (v0.1.56)
+
+En un entorno Symfony autorizado y **con escrituras detenidas durante la
+captura/restauración**, el operador puede verificar los originales del catálogo
+de **una sola organización** y obtener una huella del manifiesto de metadatos.
+El comando lee MariaDB y los blobs privados; no hace backups, copia, modifica
+o publica ningún archivo:
+
+```bash
+cd symfony
+php bin/console grindflow:vault:audit --organization=UUID-DE-LA-ORGANIZACION
+# Después de restaurar BD + blobs en un entorno separado:
+php bin/console grindflow:vault:audit --organization=UUID-DE-LA-ORGANIZACION --expect=HUELLA_SHA256_DEL_INVENTARIO
+```
+
+La salida JSON contiene **solo agregados**: número de activos, papelera,
+estados `verified/missing/mismatch/unavailable`, `manifest_sha256` y si
+coincide la huella esperada. El manifiesto incorpora los metadatos de todos
+los recursos ordenados por ID, incluidos los retenidos en papelera. No expone
+nombres, IDs de recursos, hashes individuales ni rutas del servidor.
+Guardar la huella del inventario de origen con la evidencia operativa.
+
+**Códigos de salida:** `0` significa inventario no vacío, todos los
+originales comprobados y manifiesto coincidente si se indicó `--expect`;
+`2` significa entrada incorrecta, organización inexistente, catálogo vacío,
+archivo faltante/alterado/no disponible o manifiesto diferente; `3`
+indica error al auditar. No sustituir esos códigos por éxito en CI.
+
+Una huella coincidente **no** equivale a un backup recuperable si los bytes
+son inválidos: ambos criterios deben aprobar. No tomar el manifiesto durante
+subidas, renombres o movimientos activos y luego interpretarlo como snapshot
+consistente. La prueba integral de un backup requiere efectuar la
+restauración real en infraestructura descartable, ejecutar el comando sobre
+la pareja BD + blobs restaurada y registrar el resultado. Ningún PR activa
+automáticamente esta operación en Hostinger.
+
 ## Límites y estado
 
 Esta opción es preparación técnica S2, no un cutover ni un deploy.

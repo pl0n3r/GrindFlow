@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.55: ubicación privada externa opcional para los originales, todavía no desplegado.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.54 `68cd47a0356211bf99434fc7d962d3b7774e747a`, CI exact-main success. No se copian bytes, cambian credenciales ni ejecutan migraciones productivas.
+> **Candidato v0.1.56: auditoría operativa de recuperación del Vault Symfony, todavía no desplegado.** El alcance «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.55 `02c4a00df713fe2f0b2555d6666b2d145d1bf107`, CI exact-main success. No se hacen backups ni migraciones productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.55** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.54~~ | `68cd47a0356211bf99434fc7d962d3b7774e747a` |
+| Version objetivo | 🚧 **v0.1.56** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.55~~ | `02c4a00df713fe2f0b2555d6666b2d145d1bf107` |
 | CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión pendiente | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+261** | **−32** | **+229** |
+| **8** | **+404** | **−70** | **+334** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: raíz privada configurable fuera de la carpeta del release, manteniendo modo local por defecto |
+| Alcance | S2: verificador único de blobs para HTTP + CLI de inventario/recuperación por organización |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,30 +58,30 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Servicio de storage privado Symfony compartido por cargas, descargas, vistas previas, diagnóstico y restauración; `GRINDFLOW_VAULT_ROOT` es opcional y por defecto conserva `symfony/var/vault`.
-- La ruta externa exige padre existente y ubicación absoluta fuera del release. Bloquea directorios simbólicos, travesías y webroot, crea solo el directorio final con permisos 0700.
-- PHPUnit prueba la raíz original, ruta externa y rechazos; guía operativa explica cómo preservar catálogo/blobs, persistencia y recuperación, sin prometer backup automático, mover datos ni activar Hostinger.
+- CLI `grindflow:vault:audit --organization=<UUID> [--expect=<SHA256>]`: revisa el catálogo y los originales privados activos y en papelera; devuelve resumen JSON de integridad + huella reproducible de metadatos para cotejar una restauración.
+- Backend HTTP y auditoría CLI usan el mismo verificador de tamaño/SHA-256. Un catálogo vacío, bytes corruptos/ausentes o una huella distinta no se reportan como recuperación correcta.
+- Tests PHP/MariaDB con dos organizaciones sintéticas y restauración en entorno descartable; guía de operación sin rutas físicas, nombres o hashes individuales en la salida, sin modificar Hostinger ni crear backups.
 ## Archivos modificados en este deploy
-Este inventario corresponde al **cambio candidato en el PR**, no a archivos desplegados en Hostinger.
+Inventario del **cambio candidato en el PR**, no archivos desplegados en Hostinger.
 - `README.md`
 - `config/version.php`
 - `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/README.md`
-- `symfony/config/services.yaml`
 - `symfony/src/Http/Controller/VaultController.php`
-- `symfony/src/Infrastructure/Storage/PrivateVaultDirectory.php`
-- `symfony/tests/php/PrivateVaultDirectoryTest.php`
+- `symfony/src/Infrastructure/Storage/VaultAuditCommand.php`
+- `symfony/src/Infrastructure/Storage/VaultBlobVerifier.php`
+- `symfony/tests/php/VaultAuditCommandTest.php`
 ## Validación
-- PHP/MariaDB y contratos Symfony se comprueban en CI del PR; sin checkout local de este repositorio en esta sesión.
-- CI exact-main v0.1.54 success; CI/Sonar/CodeRabbit del head v0.1.55 y Hostinger son señales separadas. No se tocó producción.
+- PHP/MariaDB, TypeScript y Chromium se comprueban mediante CI del PR; sin checkout local disponible en esta sesión.
+- CI exact-main v0.1.55 success; CI/Sonar/CodeRabbit del head v0.1.56 y Hostinger son señales separadas. No se tocó producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar raíz privada configurable v0.1.55 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Verificar volumen persistente y plan de backup/restore | 🚧 Pendiente operación y política de retención |
+| **NOW** | 🚧 Validar auditoría recuperable v0.1.56 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Restauración de backups completos BD + blobs en entorno aislado | 🚧 Operación y política de retención pendientes |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -89,7 +89,7 @@ Este inventario corresponde al **cambio candidato en el PR**, no a archivos desp
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar almacenamiento privado externo v0.1.55 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Backups coherentes BD + blobs y restauración | 🚧 Pendiente de definir política de retención y backup |
+| **NOW** | 🚧 Validar comando de auditoría y manifiesto v0.1.56 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Backup y ensayo operativo de restauración | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

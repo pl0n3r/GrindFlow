@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
+use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,7 +29,10 @@ final class VaultController extends AbstractController
     private const MAX_ORGANIZATION_BYTES = 128 * 1024 * 1024;
     private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 
-    public function __construct(private readonly PrivateVaultDirectory $storage)
+    public function __construct(
+        private readonly PrivateVaultDirectory $storage,
+        private readonly VaultBlobVerifier $verifier,
+    )
     {
     }
 
@@ -332,7 +336,7 @@ final class VaultController extends AbstractController
         }
         // Never serve a modified or incomplete original, even when its size
         // matches. The integrity endpoint remains a read-only diagnostic.
-        if ($this->originalStatus($asset) !== 'verified') {
+        if ($this->verifier->status($asset) !== 'verified') {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
         $path = $this->storage->root().'/'.$asset['storage_key'].'.blob';
@@ -378,7 +382,7 @@ final class VaultController extends AbstractController
         if (!in_array($mime, self::MIMES, true)) {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
-        if ($this->originalStatus($asset) !== 'verified') {
+        if ($this->verifier->status($asset) !== 'verified') {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
         $path = $this->storage->root().'/'.$asset['storage_key'].'.blob';
@@ -422,54 +426,11 @@ final class VaultController extends AbstractController
         if ($asset === false) {
             return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
         }
-        $status = $this->originalStatus($asset);
+        $status = $this->verifier->status($asset);
 
         return $this->privateJson(['data' => ['id' => $id, 'status' => $status]]);
     }
 
-
-    /**
-     * Shared read-only guard for verification, download, preview and restore.
-     * Avoids trusting size alone: equal-size mutations must never be served.
-     *
-     * @param array{storage_key:mixed,size_bytes:mixed,sha256:mixed} $asset
-     */
-    private function originalStatus(array $asset): string
-    {
-        $root = $this->storage->root();
-        $key = (string) $asset['storage_key'];
-        $expectedSize = (int) $asset['size_bytes'];
-        $expectedHash = (string) $asset['sha256'];
-        $status = 'unavailable';
-        // Corrupted keys and unsafe storage structures must never be traversed.
-        if (preg_match('/\\A[0-9a-fA-F-]{36}\\z/D', $key) === 1 && !is_link($root) && is_dir($root)) {
-            $path = $root.'/'.$key.'.blob';
-            clearstatcache(true, $path);
-            if (is_link($path)) {
-                $status = 'unavailable';
-            } elseif (!is_file($path)) {
-                $status = 'missing';
-            } elseif (!is_readable($path)) {
-                $status = 'unavailable';
-            } elseif ($expectedSize < 1 || $expectedSize > self::MAX_BYTES
-                || preg_match('/\\A[a-fA-F0-9]{64}\\z/D', $expectedHash) !== 1) {
-                $status = 'mismatch';
-            } else {
-                $actualSize = @filesize($path);
-                if ($actualSize === false) {
-                    $status = 'unavailable';
-                } elseif ($actualSize !== $expectedSize) {
-                    $status = 'mismatch';
-                } else {
-                    $actualHash = @hash_file('sha256', $path);
-                    // An unreadable file does not become a false mismatch.
-                    $status = $actualHash === false ? 'unavailable'
-                        : (hash_equals(strtolower($expectedHash), $actualHash) ? 'verified' : 'mismatch');
-                }
-            }
-        }
-        return $status;
-    }
 
     /**
      * Update only the private display/attachment name, never the opaque storage key.
@@ -613,7 +574,7 @@ final class VaultController extends AbstractController
                 return 'already_active';
             }
             if ($action === 'restore') {
-                if ($this->originalStatus($asset) !== 'verified') {
+                if ($this->verifier->status($asset) !== 'verified') {
                     return 'missing_blob';
                 }
                 // Quota covers retained blobs in both views; restoration adds no bytes.
