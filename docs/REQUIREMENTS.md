@@ -26,14 +26,14 @@ Each requirement should contain:
 **Aceptación:** primer slice aislado S0 ofrece home Twig, assets React reales, versión y health seguros, sin reemplazar Laravel/Hostinger actual; Composer/Vite reproducibles; tests de rutas + asset + integración MariaDB + navegador; PHP de hosting observado antes de cutover.
 
 ### GF-UX-001 — Navegación coherente entre espacios Symfony
-**Estado:** implementado en candidato v0.1.76; validación de navegador y despliegue pendientes.
+**Estado:** implementado.
 
 **Enunciado:** la vista previa React y el admin privado comparten un componente de navegación y una convención visual: marca, nombres, jerarquía, estado activo, teclado y puntos de adaptación a pantalla angosta. Los destinos de admin deben enlazar secciones existentes, no aparentar rutas externas ni publicar contenido.
 
 **Aceptación:** a 360 y 820 px ambos espacios muestran navegación utilizable sin desbordamiento horizontal de la página; los conceptos de preview usan botones con `aria-pressed`, las rutas/secciones reales usan enlaces con `aria-current` cuando corresponde y el enlace «Saltar al contenido» tiene un destino en el admin. Prueba Chromium sobre el build Symfony aislado y sin tocar Hostinger.
 
 ### GF-UX-002 — Continuidad de acceso público a privado
-**Estado:** implementado en candidato v0.1.77; CI/Hostinger pendientes.
+**Estado:** implementado.
 
 **Enunciado:** el ingreso y selector de organización Symfony reutilizan una misma cabecera de marca y navegación, sin duplicar logos ni presentar el preview como área autenticada.
 
