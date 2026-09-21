@@ -160,7 +160,7 @@ Cada imagen de la organización puede tener una anotación interna opcional, vis
 
 ### Identidad Symfony: cambio de contraseña personal
 
-El titular de una sesión activa puede rotar únicamente su propia contraseña con comprobación de clave actual y CSRF independiente, sin que una membresía de organización habilite modificación de otras cuentas. El backend vuelve a leer el hash vigente bajo bloqueo de fila, rechaza reutilización y actualiza el hash de forma transaccional. Tras el éxito invalida la sesión actual y exige autenticarse otra vez; otras sesiones no se declaran revocadas sin un contrato explícito de invalidación centralizada. El navegador elimina de memoria los tres campos al responder. No afecta el runtime Laravel ni sus usuarios reales.
+El titular de una sesión activa puede rotar únicamente su propia contraseña con comprobación de clave actual y CSRF independiente, sin que una membresía de organización habilite modificación de otras cuentas. El backend vuelve a leer el hash vigente bajo bloqueo de fila, rechaza reutilización y actualiza el hash de forma transaccional. Tras el éxito invalida la sesión actual y exige autenticarse otra vez; otras sesiones no se declaran revocadas sin un contrato explícito de invalidación centralizada. El navegador elimina de memoria los tres campos al responder. El endpoint limita a ocho solicitudes autenticadas por identidad y ventana móvil de 15 minutos, responde `429` y `Retry-After` sin incluir secretos y aplica el límite a través de nuevas sesiones. El estado del limitador usa el cache del runtime Symfony: limpiar el cache lo reinicia y la instalación distribuida requiere un backend compartido. No afecta el runtime Laravel ni sus usuarios reales.
 
 ## 7. Quality model
 

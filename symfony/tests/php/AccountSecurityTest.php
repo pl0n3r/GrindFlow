@@ -121,6 +121,34 @@ final class AccountSecurityTest extends WebTestCase
                 'email' => $actor.'@example.test', 'password' => $next,
             ]));
             self::assertResponseRedirects('/organizations');
+
+            // The same account must not bypass the limiter by starting a new session.
+            $selector = $client->request('GET', '/organizations');
+            $client->submit($selector->filter('.identity-orgs form')->form());
+            self::assertResponseRedirects('/admin');
+            $client->request('GET', '/api/admin/context');
+            $freshCsrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
+            $freshHeaders = $jsonHeaders + ['HTTP_X_CSRF_TOKEN' => $freshCsrf];
+            for ($attempt = 0; $attempt < 2; ++$attempt) {
+                $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
+                    'current_password' => 'wrong-current', 'new_password' => $old,
+                    'confirm_password' => $old,
+                ], JSON_THROW_ON_ERROR));
+                self::assertResponseStatusCodeSame(422);
+            }
+            $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
+                'current_password' => $next, 'new_password' => $old,
+                'confirm_password' => $old,
+            ], JSON_THROW_ON_ERROR));
+            self::assertResponseStatusCodeSame(429);
+            self::assertSame('password_change_rate_limited', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertGreaterThan(0, (int) $client->getResponse()->headers->get('Retry-After'));
+            self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+            self::assertTrue(password_verify($next, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
         } finally {
             $db->delete('gf_identity_memberships', ['user_id' => $actor]);
             $db->delete('gf_identity_organizations', ['id' => $organization]);

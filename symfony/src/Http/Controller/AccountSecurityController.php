@@ -7,9 +7,11 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Entity\IdentityUser;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
@@ -25,6 +27,7 @@ final class AccountSecurityController extends AbstractController
         Connection $db,
         UserPasswordHasherInterface $hasher,
         TokenStorageInterface $tokens,
+        #[Target('profile_password')] RateLimiterFactoryInterface $attemptLimiter,
     ): JsonResponse {
         $user = $this->getUser();
         if (!$user instanceof IdentityUser || !$user->isActive()) {
@@ -32,6 +35,17 @@ final class AccountSecurityController extends AbstractController
         }
         if (!$this->isCsrfTokenValid('grindflow_profile_password', (string) $request->headers->get('X-CSRF-Token', ''))) {
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+
+        // Bound password-hash work across sessions for this identity, even for malformed payloads.
+        // The limiter's cache is server-side and never derived from a browser-provided actor ID.
+        $limit = $attemptLimiter->create($user->id())->consume();
+        if (!$limit->isAccepted()) {
+            $retryAfter = max(1, $limit->getRetryAfter()->getTimestamp() - time());
+            $response = $this->error(429, 'password_change_rate_limited', 'Demasiados intentos. Inténtalo más tarde.');
+            $response->headers->set('Retry-After', (string) $retryAfter);
+
+            return $response;
         }
 
         $body = json_decode($request->getContent(), true);

@@ -212,11 +212,13 @@ test('personal password change is available at 360px and clears all secret field
       confirm_password: 'replacement-password-456',
     });
     await route.fulfill({
-      status: attempts === 1 ? 422 : 200,
+      status: attempts === 1 ? 422 : attempts === 2 ? 429 : 200,
       contentType: 'application/json',
       body: JSON.stringify(attempts === 1
         ? { error: { code: 'current_password_invalid', message: 'La contraseña actual no coincide.' } }
-        : { data: { reauthentication_required: true } }),
+        : attempts === 2
+          ? { error: { code: 'password_change_rate_limited', message: 'Demasiados intentos. Inténtalo más tarde.' } }
+          : { data: { reauthentication_required: true } }),
     });
   });
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
@@ -237,9 +239,17 @@ test('personal password change is available at 360px and clears all secret field
   await next.fill('replacement-password-456');
   await confirmation.fill('replacement-password-456');
   await page.getByRole('button', { name: 'Actualizar contraseña' }).click();
+  await expect(page.getByText('Demasiados intentos. Inténtalo más tarde.')).toBeVisible();
+  await expect(current).toHaveValue('');
+  await expect(next).toHaveValue('');
+  await expect(confirmation).toHaveValue('');
+  await current.fill('current-password-123');
+  await next.fill('replacement-password-456');
+  await confirmation.fill('replacement-password-456');
+  await page.getByRole('button', { name: 'Actualizar contraseña' }).click();
   await expect(page.getByRole('link', { name: 'Volver a iniciar sesión' })).toHaveAttribute('href', '/login');
   await expect(page.getByText(/La sesión terminó/)).toBeVisible();
-  expect(attempts).toBe(2);
+  expect(attempts).toBe(3);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
