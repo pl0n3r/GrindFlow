@@ -265,3 +265,27 @@
 .manual-handoff-status.failed{color:#ffb7c6}
 .manual-handoff-status.none{color:#9699ae}
 @media(max-width:520px){.schedule-draft-actions{width:100%;justify-content:stretch}.schedule-draft-actions button{width:100%}}
+
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.schedule-draft-actions select{box-sizing:border-box;min-width:180px;max-width:100%;min-height:42px;border:1px solid #716287;border-radius:9px;padding:8px 10px;background:#0d0e17;color:#f8f8ff;font:inherit;font-size:12px}
+.manual-destination-panel,.manual-handoff-queue{display:grid;gap:11px;padding:14px;border:1px solid #39384d;border-radius:11px;background:#11131e;min-width:0}
+.manual-destination-panel h4,.manual-handoff-queue h4{margin:5px 0;font-size:16px}
+.manual-destination-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;min-width:0}
+.manual-destination-form label{grid-column:1/-1;font-size:12px;font-weight:750}
+.manual-destination-form input{box-sizing:border-box;width:100%;min-width:0;min-height:42px;border:1px solid #716287;border-radius:9px;padding:8px 10px;background:#0d0e17;color:#f8f8ff;font:inherit}
+.manual-destination-form button,.manual-destination-list button{min-height:42px;padding:8px 11px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;font-size:12px;cursor:pointer}
+.manual-destination-form button:disabled,.manual-destination-list button:disabled{opacity:.55;cursor:not-allowed}
+.manual-destination-list,.manual-handoff-queue ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+.manual-destination-list li,.manual-handoff-queue li{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:11px;border:1px solid #39384d;border-radius:9px;background:#151722;min-width:0}
+.manual-destination-list li>div,.manual-handoff-queue li>div{display:grid;gap:4px;min-width:0}
+.manual-destination-list strong,.manual-destination-list small,.manual-handoff-queue strong,.manual-handoff-queue span,.manual-handoff-queue small{overflow-wrap:anywhere}
+.manual-destination-list small,.manual-handoff-queue small{color:#aaa9bd}
+.manual-queue-state{text-align:right}
+.manual-queue-state>strong{color:#d9c9ff}
+@media(max-width:620px){
+  .manual-destination-form{grid-template-columns:minmax(0,1fr)}
+  .manual-destination-list li,.manual-handoff-queue li{flex-direction:column}
+  .manual-destination-list button{width:100%}
+  .manual-queue-state{text-align:left}
+  .schedule-draft-actions select{width:100%;min-width:0}
+}
