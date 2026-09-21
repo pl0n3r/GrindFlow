@@ -36,26 +36,29 @@ final class AdminContextController extends AbstractController
             return $this->error(403, 'organization_access_changed', 'Tu acceso a esta organización ha cambiado.');
         }
 
-        // The session user can lag behind a profile edit. Read the live name.
         $liveName = $memberships->displayName($user->id());
         if ($liveName === null) {
             return $this->error(403, 'account_access_changed', 'Tu cuenta ya no está activa.');
         }
+        $permissions = $memberships->permissions($organization['role']);
 
         return $this->privateJson([
             'data' => [
                 'user' => ['display_name' => $liveName],
                 'profile_name_csrf' => (string) $csrf->getToken('grindflow_profile_name')->getValue(),
                 'profile_password_csrf' => (string) $csrf->getToken('grindflow_profile_password')->getValue(),
-                'vault_upload_csrf' => $memberships->permissions($organization['role'])['content_prepare']
+                'vault_upload_csrf' => $permissions['content_prepare']
                     ? (string) $csrf->getToken('grindflow_vault_upload')->getValue()
                     : null,
-                'vault_manage_csrf' => $memberships->permissions($organization['role'])['content_prepare']
+                'vault_manage_csrf' => $permissions['content_prepare']
                     ? (string) $csrf->getToken('grindflow_vault_manage')->getValue()
                     : null,
+                'weekly_rule_csrf' => $permissions['content_prepare']
+                    ? (string) $csrf->getToken('grindflow_weekly_rule')->getValue()
+                    : null,
                 'organization' => $organization,
-                'permissions' => $memberships->permissions($organization['role']),
-                'organization_name_csrf' => $memberships->permissions($organization['role'])['organization_manage']
+                'permissions' => $permissions,
+                'organization_name_csrf' => $permissions['organization_manage']
                     ? (string) $csrf->getToken('grindflow_organization_name')->getValue()
                     : null,
             ],
@@ -90,7 +93,6 @@ final class AdminContextController extends AbstractController
         }
 
         $body = json_decode($request->getContent(), true);
-        // Tenant never comes from the request. Reject ID injection rather than ignoring it.
         if (!is_array($body) || array_key_exists('organization_id', $body) || !is_string($body['name'] ?? null)) {
             return $this->error(422, 'invalid_name', 'Indica un nombre válido, sin identificadores de organización.');
         }
@@ -100,7 +102,6 @@ final class AdminContextController extends AbstractController
             return $this->error(422, 'invalid_name', 'El nombre debe tener entre 2 y 120 caracteres visibles.');
         }
 
-        // A server-side permission check alone is not sufficient; protect the UPDATE itself.
         $db->executeStatement(
             <<<'SQL'
                 UPDATE gf_identity_organizations
