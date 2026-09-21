@@ -229,7 +229,7 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame('restored_catalog_mismatch', $missingNote['code']);
             $db->update('gf_vault_assets', ['private_note' => 'Referencia privada inicial'], ['id' => $first]);
             $db->update('gf_vault_assets', ['usage_scope' => 'needs_review'], ['id' => $first]);
-            [$exit, $wrongUsage] = $restore($mine, $stagePath, $good['manifest_sha256']);
+            [$exit, $wrongUsage] = $restoredCheck($restoreArgs);
             self::assertSame(2, $exit);
             self::assertSame('restored_catalog_mismatch', $wrongUsage['code']);
             $db->update('gf_vault_assets', ['usage_scope' => 'unclassified'], ['id' => $first]);
