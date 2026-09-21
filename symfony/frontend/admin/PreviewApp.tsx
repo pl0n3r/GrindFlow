@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WorkspaceNavigation } from './WorkspaceNavigation';
 
 type PreviewAppProps = Readonly<{ version: string }>;
 type Stage = 'biblioteca' | 'reglas' | 'trafico';
@@ -14,24 +15,10 @@ export function PreviewApp({ version }: PreviewAppProps) {
 
   return (
     <div className="preview-shell">
-      <aside className="preview-aside">
-        <a className="brand" href="/" aria-label="GrindFlow, inicio">GRIND<span>FLOW</span><span className="brand-dot">●</span></a>
-        <span className="preview-label">ESPACIO DE TRABAJO</span>
-        <nav aria-label="Explorador de secciones">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              aria-current={active === section.id ? 'page' : undefined}
-              onClick={() => setActive(section.id)}
-              className={active === section.id ? 'preview-tab selected' : 'preview-tab'}
-            >
-              <span>{section.number}</span>{section.label}
-            </button>
-          ))}
-        </nav>
-        <div className="preview-aside-bottom"><span className="status-dot" /> Entorno S0, sin datos reales</div>
-      </aside>
+      <WorkspaceNavigation mode="preview" items={sections} active={active}
+        onSelect={(id) => setActive(id as Stage)}
+        footer={<div className="preview-aside-bottom"><span className="status-dot" /> Entorno S0, sin datos reales</div>}
+      />
       <div className="preview-workspace">
         <header className="preview-toolbar">
           <span>VISTA PREVIA <span aria-hidden="true">/</span> {chosen.label.toUpperCase()}</span>

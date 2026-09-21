@@ -1,3 +1,4 @@
+import { WorkspaceNavigation } from './WorkspaceNavigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { VaultPanel } from './VaultPanel';
 import { WeeklyPlannerPanel } from './WeeklyPlannerPanel';
@@ -221,25 +222,24 @@ export function AdminApp() {
 
   return (
     <div className="admin-layout">
-      <aside className="admin-sidebar">
-        <a className="admin-brand" href="/" aria-label="GrindFlow, inicio">GRIND<span>FLOW</span></a>
-        <nav aria-label="Navegación administrativa">
-          <a className="active" href="/admin" aria-current="page"><span>01</span>Resumen</a>
-          <a href="#biblioteca"><span>02</span>Biblioteca <small>S2</small></a>
-          <a href="#programacion"><span>03</span>Programación <small>S3</small></a>
-        </nav>
-        <div className="admin-tenant">
+      <WorkspaceNavigation mode="admin" active="resumen"
+        items={[
+          { id: 'resumen', number: '01', label: 'Resumen', href: '/admin' },
+          { id: 'biblioteca', number: '02', label: 'Biblioteca', href: '#biblioteca', stage: 'S2' },
+          { id: 'programacion', number: '03', label: 'Programación', href: '#programacion', stage: 'S4' },
+        ]}
+        footer={<div className="admin-tenant">
           <small>ORGANIZACIÓN ACTUAL</small>
           <strong>{context.organization.name}</strong>
           <span>{role}</span>
-        </div>
-      </aside>
+        </div>}
+      />
       <section className="admin-workspace">
         <header className="admin-header">
           <div><small>ESPACIO PRIVADO</small><strong>{context.organization.name}</strong></div>
           <div className="admin-user"><span>{context.user.display_name}</span><span className="role-chip">{role}</span></div>
         </header>
-        <main className="admin-content">
+        <main id="contenido" className="admin-content">
           <span className="admin-kicker"><span className="admin-pulse" /> CONTEXTO VERIFICADO</span>
           <h1>Tu espacio,<br/><em>con permisos claros.</em></h1>
           <p className="admin-lead">La sesión y la membresía se revalidan en el servidor. Esta entrega muestra únicamente acciones que tu rol puede realizar.</p>
