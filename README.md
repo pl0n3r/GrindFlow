@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **13** | **+528** | **−32** | **+496** |
+| **14** | **+568** | **−38** | **+530** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -77,6 +77,7 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 - `symfony/src/Http/Controller/ContentRuleController.php`
 - `symfony/src/Http/Controller/DistributionAuthorizationController.php`
 - `symfony/src/Identity/Application/MembershipContext.php`
+- `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/DistributionAuthorizationTest.php`
 
 ## Validación
