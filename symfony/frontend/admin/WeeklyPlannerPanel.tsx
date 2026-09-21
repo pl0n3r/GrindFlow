@@ -53,6 +53,7 @@ type Props = {
   authorizationCsrf: string | null;
   canManualHandoff: boolean;
   manualHandoffCsrf: string | null;
+  manualDestinationCsrf: string | null;
 };
 
 const days = [
@@ -83,7 +84,7 @@ function browserTimezone(): string {
 
 export function WeeklyPlannerPanel({
   canEdit, csrf, canReview, reviewCsrf, scheduleCsrf, canAuthorize, authorizationCsrf,
-  canManualHandoff, manualHandoffCsrf,
+  canManualHandoff, manualHandoffCsrf, manualDestinationCsrf,
 }: Props) {
   const [rule, setRule] = useState<WeeklyRule | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -392,7 +393,8 @@ export function WeeklyPlannerPanel({
         {!loading && preview &&
           <ScheduleDraftPanel slots={preview.slots ?? []} assets={preview.assets}
             canEdit={canEdit} csrf={scheduleCsrf}
-            canManualHandoff={canManualHandoff} manualHandoffCsrf={manualHandoffCsrf} />}
+            canManualHandoff={canManualHandoff} manualHandoffCsrf={manualHandoffCsrf}
+            manualDestinationCsrf={manualDestinationCsrf} />}
 
         <p className="weekly-safety">
           <strong>Publicación bloqueada.</strong> “Listo para programar” solo confirma los contratos internos S3.
