@@ -63,4 +63,25 @@ class WorkspaceSidebarTest extends TestCase
             $this->assertStringNotContainsString('<aside class="gf-sidebar">', $source, $view);
         }
     }
+
+    public function test_responsive_sidebar_keeps_visible_icons_at_medium_width_and_text_on_mobile(): void
+    {
+        $css = file_get_contents(public_path('css/grindflow.css'));
+
+        $this->assertIsString($css);
+        $mediumParts = explode('@media (max-width: 960px)', $css, 2);
+        $this->assertCount(2, $mediumParts);
+        $medium = explode('@media (max-width: 680px)', $mediumParts[1], 2)[0];
+
+        $this->assertStringContainsString('grid-template-columns: 88px minmax(0, 1fr);', $medium);
+        $this->assertStringContainsString('.gf-navitem__icon', $medium);
+        $this->assertStringContainsString('width: 21px;', $medium);
+        $this->assertStringContainsString('.gf-sidebar__logout-label', $medium);
+
+        $mobileParts = explode('@media (max-width: 680px)', $css, 2);
+        $this->assertCount(2, $mobileParts);
+        $this->assertStringContainsString('.gf-sidebar .gf-navitem__text', $mobileParts[1]);
+        $this->assertStringContainsString('position: static;', $mobileParts[1]);
+    }
+
 }
