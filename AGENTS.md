@@ -183,6 +183,9 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   Comunicar hitos reales en mensajes breves y, al final de la sesion,
   separar codigo escrito, tests/gates, PRs fusionados, deploy observado y
   pendientes. No llamar desplegada una rama o funcionalidad solo preparada.
+- Nunca prometer trabajo continuo entre mensajes ni anunciar un cambio futuro
+  como ejecutado. Para una cadencia horaria solicitada, utilizar tareas
+  programadas si estan disponibles y reportar solo los hechos de cada ejecucion.
 
 ### Regla de reportes CSV de Traffic
 
