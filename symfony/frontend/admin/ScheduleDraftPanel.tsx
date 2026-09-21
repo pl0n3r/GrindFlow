@@ -225,8 +225,11 @@ export function ScheduleDraftPanel({
       if (!response.ok) {
         throw new Error(body?.error?.message ?? 'No se pudo crear el destino manual.');
       }
+      if (body?.data?.provider_calls !== false) {
+        throw new Error('No se confirmó el límite de destino interno.');
+      }
       setFeedback(body.data.changed
-        ? 'Destino manual creado. Sigue siendo una etiqueta interna, sin conexión externa.'
+        ? 'Destino manual creado. Sigue siendo una referencia interna.'
         : 'Ese destino manual ya existía.');
       setNewDestinationLabel('');
       await load();
@@ -337,7 +340,7 @@ export function ScheduleDraftPanel({
       }
 
       const labels: Record<typeof action, string> = {
-        prepare: 'Salida manual preparada con destino explícito. Aún no se ha publicado nada.',
+        prepare: 'Salida manual preparada para el destino elegido. Aún no se ha publicado nada.',
         complete: 'Salida manual registrada como realizada por una persona.',
         fail: 'Fallo manual registrado. Puedes preparar un nuevo intento.',
       };
@@ -354,14 +357,14 @@ export function ScheduleDraftPanel({
     <section className="schedule-draft-panel" aria-labelledby="schedule-draft-title">
       <div>
         <span className="admin-kicker">S4 · AGENDA INTERNA</span>
-        <h3 id="schedule-draft-title">Borradores persistidos</h3>
+        <h3 id="schedule-draft-title">Borradores y salida manual</h3>
         <p>Reserva un recurso revisado en un slot de la regla semanal. No conecta redes ni realiza publicaciones.</p>
       </div>
 
       {canManualHandoff && manualDestinationCsrf && destinationReady &&
         <section className="manual-destination-panel" aria-labelledby="manual-destination-title">
           <div>
-            <strong id="manual-destination-title">Destinos manuales internos</strong>
+            <h4 id="manual-destination-title">Destinos manuales</h4>
             <p>Son etiquetas de trabajo humano. No contienen credenciales ni conectan una plataforma externa.</p>
           </div>
           <form onSubmit={createDestination} className="manual-destination-form">
@@ -441,7 +444,7 @@ export function ScheduleDraftPanel({
                     <span>{draft.local_date} · {draft.local_time} ({draft.timezone})</span>
                     <small>{draft.status === 'draft' ? 'Borrador reservado' : 'Borrador cancelado'}</small>
                     {draft.manual_destination &&
-                      <small>Destino manual: {draft.manual_destination.label}</small>}
+                      <small>Destino: {draft.manual_destination.label}</small>}
                     {handoffReady &&
                       <small className={'manual-handoff-status ' + draft.manual_handoff_status}>
                         {draft.manual_handoff_status === 'prepared' && 'Salida manual preparada'}
@@ -458,7 +461,8 @@ export function ScheduleDraftPanel({
                           <>
                             <label className="manual-destination-choice">
                               Destino manual
-                              <select value={destinationByDraft[draft.id] ?? draft.manual_destination?.id ?? ''}
+                              <select aria-label={'Destino manual para ' + draft.asset_name}
+                                value={destinationByDraft[draft.id] ?? draft.manual_destination?.id ?? ''}
                                 onChange={(event) => setDestinationByDraft((current) => ({
                                   ...current,
                                   [draft.id]: event.target.value,
@@ -500,7 +504,7 @@ export function ScheduleDraftPanel({
       {!loading && queueReady &&
         <section className="manual-handoff-queue" aria-labelledby="manual-handoff-queue-title">
           <div>
-            <strong id="manual-handoff-queue-title">Cola interna de handoff · {queueTotal}</strong>
+            <h4 id="manual-handoff-queue-title">Trabajo manual pendiente · {queueTotal}</h4>
             <p>Primero aparecen los borradores vencidos o listos para atención humana.</p>
           </div>
           {queue.length === 0
