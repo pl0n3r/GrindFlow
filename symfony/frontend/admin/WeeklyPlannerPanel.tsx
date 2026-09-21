@@ -23,9 +23,11 @@ type PreviewAsset = {
   name: string;
   mime_type: string;
   usage_scope: string;
+  content_review_approved: boolean;
+  content_review_updated_at: string | null;
   distribution_authorized: boolean;
   distribution_authorization_updated_at: string | null;
-  eligible: false;
+  eligible: boolean;
   blocking_reasons: string[];
 };
 
@@ -43,6 +45,8 @@ type Preview = {
 type Props = {
   canEdit: boolean;
   csrf: string | null;
+  canReview: boolean;
+  reviewCsrf: string | null;
   canAuthorize: boolean;
   authorizationCsrf: string | null;
 };
@@ -73,7 +77,7 @@ function browserTimezone(): string {
   }
 }
 
-export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationCsrf }: Props) {
+export function WeeklyPlannerPanel({ canEdit, csrf, canReview, reviewCsrf, canAuthorize, authorizationCsrf }: Props) {
   const [rule, setRule] = useState<WeeklyRule | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [timezone, setTimezone] = useState(browserTimezone());
@@ -82,6 +86,7 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationC
   const [maxPerDay, setMaxPerDay] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [authorizingId, setAuthorizingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
@@ -174,6 +179,39 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationC
       setError(caught instanceof Error ? caught.message : 'No se pudo guardar la regla semanal.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function setContentReview(asset: PreviewAsset, approved: boolean) {
+    if (!canReview || !reviewCsrf || reviewingId !== null) return;
+
+    setReviewingId(asset.id);
+    setFeedback('');
+    setError('');
+    try {
+      const response = await fetch('/api/admin/content-reviews/' + encodeURIComponent(asset.id), {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': reviewCsrf,
+        },
+        body: JSON.stringify({ approved }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo actualizar la revisión de contenido.');
+      }
+
+      setFeedback(approved
+        ? 'Revisión humana aprobada. Aún falta cumplir los demás bloqueos.'
+        : 'Aprobación de revisión revocada.');
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo actualizar la revisión de contenido.');
+    } finally {
+      setReviewingId(null);
     }
   }
 
@@ -299,6 +337,24 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationC
                 <div className="weekly-asset-summary">
                   <strong>{asset.name}</strong>
                   <small>{asset.mime_type} · {asset.usage_scope}</small>
+                  {asset.usage_scope === 'needs_review' &&
+                    <span className={'weekly-authorization ' + (asset.content_review_approved ? 'yes' : 'no')}>
+                      {asset.content_review_approved
+                        ? 'Revisión humana aprobada'
+                        : 'Revisión humana pendiente'}
+                    </span>}
+                  {asset.usage_scope === 'needs_review' && canReview && reviewCsrf &&
+                    <button type="button"
+                      aria-label={(asset.content_review_approved
+                        ? 'Revocar revisión de ' : 'Aprobar revisión de ') + asset.name}
+                      disabled={reviewingId !== null || authorizingId !== null}
+                      onClick={() => void setContentReview(asset, !asset.content_review_approved)}>
+                      {reviewingId === asset.id
+                        ? 'Guardando…'
+                        : asset.content_review_approved
+                          ? 'Revocar revisión'
+                          : 'Aprobar revisión'}
+                    </button>}
                   <span className={'weekly-authorization ' + (asset.distribution_authorized ? 'yes' : 'no')}>
                     {asset.distribution_authorized
                       ? 'Distribución autorizada internamente'
@@ -306,7 +362,7 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationC
                   </span>
                   {canAuthorize && authorizationCsrf &&
                     <button type="button"
-                      disabled={authorizingId !== null}
+                      disabled={authorizingId !== null || reviewingId !== null}
                       onClick={() => void setDistributionAuthorization(asset, !asset.distribution_authorized)}>
                       {authorizingId === asset.id
                         ? 'Guardando…'
@@ -315,6 +371,8 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationC
                           : 'Autorizar distribución'}
                     </button>}
                 </div>
+                {asset.eligible &&
+                  <strong className="weekly-ready">Listo para programar internamente</strong>}
                 <ul aria-label={'Bloqueos de ' + asset.name}>
                   {asset.blocking_reasons.map((reason) =>
                     <li key={reason}>{blockerLabels[reason] ?? reason}</li>
@@ -325,8 +383,9 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationC
           </ul>}
 
         <p className="weekly-safety">
-          <strong>Publicación bloqueada.</strong> La autorización de distribución es una decisión interna separada de la
-          clasificación. No crea schedules, no llama proveedores y no certifica por sí sola derechos ni cumplimiento.
+          <strong>Publicación bloqueada.</strong> “Listo para programar” solo confirma los contratos internos S3:
+          regla, revisión humana y autorización de distribución. No crea schedules, no llama proveedores y no certifica
+          derechos, consentimiento ni aceptación de una plataforma.
         </p>
       </div>
     </section>

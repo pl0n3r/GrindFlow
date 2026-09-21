@@ -94,7 +94,7 @@ Each requirement should contain:
 
 
 ### GF-FR-013 — Autorización explícita de distribución Symfony
-**Estado:** candidato v0.1.69; validación, merge y producción se verifican por separado.
+**Estado:** integrado en main v0.1.69; despliegue Symfony y producción se verifican por separado.
 
 **Enunciado:** una persona con rol Admin o Studio puede conceder o revocar explícitamente una autorización interna de distribución para un recurso activo de su organización. Esta decisión es independiente de la clasificación del Vault y no publica, programa ni acredita derechos, consentimiento o aceptación de una plataforma.
 
@@ -109,8 +109,23 @@ Each requirement should contain:
 
 
 
+### GF-FR-014 — Revisión humana y elegibilidad interna S3
+**Estado:** candidato v0.1.71; validación, merge y producción se verifican por separado.
+
+**Enunciado:** un recurso clasificado como `needs_review` solo puede quedar listo para el siguiente contrato interno de programación después de una decisión humana explícita y revocable. Esta revisión no sustituye autorización de distribución, derechos, consentimiento ni aceptación de una plataforma.
+
+**Aceptación:**
+- Admin, Studio y Editor pueden aprobar o revocar la revisión; Model conserva lectura sin capacidad de decisión. Actor, organización y rol provienen de la sesión y se revalidan dentro de la transacción.
+- El endpoint acepta únicamente `{approved: boolean}`, exige CSRF dedicado, oculta recursos de otros tenants y solo admite originales activos actualmente clasificados `needs_review`.
+- Cada cambio agrega un evento append-only `approve/revoke` con actor y UTC. Repetir el mismo estado es idempotente; no crea eventos duplicados.
+- El preview muestra por separado clasificación, revisión humana y autorización de distribución. `eligible=true` únicamente cuando existe regla semanal, el recurso `needs_review` tiene aprobación vigente y la autorización de distribución vigente es `grant`, sin otros bloqueos.
+- `eligible` significa únicamente listo para el futuro Scheduler interno. `can_publish=false` permanece obligatorio y la decisión no crea schedule, job, entrega ni llamada externa.
+- `unclassified` e `internal_only` continúan bloqueados aunque exista un evento histórico de revisión; borrar o mover a papelera impide nuevas decisiones.
+
+**Verificación:** PHPUnit/MariaDB con 401/403, CSRF, tenant, clasificación no aplicable, idempotencia, approve/revoke y preview; Chromium móvil prueba el flujo revisión → autorización → “Listo para programar” conservando publicación bloqueada.
+
 ### GF-UX-001 — Shell de navegación consistente y responsive
-**Estado:** candidato v0.1.70; CI, merge y producción se verifican por separado.
+**Estado:** integrado en main v0.1.70; despliegue y producción se verifican por separado.
 
 **Enunciado:** las superficies Laravel autenticadas comparten una única navegación del workspace, de modo que el mismo usuario y la misma organización no reciban menús distintos por estar en otra página.
 

@@ -120,6 +120,21 @@ La selección nunca comprende automáticamente páginas no visibles, requiere
 confirmación y se limpia al cambiar página/vista/filtros o tras guardar.
 Ningún estado de clasificación constituye permiso para distribución.
 
+### S3 · Revisión humana y readiness interno
+
+La clasificación S2 sigue siendo descriptiva y no autoriza nada. Cuando un original está
+en `needs_review`, una persona con permiso de preparación editorial puede registrar una
+decisión humana `approve/revoke` en un ledger append-only, separado de la autorización
+de distribución. El preview S3 solo marca el original como **listo para programar
+internamente** cuando existe una regla semanal, la revisión humana vigente está aprobada
+y la autorización de distribución vigente está concedida, sin otros bloqueos.
+
+Este readiness no crea una publicación, un schedule persistido, un job ni una llamada a
+proveedor. `can_publish=false` continúa siendo el contrato global hasta que S4 implemente
+programación y una entrega permitida con sus propias compuertas. La aprobación de revisión
+tampoco prueba titularidad, mayoría de edad, consentimiento, licencia o aceptación de una
+plataforma.
+
 ## 4. Non-negotiable invariants
 
 1. Tenant data must not cross organization boundaries.
@@ -406,12 +421,13 @@ productivas, proveedores externos ni escrituras en producción.
 - The endpoint returns at most 30 recent active assets plus the complete active
   count. Trash and foreign-tenant assets are excluded.
 - Each visible asset carries stable blocking reasons. Missing rule,
-  unclassified/internal-only/needs-review state and missing distribution
-  authorization are surfaced explicitly rather than guessed.
-- S2 classification never grants publishing permission. Until a separate
-  distribution-authorization contract exists, every preview item remains
-  `eligible=false`, the response remains `can_publish=false`, and mode is
-  `review_only`.
+  unclassified/internal-only classification, pending human review and missing
+  distribution authorization are surfaced explicitly rather than guessed.
+- S2 classification never grants publishing permission. The preview marks
+  `eligible=true` solely for internal scheduling readiness when the saved rule,
+  current human-review approval and current distribution authorization all
+  exist without remaining blockers. `can_publish=false` and mode `review_only`
+  remain mandatory regardless of an item's internal eligibility.
 - This preview is read-only: it creates no schedule, performs no provider call
   and changes no production data.
 - The authenticated React workspace exposes this rule and preview as a mobile-first
@@ -433,7 +449,8 @@ productivas, proveedores externos ni escrituras en producción.
   It does not reserve assets, consume capacity or authorize publication.
 - A same-day occurrence that already passed is rolled to that weekday's next
   future occurrence rather than fabricating a past schedule.
-- Missing rules yield no slots. The response continues to fail closed with
-  `can_publish=false` and `review_only` until the independent distribution
-  authorization contract exists.
+- Missing rules yield no slots. Internal readiness is independent of a
+  publishing capability: the response continues to fail closed with
+  `can_publish=false` and `review_only` even after distribution authorization
+  and human review are granted.
 

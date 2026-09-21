@@ -166,6 +166,22 @@ final class ContentRuleController extends AbstractController
             <<<'SQL'
                 SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at,
                     (
+                        SELECT review_event.action
+                        FROM gf_content_review_events review_event
+                        WHERE review_event.organization_id = asset.organization_id
+                          AND review_event.asset_id = asset.id
+                        ORDER BY review_event.created_at DESC, review_event.id DESC
+                        LIMIT 1
+                    ) AS content_review_action,
+                    (
+                        SELECT review_event.created_at
+                        FROM gf_content_review_events review_event
+                        WHERE review_event.organization_id = asset.organization_id
+                          AND review_event.asset_id = asset.id
+                        ORDER BY review_event.created_at DESC, review_event.id DESC
+                        LIMIT 1
+                    ) AS content_review_updated_at,
+                    (
                         SELECT auth_event.action
                         FROM gf_distribution_authorization_events auth_event
                         WHERE auth_event.organization_id = asset.organization_id
@@ -211,11 +227,12 @@ final class ContentRuleController extends AbstractController
                 $reasons[] = 'weekly_rule_missing';
             }
             $scope = (string) $asset['usage_scope'];
+            $contentReviewApproved = ($asset['content_review_action'] ?? null) === 'approve';
             if ($scope === 'unclassified') {
                 $reasons[] = 'classification_missing';
             } elseif ($scope === 'internal_only') {
                 $reasons[] = 'internal_only';
-            } elseif ($scope === 'needs_review') {
+            } elseif ($scope === 'needs_review' && !$contentReviewApproved) {
                 $reasons[] = 'content_review_required';
             }
             $distributionAuthorized = ($asset['distribution_action'] ?? null) === 'grant';
@@ -228,13 +245,18 @@ final class ContentRuleController extends AbstractController
                 'name' => (string) $asset['original_name'],
                 'mime_type' => (string) $asset['mime_type'],
                 'usage_scope' => $scope,
+                'content_review_approved' => $contentReviewApproved,
+                'content_review_updated_at' => $asset['content_review_updated_at'] === null
+                    ? null
+                    : (string) $asset['content_review_updated_at'],
                 'distribution_authorized' => $distributionAuthorized,
                 'distribution_authorization_updated_at' =>
                     $asset['distribution_authorization_updated_at'] === null
                         ? null
                         : (string) $asset['distribution_authorization_updated_at'],
-                // Authorization only removes its own blocker. Scheduling remains fail-closed.
-                'eligible' => false,
+                // Eligibility only means ready for the next internal scheduling contract.
+                // External publication remains impossible from this preview.
+                'eligible' => $rule !== false && $reasons === [],
                 'blocking_reasons' => array_values(array_unique($reasons)),
             ];
         }, $assets);
