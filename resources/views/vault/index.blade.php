@@ -12,71 +12,7 @@
     <div class="gf-grid" aria-hidden="true"></div>
 
     <div class="gf-app">
-        <aside class="gf-sidebar">
-            <x-brand :href="route('dashboard')" />
-
-            <nav class="gf-sidebar__nav" aria-label="Navegacion del workspace">
-                <span class="gf-sidebar__label">Workspace</span>
-
-                <a class="gf-navitem" href="{{ route('dashboard') }}">
-                    <span class="gf-navitem__text">Resumen</span>
-                </a>
-
-                <a
-                    class="gf-navitem gf-navitem--active"
-                    href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
-                    aria-current="page"
-                >
-                    <span class="gf-navitem__text">Biblioteca</span>
-                </a>
-
-                <a
-                    class="gf-navitem"
-                    href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
-                >
-                    <span class="gf-navitem__text">Programación</span>
-                </a>
-
-                <a class="gf-navitem" href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}">
-                    <span class="gf-navitem__text">Distribución</span>
-                </a>
-
-                <span class="gf-sidebar__label">Insights</span>
-
-                @if (auth()->user()?->canManageTrafficOrganization($organization))
-                    <a class="gf-navitem" href="{{ route('organizations.traffic.index', ['organizationId' => $organization->id]) }}">
-                        <span class="gf-navitem__text">Tráfico</span>
-                    </a>
-                @endif
-
-                @if (auth()->user()?->canManageFinanceOrganization($organization))
-                    <a class="gf-navitem" href="{{ route('organizations.finance.index', ['organizationId' => $organization->id]) }}">
-                        <span class="gf-navitem__text">Finanzas</span>
-                    </a>
-                @endif
-
-                @if (auth()->user()?->isPlatformAdmin())
-                    <span class="gf-sidebar__label">Admin</span>
-
-                    <a class="gf-navitem" href="{{ route('admin.system') }}">
-                        <span class="gf-navitem__text">Sistema</span>
-                    </a>
-
-                    <a class="gf-navitem" href="{{ route('admin.diagnostics') }}">
-                        <span class="gf-navitem__text">Diagnósticos</span>
-                    </a>
-                @endif
-            </nav>
-
-            <div class="gf-sidebar__bottom">
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="gf-button gf-button--ghost gf-button--full" type="submit">
-                        Cerrar sesion
-                    </button>
-                </form>
-            </div>
-        </aside>
+        <x-workspace-sidebar :organization="$organization" active="vault" />
 
         <main class="gf-main">
             <header class="gf-appbar">

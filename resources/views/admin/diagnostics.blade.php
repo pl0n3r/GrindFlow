@@ -11,36 +11,7 @@
     <div class="gf-grid" aria-hidden="true"></div>
 
     <div class="gf-app">
-        <aside class="gf-sidebar">
-            <x-brand :href="route('dashboard')" />
-
-            <nav class="gf-sidebar__nav" aria-label="Navegacion del workspace">
-                <span class="gf-sidebar__label">Workspace</span>
-
-                <a class="gf-navitem" href="{{ route('dashboard') }}">
-                    <span class="gf-navitem__text">Resumen</span>
-                </a>
-
-                <span class="gf-sidebar__label">Admin</span>
-
-                <a class="gf-navitem" href="{{ route('admin.system') }}">
-                    <span class="gf-navitem__text">Sistema</span>
-                </a>
-
-                <a class="gf-navitem gf-navitem--active" href="{{ route('admin.diagnostics') }}" aria-current="page">
-                    <span class="gf-navitem__text">Diagnósticos</span>
-                </a>
-            </nav>
-
-            <div class="gf-sidebar__bottom">
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="gf-button gf-button--ghost gf-button--full" type="submit">
-                        Cerrar sesion
-                    </button>
-                </form>
-            </div>
-        </aside>
+        <x-workspace-sidebar :organization="$workspaceOrganization" active="diagnostics" />
 
         <main class="gf-main">
             <header class="gf-appbar">

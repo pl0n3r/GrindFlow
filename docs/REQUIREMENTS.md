@@ -107,6 +107,21 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit/MariaDB con autenticación, CSRF, rol, cross-tenant, grant, idempotencia, revoke y preview; React/Chromium móvil para control explícito y estado visible. Datos sintéticos únicamente.
 
+
+
+### GF-UX-001 — Shell de navegación consistente y responsive
+**Estado:** candidato v0.1.70; CI, merge y producción se verifican por separado.
+
+**Enunciado:** las superficies Laravel autenticadas comparten una única navegación del workspace, de modo que el mismo usuario y la misma organización no reciban menús distintos por estar en otra página.
+
+**Aceptación:**
+- Dashboard, Biblioteca, Programación, Distribución, Tráfico, Finanzas, Sistema y Diagnósticos reutilizan el mismo componente de navegación; ninguna vista mantiene una copia privada del sidebar.
+- El destino activo es único. Las opciones sin organización, ruta o permiso se muestran deshabilitadas con una razón accesible en vez de desaparecer accidentalmente por divergencia entre plantillas.
+- En escritorio se muestran icono y texto. Entre 681 y 960 px el rail conserva iconos visibles, nombres accesibles y un cierre de sesión compacto sin texto partido. En 680 px o menos la navegación pasa a barra inferior horizontal con icono y texto.
+- Los enlaces por organización conservan las comprobaciones de permisos existentes; un cambio visual no amplía acceso ni salta autorización server-side.
+
+**Verificación:** prueba de componente para destinos/estado activo y prueba de contrato que impide reintroducir sidebars privados en las vistas; CI Laravel, navegador y análisis estático permanecen obligatorios.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation

@@ -623,6 +623,7 @@ a {
 .gf-navitem {
   display: flex;
   align-items: center;
+  gap: 11px;
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -631,6 +632,24 @@ a {
   text-decoration: none;
   font-size: 14px;
   font-weight: 700;
+}
+
+.gf-nav-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.gf-navitem__icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .gf-navitem:hover {
@@ -652,6 +671,13 @@ a {
 
 .gf-sidebar__bottom {
   margin-top: auto;
+}
+
+.gf-sidebar__logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
 }
 
 .gf-main {
@@ -874,7 +900,7 @@ a {
   }
 
   .gf-app {
-    grid-template-columns: 78px minmax(0, 1fr);
+    grid-template-columns: 88px minmax(0, 1fr);
   }
 
   .gf-sidebar .gf-brand__name,
@@ -895,7 +921,7 @@ a {
 
   .gf-sidebar {
     align-items: center;
-    padding-inline: 10px;
+    padding-inline: 12px;
   }
 
   .gf-sidebar__nav {
@@ -904,7 +930,37 @@ a {
 
   .gf-navitem {
     justify-content: center;
+    gap: 0;
     padding: 0;
+  }
+
+  .gf-navitem__icon {
+    width: 21px;
+    height: 21px;
+    flex-basis: 21px;
+  }
+
+  .gf-sidebar__bottom {
+    width: 100%;
+  }
+
+  .gf-sidebar__logout {
+    width: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    margin-inline: auto;
+    padding: 0;
+    border-radius: 12px;
+  }
+
+  .gf-sidebar__logout-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 }
 
@@ -986,11 +1042,17 @@ a {
     flex: 0 0 auto;
     flex-direction: column;
     min-width: 76px;
-    min-height: 54px;
-    gap: 2px;
-    padding: 5px 9px;
+    min-height: 58px;
+    gap: 4px;
+    padding: 6px 9px;
     font-size: 11px;
     scroll-snap-align: start;
+  }
+
+  .gf-sidebar .gf-navitem__icon {
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
   }
 
   .gf-sidebar .gf-navitem__text {
