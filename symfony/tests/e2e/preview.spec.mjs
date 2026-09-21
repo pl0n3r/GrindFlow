@@ -1388,3 +1388,109 @@ test('S2 mobile verifies only visible originals and clears results on view switc
   await expect(page.getByText(/necesitan revisión/)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
+
+test('S2 editor classifies explicitly selected active images atomically at 360px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const ids = ['00000000-0000-7000-8000-000000000081', '00000000-0000-7000-8000-000000000082'];
+  let bulkCalls = 0;
+  let state = 'unclassified';
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+      user: { display_name: 'Editor sintético' },
+      organization: { id: ids[0], name: 'Colección privada', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+      vault_manage_csrf: 'batch-token', vault_upload_csrf: 'upload-token', profile_name_csrf: 'profile-token',
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const url = new URL(route.request().url());
+    const usage = url.searchParams.get('usage');
+    const trashed = url.searchParams.get('view') === 'trash';
+    const matches = !trashed && (!usage || usage === 'all' || usage === state);
+    const assets = matches ? ids.map((id, index) => ({
+      id, name: 'imagen-' + (index + 1) + '.png', mime_type: 'image/png',
+      size_bytes: 69, created_at: '2026-09-21 00:00:00', usage_scope: state,
+      download_url: '/api/admin/vault/' + id + '/download',
+    })) : [];
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets, page: 1, pages: assets.length ? 1 : 0, total: assets.length,
+        quota: { used_assets: 2, max_assets: 100, used_bytes: 138, max_bytes: 128 * 1024 * 1024 },
+      } }),
+    });
+  });
+  await page.route('**/api/admin/vault/usage/bulk', async (route) => {
+    bulkCalls += 1;
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('batch-token');
+    expect(route.request().postDataJSON()).toEqual({
+      ids, usage_scope: 'needs_review',
+    });
+    if (bulkCalls === 1) return route.fulfill({
+      status: 404, contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'file_not_found', message: 'Alguna imagen ya no está activa.' } }),
+    });
+    state = 'needs_review';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { usage_scope: state, selected_count: 2, updated_count: 2 } }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-batch-e2e=1', type: 'module' });
+  await expect(page.getByRole('checkbox', { name: 'Seleccionar imagen-1.png' })).toBeVisible();
+  await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
+  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByLabel('Clasificación para la selección').selectOption('needs_review');
+  await page.getByRole('button', { name: 'Revisar clasificación de selección' }).click();
+  await expect(page.getByText(/¿Asignar «Requiere revisión» a las 2 imágenes/)).toBeVisible();
+  await page.getByRole('button', { name: 'Confirmar clasificación de selección' }).click();
+  await expect(page.getByRole('alert').getByText('Alguna imagen ya no está activa.')).toBeVisible();
+  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByRole('button', { name: 'Revisar clasificación de selección' }).click();
+  await page.getByRole('button', { name: 'Confirmar clasificación de selección' }).click();
+  await expect(page.getByText(/2 imágenes revisadas; 2 clasificaciones actualizadas/)).toBeVisible();
+  await expect(page.getByText('0 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByText('Clasificación: Requiere revisión')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
+  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByLabel('Clasificación interna', { exact: true }).selectOption('unclassified');
+  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await page.getByLabel('Clasificación interna', { exact: true }).selectOption('all');
+  await expect(page.getByText('0 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  expect(bulkCalls).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test('S2 viewer has no batch controls in library or trash', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000083';
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
+      user: { display_name: 'Lector sintético' },
+      organization: { id, name: 'Espacio propio', role: 'model' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: false, content_review: false },
+      vault_manage_csrf: null, vault_upload_csrf: null,
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      assets: [{ id, name: 'visible.png', mime_type: 'image/png', size_bytes: 69,
+        created_at: '2026-09-21 00:00:00', download_url: '/api/admin/vault/' + id + '/download' }],
+      page: 1, pages: 1, total: 1,
+    } }),
+  }));
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-batch-viewer-e2e=1', type: 'module' });
+  await expect(page.getByText('visible.png')).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Seleccionar imágenes visibles' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
+});
