@@ -195,6 +195,30 @@ final class ManualDestinationTest extends WebTestCase
         }
         self::assertTrue($deleteBlocked, 'MariaDB must reject deleting manual destinations.');
 
+        $client->request('PUT', '/api/admin/manual-destinations/'.$destinationId, server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_CSRF_TOKEN' => $csrf,
+        ], content: '{"active":false}');
+        self::assertResponseIsSuccessful();
+
+        $lifecycleRewriteBlocked = false;
+        try {
+            $db->update(
+                'gf_manual_destinations',
+                ['disabled_at' => '2000-01-01 00:00:00'],
+                ['id' => $destinationId],
+            );
+        } catch (\Doctrine\DBAL\Exception) {
+            $lifecycleRewriteBlocked = true;
+        }
+        self::assertTrue($lifecycleRewriteBlocked, 'MariaDB must reject rewriting a disable event.');
+
+        $client->request('PUT', '/api/admin/manual-destinations/'.$destinationId, server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_CSRF_TOKEN' => $csrf,
+        ], content: '{"active":true}');
+        self::assertResponseIsSuccessful();
+
         $db->update(
             'gf_identity_memberships',
             ['role' => 'editor', 'updated_at' => gmdate('Y-m-d H:i:s')],
