@@ -138,6 +138,71 @@ final class ContentRuleController extends AbstractController
         return $this->privateJson(['data' => ['rule' => $this->publicRule($row)]]);
     }
 
+    #[Route('/api/admin/rules/weekly/preview', name: 'grindflow_weekly_rule_preview', methods: ['GET'])]
+    public function preview(Request $request, MembershipContext $memberships, Connection $db): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+
+        $rule = $db->fetchAssociative(
+            'SELECT timezone, weekdays, local_time, max_per_day, mode, updated_at FROM gf_content_rules WHERE organization_id = :organization',
+            ['organization' => $context['organization']['id']],
+        );
+        $assets = $db->fetchAllAssociative(
+            <<<'SQL'
+                SELECT id, original_name, mime_type, usage_scope, created_at
+                FROM gf_vault_assets
+                WHERE organization_id = :organization AND deleted_at IS NULL
+                ORDER BY created_at DESC, id DESC
+                LIMIT 30
+                SQL,
+            ['organization' => $context['organization']['id']],
+        );
+        $total = (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
+            ['organization' => $context['organization']['id']],
+        );
+
+        $items = array_map(function (array $asset) use ($rule): array {
+            $reasons = [];
+            if ($rule === false) {
+                $reasons[] = 'weekly_rule_missing';
+            }
+            $scope = (string) $asset['usage_scope'];
+            if ($scope === 'unclassified') {
+                $reasons[] = 'classification_missing';
+            } elseif ($scope === 'internal_only') {
+                $reasons[] = 'internal_only';
+            } elseif ($scope === 'needs_review') {
+                $reasons[] = 'content_review_required';
+            }
+            // S3 intentionally has no distribution-authorization contract yet.
+            // Classification alone must never become a publishing permission.
+            $reasons[] = 'distribution_authorization_missing';
+
+            return [
+                'id' => (string) $asset['id'],
+                'name' => (string) $asset['original_name'],
+                'mime_type' => (string) $asset['mime_type'],
+                'usage_scope' => $scope,
+                'eligible' => false,
+                'blocking_reasons' => array_values(array_unique($reasons)),
+            ];
+        }, $assets);
+
+        return $this->privateJson(['data' => [
+            'rule' => $rule === false ? null : $this->publicRule($rule),
+            'assets' => $items,
+            'visible' => count($items),
+            'total_active_assets' => $total,
+            'limit' => 30,
+            'can_publish' => false,
+            'mode' => 'review_only',
+        ]]);
+    }
+
     /** @return array{user: IdentityUser, organization: array{id: string, name: string, role: string}}|JsonResponse */
     private function context(Request $request, MembershipContext $memberships): array|JsonResponse
     {
