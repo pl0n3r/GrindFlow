@@ -25,6 +25,16 @@ final class PrivateVaultDirectoryTest extends TestCase
             self::assertDirectoryExists($base.'/media');
             self::assertSame($base.'/media', $external->root());
             self::assertNotSame($default->root(), $external->root());
+
+            self::assertTrue(chmod($base.'/media', 0755));
+            try {
+                $external->ensureWritable();
+                self::fail('An externally readable Vault directory was accepted.');
+            } catch (\RuntimeException) {
+                // The application must not use an operator-owned public directory.
+            }
+            self::assertTrue(chmod($base.'/media', 0700));
+            self::assertSame($base.'/media', $external->ensureWritable());
         } finally {
             @rmdir($base.'/media');
             @rmdir($project.'/var/vault');
