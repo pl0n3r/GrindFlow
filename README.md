@@ -33,13 +33,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+149** | **−49** | **+100** |
+| **4** | **+103** | **−46** | **+57** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts]** |
 | Alcance | #73: distinguir redirección de login/sesión, sanear `Location` y cortar reintentos deterministas |
 | Revisiones | CI + Sonar + **CodeRabbit terminado sobre head final ANTES de merge**; exact-main y Hostinger separados |
 
