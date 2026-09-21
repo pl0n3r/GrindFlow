@@ -215,6 +215,7 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
     }),
   }));
   const stored = [];
+  let uploads = 0;
   await page.route('**/api/admin/vault**', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, contentType: 'application/json',
@@ -223,8 +224,10 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
           quota: { used_assets: stored.length, max_assets: 100,
             used_bytes: stored.length * png.length, max_bytes: 128 * 1024 * 1024 } } }) });
     }
+    uploads++;
     expect(route.request().method()).toBe('POST');
     expect(route.request().headers()['x-csrf-token']).toBe('vault-csrf-test');
+    expect(route.request().postData()).not.toContain('no-enviar.png');
     expect(route.request().postDataBuffer().includes(png)).toBe(true);
     const saved = { id, name: 'foto-ejemplo.png', mime_type: 'image/png', size_bytes: png.length,
       created_at: '2026-09-20 00:00:00', download_url: '/api/admin/vault/' + id + '/download' };
@@ -244,10 +247,23 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
   await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
   await expect(page.getByText('0 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('Espacio utilizado: 0.00 de 128 MiB')).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
-    name: 'foto-ejemplo.png', mimeType: 'image/png', buffer: png,
-  });
+  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+    { name: 'foto-ejemplo.png', mimeType: 'image/png', buffer: png },
+    { name: 'no-enviar.png', mimeType: 'image/png', buffer: png },
+    { name: 'formato-no-valido.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg></svg>') },
+  ]);
+  await expect(page.getByAltText('Vista local de foto-ejemplo.png')).toBeVisible();
+  await expect(page.getByAltText('Vista local de no-enviar.png')).toBeVisible();
+  await expect(page.getByAltText('Vista local de formato-no-valido.svg')).toHaveCount(0);
+  await expect(page.getByText(/Archivo no admitido: JPEG, PNG o WebP/)).toBeVisible();
+  expect(uploads).toBe(0); // Local review does not upload.
+  await page.getByRole('button', { name: 'Descartar formato-no-valido.svg' }).click();
+  await page.getByRole('button', { name: 'Descartar no-enviar.png' }).click();
+  await expect(page.getByRole('button', { name: /Guardar 1 imagen/ })).toBeVisible();
+  await expect(page.getByAltText('Vista local de no-enviar.png')).toHaveCount(0);
   await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
+  expect(uploads).toBe(1);
+  await expect(page.getByAltText('Vista local de foto-ejemplo.png')).toHaveCount(0);
   await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
   await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('foto-ejemplo.png', { exact: true })).toBeVisible();
