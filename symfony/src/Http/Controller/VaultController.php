@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,6 +27,10 @@ final class VaultController extends AbstractController
     private const MAX_ORGANIZATION_ASSETS = 100;
     private const MAX_ORGANIZATION_BYTES = 128 * 1024 * 1024;
     private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    public function __construct(private readonly PrivateVaultDirectory $storage)
+    {
+    }
 
     #[Route('/api/admin/vault', name: 'grindflow_vault_list', methods: ['GET'])]
     public function list(Request $request, MembershipContext $memberships, Connection $db): JsonResponse
@@ -163,10 +168,7 @@ final class VaultController extends AbstractController
         }
 
         $id = Uuid::v7()->toRfc4122();
-        $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
-        if (is_link($root) || (!is_dir($root) && !mkdir($root, 0700, true) && !is_dir($root))) {
-            throw new \RuntimeException('Private storage is not available.');
-        }
+        $root = $this->storage->ensureWritable();
         $file->move($root, $id.'.blob');
         $path = $root.'/'.$id.'.blob';
 
@@ -333,7 +335,7 @@ final class VaultController extends AbstractController
         if ($this->originalStatus($asset) !== 'verified') {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
-        $path = (string) $this->getParameter('kernel.project_dir').'/var/vault/'.$asset['storage_key'].'.blob';
+        $path = $this->storage->root().'/'.$asset['storage_key'].'.blob';
 
         $response = new BinaryFileResponse($path);
         $response->headers->set('Content-Type', 'application/octet-stream');
@@ -379,7 +381,7 @@ final class VaultController extends AbstractController
         if ($this->originalStatus($asset) !== 'verified') {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
-        $path = (string) $this->getParameter('kernel.project_dir').'/var/vault/'.$asset['storage_key'].'.blob';
+        $path = $this->storage->root().'/'.$asset['storage_key'].'.blob';
 
         $response = new BinaryFileResponse($path);
         $response->headers->set('Content-Type', $mime);
@@ -434,7 +436,7 @@ final class VaultController extends AbstractController
      */
     private function originalStatus(array $asset): string
     {
-        $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
+        $root = $this->storage->root();
         $key = (string) $asset['storage_key'];
         $expectedSize = (int) $asset['size_bytes'];
         $expectedHash = (string) $asset['sha256'];
