@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.64: límite de intentos de cambio de contraseña personal Symfony.** El alcance «solo el deploy actual» sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.63 `993293b06607bd31bcea622f906008a9f081d769`, CI exact-main success (run 35572662055). Ningún dato ni migración productiva fue modificado.
+> **Candidato v0.1.65: primera regla semanal S3 en modo revisión.** El runtime desplegado sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.64 `c5e59e85481213360692759f22c3426072374ee5`. La nueva regla no publica, no llama plataformas externas y no modifica datos productivos.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.64** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.63~~ | `993293b06607bd31bcea622f906008a9f081d769` |
-| CI del PR | 🚧 Head v0.1.64 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.65** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.64~~ | `c5e59e85481213360692759f22c3426072374ee5` |
+| CI del PR | 🚧 Head v0.1.65 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
 | Deploy Observer | 🚧 Release humano por observar | No prueba Symfony remoto |
 | Production Smoke | ⛔ Credencial E2E productiva pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Symfony S2 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | ✅ ~~Ningún esquema productivo modificado~~ | DB Symfony descartable |
+| Symfony S3 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
+| Migraciones | ✅ ~~Ningún esquema productivo modificado~~ | Nueva tabla solo en DB Symfony descartable al validar |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+91** | **−28** | **+63** |
+| **5** | **+264** | **−37** | **+227** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S1: ocho solicitudes con CSRF válido por cuenta y ventana móvil de 15 minutos; bloqueo 429 |
+| Alcance | S3: persistir una regla semanal por tenant, validada y siempre `review_only` |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,42 +58,38 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Protección de la cuenta Symfony: limitador independiente del login y de la sesión del navegador, con clave derivada del actor autenticado en el servidor.
-- Respuesta `429` con código estable, `Retry-After` y `Cache-Control: no-store` antes de volver a calcular hashes o escribir SQL; CSRF inválido no consume cupo.
-- Pruebas PHPUnit/MariaDB cubren límite tras cerrar y volver a abrir sesión; Chromium móvil comprueba mensaje de bloqueo y limpieza de contraseñas. Sin cambiar el runtime Laravel.
-- Cache por defecto `cache.rate_limiter`; limpiar cache reinicia ventanas. Varias instancias Symfony requerirían cache compartido antes del cutover.
+- Primera configuración S3 persistente por organización: zona horaria IANA, días de semana, hora local y máximo diario.
+- API `GET/PUT /api/admin/rules/weekly` toma el tenant únicamente de la sesión verificada y revalida rol activo dentro de la transacción de escritura.
+- CSRF dedicado y rechazo de campos extra impiden inyectar IDs de usuario/organización desde el cliente.
+- El modo queda forzado a `review_only`: esta entrega prepara planificación, pero no concede permiso de distribución ni ejecuta publicaciones externas.
 
 ## Archivos modificados en este deploy
-Inventario del **cambio candidato en PR**, NO prueba de deploy de Symfony en Hostinger.
+Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
-- `docs/GRINDFLOW-SPEC.md`
-- `docs/REQUIREMENTS.md`
-- `symfony/README.md`
-- `symfony/config/packages/framework.yaml`
-- `symfony/src/Http/Controller/AccountSecurityController.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/AccountSecurityTest.php`
+- `symfony/migrations/Version20260921090000.php`
+- `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/src/Http/Controller/ContentRuleController.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.64 por verificar; CI exact-main v0.1.63 success.
-- Sin checkout local de PHP/MariaDB/Chromium; GitHub Actions valida el cambio. Producción intacta.
+- CI/Sonar/CodeRabbit del candidato v0.1.65 por verificar; la base v0.1.64 ya está fusionada en `main`.
+- Sin checkout local de PHP/MariaDB/Chromium; GitHub Actions debe validar migración, PHP y contratos. Producción intacta.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar seguridad de cuenta v0.1.64 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Contrato de revocación multi-sesión y recuperación verificable de MariaDB | 🚧 Sin suponer sesiones globales |
-| **LATER** | 🚧 Paridad Symfony y cutover reversible | 🚧 Planificado |
+| **NOW** | 🚧 Validar regla semanal review-only v0.1.65 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Preview semanal con recursos elegibles y razones de bloqueo | 🚧 Sin publicación externa |
+| **LATER** | 🚧 Scheduler Symfony + distribución autorizada + Traffic | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Límite de intentos por identidad v0.1.64 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Backup MariaDB y ensayo integral de restauración | 🚧 Retención y operación pendientes |
-| **LATER** | 🚧 Paridad del monolito modular | 🚧 S2–S5 |
+| **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
+| **NOW** | 🚧 Regla semanal S3 v0.1.65 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Preview semanal y elegibilidad | 🚧 S3 |
+| **LATER** | 🚧 Paridad del monolito modular | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
