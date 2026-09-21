@@ -24,6 +24,8 @@ diagnostics_json="$workdir/diagnostics.json"
 up_body="$workdir/up.body"
 up_headers="$workdir/up.headers"
 login_headers="$workdir/login.headers"
+login_post_headers="$workdir/login-post.headers"
+dashboard_headers="$workdir/dashboard.headers"
 module_html="$workdir/module.html"
 csv_body="$workdir/traffic.csv"
 csv_headers="$workdir/traffic.headers"
@@ -40,7 +42,7 @@ print_http_failure() {
   printf 'ERROR: %s returned HTTP %s\n' "$label" "$status" >&2
   if [[ -s "$headers_file" ]]; then
     printf '%s\n' '---- safe response headers ----' >&2
-    grep -iE '^(server|content-type|content-length|location|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
+    grep -iE '^(server|content-type|content-length|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
   fi
   if [[ -s "$body_file" ]]; then
     python3 - "$body_file" >&2 <<'PY'
@@ -52,6 +54,24 @@ if snippet:
 PY
   fi
   printf '%s\n' '-------------------------------' >&2
+}
+
+# Report only a short path: never leak redirect host, query strings, fragments or tokens.
+safe_redirect_path() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+    for line in handle:
+        if not line.lower().startswith("location:"):
+            continue
+        path = urlsplit(line.partition(":")[2].strip()).path
+        print(path if path in {"/login", "/dashboard", "/organizations", "/admin", "/admin/system"} else "(redacted)")
+        break
+    else:
+        print("(missing)")
+PY
 }
 
 extract_csrf() {
@@ -228,7 +248,7 @@ check_workspace_modules() {
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$module_html" "$csv_body" "$csv_headers"
+  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
   if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers" "$up_body"; return 1; fi
@@ -240,11 +260,26 @@ run_smoke() {
   local token
   if ! token="$(extract_csrf)"; then printf 'ERROR: login page did not expose a CSRF token.\n' >&2; return 1; fi
   local login_status
-  login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token=$token" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password=$E2E_USER_PASSWORD" "$BASE_URL/login")"
-  case "$login_status" in 302|303) ;; *) printf 'ERROR: login returned HTTP %s\n' "$login_status" >&2; return 1 ;; esac
+  login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --dump-header "$login_post_headers" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token=$token" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password=$E2E_USER_PASSWORD" "$BASE_URL/login")"
+  case "$login_status" in
+    302|303) ;;
+    401|403|419|422|429) printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2; return 7 ;;
+    *) printf 'ERROR: login returned HTTP %s\n' "$login_status" >&2; return 1 ;;
+  esac
+  local login_redirect
+  login_redirect="$(safe_redirect_path "$login_post_headers")"
+  printf 'LOGIN_REDIRECT_PATH=%s\n' "$login_redirect"
+  if [[ "$login_redirect" == "/login" ]]; then
+    printf 'ERROR: login redirected back to /login; credentials or account/session require investigation. No repeated login attempts.\n' >&2
+    return 7
+  fi
 
   local dashboard_status
-  dashboard_status="$(curl_common --cookie "$cookie_jar" --output "$dashboard_html" --write-out '%{http_code}' "$BASE_URL/dashboard")"
+  dashboard_status="$(curl_common --cookie "$cookie_jar" --dump-header "$dashboard_headers" --output "$dashboard_html" --write-out '%{http_code}' "$BASE_URL/dashboard")"
+  if [[ "$dashboard_status" == "302" || "$dashboard_status" == "303" ]]; then
+    printf 'ERROR: authenticated dashboard returned HTTP %s, redirect path %s; check authentication/session. No repeated login attempts.\n' "$dashboard_status" "$(safe_redirect_path "$dashboard_headers")" >&2
+    return 7
+  fi
   if [[ "$dashboard_status" != "200" ]]; then printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2; print_diagnostics; return 1; fi
   if ! assert_contains "$dashboard_html" "Overview"; then print_diagnostics; return 1; fi
   if ! assert_contains "$dashboard_html" "Tenant isolation active"; then print_diagnostics; return 1; fi
@@ -312,6 +347,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
     4) printf 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.\n' >&2; exit 4 ;;
     5) printf 'ERROR: read-only workspace module check failed; no repeated login requests.\n' >&2; exit 5 ;;
     6) printf 'ERROR: production release inventory failed or differs; no repeated login requests.\n' >&2; exit 6 ;;
+    7) printf 'ERROR: authentication failure is deterministic; do not retry credentials.\n' >&2; exit 7 ;;
   esac
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then sleep "$WAIT_SECONDS"; fi
 done

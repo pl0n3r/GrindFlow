@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.77: navegación continua de acceso + compuerta CodeRabbit obligatoria.** Base exacta `main` v0.1.76 `10da41703359bc3455bb5939be08e371e60f1293`. Symfony aislado, NO desplegado ni migrado en Hostinger.
+> **Candidato v0.1.78: diagnóstico seguro del acceso y smoke sin intentos repetidos.** Base exacta `main` v0.1.77 `4b5ebeba23e535b845caec943e1b713dd5379165`; sin cutover ni migraciones productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,30 +18,30 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.77** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.76~~ | `10da41703359bc3455bb5939be08e371e60f1293` |
-| CI del PR | 🚧 Head v0.1.77 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.78** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.77~~ | `4b5ebeba23e535b845caec943e1b713dd5379165` |
+| CI del PR | 🚧 Head v0.1.78 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente del head estable | SonarCloud PR |
-| CodeRabbit | 🚧 Pendiente del head estable | PR |
-| CI del SHA exacto de main | ✅ ~~v0.1.76 success~~ | run `35664374136` |
-| Deploy Observer | ✅ ~~v0.1.76 release observado~~ | run `35664374124`; versión humana, NO SHA Hostinger |
-| Production Smoke | ⛔ Credencial ya configurada; autenticación no verificada | run `35664937043` falló: `/dashboard` HTTP 302 tras POST; [Issue #73](https://github.com/pl0n3r/GrindFlow/issues/73). #1 cerrado |
+| CodeRabbit | 🚧 Esperar revisión completa del head final | PR y AGENTS.md |
+| CI del SHA exacto de main | 🚧 v0.1.77 ejecutándose | run `35667874191` |
+| Deploy Observer | 🚧 v0.1.77 en observación | run `35667874090`; versión humana, NO SHA Hostinger |
+| Production Smoke | ⛔ Auth E2E sin verificar | [Issue #73](https://github.com/pl0n3r/GrindFlow/issues/73), run `35664937043`; #1 resuelto |
 | Symfony en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | ✅ ~~Sin migraciones nuevas en el candidato~~ | Producción intacta |
+| Migraciones | ✅ ~~Sin cambios de esquema~~ | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+149** | **−49** | **+100** |
+| **4** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | GF-UX-002: misma cabecera login/organizaciones Symfony, navegación 360/820 px y CSRF; regla bloqueante CodeRabbit |
-| Revisiones | CI + Sonar + **CodeRabbit terminado sobre head final ANTES de merge**; exact-main y Hostinger separados |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Alcance | #73: inspección segura de redirect login/dashboard, manejo 419, abortar reintentos deterministas |
+| Revisiones | CI/Sonar/CodeRabbit sobre el mismo SHA antes del merge; exact-main y Hostinger separados |
 
 ## Flujo de entrega
 ```mermaid
@@ -60,46 +60,38 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Cabecera Symfony compartida entre login y selección de organización; enlaces reales a inicio/vista previa y sección actual accesible, sin duplicar marca ni exponer funciones privadas.
-- CSS acotado para la cabecera de identidad, enlaces y tarjetas a 360/820 px; CSRF y membresías sin cambios.
-- Regresión PHPUnit del selector autenticado y Chromium del ingreso responsive, CSRF y ausencia de desbordamiento.
-- **Regla dura en AGENTS.md + docs/GOVERNANCE.md:** si CodeRabbit no finaliza sobre el SHA último, el merge permanece bloqueado; PR #72 documentada como incidente de proceso.
-- La configuración del secreto E2E cerró #1, pero el smoke de producción v0.1.76 falló con HTTP 302 en Dashboard; diagnóstico registrado en #73. Sin publicación externa, deploy de Symfony ni migraciones productivas.
+- Captura `Location` del POST login y GET dashboard; emite solo rutas estáticas permitidas, sin consultas, dominios, identificadores o secretos. El logger general también excluye `Location` cruda.
+- Redirecciones de autenticación y HTTP 401/403/419/422/429 se detienen tras un solo login, evitando 15 intentos repetidos; fallos transitorios conservan su política.
+- Contrato sin acceso a producción con curl simulado: vuelta a login, HTTP 419, dashboard→login/organizaciones y ruta privada censurada.
+- #73 sigue abierto: instrumentación NO equivale a corregir las credenciales/sesión reales ni demuestra deploy. Sin cambios de datos, cuenta ni Symfony.
 
 ## Archivos modificados en este deploy
-Inventario del candidato v0.1.77. El contrato histórico del tablero usa «solo el deploy actual» como marcador de snapshot; NO prueba despliegue Symfony en Hostinger.
-- `AGENTS.md`
+Inventario del candidato v0.1.78, no evidencia de archivos publicados. «solo el deploy actual» conserva el marcador de control del snapshot README.
 - `README.md`
 - `config/version.php`
-- `docs/GOVERNANCE.md`
-- `docs/REQUIREMENTS.md`
-- `symfony/public/assets/grindflow.css`
-- `symfony/templates/identity/_header.html.twig`
-- `symfony/templates/identity/login.html.twig`
-- `symfony/templates/identity/organizations.html.twig`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/IdentityLoginTest.php`
+- `scripts/production-smoke-contract.sh`
+- `scripts/production-smoke.sh`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.77 pendientes; **sin aprobación ni merge hasta revisión final explícita de CodeRabbit**.
-- `symfony-preview` debe ejecutar PHPUnit/MariaDB, Vite y Chromium a 360/820 px. No hubo pruebas locales; la rama aún requiere CI de PR.
-- El smoke v0.1.76 detectó 15 redirecciones HTTP 302 al consultar el dashboard, pero no distingue aún contraseña inválida de sesión no conservada. #73 registra diagnóstico.
+- CI/Sonar/CodeRabbit del candidato todavía pendientes. El gate `fast[contracts]` debe ejecutar mocks y no usa contraseña E2E real.
+- Smoke #59 encontró `/dashboard HTTP 302` sin `Location`; una vez integrado v0.1.78 se registrará solo el destino saneado para investigar #73.
+- No repetir pruebas manuales ciegas ni inferir deploy exacto desde el número de versión.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Acceso visual v0.1.77 + gate CodeRabbit final; diagnosticar #73 | 🚧 PR/revisión y producción separados |
-| **NEXT** | 🚧 Corregir origen del 302 E2E sin reintentos de autenticación innecesarios; seguir S4 | 🚧 Con evidencia de diagnóstico |
-| **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y cutover Symfony pendiente de paridad | ⛔ No declarar producción validada |
+| **NOW** | 🚧 Validar diagnóstico seguro v0.1.78 #73 | 🚧 CI/Sonar/CodeRabbit |
+| **NEXT** | 🚧 Determinar causa real del redirect con una prueba posterior | 🚧 Evidencia saneada |
+| **LATER** | 🚧 S4, Distribution + Traffic Symfony | 🚧 Sin cutover |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y paridad cutover | ⛔ Producción no verificada |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Navegación workspace v0.1.76, secreto E2E configurado #1~~ | ✅ ~~CI exact-main v0.1.76; release observado~~ |
-| **NOW** | 🚧 Acceso visual v0.1.77 + gate CodeRabbit final; diagnosticar #73 | 🚧 PR/revisión y producción separados |
-| **NEXT** | 🚧 Corregir origen del 302 E2E sin reintentos de autenticación innecesarios; seguir S4 | 🚧 Con evidencia de diagnóstico |
+| **DONE** | ✅ ~~Navegación de identidad + CodeRabbit obligatorio v0.1.77; secret #1~~ | ✅ ~~PR #74 fusionada con revisión final~~ |
+| **NOW** | 🚧 Smoke seguro y fail-fast v0.1.78 | 🚧 Head pendiente de CI/revisión |
+| **NEXT** | 🚧 Corregir causa #73 después de conocer destino 302 | 🚧 No inferir fallo de contraseña |
 | **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y cutover Symfony pendiente de paridad | ⛔ No declarar producción validada |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado y cutover sin paridad | ⛔ Hostinger no verificado |
