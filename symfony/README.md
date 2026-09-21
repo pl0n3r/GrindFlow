@@ -4,8 +4,8 @@
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.51 preparada sobre main v0.1.50: verificación privada de tamaño y SHA-256 de originales en biblioteca y papelera. |
-| VALIDADO EN CÓDIGO | CI del head final y Sonar pendientes de reconfirmar tras correcciones; CI exact-main de v0.1.50 success. |
+| IMPLEMENTADO | v0.1.54 en rama: integridad SHA-256 antes de descargar/previsualizar/restaurar y auditoría manual de página visible. |
+| VALIDADO EN CÓDIGO | CI y Sonar del head v0.1.54 pendientes; base exact-main v0.1.53 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
