@@ -83,5 +83,4 @@ class WorkspaceSidebarTest extends TestCase
         $this->assertStringContainsString('.gf-sidebar .gf-navitem__text', $mobileParts[1]);
         $this->assertStringContainsString('position: static;', $mobileParts[1]);
     }
-
 }
