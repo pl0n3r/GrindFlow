@@ -160,20 +160,29 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 ### Regla de avance sustancial por cada mensaje
 
 - Cuando el propietario diga "sigue", "adelante" o equivalente, ejecutar un
-  **bloque coherente de desarrollo**: inspeccion -> codigo -> pruebas ->
-  revision -> entrega verificable. No cerrar una sesion tras una sola
-  correccion minima si hay trabajo independiente y seguro disponible.
-- Agrupar en el mismo ciclo varias mejoras relacionadas o un modulo vertical
-  completo, incluyendo tests, documentacion de la entrega y gates aplicables.
-  El numero de archivos no mide el valor: preferir flujos funcionales y
-  defectos de causa raiz, no commits o notas de progreso cosmeticos.
+  **ciclo de desarrollo sustancial**: inspeccion -> codigo -> pruebas ->
+  revision -> entrega verificable -> siguiente prioridad. La autorizacion de
+  continuar ya esta dada: no volver a preguntar "¿sigo?" entre avances ni
+  cerrar la respuesta al terminar la primera correccion o el primer PR.
+- Por defecto, intentar **varias mejoras funcionales relacionadas o un modulo
+  vertical completo** por solicitud, con backend, UI real donde aplique,
+  pruebas, documentacion y compuertas. Tras cerrar un PR, consultar el
+  roadmap y avanzar a otro bloque seguro dentro de la misma sesion.
+  Si el ciclo alcanza solo un avance, indicar el bloqueo concreto o limite
+  real, no presentarlo como final del trabajo solicitado.
+- **Releases pequenas no significa respuestas pequenas:** conservar los PRs
+  enfocados, un incremento patch por PR desplegable y merge serializado,
+  pero encadenar varias entregas independientes y verificables cuando sea
+  posible. No sacrificar CI, Sonar, seguridad, calidad ni la comprobacion del
+  SHA exacto de `main` por alcanzar una cantidad artificial de commits o PRs.
 - Si CI, Sonar o CodeRabbit estan ejecutandose, inspeccionar o implementar
-  una linea independiente mientras tanto. No detener el avance por esperas
-  externas, pero tampoco saltar los controles del PR ni abrir un PR
-  dependiente sin revalidar su base.
-- En cada respuesta distinguir con precision cambios ya escritos, tests
-  ejecutados, PR/merge y bloqueos de produccion. Nunca presentar una rama
-  preparada como funcionalidad validada o desplegada.
+  una linea independiente mientras tanto; no abrir trabajos dependientes
+  sin revalidar base ni fusionar un PR antes de cumplir sus compuertas.
+- El numero de archivos no mide valor: priorizar flujos funcionales y
+  defectos de causa raiz sobre scaffolding, cambios cosmeticos y reportes.
+  Comunicar hitos reales en mensajes breves y, al final de la sesion,
+  separar codigo escrito, tests/gates, PRs fusionados, deploy observado y
+  pendientes. No llamar desplegada una rama o funcionalidad solo preparada.
 
 ### Regla de reportes CSV de Traffic
 
