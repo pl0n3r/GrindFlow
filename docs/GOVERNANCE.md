@@ -40,6 +40,26 @@ Las plantillas de Issue exigen objetivo, alcance, aceptación y riesgos; PR apor
 
 El preflight valida el título PR; fast ejecuta comprobación de archivos, plantillas, etiquetas y enlaces relativos canónicos, más contrato con casos inválidos. Se mantiene el agregado existente `GrindFlow CI / validate`, Sonar automático y las revisiones CodeRabbit. Sin duplicar workflows de análisis ni cambiar secretos/permisos productivos.
 
+## Compuerta de revisión CodeRabbit antes del merge
+
+**Obligatoria por decisión del propietario del 21/09/2026.** Un PR solo puede
+fusionarse después de contar, para su **head SHA final**, con CI agregado y
+Sonar aprobados **y** con evidencia de revisión CodeRabbit terminada. Revisar
+comentarios e hilos accionables; corregirlos y resolverlos. Una modificación
+de la rama reinicia las comprobaciones de ese head, incluida una nueva revisión
+final de CodeRabbit.
+
+«Currently processing», una revisión pendiente/fallida o la ausencia de
+comentarios no habilitan el merge. Si el servicio no finaliza, dejar el PR
+abierto y documentar el bloqueo, sin convertir el timeout en excepción. No
+confundir una política en documentos con una protección automática de rama:
+un ruleset de GitHub solo se considera activo si se verifica en GitHub.
+Únicamente una autorización expresa del propietario para una PR concreta
+puede tratarse como excepción documentada.
+
+Caso que motivó el cambio: PR #72 se fusionó mientras CodeRabbit continuaba
+procesando. Véase el procedimiento operativo en [AGENTS.md](../AGENTS.md).
+
 ## Seguridad y estados
 
 Respetar la secuencia: IMPLEMENTADO → VALIDADO EN CÓDIGO → DESPLEGADO → VALIDADO EN PRODUCCIÓN. No saltar etapas. Nunca ejecutar migraciones productivas, reseteos, uploads externos, cambios irreversibles o pruebas E2E con datos reales por copiar prácticas de otro proyecto. Gobierno GitHub usa permisos mínimos solo para labels; cualquier protección/ruleset de `main` que exija acceso administrativo queda documentada como dependencia externa, no se simula.
