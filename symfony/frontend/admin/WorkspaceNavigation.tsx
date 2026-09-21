@@ -48,7 +48,7 @@ export function WorkspaceNavigation({
           ) : (
             <a key={item.id} href={item.href ?? '#contenido'}
               className={'workspace-nav-item' + (selected ? ' active' : '')}
-              aria-current={selected ? 'page' : undefined}>
+              aria-current={selected ? (item.href?.startsWith('#') ? 'location' : 'page') : undefined}>
               {contents}
             </a>
           );

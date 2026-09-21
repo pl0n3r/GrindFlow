@@ -1991,6 +1991,9 @@ test('preview and private workspace share responsive navigation without horizont
     await expect(adminNav.getByRole('link', { name: /Biblioteca/ })).toHaveAttribute('href', '#biblioteca');
     await expect(adminNav.getByRole('link', { name: /Programación/ })).toHaveAttribute('href', '#programacion');
     await expect(adminNav.getByRole('link', { name: /Resumen/ })).toHaveAttribute('aria-current', 'page');
+    await adminNav.getByRole('link', { name: /Biblioteca/ }).click();
+    await expect(adminNav.getByRole('link', { name: /Biblioteca/ })).toHaveAttribute('aria-current', 'location');
+    await expect(adminNav.getByRole('link', { name: /Resumen/ })).not.toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#contenido')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.unroute('**/api/admin/context');

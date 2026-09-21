@@ -54,6 +54,20 @@ export function AdminApp() {
   const [passwordChanged, setPasswordChanged] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [activeSection, setActiveSection] = useState(() => {
+    if (window.location.hash === '#biblioteca') return 'biblioteca';
+    if (window.location.hash === '#programacion') return 'programacion';
+    return 'resumen';
+  });
+
+  useEffect(() => {
+    const synchronizeSection = () => {
+      setActiveSection(window.location.hash === '#biblioteca' ? 'biblioteca'
+        : window.location.hash === '#programacion' ? 'programacion' : 'resumen');
+    };
+    window.addEventListener('hashchange', synchronizeSection);
+    return () => window.removeEventListener('hashchange', synchronizeSection);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -222,7 +236,7 @@ export function AdminApp() {
 
   return (
     <div className="admin-layout">
-      <WorkspaceNavigation mode="admin" active="resumen"
+      <WorkspaceNavigation mode="admin" active={activeSection}
         items={[
           { id: 'resumen', number: '01', label: 'Resumen', href: '/admin' },
           { id: 'biblioteca', number: '02', label: 'Biblioteca', href: '#biblioteca', stage: 'S2' },

@@ -60,8 +60,8 @@ flowchart LR
 ## Qué se hizo
 - Componente `WorkspaceNavigation` compartido por preview conceptual y admin real: marca, etiqueta de espacio, números, secciones, estados activos y pie contextual.
 - Menús sincronizados a breakpoint de 900 px, con barra horizontal desplazable dentro del menú a 820/360 px y rail más compacto a 901–1120 px, sin agrandar el documento.
-- Admin: accesos «Biblioteca» y «Programación» conservan anclas reales, «Resumen» expone página activa, y «Saltar al contenido» llega al `main` correcto.
-- Acciones de sesión fuera de posicionamiento absoluto sobre la cabecera. Estados accesibles en preview mediante `aria-pressed`, en admin mediante `aria-current`; pruebas Chromium a 820 y 360 px.
+- Admin: accesos «Biblioteca» y «Programación» conservan anclas reales, «Resumen» y las secciones siguen el hash activo, y «Saltar al contenido» llega al `main` correcto.
+- Acciones de sesión fuera de posicionamiento absoluto sobre la cabecera. Estados accesibles en preview mediante `aria-pressed`, en admin mediante `aria-current` (`page`/`location`); pruebas Chromium a 820 y 360 px.
 - No hay publicación externa ni cambios productivos. Los módulos S4 y la biblioteca no alteran sus contratos.
 
 ## Archivos modificados en este deploy
