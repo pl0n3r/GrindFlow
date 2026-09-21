@@ -233,3 +233,7 @@
 .weekly-asset-summary button:disabled{opacity:.55;cursor:wait}
 .weekly-asset-summary button:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
 @media(max-width:520px){.weekly-asset-summary button{justify-self:stretch}}
+
+
+/* S3 internal readiness: never present this as external publication permission. */
+.weekly-ready{align-self:start;justify-self:start;padding:6px 9px;border:1px solid #4f9c84;border-radius:9px;background:#14362f;color:#d6fff1;font-size:11px;overflow-wrap:anywhere}
