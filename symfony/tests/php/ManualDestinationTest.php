@@ -92,6 +92,7 @@ final class ManualDestinationTest extends WebTestCase
         self::assertSame([], $empty['destinations']);
         self::assertSame(0, $empty['total']);
         self::assertSame(100, $empty['limit']);
+        self::assertFalse($empty['provider_calls']);
 
         $client->request(
             'POST',
@@ -116,6 +117,7 @@ final class ManualDestinationTest extends WebTestCase
         self::assertTrue($created['changed']);
         self::assertSame('Mesa principal', $created['destination']['label']);
         self::assertTrue($created['destination']['active']);
+        self::assertFalse($created['provider_calls']);
         $destinationId = $created['destination']['id'];
 
         $client->request('POST', '/api/admin/manual-destinations', server: [
@@ -126,6 +128,7 @@ final class ManualDestinationTest extends WebTestCase
         $duplicate = json_decode((string) $client->getResponse()->getContent(), true)['data'];
         self::assertFalse($duplicate['changed']);
         self::assertSame($destinationId, $duplicate['destination']['id']);
+        self::assertFalse($duplicate['provider_calls']);
 
         $client->request('GET', '/api/admin/manual-destinations');
         self::assertResponseIsSuccessful();
@@ -175,6 +178,22 @@ final class ManualDestinationTest extends WebTestCase
                 ['id' => $destinationId, 'organization' => $mine],
             ),
         );
+
+        $renameBlocked = false;
+        try {
+            $db->update('gf_manual_destinations', ['label' => 'Renombrado por SQL'], ['id' => $destinationId]);
+        } catch (\Doctrine\DBAL\Exception) {
+            $renameBlocked = true;
+        }
+        self::assertTrue($renameBlocked, 'MariaDB must reject rewriting destination identity.');
+
+        $deleteBlocked = false;
+        try {
+            $db->delete('gf_manual_destinations', ['id' => $destinationId]);
+        } catch (\Doctrine\DBAL\Exception) {
+            $deleteBlocked = true;
+        }
+        self::assertTrue($deleteBlocked, 'MariaDB must reject deleting manual destinations.');
 
         $db->update(
             'gf_identity_memberships',
