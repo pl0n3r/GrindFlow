@@ -179,12 +179,16 @@ Un handoff preparado se liga a un destino interno explícito del tenant. El dest
 es solo una etiqueta de trabajo administrada por Admin/Studio; no representa una
 conexión técnica y no puede contener credenciales, tokens, provider IDs ni una URL
 de publicación. Desactivarlo bloquea nuevas preparaciones, sin modificar eventos
-históricos que ya lo referencian.
+históricos que ya lo referencian. Su identidad y etiqueta son inmutables a
+nivel MariaDB; el catálogo no se borra y solo alterna estado activo/inactivo.
 
 Cada evento de handoff conserva `destination_id`. `complete` y `fail`
 heredan el destino de su `prepare`; para cambiarlo debe existir un fallo y un
-nuevo `prepare`. Esta secuencia evita reescrituras silenciosas del destino de un
-intento ya iniciado.
+nuevo `prepare`. Un evento `prepare` heredado de v0.1.73 sin destino se conserva
+y puede recibir un nuevo `prepare` con destino después de la migración. Durante
+un deploy expand-before-migrate, el endpoint conserva el contrato anterior hasta
+que exista `gf_manual_destinations`. Esta secuencia evita reescrituras silenciosas
+y evita romper handoffs activos por orden de despliegue.
 
 La cola interna se deriva de borradores activos cuyo último evento es
 `prepared` o `failed`. Se ordena con los vencidos primero y luego por UTC
