@@ -23,3 +23,11 @@ services:
     arguments:
       $projectDir: '%kernel.project_dir%'
       $rootOverride: '%env(default:grindflow_vault_root_default:GRINDFLOW_VAULT_ROOT)%'
+
+  GrindFlow\Infrastructure\Storage\VaultStageCommand:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
+
+  GrindFlow\Infrastructure\Storage\VaultVerifyStageCommand:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
