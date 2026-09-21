@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+151** | **−19** | **+132** |
+| **12** | **+517** | **−27** | **+490** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -64,15 +64,19 @@ flowchart LR
 - El panel móvil permite la decisión explícita y muestra que la autorización interna no acredita derechos ni publicación.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
+Inventario de solo el candidato actual; no prueba despliegue Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
-- `docs/GRINDFLOW-SPEC.md`
-- `symfony/src/Http/Controller/ContentRuleController.php`
+- `docs/REQUIREMENTS.md`
+- `symfony/frontend/admin/AdminApp.tsx`
 - `symfony/frontend/admin/WeeklyPlannerPanel.tsx`
 - `symfony/frontend/admin/admin.css`
-- `symfony/tests/php/WeeklyRulePreviewTest.php`
-- `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/migrations/Version20260921135500.php`
+- `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/src/Http/Controller/ContentRuleController.php`
+- `symfony/src/Http/Controller/DistributionAuthorizationController.php`
+- `symfony/src/Identity/Application/MembershipContext.php`
+- `symfony/tests/php/DistributionAuthorizationTest.php`
 
 ## Validación
 - CI/Sonar/CodeRabbit del candidato v0.1.69 por verificar; la base v0.1.68 está fusionada.
