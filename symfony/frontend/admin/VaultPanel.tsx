@@ -51,6 +51,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<File[]>([]);
+  const [localPreviews, setLocalPreviews] = useState<Array<{ index: number; url: string }>>([]);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; name: string } | null>(null);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
@@ -69,6 +71,26 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const integrityRequest = useRef(0);
 
   useEffect(() => () => { integrityRequest.current += 1; }, []);
+
+  // Preview only explicitly selected local JPEG/PNG/WebP images. Object URLs
+  // stay in this browser, are never sent to the server, and are revoked after
+  // selection changes, a retry, completion or unmount. Cap memory to 8 thumbs.
+  useEffect(() => {
+    const previews = selected.slice(0, 8).flatMap((file, index) =>
+      ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) &&
+      file.size > 0 && file.size <= 8 * 1024 * 1024
+        ? [{ index, url: URL.createObjectURL(file) }] : []);
+    setLocalPreviews(previews);
+    return () => { for (const preview of previews) URL.revokeObjectURL(preview.url); };
+  }, [selected]);
+
+  function discardSelected(index: number) {
+    if (uploading) return;
+    const remaining = selected.filter((_, current) => current !== index);
+    setSelected(remaining);
+    setRetryPending((current) => current && remaining.length > 0);
+    if (fileInput.current) fileInput.current.value = '';
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -449,7 +471,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     </div>}
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir imágenes desde tu dispositivo</label>
-      <input id="vault-files" type="file" multiple accept="image/jpeg,image/png,image/webp"
+      <input id="vault-files" ref={fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp"
         disabled={uploading || loading} onChange={(event) => {
           setSelected(Array.from(event.currentTarget.files ?? []));
           setRetryPending(false);
@@ -459,6 +481,30 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           setHasTrashDuplicate(false);
         }} />
       <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual y no crea copias de imágenes idénticas.</small>
+      {selected.length > 0 && <div className="vault-selection" aria-label="Revisar imágenes elegidas">
+        <p role="status">{selected.length} {selected.length === 1
+          ? 'imagen seleccionada antes de guardarla.' : 'imágenes seleccionadas antes de guardarlas.'}
+          {' '}Puedes descartar cualquiera sin enviarla.</p>
+        <ul className="vault-selected-files">
+          {selected.slice(0, 8).map((file, index) => {
+            const thumbnail = localPreviews.find((preview) => preview.index === index);
+            const valid = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+              && file.size > 0 && file.size <= 8 * 1024 * 1024;
+            return <li key={index}>
+              {thumbnail ? <img src={thumbnail.url} alt={'Vista local de ' + file.name}
+                loading="lazy" decoding="async" /> : <span className="vault-selected-mark" aria-hidden="true">▧</span>}
+              <span className="vault-selected-details">
+                <strong>{file.name}</strong>
+                <small>{(file.size / (1024 * 1024)).toFixed(2)} MiB · {file.type || 'tipo desconocido'}</small>
+                {!valid && <small role="alert">Archivo no admitido: JPEG, PNG o WebP, de 1 byte a 8 MiB.</small>}
+              </span>
+              <button type="button" disabled={uploading} onClick={() => discardSelected(index)}
+                aria-label={'Descartar ' + file.name}>Descartar</button>
+            </li>;
+          })}
+        </ul>
+        {selected.length > 8 && <small>Se muestran 8 de {selected.length} imágenes. Todas se revisarán al guardarlas.</small>}
+      </div>}
       {retryPending && selected.length > 0 && <small role="status">{selected.length} {selected.length === 1 ? 'archivo pendiente' : 'archivos pendientes'}. Solo se reenviarán los que fallaron; seleccionar nuevos archivos reemplaza esta lista.</small>}
       {retryPending && <button type="button" disabled={uploading} onClick={() => {
         setSelected([]);
