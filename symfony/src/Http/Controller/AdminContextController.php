@@ -56,6 +56,9 @@ final class AdminContextController extends AbstractController
                 'weekly_rule_csrf' => $permissions['content_prepare']
                     ? (string) $csrf->getToken('grindflow_weekly_rule')->getValue()
                     : null,
+                'distribution_authorization_csrf' => $permissions['distribution_authorize']
+                    ? (string) $csrf->getToken('grindflow_distribution_authorization')->getValue()
+                    : null,
                 'organization' => $organization,
                 'permissions' => $permissions,
                 'organization_name_csrf' => $permissions['organization_manage']
