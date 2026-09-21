@@ -421,3 +421,19 @@ productivas, proveedores externos ni escrituras en producción.
   the review-only boundary and renders backend blocking reasons rather than
   recomputing eligibility in the browser.
 
+## 24. S3 derived weekly slots
+
+- A saved weekly rule exposes a preview-only set of upcoming local slots. These
+  rows are derived at request time and are not persisted schedules, assignments
+  or provider jobs.
+- At most one next future occurrence is returned for each configured weekday.
+  The rule's IANA timezone and local clock are authoritative; each slot also
+  carries the equivalent UTC instant for deterministic downstream planning.
+- Slot `capacity` mirrors `max_per_day` as an informational planning limit.
+  It does not reserve assets, consume capacity or authorize publication.
+- A same-day occurrence that already passed is rolled to that weekday's next
+  future occurrence rather than fabricating a past schedule.
+- Missing rules yield no slots. The response continues to fail closed with
+  `can_publish=false` and `review_only` until the independent distribution
+  authorization contract exists.
+
