@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+1342** | **−84** | **+1258** |
+| **17** | **+1346** | **−85** | **+1261** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -80,6 +80,7 @@ Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en
 - `symfony/src/Http/Controller/ScheduleDraftController.php`
 - `symfony/src/Scheduling/WeeklySlotCalculator.php`
 - `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/ContentReviewDecisionTest.php`
 - `symfony/tests/php/ScheduleDraftTest.php`
 
 ## Validación
