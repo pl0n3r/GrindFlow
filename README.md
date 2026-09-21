@@ -64,7 +64,7 @@ flowchart LR
 - La UI móvil muestra revisión pendiente/aprobada y “Listo para programar internamente”, pero conserva `can_publish=false`: no crea schedules, jobs ni llamadas externas.
 
 ## Archivos modificados en este deploy
-Inventario de solo el candidato actual; no prueba despliegue Symfony en Hostinger.
+Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en Hostinger.
 - `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
@@ -80,6 +80,7 @@ Inventario de solo el candidato actual; no prueba despliegue Symfony en Hostinge
 - `symfony/src/Identity/Application/MembershipContext.php`
 - `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/ContentReviewDecisionTest.php`
+- `symfony/tests/php/DistributionAuthorizationTest.php`
 
 ## Validación
 - CI/Sonar/CodeRabbit del candidato v0.1.71 por verificar; la base v0.1.70 tiene CI exact-main success.
