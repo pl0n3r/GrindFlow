@@ -1599,7 +1599,8 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Falta guardar una regla semanal')).toBeVisible();
 
   await page.getByLabel('Zona horaria IANA').fill('America/Bogota');
-  await page.getByRole('checkbox', { name: 'Sáb' }).check();
+  await page.locator('.weekly-days label').filter({ hasText: 'Sáb' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Sáb' })).toBeChecked();
   await page.getByLabel('Hora local').fill('09:30');
   await page.getByLabel('Máximo por día').fill('2');
   await page.getByRole('button', { name: 'Guardar regla' }).click();
