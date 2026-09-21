@@ -59,6 +59,7 @@ final class ManualDestinationController extends AbstractController
             ], $rows),
             'total' => $total,
             'limit' => 100,
+            'provider_calls' => false,
         ]]);
     }
 
