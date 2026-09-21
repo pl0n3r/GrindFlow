@@ -852,7 +852,7 @@ test('S2 mobile filing is tenant-scoped, editable, filterable and never a publis
   await page.getByLabel('Organizar imagen').selectOption('working');
   await expect(page.getByText('Token caducado.')).toBeVisible();
   await expect(page.getByText('Estado interno: Sin clasificar')).toBeVisible();
-  await page.getByLabel('Organizar imagen').selectOption('inbox');
+  await expect(page.getByLabel('Organizar imagen')).toHaveValue('inbox');
   await page.getByLabel('Organizar imagen').selectOption('working');
   await expect(page.getByText('Estado interno: En organización')).toBeVisible();
   await expect(page.getByText('Estado interno actualizado. No autoriza publicaciones.')).toBeVisible();

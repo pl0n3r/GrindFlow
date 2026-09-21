@@ -51,6 +51,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
   const [noteDraft, setNoteDraft] = useState('');
+  const [filingDraft, setFilingDraft] = useState<FilingState>('inbox');
   const [actionFeedback, setActionFeedback] = useState('');
   const [actionError, setActionError] = useState('');
   const [pages, setPages] = useState(0);
@@ -124,6 +125,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setAssets(data.assets);
       setDetail(null);
       setNoteDraft('');
+      setFilingDraft('inbox');
       setDetailError('');
       setConfirmId(null);
       setRenameId(null);
@@ -229,10 +231,12 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     if (detail?.id === id) {
       setDetail(null);
       setNoteDraft('');
+      setFilingDraft('inbox');
       return;
     }
     setDetail(null);
     setNoteDraft('');
+    setFilingDraft('inbox');
     setDetailError('');
     setDetailLoading(true);
     try {
@@ -243,6 +247,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo consultar la imagen.');
       setDetail(body.data.asset as Asset);
       setNoteDraft(typeof body.data.asset.note === 'string' ? body.data.asset.note : '');
+      setFilingDraft(body.data.asset.filing === 'working' || body.data.asset.filing === 'organized'
+        ? body.data.asset.filing : 'inbox');
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar la imagen.');
     } finally {
@@ -278,6 +284,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setRenameId(null);
     setDetail(null);
     setNoteDraft('');
+    setFilingDraft('inbox');
     integrityRequest.current += 1;
     setCheckingId(null);
     setBulkChecking(false);
@@ -373,6 +380,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setAssets((previous) => previous.map((asset) =>
         asset.id === id ? { ...asset, filing: next } : asset));
       setDetail((previous) => previous?.id === id ? { ...previous, filing: next } : previous);
+      setFilingDraft(next);
       setActionFeedback('Estado interno actualizado. No autoriza publicaciones.');
       // An edited item can leave the active filter; the backend provides
       // the correct total, page and quota after every change.
@@ -382,6 +390,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       }
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'No se pudo cambiar la clasificación.');
+      // The server is authoritative: a failed request must not leave a visual
+      // selection implying that the new state was saved.
+      setFilingDraft(detail.filing ?? 'inbox');
     } finally {
       setBusyId(null);
     }
@@ -716,9 +727,13 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             </dl>
             {canUpload && manageCsrf && <div className="vault-filing-editor">
               <label htmlFor={'vault-filing-' + asset.id}>Organizar imagen</label>
-              <select id={'vault-filing-' + asset.id} value={detail.filing ?? 'inbox'}
+              <select id={'vault-filing-' + asset.id} value={filingDraft}
                 disabled={!!busyId}
-                onChange={(event) => void changeFiling(asset.id, event.currentTarget.value as FilingState)}>
+                onChange={(event) => {
+                  const next = event.currentTarget.value as FilingState;
+                  setFilingDraft(next);
+                  void changeFiling(asset.id, next);
+                }}>
                 <option value="inbox">Sin clasificar</option>
                 <option value="working">En organización</option>
                 <option value="organized">Organizada</option>
