@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+258** | **−18** | **+240** |
+| **5** | **+276** | **−18** | **+258** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -67,6 +67,7 @@ flowchart LR
 Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
+- `docs/GRINDFLOW-SPEC.md`
 - `symfony/src/Http/Controller/ContentRuleController.php`
 - `symfony/tests/php/WeeklyRulePreviewTest.php`
 
