@@ -345,6 +345,8 @@ export function WeeklyPlannerPanel({ canEdit, csrf, canReview, reviewCsrf, canAu
                     </span>}
                   {asset.usage_scope === 'needs_review' && canReview && reviewCsrf &&
                     <button type="button"
+                      aria-label={(asset.content_review_approved
+                        ? 'Revocar revisión de ' : 'Aprobar revisión de ') + asset.name}
                       disabled={reviewingId !== null || authorizingId !== null}
                       onClick={() => void setContentReview(asset, !asset.content_review_approved)}>
                       {reviewingId === asset.id
