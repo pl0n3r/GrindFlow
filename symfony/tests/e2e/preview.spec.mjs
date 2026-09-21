@@ -1605,7 +1605,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await page.getByLabel('Máximo por día').fill('2');
   await page.getByRole('button', { name: 'Guardar regla' }).click();
 
-  await expect(page.getByRole('status')).toContainText('Regla semanal guardada');
+  await expect(page.locator('.weekly-feedback')).toContainText('Regla semanal guardada');
   await expect(page.getByText('Falta autorización explícita de distribución')).toBeVisible();
   await expect(page.getByText('Falta guardar una regla semanal')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Actualizar regla' })).toBeVisible();
