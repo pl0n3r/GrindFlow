@@ -138,6 +138,10 @@ Se **conserva** la aplicación Laravel y su CI como referencia operativa durante
 ### Vault S2: notas de trabajo privadas
 Cada imagen de la organización puede tener una anotación interna opcional, visible solo desde el detalle autenticado del Vault. No es una validación editorial, licencia, permiso, aprobación de publicación ni titularidad; esos contratos son distintos y deben definirse e implementarse antes de distribución real. Un miembro con permiso `content_prepare` puede editar o limpiar la nota con CSRF y reautorización por transacción; la consulta sigue siendo tenant-safe, y la papelera conserva la nota sin aceptar modificaciones. El catálogo y las herramientas de recuperación deben preservar y cotejarla con el original y la base restaurada.
 
+### Identidad Symfony: cambio de contraseña personal
+
+El titular de una sesión activa puede rotar únicamente su propia contraseña con comprobación de clave actual y CSRF independiente, sin que una membresía de organización habilite modificación de otras cuentas. El backend vuelve a leer el hash vigente bajo bloqueo de fila, rechaza reutilización y actualiza el hash de forma transaccional. Tras el éxito invalida la sesión actual y exige autenticarse otra vez; otras sesiones no se declaran revocadas sin un contrato explícito de invalidación centralizada. El navegador elimina de memoria los tres campos al responder. No afecta el runtime Laravel ni sus usuarios reales.
+
 ## 7. Quality model
 
 Todos los PR deploy-bound pasan las compuertas aplicables y el agregado estable `GrindFlow CI / validate`. Durante coexistencia siguen activos Laravel/MariaDB/legado; el primer slice Symfony agrega Composer, Doctrine/MariaDB, Vite/TypeScript y Playwright con cobertura real antes de retirar gates antiguos.

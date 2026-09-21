@@ -186,6 +186,73 @@ test('editor can update only their own profile name from a 360px React panel', a
   expect(overflow.page, JSON.stringify(overflow)).toBeLessThanOrEqual(360);
 });
 
+test('personal password change is available at 360px and clears all secret fields', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Cuenta sintética' },
+      organization: { id: '00000000-0000-7000-8000-000000000055', name: 'Espacio de prueba', role: 'model' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: false, content_review: false },
+      profile_name_csrf: 'profile-token', profile_password_csrf: 'password-token',
+      vault_upload_csrf: null, vault_manage_csrf: null, organization_name_csrf: null,
+    } }),
+  }));
+  let attempts = 0;
+  await page.route('**/api/admin/profile/password', async (route) => {
+    attempts += 1;
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('password-token');
+    expect(route.request().postDataJSON()).toEqual({
+      current_password: 'current-password-123',
+      new_password: 'replacement-password-456',
+      confirm_password: 'replacement-password-456',
+    });
+    await route.fulfill({
+      status: attempts === 1 ? 422 : 200,
+      contentType: 'application/json',
+      body: JSON.stringify(attempts === 1
+        ? { error: { code: 'current_password_invalid', message: 'La contraseña actual no coincide.' } }
+        : { data: { reauthentication_required: true } }),
+    });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: asset + '?password-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Cambiar contraseña' })).toBeVisible();
+  const current = page.getByLabel('Contraseña actual');
+  const next = page.getByLabel('Nueva contraseña', { exact: true });
+  const confirmation = page.getByLabel('Confirmar nueva contraseña');
+  await current.fill('current-password-123');
+  await next.fill('replacement-password-456');
+  await confirmation.fill('replacement-password-456');
+  await page.getByRole('button', { name: 'Actualizar contraseña' }).click();
+  await expect(page.getByText('La contraseña actual no coincide.')).toBeVisible();
+  await expect(current).toHaveValue('');
+  await expect(next).toHaveValue('');
+  await expect(confirmation).toHaveValue('');
+  await current.fill('current-password-123');
+  await next.fill('replacement-password-456');
+  await confirmation.fill('replacement-password-456');
+  await page.getByRole('button', { name: 'Actualizar contraseña' }).click();
+  await expect(page.getByRole('link', { name: 'Volver a iniciar sesión' })).toHaveAttribute('href', '/login');
+  await expect(page.getByText(/La sesión terminó/)).toBeVisible();
+  expect(attempts).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test('password API rejects anonymous attempts as JSON without redirect', async ({ request }) => {
+  const response = await request.post('/api/admin/profile/password', {
+    data: { current_password: 'x', new_password: 'new-password-123', confirm_password: 'new-password-123' },
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(401);
+  expect((await response.json()).error.code).toBe('authentication_required');
+  expect(response.headers()['cache-control']).toContain('no-store');
+});
+
 test('profile API never redirects anonymous writes to a private HTML page', async ({ request }) => {
   const response = await request.post('/api/admin/profile/name', { data: { name: 'No autorizado' }, maxRedirects: 0 });
   expect(response.status()).toBe(401);
