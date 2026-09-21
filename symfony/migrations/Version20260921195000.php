@@ -78,9 +78,27 @@ final class Version20260921195000 extends AbstractMigration
                     AND OLD.label <=> NEW.label
                     AND OLD.created_by <=> NEW.created_by
                     AND OLD.created_at <=> NEW.created_at
+                    AND (
+                        (
+                            OLD.disabled_at <=> NEW.disabled_at
+                            AND OLD.disabled_by <=> NEW.disabled_by
+                        )
+                        OR (
+                            OLD.disabled_at IS NULL
+                            AND OLD.disabled_by IS NULL
+                            AND NEW.disabled_at IS NOT NULL
+                            AND NEW.disabled_by IS NOT NULL
+                        )
+                        OR (
+                            OLD.disabled_at IS NOT NULL
+                            AND OLD.disabled_by IS NOT NULL
+                            AND NEW.disabled_at IS NULL
+                            AND NEW.disabled_by IS NULL
+                        )
+                    )
                 ) THEN
                     SIGNAL SQLSTATE '45000'
-                        SET MESSAGE_TEXT = 'manual destination identity is immutable';
+                        SET MESSAGE_TEXT = 'manual destination lifecycle is constrained';
                 END IF;
             END
             SQL);
