@@ -23,6 +23,8 @@ type PreviewAsset = {
   name: string;
   mime_type: string;
   usage_scope: string;
+  distribution_authorized: boolean;
+  distribution_authorization_updated_at: string | null;
   eligible: false;
   blocking_reasons: string[];
 };
@@ -41,6 +43,8 @@ type Preview = {
 type Props = {
   canEdit: boolean;
   csrf: string | null;
+  canAuthorize: boolean;
+  authorizationCsrf: string | null;
 };
 
 const days = [
@@ -69,7 +73,7 @@ function browserTimezone(): string {
   }
 }
 
-export function WeeklyPlannerPanel({ canEdit, csrf }: Props) {
+export function WeeklyPlannerPanel({ canEdit, csrf, canAuthorize, authorizationCsrf }: Props) {
   const [rule, setRule] = useState<WeeklyRule | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [timezone, setTimezone] = useState(browserTimezone());
@@ -78,6 +82,7 @@ export function WeeklyPlannerPanel({ canEdit, csrf }: Props) {
   const [maxPerDay, setMaxPerDay] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [authorizingId, setAuthorizingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
 
@@ -172,6 +177,39 @@ export function WeeklyPlannerPanel({ canEdit, csrf }: Props) {
     }
   }
 
+  async function setDistributionAuthorization(asset: PreviewAsset, authorized: boolean) {
+    if (!canAuthorize || !authorizationCsrf || authorizingId !== null) return;
+
+    setAuthorizingId(asset.id);
+    setFeedback('');
+    setError('');
+    try {
+      const response = await fetch('/api/admin/distribution-authorizations/' + encodeURIComponent(asset.id), {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': authorizationCsrf,
+        },
+        body: JSON.stringify({ authorized }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo actualizar la autorización de distribución.');
+      }
+
+      setFeedback(authorized
+        ? 'Autorización interna de distribución registrada.'
+        : 'Autorización interna de distribución revocada.');
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo actualizar la autorización de distribución.');
+    } finally {
+      setAuthorizingId(null);
+    }
+  }
+
   return (
     <section id="programacion" className="admin-settings weekly-planner" aria-labelledby="weekly-planner-title">
       <span className="admin-kicker">S3 · PROGRAMACIÓN SEGURA</span>
@@ -258,9 +296,24 @@ export function WeeklyPlannerPanel({ canEdit, csrf }: Props) {
           <ul className="weekly-assets">
             {preview.assets.map((asset) =>
               <li key={asset.id}>
-                <div>
+                <div className="weekly-asset-summary">
                   <strong>{asset.name}</strong>
                   <small>{asset.mime_type} · {asset.usage_scope}</small>
+                  <span className={'weekly-authorization ' + (asset.distribution_authorized ? 'yes' : 'no')}>
+                    {asset.distribution_authorized
+                      ? 'Distribución autorizada internamente'
+                      : 'Distribución sin autorizar'}
+                  </span>
+                  {canAuthorize && authorizationCsrf &&
+                    <button type="button"
+                      disabled={authorizingId !== null}
+                      onClick={() => void setDistributionAuthorization(asset, !asset.distribution_authorized)}>
+                      {authorizingId === asset.id
+                        ? 'Guardando…'
+                        : asset.distribution_authorized
+                          ? 'Revocar autorización'
+                          : 'Autorizar distribución'}
+                    </button>}
                 </div>
                 <ul aria-label={'Bloqueos de ' + asset.name}>
                   {asset.blocking_reasons.map((reason) =>
@@ -272,8 +325,8 @@ export function WeeklyPlannerPanel({ canEdit, csrf }: Props) {
           </ul>}
 
         <p className="weekly-safety">
-          <strong>Publicación bloqueada.</strong> La clasificación del Vault no equivale a autorización de distribución.
-          El siguiente paso de S3 añadirá esa aprobación como contrato separado.
+          <strong>Publicación bloqueada.</strong> La autorización de distribución es una decisión interna separada de la
+          clasificación. No crea schedules, no llama proveedores y no certifica por sí sola derechos ni cumplimiento.
         </p>
       </div>
     </section>
