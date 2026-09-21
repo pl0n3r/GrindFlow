@@ -262,9 +262,14 @@ run_smoke() {
   if ! token="$(extract_csrf)"; then printf 'ERROR: login page did not expose a CSRF token.\n' >&2; return 1; fi
   local login_status
   login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --dump-header "$login_post_headers" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token=$token" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password=$E2E_USER_PASSWORD" "$BASE_URL/login")"
-  case "$login_status" in 302|303) ;; *) printf 'ERROR: login returned HTTP %s\n' "$login_status" >&2; return 1 ;; esac
+  case "$login_status" in
+    302|303) ;;
+    401|403|419|422|429) printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2; return 7 ;;
+    *) printf 'ERROR: login returned HTTP %s\n' "$login_status" >&2; return 1 ;;
+  esac
   local login_redirect
   login_redirect="$(safe_redirect_path "$login_post_headers")"
+  printf 'LOGIN_REDIRECT_PATH=%s\n' "$login_redirect"
   if [[ "$login_redirect" == "/login" ]]; then
     printf 'ERROR: login redirected back to /login; credentials or account/session require investigation. No repeated login attempts.\n' >&2
     return 7
