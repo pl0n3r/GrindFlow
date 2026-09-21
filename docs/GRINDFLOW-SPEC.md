@@ -173,6 +173,24 @@ respuestas de proveedor, media ni URL privada. El endpoint y la UI deben
 declarar `publishes=false`, `provider_calls=false` y
 `external_evidence=false`.
 
+### S4 · Destinos manuales y cola interna
+
+Un handoff preparado se liga a un destino interno explícito del tenant. El destino
+es solo una etiqueta de trabajo administrada por Admin/Studio; no representa una
+conexión técnica y no puede contener credenciales, tokens, provider IDs ni una URL
+de publicación. Desactivarlo bloquea nuevas preparaciones, sin modificar eventos
+históricos que ya lo referencian.
+
+Cada evento de handoff conserva `destination_id`. `complete` y `fail`
+heredan el destino de su `prepare`; para cambiarlo debe existir un fallo y un
+nuevo `prepare`. Esta secuencia evita reescrituras silenciosas del destino de un
+intento ya iniciado.
+
+La cola interna se deriva de borradores activos cuyo último evento es
+`prepared` o `failed`. Se ordena con los vencidos primero y luego por UTC
+programado, devuelve una ventana acotada y un total tenant-scoped, y sigue siendo
+una lista de trabajo humano. No crea jobs, deliveries ni llamadas de proveedor.
+
 ## 4. Non-negotiable invariants
 
 1. Tenant data must not cross organization boundaries.
