@@ -1504,3 +1504,115 @@ test('S2 viewer has no batch controls in library or trash', async ({ page }) => 
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
 });
+
+test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication blocked', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+
+  let savedRule = null;
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        user: { display_name: 'Editora S3' },
+        organization: { id: '00000000-0000-7000-8000-000000000067', name: 'Agenda segura', role: 'editor' },
+        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+        profile_name_csrf: 'profile-token',
+        profile_password_csrf: 'password-token',
+        vault_upload_csrf: 'vault-token',
+        vault_manage_csrf: 'vault-manage-token',
+        weekly_rule_csrf: 'weekly-rule-token',
+        organization_name_csrf: null,
+      },
+    }),
+  }));
+  await page.route('**/api/admin/vault?*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        assets: [], limit: 30, page: 1, view: 'active', format: 'all', usage: 'all', sort: 'recent',
+        total: 0, pages: 0,
+        quota: { used_bytes: 0, max_bytes: 134217728, used_assets: 0, max_assets: 100 },
+      },
+    }),
+  }));
+  await page.route((url) => url.pathname === '/api/admin/rules/weekly', async (route) => {
+    if (route.request().method() === 'PUT') {
+      expect(route.request().headers()['x-csrf-token']).toBe('weekly-rule-token');
+      const payload = route.request().postDataJSON();
+      expect(payload).toEqual({
+        timezone: 'America/Bogota',
+        weekdays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+        local_time: '09:30',
+        max_per_day: 2,
+      });
+      expect(payload).not.toHaveProperty('organization_id');
+      savedRule = { ...payload, mode: 'review_only', updated_at: '2026-09-21 13:00:00' };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { rule: savedRule } }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { rule: savedRule } }),
+    });
+  });
+  await page.route((url) => url.pathname === '/api/admin/rules/weekly/preview', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        rule: savedRule,
+        assets: [{
+          id: '00000000-0000-7000-8000-000000000099',
+          name: 'campaña.png',
+          mime_type: 'image/png',
+          usage_scope: 'unclassified',
+          eligible: false,
+          blocking_reasons: savedRule
+            ? ['classification_missing', 'distribution_authorization_missing']
+            : ['weekly_rule_missing', 'classification_missing', 'distribution_authorization_missing'],
+        }],
+        visible: 1,
+        total_active_assets: 1,
+        limit: 30,
+        can_publish: false,
+        mode: 'review_only',
+      },
+    }),
+  }));
+
+  await page.evaluate(() => {
+    document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>';
+  });
+  await page.addScriptTag({ url: script + '?weekly-planner-e2e=1', type: 'module' });
+
+  await expect(page.getByRole('heading', { name: 'Regla y vista previa semanal' })).toBeVisible();
+  await expect(page.getByText('Publicación bloqueada.')).toBeVisible();
+  await expect(page.getByText('Falta guardar una regla semanal')).toBeVisible();
+
+  await page.getByLabel('Zona horaria IANA').fill('America/Bogota');
+  await page.getByRole('checkbox', { name: 'Sáb' }).check();
+  await page.getByLabel('Hora local').fill('09:30');
+  await page.getByLabel('Máximo por día').fill('2');
+  await page.getByRole('button', { name: 'Guardar regla' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Regla semanal guardada');
+  await expect(page.getByText('Falta autorización explícita de distribución')).toBeVisible();
+  await expect(page.getByText('Falta guardar una regla semanal')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Actualizar regla' })).toBeVisible();
+
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(overflow.scrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewportWidth);
+});
+
