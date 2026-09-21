@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.65: primera regla semanal S3 en modo revisión.** El runtime desplegado sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.64 `c5e59e85481213360692759f22c3426072374ee5`. La nueva regla no publica, no llama plataformas externas y no modifica datos productivos.
+> **Candidato v0.1.66: preview semanal S3 con bloqueos explícitos.** El runtime desplegado sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.65 `ef4ed47636c040243ba008310308be18f658682f`. El preview es read-only, tenant-safe y no publica ni llama plataformas externas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,9 +18,9 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.65** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.64~~ | `c5e59e85481213360692759f22c3426072374ee5` |
-| CI del PR | 🚧 Head v0.1.65 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.66** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.65~~ | `ef4ed47636c040243ba008310308be18f658682f` |
+| CI del PR | 🚧 Head v0.1.66 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+264** | **−37** | **+227** |
+| **5** | **+277** | **−18** | **+259** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S3: persistir una regla semanal por tenant, validada y siempre `review_only` |
+| Alcance | S3: preview read-only de hasta 30 recursos activos con bloqueos explícitos y total tenant-safe |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,21 +58,21 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Primera configuración S3 persistente por organización: zona horaria IANA, días de semana, hora local y máximo diario.
-- API `GET/PUT /api/admin/rules/weekly` toma el tenant únicamente de la sesión verificada y revalida rol activo dentro de la transacción de escritura.
-- CSRF dedicado y rechazo de campos extra impiden inyectar IDs de usuario/organización desde el cliente.
-- El modo queda forzado a `review_only`: esta entrega prepara planificación, pero no concede permiso de distribución ni ejecuta publicaciones externas.
+- Nuevo `GET /api/admin/rules/weekly/preview`: cruza la regla semanal con recursos activos del Vault del tenant sin aceptar IDs de organización desde el cliente.
+- Cada recurso expone `eligible=false` y razones estables de bloqueo (`weekly_rule_missing`, `classification_missing`, `internal_only`, `content_review_required`, `distribution_authorization_missing`).
+- El preview devuelve total completo y una ventana acotada de 30 recursos; papelera y otros tenants quedan fuera.
+- La clasificación nunca se convierte en permiso: hasta implementar autorización de distribución, `can_publish=false` y el modo permanece `review_only`.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
-- `symfony/migrations/Version20260921090000.php`
-- `symfony/src/Http/Controller/AdminContextController.php`
+- `docs/GRINDFLOW-SPEC.md`
 - `symfony/src/Http/Controller/ContentRuleController.php`
+- `symfony/tests/php/WeeklyRulePreviewTest.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.65 por verificar; la base v0.1.64 ya está fusionada en `main`.
+- CI/Sonar/CodeRabbit del candidato v0.1.66 por verificar; la base v0.1.65 ya está fusionada en `main`.
 - Sin checkout local de PHP/MariaDB/Chromium; GitHub Actions debe validar migración, PHP y contratos. Producción intacta.
 
 ## Qué sigue
@@ -80,8 +80,8 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar regla semanal review-only v0.1.65 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Preview semanal con recursos elegibles y razones de bloqueo | 🚧 Sin publicación externa |
+| **NOW** | 🚧 Validar preview semanal review-only v0.1.66 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Contrato explícito de autorización de distribución y slots semanales | 🚧 Sin publicación externa |
 | **LATER** | 🚧 Scheduler Symfony + distribución autorizada + Traffic | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -89,7 +89,7 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
-| **NOW** | 🚧 Regla semanal S3 v0.1.65 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Preview semanal y elegibilidad | 🚧 S3 |
+| **NOW** | 🚧 Preview semanal S3 v0.1.66 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Autorización de distribución + slots | 🚧 S3 |
 | **LATER** | 🚧 Paridad del monolito modular | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

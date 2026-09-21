@@ -138,6 +138,95 @@ final class ContentRuleController extends AbstractController
         return $this->privateJson(['data' => ['rule' => $this->publicRule($row)]]);
     }
 
+    #[Route('/api/admin/rules/weekly/preview', name: 'grindflow_weekly_rule_preview', methods: ['GET'])]
+    public function preview(Request $request, MembershipContext $memberships, Connection $db): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+
+        $params = [
+            'organization' => $context['organization']['id'],
+            'user' => $context['user']->id(),
+        ];
+        $rule = $db->fetchAssociative(
+            <<<'SQL'
+                SELECT rule.timezone, rule.weekdays, rule.local_time, rule.max_per_day, rule.mode, rule.updated_at
+                FROM gf_content_rules rule
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = rule.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE rule.organization_id = :organization
+                  AND membership.user_id = :user AND actor.is_active = 1
+                SQL,
+            $params,
+        );
+        $assets = $db->fetchAllAssociative(
+            <<<'SQL'
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.organization_id = :organization AND asset.deleted_at IS NULL
+                  AND membership.user_id = :user AND actor.is_active = 1
+                ORDER BY asset.created_at DESC, asset.id DESC
+                LIMIT 30
+                SQL,
+            $params,
+        );
+        $total = (int) $db->fetchOne(
+            <<<'SQL'
+                SELECT COUNT(*)
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.organization_id = :organization AND asset.deleted_at IS NULL
+                  AND membership.user_id = :user AND actor.is_active = 1
+                SQL,
+            $params,
+        );
+
+        $items = array_map(function (array $asset) use ($rule): array {
+            $reasons = [];
+            if ($rule === false) {
+                $reasons[] = 'weekly_rule_missing';
+            }
+            $scope = (string) $asset['usage_scope'];
+            if ($scope === 'unclassified') {
+                $reasons[] = 'classification_missing';
+            } elseif ($scope === 'internal_only') {
+                $reasons[] = 'internal_only';
+            } elseif ($scope === 'needs_review') {
+                $reasons[] = 'content_review_required';
+            }
+            // S3 intentionally has no distribution-authorization contract yet.
+            // Classification alone must never become a publishing permission.
+            $reasons[] = 'distribution_authorization_missing';
+
+            return [
+                'id' => (string) $asset['id'],
+                'name' => (string) $asset['original_name'],
+                'mime_type' => (string) $asset['mime_type'],
+                'usage_scope' => $scope,
+                'eligible' => false,
+                'blocking_reasons' => array_values(array_unique($reasons)),
+            ];
+        }, $assets);
+
+        return $this->privateJson(['data' => [
+            'rule' => $rule === false ? null : $this->publicRule($rule),
+            'assets' => $items,
+            'visible' => count($items),
+            'total_active_assets' => $total,
+            'limit' => 30,
+            'can_publish' => false,
+            'mode' => 'review_only',
+        ]]);
+    }
+
     /** @return array{user: IdentityUser, organization: array{id: string, name: string, role: string}}|JsonResponse */
     private function context(Request $request, MembershipContext $memberships): array|JsonResponse
     {
