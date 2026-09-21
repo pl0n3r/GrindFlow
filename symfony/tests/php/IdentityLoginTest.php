@@ -73,6 +73,9 @@ final class IdentityLoginTest extends WebTestCase
             $list = $client->request('GET', '/organizations');
             self::assertResponseIsSuccessful();
             self::assertSelectorTextContains('h1', 'Elige tu organización');
+            self::assertSelectorExists('header.identity-navbar nav[aria-label="Navegación de acceso"]');
+            self::assertSelectorTextContains('header.identity-navbar .identity-current[aria-current="page"]', 'Organizaciones');
+            self::assertSelectorExists('header.identity-navbar a[href="/preview"]');
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertStringContainsString('private', (string) $client->getResponse()->headers->get('Cache-Control'));
             self::assertSelectorTextContains('.identity-orgs', 'My isolated org');

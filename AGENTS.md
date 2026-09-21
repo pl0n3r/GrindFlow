@@ -914,19 +914,39 @@ Reglas:
 - Migraciones de produccion, acciones destructivas y cambios de secretos nunca
   se presentan como realizados si solo fueron validados en codigo.
 
-### Regla de CodeRabbit sobre heads estables
+### Regla BLOQUEANTE de CodeRabbit antes de fusionar
 
-- `.coderabbit.yaml` mantiene `auto_review.enabled=true` y
-  `auto_incremental_review=false`.
-- La implementacion y correcciones deterministicas se estabilizan primero; luego
-  CI/Sonar y un unico `@coderabbitai full review` se inspeccionan en paralelo
-  sobre el mismo SHA previsto para merge.
-- Si un hallazgo obliga a cambiar codigo, se crea un nuevo head logico, se
-  revalidan los gates afectados y se vuelve a pedir full review sobre ese SHA.
-- Nunca se afirma que CodeRabbit paso cuando solo esta procesando.
-- Una demora indefinida del reviewer externo, sin finding/thread accionable y con
-  CI/Sonar canonicos verdes, se documenta como reviewer pendiente; no se inventa
-  una aprobacion.
+**Decisión explícita del propietario (21/09/2026), tras PR #72:** CodeRabbit
+es una compuerta de revisión obligatoria para CADA PR de GrindFlow. CI y Sonar
+verdes NO sustituyen la revisión final del mismo head.
+
+1. Estabilizar el SHA final del PR; comprobar CI `GrindFlow CI / validate` y
+   Sonar satisfactorios para ese SHA y solicitar/confirmar CodeRabbit full review.
+2. Antes de ejecutar squash/merge, verificar en GitHub que **CodeRabbit terminó
+   explícitamente su revisión** de ese SHA: revisión final registrada o resumen
+   inequívoco de finalización. Un comentario de «Currently processing», una
+   revisión parcial, silencio, un check ausente o la ausencia de comentarios/hilos
+   NO son aprobación ni finalización.
+3. Inspeccionar revisión, comentarios inline e hilos; corregir TODOS los
+   hallazgos accionables o justificar y resolver los falsos positivos con
+   evidencia. No fusionar con hilos accionables abiertos o cambios solicitados.
+4. Si se modifica la rama, el resultado del head anterior deja de valer:
+   volver a verificar CI/Sonar y obtener revisión final de CodeRabbit sobre el
+   NUEVO SHA antes de fusionar. Verificar base/head de nuevo para evitar carreras.
+5. Si CodeRabbit demora indefinidamente, falla, cancela o no entrega evidencia
+   final, **mantener el PR abierto y bloquear el merge**; registrar el bloqueo
+   y avanzar únicamente en trabajo independiente seguro. No hay excepción
+   automática por timeout, CI verde, ausencia de findings ni presión de entrega.
+6. No reinterpretar `mergeable=true` de GitHub como evidencia del gate de
+   CodeRabbit. No registrar `CodeRabbit aprobado` ni `review completada` sin
+   prueba explícita. Una excepción excepcional requiere instrucción expresa
+   del propietario para ESA PR y debe quedar documentada antes de ejecutarla.
+
+**Lección registrada:** PR #72 fue fusionada con CI/Sonar verdes mientras
+CodeRabbit todavía mostraba «Currently processing», sin revisión final visible.
+Esa conducta no se repite. Esta es una regla de actuación del agente; por sí
+sola no implica que GitHub tenga un ruleset/required check configurado.
+
 
 ### Observacion de deploy y real-stack
 

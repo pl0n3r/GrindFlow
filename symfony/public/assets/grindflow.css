@@ -13,3 +13,18 @@
 .identity-orgs li{border:1px solid #514462;border-radius:12px;padding:16px}
 .identity-orgs li form{gap:10px}
 .identity-orgs span{color:var(--muted);font-size:13px}
+
+/* Reuse the public GrindFlow masthead on the two Symfony identity pages. */
+.identity-navbar{min-width:0;padding-block:22px;border-bottom:1px solid var(--line)}
+.identity-navbar nav{min-width:0;gap:clamp(12px,2vw,30px)}
+.identity-navbar nav .identity-current{padding:12px 15px;border:1px solid #514462;border-radius:12px;background:#2b2744;color:#f7f4ff;font-size:12px;white-space:nowrap}
+.identity-navbar .identity-preview-link{white-space:nowrap}
+@media(max-width:590px){
+  .identity-navbar{padding:18px 16px;gap:10px}
+  .identity-navbar .brand{font-size:20px}
+  .identity-navbar nav{gap:10px;font-size:12px}
+  .identity-navbar nav>a:first-child{display:inline-flex}
+  .identity-navbar nav .identity-preview-link{display:none}
+  .identity-navbar nav .identity-current{padding:10px;font-size:11px}
+  .identity-shell{padding:28px 16px}
+}
