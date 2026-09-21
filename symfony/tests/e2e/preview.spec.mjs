@@ -1512,20 +1512,22 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   expect(script).toBeTruthy();
 
   let savedRule = null;
+  let distributionAuthorized = false;
   await page.route('**/api/admin/context', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
       data: {
-        user: { display_name: 'Editora S3' },
-        organization: { id: '00000000-0000-7000-8000-000000000067', name: 'Agenda segura', role: 'editor' },
-        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+        user: { display_name: 'Estudio S3' },
+        organization: { id: '00000000-0000-7000-8000-000000000067', name: 'Agenda segura', role: 'studio' },
+        permissions: { workspace_view: true, organization_manage: true, content_prepare: true, content_review: true, distribution_authorize: true },
         profile_name_csrf: 'profile-token',
         profile_password_csrf: 'password-token',
         vault_upload_csrf: 'vault-token',
         vault_manage_csrf: 'vault-manage-token',
         weekly_rule_csrf: 'weekly-rule-token',
-        organization_name_csrf: null,
+        distribution_authorization_csrf: 'distribution-token',
+        organization_name_csrf: 'organization-token',
       },
     }),
   }));
@@ -1564,6 +1566,26 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       body: JSON.stringify({ data: { rule: savedRule } }),
     });
   });
+  await page.route((url) => url.pathname.startsWith('/api/admin/distribution-authorizations/'), async (route) => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().headers()['x-csrf-token']).toBe('distribution-token');
+    const payload = route.request().postDataJSON();
+    expect(payload).toEqual({ authorized: !distributionAuthorized });
+    distributionAuthorized = payload.authorized;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          asset_id: '00000000-0000-7000-8000-000000000099',
+          authorized: distributionAuthorized,
+          changed: true,
+          updated_at: '2026-09-21 14:00:00',
+          publishes: false,
+        },
+      }),
+    });
+  });
   await page.route((url) => url.pathname === '/api/admin/rules/weekly/preview', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -1583,10 +1605,12 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
           name: 'campaña.png',
           mime_type: 'image/png',
           usage_scope: 'unclassified',
+          distribution_authorized: distributionAuthorized,
+          distribution_authorization_updated_at: distributionAuthorized ? '2026-09-21 14:00:00' : null,
           eligible: false,
           blocking_reasons: savedRule
-            ? ['classification_missing', 'distribution_authorization_missing']
-            : ['weekly_rule_missing', 'classification_missing', 'distribution_authorization_missing'],
+            ? ['classification_missing', ...(distributionAuthorized ? [] : ['distribution_authorization_missing'])]
+            : ['weekly_rule_missing', 'classification_missing', ...(distributionAuthorized ? [] : ['distribution_authorization_missing'])],
         }],
         visible: 1,
         total_active_assets: 1,
@@ -1620,6 +1644,16 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Próximos slots')).toBeVisible();
   await expect(page.getByText('2026-09-22 · 09:30')).toBeVisible();
   await expect(page.getByText('Capacidad 2/día')).toBeVisible();
+  await expect(page.getByText('Distribución sin autorizar')).toBeVisible();
+  await page.getByRole('button', { name: 'Autorizar distribución' }).click();
+  await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución registrada');
+  await expect(page.getByText('Distribución autorizada internamente')).toBeVisible();
+  await expect(page.getByText('Falta autorización explícita de distribución')).toHaveCount(0);
+  await expect(page.getByText('Publicación bloqueada.')).toBeVisible();
+  await page.getByRole('button', { name: 'Revocar autorización' }).click();
+  await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
+  await expect(page.getByText('Distribución sin autorizar')).toBeVisible();
+
 
   const overflow = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

@@ -10,12 +10,14 @@ type Context = {
   vault_upload_csrf: string | null;
   vault_manage_csrf: string | null;
   weekly_rule_csrf?: string | null;
+  distribution_authorization_csrf?: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
     organization_manage: boolean;
     content_prepare: boolean;
     content_review: boolean;
+    distribution_authorize: boolean;
   };
 };
 
@@ -319,12 +321,17 @@ export function AdminApp() {
           <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf}
             manageCsrf={context.vault_manage_csrf} />
           {context.weekly_rule_csrf !== undefined &&
-            <WeeklyPlannerPanel canEdit={context.permissions.content_prepare} csrf={context.weekly_rule_csrf} />}
+            <WeeklyPlannerPanel
+              canEdit={context.permissions.content_prepare}
+              csrf={context.weekly_rule_csrf}
+              canAuthorize={context.permissions.distribution_authorize}
+              authorizationCsrf={context.distribution_authorization_csrf ?? null}
+            />}
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
               ? <>
                   <strong>Alcance S3 en revisión</strong>
-                  <p>La regla semanal y su vista previa ya son visibles en Symfony. Aún no se crean publicaciones ni se conectan plataformas externas.</p>
+                  <p>La regla semanal, sus slots y la autorización interna por recurso ya son visibles en Symfony. Aún no se crean publicaciones ni se conectan plataformas externas.</p>
                 </>
               : <>
                   <strong>Alcance S2 inicial</strong>

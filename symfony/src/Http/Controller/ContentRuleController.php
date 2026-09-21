@@ -164,7 +164,23 @@ final class ContentRuleController extends AbstractController
         );
         $assets = $db->fetchAllAssociative(
             <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at,
+                    (
+                        SELECT auth_event.action
+                        FROM gf_distribution_authorization_events auth_event
+                        WHERE auth_event.organization_id = asset.organization_id
+                          AND auth_event.asset_id = asset.id
+                        ORDER BY auth_event.created_at DESC, auth_event.id DESC
+                        LIMIT 1
+                    ) AS distribution_action,
+                    (
+                        SELECT auth_event.created_at
+                        FROM gf_distribution_authorization_events auth_event
+                        WHERE auth_event.organization_id = asset.organization_id
+                          AND auth_event.asset_id = asset.id
+                        ORDER BY auth_event.created_at DESC, auth_event.id DESC
+                        LIMIT 1
+                    ) AS distribution_authorization_updated_at
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -202,15 +218,22 @@ final class ContentRuleController extends AbstractController
             } elseif ($scope === 'needs_review') {
                 $reasons[] = 'content_review_required';
             }
-            // S3 intentionally has no distribution-authorization contract yet.
-            // Classification alone must never become a publishing permission.
-            $reasons[] = 'distribution_authorization_missing';
+            $distributionAuthorized = ($asset['distribution_action'] ?? null) === 'grant';
+            if (!$distributionAuthorized) {
+                $reasons[] = 'distribution_authorization_missing';
+            }
 
             return [
                 'id' => (string) $asset['id'],
                 'name' => (string) $asset['original_name'],
                 'mime_type' => (string) $asset['mime_type'],
                 'usage_scope' => $scope,
+                'distribution_authorized' => $distributionAuthorized,
+                'distribution_authorization_updated_at' =>
+                    $asset['distribution_authorization_updated_at'] === null
+                        ? null
+                        : (string) $asset['distribution_authorization_updated_at'],
+                // Authorization only removes its own blocker. Scheduling remains fail-closed.
                 'eligible' => false,
                 'blocking_reasons' => array_values(array_unique($reasons)),
             ];
