@@ -22,7 +22,7 @@ status=200; body=""; csv_headers=""; redirect=""
 [[ -z "${MOCK_REQUEST_LOG:-}" ]] || printf '%s %s\n' "$method" "$url" >> "$MOCK_REQUEST_LOG"
 case "$url" in
   http://mock/up) body="ok";;
-  http://mock/login) if [[ "$method" == POST ]]; then status=302; redirect="/dashboard"; [[ "${MOCK_AUTH_MODE:-ok}" == post_login ]] && redirect="/login?private-query-do-not-print"; else body='<form><input name="_token" value="fake-csrf"></form>'; fi;;
+  http://mock/login) if [[ "$method" == POST ]]; then status=302; redirect="/dashboard"; if [[ "${MOCK_AUTH_MODE:-ok}" == post_login ]]; then redirect="/login?private-query-do-not-print"; fi; else body='<form><input name="_token" value="fake-csrf"></form>'; fi;;
   http://mock/dashboard)
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_login ]]; then status=302; redirect="/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_other ]]; then status=302; redirect="/organizations?private-query-do-not-print"; fi
