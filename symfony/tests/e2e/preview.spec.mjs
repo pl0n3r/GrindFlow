@@ -1085,3 +1085,58 @@ test('S2 ignores a stale integrity response after switching views, without block
   await expect(page.getByText('Alerta: el tamaño o la huella SHA-256 no coinciden.')).toHaveCount(0);
   expect(checks).toBe(2);
 });
+
+test('S2 mobile verifies only visible originals and clears results on view switch', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const first = '00000000-0000-7000-8000-000000000061';
+  const second = '00000000-0000-7000-8000-000000000062';
+  const assets = [first, second].map((id, index) => ({
+    id, name: 'imagen-' + (index + 1) + '.png', mime_type: 'image/png',
+    size_bytes: 69, created_at: '2026-09-20 00:00:00',
+    download_url: '/api/admin/vault/' + id + '/download',
+  }));
+  const requests = [];
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Lector de prueba' },
+      organization: { id: first, name: 'Imágenes propias', role: 'model' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: false },
+      vault_upload_csrf: null, vault_manage_csrf: null,
+    } }),
+  }));
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const trash = new URL(route.request().url()).searchParams.get('view') === 'trash';
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: trash ? [] : assets, page: 1, pages: trash ? 0 : 1,
+        total: trash ? 0 : 2,
+        quota: { used_assets: 2, max_assets: 100, used_bytes: 138, max_bytes: 128 * 1024 * 1024 },
+      } }),
+    });
+  });
+  await page.route('**/api/admin/vault/*/integrity', (route) => {
+    expect(route.request().method()).toBe('GET');
+    const id = new URL(route.request().url()).pathname.split('/')[4];
+    requests.push(id);
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, status: id === first ? 'verified' : 'mismatch' } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-page-integrity-e2e=1', type: 'module' });
+  await expect(page.getByText('imagen-1.png')).toBeVisible();
+  await page.getByRole('button', { name: 'Verificar originales visibles (2)' }).click();
+  await expect(page.getByText('Comprobados 2 de 2 originales.')).toBeVisible();
+  await expect(page.getByText(/1 de 2 imágenes necesitan revisión/)).toBeVisible();
+  await expect(page.getByText('Original íntegro: tamaño y SHA-256 coinciden.')).toBeVisible();
+  await expect(page.getByText(/Alerta: el tamaño o la huella SHA-256 no coinciden/)).toBeVisible();
+  expect(requests).toEqual([first, second]);
+  await page.getByRole('button', { name: 'Papelera', exact: true }).click();
+  await expect(page.getByText('La papelera está vacía.')).toBeVisible();
+  await expect(page.getByText(/necesitan revisión/)).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
