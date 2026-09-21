@@ -11,6 +11,7 @@ type Context = {
   vault_manage_csrf: string | null;
   weekly_rule_csrf?: string | null;
   content_review_csrf?: string | null;
+  schedule_draft_csrf?: string | null;
   distribution_authorization_csrf?: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
@@ -328,6 +329,7 @@ export function AdminApp() {
               csrf={context.weekly_rule_csrf}
               canReview={context.permissions.content_review_decide}
               reviewCsrf={context.content_review_csrf ?? null}
+              scheduleCsrf={context.schedule_draft_csrf ?? null}
               canAuthorize={context.permissions.distribution_authorize}
               authorizationCsrf={context.distribution_authorization_csrf ?? null}
             />}
@@ -337,7 +339,7 @@ export function AdminApp() {
                   <strong>Alcance S3 en revisión</strong>
                   <p>
                     La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony.
-                    Aún no se crean schedules ni publicaciones externas.
+                    La agenda permite borradores cancelables, sin envíos ni publicaciones externas.
                   </p>
                 </>
               : <>
