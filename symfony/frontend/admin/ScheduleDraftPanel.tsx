@@ -264,7 +264,8 @@ export function ScheduleDraftPanel({
                             </button>
                           </>}
                       </>}
-                    {canEdit && csrf && draft.status === 'draft' &&
+                    {canEdit && csrf && draft.status === 'draft'
+                      && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
                       <button type="button" disabled={busyId !== null}
                         aria-label={'Cancelar borrador de ' + draft.asset_name}
                         onClick={() => void cancel(draft)}>
