@@ -10,6 +10,7 @@ use GrindFlow\Infrastructure\Storage\VaultAuditCommand;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Uid\Uuid;
 
@@ -26,6 +27,8 @@ final class VaultAuditCommandTest extends KernelTestCase
     public function testAuditReportsTenantScopedIntegrityAndRejectsIncompleteRestore(): void
     {
         self::bootKernel();
+        // The operator must be able to find the command in the real Symfony container.
+        self::assertSame('grindflow:vault:audit', (new Application(static::$kernel))->find('grindflow:vault:audit')->getName());
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $base = sys_get_temp_dir().'/gf-recovery-'.bin2hex(random_bytes(6));
