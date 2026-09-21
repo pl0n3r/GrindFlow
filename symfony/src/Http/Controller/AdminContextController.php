@@ -65,6 +65,9 @@ final class AdminContextController extends AbstractController
                 'distribution_authorization_csrf' => $permissions['distribution_authorize']
                     ? (string) $csrf->getToken('grindflow_distribution_authorization')->getValue()
                     : null,
+                'manual_handoff_csrf' => $permissions['manual_handoff_manage']
+                    ? (string) $csrf->getToken('grindflow_manual_handoff')->getValue()
+                    : null,
                 'organization' => $organization,
                 'permissions' => $permissions,
                 'organization_name_csrf' => $permissions['organization_manage']
