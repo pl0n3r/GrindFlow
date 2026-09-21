@@ -62,6 +62,15 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit/MariaDB de CSRF, ACL, tenant, validación, retención en papelera y persistencia; Playwright/Chromium a 360 px; regresión del manifiesto de staging y restauración. Todo en entornos sintéticos, sin migraciones productivas.
 
+### GF-SEC-005 — Cambio de contraseña personal en Symfony
+**Estado:** implementado en candidato v0.1.61; CI, merge y producción son verificaciones separadas.
+
+**Enunciado:** una persona con sesión Symfony activa cambia únicamente su propia contraseña desde React, independientemente del rol de su organización.
+
+**Aceptación:** POST JSON con exclusivamente contraseña actual, nueva y confirmación; CSRF exclusivo de esta acción y cuenta activa; mínimo 12/máximo 128 caracteres para la nueva clave. Verificar la contraseña anterior frente al hash vigente dentro de una transacción con bloqueo de la fila, denegar reutilización y cambios ajenos. Aplicar hash de Symfony, revocar la sesión actual tras éxito y exigir nuevo login. No incluir contraseñas ni hashes en respuestas, métricas o logs; no prometer revocación de otras sesiones sin infraestructura de sesiones verificable. El panel a 360 px limpia los tres campos también tras error.
+
+**Verificación:** PHPUnit contra MariaDB Symfony descartable para anónimo, CSRF, campos extra/IDOR, contraseña errónea, reuso, confirmación, éxito, cierre de sesión y nuevo login; Chromium con respuestas sintéticas para errores y recorrido móvil. Sin tocar usuarios ni sesiones Laravel.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation

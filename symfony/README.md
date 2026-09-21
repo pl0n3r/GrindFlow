@@ -1,13 +1,15 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice candidato v0.1.60:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice candidato v0.1.61:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.60 en rama: nota privada editable por imagen activa con ACL/CSRF y manifiesto de recuperación completo. |
-| VALIDADO EN CÓDIGO | CI/Sonar del head v0.1.60 por verificar; base exact-main v0.1.59 success. |
+| IMPLEMENTADO | v0.1.61 en rama: rotación personal de contraseña y reingreso con CSRF, hash actual bloqueado y panel React móvil. |
+| VALIDADO EN CÓDIGO | CI/Sonar del head v0.1.61 por verificar; base exact-main v0.1.60 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
+
+**v0.1.61, seguridad personal:** el panel privado permite rotar la contraseña propia sin permisos administrativos del tenant. La API exige CSRF dedicado, contraseña actual verificada contra hash vigente bajo bloqueo SQL, confirmación y contraseña nueva distinta; no acepta IDs. Al cambiarla invalida la sesión actual y pide nuevo login. PHP/MariaDB descartable + Chromium móvil cubren rechazo, aislamiento y respuesta sin secretos. No significa revocación comprobada de todas las sesiones ni migración de cuentas Laravel.
 
 **v0.1.54, garantía de lectura S2:** la misma verificación de tamaño y huella SHA-256 se aplica a descargas, vistas previas y restauraciones. Un original alterado o ausente genera error genérico sin entregar bytes; el diagnóstico individual conserva los estados `verified|missing|mismatch|unavailable`. React permite comprobar la página visible (máximo 30 archivos) únicamente por petición expresa del usuario. Cada resultado está vinculado a su imagen y se limpia al cambiar página/vista. Se conserva el aislamiento tenant y no se muestran rutas/huellas. **Verificación no es backup ni storage durable:** `symfony/var/vault` continúa local y descartable hasta definir y probar persistencia, backup y recuperación fuera del árbol desplegable.
 

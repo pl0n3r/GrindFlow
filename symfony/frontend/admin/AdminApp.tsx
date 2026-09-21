@@ -5,6 +5,7 @@ type Context = {
   user: { display_name: string };
   organization_name_csrf: string | null;
   profile_name_csrf: string | null;
+  profile_password_csrf: string | null;
   vault_upload_csrf: string | null;
   vault_manage_csrf: string | null;
   organization: { id: string; name: string; role: string };
@@ -34,6 +35,12 @@ export function AdminApp() {
   const [profileName, setProfileName] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState('');
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
 
@@ -144,6 +151,47 @@ export function AdminApp() {
     }
   }
 
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (state.kind !== 'ready' || !state.context.profile_password_csrf ||
+        changingPassword || passwordChanged) return;
+
+    setChangingPassword(true);
+    setPasswordFeedback('');
+    try {
+      const response = await fetch('/api/admin/profile/password', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': state.context.profile_password_csrf,
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo cambiar la contraseña.');
+      }
+      if (body?.data?.reauthentication_required !== true) {
+        throw new Error('La respuesta del servidor no confirmó el cierre de sesión.');
+      }
+      setPasswordChanged(true);
+      setPasswordFeedback('Contraseña actualizada. La sesión terminó; inicia sesión de nuevo.');
+    } catch (error) {
+      setPasswordFeedback(error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.');
+    } finally {
+      // Never keep plaintext passwords mounted in React state after a submission.
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setChangingPassword(false);
+    }
+  }
+
   if (state.kind === 'loading') {
     return <section className="admin-state" role="status"><span className="admin-pulse" />Cargando contexto seguro…</section>;
   }
@@ -240,6 +288,31 @@ export function AdminApp() {
               </div>
             </form>
             {profileFeedback && <p role="status">{profileFeedback}</p>}
+          </section>
+          <section className="admin-settings" aria-labelledby="password-settings-title">
+            <span className="admin-kicker">SEGURIDAD PERSONAL</span>
+            <h2 id="password-settings-title">Cambiar contraseña</h2>
+            <p>Solo puedes cambiar la contraseña de tu propia cuenta. Se cerrará esta sesión al guardar.</p>
+            {!passwordChanged
+              ? <form onSubmit={changePassword} className="admin-password-form">
+                  <label htmlFor="current-password">Contraseña actual</label>
+                  <input id="current-password" type="password" autoComplete="current-password"
+                    value={currentPassword} required onChange={(event) => setCurrentPassword(event.target.value)} />
+                  <label htmlFor="new-password">Nueva contraseña</label>
+                  <input id="new-password" type="password" autoComplete="new-password"
+                    minLength={12} maxLength={128} value={newPassword} required
+                    aria-describedby="password-guidance" onChange={(event) => setNewPassword(event.target.value)} />
+                  <small id="password-guidance">Entre 12 y 128 caracteres; usa una contraseña distinta de la anterior.</small>
+                  <label htmlFor="confirm-password">Confirmar nueva contraseña</label>
+                  <input id="confirm-password" type="password" autoComplete="new-password"
+                    minLength={12} maxLength={128} value={confirmPassword} required
+                    onChange={(event) => setConfirmPassword(event.target.value)} />
+                  <button type="submit" disabled={changingPassword || !context.profile_password_csrf}>
+                    {changingPassword ? 'Actualizando…' : 'Actualizar contraseña'}
+                  </button>
+                </form>
+              : <a className="admin-signin-link" href="/login">Volver a iniciar sesión</a>}
+            {passwordFeedback && <p role="status">{passwordFeedback}</p>}
           </section>
           <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf}
             manageCsrf={context.vault_manage_csrf} />
