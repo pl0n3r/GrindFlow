@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.70: shell de navegación unificado y responsive.** El runtime productivo continúa siendo Laravel en Hostinger mientras Symfony migra por slices. Base exacta `main` v0.1.69 `0632dc89a30b95e3d8b00ce82f3f380644dde9e0`. Este cambio corrige la navegación inconsistente entre páginas y el rail vacío en ventanas medianas sin ampliar permisos.
+> **Candidato v0.1.71: revisión humana y elegibilidad interna S3.** El runtime productivo continúa siendo Laravel en Hostinger; Symfony sigue aislado. Base exacta `main` v0.1.70 `fedc8a153ae58e28765b1a7f398465cbcd97b191`, con CI exact-main success. La revisión humana y la autorización de distribución son contratos separados; quedar listo para programar no crea schedules ni habilita publicación externa.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.70** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.69~~ | `0632dc89a30b95e3d8b00ce82f3f380644dde9e0` |
-| CI del PR | 🚧 Head v0.1.70 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.71** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.70~~ | `fedc8a153ae58e28765b1a7f398465cbcd97b191` |
+| CI del PR | 🚧 Head v0.1.71 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
-| CI del SHA exacto de main | 🚧 v0.1.69 por observar | SHA `0632dc89a30b95e3d8b00ce82f3f380644dde9e0` |
-| Deploy Observer | 🚧 v0.1.69 por observar | No prueba SHA remoto ni Symfony |
-| Production Smoke | ⛔ Credencial E2E productiva pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| CI del SHA exacto de main | ✅ ~~v0.1.70 success~~ | run `35624143900` |
+| Deploy Observer | ✅ ~~v0.1.70 observado~~ | run `35624143919`; versión humana, no prueba Symfony ni SHA remoto |
+| Production Smoke | ⛔ Credencial E2E productiva pendiente | run `35624143926`; [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
 | Symfony S3 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | ✅ ~~Sin migración nueva en este candidato~~ | Producción intacta |
+| Migraciones | 🚧 Ledger append-only de revisión S3 en MariaDB descartable | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **18** | **+531** | **−535** | **-4** |
+| **15** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
-| Alcance | Shell Laravel compartido + responsive 820 px + consistencia entre módulos |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Alcance | S3: revisión humana explícita + readiness interno; sin schedule ni publicación externa |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,43 +58,40 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Un único componente Blade define la navegación de Dashboard, Biblioteca, Programación, Distribución, Tráfico, Finanzas, Sistema y Diagnósticos.
-- El rail entre 681–960 px conserva iconos visibles y nombres accesibles; el cierre de sesión ya no parte texto ni deja botones vacíos.
-- En móvil continúa la barra inferior horizontal con icono + texto; los módulos sin permiso/ruta/organización muestran estado deshabilitado con razón accesible.
-- Se añadió prueba de contrato para impedir que las vistas vuelvan a copiar sidebars privados y smoke real de navegador a 820 px para el fallo reportado.
+- Nuevo ledger append-only `approve/revoke` de revisión humana por recurso, tenant y actor, independiente de la clasificación y de la autorización de distribución.
+- Admin/Studio/Editor pueden decidir revisión con CSRF dedicado y revalidación dentro de la transacción; recursos ajenos, en papelera o fuera de `needs_review` fallan cerrado.
+- El preview S3 separa clasificación, revisión y autorización. Solo muestra `eligible=true` cuando la regla existe y los bloqueos internos están resueltos.
+- La UI móvil muestra revisión pendiente/aprobada y “Listo para programar internamente”, pero conserva `can_publish=false`: no crea schedules, jobs ni llamadas externas.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy en Hostinger.
+Inventario de solo el candidato actual; no prueba despliegue Symfony en Hostinger.
+- `.github/workflows/grindflow-ci.yml`
 - `README.md`
-- `app/Http/Controllers/Admin/DiagnosticsController.php`
 - `config/version.php`
+- `docs/GRINDFLOW-SPEC.md`
 - `docs/REQUIREMENTS.md`
-- `public/css/grindflow.css`
-- `resources/views/admin/diagnostics.blade.php`
-- `resources/views/admin/system.blade.php`
-- `resources/views/components/workspace-sidebar.blade.php`
-- `resources/views/dashboard.blade.php`
-- `resources/views/distribution/index.blade.php`
-- `resources/views/finance/index.blade.php`
-- `resources/views/scheduling/index.blade.php`
-- `resources/views/traffic/index.blade.php`
-- `resources/views/vault/index.blade.php`
-- `scripts/browser-smoke.sh`
-- `tests/Browser/workflow-template.html`
-- `tests/Feature/NavigationLabelsTest.php`
-- `tests/Feature/WorkspaceSidebarTest.php`
+- `symfony/frontend/admin/AdminApp.tsx`
+- `symfony/frontend/admin/WeeklyPlannerPanel.tsx`
+- `symfony/frontend/admin/admin.css`
+- `symfony/migrations/Version20260921163000.php`
+- `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/src/Http/Controller/ContentReviewController.php`
+- `symfony/src/Http/Controller/ContentRuleController.php`
+- `symfony/src/Identity/Application/MembershipContext.php`
+- `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/ContentReviewDecisionTest.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.70 por verificar; la base v0.1.69 está fusionada.
-- El cambio exige PHPUnit, análisis PHP, navegador Laravel y real-stack MariaDB; el smoke de navegador incluye el breakpoint de 820 px. Producción no se modifica desde esta rama.
+- CI/Sonar/CodeRabbit del candidato v0.1.71 por verificar; la base v0.1.70 tiene CI exact-main success.
+- GitHub Actions debe validar migración reversible, PHPUnit/MariaDB, TypeScript/Vite y Chromium móvil. Producción permanece intacta.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar shell unificado v0.1.70 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Scheduler Symfony persistido tenant-safe | 🚧 S3, sin publicación externa |
+| **NOW** | 🚧 Validar revisión humana y readiness v0.1.71 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Scheduler Symfony persistido tenant-safe | 🚧 S4, sin publicación externa |
 | **LATER** | 🚧 Scheduler Symfony + distribución autorizada + Traffic | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -102,7 +99,7 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
-| **NOW** | 🚧 Shell de navegación unificado v0.1.70 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Scheduler Symfony persistido tenant-safe | 🚧 S3 |
+| **NOW** | 🚧 Readiness S3 v0.1.71 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Scheduler Symfony persistido tenant-safe | 🚧 S4 |
 | **LATER** | 🚧 Paridad del monolito modular | 🚧 S3–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
