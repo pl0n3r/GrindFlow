@@ -9,6 +9,15 @@ type WeeklyRule = {
   updated_at: string;
 };
 
+type WeeklySlot = {
+  local_date: string;
+  weekday: string;
+  local_time: string;
+  timezone: string;
+  capacity: number;
+  scheduled_at_utc: string;
+};
+
 type PreviewAsset = {
   id: string;
   name: string;
@@ -20,6 +29,7 @@ type PreviewAsset = {
 
 type Preview = {
   rule: WeeklyRule | null;
+  slots?: WeeklySlot[];
   assets: PreviewAsset[];
   visible: number;
   total_active_assets: number;
@@ -218,6 +228,28 @@ export function WeeklyPlannerPanel({ canEdit, csrf }: Props) {
             ? <span>Cargando…</span>
             : <span>{preview?.total_active_assets ?? 0} recursos activos · {preview?.visible ?? 0} mostrados</span>}
         </div>
+
+        {!loading && preview && (preview.slots?.length ?? 0) > 0 &&
+          <section className="weekly-slot-section" aria-labelledby="weekly-slot-title">
+            <div className="weekly-slot-heading">
+              <strong id="weekly-slot-title">Próximos slots</strong>
+              <span>{preview.slots?.length} días configurados</span>
+            </div>
+            <ul className="weekly-slots">
+              {preview.slots?.map((slot) =>
+                <li key={slot.scheduled_at_utc}>
+                  <div>
+                    <strong>{slot.local_date} · {slot.local_time}</strong>
+                    <small>{slot.timezone}</small>
+                  </div>
+                  <span>Capacidad {slot.capacity}/día</span>
+                </li>
+              )}
+            </ul>
+          </section>}
+
+        {!loading && preview && preview.rule && (preview.slots?.length ?? 0) === 0 &&
+          <p>No hay slots futuros para la regla semanal actual.</p>}
 
         {!loading && preview && preview.assets.length === 0 &&
           <p>No hay recursos activos en el Vault para previsualizar.</p>}
