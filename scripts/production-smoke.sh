@@ -59,7 +59,6 @@ PY
 # Report only a short path: never leak redirect host, query strings, fragments or tokens.
 safe_redirect_path() {
   python3 - "$1" <<'PY'
-import re
 import sys
 from urllib.parse import urlsplit
 
@@ -68,7 +67,7 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
         if not line.lower().startswith("location:"):
             continue
         path = urlsplit(line.partition(":")[2].strip()).path
-        print(path if re.fullmatch(r"/[A-Za-z0-9/_-]{0,100}", path) else "(redacted)")
+        print(path if path in {"/login", "/dashboard", "/organizations", "/admin", "/admin/system"} else "(redacted)")
         break
     else:
         print("(missing)")
