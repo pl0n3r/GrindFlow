@@ -63,6 +63,14 @@ final class PrivateVaultDirectory
         if (is_link($root) || !is_dir($root) || !is_writable($root)) {
             throw new \RuntimeException('Private Vault storage is not writable.');
         }
+        // A pre-existing external directory must not make private originals
+        // accessible to group members or other users on a shared host.
+        if ($this->rootOverride !== '') {
+            $mode = @fileperms($root);
+            if ($mode === false || ($mode & 0077) !== 0) {
+                throw new \RuntimeException('External Vault directory requires private permissions.');
+            }
+        }
 
         return $root;
     }
