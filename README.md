@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.52: cabeceras de privacidad para rutas Symfony, todavía no desplegado.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; los cambios Symfony siguen aislados. Base `main` v0.1.51 `ff63576bdf877a31ed0e53087628d19f32c35e47`, CI exact-main success. Evita almacenar login, área privada y API, incluso ante redirecciones y errores. Symfony aún no desplegado en Hostinger.
+> **Candidato v0.1.53: auditoría y manual operativo de agentes, todavía no desplegado.** La lectura «solo el deploy actual» sigue describiendo el runtime Laravel observado; Symfony continúa aislado. Base `main` v0.1.52 `2832b4c683ad37f393a348a41d40794d0ba14ca5`, CI exact-main success. Se separan reglas vigentes y notas históricas, y se documenta el ciclo de varios avances sin Codex. No se modifica la producción.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.52** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.51~~ | `ff63576bdf877a31ed0e53087628d19f32c35e47` |
+| Version objetivo | 🚧 **v0.1.53** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.52~~ | `2832b4c683ad37f393a348a41d40794d0ba14ca5` |
 | CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Hallazgos atendidos; revalidación pendiente | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+44** | **−22** | **+22** |
+| **5** | **+522** | **−393** | **+129** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | Respuesta no almacenable en rutas privadas Symfony, incluidos errores y redirecciones |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Alcance | Auditoría operativa de AGENTS, reglas vigentes, historial preservado y handoff sin Codex |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,28 +58,29 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- El suscriptor HTTP aplica `Cache-Control: no-store, private` a `/login`, `/logout`, `/admin`, `/organizations` y `/api/admin` (y sus subrutas), incluso ante redirecciones y errores.
-- Se preservan CSP, políticas más estrictas de privacidad y cabeceras de archivos privados ya existentes. Las rutas públicas no reciben esta nueva restricción.
-- PHPUnit comprueba que login, redirección del admin, selección de organización, API sin sesión y ruta privada inexistente no sean cacheables; el home público conserva su contrato.
+- `AGENTS.md` tiene inicio rápido, mapa de lectura por componente, ruta de entrega sin Codex, y regla para avanzar varias mejoras relacionadas por solicitud.
+- Se archivaron íntegras 345 líneas históricas de Laravel/Next.js/Supabase sin perder decisiones, evitando que definan por error el stack nuevo Symfony.
+- Auditoría versionada en `docs/AGENTS-AUDIT.md`, coherencia CI, roadmap, README y estados de entrega; ningún módulo nuevo ni migración productiva.
 
 ## Archivos modificados en este deploy
 
 Este inventario corresponde al **cambio candidato en el PR**, no a archivos desplegados en Hostinger.
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
-- `symfony/tests/php/PreviewTest.php`
+- `docs/AGENTS-AUDIT.md`
+- `docs/AGENTS-LEGACY-ARCHIVE.md`
 
 ## Validación
-- El nuevo caso PHPUnit Symfony se comprueba en CI del PR; sin checkout local en esta sesión.
-- CI exact-main v0.1.51 success; CI/Sonar/CodeRabbit del head v0.1.52 y Hostinger son señales separadas. Sin migraciones ni cutover Symfony.
+- El PR debe superar preflight (gobierno y título), fast (versión y dashboard), validate y Sonar; sin prueba local en esta sesión.
+- CI exact-main v0.1.52 success; producción Smoke continúa fallando por credencial de lectura, independiente del CI. Sin migraciones ni cutover Symfony.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar privacidad HTTP Symfony v0.1.52 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar auditoría de agentes v0.1.53 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
@@ -88,7 +89,7 @@ Este inventario corresponde al **cambio candidato en el PR**, no a archivos desp
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar privacidad HTTP Symfony v0.1.52 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar auditoría de agentes v0.1.53 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
