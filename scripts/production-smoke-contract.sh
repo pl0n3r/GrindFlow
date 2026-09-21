@@ -26,6 +26,7 @@ case "$url" in
   http://mock/dashboard)
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_login ]]; then status=302; redirect="/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_other ]]; then status=302; redirect="/organizations?private-query-do-not-print"; fi
+    if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_secret ]]; then status=302; redirect="/l/private-query-do-not-print?private-query-do-not-print"; fi
     if [[ "${MOCK_VAULT_MODE:-ok}" == missing_link ]]; then body='<h1>Overview</h1>Tenant isolation active'; else body='<h1>Overview</h1>Tenant isolation active <a href="/organizations/example/vault">Vault</a>'; fi;;
   http://mock/admin/system)
     release="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" "$MOCK_REPOSITORY_ROOT/config/version.php")"
@@ -127,6 +128,8 @@ run_case() {
       if [[ "$auth_mode" == post_login ]]; then
         grep -Fq 'ERROR: login redirected back to /login;' "$log"
         ! grep -Fq 'GET http://mock/dashboard' "$requests"
+      elif [[ "$auth_mode" == dashboard_secret ]]; then
+        grep -Fq "redirect path (redacted)" "$log"
       else
         grep -Fq "redirect path /$( [[ "$auth_mode" == dashboard_login ]] && printf login || printf organizations)" "$log"
       fi;;
@@ -152,6 +155,7 @@ run_case auth_post_login 0 7 valid ok ok ok current post_login
 run_case auth_post_419 0 7 valid ok ok ok current post_419
 run_case auth_dashboard_login 0 7 valid ok ok ok current dashboard_login
 run_case auth_dashboard_other 0 7 valid ok ok ok current dashboard_other
+run_case auth_dashboard_secret 0 7 valid ok ok ok current dashboard_secret
 
 if MOCK_PENDING=unknown MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/unknown.log" 2>&1; then printf 'FAIL: unknown schema passed smoke.\n' >&2; exit 1; else result=$?; fi
 [[ "$result" -eq 1 ]]
@@ -159,7 +163,7 @@ grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unkno
 ! grep -q '^MIGRATIONS_PENDING=' "$workdir/unknown.log"
 printf 'PASS production smoke contract: unknown\n' "$requests")" -eq 1 ]]
       ! grep -Fq 'GET http://mock/dashboard' "$requests";;
-    auth_post_login|auth_dashboard_login|auth_dashboard_other)
+    auth_post_login|auth_dashboard_login|auth_dashboard_other|auth_dashboard_secret)
       grep -Fq 'LOGIN_REDIRECT_PATH=' "$log"
       grep -Fq 'ERROR: authentication redirect is deterministic; do not retry credentials.' "$log"
       ! grep -Fq 'private-query-do-not-print' "$log"
