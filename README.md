@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+479** | **−514** | **-35** |
+| **18** | **+507** | **−535** | **-28** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -80,6 +80,8 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 - `resources/views/traffic/index.blade.php`
 - `resources/views/vault/index.blade.php`
 - `scripts/browser-smoke.sh`
+- `tests/Browser/workflow-template.html`
+- `tests/Feature/NavigationLabelsTest.php`
 - `tests/Feature/WorkspaceSidebarTest.php`
 
 ## Validación
