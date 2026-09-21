@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.73: handoff manual auditado S4.** Base exacta `main` v0.1.72 `c78d311e0339c26d555eb76b9d0a9bd524055e87`, con CI exact-main success. El handoff registra preparación/resultado humano sin llamar proveedores ni afirmar publicación externa.
+> **Candidato v0.1.74: destinos manuales y cola interna S4.** Base exacta `main` v0.1.73 `97dd3018e1c6b478217353455de6e203c6337c51`, con CI exact-main success. El handoff humano ahora exige un destino interno explícito tras migrar y expone una cola tenant-safe, sin proveedor ni publicación externa.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.73** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.72~~ | `c78d311e0339c26d555eb76b9d0a9bd524055e87` |
-| CI del PR | 🚧 Head v0.1.73 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.74** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.73~~ | `97dd3018e1c6b478217353455de6e203c6337c51` |
+| CI del PR | 🚧 Head v0.1.74 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
-| CI del SHA exacto de main | ✅ ~~v0.1.72 success~~ | run `35641498049` |
-| Deploy Observer | ✅ ~~v0.1.72 observado~~ | run `35641498057`; versión humana, no prueba Symfony ni SHA remoto |
-| Production Smoke | ⛔ Credencial E2E productiva pendiente | run `35641498009`; [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| CI del SHA exacto de main | ✅ ~~v0.1.73 success~~ | run `35643400862` |
+| Deploy Observer | ✅ ~~v0.1.73 observado~~ | run `35643400887`; versión humana, no prueba Symfony ni SHA remoto |
+| Production Smoke | ⛔ Credencial E2E productiva pendiente | run `35643400895`; [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
 | Symfony S3 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | 🚧 Ledger manual + FK compuesto + triggers append-only en MariaDB descartable | Producción intacta |
+| Migraciones | 🚧 Catálogo de destinos + FK de handoff + invariantes SQL en MariaDB descartable | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+903** | **−40** | **+863** |
+| **19** | **+1872** | **−110** | **+1762** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Alcance | S4: prepare/complete/fail manual auditado; sin proveedor ni publicación automática |
+| Alcance | S4: destinos internos explícitos + cola humana tenant-safe; sin proveedor real |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,10 +58,11 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo ledger `gf_manual_handoff_events` tenant-safe y append-only, con transición humana `prepare → complete/fail` y retry explícito `fail → prepare`.
-- Admin/Studio registran handoff con CSRF dedicado; Editor/Model conservan lectura sin permiso de cierre manual.
-- `complete`/`fail` solo se aceptan cuando el horario UTC ya llegó. Un handoff preparado o completado bloquea la cancelación del borrador para evitar historiales contradictorios.
-- React móvil muestra estado y acciones de handoff. Cada respuesta confirma `publishes=false`, `provider_calls=false` y `external_evidence=false`.
+- Catálogo tenant-owned de destinos manuales, con alta, desactivación/reactivación, nombre inmutable y DELETE bloqueado en MariaDB.
+- Cada `prepare` posterior a la migración exige un destino activo del mismo tenant; `complete`/`fail` heredan ese destino y cambiarlo requiere fallo + nuevo intento.
+- Compatibilidad expand-before-migrate: mientras la tabla nueva aún no exista, el endpoint conserva temporalmente el contrato v0.1.73; un `prepare` legado sin destino puede ganar destino después sin borrar su evento original.
+- Cola interna GET deriva hasta 30 handoffs `prepared/failed`, ordena vencidos primero y expone total tenant-scoped. React móvil administra destinos, exige selección por borrador y muestra trabajo pendiente.
+- Todos los contratos permanecen sin proveedor: `provider_calls=false`; no hay delivery, exportación de media ni publicación automática.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en Hostinger.
@@ -74,16 +75,19 @@ Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en
 - `symfony/frontend/admin/ScheduleDraftPanel.tsx`
 - `symfony/frontend/admin/WeeklyPlannerPanel.tsx`
 - `symfony/frontend/admin/admin.css`
-- `symfony/migrations/Version20260921193000.php`
+- `symfony/migrations/Version20260921195000.php`
 - `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/src/Http/Controller/ManualDestinationController.php`
 - `symfony/src/Http/Controller/ManualHandoffController.php`
+- `symfony/src/Http/Controller/ManualHandoffQueueController.php`
 - `symfony/src/Http/Controller/ScheduleDraftController.php`
-- `symfony/src/Identity/Application/MembershipContext.php`
 - `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/ManualDestinationTest.php`
+- `symfony/tests/php/ManualHandoffLegacyDestinationTest.php`
 - `symfony/tests/php/ManualHandoffTest.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.73 por verificar; la base v0.1.72 tiene CI exact-main success.
+- CI/Sonar/CodeRabbit del candidato v0.1.74 por verificar; la base v0.1.73 tiene CI exact-main success.
 - El gate Symfony debe probar migración reversible, PHPUnit/MariaDB, TypeScript/Vite y Chromium móvil. Producción permanece intacta.
 
 ## Qué sigue
@@ -91,8 +95,8 @@ Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar handoff manual S4 v0.1.73 | 🚧 CI y revisión |
-| **NEXT** | 🚧 S4 destino manual explícito / cola interna | 🚧 Sin proveedor real |
+| **NOW** | 🚧 Validar destinos/cola S4 v0.1.74 | 🚧 CI y revisión |
+| **NEXT** | 🚧 S4 salida manual con evidencia interna más rica / preparación operativa | 🚧 Sin proveedor real |
 | **LATER** | 🚧 Distribución autorizada + Traffic Symfony | 🚧 S4–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -100,7 +104,7 @@ Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
-| **NOW** | 🚧 Handoff manual S4 v0.1.73 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Destino manual explícito / cola interna | 🚧 Sin proveedor real |
+| **NOW** | 🚧 Destinos manuales + cola v0.1.74 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Preparación operativa S4 | 🚧 Sin proveedor real |
 | **LATER** | 🚧 Distribución + Traffic Symfony | 🚧 S4–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

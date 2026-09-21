@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
 type Slot = {
   local_date: string;
@@ -14,6 +14,14 @@ type Asset = {
   eligible: boolean;
 };
 
+type ManualDestination = {
+  id: string;
+  label: string;
+  active: boolean;
+  created_at: string;
+  disabled_at: string | null;
+};
+
 type Draft = {
   id: string;
   asset_id: string;
@@ -25,6 +33,21 @@ type Draft = {
   status: 'draft' | 'cancelled';
   manual_handoff_status: 'none' | 'prepared' | 'completed' | 'failed';
   manual_handoff_updated_at: string | null;
+  manual_destination: { id: string; label: string } | null;
+};
+
+type QueueItem = {
+  draft_id: string;
+  asset_id: string;
+  asset_name: string;
+  scheduled_at_utc: string;
+  local_date: string;
+  local_time: string;
+  timezone: string;
+  status: 'prepared' | 'failed';
+  due: boolean;
+  handoff_updated_at: string;
+  destination: { id: string; label: string; active: boolean } | null;
 };
 
 type Props = {
@@ -34,42 +57,138 @@ type Props = {
   csrf: string | null;
   canManualHandoff: boolean;
   manualHandoffCsrf: string | null;
+  manualDestinationCsrf: string | null;
 };
 
 export function ScheduleDraftPanel({
-  slots, assets, canEdit, csrf, canManualHandoff, manualHandoffCsrf,
+  slots,
+  assets,
+  canEdit,
+  csrf,
+  canManualHandoff,
+  manualHandoffCsrf,
+  manualDestinationCsrf,
 }: Props) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [total, setTotal] = useState(0);
   const [handoffReady, setHandoffReady] = useState(false);
+  const [destinations, setDestinations] = useState<ManualDestination[]>([]);
+  const [destinationReady, setDestinationReady] = useState(false);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [queueReady, setQueueReady] = useState(false);
+  const [destinationByDraft, setDestinationByDraft] = useState<Record<string, string>>({});
+  const [newDestinationLabel, setNewDestinationLabel] = useState('');
   const [assetId, setAssetId] = useState('');
   const [utcSlot, setUtcSlot] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+  const [destinationLoadError, setDestinationLoadError] = useState('');
+  const [queueLoadError, setQueueLoadError] = useState('');
 
   const eligibleAssets = assets.filter((asset) => asset.eligible);
+  const activeDestinations = useMemo(
+    () => destinations.filter((destination) => destination.active),
+    [destinations],
+  );
 
   async function load(signal?: AbortSignal) {
+    setError('');
+    setDestinationLoadError('');
+    setQueueLoadError('');
+
     try {
-      const response = await fetch('/api/admin/schedules', {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-        signal,
-      });
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(body?.error?.message ?? 'No se pudo abrir la agenda.');
+      const [scheduleResult, destinationResult, queueResult] = await Promise.allSettled([
+        fetch('/api/admin/schedules', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal,
+        }),
+        fetch('/api/admin/manual-destinations', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal,
+        }),
+        fetch('/api/admin/manual-handoff-queue', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal,
+        }),
+      ]);
+
+      if (signal?.aborted) return;
+      if (scheduleResult.status !== 'fulfilled') {
+        throw scheduleResult.reason;
       }
-      setDrafts(body.data.drafts as Draft[]);
-      setTotal(body.data.total as number);
-      setHandoffReady(body.data.manual_handoff_ready === true);
+
+      const scheduleBody = await scheduleResult.value.json();
+      if (!scheduleResult.value.ok) {
+        throw new Error(scheduleBody?.error?.message ?? 'No se pudo abrir la agenda.');
+      }
+
+      const nextDrafts = scheduleBody.data.drafts as Draft[];
+      setDrafts(nextDrafts);
+      setTotal(scheduleBody.data.total as number);
+      setHandoffReady(scheduleBody.data.manual_handoff_ready === true);
+      setDestinationByDraft((current) => {
+        const next = { ...current };
+        for (const draft of nextDrafts) {
+          if (!next[draft.id] && draft.manual_destination?.id) {
+            next[draft.id] = draft.manual_destination.id;
+          }
+        }
+        return next;
+      });
+
+      if (destinationResult.status === 'fulfilled') {
+        try {
+          const destinationBody = await destinationResult.value.json();
+          if (!destinationResult.value.ok) {
+            throw new Error(
+              destinationBody?.error?.message ?? 'No se pudieron cargar los destinos manuales.',
+            );
+          }
+          setDestinations(destinationBody.data.destinations as ManualDestination[]);
+          setDestinationReady(destinationBody.data.ready === true);
+        } catch (caught) {
+          setDestinationReady(false);
+          setDestinationLoadError(
+            caught instanceof Error
+              ? caught.message
+              : 'No se pudieron cargar los destinos manuales.',
+          );
+        }
+      } else {
+        setDestinationReady(false);
+        setDestinationLoadError('No se pudieron cargar los destinos manuales.');
+      }
+
+      if (queueResult.status === 'fulfilled') {
+        try {
+          const queueBody = await queueResult.value.json();
+          if (!queueResult.value.ok) {
+            throw new Error(queueBody?.error?.message ?? 'No se pudo cargar la cola manual.');
+          }
+          setQueue(queueBody.data.items as QueueItem[]);
+          setQueueTotal(queueBody.data.total as number);
+          setQueueReady(queueBody.data.ready === true);
+        } catch (caught) {
+          setQueueReady(false);
+          setQueueLoadError(
+            caught instanceof Error ? caught.message : 'No se pudo cargar la cola manual.',
+          );
+        }
+      } else {
+        setQueueReady(false);
+        setQueueLoadError('No se pudo cargar la cola manual.');
+      }
     } catch (caught) {
-      if (caught instanceof DOMException && caught.name === 'AbortError') return;
+      if (signal?.aborted || (caught instanceof DOMException && caught.name === 'AbortError')) return;
       setError(caught instanceof Error ? caught.message : 'No se pudo abrir la agenda.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }
 
@@ -119,6 +238,79 @@ export function ScheduleDraftPanel({
     }
   }
 
+  async function createDestination(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canManualHandoff || !manualDestinationCsrf || busyId !== null) return;
+    const label = newDestinationLabel.trim();
+    if (label.length < 2) return;
+
+    setBusyId('destination-create');
+    setError('');
+    setFeedback('');
+    try {
+      const response = await fetch('/api/admin/manual-destinations', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': manualDestinationCsrf,
+        },
+        body: JSON.stringify({ label }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo crear el destino manual.');
+      }
+      if (body?.data?.provider_calls !== false) {
+        throw new Error('No se confirmó el límite de destino interno.');
+      }
+      setFeedback(body.data.changed
+        ? 'Destino manual creado. Sigue siendo una referencia interna.'
+        : 'Ese destino manual ya existía.');
+      setNewDestinationLabel('');
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo crear el destino manual.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleDestination(destination: ManualDestination) {
+    if (!canManualHandoff || !manualDestinationCsrf || busyId !== null) return;
+    setBusyId('destination-' + destination.id);
+    setError('');
+    setFeedback('');
+    try {
+      const response = await fetch('/api/admin/manual-destinations/' + encodeURIComponent(destination.id), {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': manualDestinationCsrf,
+        },
+        body: JSON.stringify({ active: !destination.active }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo actualizar el destino manual.');
+      }
+      if (body?.data?.provider_calls !== false) {
+        throw new Error('No se confirmó el límite de destino interno.');
+      }
+      setFeedback(destination.active
+        ? 'Destino manual desactivado para nuevas preparaciones.'
+        : 'Destino manual reactivado.');
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo actualizar el destino manual.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function cancel(draft: Draft) {
     if (!canEdit || !csrf || busyId !== null || draft.status !== 'draft') return;
     setBusyId(draft.id);
@@ -150,6 +342,12 @@ export function ScheduleDraftPanel({
     if (!canManualHandoff || !manualHandoffCsrf || !handoffReady
       || busyId !== null || draft.status !== 'draft') return;
 
+    const destinationId = destinationByDraft[draft.id] ?? draft.manual_destination?.id ?? '';
+    if (action === 'prepare' && !activeDestinations.some((destination) => destination.id === destinationId)) {
+      setError('Selecciona un destino manual activo antes de preparar la salida.');
+      return;
+    }
+
     setBusyId('handoff-' + draft.id);
     setFeedback('');
     setError('');
@@ -164,19 +362,22 @@ export function ScheduleDraftPanel({
             'Content-Type': 'application/json',
             'X-CSRF-Token': manualHandoffCsrf,
           },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify(action === 'prepare'
+            ? { action, destination_id: destinationId }
+            : { action }),
         },
       );
       const body = await response.json();
       if (!response.ok) {
         throw new Error(body?.error?.message ?? 'No se pudo registrar la salida manual.');
       }
-      if (body?.data?.publishes !== false || body?.data?.provider_calls !== false) {
+      if (body?.data?.publishes !== false || body?.data?.provider_calls !== false
+        || body?.data?.external_evidence !== false) {
         throw new Error('No se confirmó el límite de salida manual segura.');
       }
 
       const labels: Record<typeof action, string> = {
-        prepare: 'Salida manual preparada. Aún no se ha publicado nada.',
+        prepare: 'Salida manual preparada para el destino elegido. Aún no se ha publicado nada.',
         complete: 'Salida manual registrada como realizada por una persona.',
         fail: 'Fallo manual registrado. Puedes preparar un nuevo intento.',
       };
@@ -189,14 +390,59 @@ export function ScheduleDraftPanel({
     }
   }
 
-
   return (
     <section className="schedule-draft-panel" aria-labelledby="schedule-draft-title">
       <div>
         <span className="admin-kicker">S4 · AGENDA INTERNA</span>
-        <h3 id="schedule-draft-title">Borradores persistidos</h3>
+        <h3 id="schedule-draft-title">Borradores y salida manual</h3>
         <p>Reserva un recurso revisado en un slot de la regla semanal. No conecta redes ni realiza publicaciones.</p>
       </div>
+
+      {canManualHandoff && manualDestinationCsrf && destinationReady &&
+        <section className="manual-destination-panel" aria-labelledby="manual-destination-title">
+          <div>
+            <h4 id="manual-destination-title">Destinos manuales</h4>
+            <p>Son etiquetas de trabajo humano. No contienen credenciales ni conectan una plataforma externa.</p>
+          </div>
+          <form onSubmit={createDestination} className="manual-destination-form">
+            <label htmlFor="manual-destination-label">Nuevo destino</label>
+            <div>
+              <input id="manual-destination-label" minLength={2} maxLength={80}
+                value={newDestinationLabel}
+                onChange={(event) => setNewDestinationLabel(event.target.value)}
+                placeholder="Ej. Canal editorial A" />
+              <button type="submit"
+                disabled={busyId !== null || newDestinationLabel.trim().length < 2}>
+                {busyId === 'destination-create' ? 'Creando…' : 'Crear destino'}
+              </button>
+            </div>
+          </form>
+          {destinations.length === 0
+            ? <p>No hay destinos manuales todavía.</p>
+            : <ul className="manual-destination-list">
+                {destinations.map((destination) =>
+                  <li key={destination.id}>
+                    <span>
+                      <strong>{destination.label}</strong>
+                      <small>{destination.active ? 'Activo para nuevas preparaciones' : 'Desactivado'}</small>
+                    </span>
+                    <button type="button" disabled={busyId !== null}
+                      onClick={() => void toggleDestination(destination)}>
+                      {busyId === 'destination-' + destination.id
+                        ? 'Guardando…'
+                        : destination.active ? 'Desactivar' : 'Reactivar'}
+                    </button>
+                  </li>)}
+              </ul>}
+        </section>}
+
+      {destinationLoadError &&
+        <p className="weekly-warning" role="status">
+          Agenda cargada parcialmente: {destinationLoadError} Los borradores siguen disponibles.
+        </p>}
+      {!destinationLoadError && canManualHandoff && manualDestinationCsrf && !destinationReady &&
+        <p>El catálogo de destinos manuales todavía requiere migración.</p>}
+
       {canEdit && csrf && eligibleAssets.length > 0 && slots.length > 0 &&
         <form className="schedule-draft-form" onSubmit={create}>
           <label htmlFor="schedule-draft-asset">Recurso listo</label>
@@ -222,8 +468,10 @@ export function ScheduleDraftPanel({
       {canEdit && csrf && eligibleAssets.length === 0 &&
         <p>No hay recursos listos para crear borradores. Resuelve primero los bloqueos S3.</p>}
       {(!canEdit || !csrf) && <p>Tu rol puede consultar los borradores, pero no crearlos ni cancelarlos.</p>}
+
       {feedback && <p className="weekly-feedback" role="status">{feedback}</p>}
       {error && <p className="weekly-error" role="alert">{error}</p>}
+
       {loading
         ? <p role="status">Cargando borradores…</p>
         : <div className="schedule-draft-history">
@@ -236,6 +484,8 @@ export function ScheduleDraftPanel({
                     <strong>{draft.asset_name}</strong>
                     <span>{draft.local_date} · {draft.local_time} ({draft.timezone})</span>
                     <small>{draft.status === 'draft' ? 'Borrador reservado' : 'Borrador cancelado'}</small>
+                    {draft.manual_destination &&
+                      <small>Destino: {draft.manual_destination.label}</small>}
                     {handoffReady &&
                       <small className={'manual-handoff-status ' + draft.manual_handoff_status}>
                         {draft.manual_handoff_status === 'prepared' && 'Salida manual preparada'}
@@ -244,14 +494,30 @@ export function ScheduleDraftPanel({
                         {draft.manual_handoff_status === 'none' && 'Salida manual sin preparar'}
                       </small>}
                   </div>
+
                   <div className="schedule-draft-actions">
                     {canManualHandoff && manualHandoffCsrf && handoffReady && draft.status === 'draft' &&
                       <>
                         {(draft.manual_handoff_status === 'none' || draft.manual_handoff_status === 'failed') &&
-                          <button type="button" disabled={busyId !== null}
-                            onClick={() => void updateManualHandoff(draft, 'prepare')}>
-                            {busyId === 'handoff-' + draft.id ? 'Guardando…' : 'Preparar salida manual'}
-                          </button>}
+                          <>
+                            <label className="manual-destination-choice">
+                              Destino manual
+                              <select aria-label={'Destino manual para ' + draft.asset_name}
+                                value={destinationByDraft[draft.id] ?? draft.manual_destination?.id ?? ''}
+                                onChange={(event) => setDestinationByDraft((current) => ({
+                                  ...current,
+                                  [draft.id]: event.target.value,
+                                }))}>
+                                <option value="">Selecciona destino</option>
+                                {activeDestinations.map((destination) =>
+                                  <option key={destination.id} value={destination.id}>{destination.label}</option>)}
+                              </select>
+                            </label>
+                            <button type="button" disabled={busyId !== null || activeDestinations.length === 0}
+                              onClick={() => void updateManualHandoff(draft, 'prepare')}>
+                              {busyId === 'handoff-' + draft.id ? 'Guardando…' : 'Preparar salida manual'}
+                            </button>
+                          </>}
                         {draft.manual_handoff_status === 'prepared' &&
                           <>
                             <button type="button" disabled={busyId !== null}
@@ -275,9 +541,40 @@ export function ScheduleDraftPanel({
                 </li>)}
             </ul>
           </div>}
+
+      {!loading && queueLoadError &&
+        <p className="weekly-warning" role="status">
+          Agenda cargada parcialmente: {queueLoadError} El historial de borradores sigue disponible.
+        </p>}
+
+      {!loading && queueReady &&
+        <section className="manual-handoff-queue" aria-labelledby="manual-handoff-queue-title">
+          <div>
+            <h4 id="manual-handoff-queue-title">Trabajo manual pendiente · {queueTotal}</h4>
+            <p>Primero aparecen los borradores vencidos o listos para atención humana.</p>
+          </div>
+          {queue.length === 0
+            ? <p>No hay salidas manuales preparadas ni fallidas.</p>
+            : <ul>
+                {queue.map((item) =>
+                  <li key={item.draft_id}>
+                    <div>
+                      <strong>{item.asset_name}</strong>
+                      <span>{item.local_date} · {item.local_time} ({item.timezone})</span>
+                      <small>{item.destination?.label ?? 'Destino sin resolver'}</small>
+                    </div>
+                    <span className={'manual-queue-state ' + (item.due ? 'due' : 'future')}>
+                      {item.status === 'failed'
+                        ? 'Falló, requiere decisión'
+                        : item.due ? 'Listo para atención' : 'Preparado, aún no vence'}
+                    </span>
+                  </li>)}
+              </ul>}
+        </section>}
+
       <p className="weekly-safety">
-        <strong>Solo agenda y handoff humano.</strong> Preparar o cerrar una salida manual registra una decisión
-        interna; no llama proveedores, no mueve contenido fuera de GrindFlow y no prueba una publicación externa.
+        <strong>Solo agenda y handoff humano.</strong> Destinos y cola son organización interna.
+        No llaman proveedores, no mueven contenido fuera de GrindFlow y no prueban una publicación externa.
       </p>
     </section>
   );

@@ -1515,6 +1515,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   let contentReviewApproved = false;
   let distributionAuthorized = false;
   let scheduleDrafts = [];
+  let manualDestinations = [];
   await page.route('**/api/admin/context', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -1532,6 +1533,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         schedule_draft_csrf: 'schedule-token',
         distribution_authorization_csrf: 'distribution-token',
         manual_handoff_csrf: 'manual-handoff-token',
+        manual_destination_csrf: 'manual-destination-token',
         organization_name_csrf: 'organization-token',
       },
     }),
@@ -1612,6 +1614,99 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       }),
     });
   });
+  await page.route((url) => url.pathname === '/api/admin/manual-destinations'
+    || url.pathname.startsWith('/api/admin/manual-destinations/'), async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.pathname === '/api/admin/manual-destinations' && request.method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            ready: true,
+            destinations: manualDestinations,
+            total: manualDestinations.length,
+            limit: 100,
+          },
+        }),
+      });
+    }
+
+    expect(request.headers()['x-csrf-token']).toBe('manual-destination-token');
+    if (url.pathname === '/api/admin/manual-destinations') {
+      expect(request.method()).toBe('POST');
+      expect(request.postDataJSON()).toEqual({ label: 'Mesa principal' });
+      const destination = {
+        id: '00000000-0000-7000-8000-000000000174',
+        label: 'Mesa principal',
+        active: true,
+        created_at: '2026-09-21 19:30:00',
+        disabled_at: null,
+      };
+      manualDestinations = [destination];
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { destination, changed: true, provider_calls: false } }),
+      });
+    }
+
+    expect(request.method()).toBe('PUT');
+    expect(url.pathname).toBe('/api/admin/manual-destinations/00000000-0000-7000-8000-000000000174');
+    const payload = request.postDataJSON();
+    expect(payload).toHaveProperty('active');
+    manualDestinations = manualDestinations.map((destination) => ({
+      ...destination,
+      active: payload.active,
+      disabled_at: payload.active ? null : '2026-09-21 19:35:00',
+    }));
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: { destination: manualDestinations[0], changed: true, provider_calls: false },
+      }),
+    });
+  });
+
+  await page.route((url) => url.pathname === '/api/admin/manual-handoff-queue', (route) => {
+    const items = scheduleDrafts
+      .filter((draft) => draft.status === 'draft'
+        && ['prepared', 'failed'].includes(draft.manual_handoff_status))
+      .map((draft) => ({
+        draft_id: draft.id,
+        asset_id: draft.asset_id,
+        asset_name: draft.asset_name,
+        scheduled_at_utc: draft.scheduled_at_utc,
+        local_date: draft.local_date,
+        local_time: draft.local_time,
+        timezone: draft.timezone,
+        status: draft.manual_handoff_status,
+        due: false,
+        handoff_updated_at: draft.manual_handoff_updated_at,
+        destination: draft.manual_destination
+          ? { ...draft.manual_destination, active: true }
+          : null,
+      }));
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          ready: true,
+          items,
+          total: items.length,
+          limit: 30,
+          can_manage: true,
+          provider_calls: false,
+        },
+      }),
+    });
+  });
+
   await page.route((url) => url.pathname === '/api/admin/schedules'
     || url.pathname.startsWith('/api/admin/schedules/'), async (route) => {
     const request = route.request();
@@ -1626,6 +1721,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
             total: scheduleDrafts.length,
             limit: 30,
             manual_handoff_ready: true,
+            manual_destination_ready: true,
             mode: 'review_only',
             can_publish: false,
           },
@@ -1638,13 +1734,26 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       expect(request.headers()['x-csrf-token']).toBe('manual-handoff-token');
       const payload = request.postDataJSON();
       expect(['prepare', 'complete', 'fail']).toContain(payload.action);
+      if (payload.action === 'prepare') {
+        expect(payload).toEqual({
+          action: 'prepare',
+          destination_id: '00000000-0000-7000-8000-000000000174',
+        });
+      } else {
+        expect(payload).toEqual({ action: payload.action });
+      }
       const status = payload.action === 'prepare'
         ? 'prepared'
         : payload.action === 'complete' ? 'completed' : 'failed';
+      const selected = manualDestinations.find((destination) =>
+        destination.id === '00000000-0000-7000-8000-000000000174');
       scheduleDrafts = scheduleDrafts.map((draft) => ({
         ...draft,
         manual_handoff_status: status,
         manual_handoff_updated_at: '2026-09-21 18:45:00',
+        manual_destination: payload.action === 'prepare'
+          ? { id: selected.id, label: selected.label }
+          : draft.manual_destination,
       }));
       return route.fulfill({
         status: 200,
@@ -1653,6 +1762,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
           data: {
             draft_id: '00000000-0000-7000-8000-000000000172',
             status,
+            destination_id: '00000000-0000-7000-8000-000000000174',
             changed: true,
             updated_at: '2026-09-21 18:45:00',
             publishes: false,
@@ -1683,6 +1793,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         status: 'draft',
         manual_handoff_status: 'none',
         manual_handoff_updated_at: null,
+        manual_destination: null,
       };
       const existing = scheduleDrafts.find((item) =>
         item.asset_id === payload.asset_id && item.scheduled_at_utc === payload.scheduled_at_utc
@@ -1785,7 +1896,14 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Falta autorización explícita de distribución')).toHaveCount(0);
   await expect(page.getByText('Listo para programar internamente')).toBeVisible();
   await expect(page.getByText('Publicación bloqueada.')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Borradores persistidos' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Borradores y salida manual' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Destinos manuales' })).toBeVisible();
+  await page.getByLabel('Nuevo destino').fill('Mesa principal');
+  await page.getByRole('button', { name: 'Crear destino' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Destino manual creado. Sigue siendo una referencia interna.',
+  );
+  await expect(page.getByText('Mesa principal', { exact: true }).first()).toBeVisible();
   await page.getByLabel('Recurso listo').selectOption('00000000-0000-7000-8000-000000000099');
   await page.getByLabel('Horario').selectOption('2026-09-22T14:30:00Z');
   await page.getByRole('button', { name: 'Guardar borrador' }).click();
@@ -1795,11 +1913,16 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Historial interno · 1 borradores')).toBeVisible();
   await expect(page.getByText('Borrador reservado')).toBeVisible();
   await expect(page.getByText('Salida manual sin preparar')).toBeVisible();
+  await page.getByLabel('Destino manual para campaña.png').selectOption(
+    '00000000-0000-7000-8000-000000000174',
+  );
   await page.getByRole('button', { name: 'Preparar salida manual' }).click();
   await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
-    'Salida manual preparada. Aún no se ha publicado nada.',
+    'Salida manual preparada para el destino elegido. Aún no se ha publicado nada.',
   );
   await expect(page.getByText('Salida manual preparada', { exact: true })).toBeVisible();
+  await expect(page.getByText('Destino: Mesa principal')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trabajo manual pendiente · 1' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Registrar fallo' }).click();
   await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
@@ -1813,6 +1936,17 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   );
   await expect(page.getByText('Borrador cancelado', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Trabajo manual pendiente · 0' })).toBeVisible();
+  await page.getByRole('button', { name: 'Desactivar' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Destino manual desactivado para nuevas preparaciones.',
+  );
+  await expect(page.getByText('Desactivado', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reactivar' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Destino manual reactivado.',
+  );
+  await expect(page.getByText('Activo para nuevas preparaciones', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Revocar autorización' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
   await expect(page.getByText('Distribución sin autorizar')).toBeVisible();

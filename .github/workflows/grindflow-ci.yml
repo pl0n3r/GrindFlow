@@ -631,6 +631,7 @@ jobs:
         working-directory: symfony
         run: |
           set -euo pipefail
+          php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921195000' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921193000' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921173000' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921163000' --down --no-interaction

@@ -17,7 +17,7 @@ final class ManualHandoffTest extends WebTestCase
         return Kernel::class;
     }
 
-    public function testManualHandoffIsTenantSafeAppendOnlyDueAwareAndNeverPublishes(): void
+    public function testManualHandoffRequiresExplicitTenantDestinationAndNeverPublishes(): void
     {
         $client = static::createClient();
         /** @var Connection $db */
@@ -26,6 +26,10 @@ final class ManualHandoffTest extends WebTestCase
         $user = Uuid::v7()->toRfc4122();
         $mine = Uuid::v7()->toRfc4122();
         $foreign = Uuid::v7()->toRfc4122();
+        $destination = Uuid::v7()->toRfc4122();
+        $alternateDestination = Uuid::v7()->toRfc4122();
+        $disabledDestination = Uuid::v7()->toRfc4122();
+        $foreignDestination = Uuid::v7()->toRfc4122();
         $asset = Uuid::v7()->toRfc4122();
         $assetPast = Uuid::v7()->toRfc4122();
         $foreignAsset = Uuid::v7()->toRfc4122();
@@ -42,7 +46,7 @@ final class ManualHandoffTest extends WebTestCase
             'PUT',
             '/api/admin/schedules/'.$futureDraft.'/manual-handoff',
             server: ['CONTENT_TYPE' => 'application/json'],
-            content: '{"action":"prepare"}',
+            content: json_encode(['action' => 'prepare', 'destination_id' => $destination], JSON_THROW_ON_ERROR),
         );
         self::assertResponseStatusCodeSame(401);
 
@@ -76,6 +80,23 @@ final class ManualHandoffTest extends WebTestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        foreach ([
+            [$destination, $mine, 'Mesa principal', null, null],
+            [$alternateDestination, $mine, 'Mesa alterna', null, null],
+            [$disabledDestination, $mine, 'Mesa pausada', $now, $user],
+            [$foreignDestination, $foreign, 'Mesa ajena', null, null],
+        ] as [$id, $organization, $label, $disabledAt, $disabledBy]) {
+            $db->insert('gf_manual_destinations', [
+                'id' => $id,
+                'organization_id' => $organization,
+                'label' => $label,
+                'created_by' => $user,
+                'created_at' => $now,
+                'disabled_at' => $disabledAt,
+                'disabled_by' => $disabledBy,
+            ]);
+        }
 
         foreach ([
             [$asset, $mine, 'future.png'],
@@ -137,20 +158,47 @@ final class ManualHandoffTest extends WebTestCase
             'PUT',
             '/api/admin/schedules/'.$futureDraft.'/manual-handoff',
             server: ['CONTENT_TYPE' => 'application/json'],
-            content: '{"action":"prepare"}',
+            content: json_encode(['action' => 'prepare', 'destination_id' => $destination], JSON_THROW_ON_ERROR),
         );
         self::assertResponseStatusCodeSame(403);
+
+        $client->request('PUT', '/api/admin/schedules/'.$futureDraft.'/manual-handoff', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_CSRF_TOKEN' => $csrf,
+        ], content: '{"action":"prepare"}');
+        self::assertResponseStatusCodeSame(422);
+
+        foreach ([$foreignDestination, $disabledDestination] as $unavailable) {
+            $client->request('PUT', '/api/admin/schedules/'.$futureDraft.'/manual-handoff', server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $csrf,
+            ], content: json_encode([
+                'action' => 'prepare',
+                'destination_id' => $unavailable,
+            ], JSON_THROW_ON_ERROR));
+            self::assertResponseStatusCodeSame(409);
+            self::assertSame(
+                'manual_destination_unavailable',
+                json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
+            );
+        }
 
         $client->request('PUT', '/api/admin/schedules/'.$foreignDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $destination,
+        ], JSON_THROW_ON_ERROR));
         self::assertResponseStatusCodeSame(404);
 
         $client->request('PUT', '/api/admin/schedules/'.$cancelledDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $destination,
+        ], JSON_THROW_ON_ERROR));
         self::assertResponseStatusCodeSame(409);
         self::assertSame(
             'draft_cancelled',
@@ -160,11 +208,15 @@ final class ManualHandoffTest extends WebTestCase
         $client->request('PUT', '/api/admin/schedules/'.$futureDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $destination,
+        ], JSON_THROW_ON_ERROR));
         self::assertResponseIsSuccessful();
         $preparedFuture = json_decode((string) $client->getResponse()->getContent(), true)['data'];
         self::assertTrue($preparedFuture['changed']);
         self::assertSame('prepared', $preparedFuture['status']);
+        self::assertSame($destination, $preparedFuture['destination_id']);
         self::assertFalse($preparedFuture['publishes']);
         self::assertFalse($preparedFuture['provider_calls']);
         self::assertFalse($preparedFuture['external_evidence']);
@@ -172,7 +224,10 @@ final class ManualHandoffTest extends WebTestCase
         $client->request('PUT', '/api/admin/schedules/'.$futureDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $destination,
+        ], JSON_THROW_ON_ERROR));
         self::assertResponseIsSuccessful();
         self::assertFalse(
             json_decode((string) $client->getResponse()->getContent(), true)['data']['changed'],
@@ -181,6 +236,19 @@ final class ManualHandoffTest extends WebTestCase
             'SELECT COUNT(*) FROM gf_manual_handoff_events WHERE organization_id = :organization AND draft_id = :draft',
             ['organization' => $mine, 'draft' => $futureDraft],
         ));
+
+        $client->request('PUT', '/api/admin/schedules/'.$futureDraft.'/manual-handoff', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_CSRF_TOKEN' => $csrf,
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $alternateDestination,
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame(
+            'manual_destination_change_requires_retry',
+            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
+        );
 
         $client->request('PUT', '/api/admin/schedules/'.$futureDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
@@ -201,10 +269,24 @@ final class ManualHandoffTest extends WebTestCase
             json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
         );
 
+        $client->request('GET', '/api/admin/manual-handoff-queue');
+        self::assertResponseIsSuccessful();
+        $futureQueue = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+        self::assertTrue($futureQueue['ready']);
+        self::assertSame(1, $futureQueue['total']);
+        self::assertSame($futureDraft, $futureQueue['items'][0]['draft_id']);
+        self::assertSame('prepared', $futureQueue['items'][0]['status']);
+        self::assertFalse($futureQueue['items'][0]['due']);
+        self::assertSame('Mesa principal', $futureQueue['items'][0]['destination']['label']);
+        self::assertFalse($futureQueue['provider_calls']);
+
         $client->request('PUT', '/api/admin/schedules/'.$pastDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $destination,
+        ], JSON_THROW_ON_ERROR));
         self::assertResponseIsSuccessful();
 
         $client->request('PUT', '/api/admin/schedules/'.$pastDraft.'/manual-handoff', server: [
@@ -212,20 +294,21 @@ final class ManualHandoffTest extends WebTestCase
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ], content: '{"action":"fail"}');
         self::assertResponseIsSuccessful();
-        self::assertSame(
-            'failed',
-            json_decode((string) $client->getResponse()->getContent(), true)['data']['status'],
-        );
+        $failed = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+        self::assertSame('failed', $failed['status']);
+        self::assertSame($destination, $failed['destination_id']);
 
         $client->request('PUT', '/api/admin/schedules/'.$pastDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
+        ], content: json_encode([
+            'action' => 'prepare',
+            'destination_id' => $alternateDestination,
+        ], JSON_THROW_ON_ERROR));
         self::assertResponseIsSuccessful();
-        self::assertSame(
-            'prepared',
-            json_decode((string) $client->getResponse()->getContent(), true)['data']['status'],
-        );
+        $retried = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+        self::assertSame('prepared', $retried['status']);
+        self::assertSame($alternateDestination, $retried['destination_id']);
 
         $client->request('PUT', '/api/admin/schedules/'.$pastDraft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
@@ -234,6 +317,7 @@ final class ManualHandoffTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $completed = json_decode((string) $client->getResponse()->getContent(), true)['data'];
         self::assertSame('completed', $completed['status']);
+        self::assertSame($alternateDestination, $completed['destination_id']);
         self::assertFalse($completed['publishes']);
         self::assertFalse($completed['external_evidence']);
 
@@ -246,40 +330,35 @@ final class ManualHandoffTest extends WebTestCase
             json_decode((string) $client->getResponse()->getContent(), true)['data']['changed'],
         );
 
-        $client->request('PUT', '/api/admin/schedules/'.$pastDraft.'/manual-handoff', server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: '{"action":"prepare"}');
-        self::assertResponseStatusCodeSame(409);
-        self::assertSame(
-            'manual_handoff_completed',
-            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
-        );
-
         $client->request('GET', '/api/admin/schedules');
         self::assertResponseIsSuccessful();
         $agenda = json_decode((string) $client->getResponse()->getContent(), true)['data'];
         self::assertTrue($agenda['manual_handoff_ready']);
+        self::assertTrue($agenda['manual_destination_ready']);
         self::assertSame(3, $agenda['total']);
         $byId = [];
         foreach ($agenda['drafts'] as $draft) {
             $byId[$draft['id']] = $draft;
         }
         self::assertSame('prepared', $byId[$futureDraft]['manual_handoff_status']);
+        self::assertSame('Mesa principal', $byId[$futureDraft]['manual_destination']['label']);
         self::assertSame('completed', $byId[$pastDraft]['manual_handoff_status']);
+        self::assertSame('Mesa alterna', $byId[$pastDraft]['manual_destination']['label']);
         self::assertSame('none', $byId[$cancelledDraft]['manual_handoff_status']);
+        self::assertNull($byId[$cancelledDraft]['manual_destination']);
         self::assertArrayNotHasKey($foreignDraft, $byId);
         self::assertFalse($agenda['can_publish']);
 
         $event = $db->fetchAssociative(
             <<<'SQL'
-                SELECT id FROM gf_manual_handoff_events
+                SELECT id, destination_id FROM gf_manual_handoff_events
                 WHERE organization_id = :organization AND draft_id = :draft
                 ORDER BY created_at DESC, id DESC LIMIT 1
                 SQL,
             ['organization' => $mine, 'draft' => $pastDraft],
         );
         self::assertIsArray($event);
+        self::assertSame($alternateDestination, $event['destination_id']);
 
         $updateBlocked = false;
         try {
@@ -307,5 +386,11 @@ final class ManualHandoffTest extends WebTestCase
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ], content: '{"action":"fail"}');
         self::assertResponseStatusCodeSame(403);
+
+        $client->request('GET', '/api/admin/manual-handoff-queue');
+        self::assertResponseIsSuccessful();
+        self::assertFalse(
+            json_decode((string) $client->getResponse()->getContent(), true)['data']['can_manage'],
+        );
     }
 }

@@ -14,6 +14,7 @@ type Context = {
   schedule_draft_csrf?: string | null;
   distribution_authorization_csrf?: string | null;
   manual_handoff_csrf?: string | null;
+  manual_destination_csrf?: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -336,14 +337,15 @@ export function AdminApp() {
               authorizationCsrf={context.distribution_authorization_csrf ?? null}
               canManualHandoff={context.permissions.manual_handoff_manage}
               manualHandoffCsrf={context.manual_handoff_csrf ?? null}
+              manualDestinationCsrf={context.manual_destination_csrf ?? null}
             />}
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
               ? <>
-                  <strong>Alcance S4 · agenda interna</strong>
+                  <strong>Alcance S4 · agenda y cola manual</strong>
                   <p>
-                    La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony.
-                    La agenda permite borradores cancelables y handoff manual auditado, sin llamadas a proveedores.
+                    Symfony ya permite borradores, destinos internos y una cola humana auditable.
+                    Ninguno de estos estados llama proveedores ni equivale a una publicación externa.
                   </p>
                 </>
               : <>
