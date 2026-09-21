@@ -17,8 +17,9 @@ GRINDFLOW_VAULT_ROOT=/ruta-privada-fuera-del-release/grindflow-vault
 
 El directorio padre debe existir. El proceso PHP debe poder escribir dentro
 de la raíz privada. Si falta la carpeta final, se crea con permisos 0700;
-no se siguen enlaces simbólicos como raíz configurada, no se aceptan rutas
-relativas ni segmentos `.` o `..` y no se acepta una ubicación dentro
+no se siguen enlaces simbólicos como raíz configurada, ni se acepta una
+carpeta externa ya existente que conceda permisos a grupo u otros usuarios.
+Tampoco se aceptan rutas relativas ni segmentos `.` o `..` ni una ubicación dentro
 del árbol del release. La carpeta debe permanecer fuera del webroot y no
 publicarse como alias del servidor HTTP.
 
