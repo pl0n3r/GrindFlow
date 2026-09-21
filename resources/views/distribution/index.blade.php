@@ -9,37 +9,7 @@
 <body>
 <div class="gf-grid" aria-hidden="true"></div>
 <div class="gf-app">
-    <aside class="gf-sidebar">
-        <x-brand :href="route('dashboard')" />
-        <nav class="gf-sidebar__nav" aria-label="Workspace navigation">
-            <span class="gf-sidebar__label">Workspace</span>
-            <a class="gf-navitem" href="{{ route('dashboard') }}"><span class="gf-navitem__text">Resumen</span></a>
-            <a class="gf-navitem"
-                href="{{ route('organizations.vault.index', ['organizationId' => $organization->id]) }}"
-            >
-                <span class="gf-navitem__text">Biblioteca</span>
-            </a>
-            <a class="gf-navitem"
-                href="{{ route('organizations.scheduler.index', ['organizationId' => $organization->id]) }}"
-            >
-                <span class="gf-navitem__text">Programación</span>
-            </a>
-            <a class="gf-navitem gf-navitem--active" aria-current="page"
-                href="{{ route('organizations.distribution.index', ['organizationId' => $organization->id]) }}"
-            >
-                <span class="gf-navitem__text">Distribución</span>
-            </a>
-            <span class="gf-sidebar__label">Insights</span>
-            @if (auth()->user()?->canManageTrafficOrganization($organization))
-                <a class="gf-navitem"
-                    href="{{ route('organizations.traffic.index', ['organizationId' => $organization->id]) }}"
-                >
-                    <span class="gf-navitem__text">Tráfico</span>
-                </a>
-            @endif
-        </nav>
-        <div class="gf-sidebar__bottom"><form method="POST" action="{{ route('logout') }}">@csrf<button class="gf-button gf-button--ghost gf-button--full">Cerrar sesion</button></form></div>
-    </aside>
+    <x-workspace-sidebar :organization="$organization" active="distribution" />
     <main class="gf-main">
         <header class="gf-appbar"><div class="gf-appbar__meta">GF / {{ strtoupper($organization->slug) }} / DISTRIBUTION</div><div class="gf-avatar">{{ strtoupper(substr((string) auth()->user()?->name, 0, 2)) }}</div></header>
         <section class="gf-pagehead"><div><span class="gf-kicker"><span class="gf-kicker__dot"></span>Reliable delivery control</span><h1>Distribution</h1><p>Estado, reintentos e idempotencia de cada entrega programada.</p></div><span class="gf-badge">{{ $ready ? 'Distribution ready' : 'Migration required' }}</span></section>
