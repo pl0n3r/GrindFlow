@@ -1,10 +1,60 @@
 # GrindFlow — contexto canonico para AI / Work / Codex
 
-**Leer este archivo primero, completo.** Un agente nuevo debe poder continuar
-usando solo el repositorio: no depende de memoria, chats anteriores ni prompts
-previos. El `README.md` es solo la foto de la entrega actual; las decisiones
-durables viven aqui y en las especificaciones. Si una decisión cambia, registrar
-el cambio aquí en el mismo PR que modifica el producto.
+**Leer el inicio rápido y las reglas vigentes del área antes de modificar código.**
+Un agente nuevo puede reconstruir el estado desde GitHub sin memoria ni chats:
+la evidencia de `main`, las decisiones en este archivo y las especificaciones
+son la base. El `README.md` es una foto de entrega, no un manual acumulativo;
+las notas históricas están archivadas y explícitamente desautorizadas como
+stack objetivo. Documentar decisiones durables en el mismo PR que las aplica.
+
+## Inicio rápido obligatorio y lectura por relevancia
+
+1. **Verificar estado real, no recordar un estado de chat:** leer SHA exacto de
+   `main`, versión `config/version.php`, PRs abiertos, última compuerta
+   `GrindFlow CI / validate` del mismo SHA y prioridad vigente del
+   [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+   Un badge o el README pueden describir una ejecución distinta.
+2. **Arquitectura que guía código nuevo:** Symfony 7.4 + Doctrine/MariaDB,
+   React/TypeScript/Vite admin y Twig público en `symfony/` aislado. PHP 8.5
+   es objetivo sujeto a compatibilidad observada. Laravel en raíz y el
+   legado Next.js se mantienen operativos hasta cutover probado; no crear
+   otra arquitectura por analogía con Condor.
+3. **Lectura mínima del slice:** consultar `docs/GRINDFLOW-SPEC.md`,
+   `docs/REQUIREMENTS.md`, `docs/DEVELOPMENT-MODEL.md` y
+   `docs/STACK-TRANSITION-SYMFONY.md` en los apartados relevantes.
+   Leer las reglas de dominio de este archivo para los componentes tocados;
+   el [archivo histórico](docs/AGENTS-LEGACY-ARCHIVE.md) se consulta solo
+   para mantener o migrar comportamiento antiguo.
+4. **Entrega por solicitud de desarrollo:** terminar PRs pertinentes ya
+   abiertos, ejecutar una mejora vertical verificable y continuar con otra
+   mejora segura del roadmap si hay margen, sin pedir «¿sigo?» entre pasos.
+   PRs pequeños y merges seriales; nunca inventar CI, deploy, métricas
+   o ejecuciones futuras.
+5. **Sin Codex:** usar GitHub de escritura, rama enfocada y GitHub Actions;
+   si falta checkout local, declararlo. Sin permisos Git, explicar el
+   bloqueo concreto; no sustituir GitHub por cambios no persistidos.
+6. **Estados separados:** IMPLEMENTADO (fuente), VALIDADO EN CÓDIGO
+   (compuertas), FUSIONADO (SHA exacto main), DESPLEGADO (evidencia
+   independiente del entorno) y VALIDADO EN PRODUCCIÓN (flujo real
+   comprobado). La versión visible no demuestra el SHA remoto.
+
+### Mapa de lectura y cambios seguros
+
+| Si tocas… | Inspeccionar además… | Validación principal |
+| --- | --- | --- |
+| Symfony, identidad, permisos, Vault, frontend React | `symfony/src/`, `symfony/frontend/`, migraciones y tests Symfony | `symfony-preview`: PHP, MariaDB descartable, TypeScript/Vite y Chromium |
+| Laravel operativo | `app/`, `routes/`, `database/`, `tests/` y configuración del hosting | Gates PHP, tests, MariaDB y navegador seleccionados |
+| Next.js y workers antiguos | `src/`, `workers/`, `supabase/` y [archivo histórico](docs/AGENTS-LEGACY-ARCHIVE.md) | Gate `legacy` y contratos relevantes; no ampliar el legado por inercia |
+| Versionado, README, GitHub Actions, Sonar | `scripts/ci-scope.sh`, `scripts/readme-dashboard.py`, `scripts/release-version.py`, `docs/GOVERNANCE.md` | `preflight`, `fast`, `validate`, Sonar y exact-main |
+| Hostinger y datos reales | `docs/DEPLOY-HOSTINGER.md`, reglas de smoke/diagnósticos y plan de transición | Observer + smoke lectura; mutaciones requieren operación autorizada |
+
+**Regla para cambiar estas instrucciones:** comprobar que los paths, comandos,
+gates, decisiones y versiones descritos existen realmente en `main`; eliminar
+referencias obsoletas o marcarlas históricas sin borrar su trazabilidad. Actualizar
+el mismo PR con los tests y controles implicados; el
+[registro de auditoría](docs/AGENTS-AUDIT.md) explica esta depuración.
+
+---
 
 ## Decisión vigente y obligatoria · transición de stack 20/09/2026
 
@@ -12,7 +62,7 @@ el cambio aquí en el mismo PR que modifica el producto.
 
 **Precedencia temporal:** esta decisión nueva **sustituye** el stack objetivo Laravel 13/Blade/Livewire del apartado histórico del 17/09/2026, PERO no convierte en falso el estado actual del código: Laravel y el legado Next.js siguen presentes y se conservan hasta paridad+cutover probados. Las reglas Laravel de este archivo rigen ese runtime mientras continúe en uso; no se importan como APIs de Symfony. No empezar módulos nuevos en Laravel por inercia cuando sean parte de la migración aprobada.
 
-**Reglas de desarrollo inmediato:** seguir el [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) por vertical slices visibles S0→S5, con CI exact-main y Sonar del head estable; mantener gate `GrindFlow CI / validate` e introducir nuevos gates Symfony/React sin apagar tests existentes; no cambiar `public_html`, migrar SQL productivo, borrar Laravel ni activar integraciones externas como efecto de este PR documental. Reconciliar PR #7 (paridad) y #9 (experiencia de piloto) con esta decisión antes de fusionarlos.
+**Reglas de desarrollo inmediato:** seguir el [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) por slices visibles S0→S5 y consultar PRs abiertos en cada arranque (no asumir que #7/#9 sigan abiertos). Mantener el gate `GrindFlow CI / validate`, CI exact-main y Sonar sobre head estable; no desactivar Laravel/legado antes de paridad. No cambiar `public_html`, migrar SQL productivo, borrar Laravel ni habilitar integraciones externas por una entrega documental o un preview Symfony.
 
 **No copiar Condor indiscriminadamente:** heredar patrones técnicos, calidad, seguridad, diagnóstico, accesibilidad y entrega; GrindFlow conserva su dominio de media, UTC, multi-moneda, derechos, permisos por tenant, publicación responsable y modelo SaaS propios. Condor no define precios ni módulos de GrindFlow.
 
@@ -59,8 +109,9 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 
 ## Protocolo de inicio para agentes y sesiones
 
-1. Leer este `AGENTS.md` completo. Consultar docs especificas de la tarea,
-   no releer todo el repositorio después de cada ajuste menor.
+1. Leer el inicio rápido de `AGENTS.md`, las reglas del área modificada
+   y la documentación relevante; no releer todo el repositorio después
+   de cada ajuste menor ni activar notas del archivo histórico.
 2. Inspeccionar `main`, PRs abiertos, `GrindFlow CI / validate` del SHA exacto
    y el roadmap [#2](https://github.com/pl0n3r/GrindFlow/issues/2).
 3. Si un PR activo cubre el trabajo, terminarlo y verificar sus gates antes
@@ -115,9 +166,13 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   Un hito minor explícito `0.x.y -> 0.(x+1).0` es deliberado. `1.0.0`
   requiere decisión expresa del propietario. No usar la versión humana como
   certificado del Git SHA que está desplegado.
-- `scripts/release-version.py` verifica transiciones, no altera Git ni
-  genera commits. Versionar antes del head estable final de CI, Sonar y CodeRabbit;
-  si `main` avanza, revalidar el cambio contra la nueva base.
+- `scripts/release-version.py` verifica **cada transición de PR**, incluso
+  las PR solo documentales: con el contrato CI vigente, un PR independiente
+  requiere patch +1 y título `(V X.Y.Z)`; mantener README y huella exacta
+  consistentes. Si en el futuro se desea una excepción para solo documentación,
+  cambiar **antes** el contrato, los tests y el gate mediante un PR separado.
+  No intentar fusionar un PR documental con versión sin cambio: `fast` falla.
+  Versionar antes del head estable CI/Sonar/CodeRabbit y revalidar si `main` avanza.
 - La versión se muestra en Admin > System. El SHA real de Hostinger solo puede
   declararse **DEPLOYED** tras un marcador/observación verificable de ese
   checkout; un Smoke de solo lectura sin SHA remoto comprobado no basta.
@@ -160,20 +215,32 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 ### Regla de avance sustancial por cada mensaje
 
 - Cuando el propietario diga "sigue", "adelante" o equivalente, ejecutar un
-  **bloque coherente de desarrollo**: inspeccion -> codigo -> pruebas ->
-  revision -> entrega verificable. No cerrar una sesion tras una sola
-  correccion minima si hay trabajo independiente y seguro disponible.
-- Agrupar en el mismo ciclo varias mejoras relacionadas o un modulo vertical
-  completo, incluyendo tests, documentacion de la entrega y gates aplicables.
-  El numero de archivos no mide el valor: preferir flujos funcionales y
-  defectos de causa raiz, no commits o notas de progreso cosmeticos.
+  **ciclo de desarrollo sustancial**: inspeccion -> codigo -> pruebas ->
+  revision -> entrega verificable -> siguiente prioridad. La autorizacion de
+  continuar ya esta dada: no volver a preguntar "¿sigo?" entre avances ni
+  cerrar la respuesta al terminar la primera correccion o el primer PR.
+- Por defecto, intentar **varias mejoras funcionales relacionadas o un modulo
+  vertical completo** por solicitud, con backend, UI real donde aplique,
+  pruebas, documentacion y compuertas. Tras cerrar un PR, consultar el
+  roadmap y avanzar a otro bloque seguro dentro de la misma sesion.
+  Si el ciclo alcanza solo un avance, indicar el bloqueo concreto o limite
+  real, no presentarlo como final del trabajo solicitado.
+- **Releases pequenas no significa respuestas pequenas:** conservar los PRs
+  enfocados, un incremento patch por PR desplegable y merge serializado,
+  pero encadenar varias entregas independientes y verificables cuando sea
+  posible. No sacrificar CI, Sonar, seguridad, calidad ni la comprobacion del
+  SHA exacto de `main` por alcanzar una cantidad artificial de commits o PRs.
 - Si CI, Sonar o CodeRabbit estan ejecutandose, inspeccionar o implementar
-  una linea independiente mientras tanto. No detener el avance por esperas
-  externas, pero tampoco saltar los controles del PR ni abrir un PR
-  dependiente sin revalidar su base.
-- En cada respuesta distinguir con precision cambios ya escritos, tests
-  ejecutados, PR/merge y bloqueos de produccion. Nunca presentar una rama
-  preparada como funcionalidad validada o desplegada.
+  una linea independiente mientras tanto; no abrir trabajos dependientes
+  sin revalidar base ni fusionar un PR antes de cumplir sus compuertas.
+- El numero de archivos no mide valor: priorizar flujos funcionales y
+  defectos de causa raiz sobre scaffolding, cambios cosmeticos y reportes.
+  Comunicar hitos reales en mensajes breves y, al final de la sesion,
+  separar codigo escrito, tests/gates, PRs fusionados, deploy observado y
+  pendientes. No llamar desplegada una rama o funcionalidad solo preparada.
+- Nunca prometer trabajo continuo entre mensajes ni anunciar un cambio futuro
+  como ejecutado. Para una cadencia horaria solicitada, utilizar tareas
+  programadas si estan disponibles y reportar solo los hechos de cada ejecucion.
 
 ### Regla de reportes CSV de Traffic
 
@@ -771,8 +838,8 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
   agregada para branch protection.
 - Cada PR y push exacto a `main` empieza con un `preflight` corto que calcula
   el diff y ejecuta el clasificador reusable `scripts/ci-scope.sh`.
-- `fast`, `php-quality`, `tests`, `database`, `browser`, `real-stack` y `legacy`
-  salen directamente de `preflight` cuando aplican. Ningun gate pesado espera a
+- `fast`, `php-quality`, `tests`, `database`, `browser`, `real-stack`,
+  `legacy` y `symfony-preview` salen de `preflight` cuando aplican. Ningun gate pesado espera a
   que termine otro gate independiente.
 - `fast` siempre existe despues de preflight y protege contratos operativos,
   sintaxis de automatizacion y el dashboard README exacto; no instala Composer ni
@@ -805,15 +872,16 @@ Debe conservar, en este orden:
 
 1. `# GrindFlow — Último deploy`
 2. badges vivos de GrindFlow CI, Sonar Quality Gate y Production Smoke
-3. `## Estado del deploy`
-4. `## Huella del cambio`
-5. `## Calidad y entrega`
-6. `## Flujo de entrega`
-7. `## Qué se hizo`
-8. `## Archivos modificados en este deploy`
-9. `## Validación`
-10. `## Qué sigue`
-11. `## Panorama general pendiente`
+3. `## Progress convention` y `## Fuentes de verdad`
+4. `## Estado del deploy`
+5. `## Huella del cambio`
+6. `## Calidad y entrega`
+7. `## Flujo de entrega`
+8. `## Qué se hizo`
+9. `## Archivos modificados en este deploy`
+10. `## Validación`
+11. `## Qué sigue`
+12. `## Panorama general pendiente`
 
 Reglas:
 
@@ -935,347 +1003,13 @@ Reglas:
   comprobacion externa. SSH es solo fallback de recuperacion.
 - Nunca se expone `laravel.log` crudo mediante una ruta publica o autenticada.
 
-### Cambio de arquitectura aprobado — 17 de septiembre de 2026
+## Referencia archivada y políticas de migración
 
-GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
-code hacia un **monolito modular Laravel**. El stack objetivo es PHP 8.5 +
-Laravel 13 + Blade/Livewire + Tailwind + MariaDB (driver `mysql`) + Laravel
-Queues/Scheduler + almacenamiento S3-compatible.
-
-El codigo TypeScript actual es referencia funcional temporal. No se elimina un
-modulo legado hasta que su reemplazo Laravel tenga paridad trazable y este
-VALIDATED IN CODE. Las reglas de este archivo que mencionan implementaciones
-TypeScript/Supabase concretas siguen siendo validas para el legado mientras
-exista, pero no obligan a reproducir esas decisiones tecnicas en Laravel cuando
-el mismo invariante pueda preservarse de forma mas simple.
-
-El modelo de desarrollo y CI se inspira en BRVTAL: contexto durable en AGENTS,
-spec/requisitos versionados, una compuerta final estable `validate`, SonarQube
-Cloud como analisis estatico adicional y CodeRabbit como revisor asesor durante
-su calibracion.
-
-## Que es el producto
-
-Plataforma SaaS multi-tenant para estudios de contenido adulto y modelos
-independientes. Siete modulos: control de acceso por rol, ingesta y reciclado de
-vault, pipeline de medios, programacion con reglas duras, distribucion
-automatizada, enlaces rastreados y libro de reparto de ingresos.
-
-## Decisiones cerradas
-
-Se acordaron con el cliente antes de escribir codigo. No se cambian sin volver a
-preguntar.
-
-| Tema | Decision |
-|---|---|
-| Stack objetivo | PHP 8.5, Laravel 13, Blade + Livewire, Tailwind, MariaDB mediante el driver `mysql`, almacenamiento S3-compatible |
-| Despliegue | Hostinger Web/Cloud para Laravel. MariaDB es la base nativa del hosting. El legado Supabase/PostgreSQL se mantiene solo como referencia temporal durante la migracion |
-| Multi-tenancy | `organizations` + `memberships`; `TenantContext`, scopes tenant-aware fail-closed, Policies y constraints/trigger en MariaDB |
-| Cola | Laravel Queues; backend de base MariaDB solo si aporta simplicidad y con locking transaccional validado |
-| Cumplimiento 2257 | Desde los cimientos, con bloqueo en la base |
-| Idiomas | es/en según requisitos de producto; `next-intl` es dependencia solo del legado Next.js |
-| Subidas | URL prefirmada tras validar token, con vigencia y limites estrictos |
-| Acortador | `/l/[slug]` en la misma app, sin dominio aparte |
-| CI | `GrindFlow CI` con compuerta estable `validate`, gates selectivos, SonarQube Cloud y CodeRabbit asesor |
-| Secretos en reposo | AES-256-GCM con `ENCRYPTION_MASTER_KEY` del entorno |
-| Limite del acortador | Laravel `/l/{token}` con throttle y deduplicación HMAC de 10 minutos, sin guardar IP |
-| Integraciones previstas en el legado | No implica adaptadores externos reales habilitados en Laravel; verificar por contrato y código |
-
-## Reglas que no se rompen
-
-> Las reglas que mencionan Supabase/PostgreSQL/RLS mas abajo son contratos del
-> legado TypeScript mientras exista. No definen la tecnologia objetivo Laravel.
-> Sus invariantes funcionales deben preservarse al migrarlos a MariaDB.
-
-1. **El aislamiento Laravel falla cerrado.** Todo modelo tenant-owned debe llevar
-   `organization_id` y usar el contrato tenant-aware del proyecto. Sin
-   `TenantContext` de organizacion, una consulta tenant-owned devuelve cero
-   filas y una creacion falla. Las Policies autorizan mutaciones y MariaDB
-   conserva FKs, unicidad, ENUMs e invariantes estructurales. Bypassear el scope
-   solo se permite en caminos administrativos explicitamente revisados.
-
-2. **Nada se publica sin sanitizar.** Una foto de movil lleva las coordenadas del
-   sitio donde se tomo. El trigger `schedules_enforce_gates` lo impide en la
-   base; no lo debilites para desbloquear una demo.
-
-3. **Nada se publica sin expediente 2257 vigente.** Mismo trigger, misma razon:
-   es requisito legal, no una preferencia de producto.
-
-4. **Los tipos de `database.types.ts` son alias, nunca interfaces.** PostgREST
-   exige `Record<string, unknown>` y una interfaz no obtiene indice implicito. Si
-   alguien la convierte en interfaz, el esquema entero se resuelve a `never` y
-   **las consultas pierden el tipado en silencio**. Ya paso una vez durante la
-   Entrega 1 y costo un buen rato localizarlo.
-
-5. **`@supabase/ssr` tiene que ir al dia.** La version 0.5.2 arrastra una copia
-   antigua de supabase-js cuyas firmas genericas no encajan con las actuales, y
-   el sintoma es exactamente el mismo: todo a `never`, sin ningun error que
-   apunte a la causa.
-
-6. **Las pruebas de RLS no comprueban permisos, intentan violarlos.** Una prueba
-   que solo verifique que cada usuario ve lo suyo no sirve. Hay que intentar leer
-   y escribir datos ajenos y exigir que la base lo impida.
-
-7. **Bajo RLS, un UPDATE ajeno no lanza error: afecta a cero filas.** Por eso
-   existe `tests.assert_affects`. Comprobar esos casos con `assert_rejected` da
-   un falso verde.
-
-8. **Ningun token se escribe en `platform_credentials` fuera de
-   `src/lib/credentials.ts`.** Ese modulo cifra antes de insertar. Escribir por
-   otra via guarda el secreto en claro y la base no puede impedirlo: solo ve
-   texto.
-
-9. **La ventana de deduplicacion de clics no es un parametro.** Vive como
-   constante en el cuerpo de `record_link_click`. Quien invoca esa funcion es
-   anonimo; si pudiera elegir la ventana, pasaria cero y el limite dejaria de
-   existir.
-
-10. **`web` nunca se expone directamente a internet.** El limitador identifica al
-    visitante por `X-Forwarded-For`, que el cliente puede falsificar. Sin un proxy
-    inverso delante que la reescriba, el limite es decorativo.
-
-11. **De la IP no se guarda nunca la direccion, solo su hash con sal.** Ni en la
-    base ni en los registros.
-
-12. **Ningun texto llega al publicador sin pasar por el filtro estricto.** Lo
-    impone el tipo `PublishableCaption`, que solo produce `validateCaption`. Si
-    alguien lo convierte en un `string` corriente para "simplificar", la garantia
-    desaparece y no queda ningun error que lo avise. La prueba con
-    `@ts-expect-error` en `tests/captions.test.ts` existe justo para eso.
-
-13. **Los terminos de la lista dura no son configurables.** Los que sugieren
-    minoria de edad, falta de consentimiento o parentesco no admiten excepcion
-    por organizacion ni por plataforma. No es una preferencia de producto.
-
-14. **Ante un enrutado ambiguo NO se adivina.** Dos perfiles que normalizan
-    igual dejan el archivo sin asignar. Mandarlo a la modelo equivocada es peor:
-    sin asignar alguien lo revisa, mal asignado nadie lo hace y acaba publicado
-    en la cuenta que no era.
-
-15. **Un duplicado se marca, nunca se descarta en silencio.** La fila se conserva
-    con el motivo y el enlace al original. Lo que si se borra es la segunda copia
-    de los bytes en R2.
-
-16. **Un archivo sin perfil no se descarga.** Sin perfil no hay carpeta de R2, y
-    traer gigabytes que nadie reclamo es trabajo tirado.
-
-17. **Los workers de Node entran por `public.claim_jobs`, no por `app.claim_jobs`.**
-    PostgREST solo expone `public`. El envoltorio delega y no duplica logica, y
-    esta concedido solo a `service_role`.
-
-18. **En el triaje, el cliente de servicio solo toca lo que el RLS devolvio.**
-    Primero se actualizan los items con el cliente de sesion; despues se encolan
-    trabajos SOLO para los ids que ese UPDATE devolvio. Al reves, una peticion con
-    ids ajenos encolaria descargas de material de otra agencia.
-
-19. **La coordinacion entre replicas del worker vive en la base, no en el
-    programador.** `jobs_one_live_scan_per_connection` es la unica capa que ven
-    todas a la vez. El rechazo por duplicado es el caso normal, no un error.
-
-20. **Google exige `prompt=consent` ademas de `access_type=offline`.** Sin lo
-    primero, una cuenta que ya autorizo antes no recibe refresh token y la
-    conexion nace muerta sin ningun error visible.
-
-21. **El publicador solo acepta `PublishableCaption`.** El worker vuelve a
-    validar el texto justo antes de enviarlo, porque en la base es una cadena
-    corriente. No es un tramite: entre programar y publicar pueden haber cambiado
-    los destinos verificados.
-
-22. **Un 401 suspende el perfil en esa red, no solo esa publicacion.** Encadenar
-    peticiones con credenciales muertas es el patron que acaba en baneo. Un 429
-    NO suspende: es pasajero.
-
-23. **Un 429 no gasta intento.** `defer_job` decrementa `attempts` a proposito.
-    Contarlo haria que una racha de limites diera el trabajo por muerto sin
-    haberlo intentado de verdad.
-
-24. **Nunca se espera menos de lo que pidio la plataforma.** El margen del
-    backoff se suma, jamas se resta.
-
-25. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
-    `grant ... on all tables` de la migracion 000900 solo alcanzo a las que
-    existian entonces; el sintoma es un "permission denied" que no menciona el
-    RLS por ningun lado. La migracion 001200 dejo puesto un
-    `alter default privileges`, pero conviene comprobarlo con una asercion en
-    cada tabla nueva.
-
-## Topologia de compuertas del legado TypeScript
-
-**ARCHIVO HISTÓRICO:** el diagrama siguiente no describe el GitHub Actions
-vigente. La compuerta actual es `GrindFlow CI / validate` con PHP 8.5,
-MariaDB, browser SQLite, real-stack MariaDB y pruebas legadas seleccionadas.
-
-```
-lint ──────┐
-typecheck ─┤
-hard-rule ─┤
-rls ───────┼─> validate   (la unica que hay que exigir en la rama principal)
-build ─────┤
-workers ───┤
-docker ────┘
-```
-
-`rls` levanta un PostgreSQL 16 de servicio, aplica el arranque de auth que
-reproduce lo que Supabase da de fabrica, corre las diecisiete migraciones y ejecuta las
-116 aserciones.
-
-Históricamente, el legado aspiró a construir imágenes Docker. Laravel ya no
-se despliega por contenedores: Hostinger usa el checkout Git y PHP/MariaDB.
-
-## Mapa actual del repositorio Laravel
-
-| Ruta | Contenido |
-|---|---|
-| `app/`, `routes/`, `resources/views/` | Aplicación y UI Laravel |
-| `config/`, `bootstrap/`, `database/` | Configuración, bootstrap, migraciones y seeders |
-| `tests/Feature/`, `tests/Unit/`, `tests/Browser/` | Regresiones y E2E descartable |
-| `.github/workflows/` | CI, observer de release y smoke separado |
-| `docs/`, `AGENTS.md` | Decisiones durables y especificaciones |
-| `ROADMAP.md` | Acceso al roadmap maestro, Issue #2; sin progreso paralelo |
-| `src/`, `workers/`, `supabase/` | Solo legado hasta paridad GF-MIG-003 |
-
-## Mapa del legado (referencia historica)
-
-| Ruta | Contenido |
-|---|---|
-| `src/app/[locale]/(panel)/` | Paneles de admin, estudio y modelo |
-| `src/app/[locale]/u/[token]/` | Pagina publica de subida sin cuenta |
-| `src/app/api/uploads/presign/` | Unico endpoint que atiende sin sesion |
-| `src/lib/scheduling/hard-rule.ts` | Motor anti-repeticion, codigo puro |
-| `src/lib/captions/validator.ts` | Filtro estricto y el tipo `PublishableCaption` |
-| `src/lib/captions/provider.ts` | Interfaz del generador; hoy un simulado |
-| `src/lib/captions/pipeline.ts` | Generar -> validar -> reintentar -> fallar cerrado |
-| `src/lib/connectors/provider.ts` | Interfaz comun de nubes; `clients.ts` la factoria |
-| `src/lib/connectors/routing.ts` | Enrutado hibrido, codigo puro |
-| `src/lib/connectors/triage.ts` | Reglas del lote de asignacion |
-| `src/workers/ingest/scheduler.ts` | Que conexiones toca escanear |
-| `src/lib/publishing/errors.ts` | Clasificacion de fallos y espera; codigo puro |
-| `src/lib/publishing/registry.ts` | Registro de destinos; obliga a tenerlos todos |
-| `src/workers/publish/` | Worker de publicacion (Node) |
-| `src/lib/connectors/connection.ts` | Unico camino de entrada y salida de los tokens de nube |
-| `src/workers/ingest/` | Worker de ingesta en Node |
-| `tsconfig.workers.json` | Sustituye `server-only` para ejecutar fuera de Next |
-| `src/lib/crypto/secrets.ts` | Cifrado AES-256-GCM, formato versionado `v1.` |
-| `src/lib/credentials.ts` | Unico camino de entrada y salida de los tokens |
-| `src/lib/rate-limit.ts` | Ventana fija en memoria y hash de IP |
-| `Dockerfile`, `workers/Dockerfile` | Imagenes de panel y workers |
-| `src/lib/supabase/service.ts` | Clave de servicio: omite RLS, marcado `server-only` |
-| `src/middleware.ts` | Redirector `/l/`, i18n y refresco de sesion |
-| `supabase/migrations/` | Diez migraciones, orden alfabetico |
-| `supabase/tests/` | Arranque de auth, semilla y aserciones |
-| `workers/` | Pipeline de medios en Python |
-
-## Requerimiento anadido: identidad visual y estetica de la interfaz
-
-Solicitado por el arquitecto el 16 de septiembre de 2026, tras el cambio de
-nombre a GrindFlow. No estaba en el PRD original y no tiene fase asignada
-todavia; conviene abordarlo ANTES de construir mas pantallas (analitica,
-finanzas, levantar suspensiones), porque cada pantalla nueva sobre la paleta
-provisional es una pantalla que habra que retocar.
-
-Abarca:
-
-- **Logo** de GrindFlow: version completa y version compacta (para la barra
-  lateral y el favicon), en claro y en oscuro.
-- **Iconografia**: hoy se usa Lucide tal cual. Decidir si se conserva, se ajusta
-  (grosor, tamano) o se sustituye en las secciones principales.
-- **Sistema de color**: la paleta actual (`src/app/globals.css`) es un
-  provisional oscuro en tonos `ink` con acento violeta `brand`. Hay que definir
-  la definitiva: marca, neutros, semanticos (ok/warn/danger) y su version clara
-  si se decide ofrecer tema claro.
-- **Tipografia**: hoy la del sistema. Elegir familia para interfaz y para cifras
-  (tabulares, por los paneles de finanzas).
-- **Estilo de componentes**: tarjetas, botones, formularios, tablas, estados
-  vacios y de error. Los primitivos viven en `src/components/ui/`.
-- **Pagina publica de subida** (`/u/[token]`): es la unica pantalla que ve la
-  modelo desde el movil sin cuenta, y hoy es la mas desnuda.
-- **Pantalla de acceso** y pagina de inicio.
-
-Preguntas abiertas para el arquitecto antes de empezar:
-
-1. ¿Existe ya alguna referencia de marca (color, logo previo, tipografia) o se
-   parte de cero?
-2. ¿Tema oscuro solo, claro solo, o los dos? Hoy es oscuro por defecto porque
-   es una herramienta de muchas horas seguidas y el material se lee mejor asi.
-3. ¿Que tono quiere transmitir el producto: herramienta profesional sobria, o
-   algo mas cercano a la estetica del sector?
-4. ¿Hay restricciones de accesibilidad (contraste minimo, tamano de fuente)?
-
-## Estado por modulo y vigencia de memoria
-
-El registro actual es [roadmap general #2](https://github.com/pl0n3r/GrindFlow/issues/2),
-`docs/REQUIREMENTS.md` y código de `main`. No interpretar números de PR del
-propietario anterior como PRs abiertos del repositorio transferido.
-
-- Laravel/MariaDB cubre identidad, Vault, ingesta, procesamiento, Scheduling,
-  Distribution, Traffic y Finance con pruebas; paridad completa y producción
-  exigen evidencias independientes.
-- Dropbox/Drive están probados con respuestas sintéticas, no con cuentas reales.
-- Distribution dispone de proveedor sandbox; no afirmar conexión externa real.
-- Finance registra ledger interno; no incluye payouts ni integración bancaria.
-
-### Archivo histórico del legado: no es arquitectura vigente
-
-Los apartados siguientes conservan decisiones y riesgos de Next.js,
-PostgreSQL/Supabase y VPS/Docker. El objetivo operativo vigente es Laravel 13,
-PHP 8.5, MariaDB y Hostinger: consultar `docs/GRINDFLOW-SPEC.md` y
-`docs/DEPLOY-HOSTINGER.md` antes de planificar. Una afirmación histórica
-nunca decide nuevos gates, DB, despliegue ni credenciales.
-
-## Riesgos cerrados
-
-- ~~ToS de Vercel y limites de FFmpeg~~ → se pivoto a VPS propio con contenedores.
-- ~~`record_link_click` invocable por `anon` sin limite~~ → dos capas de limite,
-  la autoritativa en PostgreSQL.
-- ~~Falta la funcion de cifrado de credenciales~~ → `src/lib/crypto/secrets.ts`,
-  con 20 pruebas centradas en la deteccion de manipulacion.
-
-## Cambio de nombre (16 de septiembre de 2026)
-
-El producto paso de MediaVault a **GrindFlow**, forma corta **GF**. Se
-renombraron 51 ocurrencias en 22 archivos, incluidos tres identificadores que no
-son solo texto:
-
-- El contexto del cifrado AES-GCM (`grindflow:credential:...`,
-  `grindflow:cloud:...`). Como es el AAD firmado dentro de cada secreto, ningun
-  dato cifrado con el nombre anterior se podria descifrar ahora. No habia
-  ninguno: se cambio antes del primer despliegue precisamente por eso.
-- La cabecera del webhook, `X-GrindFlow-Signature`. Es un contrato con quien
-  reciba webhooks; nadie los recibia todavia.
-- Las cookies de OAuth, `gf_oauth_nonce` y `gf_oauth_carpeta`.
-
-## Riesgos abiertos
-
-- **La perdida de `ENCRYPTION_MASTER_KEY` es irreversible.** Sin ella, las
-  credenciales guardadas no se recuperan ni con el volcado completo de la base, y
-  hay que reconectar cada cuenta a mano. Debe respaldarse fuera del servidor.
-- **El cifrado no protege un servidor comprometido en ejecucion**, donde la clave
-  esta en memoria. El paso siguiente, si el producto crece, es un KMS.
-- **La rotacion de clave todavia no esta implementada.** El formato lleva prefijo
-  de version (`v1.`) precisamente para permitirla sin migrar todas las filas de
-  golpe, pero la funcion que reescribe los criptogramas no existe.
-- **Las imagenes Docker se construyen en CI pero no se han arrancado en un
-  servidor.** El primer despliegue real sigue siendo la prueba que falta.
-- **No hay copia de seguridad automatizada** de nada que no cubra Supabase.
-- **La verificacion de Google para los alcances de Drive tarda semanas** y limita
-  a 100 usuarios mientras tanto. Conviene iniciar el tramite antes que el codigo.
-- **Google entrega el refresh token solo en la primera autorizacion** salvo que
-  se pida `prompt=consent`. Perderlo obliga a desconectar y reconectar a mano: es
-  el fallo mas comun de estas integraciones.
-- **Los diccionarios de terminos penalizados son heuristicas observadas**, no
-  reglas publicadas. Ninguna plataforma documenta su lista; habra que ajustarlos
-  cuando cambie el comportamiento real.
-- **Las integraciones no se han ejecutado nunca contra las APIs reales.** El
-  entorno de desarrollo no alcanza internet. La primera conexion de verdad sigue
-  siendo la prueba que falta, en Dropbox y en Drive.
-- **El alcance `drive.readonly` exige verificacion de Google**, con un limite de
-  100 usuarios mientras tanto. El codigo esta listo; el tramite manda.
-- **El primer recorrido de un Drive muy grande puede necesitar varias pasadas.**
-  Tiene un presupuesto de 200 paginas; si se agota no guarda cursor y la
-  siguiente vuelve a empezar. Rehacerlo es barato (los upsert absorben lo ya
-  registrado, no se descarga nada) pero no es instantaneo.
-- **El panel de triaje no tiene pruebas de navegador.** Su logica y sus garantias
-  en la base si estan cubiertas; el renderizado y la seleccion, no.
-- **Nada se ha publicado en Telegram de verdad.** Las pruebas simulan la Bot API.
-- **Falta la pantalla para levantar suspensiones.** La politica RLS ya deja
-  hacerlo al estudio; la vista no existe, asi que hoy habria que tocarlo a mano.
+Las decisiones y riesgos de Next.js/Supabase, la adopción intermedia de Laravel
+del 17/09/2026, rutas heredadas y preguntas de diseño históricas se conservan
+**sin pérdida** en [AGENTS-LEGACY-ARCHIVE.md](docs/AGENTS-LEGACY-ARCHIVE.md).
+No son instrucciones para usar Laravel como destino final, reintroducir
+PostgreSQL, exigir VPS/Docker ni copiar una API legada a Symfony. Portar
+invariantes de aislamiento, permisos, uso autorizado, trazabilidad y
+procesamiento responsable con pruebas negativas equivalentes. Para el plan
+de conmutación usar [STACK-TRANSITION-SYMFONY.md](docs/STACK-TRANSITION-SYMFONY.md).

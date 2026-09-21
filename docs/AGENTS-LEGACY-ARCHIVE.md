@@ -1,0 +1,359 @@
+# Archivo histórico de AGENTS.md · GrindFlow
+
+> **No es un manual de arranque ni define la arquitectura vigente.** Se conservan
+> íntegramente las decisiones, notas de implementación y riesgos históricos
+> trasladados desde `AGENTS.md` en la revisión operativa del 20/09/2026.
+> Varias frases describen a Laravel como stack objetivo, Next.js/Supabase
+> como stack vivo, limitaciones antiguas de integración o riesgos ya resueltos.
+> Para tomar decisiones presentes usar primero `../AGENTS.md`, el código de
+> `main`, `STACK-TRANSITION-SYMFONY.md`, `DEVELOPMENT-MODEL.md` y el
+> roadmap #2. Los invariantes de seguridad del negocio se conservan al
+> migrar, pero las rutas/tecnologías antiguas no son instrucciones para
+> implementar módulos nuevos.
+
+---
+
+### Cambio de arquitectura aprobado — 17 de septiembre de 2026
+
+GrindFlow esta en migracion desde Next.js/TypeScript/Supabase-oriented application
+code hacia un **monolito modular Laravel**. El stack objetivo es PHP 8.5 +
+Laravel 13 + Blade/Livewire + Tailwind + MariaDB (driver `mysql`) + Laravel
+Queues/Scheduler + almacenamiento S3-compatible.
+
+El codigo TypeScript actual es referencia funcional temporal. No se elimina un
+modulo legado hasta que su reemplazo Laravel tenga paridad trazable y este
+VALIDATED IN CODE. Las reglas de este archivo que mencionan implementaciones
+TypeScript/Supabase concretas siguen siendo validas para el legado mientras
+exista, pero no obligan a reproducir esas decisiones tecnicas en Laravel cuando
+el mismo invariante pueda preservarse de forma mas simple.
+
+El modelo de desarrollo y CI se inspira en BRVTAL: contexto durable en AGENTS,
+spec/requisitos versionados, una compuerta final estable `validate`, SonarQube
+Cloud como analisis estatico adicional y CodeRabbit como revisor asesor durante
+su calibracion.
+
+## Que es el producto
+
+Plataforma SaaS multi-tenant para estudios de contenido adulto y modelos
+independientes. Siete modulos: control de acceso por rol, ingesta y reciclado de
+vault, pipeline de medios, programacion con reglas duras, distribucion
+automatizada, enlaces rastreados y libro de reparto de ingresos.
+
+## Decisiones cerradas
+
+Se acordaron con el cliente antes de escribir codigo. No se cambian sin volver a
+preguntar.
+
+| Tema | Decision |
+|---|---|
+| Stack objetivo | PHP 8.5, Laravel 13, Blade + Livewire, Tailwind, MariaDB mediante el driver `mysql`, almacenamiento S3-compatible |
+| Despliegue | Hostinger Web/Cloud para Laravel. MariaDB es la base nativa del hosting. El legado Supabase/PostgreSQL se mantiene solo como referencia temporal durante la migracion |
+| Multi-tenancy | `organizations` + `memberships`; `TenantContext`, scopes tenant-aware fail-closed, Policies y constraints/trigger en MariaDB |
+| Cola | Laravel Queues; backend de base MariaDB solo si aporta simplicidad y con locking transaccional validado |
+| Cumplimiento 2257 | Desde los cimientos, con bloqueo en la base |
+| Idiomas | es/en según requisitos de producto; `next-intl` es dependencia solo del legado Next.js |
+| Subidas | URL prefirmada tras validar token, con vigencia y limites estrictos |
+| Acortador | `/l/[slug]` en la misma app, sin dominio aparte |
+| CI | `GrindFlow CI` con compuerta estable `validate`, gates selectivos, SonarQube Cloud y CodeRabbit asesor |
+| Secretos en reposo | AES-256-GCM con `ENCRYPTION_MASTER_KEY` del entorno |
+| Limite del acortador | Laravel `/l/{token}` con throttle y deduplicación HMAC de 10 minutos, sin guardar IP |
+| Integraciones previstas en el legado | No implica adaptadores externos reales habilitados en Laravel; verificar por contrato y código |
+
+## Reglas que no se rompen
+
+> Las reglas que mencionan Supabase/PostgreSQL/RLS mas abajo son contratos del
+> legado TypeScript mientras exista. No definen la tecnologia objetivo Laravel.
+> Sus invariantes funcionales deben preservarse al migrarlos a MariaDB.
+
+1. **El aislamiento Laravel falla cerrado.** Todo modelo tenant-owned debe llevar
+   `organization_id` y usar el contrato tenant-aware del proyecto. Sin
+   `TenantContext` de organizacion, una consulta tenant-owned devuelve cero
+   filas y una creacion falla. Las Policies autorizan mutaciones y MariaDB
+   conserva FKs, unicidad, ENUMs e invariantes estructurales. Bypassear el scope
+   solo se permite en caminos administrativos explicitamente revisados.
+
+2. **Nada se publica sin sanitizar.** Una foto de movil lleva las coordenadas del
+   sitio donde se tomo. El trigger `schedules_enforce_gates` lo impide en la
+   base; no lo debilites para desbloquear una demo.
+
+3. **Nada se publica sin expediente 2257 vigente.** Mismo trigger, misma razon:
+   es requisito legal, no una preferencia de producto.
+
+4. **Los tipos de `database.types.ts` son alias, nunca interfaces.** PostgREST
+   exige `Record<string, unknown>` y una interfaz no obtiene indice implicito. Si
+   alguien la convierte en interfaz, el esquema entero se resuelve a `never` y
+   **las consultas pierden el tipado en silencio**. Ya paso una vez durante la
+   Entrega 1 y costo un buen rato localizarlo.
+
+5. **`@supabase/ssr` tiene que ir al dia.** La version 0.5.2 arrastra una copia
+   antigua de supabase-js cuyas firmas genericas no encajan con las actuales, y
+   el sintoma es exactamente el mismo: todo a `never`, sin ningun error que
+   apunte a la causa.
+
+6. **Las pruebas de RLS no comprueban permisos, intentan violarlos.** Una prueba
+   que solo verifique que cada usuario ve lo suyo no sirve. Hay que intentar leer
+   y escribir datos ajenos y exigir que la base lo impida.
+
+7. **Bajo RLS, un UPDATE ajeno no lanza error: afecta a cero filas.** Por eso
+   existe `tests.assert_affects`. Comprobar esos casos con `assert_rejected` da
+   un falso verde.
+
+8. **Ningun token se escribe en `platform_credentials` fuera de
+   `src/lib/credentials.ts`.** Ese modulo cifra antes de insertar. Escribir por
+   otra via guarda el secreto en claro y la base no puede impedirlo: solo ve
+   texto.
+
+9. **La ventana de deduplicacion de clics no es un parametro.** Vive como
+   constante en el cuerpo de `record_link_click`. Quien invoca esa funcion es
+   anonimo; si pudiera elegir la ventana, pasaria cero y el limite dejaria de
+   existir.
+
+10. **`web` nunca se expone directamente a internet.** El limitador identifica al
+    visitante por `X-Forwarded-For`, que el cliente puede falsificar. Sin un proxy
+    inverso delante que la reescriba, el limite es decorativo.
+
+11. **De la IP no se guarda nunca la direccion, solo su hash con sal.** Ni en la
+    base ni en los registros.
+
+12. **Ningun texto llega al publicador sin pasar por el filtro estricto.** Lo
+    impone el tipo `PublishableCaption`, que solo produce `validateCaption`. Si
+    alguien lo convierte en un `string` corriente para "simplificar", la garantia
+    desaparece y no queda ningun error que lo avise. La prueba con
+    `@ts-expect-error` en `tests/captions.test.ts` existe justo para eso.
+
+13. **Los terminos de la lista dura no son configurables.** Los que sugieren
+    minoria de edad, falta de consentimiento o parentesco no admiten excepcion
+    por organizacion ni por plataforma. No es una preferencia de producto.
+
+14. **Ante un enrutado ambiguo NO se adivina.** Dos perfiles que normalizan
+    igual dejan el archivo sin asignar. Mandarlo a la modelo equivocada es peor:
+    sin asignar alguien lo revisa, mal asignado nadie lo hace y acaba publicado
+    en la cuenta que no era.
+
+15. **Un duplicado se marca, nunca se descarta en silencio.** La fila se conserva
+    con el motivo y el enlace al original. Lo que si se borra es la segunda copia
+    de los bytes en R2.
+
+16. **Un archivo sin perfil no se descarga.** Sin perfil no hay carpeta de R2, y
+    traer gigabytes que nadie reclamo es trabajo tirado.
+
+17. **Los workers de Node entran por `public.claim_jobs`, no por `app.claim_jobs`.**
+    PostgREST solo expone `public`. El envoltorio delega y no duplica logica, y
+    esta concedido solo a `service_role`.
+
+18. **En el triaje, el cliente de servicio solo toca lo que el RLS devolvio.**
+    Primero se actualizan los items con el cliente de sesion; despues se encolan
+    trabajos SOLO para los ids que ese UPDATE devolvio. Al reves, una peticion con
+    ids ajenos encolaria descargas de material de otra agencia.
+
+19. **La coordinacion entre replicas del worker vive en la base, no en el
+    programador.** `jobs_one_live_scan_per_connection` es la unica capa que ven
+    todas a la vez. El rechazo por duplicado es el caso normal, no un error.
+
+20. **Google exige `prompt=consent` ademas de `access_type=offline`.** Sin lo
+    primero, una cuenta que ya autorizo antes no recibe refresh token y la
+    conexion nace muerta sin ningun error visible.
+
+21. **El publicador solo acepta `PublishableCaption`.** El worker vuelve a
+    validar el texto justo antes de enviarlo, porque en la base es una cadena
+    corriente. No es un tramite: entre programar y publicar pueden haber cambiado
+    los destinos verificados.
+
+22. **Un 401 suspende el perfil en esa red, no solo esa publicacion.** Encadenar
+    peticiones con credenciales muertas es el patron que acaba en baneo. Un 429
+    NO suspende: es pasajero.
+
+23. **Un 429 no gasta intento.** `defer_job` decrementa `attempts` a proposito.
+    Contarlo haria que una racha de limites diera el trabajo por muerto sin
+    haberlo intentado de verdad.
+
+24. **Nunca se espera menos de lo que pidio la plataforma.** El margen del
+    backoff se suma, jamas se resta.
+
+25. **Una tabla nueva nace SIN privilegios para `authenticated`.** El
+    `grant ... on all tables` de la migracion 000900 solo alcanzo a las que
+    existian entonces; el sintoma es un "permission denied" que no menciona el
+    RLS por ningun lado. La migracion 001200 dejo puesto un
+    `alter default privileges`, pero conviene comprobarlo con una asercion en
+    cada tabla nueva.
+
+## Topologia de compuertas del legado TypeScript
+
+**ARCHIVO HISTÓRICO:** el diagrama siguiente no describe el GitHub Actions
+vigente. La compuerta actual es `GrindFlow CI / validate` con PHP 8.5,
+MariaDB, browser SQLite, real-stack MariaDB y pruebas legadas seleccionadas.
+
+```
+lint ──────┐
+typecheck ─┤
+hard-rule ─┤
+rls ───────┼─> validate   (la unica que hay que exigir en la rama principal)
+build ─────┤
+workers ───┤
+docker ────┘
+```
+
+`rls` levanta un PostgreSQL 16 de servicio, aplica el arranque de auth que
+reproduce lo que Supabase da de fabrica, corre las diecisiete migraciones y ejecuta las
+116 aserciones.
+
+Históricamente, el legado aspiró a construir imágenes Docker. Laravel ya no
+se despliega por contenedores: Hostinger usa el checkout Git y PHP/MariaDB.
+
+## Mapa actual del repositorio Laravel
+
+| Ruta | Contenido |
+|---|---|
+| `app/`, `routes/`, `resources/views/` | Aplicación y UI Laravel |
+| `config/`, `bootstrap/`, `database/` | Configuración, bootstrap, migraciones y seeders |
+| `tests/Feature/`, `tests/Unit/`, `tests/Browser/` | Regresiones y E2E descartable |
+| `.github/workflows/` | CI, observer de release y smoke separado |
+| `docs/`, `AGENTS.md` | Decisiones durables y especificaciones |
+| `ROADMAP.md` | Acceso al roadmap maestro, Issue #2; sin progreso paralelo |
+| `src/`, `workers/`, `supabase/` | Solo legado hasta paridad GF-MIG-003 |
+
+## Mapa del legado (referencia historica)
+
+| Ruta | Contenido |
+|---|---|
+| `src/app/[locale]/(panel)/` | Paneles de admin, estudio y modelo |
+| `src/app/[locale]/u/[token]/` | Pagina publica de subida sin cuenta |
+| `src/app/api/uploads/presign/` | Unico endpoint que atiende sin sesion |
+| `src/lib/scheduling/hard-rule.ts` | Motor anti-repeticion, codigo puro |
+| `src/lib/captions/validator.ts` | Filtro estricto y el tipo `PublishableCaption` |
+| `src/lib/captions/provider.ts` | Interfaz del generador; hoy un simulado |
+| `src/lib/captions/pipeline.ts` | Generar -> validar -> reintentar -> fallar cerrado |
+| `src/lib/connectors/provider.ts` | Interfaz comun de nubes; `clients.ts` la factoria |
+| `src/lib/connectors/routing.ts` | Enrutado hibrido, codigo puro |
+| `src/lib/connectors/triage.ts` | Reglas del lote de asignacion |
+| `src/workers/ingest/scheduler.ts` | Que conexiones toca escanear |
+| `src/lib/publishing/errors.ts` | Clasificacion de fallos y espera; codigo puro |
+| `src/lib/publishing/registry.ts` | Registro de destinos; obliga a tenerlos todos |
+| `src/workers/publish/` | Worker de publicacion (Node) |
+| `src/lib/connectors/connection.ts` | Unico camino de entrada y salida de los tokens de nube |
+| `src/workers/ingest/` | Worker de ingesta en Node |
+| `tsconfig.workers.json` | Sustituye `server-only` para ejecutar fuera de Next |
+| `src/lib/crypto/secrets.ts` | Cifrado AES-256-GCM, formato versionado `v1.` |
+| `src/lib/credentials.ts` | Unico camino de entrada y salida de los tokens |
+| `src/lib/rate-limit.ts` | Ventana fija en memoria y hash de IP |
+| `Dockerfile`, `workers/Dockerfile` | Imagenes de panel y workers |
+| `src/lib/supabase/service.ts` | Clave de servicio: omite RLS, marcado `server-only` |
+| `src/middleware.ts` | Redirector `/l/`, i18n y refresco de sesion |
+| `supabase/migrations/` | Diez migraciones, orden alfabetico |
+| `supabase/tests/` | Arranque de auth, semilla y aserciones |
+| `workers/` | Pipeline de medios en Python |
+
+## Requerimiento anadido: identidad visual y estetica de la interfaz
+
+Solicitado por el arquitecto el 16 de septiembre de 2026, tras el cambio de
+nombre a GrindFlow. No estaba en el PRD original y no tiene fase asignada
+todavia; conviene abordarlo ANTES de construir mas pantallas (analitica,
+finanzas, levantar suspensiones), porque cada pantalla nueva sobre la paleta
+provisional es una pantalla que habra que retocar.
+
+Abarca:
+
+- **Logo** de GrindFlow: version completa y version compacta (para la barra
+  lateral y el favicon), en claro y en oscuro.
+- **Iconografia**: hoy se usa Lucide tal cual. Decidir si se conserva, se ajusta
+  (grosor, tamano) o se sustituye en las secciones principales.
+- **Sistema de color**: la paleta actual (`src/app/globals.css`) es un
+  provisional oscuro en tonos `ink` con acento violeta `brand`. Hay que definir
+  la definitiva: marca, neutros, semanticos (ok/warn/danger) y su version clara
+  si se decide ofrecer tema claro.
+- **Tipografia**: hoy la del sistema. Elegir familia para interfaz y para cifras
+  (tabulares, por los paneles de finanzas).
+- **Estilo de componentes**: tarjetas, botones, formularios, tablas, estados
+  vacios y de error. Los primitivos viven en `src/components/ui/`.
+- **Pagina publica de subida** (`/u/[token]`): es la unica pantalla que ve la
+  modelo desde el movil sin cuenta, y hoy es la mas desnuda.
+- **Pantalla de acceso** y pagina de inicio.
+
+Preguntas abiertas para el arquitecto antes de empezar:
+
+1. ¿Existe ya alguna referencia de marca (color, logo previo, tipografia) o se
+   parte de cero?
+2. ¿Tema oscuro solo, claro solo, o los dos? Hoy es oscuro por defecto porque
+   es una herramienta de muchas horas seguidas y el material se lee mejor asi.
+3. ¿Que tono quiere transmitir el producto: herramienta profesional sobria, o
+   algo mas cercano a la estetica del sector?
+4. ¿Hay restricciones de accesibilidad (contraste minimo, tamano de fuente)?
+
+## Estado por modulo y vigencia de memoria
+
+El registro actual es [roadmap general #2](https://github.com/pl0n3r/GrindFlow/issues/2),
+`docs/REQUIREMENTS.md` y código de `main`. No interpretar números de PR del
+propietario anterior como PRs abiertos del repositorio transferido.
+
+- Laravel/MariaDB cubre identidad, Vault, ingesta, procesamiento, Scheduling,
+  Distribution, Traffic y Finance con pruebas; paridad completa y producción
+  exigen evidencias independientes.
+- Dropbox/Drive están probados con respuestas sintéticas, no con cuentas reales.
+- Distribution dispone de proveedor sandbox; no afirmar conexión externa real.
+- Finance registra ledger interno; no incluye payouts ni integración bancaria.
+
+### Archivo histórico del legado: no es arquitectura vigente
+
+Los apartados siguientes conservan decisiones y riesgos de Next.js,
+PostgreSQL/Supabase y VPS/Docker. El objetivo operativo vigente es Laravel 13,
+PHP 8.5, MariaDB y Hostinger: consultar `docs/GRINDFLOW-SPEC.md` y
+`docs/DEPLOY-HOSTINGER.md` antes de planificar. Una afirmación histórica
+nunca decide nuevos gates, DB, despliegue ni credenciales.
+
+## Riesgos cerrados
+
+- ~~ToS de Vercel y limites de FFmpeg~~ → se pivoto a VPS propio con contenedores.
+- ~~`record_link_click` invocable por `anon` sin limite~~ → dos capas de limite,
+  la autoritativa en PostgreSQL.
+- ~~Falta la funcion de cifrado de credenciales~~ → `src/lib/crypto/secrets.ts`,
+  con 20 pruebas centradas en la deteccion de manipulacion.
+
+## Cambio de nombre (16 de septiembre de 2026)
+
+El producto paso de MediaVault a **GrindFlow**, forma corta **GF**. Se
+renombraron 51 ocurrencias en 22 archivos, incluidos tres identificadores que no
+son solo texto:
+
+- El contexto del cifrado AES-GCM (`grindflow:credential:...`,
+  `grindflow:cloud:...`). Como es el AAD firmado dentro de cada secreto, ningun
+  dato cifrado con el nombre anterior se podria descifrar ahora. No habia
+  ninguno: se cambio antes del primer despliegue precisamente por eso.
+- La cabecera del webhook, `X-GrindFlow-Signature`. Es un contrato con quien
+  reciba webhooks; nadie los recibia todavia.
+- Las cookies de OAuth, `gf_oauth_nonce` y `gf_oauth_carpeta`.
+
+## Riesgos abiertos
+
+- **La perdida de `ENCRYPTION_MASTER_KEY` es irreversible.** Sin ella, las
+  credenciales guardadas no se recuperan ni con el volcado completo de la base, y
+  hay que reconectar cada cuenta a mano. Debe respaldarse fuera del servidor.
+- **El cifrado no protege un servidor comprometido en ejecucion**, donde la clave
+  esta en memoria. El paso siguiente, si el producto crece, es un KMS.
+- **La rotacion de clave todavia no esta implementada.** El formato lleva prefijo
+  de version (`v1.`) precisamente para permitirla sin migrar todas las filas de
+  golpe, pero la funcion que reescribe los criptogramas no existe.
+- **Las imagenes Docker se construyen en CI pero no se han arrancado en un
+  servidor.** El primer despliegue real sigue siendo la prueba que falta.
+- **No hay copia de seguridad automatizada** de nada que no cubra Supabase.
+- **La verificacion de Google para los alcances de Drive tarda semanas** y limita
+  a 100 usuarios mientras tanto. Conviene iniciar el tramite antes que el codigo.
+- **Google entrega el refresh token solo en la primera autorizacion** salvo que
+  se pida `prompt=consent`. Perderlo obliga a desconectar y reconectar a mano: es
+  el fallo mas comun de estas integraciones.
+- **Los diccionarios de terminos penalizados son heuristicas observadas**, no
+  reglas publicadas. Ninguna plataforma documenta su lista; habra que ajustarlos
+  cuando cambie el comportamiento real.
+- **Las integraciones no se han ejecutado nunca contra las APIs reales.** El
+  entorno de desarrollo no alcanza internet. La primera conexion de verdad sigue
+  siendo la prueba que falta, en Dropbox y en Drive.
+- **El alcance `drive.readonly` exige verificacion de Google**, con un limite de
+  100 usuarios mientras tanto. El codigo esta listo; el tramite manda.
+- **El primer recorrido de un Drive muy grande puede necesitar varias pasadas.**
+  Tiene un presupuesto de 200 paginas; si se agota no guarda cursor y la
+  siguiente vuelve a empezar. Rehacerlo es barato (los upsert absorben lo ya
+  registrado, no se descarga nada) pero no es instantaneo.
+- **El panel de triaje no tiene pruebas de navegador.** Su logica y sus garantias
+  en la base si estan cubiertas; el renderizado y la seleccion, no.
+- **Nada se ha publicado en Telegram de verdad.** Las pruebas simulan la Bot API.
+- **Falta la pantalla para levantar suspensiones.** La politica RLS ya deja
+  hacerlo al estudio; la vista no existe, asi que hoy habria que tocarlo a mano.
