@@ -28,6 +28,7 @@ final class ManualDestinationController extends AbstractController
                 'ready' => false,
                 'destinations' => [],
                 'total' => 0,
+                'provider_calls' => false,
             ]]);
         }
 
@@ -131,12 +132,14 @@ final class ManualDestinationController extends AbstractController
             return $this->privateJson(['data' => [
                 'destination' => $this->publicDestination($result['destination']),
                 'changed' => false,
+                'provider_calls' => false,
             ]]);
         }
 
         return $this->privateJson(['data' => [
             'destination' => $this->publicDestination($result['destination']),
             'changed' => true,
+            'provider_calls' => false,
         ]], 201);
     }
 
