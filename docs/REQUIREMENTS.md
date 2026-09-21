@@ -72,7 +72,7 @@ Each requirement should contain:
 **Verificación:** PHPUnit contra MariaDB Symfony descartable para anónimo, CSRF, campos extra/IDOR, contraseña errónea, reuso, confirmación, éxito, cierre de sesión y nuevo login; Chromium con respuestas sintéticas para errores y recorrido móvil. Sin tocar usuarios ni sesiones Laravel.
 
 ### GF-FR-011 — Clasificación conservadora y filtro privado del Vault Symfony
-**Estado:** candidato v0.1.61; integración, CI y despliegue se verifican por separado.
+**Estado:** integrado en main v0.1.62; la disponibilidad en Hostinger Symfony no está confirmada.
 
 **Enunciado:** cada imagen conserva una clasificación interna obligatoria con valor inicial `unclassified`; un miembro autorizado puede elegir `internal_only` o `needs_review`. Ningún valor confirma derechos, conformidad o autorización de publicación.
 

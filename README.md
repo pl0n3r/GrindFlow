@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.62: clasificar y filtrar originales privados del Vault, sin autorización de publicación.** El alcance «solo el deploy actual» es el runtime Laravel observado; Symfony NO desplegado en Hostinger. Base exacta `main` v0.1.60 `8004c397d5e379366e9cc83a9dcb019910842f0e` y CI exact-main success (run 35571177256). El cambio de contraseña de v0.1.61 se conserva; no se ejecutaron migraciones ni operaciones sobre datos productivos.
+> **Candidato v0.1.63: clasificación múltiple de hasta 30 imágenes visibles, transaccional y tenant-safe.** El alcance «solo el deploy actual» sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.62 `311cbcbe015c039d719527f2c3d417ab8d1c4ac8`, CI exact-main success (run 35571685244). No se cambiaron datos ni migraciones productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.62** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.61~~ | `8004c397d5e379366e9cc83a9dcb019910842f0e` |
+| Version objetivo | 🚧 **v0.1.63** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.62~~ | `311cbcbe015c039d719527f2c3d417ab8d1c4ac8` |
 | CI del PR | 🚧 Nuevo head por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **18** | **+416** | **−37** | **+379** |
+| **10** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: clasificación conservadora, filtro por tenant, preservación en recuperación |
+| Alcance | S2: clasificar selección visible en una sola transacción y conservar guardas de tenant |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,43 +58,33 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Clasificación privada por imagen con estado inicial sin clasificar, solo uso interno o requiere revisión. Ninguna opción autoriza distribuir ni acredita derechos.
-- API de edición con sesión, CSRF, rol y tenant revalidados en transacción; papelera, recurso ajeno y revocaciones rechazan escritura. API de biblioteca filtra por estado también en papelera, sin distorsionar cuota.
-- React móvil muestra clasificación y filtro, permite guardar/deshacer con errores y conserva opción de solo lectura. Migración Doctrine reversible solo para Symfony descartable.
-- Auditoría, etapa, verificación offline y recuperación contrastan clasificación y detectan alteración del catálogo. Regresiones PHPUnit/MariaDB y Chromium 360px con aislamiento y permisos.
-
+- Selección explícita de 1 a 30 imágenes activas de la página actual con confirmación, opción de seleccionar/quitar visibles, estado accesible y vista móvil 360 px.
+- API de clasificación masiva: CSRF, membresía y rol revalidados bajo bloqueo SQL; lote mixto con imagen ajena, en papelera o ausente se rechaza completo sin escrituras parciales.
+- Repetir la misma clasificación devuelve cero recursos cambiados, sin duplicación ni efectos externos. UI mantiene la selección tras rechazo y la limpia al guardar o cambiar filtros/vista/página.
+- PHPUnit/MariaDB con fixtures descartables y Chromium sintético cubren transacción, tenant, IDOR, rol de lectura, reintento y errores.
 ## Archivos modificados en este deploy
-Inventario del **cambio candidato en PR**, NO evidencia de archivos desplegados en Hostinger.
+Inventario del **cambio candidato en PR**, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
 - `docs/GRINDFLOW-SPEC.md`
 - `docs/REQUIREMENTS.md`
-- `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/README.md`
 - `symfony/frontend/admin/VaultPanel.tsx`
 - `symfony/frontend/admin/admin.css`
-- `symfony/migrations/Version20260921070000.php`
 - `symfony/src/Http/Controller/VaultController.php`
-- `symfony/src/Infrastructure/Storage/VaultAuditCommand.php`
-- `symfony/src/Infrastructure/Storage/VaultManifest.php`
-- `symfony/src/Infrastructure/Storage/VaultStageCommand.php`
-- `symfony/src/Infrastructure/Storage/VaultVerifyRestoreCommand.php`
-- `symfony/src/Infrastructure/Storage/VaultVerifyStageCommand.php`
 - `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/VaultAuditCommandTest.php`
-- `symfony/tests/php/VaultTrashTest.php`
-
+- `symfony/tests/php/VaultBulkUsageTest.php`
 ## Validación
-- Pruebas Symfony PHP/MariaDB, TypeScript y Chromium se comprueban con CI de PR; no hubo checkout local en esta sesión.
-- `main` v0.1.60 tiene CI exact-main success; CI/Sonar/CodeRabbit del candidato aún no se atribuyen como éxito. No se tocó producción.
+- CI/Sonar/CodeRabbit del candidato v0.1.63 por verificar; el CI exact-main v0.1.62 tuvo resultado success.
+- Sin checkout local de PHP/MariaDB/Chromium; GitHub Actions valida el cambio. No se tocó producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Comprobar clasificación v0.1.62 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Reglas de uso y elegibilidad comprobables; ensayo real backup MariaDB + blobs | 🚧 Sin autorización implícita |
+| **NOW** | 🚧 Validar clasificación múltiple v0.1.63 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Reglas de elegibilidad y ensayo real backup MariaDB + blobs | 🚧 Sin autorización implícita |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -102,7 +92,7 @@ Inventario del **cambio candidato en PR**, NO evidencia de archivos desplegados 
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Clasificación S2 y preservación del catálogo v0.1.62 | 🚧 CI y revisión |
+| **NOW** | 🚧 Clasificación múltiple S2 v0.1.63 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Backup MariaDB y ensayo integral de restauración | 🚧 Retención y operación pendientes |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

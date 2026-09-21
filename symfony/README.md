@@ -4,8 +4,8 @@
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.61 en rama: rotación personal de contraseña y reingreso con CSRF, hash actual bloqueado y panel React móvil. |
-| VALIDADO EN CÓDIGO | CI/Sonar del head v0.1.62 por verificar; base exact-main v0.1.60 success. |
+| IMPLEMENTADO | v0.1.63 en rama: clasificación transaccional de selección privada y UI móvil; conserva seguridad de cuenta v0.1.61 y categorías v0.1.62. |
+| VALIDADO EN CÓDIGO | CI/Sonar del candidato v0.1.63 por verificar; base exact-main v0.1.62 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 

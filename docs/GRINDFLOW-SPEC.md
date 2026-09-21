@@ -100,7 +100,7 @@ El destino es una **aplicación Symfony monolítica modular**, una MariaDB con m
 
 Se **conserva** la aplicación Laravel y su CI como referencia operativa durante la transición. Cada módulo se traslada con migraciones y pruebas de paridad de usuarios/organizaciones, IDs, permisos, estados, URLs, auditoría e históricos; por módulo existe un propietario único de escritura para evitar dos runtimes mutando el mismo estado sin coordinación. No modificar/borrar tablas Laravel automáticamente desde Doctrine.
 
-### S2 · Clasificación conservadora de recursos (candidato v0.1.61)
+### S2 · Clasificación conservadora de recursos (integrada v0.1.62)
 
 El Vault asigna a cada original una clasificación interna: `unclassified` por defecto,
 `internal_only` o `needs_review`, editable por personal que prepara contenido
