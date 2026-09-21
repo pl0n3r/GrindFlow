@@ -1614,6 +1614,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await page.route((url) => url.pathname === '/api/admin/schedules'
     || url.pathname.startsWith('/api/admin/schedules/'), async (route) => {
     const request = route.request();
+    const url = new URL(request.url());
     if (url.pathname === '/api/admin/schedules' && request.method() === 'GET') {
       return route.fulfill({
         status: 200,
