@@ -39,7 +39,9 @@ Each requirement should contain:
 
 **Enunciado:** el ingreso y selector de organización Symfony reutilizan una misma cabecera de marca y navegación, sin duplicar logos ni presentar el preview como área autenticada.
 
-**Aceptación:** enlaces reales y estado visible por página, navegación sin desbordamiento a 360/820 px y CSRF/login/membresía existentes sin regresión. PHP prueba la cabecera de selección autenticada; Chromium prueba ambas anchuras del ingreso. No modifica cuentas ni despliega Symfony.
+**Aceptación:** enlaces reales y estado visible por página, navegación sin desbordamiento a 360/820 px y CSRF/login/membresía existentes sin regresión. No modifica cuentas ni despliega Symfony.
+
+**Verificación:** PHPUnit prueba la cabecera de selección autenticada; Chromium prueba ambas anchuras del ingreso y ausencia de desbordamiento.
 
 ### GF-ARCH-002 — Paridad de datos y tenencia
 **Estado:** definido, pendiente de ejecución.
