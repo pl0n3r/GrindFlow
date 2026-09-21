@@ -52,7 +52,16 @@ final readonly class MembershipContext
         return is_string($name) ? $name : null;
     }
 
-    /** @return array{workspace_view: bool, organization_manage: bool, content_prepare: bool, content_review: bool, content_review_decide: bool, distribution_authorize: bool} */
+    /**
+     * @return array{
+     *   workspace_view: bool,
+     *   organization_manage: bool,
+     *   content_prepare: bool,
+     *   content_review: bool,
+     *   content_review_decide: bool,
+     *   distribution_authorize: bool
+     * }
+     */
     public function permissions(string $role): array
     {
         return [
