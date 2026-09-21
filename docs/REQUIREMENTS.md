@@ -47,6 +47,21 @@ Each requirement should contain:
 
 **Aceptación:** cinco participantes con línea base definida; registrar tiempo operativo, entregas y errores, costos de infraestructura, funciones usadas y tráfico medible. Prueba comercial de 30 días/dos redes y precios quedan pendientes de resultado y aprobación.
 
+### GF-FR-010 — Anotación privada del Vault Symfony
+**Estado:** implementado en candidato v0.1.60; código, despliegue y producción se validan por separado.
+
+**Enunciado:** un miembro con permiso de preparar recursos puede añadir, editar o borrar una nota interna opcional por imagen de su organización. La nota no aprueba contenido, no concede permisos, no asigna titularidad y no inicia distribución.
+
+**Aceptación:**
+- Nota de hasta 280 caracteres visibles en una sola línea; texto vacío borra el valor. Rechazar campos extra, texto no válido y caracteres de control/invisibles.
+- Consultar nota solo por API de detalle de recurso activo dentro de organización y membresía actuales. Modelos en rol de lectura pueden verla, pero no editarla.
+- Guardar exige CSRF y reautorizar usuario, membresía, rol, organización y estado activo en la transacción; papelera y recursos ajenos no admiten edición.
+- No modificar bytes, nombre, integridad SHA-256, cuota ni URL de descarga.
+- El inventario de respaldo, el manifiesto privado, la verificación offline y el cotejo con base restaurada incorporan la nota: si se pierde o altera, el contraste falla cerrado. Las copias anteriores al nuevo esquema se consideran incompatibles hasta prepararlas de nuevo desde el origen adecuado.
+- Navegación móvil a 360 px con estados de guardado/error y rol de solo lectura. No exponer notas en enlaces públicos ni diagnosticar sus valores en logs.
+
+**Verificación:** PHPUnit/MariaDB de CSRF, ACL, tenant, validación, retención en papelera y persistencia; Playwright/Chromium a 360 px; regresión del manifiesto de staging y restauración. Todo en entornos sintéticos, sin migraciones productivas.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation

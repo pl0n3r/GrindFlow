@@ -74,6 +74,7 @@ final class VaultAuditCommandTest extends KernelTestCase
                     'mime_type' => 'image/png', 'size_bytes' => strlen($bytes),
                     'sha256' => hash('sha256', $bytes), 'storage_key' => $id,
                     'created_at' => $at,
+                    'private_note' => $id === $first ? 'Referencia privada inicial' : null,
                     'deleted_at' => $id === $second ? $at : null,
                     'deleted_by' => $id === $second ? $user : null,
                 ]);
@@ -98,6 +99,7 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame(1, $good['active']);
             self::assertSame(1, $good['trash']);
             self::assertSame(2, $good['assets']);
+            self::assertStringNotContainsString('Referencia privada inicial', $display);
             self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/D', $good['manifest_sha256']);
             foreach ([$first, $second, $other, $root, hash('sha256', $bytes)] as $private) {
                 self::assertStringNotContainsString($private, $display);
@@ -140,6 +142,8 @@ final class VaultAuditCommandTest extends KernelTestCase
             );
             self::assertSame($mine, $stagedManifest['organization_id']);
             self::assertSame(2, count($stagedManifest['assets']));
+            self::assertSame('Referencia privada inicial', $stagedManifest['assets'][0]['private_note']);
+            self::assertNull($stagedManifest['assets'][1]['private_note']);
             self::assertSame($good['manifest_sha256'], $stagedManifest['manifest_sha256']);
             self::assertStringNotContainsString($foreign, $stage->getDisplay());
             self::assertStringNotContainsString($root, $stage->getDisplay());
@@ -214,6 +218,15 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame(2, $exit);
             self::assertSame('stage_integrity_failed', $damagedStaging['code']);
             file_put_contents($stagedFirst, $bytes);
+
+            // A note is recoverable catalog metadata: losing or altering it
+            // after restoration must invalidate the manifest, even if all
+            // originals match byte for byte.
+            $db->update('gf_vault_assets', ['private_note' => 'Nota restaurada distinta'], ['id' => $first]);
+            [$exit, $missingNote] = $restoredCheck($restoreArgs);
+            self::assertSame(2, $exit);
+            self::assertSame('restored_catalog_mismatch', $missingNote['code']);
+            $db->update('gf_vault_assets', ['private_note' => 'Referencia privada inicial'], ['id' => $first]);
 
             $db->update('gf_vault_assets', ['original_name' => 'renamed-after-stage.png'], ['id' => $first]);
             [$exit, $changedCatalog] = $restoredCheck($restoreArgs);

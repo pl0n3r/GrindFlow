@@ -76,7 +76,7 @@ final class VaultVerifyStageCommand extends Command
                 if (!is_array($asset)
                     || array_keys($asset) !== [
                         'id', 'uploaded_by', 'original_name', 'mime_type', 'size_bytes',
-                        'sha256', 'storage_key', 'created_at', 'deleted_at', 'deleted_by',
+                        'sha256', 'storage_key', 'created_at', 'deleted_at', 'deleted_by', 'private_note',
                     ]
                     || !is_string($asset['id']) || !is_string($asset['storage_key'])
                     || !is_string($asset['sha256']) || !is_int($asset['size_bytes'])
@@ -84,6 +84,7 @@ final class VaultVerifyStageCommand extends Command
                     || !is_string($asset['mime_type']) || !is_string($asset['created_at'])
                     || ($asset['deleted_at'] !== null && !is_string($asset['deleted_at']))
                     || ($asset['deleted_by'] !== null && !is_string($asset['deleted_by']))
+                    || ($asset['private_note'] !== null && !is_string($asset['private_note']))
                     || preg_match('/\\A[0-9a-fA-F-]{36}\\z/D', $asset['storage_key']) !== 1
                     || preg_match('/\\A[0-9a-fA-F]{64}\\z/D', $asset['sha256']) !== 1
                     || $asset['id'] <= $previousId

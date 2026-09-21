@@ -26,6 +26,7 @@ final class VaultManifest
             'created_at' => (string) $asset['created_at'],
             'deleted_at' => $asset['deleted_at'] === null ? null : (string) $asset['deleted_at'],
             'deleted_by' => $asset['deleted_by'] === null ? null : (string) $asset['deleted_by'],
+            'private_note' => $asset['private_note'] === null ? null : (string) $asset['private_note'],
         ];
     }
 
