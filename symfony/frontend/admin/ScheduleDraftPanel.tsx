@@ -85,6 +85,8 @@ export function ScheduleDraftPanel({
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+  const [destinationLoadError, setDestinationLoadError] = useState('');
+  const [queueLoadError, setQueueLoadError] = useState('');
 
   const eligibleAssets = assets.filter((asset) => asset.eligible);
   const activeDestinations = useMemo(
@@ -93,8 +95,12 @@ export function ScheduleDraftPanel({
   );
 
   async function load(signal?: AbortSignal) {
+    setError('');
+    setDestinationLoadError('');
+    setQueueLoadError('');
+
     try {
-      const [scheduleResponse, destinationResponse, queueResponse] = await Promise.all([
+      const [scheduleResult, destinationResult, queueResult] = await Promise.allSettled([
         fetch('/api/admin/schedules', {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
@@ -111,33 +117,21 @@ export function ScheduleDraftPanel({
           signal,
         }),
       ]);
-      const [scheduleBody, destinationBody, queueBody] = await Promise.all([
-        scheduleResponse.json(),
-        destinationResponse.json(),
-        queueResponse.json(),
-      ]);
-      if (!scheduleResponse.ok) {
+
+      if (signal?.aborted) return;
+      if (scheduleResult.status !== 'fulfilled') {
+        throw scheduleResult.reason;
+      }
+
+      const scheduleBody = await scheduleResult.value.json();
+      if (!scheduleResult.value.ok) {
         throw new Error(scheduleBody?.error?.message ?? 'No se pudo abrir la agenda.');
-      }
-      if (!destinationResponse.ok) {
-        throw new Error(destinationBody?.error?.message ?? 'No se pudieron cargar los destinos manuales.');
-      }
-      if (!queueResponse.ok) {
-        throw new Error(queueBody?.error?.message ?? 'No se pudo cargar la cola manual.');
       }
 
       const nextDrafts = scheduleBody.data.drafts as Draft[];
-      const nextDestinations = destinationBody.data.destinations as ManualDestination[];
-      const nextQueue = queueBody.data.items as QueueItem[];
       setDrafts(nextDrafts);
       setTotal(scheduleBody.data.total as number);
       setHandoffReady(scheduleBody.data.manual_handoff_ready === true);
-      setDestinations(nextDestinations);
-      setDestinationReady(destinationBody.data.ready === true);
-      setQueue(nextQueue);
-      setQueueTotal(queueBody.data.total as number);
-      setQueueReady(queueBody.data.ready === true);
-
       setDestinationByDraft((current) => {
         const next = { ...current };
         for (const draft of nextDrafts) {
@@ -147,11 +141,54 @@ export function ScheduleDraftPanel({
         }
         return next;
       });
+
+      if (destinationResult.status === 'fulfilled') {
+        try {
+          const destinationBody = await destinationResult.value.json();
+          if (!destinationResult.value.ok) {
+            throw new Error(
+              destinationBody?.error?.message ?? 'No se pudieron cargar los destinos manuales.',
+            );
+          }
+          setDestinations(destinationBody.data.destinations as ManualDestination[]);
+          setDestinationReady(destinationBody.data.ready === true);
+        } catch (caught) {
+          setDestinationReady(false);
+          setDestinationLoadError(
+            caught instanceof Error
+              ? caught.message
+              : 'No se pudieron cargar los destinos manuales.',
+          );
+        }
+      } else {
+        setDestinationReady(false);
+        setDestinationLoadError('No se pudieron cargar los destinos manuales.');
+      }
+
+      if (queueResult.status === 'fulfilled') {
+        try {
+          const queueBody = await queueResult.value.json();
+          if (!queueResult.value.ok) {
+            throw new Error(queueBody?.error?.message ?? 'No se pudo cargar la cola manual.');
+          }
+          setQueue(queueBody.data.items as QueueItem[]);
+          setQueueTotal(queueBody.data.total as number);
+          setQueueReady(queueBody.data.ready === true);
+        } catch (caught) {
+          setQueueReady(false);
+          setQueueLoadError(
+            caught instanceof Error ? caught.message : 'No se pudo cargar la cola manual.',
+          );
+        }
+      } else {
+        setQueueReady(false);
+        setQueueLoadError('No se pudo cargar la cola manual.');
+      }
     } catch (caught) {
-      if (caught instanceof DOMException && caught.name === 'AbortError') return;
+      if (signal?.aborted || (caught instanceof DOMException && caught.name === 'AbortError')) return;
       setError(caught instanceof Error ? caught.message : 'No se pudo abrir la agenda.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }
 
@@ -264,7 +301,7 @@ export function ScheduleDraftPanel({
         throw new Error('No se confirmó el límite de destino interno.');
       }
       setFeedback(destination.active
-        ? 'Destino manual desactivado. El historial se conserva.'
+        ? 'Destino manual desactivado para nuevas preparaciones.'
         : 'Destino manual reactivado.');
       await load();
     } catch (caught) {
@@ -387,7 +424,7 @@ export function ScheduleDraftPanel({
                   <li key={destination.id}>
                     <span>
                       <strong>{destination.label}</strong>
-                      <small>{destination.active ? 'Activo' : 'Desactivado'}</small>
+                      <small>{destination.active ? 'Activo para nuevas preparaciones' : 'Desactivado'}</small>
                     </span>
                     <button type="button" disabled={busyId !== null}
                       onClick={() => void toggleDestination(destination)}>
@@ -399,7 +436,11 @@ export function ScheduleDraftPanel({
               </ul>}
         </section>}
 
-      {canManualHandoff && manualDestinationCsrf && !destinationReady &&
+      {destinationLoadError &&
+        <p className="weekly-warning" role="status">
+          Agenda cargada parcialmente: {destinationLoadError} Los borradores siguen disponibles.
+        </p>}
+      {!destinationLoadError && canManualHandoff && manualDestinationCsrf && !destinationReady &&
         <p>El catálogo de destinos manuales todavía requiere migración.</p>}
 
       {canEdit && csrf && eligibleAssets.length > 0 && slots.length > 0 &&
@@ -500,6 +541,11 @@ export function ScheduleDraftPanel({
                 </li>)}
             </ul>
           </div>}
+
+      {!loading && queueLoadError &&
+        <p className="weekly-warning" role="status">
+          Agenda cargada parcialmente: {queueLoadError} El historial de borradores sigue disponible.
+        </p>}
 
       {!loading && queueReady &&
         <section className="manual-handoff-queue" aria-labelledby="manual-handoff-queue-title">
