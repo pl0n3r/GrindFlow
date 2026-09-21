@@ -125,7 +125,7 @@ Each requirement should contain:
 **Verificación:** PHPUnit/MariaDB con 401/403, CSRF, tenant, clasificación no aplicable, idempotencia, approve/revoke y preview; Chromium móvil prueba el flujo revisión → autorización → “Listo para programar” conservando publicación bloqueada.
 
 ### GF-FR-015 — Borradores persistidos de agenda S4
-**Estado:** candidato v0.1.72; validación, merge y producción se verifican por separado.
+**Estado:** integrado en main v0.1.72; despliegue Symfony y producción se verifican por separado.
 
 **Enunciado:** un recurso que cumple los contratos internos S3 puede reservar un próximo slot de la regla semanal como borrador persistido de agenda. El borrador es tenant-safe, cancelable y conserva historial, pero nunca crea una publicación, entrega, job o llamada a proveedor.
 
@@ -139,6 +139,22 @@ Each requirement should contain:
 - Todas las respuestas mantienen `mode=review_only`/`publishes=false` o `can_publish=false` según corresponda. S4 no crea distribution attempts ni integra proveedores.
 
 **Verificación:** PHPUnit/MariaDB con 401/403, CSRF, cross-tenant, elegibilidad, slot obsoleto, idempotencia, capacidad, cancelación, historial inmutable y lectura para Model; Chromium móvil crea y cancela un borrador y comprueba ausencia de publicación externa.
+
+### GF-FR-016 — Handoff manual auditable S4
+**Estado:** candidato v0.1.73; validación, merge y producción se verifican por separado.
+
+**Enunciado:** Admin o Studio puede registrar un handoff humano sobre un borrador S4 mediante un ledger interno append-only, sin llamar proveedores ni afirmar que ocurrió una publicación externa.
+
+**Aceptación:**
+- Actor, organización y rol salen exclusivamente de la sesión y se revalidan dentro de la transacción. Editor/Model no pueden registrar handoff; un borrador de otro tenant responde como inexistente.
+- El endpoint exige CSRF dedicado y acepta solo `prepare`, `complete` o `fail`. `prepare` es idempotente; `complete`/`fail` requieren un `prepare` vigente y horario programado ya alcanzado.
+- `fail → prepare` permite un nuevo intento auditable. `complete` es terminal; repetir `complete` es idempotente y cualquier transición posterior se rechaza.
+- Borradores cancelados no aceptan eventos. Un borrador con handoff `prepared` o `completed` no puede cancelarse; tras `failed` puede cancelarse o prepararse otra vez.
+- Cada transición agrega actor y UTC a `gf_manual_handoff_events`; MariaDB bloquea UPDATE/DELETE y el FK compuesto impide mezclar organización y borrador.
+- La agenda deriva el último estado sin alterar el borrador y sigue funcionando con fallback explícito si la migración de handoff aún no existe.
+- Todas las respuestas declaran `publishes=false`, `provider_calls=false` y `external_evidence=false`. No se exporta media, no se crea delivery y no se integra ninguna red externa.
+
+**Verificación:** PHPUnit/MariaDB para 401/403, CSRF, cross-tenant, cancelado, futuro/no-due, prepare idempotente, fail/retry/complete, estado terminal, cancelación protegida e inmutabilidad SQL; Chromium móvil prepara y registra fallo sin perder responsive ni convertir el evento en publicación.
 
 ### GF-UX-001 — Shell de navegación consistente y responsive
 **Estado:** integrado en main v0.1.70; despliegue y producción se verifican por separado.
