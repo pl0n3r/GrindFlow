@@ -89,7 +89,7 @@ final class VaultStageCommand extends Command
                 }
             }
             $digest = VaultManifest::digest($assets);
-            if (!mkdir($resolvedTarget, 0700) || !mkdir($resolvedTarget.'/blobs', 0700)) {
+            if (!@mkdir($resolvedTarget, 0700) || !@mkdir($resolvedTarget.'/blobs', 0700)) {
                 throw new \RuntimeException('Cannot create private stage.');
             }
 
@@ -150,7 +150,7 @@ final class VaultStageCommand extends Command
             ];
             $encoded = json_encode($manifest, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
             $manifestPath = $resolvedTarget.'/manifest.json';
-            if (file_put_contents($manifestPath, $encoded."\n", LOCK_EX) !== strlen($encoded) + 1
+            if (@file_put_contents($manifestPath, $encoded."\n", LOCK_EX) !== strlen($encoded) + 1
                 || !@chmod($manifestPath, 0600)) {
                 throw new \RuntimeException('Cannot complete private manifest.');
             }

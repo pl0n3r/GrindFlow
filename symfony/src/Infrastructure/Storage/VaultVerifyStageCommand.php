@@ -55,7 +55,7 @@ final class VaultVerifyStageCommand extends Command
                 || (($size = @filesize($path)) === false) || $size < 1 || $size > 512 * 1024) {
                 return $this->emit($output, ['status' => 'incomplete', 'code' => 'manifest_unavailable'], 2);
             }
-            $content = file_get_contents($path);
+            $content = @file_get_contents($path);
             $manifest = is_string($content) ? json_decode($content, true) : null;
             if (!is_array($manifest)
                 || array_keys($manifest) !== ['schema', 'organization_id', 'manifest_sha256', 'assets']
@@ -105,7 +105,7 @@ final class VaultVerifyStageCommand extends Command
                 || (($mode = @fileperms($blobRoot)) === false) || ($mode & 0077) !== 0) {
                 return $this->emit($output, ['status' => 'incomplete', 'code' => 'blobs_unavailable'], 2);
             }
-            $entries = scandir($blobRoot);
+            $entries = @scandir($blobRoot);
             if ($entries === false || count($entries) !== count($assets) + 2) {
                 return $this->emit($output, ['status' => 'incomplete', 'code' => 'blob_count_mismatch'], 2);
             }
