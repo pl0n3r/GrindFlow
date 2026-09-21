@@ -47,6 +47,10 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp'>('all');
   const [usage, setUsage] = useState<'all' | UsageScope>('all');
   const [usageDraft, setUsageDraft] = useState<UsageScope>('unclassified');
+  const [batchIds, setBatchIds] = useState<string[]>([]);
+  const [batchUsage, setBatchUsage] = useState<UsageScope>('needs_review');
+  const [batchConfirm, setBatchConfirm] = useState(false);
+  const [batchSaving, setBatchSaving] = useState(false);
   const [sort, setSort] = useState<'recent' | 'oldest' | 'name_asc' | 'name_desc' | 'size_asc' | 'size_desc'>('recent');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -111,6 +115,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setBulkProgress(null);
     setBulkStatus('');
     setIntegrity({});
+    setBatchIds([]);
+    setBatchConfirm(false);
     fetch('/api/admin/vault?page=' + page + '&view=' + view +
       (search ? '&q=' + encodeURIComponent(search) : '') +
       '&format=' + format + '&sort=' + sort + '&usage=' + usage, {
@@ -257,6 +263,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   function searchAssets(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (batchSaving) return;
     const query = searchDraft.trim();
     if (query === search && page === 1) return;
     setLoading(true);
@@ -275,7 +282,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   }
 
   function switchView(next: 'active' | 'trash') {
-    if (view === next) return;
+    if (view === next || batchSaving) return;
     setLoading(true);
     setPage(1);
     setView(next);
@@ -295,7 +302,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   }
 
   async function changeState(id: string, action: 'trash' | 'restore') {
-    if (!canUpload || !manageCsrf || busyId) return;
+    if (!canUpload || !manageCsrf || busyId || batchSaving) return;
     setBusyId(id);
     setActionError('');
     setActionFeedback('');
@@ -323,7 +330,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   async function rename(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
-    if (!canUpload || !manageCsrf || busyId || !renameName.trim()) return;
+    if (!canUpload || !manageCsrf || busyId || batchSaving || !renameName.trim()) return;
     setBusyId(id);
     setActionError('');
     setActionFeedback('');
@@ -355,7 +362,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   async function saveNote(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
-    if (!canUpload || !manageCsrf || busyId || detail?.id !== id) return;
+    if (!canUpload || !manageCsrf || busyId || batchSaving || detail?.id !== id) return;
     setBusyId(id);
     setActionFeedback('');
     setActionError('');
@@ -388,7 +395,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   async function saveUsage(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
-    if (!canUpload || !manageCsrf || busyId || detail?.id !== id) return;
+    if (!canUpload || !manageCsrf || busyId || batchSaving || detail?.id !== id) return;
     setBusyId(id);
     setActionFeedback('');
     setActionError('');
@@ -415,6 +422,54 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setActionError(cause instanceof Error ? cause.message : 'No se pudo clasificar la imagen.');
     } finally {
       setBusyId(null);
+    }
+  }
+
+  function toggleBatch(id: string) {
+    if (batchSaving || loading) return;
+    setBatchConfirm(false);
+    setBatchIds((previous) => previous.includes(id)
+      ? previous.filter((selectedId) => selectedId !== id)
+      : [...previous, id]);
+  }
+
+  async function saveBatch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canUpload || !manageCsrf || view !== 'active' || !batchConfirm ||
+        batchSaving || !!busyId || loading || batchIds.length < 1 || batchIds.length > 30) return;
+    const ids = [...batchIds];
+    // Do not apply a silent partial update when the page changed before confirmation.
+    if (ids.some((id) => !assets.some((asset) => asset.id === id))) {
+      setActionError('La selección ya no corresponde a esta página. Actualiza la biblioteca.');
+      setBatchConfirm(false);
+      return;
+    }
+    setBatchSaving(true);
+    setActionError('');
+    setActionFeedback('');
+    try {
+      const response = await fetch('/api/admin/vault/usage/bulk', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': manageCsrf, Accept: 'application/json' },
+        body: JSON.stringify({ ids, usage_scope: batchUsage }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo clasificar la selección.');
+      if (body?.data?.usage_scope !== batchUsage || body?.data?.selected_count !== ids.length ||
+          !Number.isInteger(body?.data?.updated_count)) {
+        throw new Error('El servidor no confirmó la clasificación completa.');
+      }
+      setBatchIds([]);
+      setBatchConfirm(false);
+      setDetail(null);
+      setActionFeedback(ids.length + ' imágenes revisadas; ' + body.data.updated_count +
+        ' clasificaciones actualizadas. Ninguna queda autorizada para distribuir.');
+      setRefresh((previous) => previous + 1);
+    } catch (cause) {
+      setBatchConfirm(false);
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo clasificar la selección.');
+    } finally {
+      setBatchSaving(false);
     }
   }
 
@@ -503,9 +558,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     <h2 id="vault-title">Biblioteca de imágenes</h2>
     <p>Imágenes privadas de la organización seleccionada. Nada se publica externamente.</p>
     <nav className="vault-tabs" aria-label="Vistas de biblioteca">
-      <button type="button" aria-pressed={view === 'active'} disabled={loading || !!busyId}
+      <button type="button" aria-pressed={view === 'active'} disabled={loading || !!busyId || batchSaving}
         onClick={() => switchView('active')}>Biblioteca</button>
-      <button type="button" aria-pressed={view === 'trash'} disabled={loading || !!busyId}
+      <button type="button" aria-pressed={view === 'trash'} disabled={loading || !!busyId || batchSaving}
         onClick={() => switchView('trash')}>Papelera</button>
     </nav>
     {view === 'trash' && <p>Las imágenes en papelera no se pueden descargar y conservan su original privado. No se borran definitivamente en esta versión.</p>}
@@ -514,14 +569,14 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       <input id="vault-search-name" type="search" value={searchDraft} maxLength={80}
         onChange={(event) => setSearchDraft(event.currentTarget.value)}
         placeholder="Nombre de imagen" />
-      <button type="submit" disabled={loading}>Buscar</button>
+      <button type="submit" disabled={loading || batchSaving}>Buscar</button>
       {(search || searchDraft) && <button type="button" disabled={loading}
         onClick={clearSearch}>Limpiar búsqueda</button>}
     </form>
     {search && <p className="vault-search-status" role="status">Resultados para «{search}» en {view === 'trash' ? 'papelera' : 'biblioteca'}.</p>}
     <div className="vault-filters" role="group" aria-label="Filtrar y ordenar imágenes">
       <label htmlFor="vault-format">Formato</label>
-      <select id="vault-format" value={format} disabled={loading}
+      <select id="vault-format" value={format} disabled={loading || batchSaving}
         onChange={(event) => {
           setLoading(true);
           setPage(1);
@@ -533,7 +588,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         <option value="webp">WebP</option>
       </select>
       <label htmlFor="vault-usage">Clasificación interna</label>
-      <select id="vault-usage" value={usage} disabled={loading}
+      <select id="vault-usage" value={usage} disabled={loading || batchSaving}
         onChange={(event) => {
           setLoading(true); setPage(1);
           setUsage(event.currentTarget.value as 'all' | UsageScope);
@@ -543,7 +598,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           <option key={value} value={value}>{label}</option>)}
       </select>
       <label htmlFor="vault-sort">Ordenar por</label>
-      <select id="vault-sort" value={sort} disabled={loading}
+      <select id="vault-sort" value={sort} disabled={loading || batchSaving}
         onChange={(event) => {
           setLoading(true);
           setPage(1);
@@ -639,6 +694,38 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
       <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
+      {view === 'active' && canUpload && manageCsrf && <form className="vault-batch"
+        onSubmit={(event) => void saveBatch(event)} aria-label="Clasificación de imágenes seleccionadas">
+        <h3>Clasificar selección</h3>
+        <p>Solo originales seleccionados de esta página. La clasificación no acredita derechos ni permite publicar.</p>
+        <button type="button" disabled={batchSaving || !!busyId || bulkChecking || loading}
+          onClick={() => {
+            const ids = assets.map((asset) => asset.id);
+            setBatchIds(batchIds.length === ids.length ? [] : ids);
+            setBatchConfirm(false);
+          }}>
+          {batchIds.length === assets.length ? 'Quitar selección visible' : 'Seleccionar imágenes visibles'}
+        </button>
+        <p role="status">{batchIds.length} de {assets.length} imágenes visibles seleccionadas.</p>
+        <label htmlFor="vault-batch-scope">Clasificación para la selección</label>
+        <select id="vault-batch-scope" value={batchUsage} disabled={batchSaving || !!busyId}
+          onChange={(event) => { setBatchUsage(event.target.value as UsageScope); setBatchConfirm(false); }}>
+          {Object.entries(usageLabels).map(([value, label]) =>
+            <option key={value} value={value}>{label}</option>)}
+        </select>
+        {!batchConfirm
+          ? <button type="button" disabled={batchSaving || !!busyId || bulkChecking || !batchIds.length}
+              onClick={() => setBatchConfirm(true)}>Revisar clasificación de selección</button>
+          : <div className="vault-confirm">
+              <p>¿Asignar «{usageLabels[batchUsage]}» a las {batchIds.length} imágenes seleccionadas?</p>
+              <button type="submit" disabled={batchSaving || !!busyId}>
+                {batchSaving ? 'Guardando selección…' : 'Confirmar clasificación de selección'}
+              </button>
+              <button type="button" disabled={batchSaving} onClick={() => setBatchConfirm(false)}>
+                Cancelar clasificación
+              </button>
+            </div>}
+      </form>}
       <div className="vault-audit">
         <button type="button" disabled={bulkChecking || !!checkingId || !!busyId || loading}
           onClick={() => void verifyVisible()}>
@@ -650,6 +737,13 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       </div>
       <ul className="vault-list">
         {assets.map((asset) => <li key={asset.id}>
+          {view === 'active' && canUpload && manageCsrf &&
+            <label className="vault-batch-checkbox">
+              <input type="checkbox" aria-label={'Seleccionar ' + asset.name}
+                checked={batchIds.includes(asset.id)}
+                disabled={batchSaving || !!busyId || loading || bulkChecking}
+                onChange={() => toggleBatch(asset.id)} />
+            </label>}
           <span className="vault-image-mark" aria-hidden="true">▧</span>
           <span className="vault-details">
             <strong>{asset.name}</strong>
@@ -748,10 +842,10 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         </li>)}
       </ul>
       {pages > 1 && <nav className="vault-pages" aria-label="Páginas de la biblioteca">
-        <button type="button" disabled={loading || page === 1}
+        <button type="button" disabled={loading || batchSaving || page === 1}
           onClick={() => { setLoading(true); setPage((current) => current - 1); }}>Anterior</button>
         <span>Página {page} de {pages}</span>
-        <button type="button" disabled={loading || page >= pages}
+        <button type="button" disabled={loading || batchSaving || page >= pages}
           onClick={() => { setLoading(true); setPage((current) => current + 1); }}>Siguiente</button>
       </nav>}
     </>}

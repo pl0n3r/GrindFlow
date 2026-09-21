@@ -110,6 +110,16 @@ consentimiento, confirmación de titularidad ni autorización de publicar: ningu
 etiqueta de S2 abre distribución externa. Los manifiestos y ensayos de recuperación
 incluyen el valor, también cuando el archivo está en la papelera.
 
+### S2 · Clasificación múltiple explícita (candidato v0.1.63)
+
+El equipo puede seleccionar hasta 30 originales **activos de una página visible**
+y aplicarles una de las clasificaciones internas existentes en una sola transacción
+tenant-safe. Un elemento fuera del tenant, ausente o en papelera invalida la
+operación completa, sin éxitos parciales ni divulgación de su identidad.
+La selección nunca comprende automáticamente páginas no visibles, requiere
+confirmación y se limpia al cambiar página/vista/filtros o tras guardar.
+Ningún estado de clasificación constituye permiso para distribución.
+
 ## 4. Non-negotiable invariants
 
 1. Tenant data must not cross organization boundaries.

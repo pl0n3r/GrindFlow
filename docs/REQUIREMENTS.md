@@ -82,6 +82,15 @@ Each requirement should contain:
 - Clasificación y nota permanecen en papelera y tras restaurar. El manifiesto Vault y el cotejo de recuperación detectan estados omitidos o alterados, sin exponer datos de otros tenants.
 - UI móvil de 360 px muestra filtro, estado y edición accesible con feedback; no cambia bytes, SHA-256, cuotas ni descarga. PHPUnit/MariaDB y Chromium con datos descartables.
 
+### GF-FR-012 — Clasificación masiva atómica de la página visible (Vault Symfony)
+**Estado:** candidato v0.1.63; CI, merge y producción se verifican por separado.
+
+**Enunciado:** el equipo autorizado selecciona explícitamente hasta 30 imágenes activas de la página actual y cambia su clasificación interna en una sola operación, sin autorizar publicación.
+
+**Aceptación:** POST JSON `/api/admin/vault/usage/bulk` acepta exclusivamente `ids` (UUIDs únicos de 1 a 30) y `usage_scope` (enum conservador de GF-FR-011); cuenta, organización y rol salen de sesión. CSRF de gestión, rol `content_prepare`, bloqueo por organización, segunda autorización en la transacción y la sentencia SQL. Si cualquier ID pertenece a otro tenant, a la papelera o ya no existe, rechazar **todo el lote**, sin mutación parcial ni fuga del ID. Es idempotente al repetir el mismo conjunto/estado; devolver recuento seleccionado y realmente cambiado, nunca hashes, rutas o notas. No ampliar límites, cuotas, permisos ni relaciones de distribución. Selección y confirmación explícitas de la página actual, no «todos los resultados»; limpiar selección al cambiar vista, página, filtro o completar guardado, preservar selección si falla; nunca habilitar controles de mutación al rol de lectura.
+
+**Verificación:** PHPUnit con MariaDB sintética para 401/403/422, rol, tenant, papelera, ID inválido/duplicado, lote mixto y repetición; Chromium a 360 px con fallo, reintento, filtros y lectura. Sin migraciones ni datos productivos.
+
 ## Functional requirements
 
 ### GF-FR-001 — Organization isolation

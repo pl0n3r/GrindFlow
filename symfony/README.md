@@ -1,6 +1,6 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice candidato v0.1.62:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice candidato v0.1.63:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
@@ -10,6 +10,8 @@
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
 **v0.1.61, seguridad personal:** el panel privado permite rotar la contraseña propia sin permisos administrativos del tenant. La API exige CSRF dedicado, contraseña actual verificada contra hash vigente bajo bloqueo SQL, confirmación y contraseña nueva distinta; no acepta IDs. Al cambiarla invalida la sesión actual y pide nuevo login. PHP/MariaDB descartable + Chromium móvil cubren rechazo, aislamiento y respuesta sin secretos. No significa revocación comprobada de todas las sesiones ni migración de cuentas Laravel.
+
+**v0.1.63, clasificación por lote:** una selección explícita de 1 a 30 imágenes activas de la página visible puede clasificarse en una transacción con CSRF, rol, tenant y estado verificados otra vez bajo bloqueo SQL. Un ID ajeno, borrado o desconocido invalida el lote entero. El panel React exige confirmación y no selecciona resultados de otras páginas. Sin migraciones adicionales, datos productivos ni autorización de distribución.
 
 **v0.1.54, garantía de lectura S2:** la misma verificación de tamaño y huella SHA-256 se aplica a descargas, vistas previas y restauraciones. Un original alterado o ausente genera error genérico sin entregar bytes; el diagnóstico individual conserva los estados `verified|missing|mismatch|unavailable`. React permite comprobar la página visible (máximo 30 archivos) únicamente por petición expresa del usuario. Cada resultado está vinculado a su imagen y se limpia al cambiar página/vista. Se conserva el aislamiento tenant y no se muestran rutas/huellas. **Verificación no es backup ni storage durable:** `symfony/var/vault` continúa local y descartable hasta definir y probar persistencia, backup y recuperación fuera del árbol desplegable.
 
