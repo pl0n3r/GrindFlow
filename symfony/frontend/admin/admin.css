@@ -210,3 +210,15 @@
   .weekly-form>button{justify-self:stretch}
 }
 
+
+/* S3 derived weekly slots: display capacity without implying scheduled publications. */
+.weekly-slot-section{display:grid;gap:10px;padding-top:14px;border-top:1px solid #39384d;min-width:0}
+.weekly-slot-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px}
+.weekly-slot-heading span{color:#bfb8cd}
+.weekly-slots{list-style:none;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+.weekly-slots li{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:11px 12px;border:1px solid #39384d;border-radius:9px;background:#151722}
+.weekly-slots li>div{display:grid;gap:4px;min-width:0}
+.weekly-slots li strong,.weekly-slots li small{overflow-wrap:anywhere}
+.weekly-slots li small{color:#aaa9bd;font-size:11px}
+.weekly-slots li>span{flex:0 0 auto;font-size:11px;color:#a8ffd5}
+@media(max-width:520px){.weekly-slots li{align-items:flex-start;flex-direction:column}.weekly-slots li>span{white-space:normal}}
