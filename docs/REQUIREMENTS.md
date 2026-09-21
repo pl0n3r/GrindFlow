@@ -141,7 +141,7 @@ Each requirement should contain:
 **Verificación:** PHPUnit/MariaDB con 401/403, CSRF, cross-tenant, elegibilidad, slot obsoleto, idempotencia, capacidad, cancelación, historial inmutable y lectura para Model; Chromium móvil crea y cancela un borrador y comprueba ausencia de publicación externa.
 
 ### GF-FR-016 — Handoff manual auditable S4
-**Estado:** candidato v0.1.73; validación, merge y producción se verifican por separado.
+**Estado:** integrado en main v0.1.73; despliegue Symfony y producción se verifican por separado.
 
 **Enunciado:** Admin o Studio puede registrar un handoff humano sobre un borrador S4 mediante un ledger interno append-only, sin llamar proveedores ni afirmar que ocurrió una publicación externa.
 
@@ -155,6 +155,23 @@ Each requirement should contain:
 - Todas las respuestas declaran `publishes=false`, `provider_calls=false` y `external_evidence=false`. No se exporta media, no se crea delivery y no se integra ninguna red externa.
 
 **Verificación:** PHPUnit/MariaDB para 401/403, CSRF, cross-tenant, cancelado, futuro/no-due, prepare idempotente, fail/retry/complete, estado terminal, cancelación protegida e inmutabilidad SQL; Chromium móvil prepara y registra fallo sin perder responsive ni convertir el evento en publicación.
+
+### GF-FR-017 — Destinos manuales y cola interna S4
+**Estado:** candidato v0.1.74; validación, merge y producción se verifican por separado.
+
+**Enunciado:** el handoff manual S4 debe elegir un destino interno explícito del tenant y exponer una cola de trabajo humano ordenada por horario, sin credenciales, IDs remotos ni llamadas a plataformas externas.
+
+**Aceptación:**
+- Admin/Studio administra un catálogo tenant-owned de destinos manuales con nombre visible de 2–80 caracteres. Editor/Model puede consultar el catálogo, pero no crear, desactivar ni reactivar.
+- El catálogo no almacena URLs, tokens, credenciales, provider IDs ni payloads externos. Desactivar un destino impide nuevas preparaciones, pero no reescribe handoffs históricos ya ligados a él.
+- `prepare` exige `destination_id` activo del mismo tenant. Repetir el mismo destino es idempotente; cambiar destino durante un intento preparado exige registrar primero `fail`.
+- Los eventos `complete` y `fail` heredan el destino del `prepare` vigente para conservar trazabilidad append-only. Un handoff legacy sin destino falla cerrado hasta una preparación válida.
+- La cola GET devuelve como máximo 30 borradores activos cuyo último handoff sea `prepared` o `failed`, ordenando primero los que ya llegaron a su UTC programado y luego por fecha/hora. Incluye total tenant-scoped, estado due/futuro y etiqueta del destino.
+- Destinos de otro tenant y borradores de otro tenant responden como inexistentes o quedan fuera de lecturas. El backend revalida actor/membresía/rol en mutaciones.
+- La UI móvil permite crear/reactivar/desactivar destinos, elegir uno al preparar y consultar la cola sin desbordamiento horizontal.
+- Todos los contratos mantienen `provider_calls=false`; no hay publicación automática, exportación de media ni evidencia externa.
+
+**Verificación:** PHPUnit/MariaDB para CRUD reversible, duplicado idempotente, CSRF/rol/cross-tenant, destino inactivo/ajeno, prepare con destino, cambio tras fail, cola tenant-safe y trazabilidad; Chromium móvil cubre crear destino → crear borrador → preparar con destino → ver cola → registrar fallo → cancelar.
 
 ### GF-UX-001 — Shell de navegación consistente y responsive
 **Estado:** integrado en main v0.1.70; despliegue y producción se verifican por separado.
