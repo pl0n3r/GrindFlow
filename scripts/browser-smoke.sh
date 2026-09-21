@@ -98,10 +98,13 @@ capture_authenticated_dashboard() {
   profile="$(mktemp -d)"
 
   local login_page="public/__grindflow_e2e_login.html"
+  local medium_probe="public/__grindflow_e2e_medium_sidebar.html"
   local dom="$ARTIFACT_DIR/dashboard-authenticated.html"
+  local medium_dom="$ARTIFACT_DIR/dashboard-medium-sidebar.html"
+  local medium_screenshot="$ARTIFACT_DIR/dashboard-medium-sidebar.png"
 
   cleanup_auth() {
-    rm -f "$login_page"
+    rm -f "$login_page" "$medium_probe"
     rm -rf "$profile"
   }
   trap cleanup_auth RETURN
@@ -186,7 +189,86 @@ PY
   assert_contains "$dom" "data-organization-summary="
   assert_contains "$dom" "data-grindflow-version="
 
+  cat > "$medium_probe" <<'HTML'
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>GrindFlow medium sidebar probe</title></head>
+<body style="margin:0">
+<p id="status">Checking medium workspace navigation…</p>
+<iframe id="workspace" src="/dashboard" title="Workspace probe" style="width:100vw;height:860px;border:0"></iframe>
+<script>
+document.getElementById('workspace').addEventListener('load', () => {
+  const frame = document.getElementById('workspace');
+  const doc = frame.contentDocument;
+  const sidebar = doc.querySelector('[data-workspace-sidebar]');
+  const icon = doc.querySelector('.gf-navitem__icon');
+  const label = doc.querySelector('.gf-navitem__text');
+  const logoutLabel = doc.querySelector('.gf-sidebar__logout-label');
+
+  if (!sidebar || !icon || !label || !logoutLabel) {
+    document.getElementById('status').textContent = 'ERROR: medium sidebar nodes missing';
+    return;
+  }
+
+  const sidebarStyle = frame.contentWindow.getComputedStyle(sidebar);
+  const iconStyle = frame.contentWindow.getComputedStyle(icon);
+  const labelStyle = frame.contentWindow.getComputedStyle(label);
+  const logoutStyle = frame.contentWindow.getComputedStyle(logoutLabel);
+  const noHorizontalOverflow = doc.documentElement.scrollWidth <= frame.contentWindow.innerWidth + 1;
+
+  const valid =
+    Math.round(parseFloat(sidebarStyle.width)) === 88 &&
+    Math.round(parseFloat(iconStyle.width)) >= 20 &&
+    labelStyle.position === 'absolute' &&
+    Math.round(parseFloat(labelStyle.width)) === 1 &&
+    logoutStyle.position === 'absolute' &&
+    noHorizontalOverflow;
+
+  document.getElementById('status').textContent = valid
+    ? 'SUCCESS: medium workspace sidebar keeps icons visible without overflow'
+    : 'ERROR: medium sidebar layout contract failed ' + JSON.stringify({
+        sidebarWidth: sidebarStyle.width,
+        iconWidth: iconStyle.width,
+        labelPosition: labelStyle.position,
+        labelWidth: labelStyle.width,
+        logoutPosition: logoutStyle.position,
+        scrollWidth: doc.documentElement.scrollWidth,
+        viewportWidth: frame.contentWindow.innerWidth
+      });
+});
+</script>
+</body>
+</html>
+HTML
+
+  "$CHROME" \
+    --headless=new \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --hide-scrollbars \
+    --window-size=820,900 \
+    --virtual-time-budget=5000 \
+    --user-data-dir="$profile" \
+    --dump-dom \
+    "$BASE_URL/__grindflow_e2e_medium_sidebar.html" > "$medium_dom"
+
+  assert_contains "$medium_dom" "SUCCESS: medium workspace sidebar keeps icons visible without overflow"
+
+  "$CHROME" \
+    --headless=new \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --hide-scrollbars \
+    --window-size=820,900 \
+    --virtual-time-budget=5000 \
+    --user-data-dir="$profile" \
+    --screenshot="$medium_screenshot" \
+    "$BASE_URL/__grindflow_e2e_medium_sidebar.html" >/dev/null 2>&1
+
   printf 'PASS %-20s %s\n' "dashboard-auth" "/dashboard"
+  printf 'PASS %-20s %s\n' "sidebar-medium" "820px"
 }
 
 capture_page \
