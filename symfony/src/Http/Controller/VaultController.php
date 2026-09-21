@@ -294,7 +294,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -308,7 +308,9 @@ final class VaultController extends AbstractController
             return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
         }
 
-        return $this->privateJson(['data' => ['asset' => $this->publicAsset($asset)]]);
+        return $this->privateJson(['data' => ['asset' => $this->publicAsset($asset) + [
+            'note' => $asset['private_note'] === null ? null : (string) $asset['private_note'],
+        ]]]);
     }
 
     #[Route('/api/admin/vault/{id}/download', name: 'grindflow_vault_download', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
@@ -517,6 +519,95 @@ final class VaultController extends AbstractController
         }
 
         return $this->privateJson(['data' => ['id' => $id, 'name' => $name]]);
+    }
+
+
+    /**
+     * Private organization annotation. It is NOT a publication approval,
+     * access grant, ownership claim or a change to the binary original.
+     */
+    #[Route('/api/admin/vault/{id}/note', name: 'grindflow_vault_note', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function note(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite editar las notas.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        $body = json_decode($request->getContent(), true);
+        if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
+            || array_keys($body) !== ['note'] || !is_string($body['note'])) {
+            return $this->error(422, 'invalid_note', 'Indica únicamente una nota de texto.');
+        }
+        // A single, visible line prevents control-character ambiguity in
+        // downstream exports. Empty text deliberately clears the annotation.
+        $note = trim($body['note']);
+        if (($note !== '' && preg_match('/\\A.{1,280}\\z/usD', $note) !== 1)
+            || preg_match('/[\\p{C}\\p{Zl}\\p{Zp}]/u', $note) !== 0) {
+            return $this->error(422, 'invalid_note', 'La nota admite hasta 280 caracteres visibles en una línea.');
+        }
+        $stored = $note === '' ? null : $note;
+        $result = $db->transactional(function (Connection $db) use ($context, $id, $stored): string {
+            $organization = $context['organization']['id'];
+            if ($db->fetchOne(
+                'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                ['organization' => $organization],
+            ) === false) {
+                return 'revoked';
+            }
+            $asset = $db->fetchAssociative(
+                'SELECT private_note FROM gf_vault_assets WHERE id = :id AND organization_id = :organization AND deleted_at IS NULL',
+                ['id' => $id, 'organization' => $organization],
+            );
+            if ($asset === false) {
+                return 'not_found';
+            }
+            $allowed = $db->fetchOne(
+                <<<'SQL'
+                    SELECT 1 FROM gf_identity_memberships membership
+                    INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                    WHERE membership.organization_id = :organization
+                      AND actor.id = :user AND actor.is_active = 1
+                      AND membership.role IN ('admin', 'studio', 'editor')
+                    SQL,
+                ['organization' => $organization, 'user' => $context['user']->id()],
+            );
+            if ($allowed === false) {
+                return 'revoked';
+            }
+            if ($asset['private_note'] === $stored) {
+                return 'updated';
+            }
+            $written = $db->executeStatement(
+                <<<'SQL'
+                    UPDATE gf_vault_assets asset SET asset.private_note = :note
+                    WHERE asset.id = :id AND asset.organization_id = :organization AND asset.deleted_at IS NULL
+                      AND EXISTS (
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = asset.organization_id
+                          AND membership.user_id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                      )
+                    SQL,
+                ['note' => $stored, 'id' => $id, 'organization' => $organization, 'user' => $context['user']->id()],
+            );
+
+            return $written === 1 ? 'updated' : 'revoked';
+        });
+        if ($result === 'not_found') {
+            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+        }
+        if ($result !== 'updated') {
+            return $this->error(403, 'organization_access_changed', 'Tu permiso para editar la nota cambió.');
+        }
+
+        return $this->privateJson(['data' => ['id' => $id, 'note' => $stored]]);
     }
 
     #[Route('/api/admin/vault/{id}/trash', name: 'grindflow_vault_trash', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]

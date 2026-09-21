@@ -135,6 +135,9 @@ Se **conserva** la aplicación Laravel y su CI como referencia operativa durante
 - Construcción mobile-first, teclado y estados accesibles de carga, vacío, error y permisos, con compatibilidad dirigida Safari/iOS.
 - El shell Blade/Livewire existente es legado funcional hasta la conmutación probada, no patrón para nuevas pantallas Symfony.
 
+### Vault S2: notas de trabajo privadas
+Cada imagen de la organización puede tener una anotación interna opcional, visible solo desde el detalle autenticado del Vault. No es una validación editorial, licencia, permiso, aprobación de publicación ni titularidad; esos contratos son distintos y deben definirse e implementarse antes de distribución real. Un miembro con permiso `content_prepare` puede editar o limpiar la nota con CSRF y reautorización por transacción; la consulta sigue siendo tenant-safe, y la papelera conserva la nota sin aceptar modificaciones. El catálogo y las herramientas de recuperación deben preservar y cotejarla con el original y la base restaurada.
+
 ## 7. Quality model
 
 Todos los PR deploy-bound pasan las compuertas aplicables y el agregado estable `GrindFlow CI / validate`. Durante coexistencia siguen activos Laravel/MariaDB/legado; el primer slice Symfony agrega Composer, Doctrine/MariaDB, Vite/TypeScript y Playwright con cobertura real antes de retirar gates antiguos.

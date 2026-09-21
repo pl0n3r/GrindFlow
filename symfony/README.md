@@ -1,11 +1,11 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice candidato v0.1.59:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice candidato v0.1.60:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.59 en rama: revisar miniaturas de imágenes locales antes de enviarlas desde el móvil y descartar archivos de forma individual sin subirlos. |
-| VALIDADO EN CÓDIGO | CI y Sonar del head v0.1.59 pendientes; base exact-main v0.1.58 success tras reintentar un workflow cancelado en Chromium. |
+| IMPLEMENTADO | v0.1.60 en rama: nota privada editable por imagen activa con ACL/CSRF y manifiesto de recuperación completo. |
+| VALIDADO EN CÓDIGO | CI/Sonar del head v0.1.60 por verificar; base exact-main v0.1.59 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
@@ -20,6 +20,8 @@
 **v0.1.58, cotejo después de restaurar:** `grindflow:vault:verify-restore` compara un stage validado y su huella guardada con el catálogo y cada blob del entorno Symfony restaurado, incluyendo papelera. Exige organización explícita y escrituras detenidas. La prueba automática usa MariaDB sintética; aún queda pendiente un respaldo completo y ensayo operativo de restauración real. [Procedimiento y límites](../docs/SYMFONY-VAULT-STORAGE.md).
 
 **v0.1.59, revisión local del lote:** la pantalla móvil permite previsualizar hasta 8 imágenes JPEG/PNG/WebP válidas elegidas desde el dispositivo, revisar formatos y tamaños, y descartar individualmente antes del POST. Las miniaturas usan URLs de objeto solo en el navegador y se liberan al cambiar la selección/cerrar/subir; no se transmiten al servidor durante la revisión. Se conservan la validación MIME/bytes y las cuotas del backend; no se crea un servicio nuevo ni se permite cargar SVG.
+
+**v0.1.60, notas privadas por imagen:** campo opcional de hasta 280 caracteres visibles, guardado en el detalle con permiso de preparación, CSRF y verificación de organización en cada operación. Solo imagen activa editable, pero la papelera conserva la nota. El rol de lectura la consulta sin formulario de edición. Nunca equivale a aprobación de publicación ni cambia cuota/bytes. La nota participa en la huella de `audit`, `stage`, `verify-stage` y `verify-restore`; los manifiestos antiguos sin campo de nota deben regenerarse. PHPUnit/MariaDB y Chromium 360 px cubren escritura, acceso, limpieza y restauración de notas sin usar datos reales.
 
 Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
 

@@ -95,6 +95,53 @@ final class VaultTrashTest extends WebTestCase
             self::assertStringNotContainsString(hash('sha256', $bytes), (string) $client->getResponse()->getContent());
             self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
 
+            // Private notes are not a publication approval or a storage mutation.
+            $noteUrl = '/api/admin/vault/'.$mineAsset.'/note';
+            $noteHeaders = ['HTTP_X_CSRF_TOKEN' => $csrf, 'CONTENT_TYPE' => 'application/json'];
+            $client->request('POST', $noteUrl);
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', $noteUrl, server: ['CONTENT_TYPE' => 'application/json'],
+                content: '{"note":"Solo el equipo"}');
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', '/api/admin/vault/'.$foreignAsset.'/note',
+                server: $noteHeaders, content: '{"note":"Intento entre organizaciones"}');
+            self::assertResponseStatusCodeSame(404);
+            foreach ([
+                '{"note":123}', '{"note":"ok","organization_id":"'.$foreign.'"}',
+                '{"note":"'.str_repeat('a', 281).'"}',
+                json_encode(['note' => "linea\u{200B}invisible"], JSON_THROW_ON_ERROR),
+                json_encode(['note' => "nota\nsegunda"], JSON_THROW_ON_ERROR),
+            ] as $invalidNote) {
+                $client->request('POST', $noteUrl, server: $noteHeaders, content: $invalidNote);
+                self::assertResponseStatusCodeSame(422);
+            }
+            $client->request('POST', $noteUrl, server: $noteHeaders,
+                content: '{"note":"  Para revisar antes de usar  "}');
+            self::assertResponseIsSuccessful();
+            self::assertSame('Para revisar antes de usar',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['note']);
+            self::assertSame('Para revisar antes de usar', $db->fetchOne(
+                'SELECT private_note FROM gf_vault_assets WHERE id = ? AND organization_id = ?',
+                [$mineAsset, $mine],
+            ));
+            $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertResponseIsSuccessful();
+            $noteDetail = json_decode((string) $client->getResponse()->getContent(), true)['data']['asset'];
+            self::assertSame('Para revisar antes de usar', $noteDetail['note']);
+            self::assertArrayNotHasKey('storage_key', $noteDetail);
+            self::assertFileExists($path);
+            self::assertSame($bytes, file_get_contents($path));
+            $client->request('POST', $noteUrl, server: $noteHeaders, content: '{"note":"  "}');
+            self::assertResponseIsSuccessful();
+            self::assertNull(json_decode((string) $client->getResponse()->getContent(), true)['data']['note']);
+            self::assertNull($db->fetchOne(
+                'SELECT private_note FROM gf_vault_assets WHERE id = ?',
+                [$mineAsset],
+            ));
+            $client->request('POST', $noteUrl, server: $noteHeaders,
+                content: '{"note":"Nota retenida en papelera"}');
+            self::assertResponseIsSuccessful();
+
             // Rename changes only display metadata; it must never move or duplicate private bytes.
             $renaming = '/api/admin/vault/'.$mineAsset.'/name';
             $renameHeaders = ['HTTP_X_CSRF_TOKEN' => $csrf, 'CONTENT_TYPE' => 'application/json'];
@@ -154,6 +201,8 @@ final class VaultTrashTest extends WebTestCase
                 self::assertResponseIsSuccessful();
             }
 
+            self::assertSame('Nota retenida en papelera',
+                $db->fetchOne('SELECT private_note FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => 'wrong']);
             self::assertResponseStatusCodeSame(403);
             self::assertNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
@@ -197,6 +246,11 @@ final class VaultTrashTest extends WebTestCase
 
             $client->request('GET', '/api/admin/vault/'.$mineAsset);
             self::assertResponseStatusCodeSame(404);
+            $client->request('POST', $noteUrl, server: $noteHeaders,
+                content: '{"note":"No editable en papelera"}');
+            self::assertResponseStatusCodeSame(404);
+            self::assertSame('Nota retenida en papelera',
+                $db->fetchOne('SELECT private_note FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/preview');
             self::assertResponseStatusCodeSame(404);
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
@@ -218,6 +272,11 @@ final class VaultTrashTest extends WebTestCase
             self::assertResponseStatusCodeSame(403);
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
             self::assertResponseStatusCodeSame(403);
+            $client->request('POST', $noteUrl, server: $noteHeaders,
+                content: '{"note":"No editable por rol de lectura"}');
+            self::assertResponseStatusCodeSame(403);
+            self::assertSame('Nota retenida en papelera',
+                $db->fetchOne('SELECT private_note FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             $db->update('gf_identity_memberships', ['role' => 'editor'], ['user_id' => $user, 'organization_id' => $mine]);
 
             // Both size mismatch and same-size SHA corruption must be reported read-only.
@@ -269,6 +328,10 @@ final class VaultTrashTest extends WebTestCase
             self::assertNull($db->fetchOne('SELECT deleted_by FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/download');
             self::assertResponseIsSuccessful();
+            $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertResponseIsSuccessful();
+            self::assertSame('Nota retenida en papelera',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['asset']['note']);
             $client->request('GET', '/api/admin/vault?view=trash');
             self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);
 

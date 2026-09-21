@@ -8,6 +8,7 @@ type Asset = {
   created_at: string;
   deleted_at?: string | null;
   download_url: string;
+  note?: string | null;
 };
 
 type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
@@ -42,6 +43,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
+  const [noteDraft, setNoteDraft] = useState('');
   const [actionFeedback, setActionFeedback] = useState('');
   const [actionError, setActionError] = useState('');
   const [pages, setPages] = useState(0);
@@ -114,6 +116,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (controller.signal.aborted) return;
       setAssets(data.assets);
       setDetail(null);
+      setNoteDraft('');
       setDetailError('');
       setConfirmId(null);
       setRenameId(null);
@@ -218,9 +221,11 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setPreviewFailed(false);
     if (detail?.id === id) {
       setDetail(null);
+      setNoteDraft('');
       return;
     }
     setDetail(null);
+    setNoteDraft('');
     setDetailError('');
     setDetailLoading(true);
     try {
@@ -230,6 +235,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo consultar la imagen.');
       setDetail(body.data.asset as Asset);
+      setNoteDraft(typeof body.data.asset.note === 'string' ? body.data.asset.note : '');
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar la imagen.');
     } finally {
@@ -264,6 +270,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setConfirmId(null);
     setRenameId(null);
     setDetail(null);
+    setNoteDraft('');
     integrityRequest.current += 1;
     setCheckingId(null);
     setBulkChecking(false);
@@ -329,6 +336,39 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setRenameId(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'No se pudo renombrar la imagen.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveNote(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    if (!canUpload || !manageCsrf || busyId || detail?.id !== id) return;
+    setBusyId(id);
+    setActionFeedback('');
+    setActionError('');
+    try {
+      const response = await fetch('/api/admin/vault/' + id + '/note', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': manageCsrf,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ note: noteDraft }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo guardar la nota privada.');
+      if (body?.data?.id !== id || (body.data.note !== null && typeof body.data.note !== 'string')) {
+        throw new Error('La respuesta de la nota privada no es válida.');
+      }
+      const saved = body.data.note as string | null;
+      setDetail((previous) => previous?.id === id ? { ...previous, note: saved } : previous);
+      setNoteDraft(saved ?? '');
+      setActionFeedback('Nota privada guardada.');
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo guardar la nota privada.');
     } finally {
       setBusyId(null);
     }
@@ -612,7 +652,20 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               <dt>Tipo</dt><dd>{detail.mime_type}</dd>
               <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
               <dt>Guardada</dt><dd>{detail.created_at}</dd>
+              <dt>Nota privada</dt><dd>{detail.note || 'Sin nota privada.'}</dd>
             </dl>
+            {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveNote(event, asset.id)}>
+              <label htmlFor={'vault-note-' + asset.id}>Nota privada de la imagen (máximo 280 caracteres)</label>
+              <input id={'vault-note-' + asset.id} type="text" value={noteDraft} maxLength={280}
+                disabled={!!busyId} onChange={(event) => setNoteDraft(event.currentTarget.value)}
+                placeholder="Añadir una referencia interna, opcional" />
+              <small>Solo la organización seleccionada puede consultarla. No autoriza publicaciones.</small>
+              <button type="submit" disabled={!!busyId || noteDraft === (detail.note ?? '')}>
+                {busyId === asset.id ? 'Guardando…' : 'Guardar nota'}
+              </button>
+              <button type="button" disabled={!!busyId || noteDraft === (detail.note ?? '')}
+                onClick={() => setNoteDraft(detail.note ?? '')}>Descartar cambios</button>
+            </form>}
             <figure className="vault-preview">
               {previewFailed
                 ? <p role="status">La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.</p>
