@@ -109,8 +109,9 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 
 ## Protocolo de inicio para agentes y sesiones
 
-1. Leer este `AGENTS.md` completo. Consultar docs especificas de la tarea,
-   no releer todo el repositorio después de cada ajuste menor.
+1. Leer el inicio rápido de `AGENTS.md`, las reglas del área modificada
+   y la documentación relevante; no releer todo el repositorio después
+   de cada ajuste menor ni activar notas del archivo histórico.
 2. Inspeccionar `main`, PRs abiertos, `GrindFlow CI / validate` del SHA exacto
    y el roadmap [#2](https://github.com/pl0n3r/GrindFlow/issues/2).
 3. Si un PR activo cubre el trabajo, terminarlo y verificar sus gates antes
