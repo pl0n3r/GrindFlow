@@ -46,7 +46,14 @@ final class Version20260921195000 extends AbstractMigration
                 CONSTRAINT fk_gf_manual_destinations_disabler
                     FOREIGN KEY (disabled_by)
                     REFERENCES gf_identity_users (id)
-                    ON DELETE RESTRICT
+                    ON DELETE RESTRICT,
+                CONSTRAINT ck_gf_manual_destinations_label
+                    CHECK (CHAR_LENGTH(TRIM(label)) BETWEEN 2 AND 80),
+                CONSTRAINT ck_gf_manual_destinations_disabled_state
+                    CHECK (
+                        (disabled_at IS NULL AND disabled_by IS NULL)
+                        OR (disabled_at IS NOT NULL AND disabled_by IS NOT NULL)
+                    )
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             SQL);
 
