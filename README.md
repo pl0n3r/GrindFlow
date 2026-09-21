@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **3** | **+81** | **−18** | **+63** |
+| **4** | **+225** | **−18** | **+207** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -68,6 +68,7 @@ Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy
 - `README.md`
 - `config/version.php`
 - `symfony/src/Http/Controller/ContentRuleController.php`
+- `symfony/tests/php/WeeklyRulePreviewTest.php`
 
 ## Validación
 - CI/Sonar/CodeRabbit del candidato v0.1.66 por verificar; la base v0.1.65 ya está fusionada en `main`.
