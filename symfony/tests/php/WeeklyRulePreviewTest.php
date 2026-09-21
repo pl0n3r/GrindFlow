@@ -98,6 +98,7 @@ final class WeeklyRulePreviewTest extends WebTestCase
             self::assertFalse($withoutRule['can_publish']);
             self::assertSame('review_only', $withoutRule['mode']);
             self::assertNull($withoutRule['rule']);
+            self::assertSame([], $withoutRule['slots']);
             self::assertNotContains($trash, array_column($withoutRule['assets'], 'id'));
             self::assertNotContains($foreignAsset, array_column($withoutRule['assets'], 'id'));
             foreach ($withoutRule['assets'] as $asset) {
