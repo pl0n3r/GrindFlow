@@ -110,7 +110,7 @@ Each requirement should contain:
 
 
 ### GF-FR-014 — Revisión humana y elegibilidad interna S3
-**Estado:** candidato v0.1.71; validación, merge y producción se verifican por separado.
+**Estado:** integrado en main v0.1.71; despliegue Symfony y producción se verifican por separado.
 
 **Enunciado:** un recurso clasificado como `needs_review` solo puede quedar listo para el siguiente contrato interno de programación después de una decisión humana explícita y revocable. Esta revisión no sustituye autorización de distribución, derechos, consentimiento ni aceptación de una plataforma.
 
@@ -123,6 +123,22 @@ Each requirement should contain:
 - `unclassified` e `internal_only` continúan bloqueados aunque exista un evento histórico de revisión; borrar o mover a papelera impide nuevas decisiones.
 
 **Verificación:** PHPUnit/MariaDB con 401/403, CSRF, tenant, clasificación no aplicable, idempotencia, approve/revoke y preview; Chromium móvil prueba el flujo revisión → autorización → “Listo para programar” conservando publicación bloqueada.
+
+### GF-FR-015 — Borradores persistidos de agenda S4
+**Estado:** candidato v0.1.72; validación, merge y producción se verifican por separado.
+
+**Enunciado:** un recurso que cumple los contratos internos S3 puede reservar un próximo slot de la regla semanal como borrador persistido de agenda. El borrador es tenant-safe, cancelable y conserva historial, pero nunca crea una publicación, entrega, job o llamada a proveedor.
+
+**Aceptación:**
+- Admin, Studio y Editor pueden crear/cancelar; Model conserva lectura. Actor, organización y rol salen de la sesión y se revalidan dentro de la transacción.
+- Crear exige CSRF dedicado, recurso activo del mismo tenant, regla semanal vigente, revisión humana aprobada, autorización de distribución vigente y un `scheduled_at_utc` que coincida exactamente con uno de los próximos slots derivados por el servidor.
+- La capacidad `max_per_day` se aplica de forma atómica por organización/slot. Dos solicitudes concurrentes no pueden excederla; repetir el mismo recurso+slot activo es idempotente.
+- Cancelar es idempotente y conserva el registro. MariaDB solo permite la transición `draft → cancelled`, bloquea reescrituras posteriores y rechaza DELETE del historial.
+- La agenda GET devuelve como máximo 30 registros recientes y un total tenant-scoped; incluye borradores activos y cancelados sin exponer rutas privadas, hashes, secretos o recursos de otro tenant.
+- Cancelar libera capacidad para un nuevo borrador, pero no borra la historia. Cambios posteriores de revisión/autorización no convierten un borrador previo en publicación.
+- Todas las respuestas mantienen `mode=review_only`/`publishes=false` o `can_publish=false` según corresponda. S4 no crea distribution attempts ni integra proveedores.
+
+**Verificación:** PHPUnit/MariaDB con 401/403, CSRF, cross-tenant, elegibilidad, slot obsoleto, idempotencia, capacidad, cancelación, historial inmutable y lectura para Model; Chromium móvil crea y cancela un borrador y comprueba ausencia de publicación externa.
 
 ### GF-UX-001 — Shell de navegación consistente y responsive
 **Estado:** integrado en main v0.1.70; despliegue y producción se verifican por separado.
