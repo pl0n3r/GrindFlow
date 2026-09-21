@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.53: auditoría y manual operativo de agentes, todavía no desplegado.** La lectura «solo el deploy actual» sigue describiendo el runtime Laravel observado; Symfony continúa aislado. Base `main` v0.1.52 `2832b4c683ad37f393a348a41d40794d0ba14ca5`, CI exact-main success. Se separan reglas vigentes y notas históricas, y se documenta el ciclo de varios avances sin Codex. No se modifica la producción.
+> **Candidato v0.1.54: proteger entrega/restauración de originales y verificar página visible, todavía no desplegado.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.53 `a9605f89df4eb1aa28f28762e5e95c0820406fc0`, CI exact-main success. Ningún dato productivo ni migración se modifica.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.53** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.52~~ | `2832b4c683ad37f393a348a41d40794d0ba14ca5` |
+| Version objetivo | 🚧 **v0.1.54** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.53~~ | `a9605f89df4eb1aa28f28762e5e95c0820406fc0` |
 | CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
-| CodeRabbit | 🚧 Hallazgos atendidos; revalidación pendiente | PR |
+| CodeRabbit | 🚧 Revisión pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
 | Deploy Observer | 🚧 Release humano por observar | No prueba Symfony en remoto |
 | Production Smoke | ⛔ Credencial E2E productiva pendiente | [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
-| Symfony S1 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
+| Symfony S2 en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
 | Migraciones | ✅ ~~Ningún esquema productivo modificado~~ | DB Symfony descartable |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+525** | **−395** | **+130** |
+| **8** | **+236** | **−65** | **+171** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts]** |
-| Alcance | Auditoría operativa de AGENTS, reglas vigentes, historial preservado y handoff sin Codex |
+| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Alcance | S2: integridad de bytes antes de lectura/restauración y revisión visible mobile-first |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,30 +58,33 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `AGENTS.md` tiene inicio rápido, mapa de lectura por componente, ruta de entrega sin Codex, y regla para avanzar varias mejoras relacionadas por solicitud.
-- Se archivaron íntegras 345 líneas históricas de Laravel/Next.js/Supabase sin perder decisiones, evitando que definan por error el stack nuevo Symfony.
-- Auditoría versionada en `docs/AGENTS-AUDIT.md`, coherencia CI, roadmap, README y estados de entrega; ningún módulo nuevo ni migración productiva.
+- Descarga, vista previa y restauración en Symfony reutilizan la verificación de tamaño/SHA-256: nunca entregan un original privado modificado, aunque conserve el mismo tamaño.
+- Auditoría manual de hasta 30 originales visibles por página (biblioteca o papelera), con estado por imagen y progreso accesible a 360 px. No es backup ni copia de archivos.
+- Regresión PHPUnit/MariaDB para bytes alterados, revocación y papelera; Chromium para estado de auditoría móvil y cambio de vista. Sin integración externa, purga, migración ni cutover.
 
 ## Archivos modificados en este deploy
 
 Este inventario corresponde al **cambio candidato en el PR**, no a archivos desplegados en Hostinger.
-- `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `docs/AGENTS-AUDIT.md`
-- `docs/AGENTS-LEGACY-ARCHIVE.md`
+- `symfony/README.md`
+- `symfony/frontend/admin/VaultPanel.tsx`
+- `symfony/frontend/admin/admin.css`
+- `symfony/src/Http/Controller/VaultController.php`
+- `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/VaultTrashTest.php`
 
 ## Validación
-- El PR debe superar preflight (gobierno y título), fast (versión y dashboard), validate y Sonar; sin prueba local en esta sesión.
-- CI exact-main v0.1.52 success; producción Smoke continúa fallando por credencial de lectura, independiente del CI. Sin migraciones ni cutover Symfony.
+- PHP/MariaDB y Chromium se comprueban en CI del PR; sin checkout local de este repositorio en esta sesión.
+- CI exact-main v0.1.53 success; CI/Sonar/CodeRabbit del head v0.1.54 y Hostinger son señales separadas. No se tocó producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar auditoría de agentes v0.1.53 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente de definir política de retención y backup |
+| **NOW** | 🚧 Validar entrega e integridad S2 v0.1.54 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente definir política de retención y backup |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -89,7 +92,7 @@ Este inventario corresponde al **cambio candidato en el PR**, no a archivos desp
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar auditoría de agentes v0.1.53 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar integridad y revisión visible v0.1.54 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |

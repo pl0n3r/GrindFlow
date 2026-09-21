@@ -135,6 +135,25 @@ final class VaultTrashTest extends WebTestCase
             $client->request('GET', '/api/admin/vault/'.$foreignAsset.'/preview');
             self::assertResponseStatusCodeSame(404);
 
+            // A same-size mutation is invisible to size-only checks. Neither
+            // download nor inline preview may deliver such private bytes.
+            file_put_contents($path, substr_replace($bytes, 'X', 0, 1));
+            foreach (['download', 'preview'] as $delivery) {
+                $client->request('GET', '/api/admin/vault/'.$mineAsset.'/'.$delivery);
+                self::assertResponseStatusCodeSame(404);
+                self::assertSame('file_unavailable',
+                    json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+                self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+            }
+            $client->request('GET', $integrityUrl);
+            self::assertSame('mismatch',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['status']);
+            file_put_contents($path, $bytes);
+            foreach (['download', 'preview'] as $delivery) {
+                $client->request('GET', '/api/admin/vault/'.$mineAsset.'/'.$delivery);
+                self::assertResponseIsSuccessful();
+            }
+
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/trash', server: ['HTTP_X_CSRF_TOKEN' => 'wrong']);
             self::assertResponseStatusCodeSame(403);
             self::assertNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
@@ -236,6 +255,11 @@ final class VaultTrashTest extends WebTestCase
             self::assertResponseStatusCodeSame(409);
             self::assertSame('file_unavailable',
                 json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+            // Restore is also guarded by the fingerprint, not only size.
+            file_put_contents($path, substr_replace($bytes, 'X', 0, 1));
+            $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
+            self::assertResponseStatusCodeSame(409);
+            self::assertNotNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             file_put_contents($path, $bytes);
 
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);

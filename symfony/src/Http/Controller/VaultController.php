@@ -315,7 +315,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.original_name, asset.storage_key
+                SELECT asset.original_name, asset.storage_key, asset.size_bytes, asset.sha256
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -328,11 +328,12 @@ final class VaultController extends AbstractController
         if ($asset === false) {
             return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
         }
-        $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
-        $path = $root.'/'.$asset['storage_key'].'.blob';
-        if (!is_file($path) || is_link($path)) {
+        // Never serve a modified or incomplete original, even when its size
+        // matches. The integrity endpoint remains a read-only diagnostic.
+        if ($this->originalStatus($asset) !== 'verified') {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
+        $path = (string) $this->getParameter('kernel.project_dir').'/var/vault/'.$asset['storage_key'].'.blob';
 
         $response = new BinaryFileResponse($path);
         $response->headers->set('Content-Type', 'application/octet-stream');
@@ -358,7 +359,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.storage_key, asset.mime_type, asset.size_bytes
+                SELECT asset.storage_key, asset.mime_type, asset.size_bytes, asset.sha256
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -375,12 +376,10 @@ final class VaultController extends AbstractController
         if (!in_array($mime, self::MIMES, true)) {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
-        $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
-        $path = $root.'/'.$asset['storage_key'].'.blob';
-        if (is_link($root) || !is_file($path) || is_link($path)
-            || filesize($path) !== (int) $asset['size_bytes']) {
+        if ($this->originalStatus($asset) !== 'verified') {
             return $this->error(404, 'file_unavailable', 'El archivo no está disponible.');
         }
+        $path = (string) $this->getParameter('kernel.project_dir').'/var/vault/'.$asset['storage_key'].'.blob';
 
         $response = new BinaryFileResponse($path);
         $response->headers->set('Content-Type', $mime);
@@ -421,6 +420,20 @@ final class VaultController extends AbstractController
         if ($asset === false) {
             return $this->error(404, 'file_not_found', 'No se encontró el archivo en tu organización.');
         }
+        $status = $this->originalStatus($asset);
+
+        return $this->privateJson(['data' => ['id' => $id, 'status' => $status]]);
+    }
+
+
+    /**
+     * Shared read-only guard for verification, download, preview and restore.
+     * Avoids trusting size alone: equal-size mutations must never be served.
+     *
+     * @param array{storage_key:mixed,size_bytes:mixed,sha256:mixed} $asset
+     */
+    private function originalStatus(array $asset): string
+    {
         $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
         $key = (string) $asset['storage_key'];
         $expectedSize = (int) $asset['size_bytes'];
@@ -453,8 +466,7 @@ final class VaultController extends AbstractController
                 }
             }
         }
-
-        return $this->privateJson(['data' => ['id' => $id, 'status' => $status]]);
+        return $status;
     }
 
     /**
@@ -586,7 +598,7 @@ final class VaultController extends AbstractController
                 return 'revoked';
             }
             $asset = $db->fetchAssociative(
-                'SELECT id, size_bytes, storage_key, deleted_at FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
+                'SELECT id, size_bytes, sha256, storage_key, deleted_at FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
                 ['id' => $id, 'organization' => $context['organization']['id']],
             );
             if ($asset === false) {
@@ -599,10 +611,7 @@ final class VaultController extends AbstractController
                 return 'already_active';
             }
             if ($action === 'restore') {
-                $root = (string) $this->getParameter('kernel.project_dir').'/var/vault';
-                $path = $root.'/'.$asset['storage_key'].'.blob';
-                if (is_link($root) || !is_file($path) || is_link($path)
-                    || filesize($path) !== (int) $asset['size_bytes']) {
+                if ($this->originalStatus($asset) !== 'verified') {
                     return 'missing_blob';
                 }
                 // Quota covers retained blobs in both views; restoration adds no bytes.

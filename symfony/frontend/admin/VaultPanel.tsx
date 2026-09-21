@@ -14,6 +14,13 @@ type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_a
 
 type Props = { canUpload: boolean; csrf: string | null; manageCsrf?: string | null };
 type UploadResult = { name: string; success: boolean; message: string };
+type IntegrityResult = { message: string; warning: boolean };
+const integrityLabels: Record<string, string> = {
+  verified: 'Original íntegro: tamaño y SHA-256 coinciden.',
+  missing: 'El original privado no está disponible: archivo ausente.',
+  mismatch: 'Alerta: el tamaño o la huella SHA-256 no coinciden.',
+  unavailable: 'No se puede verificar el almacenamiento privado en este momento.',
+};
 
 // A rejection with no usable corrective action must not be retried blindly.
 // Network and server failures can be retried; a second upload of an already
@@ -54,8 +61,11 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
-  const [integrity, setIntegrity] = useState<{ id: string; message: string; warning: boolean } | null>(null);
+  const [integrity, setIntegrity] = useState<Record<string, IntegrityResult>>({});
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [bulkChecking, setBulkChecking] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkStatus, setBulkStatus] = useState('');
   const integrityRequest = useRef(0);
 
   useEffect(() => () => { integrityRequest.current += 1; }, []);
@@ -64,7 +74,10 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     const controller = new AbortController();
     integrityRequest.current += 1;
     setCheckingId(null);
-    setIntegrity(null);
+    setBulkChecking(false);
+    setBulkProgress(null);
+    setBulkStatus('');
+    setIntegrity({});
     fetch('/api/admin/vault?page=' + page + '&view=' + view +
       (search ? '&q=' + encodeURIComponent(search) : '') +
       '&format=' + format + '&sort=' + sort, {
@@ -82,7 +95,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetailError('');
       setConfirmId(null);
       setRenameId(null);
-      setIntegrity(null);
+      setIntegrity({});
       setTotal(data.total);
       setQuota(data.quota ?? null);
       setPages(data.pages);
@@ -99,10 +112,14 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   }, [page, refresh, view, search, format, sort]);
 
   async function verifyOriginal(asset: Asset) {
-    if (checkingId || busyId) return;
+    if (checkingId || bulkChecking || busyId) return;
     const request = ++integrityRequest.current;
     setCheckingId(asset.id);
-    setIntegrity(null);
+    setIntegrity((previous) => {
+      const next = { ...previous };
+      delete next[asset.id];
+      return next;
+    });
     try {
       const response = await fetch('/api/admin/vault/' + asset.id + '/integrity', {
         credentials: 'same-origin', headers: { Accept: 'application/json' },
@@ -110,26 +127,68 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo comprobar el original.');
       const status = body?.data?.status;
-      const labels: Record<string, string> = {
-        verified: 'Original íntegro: tamaño y SHA-256 coinciden.',
-        missing: 'El original privado no está disponible: archivo ausente.',
-        mismatch: 'Alerta: el tamaño o la huella SHA-256 no coinciden.',
-        unavailable: 'No se puede verificar el almacenamiento privado en este momento.',
-      };
-      if (typeof status !== 'string' || !Object.hasOwn(labels, status)) {
+      if (typeof status !== 'string' || !Object.hasOwn(integrityLabels, status)) {
         throw new Error('El resultado de verificación no es válido.');
       }
-      if (request === integrityRequest.current) {
-        setIntegrity({ id: asset.id, message: labels[status], warning: status !== 'verified' });
-      }
+      if (request === integrityRequest.current) setIntegrity((previous) => ({
+        ...previous, [asset.id]: { message: integrityLabels[status], warning: status !== 'verified' },
+      }));
     } catch (cause) {
-      if (request === integrityRequest.current) setIntegrity({
-        id: asset.id,
-        message: cause instanceof Error ? cause.message : 'No se pudo comprobar el original.',
-        warning: true,
-      });
+      if (request === integrityRequest.current) setIntegrity((previous) => ({
+        ...previous, [asset.id]: {
+          message: cause instanceof Error ? cause.message : 'No se pudo comprobar el original.',
+          warning: true,
+        },
+      }));
     } finally {
       if (request === integrityRequest.current) setCheckingId(null);
+    }
+  }
+
+  async function verifyVisible() {
+    if (checkingId || bulkChecking || busyId || loading || assets.length === 0) return;
+    const request = ++integrityRequest.current;
+    const snapshot = [...assets].slice(0, 30);
+    setIntegrity({});
+    setBulkChecking(true);
+    setBulkProgress({ done: 0, total: snapshot.length });
+    setBulkStatus('');
+    let warnings = 0;
+    try {
+      for (const [index, asset] of snapshot.entries()) {
+        let result: IntegrityResult;
+        try {
+          const response = await fetch('/api/admin/vault/' + asset.id + '/integrity', {
+            credentials: 'same-origin', headers: { Accept: 'application/json' },
+          });
+          const body = await response.json();
+          if (request !== integrityRequest.current) return;
+          // A revoked session cannot be represented as a corrupt individual image.
+          if (response.status === 401 || response.status === 403 || response.status === 409) {
+            throw new Error(body?.error?.message ?? 'Tu sesión o acceso cambió. Actualiza el panel.');
+          }
+          if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo comprobar el original.');
+          const status = body?.data?.status;
+          if (typeof status !== 'string' || !Object.hasOwn(integrityLabels, status)) {
+            throw new Error('El resultado de verificación no es válido.');
+          }
+          result = { message: integrityLabels[status], warning: status !== 'verified' };
+        } catch (cause) {
+          if (request !== integrityRequest.current) return;
+          result = { message: cause instanceof Error ? cause.message : 'No se pudo verificar.', warning: true };
+        }
+        if (result.warning) warnings += 1;
+        if (request !== integrityRequest.current) return;
+        setIntegrity((previous) => ({ ...previous, [asset.id]: result }));
+        setBulkProgress({ done: index + 1, total: snapshot.length });
+      }
+      if (request === integrityRequest.current) {
+        setBulkStatus(warnings
+          ? warnings + ' de ' + snapshot.length + ' imágenes necesitan revisión. Esta comprobación no es una copia de seguridad.'
+          : snapshot.length + ' originales comprobados correctamente. Esta comprobación no es una copia de seguridad.');
+      }
+    } finally {
+      if (request === integrityRequest.current) setBulkChecking(false);
     }
   }
 
@@ -185,7 +244,10 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setDetail(null);
     integrityRequest.current += 1;
     setCheckingId(null);
-    setIntegrity(null);
+    setBulkChecking(false);
+    setBulkProgress(null);
+    setBulkStatus('');
+    setIntegrity({});
     setActionFeedback('');
     setActionError('');
     setHasTrashDuplicate(false);
@@ -437,6 +499,15 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
       <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
+      <div className="vault-audit">
+        <button type="button" disabled={bulkChecking || !!checkingId || !!busyId || loading}
+          onClick={() => void verifyVisible()}>
+          {bulkChecking ? 'Verificando originales…' : 'Verificar originales visibles (' + assets.length + ')'}
+        </button>
+        <small>Solo esta página, incluida la papelera cuando está seleccionada. No restaura ni borra archivos.</small>
+        {bulkProgress && <p role="status" aria-live="polite">Comprobados {bulkProgress.done} de {bulkProgress.total} originales.</p>}
+        {bulkStatus && <p role="status" className="vault-feedback">{bulkStatus}</p>}
+      </div>
       <ul className="vault-list">
         {assets.map((asset) => <li key={asset.id}>
           <span className="vault-image-mark" aria-hidden="true">▧</span>
@@ -444,14 +515,14 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
           </span>
-          <button type="button" disabled={!!checkingId || !!busyId || loading}
+          <button type="button" disabled={!!checkingId || bulkChecking || !!busyId || loading}
             onClick={() => void verifyOriginal(asset)}
             aria-label={'Verificar integridad de ' + asset.name}>
             {checkingId === asset.id ? 'Comprobando…' : 'Verificar integridad'}
           </button>
-          {integrity?.id === asset.id && <p role={integrity.warning ? 'alert' : 'status'}
-            className={integrity.warning ? 'vault-integrity-warning' : 'vault-integrity-ok'}>
-            {integrity.message}
+          {integrity[asset.id] && <p role={integrity[asset.id].warning ? 'alert' : 'status'}
+            className={integrity[asset.id].warning ? 'vault-integrity-warning' : 'vault-integrity-ok'}>
+            {integrity[asset.id].message}
           </p>}
           {view === 'active' && <>
             <button type="button" disabled={detailLoading || !!busyId} aria-expanded={detail?.id === asset.id}
@@ -498,7 +569,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             </dl>
             <figure className="vault-preview">
               {previewFailed
-                ? <p role="status">La vista previa no está disponible. Puedes descargar el original si conservas acceso.</p>
+                ? <p role="status">La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.</p>
                 : <img src={'/api/admin/vault/' + detail.id + '/preview'}
                     alt={'Vista previa privada de ' + detail.name} loading="lazy" decoding="async"
                     referrerPolicy="no-referrer" onError={() => setPreviewFailed(true)} />}
