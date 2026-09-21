@@ -1,17 +1,19 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice candidato v0.1.55:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice candidato v0.1.56:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.55 en rama: almacenamiento privado externo opcional para que los originales no dependan obligatoriamente de la carpeta de release; la integridad v0.1.54 permanece. |
-| VALIDADO EN CÓDIGO | CI y Sonar del head v0.1.55 pendientes; base exact-main v0.1.54 success. |
+| IMPLEMENTADO | v0.1.56 en rama: auditoría CLI por organización, manifiesto de metadatos comparable y verificación de bytes compartida con HTTP. |
+| VALIDADO EN CÓDIGO | CI y Sonar del head v0.1.56 pendientes; base exact-main v0.1.55 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
 **v0.1.54, garantía de lectura S2:** la misma verificación de tamaño y huella SHA-256 se aplica a descargas, vistas previas y restauraciones. Un original alterado o ausente genera error genérico sin entregar bytes; el diagnóstico individual conserva los estados `verified|missing|mismatch|unavailable`. React permite comprobar la página visible (máximo 30 archivos) únicamente por petición expresa del usuario. Cada resultado está vinculado a su imagen y se limpia al cambiar página/vista. Se conserva el aislamiento tenant y no se muestran rutas/huellas. **Verificación no es backup ni storage durable:** `symfony/var/vault` continúa local y descartable hasta definir y probar persistencia, backup y recuperación fuera del árbol desplegable.
 
 **v0.1.55, storage fuera del release (opcional):** `GRINDFLOW_VAULT_ROOT` acepta una ruta absoluta con directorio padre ya existente y fuera del árbol de la versión desplegada. El servicio común resuelve carga/lectura/restauración e impide raíces simbólicas, rutas relativas o travesías; la ruta predeterminada de tests no cambia. No se mueven archivos existentes ni se crea backup. Operación, migración segura y verificación de restauración: [Storage privado Symfony](../docs/SYMFONY-VAULT-STORAGE.md). Symfony sigue aislado y NO desplegado.
+
+**v0.1.56, auditoría de restauración:** `php bin/console grindflow:vault:audit --organization=<UUID> [--expect=<SHA256>]` comprueba SQL + todos los blobs privados de una organización (incluida papelera), da una huella de metadatos reproducible y falla cerrado ante catálogo vacío, bytes alterados o manifiesto diferente. Los archivos, nombres e IDs de recursos no se imprimen. No crea ni restaura backups; requiere que el operador detenga las escrituras y pruebe la restauración aparte. [Procedimiento y códigos de salida](../docs/SYMFONY-VAULT-STORAGE.md).
 
 Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
 
