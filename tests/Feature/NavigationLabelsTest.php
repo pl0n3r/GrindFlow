@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 final class NavigationLabelsTest extends TestCase
 {
-    public function test_workspace_menus_use_readable_spanish_labels_without_decorative_glyphs(): void
+    public function test_workspace_navigation_uses_readable_spanish_labels_without_decorative_unicode_glyphs(): void
     {
         $views = [
             'dashboard.blade.php',
@@ -21,27 +21,31 @@ final class NavigationLabelsTest extends TestCase
             'admin/diagnostics.blade.php',
         ];
 
-        $knownLabels = [
-            'Resumen', 'Biblioteca', 'Programación', 'Distribución',
-            'Tráfico', 'Finanzas', 'Sistema', 'Diagnósticos',
-        ];
-
         foreach ($views as $view) {
             $blade = file_get_contents(resource_path('views/'.$view));
             self::assertIsString($blade, $view);
-            self::assertSame(1, preg_match('/<nav class="gf-sidebar__nav"[\s\S]*?<\/nav>/', $blade, $match), $view);
-            $navigation = $match[0];
-            self::assertStringNotContainsString('gf-navitem__icon', $navigation, $view);
-            self::assertSame(0, preg_match('/[◫◇⌁⇢⌗⌘\x{FFFD}]/u', $navigation), $view);
-            self::assertGreaterThanOrEqual(
-                1,
-                preg_match_all('/<span class="gf-navitem__text">([^<]+)<\/span>/', $navigation, $labels),
-                $view,
-            );
-            self::assertContains('Resumen', $labels[1], $view);
-            foreach ($labels[1] as $label) {
-                self::assertContains($label, $knownLabels, $view);
-            }
+            self::assertSame(1, substr_count($blade, '<x-workspace-sidebar'), $view);
+            self::assertStringNotContainsString('<aside class="gf-sidebar">', $blade, $view);
         }
+
+        $component = file_get_contents(resource_path('views/components/workspace-sidebar.blade.php'));
+        self::assertIsString($component);
+
+        foreach ([
+            'Resumen',
+            'Biblioteca',
+            'Programación',
+            'Distribución',
+            'Tráfico',
+            'Finanzas',
+            'Sistema',
+            'Diagnósticos',
+        ] as $label) {
+            self::assertStringContainsString("'label' => '".$label."'", $component);
+        }
+
+        self::assertSame(0, preg_match('/[◫◇⌁⇢⌗⌘\x{FFFD}]/u', $component));
+        self::assertStringContainsString('gf-navitem__icon', $component);
+        self::assertStringContainsString('<svg', $component);
     }
 }
