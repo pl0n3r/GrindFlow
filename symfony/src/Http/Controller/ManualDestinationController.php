@@ -28,6 +28,7 @@ final class ManualDestinationController extends AbstractController
                 'ready' => false,
                 'destinations' => [],
                 'total' => 0,
+                'limit' => 100,
                 'provider_calls' => false,
             ]]);
         }
