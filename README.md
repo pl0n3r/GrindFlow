@@ -64,7 +64,7 @@ flowchart LR
 - El modo queda forzado a `review_only`: esta entrega prepara planificación, pero no concede permiso de distribución ni ejecuta publicaciones externas.
 
 ## Archivos modificados en este deploy
-Inventario del **cambio candidato en PR**, NO prueba de deploy de Symfony en Hostinger.
+Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
 - `config/version.php`
 - `symfony/migrations/Version20260921090000.php`
