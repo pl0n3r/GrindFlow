@@ -146,23 +146,47 @@ final class ContentRuleController extends AbstractController
             return $context;
         }
 
+        $params = [
+            'organization' => $context['organization']['id'],
+            'user' => $context['user']->id(),
+        ];
         $rule = $db->fetchAssociative(
-            'SELECT timezone, weekdays, local_time, max_per_day, mode, updated_at FROM gf_content_rules WHERE organization_id = :organization',
-            ['organization' => $context['organization']['id']],
+            <<<'SQL'
+                SELECT rule.timezone, rule.weekdays, rule.local_time, rule.max_per_day, rule.mode, rule.updated_at
+                FROM gf_content_rules rule
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = rule.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE rule.organization_id = :organization
+                  AND membership.user_id = :user AND actor.is_active = 1
+                SQL,
+            $params,
         );
         $assets = $db->fetchAllAssociative(
             <<<'SQL'
-                SELECT id, original_name, mime_type, usage_scope, created_at
-                FROM gf_vault_assets
-                WHERE organization_id = :organization AND deleted_at IS NULL
-                ORDER BY created_at DESC, id DESC
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.organization_id = :organization AND asset.deleted_at IS NULL
+                  AND membership.user_id = :user AND actor.is_active = 1
+                ORDER BY asset.created_at DESC, asset.id DESC
                 LIMIT 30
                 SQL,
-            ['organization' => $context['organization']['id']],
+            $params,
         );
         $total = (int) $db->fetchOne(
-            'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
-            ['organization' => $context['organization']['id']],
+            <<<'SQL'
+                SELECT COUNT(*)
+                FROM gf_vault_assets asset
+                INNER JOIN gf_identity_memberships membership
+                    ON membership.organization_id = asset.organization_id
+                INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                WHERE asset.organization_id = :organization AND asset.deleted_at IS NULL
+                  AND membership.user_id = :user AND actor.is_active = 1
+                SQL,
+            $params,
         );
 
         $items = array_map(function (array $asset) use ($rule): array {
