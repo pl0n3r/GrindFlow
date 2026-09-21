@@ -120,34 +120,7 @@ run_case() {
       grep -Fq 'ERROR: authentication redirect is deterministic; do not retry credentials.' "$log"
       ! grep -Fq 'private-query-do-not-print' "$log"
       ! grep -Fq 'Production smoke attempt 2/' "$log"
-      [[ "$(grep -c '^POST http://mock/login
-  esac
-  printf 'PASS production smoke contract: %s\n' "$label"
-}
-
-run_case pending 3 2
-run_case pending_missing 3 2 missing
-run_case pending_mismatch 3 2 mismatch
-run_case pending_unsafe 3 2 unsafe
-run_case pending_no_fingerprint 3 2 no_fingerprint
-run_case pending_vault_failure 3 3 valid failed
-run_case pending_vault_link_missing 3 3 valid missing_link
-run_case current 0 0
-run_case current_module_failure 0 5 valid ok failed
-run_case current_csv_failure 0 5 valid ok ok failed
-run_case current_stale_release 0 6 valid ok ok ok stale
-run_case current_missing_release 0 6 valid ok ok ok missing
-run_case current_vault_failure 0 4 valid failed
-run_case current_vault_link_missing 0 4 valid missing_link
-run_case auth_post_login 0 7 valid ok ok ok current post_login
-run_case auth_dashboard_login 0 7 valid ok ok ok current dashboard_login
-run_case auth_dashboard_other 0 7 valid ok ok ok current dashboard_other
-
-if MOCK_PENDING=unknown MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/unknown.log" 2>&1; then printf 'FAIL: unknown schema passed smoke.\n' >&2; exit 1; else result=$?; fi
-[[ "$result" -eq 1 ]]
-grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unknown.log"
-! grep -q '^MIGRATIONS_PENDING=' "$workdir/unknown.log"
-printf 'PASS production smoke contract: unknown\n' "$requests")" -eq 1 ]]
+      [[ "$(grep -c '^POST http://mock/login$' "$requests")" -eq 1 ]]
       if [[ "$auth_mode" == post_login ]]; then
         grep -Fq 'ERROR: login redirected back to /login;' "$log"
         ! grep -Fq 'GET http://mock/dashboard' "$requests"
@@ -172,6 +145,9 @@ run_case current_stale_release 0 6 valid ok ok ok stale
 run_case current_missing_release 0 6 valid ok ok ok missing
 run_case current_vault_failure 0 4 valid failed
 run_case current_vault_link_missing 0 4 valid missing_link
+run_case auth_post_login 0 7 valid ok ok ok current post_login
+run_case auth_dashboard_login 0 7 valid ok ok ok current dashboard_login
+run_case auth_dashboard_other 0 7 valid ok ok ok current dashboard_other
 
 if MOCK_PENDING=unknown MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/unknown.log" 2>&1; then printf 'FAIL: unknown schema passed smoke.\n' >&2; exit 1; else result=$?; fi
 [[ "$result" -eq 1 ]]
