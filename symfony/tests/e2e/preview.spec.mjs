@@ -1764,7 +1764,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
     'Borrador cancelado. El registro se conserva en el historial.',
   );
-  await expect(page.getByText('Borrador cancelado')).toBeVisible();
+  await expect(page.getByText('Borrador cancelado', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Revocar autorización' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
