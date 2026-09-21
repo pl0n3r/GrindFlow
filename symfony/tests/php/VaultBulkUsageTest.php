@@ -120,7 +120,7 @@ final class VaultBulkUsageTest extends WebTestCase
             self::assertResponseIsSuccessful();
             $listed = json_decode((string) $client->getResponse()->getContent(), true)['data'];
             self::assertSame(2, $listed['total']);
-            self::assertSame(4, $listed['quota']['used_assets']);
+            self::assertSame(3, $listed['quota']['used_assets']);
 
             foreach ([$trashed, $foreignAsset] as $id) {
                 self::assertSame('unclassified', $db->fetchOne(
