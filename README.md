@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.56: auditoría operativa de recuperación del Vault Symfony, todavía no desplegado.** Laravel sigue como runtime productivo observado; Symfony permanece aislado. Base `main` v0.1.55 `02c4a00df713fe2f0b2555d6666b2d145d1bf107`, CI exact-main success. No se hacen backups ni migraciones productivas.
+> **Candidato v0.1.56: auditoría operativa de recuperación del Vault Symfony, todavía no desplegado.** El alcance «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.55 `02c4a00df713fe2f0b2555d6666b2d145d1bf107`, CI exact-main success. No se hacen backups ni migraciones productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
