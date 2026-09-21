@@ -1673,7 +1673,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('2026-09-22 · 09:30')).toBeVisible();
   await expect(page.getByText('Capacidad 2/día')).toBeVisible();
   await expect(page.getByText('Revisión humana pendiente')).toBeVisible();
-  await page.getByRole('button', { name: 'Aprobar revisión' }).click();
+  await page.getByRole('button', { name: 'Aprobar revisión de campaña.png' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Revisión humana aprobada');
   await expect(page.getByText('Revisión humana aprobada', { exact: true })).toBeVisible();
   await expect(page.getByText('Requiere revisión de contenido')).toHaveCount(0);
@@ -1688,7 +1688,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
   await expect(page.getByText('Distribución sin autorizar')).toBeVisible();
   await expect(page.getByText('Listo para programar internamente')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Revocar revisión' }).click();
+  await page.getByRole('button', { name: 'Revocar revisión de campaña.png' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Aprobación de revisión revocada');
   await expect(page.getByText('Revisión humana pendiente')).toBeVisible();
 
