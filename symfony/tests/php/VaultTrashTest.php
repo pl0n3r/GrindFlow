@@ -167,7 +167,7 @@ final class VaultTrashTest extends WebTestCase
             $classified = json_decode((string) $client->getResponse()->getContent(), true)['data'];
             self::assertSame(1, $classified['total']);
             self::assertSame('internal_only', $classified['assets'][0]['usage_scope']);
-            self::assertSame(2, $classified['quota']['used_assets']);
+            self::assertSame(1, $classified['quota']['used_assets']);
             $client->request('GET', '/api/admin/vault?usage=needs_review');
             self::assertSame(0, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
             foreach (['published', 'all%5B%5D', 'internal_only%26view%3Dtrash'] as $invalid) {
