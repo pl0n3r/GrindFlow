@@ -9,6 +9,7 @@ use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultAuditCommand;
 use GrindFlow\Infrastructure\Storage\VaultStageCommand;
 use GrindFlow\Infrastructure\Storage\VaultVerifyStageCommand;
+use GrindFlow\Infrastructure\Storage\VaultVerifyRestoreCommand;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -31,6 +32,7 @@ final class VaultAuditCommandTest extends KernelTestCase
         self::bootKernel();
         // The operator must be able to find the command in the real Symfony container.
         self::assertSame('grindflow:vault:audit', (new Application(static::$kernel))->find('grindflow:vault:audit')->getName());
+        self::assertSame('grindflow:vault:verify-restore', (new Application(static::$kernel))->find('grindflow:vault:verify-restore')->getName());
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $base = sys_get_temp_dir().'/gf-recovery-'.bin2hex(random_bytes(6));
@@ -177,6 +179,62 @@ final class VaultAuditCommandTest extends KernelTestCase
             [$exit, $recoveredStage] = $check($good['manifest_sha256']);
             self::assertSame(0, $exit);
             self::assertSame('verified', $recoveredStage['status']);
+
+            // The new recovery gate checks a preverified offline stage
+            // AGAINST restored SQL and restored Vault bytes, not only itself.
+            $restore = new CommandTester(new VaultVerifyRestoreCommand(
+                $db, new VaultBlobVerifier($storage), new VaultVerifyStageCommand($project),
+            ));
+            $restoreArgs = [
+                '--organization' => $mine, '--directory' => $stagePath,
+                '--expect' => $good['manifest_sha256'],
+                '--confirm-writes-stopped' => true,
+            ];
+            $restoredCheck = static function (array $args) use ($restore): array {
+                $exitCode = $restore->execute($args);
+                return [$exitCode, json_decode($restore->getDisplay(), true, 512, JSON_THROW_ON_ERROR)];
+            };
+            [$exit, $recovered] = $restoredCheck($restoreArgs);
+            self::assertSame(0, $exit);
+            self::assertSame('verified', $recovered['status']);
+            self::assertSame(2, $recovered['assets']);
+            self::assertTrue($recovered['stage_matches_database_and_originals']);
+            [$exit, $frozenMissing] = $restoredCheck(array_diff_key($restoreArgs, ['--confirm-writes-stopped' => true]));
+            self::assertSame(2, $exit);
+            self::assertSame('invalid_restore_options', $frozenMissing['code']);
+            [$exit, $wrongExpected] = $restoredCheck(array_replace($restoreArgs, ['--expect' => str_repeat('0', 64)]));
+            self::assertSame(2, $exit);
+            self::assertSame('stage_integrity_failed', $wrongExpected['code']);
+            [$exit, $foreignRestore] = $restoredCheck(array_replace($restoreArgs, ['--organization' => $foreign]));
+            self::assertSame(2, $exit);
+            self::assertSame('stage_catalog_mismatch', $foreignRestore['code']);
+
+            file_put_contents($stagedFirst, substr_replace($bytes, 'X', 0, 1));
+            [$exit, $damagedStaging] = $restoredCheck($restoreArgs);
+            self::assertSame(2, $exit);
+            self::assertSame('stage_integrity_failed', $damagedStaging['code']);
+            file_put_contents($stagedFirst, $bytes);
+
+            $db->update('gf_vault_assets', ['original_name' => 'renamed-after-stage.png'], ['id' => $first]);
+            [$exit, $changedCatalog] = $restoredCheck($restoreArgs);
+            self::assertSame(2, $exit);
+            self::assertSame('restored_catalog_mismatch', $changedCatalog['code']);
+            $db->update('gf_vault_assets', ['original_name' => 'private-'.$first.'.png'], ['id' => $first]);
+
+            file_put_contents($root.'/'.$first.'.blob', substr_replace($bytes, 'X', 0, 1));
+            [$exit, $wrongBytes] = $restoredCheck($restoreArgs);
+            self::assertSame(2, $exit);
+            self::assertSame('restored_blob_integrity_failed', $wrongBytes['code']);
+            file_put_contents($root.'/'.$first.'.blob', $bytes);
+            [$exit, $restoredAgain, $safeOutput] = (static function () use ($restore, $restoreArgs): array {
+                $exitCode = $restore->execute($restoreArgs);
+                return [$exitCode, json_decode($restore->getDisplay(), true, 512, JSON_THROW_ON_ERROR), $restore->getDisplay()];
+            })();
+            self::assertSame(0, $exit);
+            self::assertSame('verified', $restoredAgain['status']);
+            foreach ([$first, $second, $foreign, $root, $stagePath] as $private) {
+                self::assertStringNotContainsString($private, $safeOutput);
+            }
 
             file_put_contents($root.'/'.$first.'.blob', substr_replace($bytes, 'X', 0, 1));
             [$exit, $tampered] = $run($mine, $good['manifest_sha256']);

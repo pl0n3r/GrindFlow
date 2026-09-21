@@ -1,11 +1,11 @@
 # GrindFlow · Runtime Symfony aislado
 
-> **Estado del slice candidato v0.1.57:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
+> **Estado del slice candidato v0.1.58:** Symfony 7.4 + MariaDB descartable, identidad/organizaciones y Vault móvil privado. Se comprueba SHA-256 antes de descargar, previsualizar o restaurar originales; el usuario puede verificar los 30 elementos visibles, también en papelera. Laravel sigue atendiendo el sitio productivo. Symfony NO está desplegado en Hostinger y no se han migrado usuarios, imágenes ni tablas productivas.
 
 | Etapa | Evidencia separada |
 | --- | --- |
-| IMPLEMENTADO | v0.1.57 en rama: preparación manual privada de originales + catálogo por tenant y verificación independiente del stage; sin respaldo de MariaDB. |
-| VALIDADO EN CÓDIGO | CI y Sonar del head v0.1.57 pendientes; base exact-main v0.1.56 success. |
+| IMPLEMENTADO | v0.1.58 en rama: comparación read-only de stage íntegro frente a la base y los originales de un entorno restaurado y aislado. |
+| VALIDADO EN CÓDIGO | CI y Sonar del head v0.1.58 pendientes; base exact-main v0.1.57 success. |
 | DESPLEGADO | No: Symfony no se ha instalado ni activado en Hostinger. El Observer de Laravel no certifica Symfony ni SHA remoto. |
 | VALIDADO EN PRODUCCIÓN | No: Smoke autenticado sigue sin credencial E2E; la MariaDB de Symfony es solo descartable. |
 
@@ -13,7 +13,11 @@
 
 **v0.1.55, storage fuera del release (opcional):** `GRINDFLOW_VAULT_ROOT` acepta una ruta absoluta con directorio padre ya existente y fuera del árbol de la versión desplegada. El servicio común resuelve carga/lectura/restauración e impide raíces simbólicas, rutas relativas o travesías; la ruta predeterminada de tests no cambia. No se mueven archivos existentes ni se crea backup. Operación, migración segura y verificación de restauración: [Storage privado Symfony](../docs/SYMFONY-VAULT-STORAGE.md). Symfony sigue aislado y NO desplegado.
 
-**v0.1.57, auditoría de restauración:** `php bin/console grindflow:vault:audit --organization=<UUID> [--expect=<SHA256>]` comprueba SQL + todos los blobs privados de una organización (incluida papelera), da una huella de metadatos reproducible y falla cerrado ante catálogo vacío, bytes alterados o manifiesto diferente. Los archivos, nombres e IDs de recursos no se imprimen. No crea ni restaura backups; requiere que el operador detenga las escrituras y pruebe la restauración aparte. [Procedimiento y códigos de salida](../docs/SYMFONY-VAULT-STORAGE.md).
+**v0.1.56, auditoría de restauración:** `php bin/console grindflow:vault:audit --organization=<UUID> [--expect=<SHA256>]` comprueba SQL + todos los blobs privados de una organización (incluida papelera), da una huella de metadatos reproducible y falla cerrado ante catálogo vacío, bytes alterados o manifiesto diferente. Los archivos, nombres e IDs de recursos no se imprimen. No crea ni restaura backups; requiere que el operador detenga las escrituras y pruebe la restauración aparte. [Procedimiento y códigos de salida](../docs/SYMFONY-VAULT-STORAGE.md).
+
+**v0.1.57, staging privado:** `grindflow:vault:stage` prepara una copia deliberada de originales y catálogo por organización cuando no hay escrituras; `grindflow:vault:verify-stage` comprueba esta copia sin consultar DB viva. **No incluye MariaDB.**
+
+**v0.1.58, cotejo después de restaurar:** `grindflow:vault:verify-restore` compara un stage validado y su huella guardada con el catálogo y cada blob del entorno Symfony restaurado, incluyendo papelera. Exige organización explícita y escrituras detenidas. La prueba automática usa MariaDB sintética; aún queda pendiente un respaldo completo y ensayo operativo de restauración real. [Procedimiento y límites](../docs/SYMFONY-VAULT-STORAGE.md).
 
 Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
 

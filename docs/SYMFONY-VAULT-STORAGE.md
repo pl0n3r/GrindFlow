@@ -134,6 +134,49 @@ ensayar una restauración real en un entorno aislado. Ninguno de los comandos
 ejecuta SQL de restauración, cambia la raíz activa, purga ni modifica archivos
 existentes del Vault.
 
+
+
+## Ensayo de recuperación: cotejo de la copia y el entorno restaurado (v0.1.58)
+
+Tras obtener un backup completo y coherente de **MariaDB Symfony**, además
+de la carpeta privada `stage` del Vault, restaurar ambos en un **entorno
+separado y descartable**: nuevas credenciales, base aislada, directorio de
+originales privado y `GRINDFLOW_VAULT_ROOT` apuntando **solo** a esos bytes
+restaurados. No dirigir jamás esta prueba a la MariaDB ni al Vault activos de
+Laravel o de Hostinger. Suspender escrituras en el entorno del ensayo, guardar
+fuera del directorio de copia la huella SHA-256 que devolvió `audit` y usar:
+
+```bash
+cd symfony
+php bin/console grindflow:vault:verify-stage \
+  --directory=/volumen-privado-0700/copia-nueva \
+  --expect=HUELLA_SHA256_GUARDADA
+php bin/console grindflow:vault:verify-restore \
+  --organization=UUID-ORGANIZACION \
+  --directory=/volumen-privado-0700/copia-nueva \
+  --expect=HUELLA_SHA256_GUARDADA \
+  --confirm-writes-stopped
+```
+
+`verify-restore` verifica de nuevo toda la copia y compara su pertenencia a
+la organización, cantidad de archivos, huella canónica del catálogo de la
+base **restaurada** y tamaño/huella de **cada original restaurado**, incluidos
+los que sigan en papelera. Repite las lecturas para detectar cambios durante
+el ensayo; no ofrece una transacción de snapshot ni reemplaza la congelación
+de escrituras. Una copia íntegra que no coincida con la DB/restauración es
+**incompleta**, y viceversa. No se confía en un manifiesto editado sin la
+huella independiente guardada antes de capturar la copia.
+
+Salida JSON segura con `verified|incomplete|error`, recuento y huella, sin
+nombres, claves, rutas ni excepciones internas. Exit `0` solo si coincide
+todo; `2` para argumentos incorrectos o recuperación incompleta; `3`
+para error operacional. El comando **no** extrae backups de MariaDB, no
+restaura datos automáticamente, no mide las otras tablas/dependencias ni
+certifica por sí solo un RPO/RTO. Anotar aparte la validación de identidad,
+membresías, configuración/secretos recuperados, tiempo de recuperación y
+prueba de acceso con credenciales sintéticas. No ejecutarlo como parte
+de un deploy automático ni de Production Smoke.
+
 ### Operación pendiente antes de producción
 
 Definir política aprobada de retención y eliminación, almacenamiento durable
