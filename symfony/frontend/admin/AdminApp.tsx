@@ -335,7 +335,10 @@ export function AdminApp() {
             {context.weekly_rule_csrf !== undefined
               ? <>
                   <strong>Alcance S3 en revisión</strong>
-                  <p>La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony. Aún no se crean schedules ni publicaciones externas.</p>
+                  <p>
+                    La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony.
+                    Aún no se crean schedules ni publicaciones externas.
+                  </p>
                 </>
               : <>
                   <strong>Alcance S2 inicial</strong>
