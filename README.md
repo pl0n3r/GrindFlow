@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.63: clasificación múltiple de hasta 30 imágenes visibles, transaccional y tenant-safe.** El alcance «solo el deploy actual» sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.62 `311cbcbe015c039d719527f2c3d417ab8d1c4ac8`, CI exact-main success (run 35571685244). No se cambiaron datos ni migraciones productivas.
+> **Candidato v0.1.64: límite de intentos de cambio de contraseña personal Symfony.** El alcance «solo el deploy actual» sigue siendo Laravel en Hostinger; Symfony continúa aislado. Base exacta `main` v0.1.63 `993293b06607bd31bcea622f906008a9f081d769`, CI exact-main success (run 35572662055). Ningún dato ni migración productiva fue modificado.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,9 +18,9 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.63** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.62~~ | `311cbcbe015c039d719527f2c3d417ab8d1c4ac8` |
-| CI del PR | 🚧 Nuevo head por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.64** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.63~~ | `993293b06607bd31bcea622f906008a9f081d769` |
+| CI del PR | 🚧 Head v0.1.64 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+547** | **−45** | **+502** |
+| **9** | **+91** | **−28** | **+63** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: clasificar selección visible en una sola transacción y conservar guardas de tenant |
+| Alcance | S1: ocho solicitudes con CSRF válido por cuenta y ventana móvil de 15 minutos; bloqueo 429 |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
 
 ## Flujo de entrega
@@ -58,10 +58,11 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Selección explícita de 1 a 30 imágenes activas de la página actual con confirmación, opción de seleccionar/quitar visibles, estado accesible y vista móvil 360 px.
-- API de clasificación masiva: CSRF, membresía y rol revalidados bajo bloqueo SQL; lote mixto con imagen ajena, en papelera o ausente se rechaza completo sin escrituras parciales.
-- Repetir la misma clasificación devuelve cero recursos cambiados, sin duplicación ni efectos externos. UI mantiene la selección tras rechazo y la limpia al guardar o cambiar filtros/vista/página.
-- PHPUnit/MariaDB con fixtures descartables y Chromium sintético cubren transacción, tenant, IDOR, rol de lectura, reintento y errores.
+- Protección de la cuenta Symfony: limitador independiente del login y de la sesión del navegador, con clave derivada del actor autenticado en el servidor.
+- Respuesta `429` con código estable, `Retry-After` y `Cache-Control: no-store` antes de volver a calcular hashes o escribir SQL; CSRF inválido no consume cupo.
+- Pruebas PHPUnit/MariaDB cubren límite tras cerrar y volver a abrir sesión; Chromium móvil comprueba mensaje de bloqueo y limpieza de contraseñas. Sin cambiar el runtime Laravel.
+- Cache por defecto `cache.rate_limiter`; limpiar cache reinicia ventanas. Varias instancias Symfony requerirían cache compartido antes del cutover.
+
 ## Archivos modificados en este deploy
 Inventario del **cambio candidato en PR**, NO prueba de deploy de Symfony en Hostinger.
 - `README.md`
@@ -69,30 +70,30 @@ Inventario del **cambio candidato en PR**, NO prueba de deploy de Symfony en Hos
 - `docs/GRINDFLOW-SPEC.md`
 - `docs/REQUIREMENTS.md`
 - `symfony/README.md`
-- `symfony/frontend/admin/VaultPanel.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/src/Http/Controller/VaultController.php`
+- `symfony/config/packages/framework.yaml`
+- `symfony/src/Http/Controller/AccountSecurityController.php`
 - `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/VaultBulkUsageTest.php`
+- `symfony/tests/php/AccountSecurityTest.php`
+
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.63 por verificar; el CI exact-main v0.1.62 tuvo resultado success.
-- Sin checkout local de PHP/MariaDB/Chromium; GitHub Actions valida el cambio. No se tocó producción.
+- CI/Sonar/CodeRabbit del candidato v0.1.64 por verificar; CI exact-main v0.1.63 success.
+- Sin checkout local de PHP/MariaDB/Chromium; GitHub Actions valida el cambio. Producción intacta.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar clasificación múltiple v0.1.63 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Reglas de elegibilidad y ensayo real backup MariaDB + blobs | 🚧 Sin autorización implícita |
-| **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
+| **NOW** | 🚧 Validar seguridad de cuenta v0.1.64 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Contrato de revocación multi-sesión y recuperación verificable de MariaDB | 🚧 Sin suponer sesiones globales |
+| **LATER** | 🚧 Paridad Symfony y cutover reversible | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Clasificación múltiple S2 v0.1.63 | 🚧 CI y revisión |
+| **NOW** | 🚧 Límite de intentos por identidad v0.1.64 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Backup MariaDB y ensayo integral de restauración | 🚧 Retención y operación pendientes |
-| **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
+| **LATER** | 🚧 Paridad del monolito modular | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
