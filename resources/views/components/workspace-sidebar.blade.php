@@ -84,6 +84,15 @@
             'disabled_reason' => 'Diagnósticos no disponibles.',
         ],
     ] : [];
+
+    $sections = [
+        ['label' => 'Workspace', 'items' => $workspaceItems],
+        ['label' => 'Insights', 'items' => $insightItems],
+    ];
+
+    if ($adminItems !== []) {
+        $sections[] = ['label' => 'Admin', 'items' => $adminItems];
+    }
 @endphp
 
 <aside class="gf-sidebar" data-workspace-sidebar>
@@ -120,60 +129,10 @@
     </svg>
 
     <nav class="gf-sidebar__nav" aria-label="Navegación principal">
-        <span class="gf-sidebar__label">Workspace</span>
+        @foreach ($sections as $section)
+            <span class="gf-sidebar__label">{{ $section['label'] }}</span>
 
-        @foreach ($workspaceItems as $item)
-            @if ($item['href'])
-                <a
-                    class="gf-navitem {{ $active === $item['key'] ? 'gf-navitem--active' : '' }}"
-                    href="{{ $item['href'] }}"
-                    title="{{ $item['label'] }}"
-                    @if ($active === $item['key']) aria-current="page" @endif
-                >
-                    <svg class="gf-navitem__icon" aria-hidden="true"><use href="#gf-icon-{{ $item['key'] }}"></use></svg>
-                    <span class="gf-navitem__text">{{ $item['label'] }}</span>
-                </a>
-            @else
-                <span
-                    class="gf-navitem gf-navitem--disabled"
-                    aria-disabled="true"
-                    title="{{ $item['disabled_reason'] }}"
-                >
-                    <svg class="gf-navitem__icon" aria-hidden="true"><use href="#gf-icon-{{ $item['key'] }}"></use></svg>
-                    <span class="gf-navitem__text">{{ $item['label'] }}</span>
-                </span>
-            @endif
-        @endforeach
-
-        <span class="gf-sidebar__label">Insights</span>
-
-        @foreach ($insightItems as $item)
-            @if ($item['href'])
-                <a
-                    class="gf-navitem {{ $active === $item['key'] ? 'gf-navitem--active' : '' }}"
-                    href="{{ $item['href'] }}"
-                    title="{{ $item['label'] }}"
-                    @if ($active === $item['key']) aria-current="page" @endif
-                >
-                    <svg class="gf-navitem__icon" aria-hidden="true"><use href="#gf-icon-{{ $item['key'] }}"></use></svg>
-                    <span class="gf-navitem__text">{{ $item['label'] }}</span>
-                </a>
-            @else
-                <span
-                    class="gf-navitem gf-navitem--disabled"
-                    aria-disabled="true"
-                    title="{{ $item['disabled_reason'] }}"
-                >
-                    <svg class="gf-navitem__icon" aria-hidden="true"><use href="#gf-icon-{{ $item['key'] }}"></use></svg>
-                    <span class="gf-navitem__text">{{ $item['label'] }}</span>
-                </span>
-            @endif
-        @endforeach
-
-        @if ($adminItems !== [])
-            <span class="gf-sidebar__label">Admin</span>
-
-            @foreach ($adminItems as $item)
+            @foreach ($section['items'] as $item)
                 @if ($item['href'])
                     <a
                         class="gf-navitem {{ $active === $item['key'] ? 'gf-navitem--active' : '' }}"
@@ -181,7 +140,9 @@
                         title="{{ $item['label'] }}"
                         @if ($active === $item['key']) aria-current="page" @endif
                     >
-                        <svg class="gf-navitem__icon" aria-hidden="true"><use href="#gf-icon-{{ $item['key'] }}"></use></svg>
+                        <svg class="gf-navitem__icon" aria-hidden="true">
+                            <use href="#gf-icon-{{ $item['key'] }}"></use>
+                        </svg>
                         <span class="gf-navitem__text">{{ $item['label'] }}</span>
                     </a>
                 @else
@@ -190,12 +151,14 @@
                         aria-disabled="true"
                         title="{{ $item['disabled_reason'] }}"
                     >
-                        <svg class="gf-navitem__icon" aria-hidden="true"><use href="#gf-icon-{{ $item['key'] }}"></use></svg>
+                        <svg class="gf-navitem__icon" aria-hidden="true">
+                            <use href="#gf-icon-{{ $item['key'] }}"></use>
+                        </svg>
                         <span class="gf-navitem__text">{{ $item['label'] }}</span>
                     </span>
                 @endif
             @endforeach
-        @endif
+        @endforeach
     </nav>
 
     <div class="gf-sidebar__bottom">
