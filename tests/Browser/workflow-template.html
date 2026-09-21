@@ -111,7 +111,8 @@
     assert(menuIcons.length >= 4, 'Workspace menu must render visible SVG icons');
     assert(menuIcons.every(icon => icon.getAttribute('aria-hidden') === 'true'),
       'Workspace SVG icons must stay decorative for assistive technology');
-    assert(!/[◫◇⌁⇢⌗⌘�]/u.test(text(dashboard.querySelector('.gf-sidebar__nav'))),
+    const menuText = dashboard.querySelector('.gf-sidebar__nav')?.textContent ?? '';
+    assert(!/[◫◇⌁⇢⌗⌘�]/u.test(menuText),
       'Workspace menu must not depend on decorative Unicode symbols');
     pass('authenticated workspace menu renders readable labels with accessible SVG icons');
     const card = [...dashboard.querySelectorAll('.gf-org[data-organization-id]')]
