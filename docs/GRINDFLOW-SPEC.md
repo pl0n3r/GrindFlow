@@ -397,3 +397,21 @@ normales estén almacenadas en la base de datos.
 La compuerta CI `real-stack` ejecuta Chromium autenticado sobre MariaDB 11.4
 descartable y complementa `browser` sobre SQLite. Ninguna usa credenciales
 productivas, proveedores externos ni escrituras en producción.
+
+## 23. S3 weekly review preview and conservative eligibility
+
+- The authenticated preview reads the selected organization's weekly rule and
+  active Vault assets only; every data query is joined to the live membership
+  and active actor so tenant access is revalidated at read time.
+- The endpoint returns at most 30 recent active assets plus the complete active
+  count. Trash and foreign-tenant assets are excluded.
+- Each visible asset carries stable blocking reasons. Missing rule,
+  unclassified/internal-only/needs-review state and missing distribution
+  authorization are surfaced explicitly rather than guessed.
+- S2 classification never grants publishing permission. Until a separate
+  distribution-authorization contract exists, every preview item remains
+  `eligible=false`, the response remains `can_publish=false`, and mode is
+  `review_only`.
+- This preview is read-only: it creates no schedule, performs no provider call
+  and changes no production data.
+
