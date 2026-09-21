@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.76: navegación coherente en Symfony.** Base exacta `main` v0.1.75 `6edf72165b45785f9b0acb023347ce157266aab4`. Interfaz aislada; NO implica deploy ni cutover en Hostinger.
+> **Candidato v0.1.77: navegación continua de acceso + compuerta CodeRabbit obligatoria.** Base exacta `main` v0.1.76 `10da41703359bc3455bb5939be08e371e60f1293`. Symfony aislado, NO desplegado ni migrado en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,16 +18,16 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.76** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.75~~ | `6edf72165b45785f9b0acb023347ce157266aab4` |
-| CI del PR | 🚧 Head v0.1.76 por validar | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.77** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.76~~ | `10da41703359bc3455bb5939be08e371e60f1293` |
+| CI del PR | 🚧 Head v0.1.77 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente del head estable | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente del head estable | PR |
-| CI del SHA exacto de main | ✅ ~~v0.1.75 success~~ | run `35662263071` |
-| Deploy Observer | ✅ ~~v0.1.75 release observado~~ | run `35662263082`; versión humana, NO SHA Hostinger |
-| Production Smoke | ⛔ Credencial E2E productiva pendiente | run `35662263001`; [Issue #1](https://github.com/pl0n3r/GrindFlow/issues/1) |
+| CI del SHA exacto de main | ✅ ~~v0.1.76 success~~ | run `35664374136` |
+| Deploy Observer | ✅ ~~v0.1.76 release observado~~ | run `35664374124`; versión humana, NO SHA Hostinger |
+| Production Smoke | ⛔ Credencial ya configurada; autenticación no verificada | run `35664937043` falló: `/dashboard` HTTP 302 tras POST; [Issue #73](https://github.com/pl0n3r/GrindFlow/issues/73). #1 cerrado |
 | Symfony en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | 🚧 Ninguna migración nueva en este candidato | Producción intacta |
+| Migraciones | ✅ ~~Sin migraciones nuevas en el candidato~~ | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
@@ -40,8 +40,8 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | GF-UX-001: componente único de navegación React + escritorio/tablet/móvil + foco y skip link |
-| Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger independientes |
+| Alcance | GF-UX-002: misma cabecera login/organizaciones Symfony, navegación 360/820 px y CSRF; regla bloqueante CodeRabbit |
+| Revisiones | CI + Sonar + **CodeRabbit terminado sobre head final ANTES de merge**; exact-main y Hostinger separados |
 
 ## Flujo de entrega
 ```mermaid
@@ -50,51 +50,56 @@ flowchart LR
  P --> F["fast contracts"]
  F --> V["validate"]
  A --> S["Sonar"]
- A --> C["CodeRabbit"]
+ A --> C["CodeRabbit final"]
  V --> M["Squash merge"]
+ S --> M
+ C --> M
  M --> X["CI exact-main"]
  X --> O["Observer release"]
  O --> T["Smoke autenticado separado"]
 ```
 
 ## Qué se hizo
-- Componente `WorkspaceNavigation` compartido por preview conceptual y admin real: marca, etiqueta de espacio, números, secciones, estados activos y pie contextual.
-- Menús sincronizados a breakpoint de 900 px, con barra horizontal desplazable dentro del menú a 820/360 px y rail más compacto a 901–1120 px, sin agrandar el documento.
-- Admin: accesos «Biblioteca» y «Programación» conservan anclas reales, «Resumen» y las secciones siguen el hash activo, y «Saltar al contenido» llega al `main` correcto.
-- Acciones de sesión fuera de posicionamiento absoluto sobre la cabecera. Estados accesibles en preview mediante `aria-pressed`, en admin mediante `aria-current` (`page`/`location`); pruebas Chromium a 820 y 360 px.
-- No hay publicación externa ni cambios productivos. Los módulos S4 y la biblioteca no alteran sus contratos.
+- Cabecera Symfony compartida entre login y selección de organización; enlaces reales a inicio/vista previa y sección actual accesible, sin duplicar marca ni exponer funciones privadas.
+- CSS acotado para la cabecera de identidad, enlaces y tarjetas a 360/820 px; CSRF y membresías sin cambios.
+- Regresión PHPUnit del selector autenticado y Chromium del ingreso responsive, CSRF y ausencia de desbordamiento.
+- **Regla dura en AGENTS.md + docs/GOVERNANCE.md:** si CodeRabbit no finaliza sobre el SHA último, el merge permanece bloqueado; PR #72 documentada como incidente de proceso.
+- La configuración del secreto E2E cerró #1, pero el smoke de producción v0.1.76 falló con HTTP 302 en Dashboard; diagnóstico registrado en #73. Sin publicación externa, deploy de Symfony ni migraciones productivas.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual candidato; no prueba despliegue Symfony en Hostinger.
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
+- `docs/GOVERNANCE.md`
 - `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/PreviewApp.tsx`
-- `symfony/frontend/admin/WorkspaceNavigation.tsx`
-- `symfony/frontend/admin/main.tsx`
-- `symfony/frontend/admin/workspace-navigation.css`
+- `symfony/public/assets/grindflow.css`
+- `symfony/templates/identity/_header.html.twig`
+- `symfony/templates/identity/login.html.twig`
+- `symfony/templates/identity/organizations.html.twig`
 - `symfony/tests/e2e/preview.spec.mjs`
+- `symfony/tests/php/IdentityLoginTest.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.76 aún sin confirmar.
-- `symfony-preview` debe ejecutar PHPUnit/MariaDB, TypeScript/Vite y Chromium real a 360/820 px. No se ha probado el proyecto localmente en esta entrega.
+- CI/Sonar/CodeRabbit del candidato v0.1.77 pendientes; **sin aprobación ni merge hasta revisión final explícita de CodeRabbit**.
+- `symfony-preview` debe ejecutar PHPUnit/MariaDB, Vite y Chromium a 360/820 px. No hubo pruebas locales; la rama aún requiere CI de PR.
+- El smoke v0.1.76 detectó 15 redirecciones HTTP 302 al consultar el dashboard, pero no distingue aún contraseña inválida de sesión no conservada. #73 registra diagnóstico.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar navegación consistente v0.1.76 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Seguir S4 con evidencia interna y preparación operativa | 🚧 Sin proveedor real |
+| **NOW** | 🚧 Acceso visual v0.1.77 + gate CodeRabbit final; diagnosticar #73 | 🚧 PR/revisión y producción separados |
+| **NEXT** | 🚧 Corregir origen del 302 E2E sin reintentos de autenticación innecesarios; seguir S4 | 🚧 Con evidencia de diagnóstico |
 | **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y cutover Symfony pendiente de paridad | ⛔ No declarar producción validada |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~S4 cola y destinos manuales v0.1.74~~ | ✅ ~~CI exact-main v0.1.75~~ |
-| **NOW** | 🚧 Navegación unificada v0.1.76 | 🚧 Pruebas y revisión |
-| **NEXT** | 🚧 S4 preparación operativa | 🚧 Sin proveedor real |
-| **LATER** | 🚧 Distribución + Traffic Symfony | 🚧 S4–S5 |
-| **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
+| **DONE** | ✅ ~~Navegación workspace v0.1.76, secreto E2E configurado #1~~ | ✅ ~~CI exact-main v0.1.76; release observado~~ |
+| **NOW** | 🚧 Acceso visual v0.1.77 + gate CodeRabbit final; diagnosticar #73 | 🚧 PR/revisión y producción separados |
+| **NEXT** | 🚧 Corregir origen del 302 E2E sin reintentos de autenticación innecesarios; seguir S4 | 🚧 Con evidencia de diagnóstico |
+| **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y cutover Symfony pendiente de paridad | ⛔ No declarar producción validada |
