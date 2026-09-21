@@ -13,6 +13,7 @@ type Context = {
   content_review_csrf?: string | null;
   schedule_draft_csrf?: string | null;
   distribution_authorization_csrf?: string | null;
+  manual_handoff_csrf?: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -21,6 +22,7 @@ type Context = {
     content_review: boolean;
     content_review_decide: boolean;
     distribution_authorize: boolean;
+    manual_handoff_manage: boolean;
   };
 };
 
@@ -332,6 +334,8 @@ export function AdminApp() {
               scheduleCsrf={context.schedule_draft_csrf ?? null}
               canAuthorize={context.permissions.distribution_authorize}
               authorizationCsrf={context.distribution_authorization_csrf ?? null}
+              canManualHandoff={context.permissions.manual_handoff_manage}
+              manualHandoffCsrf={context.manual_handoff_csrf ?? null}
             />}
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
@@ -339,7 +343,7 @@ export function AdminApp() {
                   <strong>Alcance S4 · agenda interna</strong>
                   <p>
                     La regla semanal, sus slots, la revisión humana y la autorización interna ya son visibles en Symfony.
-                    La agenda permite borradores cancelables, sin envíos ni publicaciones externas.
+                    La agenda permite borradores cancelables y handoff manual auditado, sin llamadas a proveedores.
                   </p>
                 </>
               : <>
