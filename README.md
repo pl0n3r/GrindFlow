@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+527** | **−33** | **+494** |
+| **13** | **+528** | **−32** | **+496** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -65,6 +65,7 @@ flowchart LR
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: cambio candidato en PR, NO prueba de deploy de Symfony en Hostinger.
+- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
