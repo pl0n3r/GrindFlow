@@ -138,6 +138,7 @@ final class ManualHandoffController extends AbstractController
                 ? null
                 : (string) $latest['destination_id'];
 
+            $legacyDestinationUpgrade = false;
             if ($desired === $current) {
                 if ($desired !== 'prepare' || $destinationId === $currentDestination) {
                     return [
@@ -148,8 +149,11 @@ final class ManualHandoffController extends AbstractController
                         'updated_at' => $latest === false ? null : (string) $latest['created_at'],
                     ];
                 }
-
-                return ['status' => 'destination_change_requires_retry'];
+                if ($currentDestination === null) {
+                    $legacyDestinationUpgrade = true;
+                } else {
+                    return ['status' => 'destination_change_requires_retry'];
+                }
             }
             if ($current === 'complete') {
                 return ['status' => 'completed'];
@@ -157,7 +161,7 @@ final class ManualHandoffController extends AbstractController
 
             $eventDestination = $currentDestination;
             if ($desired === 'prepare') {
-                if (!in_array($current, ['none', 'fail'], true)) {
+                if (!$legacyDestinationUpgrade && !in_array($current, ['none', 'fail'], true)) {
                     return ['status' => 'invalid_transition'];
                 }
 
