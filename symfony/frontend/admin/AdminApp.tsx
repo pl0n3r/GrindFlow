@@ -321,8 +321,15 @@ export function AdminApp() {
           {context.weekly_rule_csrf !== undefined &&
             <WeeklyPlannerPanel canEdit={context.permissions.content_prepare} csrf={context.weekly_rule_csrf} />}
           <section className="admin-notice" role="status">
-            <strong>Alcance S3 en revisión</strong>
-            <p>La regla semanal y su vista previa ya son visibles en Symfony. Aún no se crean publicaciones ni se conectan plataformas externas.</p>
+            {context.weekly_rule_csrf !== undefined
+              ? <>
+                  <strong>Alcance S3 en revisión</strong>
+                  <p>La regla semanal y su vista previa ya son visibles en Symfony. Aún no se crean publicaciones ni se conectan plataformas externas.</p>
+                </>
+              : <>
+                  <strong>Alcance S2 inicial</strong>
+                  <p>La biblioteca privada admite imágenes; los videos, la programación y las conexiones externas todavía no están habilitados en Symfony.</p>
+                </>}
           </section>
         </main>
       </section>
