@@ -30,6 +30,7 @@ final class ManualHandoffQueueController extends AbstractController
                 'total' => 0,
                 'limit' => 30,
                 'can_manage' => false,
+                'provider_calls' => false,
             ]]);
         }
 
