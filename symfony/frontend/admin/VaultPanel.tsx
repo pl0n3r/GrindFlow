@@ -9,8 +9,15 @@ type Asset = {
   deleted_at?: string | null;
   download_url: string;
   note?: string | null;
+  usage_scope?: UsageScope;
 };
 
+type UsageScope = 'unclassified' | 'internal_only' | 'needs_review';
+const usageLabels: Record<UsageScope, string> = {
+  unclassified: 'Sin clasificar',
+  internal_only: 'Solo uso interno',
+  needs_review: 'Requiere revisión',
+};
 type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
 
 type Props = { canUpload: boolean; csrf: string | null; manageCsrf?: string | null };
@@ -38,6 +45,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
   const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp'>('all');
+  const [usage, setUsage] = useState<'all' | UsageScope>('all');
+  const [usageDraft, setUsageDraft] = useState<UsageScope>('unclassified');
   const [sort, setSort] = useState<'recent' | 'oldest' | 'name_asc' | 'name_desc' | 'size_asc' | 'size_desc'>('recent');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -104,7 +113,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setIntegrity({});
     fetch('/api/admin/vault?page=' + page + '&view=' + view +
       (search ? '&q=' + encodeURIComponent(search) : '') +
-      '&format=' + format + '&sort=' + sort, {
+      '&format=' + format + '&sort=' + sort + '&usage=' + usage, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
@@ -134,7 +143,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [page, refresh, view, search, format, sort]);
+  }, [page, refresh, view, search, format, sort, usage]);
 
   async function verifyOriginal(asset: Asset) {
     if (checkingId || bulkChecking || busyId) return;
@@ -222,10 +231,12 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     if (detail?.id === id) {
       setDetail(null);
       setNoteDraft('');
+      setUsageDraft('unclassified');
       return;
     }
     setDetail(null);
     setNoteDraft('');
+    setUsageDraft('unclassified');
     setDetailError('');
     setDetailLoading(true);
     try {
@@ -236,6 +247,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo consultar la imagen.');
       setDetail(body.data.asset as Asset);
       setNoteDraft(typeof body.data.asset.note === 'string' ? body.data.asset.note : '');
+      setUsageDraft(body.data.asset.usage_scope ?? 'unclassified');
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar la imagen.');
     } finally {
@@ -374,6 +386,38 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     }
   }
 
+  async function saveUsage(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    if (!canUpload || !manageCsrf || busyId || detail?.id !== id) return;
+    setBusyId(id);
+    setActionFeedback('');
+    setActionError('');
+    try {
+      const response = await fetch('/api/admin/vault/' + id + '/usage', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': manageCsrf, Accept: 'application/json' },
+        body: JSON.stringify({ usage_scope: usageDraft }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo clasificar la imagen.');
+      if (body?.data?.id !== id || !Object.hasOwn(usageLabels, body?.data?.usage_scope)) {
+        throw new Error('La respuesta de clasificación no es válida.');
+      }
+      const saved = body.data.usage_scope as UsageScope;
+      setDetail((previous) => previous?.id === id ? { ...previous, usage_scope: saved } : previous);
+      setAssets((previous) => previous.map((asset) => asset.id === id
+        ? { ...asset, usage_scope: saved } : asset));
+      setUsageDraft(saved);
+      setActionFeedback('Clasificación interna actualizada. No autoriza distribución.');
+      if (usage !== 'all' && usage !== saved) setRefresh((previous) => previous + 1);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo clasificar la imagen.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -488,6 +532,16 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         <option value="png">PNG</option>
         <option value="webp">WebP</option>
       </select>
+      <label htmlFor="vault-usage">Clasificación interna</label>
+      <select id="vault-usage" value={usage} disabled={loading}
+        onChange={(event) => {
+          setLoading(true); setPage(1);
+          setUsage(event.currentTarget.value as 'all' | UsageScope);
+        }}>
+        <option value="all">Todas las clasificaciones</option>
+        {Object.entries(usageLabels).map(([value, label]) =>
+          <option key={value} value={value}>{label}</option>)}
+      </select>
       <label htmlFor="vault-sort">Ordenar por</label>
       <select id="vault-sort" value={sort} disabled={loading}
         onChange={(event) => {
@@ -600,6 +654,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           <span className="vault-details">
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
+            <small>Clasificación: {usageLabels[asset.usage_scope ?? 'unclassified']}</small>
           </span>
           <button type="button" disabled={!!checkingId || bulkChecking || !!busyId || loading}
             onClick={() => void verifyOriginal(asset)}
@@ -653,6 +708,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
               <dt>Guardada</dt><dd>{detail.created_at}</dd>
               <dt>Nota privada</dt><dd>{detail.note || 'Sin nota privada.'}</dd>
+              <dt>Clasificación interna</dt><dd>{usageLabels[detail.usage_scope ?? 'unclassified']}</dd>
             </dl>
             {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveNote(event, asset.id)}>
               <label htmlFor={'vault-note-' + asset.id}>Nota privada de la imagen (máximo 280 caracteres)</label>
@@ -665,6 +721,20 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               </button>
               <button type="button" disabled={!!busyId || noteDraft === (detail.note ?? '')}
                 onClick={() => setNoteDraft(detail.note ?? '')}>Descartar cambios</button>
+            </form>}
+            {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveUsage(event, asset.id)}>
+              <label htmlFor={'vault-usage-' + asset.id}>Clasificar imagen para uso interno</label>
+              <select id={'vault-usage-' + asset.id} value={usageDraft} disabled={!!busyId}
+                onChange={(event) => setUsageDraft(event.currentTarget.value as UsageScope)}>
+                {Object.entries(usageLabels).map(([value, label]) =>
+                  <option key={value} value={value}>{label}</option>)}
+              </select>
+              <small>Clasificar no verifica derechos, no aprueba ni publica contenido.</small>
+              <button type="submit" disabled={!!busyId || usageDraft === (detail.usage_scope ?? 'unclassified')}>
+                {busyId === asset.id ? 'Guardando…' : 'Guardar clasificación'}
+              </button>
+              <button type="button" disabled={!!busyId || usageDraft === (detail.usage_scope ?? 'unclassified')}
+                onClick={() => setUsageDraft(detail.usage_scope ?? 'unclassified')}>Descartar clasificación</button>
             </form>}
             <figure className="vault-preview">
               {previewFailed

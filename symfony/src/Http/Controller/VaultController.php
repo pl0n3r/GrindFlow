@@ -70,6 +70,12 @@ final class VaultController extends AbstractController
         if (!is_string($format) || !array_key_exists($format, $formats)) {
             return $this->error(422, 'invalid_format', 'Selecciona todos los formatos, JPEG, PNG o WebP.');
         }
+        // Classification is internal workflow metadata, never a publishing grant.
+        $usageScope = $request->query->all()['usage'] ?? 'all';
+        $usageScopes = ['all', 'unclassified', 'internal_only', 'needs_review'];
+        if (!is_string($usageScope) || !in_array($usageScope, $usageScopes, true)) {
+            return $this->error(422, 'invalid_usage_scope', 'Selecciona una clasificación válida.');
+        }
         $sort = $request->query->all()['sort'] ?? 'recent';
         $sortOrders = [
             'recent' => $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC',
@@ -98,6 +104,10 @@ final class VaultController extends AbstractController
         $filter = $view === 'trash' ? ' AND asset.deleted_at IS NOT NULL' : ' AND asset.deleted_at IS NULL';
         $listParams = $params;
         $listFilter = '';
+        if ($usageScope !== 'all') {
+            $listFilter .= ' AND asset.usage_scope = :usage_scope';
+            $listParams['usage_scope'] = $usageScope;
+        }
         if ($search !== '') {
             // Escape LIKE wildcards, including the escape character itself.
             $listFilter .= " AND asset.original_name LIKE :name_search ESCAPE '!'";
@@ -110,7 +120,7 @@ final class VaultController extends AbstractController
         $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$listFilter, $listParams);
         // Order-by is strictly selected from trusted SQL constants above; never interpolate client text.
         $assets = $db->fetchAllAssociative(
-            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at '
+            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at, asset.usage_scope '
             .$scope.$filter.$listFilter.' ORDER BY '.$sortOrders[$sort].', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
             $listParams,
         );
@@ -121,6 +131,7 @@ final class VaultController extends AbstractController
             'page' => $page,
             'view' => $view,
             'format' => $format,
+            'usage' => $usageScope,
             'sort' => $sort,
             'total' => $total,
             'pages' => (int) ceil($total / 30),
@@ -277,7 +288,7 @@ final class VaultController extends AbstractController
         }
 
         $asset = $db->fetchAssociative(
-            'SELECT id, original_name, mime_type, size_bytes, created_at FROM gf_vault_assets WHERE id = :id',
+            'SELECT id, original_name, mime_type, size_bytes, created_at, usage_scope FROM gf_vault_assets WHERE id = :id',
             ['id' => $id],
         );
 
@@ -294,7 +305,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note, asset.usage_scope
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -610,6 +621,88 @@ final class VaultController extends AbstractController
         return $this->privateJson(['data' => ['id' => $id, 'note' => $stored]]);
     }
 
+    /**
+     * Conservative internal classification. No value authorizes distribution,
+     * proves rights or bypasses compliance. Default: unclassified.
+     */
+    #[Route('/api/admin/vault/{id}/usage', name: 'grindflow_vault_usage', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function usage(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar imágenes.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        $body = json_decode($request->getContent(), true);
+        if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
+            || array_keys($body) !== ['usage_scope'] || !is_string($body['usage_scope'])
+            || !in_array($body['usage_scope'], ['unclassified', 'internal_only', 'needs_review'], true)) {
+            return $this->error(422, 'invalid_usage_scope', 'Indica únicamente una clasificación interna válida.');
+        }
+        $usage = $body['usage_scope'];
+        $result = $db->transactional(function (Connection $db) use ($context, $id, $usage): string {
+            $organization = $context['organization']['id'];
+            if ($db->fetchOne(
+                'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                ['organization' => $organization],
+            ) === false) {
+                return 'revoked';
+            }
+            $asset = $db->fetchAssociative(
+                'SELECT usage_scope FROM gf_vault_assets WHERE id = :id AND organization_id = :organization AND deleted_at IS NULL',
+                ['id' => $id, 'organization' => $organization],
+            );
+            if ($asset === false) {
+                return 'not_found';
+            }
+            $allowed = $db->fetchOne(
+                <<<'SQL'
+                    SELECT 1 FROM gf_identity_memberships membership
+                    INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                    WHERE membership.organization_id = :organization
+                      AND actor.id = :user AND actor.is_active = 1
+                      AND membership.role IN ('admin', 'studio', 'editor')
+                    SQL,
+                ['organization' => $organization, 'user' => $context['user']->id()],
+            );
+            if ($allowed === false) {
+                return 'revoked';
+            }
+            if ($asset['usage_scope'] === $usage) {
+                return 'updated';
+            }
+
+            $written = $db->executeStatement(
+                <<<'SQL'
+                    UPDATE gf_vault_assets asset SET asset.usage_scope = :usage
+                    WHERE asset.id = :id AND asset.organization_id = :organization AND asset.deleted_at IS NULL
+                      AND EXISTS (
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = asset.organization_id
+                          AND membership.user_id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                      )
+                    SQL,
+                ['usage' => $usage, 'id' => $id, 'organization' => $organization, 'user' => $context['user']->id()],
+            );
+            return $written === 1 ? 'updated' : 'revoked';
+        });
+        if ($result === 'not_found') {
+            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+        }
+        if ($result !== 'updated') {
+            return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
+        }
+
+        return $this->privateJson(['data' => ['id' => $id, 'usage_scope' => $usage]]);
+    }
+
     #[Route('/api/admin/vault/{id}/trash', name: 'grindflow_vault_trash', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function trash(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
     {
@@ -739,6 +832,7 @@ final class VaultController extends AbstractController
             'created_at' => (string) $asset['created_at'],
             'deleted_at' => isset($asset['deleted_at']) ? (string) $asset['deleted_at'] : null,
             'download_url' => '/api/admin/vault/'.$asset['id'].'/download',
+            'usage_scope' => (string) ($asset['usage_scope'] ?? 'unclassified'),
         ];
     }
 

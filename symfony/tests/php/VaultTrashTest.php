@@ -142,6 +142,43 @@ final class VaultTrashTest extends WebTestCase
                 content: '{"note":"Nota retenida en papelera"}');
             self::assertResponseIsSuccessful();
 
+            // Classification never grants publishing rights and is tenant-private.
+            $usageUrl = '/api/admin/vault/'.$mineAsset.'/usage';
+            $client->request('POST', $usageUrl, server: ['CONTENT_TYPE' => 'application/json'],
+                content: '{"usage_scope":"internal_only"}');
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', '/api/admin/vault/'.$foreignAsset.'/usage',
+                server: $noteHeaders, content: '{"usage_scope":"internal_only"}');
+            self::assertResponseStatusCodeSame(404);
+            foreach (['{"usage_scope":"published"}', '{"usage_scope":null}',
+                '{"usage_scope":"internal_only","organization_id":"'.$foreign.'"}',
+                '{"usage_scope":["internal_only"]}'] as $invalidUsage) {
+                $client->request('POST', $usageUrl, server: $noteHeaders, content: $invalidUsage);
+                self::assertResponseStatusCodeSame(422);
+            }
+            $client->request('POST', $usageUrl, server: $noteHeaders,
+                content: '{"usage_scope":"internal_only"}');
+            self::assertResponseIsSuccessful();
+            self::assertSame('internal_only',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['usage_scope']);
+            self::assertSame('internal_only', $db->fetchOne(
+                'SELECT usage_scope FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            $client->request('GET', '/api/admin/vault?usage=internal_only');
+            $classified = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(1, $classified['total']);
+            self::assertSame('internal_only', $classified['assets'][0]['usage_scope']);
+            self::assertSame(2, $classified['quota']['used_assets']);
+            $client->request('GET', '/api/admin/vault?usage=needs_review');
+            self::assertSame(0, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            foreach (['published', 'all%5B%5D', 'internal_only%26view%3Dtrash'] as $invalid) {
+                $client->request('GET', '/api/admin/vault?usage='.$invalid);
+                self::assertResponseStatusCodeSame(422);
+            }
+            $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertSame('internal_only',
+                json_decode((string) $client->getResponse()->getContent(), true)['data']['asset']['usage_scope']);
+            self::assertSame($bytes, file_get_contents($path));
+
             // Rename changes only display metadata; it must never move or duplicate private bytes.
             $renaming = '/api/admin/vault/'.$mineAsset.'/name';
             $renameHeaders = ['HTTP_X_CSRF_TOKEN' => $csrf, 'CONTENT_TYPE' => 'application/json'];
@@ -246,6 +283,13 @@ final class VaultTrashTest extends WebTestCase
 
             $client->request('GET', '/api/admin/vault/'.$mineAsset);
             self::assertResponseStatusCodeSame(404);
+            $client->request('POST', $usageUrl, server: $noteHeaders,
+                content: '{"usage_scope":"needs_review"}');
+            self::assertResponseStatusCodeSame(404);
+            self::assertSame('internal_only', $db->fetchOne(
+                'SELECT usage_scope FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            $client->request('GET', '/api/admin/vault?view=trash&usage=internal_only');
+            self::assertSame(1, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
             $client->request('POST', $noteUrl, server: $noteHeaders,
                 content: '{"note":"No editable en papelera"}');
             self::assertResponseStatusCodeSame(404);
@@ -271,6 +315,9 @@ final class VaultTrashTest extends WebTestCase
             $client->request('POST', $renaming, server: $renameHeaders, content: '{"name":"prohibida.png"}');
             self::assertResponseStatusCodeSame(403);
             $client->request('POST', '/api/admin/vault/'.$mineAsset.'/restore', server: ['HTTP_X_CSRF_TOKEN' => $csrf]);
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', $usageUrl, server: $noteHeaders,
+                content: '{"usage_scope":"needs_review"}');
             self::assertResponseStatusCodeSame(403);
             $client->request('POST', $noteUrl, server: $noteHeaders,
                 content: '{"note":"No editable por rol de lectura"}');
