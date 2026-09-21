@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.54: proteger entrega/restauración de originales y verificar página visible, todavía no desplegado.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.53 `a9605f89df4eb1aa28f28762e5e95c0820406fc0`, CI exact-main success. Ningún dato productivo ni migración se modifica.
+> **Candidato v0.1.55: ubicación privada externa opcional para los originales, todavía no desplegado.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; Symfony permanece aislado. Base `main` v0.1.54 `68cd47a0356211bf99434fc7d962d3b7774e747a`, CI exact-main success. No se copian bytes, cambian credenciales ni ejecutan migraciones productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,8 +18,8 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.54** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.53~~ | `a9605f89df4eb1aa28f28762e5e95c0820406fc0` |
+| Version objetivo | 🚧 **v0.1.55** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.54~~ | `68cd47a0356211bf99434fc7d962d3b7774e747a` |
 | CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Revisión pendiente | PR |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+236** | **−65** | **+171** |
+| **8** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: integridad de bytes antes de lectura/restauración y revisión visible mobile-first |
+| Alcance | S2: raíz privada configurable fuera de la carpeta del release, manteniendo modo local por defecto |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,33 +58,30 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Descarga, vista previa y restauración en Symfony reutilizan la verificación de tamaño/SHA-256: nunca entregan un original privado modificado, aunque conserve el mismo tamaño.
-- Auditoría manual de hasta 30 originales visibles por página (biblioteca o papelera), con estado por imagen y progreso accesible a 360 px. No es backup ni copia de archivos.
-- Regresión PHPUnit/MariaDB para bytes alterados, revocación y papelera; Chromium para estado de auditoría móvil y cambio de vista. Sin integración externa, purga, migración ni cutover.
-
+- Servicio de storage privado Symfony compartido por cargas, descargas, vistas previas, diagnóstico y restauración; `GRINDFLOW_VAULT_ROOT` es opcional y por defecto conserva `symfony/var/vault`.
+- La ruta externa exige padre existente y ubicación absoluta fuera del release. Bloquea directorios simbólicos, travesías y webroot, crea solo el directorio final con permisos 0700.
+- PHPUnit prueba la raíz original, ruta externa y rechazos; guía operativa explica cómo preservar catálogo/blobs, persistencia y recuperación, sin prometer backup automático, mover datos ni activar Hostinger.
 ## Archivos modificados en este deploy
-
 Este inventario corresponde al **cambio candidato en el PR**, no a archivos desplegados en Hostinger.
 - `README.md`
 - `config/version.php`
+- `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/README.md`
-- `symfony/frontend/admin/VaultPanel.tsx`
-- `symfony/frontend/admin/admin.css`
+- `symfony/config/services.yaml`
 - `symfony/src/Http/Controller/VaultController.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/VaultTrashTest.php`
-
+- `symfony/src/Infrastructure/Storage/PrivateVaultDirectory.php`
+- `symfony/tests/php/PrivateVaultDirectoryTest.php`
 ## Validación
-- PHP/MariaDB y Chromium se comprueban en CI del PR; sin checkout local de este repositorio en esta sesión.
-- CI exact-main v0.1.53 success; CI/Sonar/CodeRabbit del head v0.1.54 y Hostinger son señales separadas. No se tocó producción.
+- PHP/MariaDB y contratos Symfony se comprueban en CI del PR; sin checkout local de este repositorio en esta sesión.
+- CI exact-main v0.1.54 success; CI/Sonar/CodeRabbit del head v0.1.55 y Hostinger son señales separadas. No se tocó producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar entrega e integridad S2 v0.1.54 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente definir política de retención y backup |
+| **NOW** | 🚧 Validar raíz privada configurable v0.1.55 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Verificar volumen persistente y plan de backup/restore | 🚧 Pendiente operación y política de retención |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
 
@@ -92,7 +89,7 @@ Este inventario corresponde al **cambio candidato en el PR**, no a archivos desp
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar integridad y revisión visible v0.1.54 | 🚧 CI y revisión |
-| **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
+| **NOW** | 🚧 Validar almacenamiento privado externo v0.1.55 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Backups coherentes BD + blobs y restauración | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
