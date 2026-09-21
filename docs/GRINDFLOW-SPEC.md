@@ -100,7 +100,7 @@ El destino es una **aplicación Symfony monolítica modular**, una MariaDB con m
 
 Se **conserva** la aplicación Laravel y su CI como referencia operativa durante la transición. Cada módulo se traslada con migraciones y pruebas de paridad de usuarios/organizaciones, IDs, permisos, estados, URLs, auditoría e históricos; por módulo existe un propietario único de escritura para evitar dos runtimes mutando el mismo estado sin coordinación. No modificar/borrar tablas Laravel automáticamente desde Doctrine.
 
-### S2 · Clasificación conservadora de recursos (candidato v0.1.61)
+### S2 · Clasificación conservadora de recursos (integrada v0.1.62)
 
 El Vault asigna a cada original una clasificación interna: `unclassified` por defecto,
 `internal_only` o `needs_review`, editable por personal que prepara contenido
@@ -109,6 +109,16 @@ sin afectar la cuota. Esta clasificación no es una licencia, verificación de e
 consentimiento, confirmación de titularidad ni autorización de publicar: ninguna
 etiqueta de S2 abre distribución externa. Los manifiestos y ensayos de recuperación
 incluyen el valor, también cuando el archivo está en la papelera.
+
+### S2 · Clasificación múltiple explícita (candidato v0.1.63)
+
+El equipo puede seleccionar hasta 30 originales **activos de una página visible**
+y aplicarles una de las clasificaciones internas existentes en una sola transacción
+tenant-safe. Un elemento fuera del tenant, ausente o en papelera invalida la
+operación completa, sin éxitos parciales ni divulgación de su identidad.
+La selección nunca comprende automáticamente páginas no visibles, requiere
+confirmación y se limpia al cambiar página/vista/filtros o tras guardar.
+Ningún estado de clasificación constituye permiso para distribución.
 
 ## 4. Non-negotiable invariants
 

@@ -152,3 +152,17 @@
 .admin-password-form :focus-visible,.admin-signin-link:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
 
 .vault-note select{flex:1 1 180px;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #8170a0;border-radius:9px;background:#0d0e17;color:#f8f8ff;font:inherit}
+
+/* Page-scoped batch classification: never overflow a 360px workspace. */
+.vault-batch{margin:16px 0;padding:16px;display:grid;gap:11px;min-width:0;border:1px solid #716287;border-radius:12px;background:#11131e}
+.vault-batch h3{font-size:17px;margin:0;color:#f8f8ff}
+.vault-batch p,.vault-batch label{font-size:13px;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.vault-batch label{font-weight:750}
+.vault-batch select{box-sizing:border-box;width:100%;min-width:0;min-height:46px;border:1px solid #8170a0;border-radius:9px;padding:10px 12px;background:#0d0e17;color:#f8f8ff;font:inherit}
+.vault-batch button{justify-self:start;min-height:44px;max-width:100%;padding:10px 14px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;font-size:12px;cursor:pointer}
+.vault-batch button:disabled{opacity:.55;cursor:not-allowed}
+.vault-batch :focus-visible,.vault-batch-checkbox :focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+.vault-batch-checkbox{display:grid;place-items:center;flex:0 0 36px;min-height:44px}
+.vault-batch-checkbox input{width:23px;height:23px;accent-color:#b896ff;cursor:pointer}
+.vault-batch .vault-confirm{min-width:0;box-sizing:border-box}
+@media(max-width:520px){.vault-batch button{justify-self:stretch}.vault-batch-checkbox{flex:0 0 44px}}

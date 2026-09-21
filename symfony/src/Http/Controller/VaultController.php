@@ -703,6 +703,132 @@ final class VaultController extends AbstractController
         return $this->privateJson(['data' => ['id' => $id, 'usage_scope' => $usage]]);
     }
 
+    /**
+     * Atomically classify 1..30 explicit active originals from the selected tenant.
+     * Never interpret a classification as permission to publish or evidence of rights.
+     */
+    #[Route('/api/admin/vault/usage/bulk', name: 'grindflow_vault_usage_bulk', methods: ['POST'])]
+    public function bulkUsage(Request $request, MembershipContext $memberships, Connection $db): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar imágenes.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        $body = json_decode($request->getContent(), true);
+        if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)) {
+            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 imágenes activas.');
+        }
+        $keys = array_keys($body);
+        sort($keys);
+        $ids = $body['ids'] ?? null;
+        $usage = $body['usage_scope'] ?? null;
+        if ($keys !== ['ids', 'usage_scope'] || !is_array($ids) || !array_is_list($ids)
+            || count($ids) < 1 || count($ids) > 30 || !is_string($usage)
+            || !in_array($usage, ['unclassified', 'internal_only', 'needs_review'], true)) {
+            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 imágenes y una clasificación válida.');
+        }
+        foreach ($ids as $id) {
+            if (!is_string($id)
+                || preg_match('/\A[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\z/D', $id) !== 1) {
+                return $this->error(422, 'invalid_bulk_usage', 'La selección contiene un identificador inválido.');
+            }
+        }
+        if (count(array_unique($ids)) !== count($ids)) {
+            return $this->error(422, 'invalid_bulk_usage', 'Cada imagen debe seleccionarse una sola vez.');
+        }
+
+        $organization = $context['organization']['id'];
+        $actor = $context['user']->id();
+        try {
+            $result = $db->transactional(function (Connection $db) use ($organization, $actor, $ids, $usage): array|string {
+                if ($db->fetchOne('SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                    ['organization' => $organization]) === false) {
+                    return 'revoked';
+                }
+                // Recheck actor BEFORE asset lookup so a revoked actor learns nothing.
+                $allowed = $db->fetchOne(
+                    <<<'SQL'
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = :organization
+                          AND actor.id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                        SQL,
+                    ['organization' => $organization, 'user' => $actor],
+                );
+                if ($allowed === false) {
+                    return 'revoked';
+                }
+                $assets = $db->fetchAllAssociative(
+                    <<<'SQL'
+                        SELECT id, usage_scope FROM gf_vault_assets
+                        WHERE organization_id = :organization AND deleted_at IS NULL
+                          AND id IN (:ids)
+                        SQL,
+                    ['organization' => $organization, 'ids' => $ids],
+                    ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+                );
+                // No partial success: foreign, trashed or missing ID rejects the ENTIRE batch.
+                if (count($assets) !== count($ids)) {
+                    return 'not_found';
+                }
+                $pending = array_values(array_map(
+                    static fn (array $asset): string => (string) $asset['id'],
+                    array_filter($assets, static fn (array $asset): bool => $asset['usage_scope'] !== $usage),
+                ));
+                if ($pending === []) {
+                    return ['selected_count' => count($ids), 'updated_count' => 0];
+                }
+                $written = $db->executeStatement(
+                    <<<'SQL'
+                        UPDATE gf_vault_assets asset
+                        SET asset.usage_scope = :usage
+                        WHERE asset.organization_id = :organization AND asset.deleted_at IS NULL
+                          AND asset.id IN (:ids) AND asset.usage_scope <> :usage_check
+                          AND EXISTS (
+                              SELECT 1 FROM gf_identity_memberships membership
+                              INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                              WHERE membership.organization_id = asset.organization_id
+                                AND membership.user_id = :user AND actor.is_active = 1
+                                AND membership.role IN ('admin', 'studio', 'editor')
+                          )
+                        SQL,
+                    [
+                        'usage' => $usage, 'usage_check' => $usage, 'organization' => $organization,
+                        'ids' => $pending, 'user' => $actor,
+                    ],
+                    ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+                );
+                if ($written !== count($pending)) {
+                    // Throw to roll back even if an unexpected concurrent writer changed a row.
+                    throw new \LogicException('Vault bulk write lost its authorization or active asset set.');
+                }
+
+                return ['selected_count' => count($ids), 'updated_count' => $written];
+            });
+        } catch (\LogicException) {
+            return $this->error(403, 'organization_access_changed', 'Tu acceso cambió; no se clasificó ninguna imagen.');
+        }
+        if ($result === 'not_found') {
+            return $this->error(404, 'file_not_found', 'Alguna imagen ya no está activa en esta organización.');
+        }
+        if ($result === 'revoked') {
+            return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
+        }
+
+        return $this->privateJson(['data' => [
+            'usage_scope' => $usage,
+            'selected_count' => $result['selected_count'],
+            'updated_count' => $result['updated_count'],
+        ]]);
+    }
+
     #[Route('/api/admin/vault/{id}/trash', name: 'grindflow_vault_trash', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function trash(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
     {
