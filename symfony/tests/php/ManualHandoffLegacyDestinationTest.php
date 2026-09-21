@@ -115,6 +115,23 @@ final class ManualHandoffLegacyDestinationTest extends WebTestCase
         $client->request('PUT', '/api/admin/schedules/'.$draft.'/manual-handoff', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
+        ], content: '{"action":"complete"}');
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame(
+            'manual_destination_required',
+            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
+        );
+        self::assertSame(
+            1,
+            (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_manual_handoff_events WHERE organization_id = :organization AND draft_id = :draft',
+                ['organization' => $organization, 'draft' => $draft],
+            ),
+        );
+
+        $client->request('PUT', '/api/admin/schedules/'.$draft.'/manual-handoff', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_CSRF_TOKEN' => $csrf,
         ], content: json_encode([
             'action' => 'prepare',
             'destination_id' => $destination,
