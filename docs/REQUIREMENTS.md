@@ -47,6 +47,20 @@ Each requirement should contain:
 
 **Aceptación:** cinco participantes con línea base definida; registrar tiempo operativo, entregas y errores, costos de infraestructura, funciones usadas y tráfico medible. Prueba comercial de 30 días/dos redes y precios quedan pendientes de resultado y aprobación.
 
+### GF-FR-011 — Clasificación interna del Vault Symfony
+**Estado:** implementado en candidato v0.1.61; CI, deploy y producción se acreditan por separado.
+
+**Enunciado:** clasificar imágenes de una organización en `inbox` (sin clasificar), `working` (en organización) y `organized` (organizada), exclusivamente para coordinación interna. Ninguna clasificación acredita derechos, elegibilidad, revisión editorial ni permiso de publicación.
+
+**Criterios de aceptación:**
+- Toda carga nueva recibe `inbox`; la migración asigna ese valor a filas existentes de Symfony y la BD rechaza valores fuera de la lista cerrada.
+- La API lista/pagina y combina filtro `filing=all|inbox|working|organized` con búsqueda, vista, MIME y orden. Total filtrado separado de cuota física, que incluye activos y papelera.
+- El detalle autenticado muestra estado; la acción POST con CSRF cambia solo metadatos para miembros con `content_prepare` y revalida tenant, rol, activo y membresía en transacción. Papelera y tenant ajeno no son editables.
+- El estado persiste al enviar a papelera/restaurar y participa en la huella de audit, stage, verify-stage y verify-restore, detectando pérdida de clasificación tras restauración.
+- En React móvil la lista y el detalle muestran la clasificación; filtro y edición con estados/error y controles de 44 px. El rol de lectura puede consultar/filtrar, no editar.
+
+**Verificación:** PHPUnit/MariaDB y Chromium 360 px sintéticos prueban filtro combinado, cuota invariable, ACL/CSRF/tenant, estados inválidos, papelera y pérdida de metadatos en recuperación; ningún proveedor externo o dato productivo.
+
 ### GF-FR-010 — Anotación privada del Vault Symfony
 **Estado:** implementado en candidato v0.1.60; código, despliegue y producción se validan por separado.
 

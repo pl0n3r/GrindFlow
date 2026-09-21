@@ -28,6 +28,7 @@ final class VaultController extends AbstractController
     private const MAX_ORGANIZATION_ASSETS = 100;
     private const MAX_ORGANIZATION_BYTES = 128 * 1024 * 1024;
     private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+    private const FILING_STATES = ['inbox', 'working', 'organized'];
 
     public function __construct(
         private readonly PrivateVaultDirectory $storage,
@@ -70,6 +71,10 @@ final class VaultController extends AbstractController
         if (!is_string($format) || !array_key_exists($format, $formats)) {
             return $this->error(422, 'invalid_format', 'Selecciona todos los formatos, JPEG, PNG o WebP.');
         }
+        $filing = $request->query->all()['filing'] ?? 'all';
+        if (!is_string($filing) || ($filing !== 'all' && !in_array($filing, self::FILING_STATES, true))) {
+            return $this->error(422, 'invalid_filing', 'Selecciona un estado interno válido.');
+        }
         $sort = $request->query->all()['sort'] ?? 'recent';
         $sortOrders = [
             'recent' => $view === 'trash' ? 'asset.deleted_at DESC' : 'asset.created_at DESC',
@@ -107,10 +112,14 @@ final class VaultController extends AbstractController
             $listFilter .= ' AND asset.mime_type = :mime_filter';
             $listParams['mime_filter'] = $formats[$format];
         }
+        if ($filing !== 'all') {
+            $listFilter .= ' AND asset.filing_state = :filing_state';
+            $listParams['filing_state'] = $filing;
+        }
         $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$listFilter, $listParams);
         // Order-by is strictly selected from trusted SQL constants above; never interpolate client text.
         $assets = $db->fetchAllAssociative(
-            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at '
+            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at, asset.filing_state '
             .$scope.$filter.$listFilter.' ORDER BY '.$sortOrders[$sort].', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
             $listParams,
         );
@@ -121,6 +130,7 @@ final class VaultController extends AbstractController
             'page' => $page,
             'view' => $view,
             'format' => $format,
+            'filing' => $filing,
             'sort' => $sort,
             'total' => $total,
             'pages' => (int) ceil($total / 30),
@@ -294,7 +304,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note, asset.filing_state
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -610,6 +620,89 @@ final class VaultController extends AbstractController
         return $this->privateJson(['data' => ['id' => $id, 'note' => $stored]]);
     }
 
+
+    /**
+     * Filing is an internal workflow aid ONLY, never rights clearance,
+     * editorial approval, permission to distribute or publisher eligibility.
+     */
+    #[Route('/api/admin/vault/{id}/filing', name: 'grindflow_vault_filing', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function filing(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        $body = json_decode($request->getContent(), true);
+        if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
+            || array_keys($body) !== ['filing'] || !is_string($body['filing'])
+            || !in_array($body['filing'], self::FILING_STATES, true)) {
+            return $this->error(422, 'invalid_filing', 'Selecciona únicamente un estado interno válido.');
+        }
+        $filing = $body['filing'];
+        $result = $db->transactional(function (Connection $db) use ($context, $id, $filing): string {
+            $organization = $context['organization']['id'];
+            if ($db->fetchOne(
+                'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                ['organization' => $organization],
+            ) === false) {
+                return 'revoked';
+            }
+            $asset = $db->fetchAssociative(
+                'SELECT filing_state FROM gf_vault_assets WHERE id = :id AND organization_id = :organization AND deleted_at IS NULL',
+                ['id' => $id, 'organization' => $organization],
+            );
+            if ($asset === false) {
+                return 'not_found';
+            }
+            $allowed = $db->fetchOne(
+                <<<'SQL'
+                    SELECT 1 FROM gf_identity_memberships membership
+                    INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                    WHERE membership.organization_id = :organization
+                      AND actor.id = :user AND actor.is_active = 1
+                      AND membership.role IN ('admin', 'studio', 'editor')
+                    SQL,
+                ['organization' => $organization, 'user' => $context['user']->id()],
+            );
+            if ($allowed === false) {
+                return 'revoked';
+            }
+            if ($asset['filing_state'] === $filing) {
+                return 'updated';
+            }
+            $written = $db->executeStatement(
+                <<<'SQL'
+                    UPDATE gf_vault_assets asset SET asset.filing_state = :filing
+                    WHERE asset.id = :id AND asset.organization_id = :organization AND asset.deleted_at IS NULL
+                      AND EXISTS (
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = asset.organization_id
+                          AND membership.user_id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                      )
+                    SQL,
+                ['filing' => $filing, 'id' => $id, 'organization' => $organization, 'user' => $context['user']->id()],
+            );
+
+            return $written === 1 ? 'updated' : 'revoked';
+        });
+        if ($result === 'not_found') {
+            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+        }
+        if ($result !== 'updated') {
+            return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
+        }
+
+        return $this->privateJson(['data' => ['id' => $id, 'filing' => $filing]]);
+    }
+
     #[Route('/api/admin/vault/{id}/trash', name: 'grindflow_vault_trash', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function trash(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
     {
@@ -738,6 +831,7 @@ final class VaultController extends AbstractController
             'size_bytes' => (int) $asset['size_bytes'],
             'created_at' => (string) $asset['created_at'],
             'deleted_at' => isset($asset['deleted_at']) ? (string) $asset['deleted_at'] : null,
+            'filing' => (string) ($asset['filing_state'] ?? 'inbox'),
             'download_url' => '/api/admin/vault/'.$asset['id'].'/download',
         ];
     }

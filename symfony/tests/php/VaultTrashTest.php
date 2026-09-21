@@ -142,6 +142,46 @@ final class VaultTrashTest extends WebTestCase
                 content: '{"note":"Nota retenida en papelera"}');
             self::assertResponseIsSuccessful();
 
+
+            // Filing is internal metadata and must not authorize publication.
+            $filingUrl = '/api/admin/vault/'.$mineAsset.'/filing';
+            $client->request('POST', $filingUrl);
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', $filingUrl, server: ['CONTENT_TYPE' => 'application/json'],
+                content: '{"filing":"organized"}');
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', '/api/admin/vault/'.$foreignAsset.'/filing',
+                server: $noteHeaders, content: '{"filing":"organized"}');
+            self::assertResponseStatusCodeSame(404);
+            foreach (['{"filing":"ready"}', '{"filing":true}',
+                '{"filing":"working","organization_id":"'.$foreign.'"}', '{"filing":null}'] as $invalidFiling) {
+                $client->request('POST', $filingUrl, server: $noteHeaders, content: $invalidFiling);
+                self::assertResponseStatusCodeSame(422);
+            }
+            $client->request('GET', '/api/admin/vault/'.$mineAsset);
+            self::assertResponseIsSuccessful();
+            self::assertSame('inbox', json_decode((string) $client->getResponse()->getContent(), true)['data']['asset']['filing']);
+            $client->request('POST', $filingUrl, server: $noteHeaders, content: '{"filing":"working"}');
+            self::assertResponseIsSuccessful();
+            self::assertSame('working', json_decode((string) $client->getResponse()->getContent(), true)['data']['filing']);
+            self::assertSame('working', $db->fetchOne(
+                'SELECT filing_state FROM gf_vault_assets WHERE id = ? AND organization_id = ?', [$mineAsset, $mine],
+            ));
+            $client->request('GET', '/api/admin/vault?filing=working');
+            self::assertResponseIsSuccessful();
+            $filed = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(1, $filed['total']);
+            self::assertSame('working', $filed['filing']);
+            self::assertSame($mineAsset, $filed['assets'][0]['id']);
+            self::assertSame(1, $filed['quota']['used_assets']);
+            $client->request('GET', '/api/admin/vault?filing=inbox');
+            self::assertSame(0, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            $client->request('GET', '/api/admin/vault?filing[]=working');
+            self::assertResponseStatusCodeSame(422);
+            $client->request('GET', '/api/admin/vault?filing=ready');
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame($bytes, file_get_contents($path));
+
             // Rename changes only display metadata; it must never move or duplicate private bytes.
             $renaming = '/api/admin/vault/'.$mineAsset.'/name';
             $renameHeaders = ['HTTP_X_CSRF_TOKEN' => $csrf, 'CONTENT_TYPE' => 'application/json'];
@@ -222,6 +262,7 @@ final class VaultTrashTest extends WebTestCase
             self::assertFileExists($path);
             self::assertSame($bytes, file_get_contents($path));
             self::assertSame($user, $db->fetchOne('SELECT deleted_by FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
+            self::assertSame('working', $db->fetchOne('SELECT filing_state FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             self::assertNotNull($db->fetchOne('SELECT deleted_at FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             // Trashed originals remain retained and may be checked without restoring.
             $client->request('GET', $integrityUrl);
@@ -249,6 +290,9 @@ final class VaultTrashTest extends WebTestCase
             $client->request('POST', $noteUrl, server: $noteHeaders,
                 content: '{"note":"No editable en papelera"}');
             self::assertResponseStatusCodeSame(404);
+            $client->request('POST', $filingUrl, server: $noteHeaders,
+                content: '{"filing":"organized"}');
+            self::assertResponseStatusCodeSame(404);
             self::assertSame('Nota retenida en papelera',
                 $db->fetchOne('SELECT private_note FROM gf_vault_assets WHERE id = ?', [$mineAsset]));
             $client->request('GET', '/api/admin/vault/'.$mineAsset.'/preview');
@@ -274,6 +318,9 @@ final class VaultTrashTest extends WebTestCase
             self::assertResponseStatusCodeSame(403);
             $client->request('POST', $noteUrl, server: $noteHeaders,
                 content: '{"note":"No editable por rol de lectura"}');
+            self::assertResponseStatusCodeSame(403);
+            $client->request('POST', $filingUrl, server: $noteHeaders,
+                content: '{"filing":"organized"}');
             self::assertResponseStatusCodeSame(403);
             self::assertSame('Nota retenida en papelera',
                 $db->fetchOne('SELECT private_note FROM gf_vault_assets WHERE id = ?', [$mineAsset]));

@@ -788,6 +788,87 @@ test('S1 revocation hides tenant workspace, while a recoverable CSRF error keeps
 });
 
 
+
+test('S2 mobile filing is tenant-scoped, editable, filterable and never a publish approval', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+  const id = '00000000-0000-7000-8000-000000000061';
+  let filing = 'inbox';
+  let failOnce = true;
+  let writes = 0;
+  const asset = { id, name: 'archivo-interno.png', mime_type: 'image/png', size_bytes: 69,
+    created_at: '2026-09-21 00:00:00', note: null,
+    download_url: '/api/admin/vault/' + id + '/download' };
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Editor de muestra' },
+      organization: { id, name: 'Clasificación privada', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false,
+        content_prepare: true, content_review: true },
+      profile_name_csrf: 'profile-test', vault_upload_csrf: 'upload-test', vault_manage_csrf: 'manage-test',
+    } }),
+  }));
+  const queries = [];
+  await page.route('**/api/admin/vault?page=*', (route) => {
+    const url = new URL(route.request().url());
+    const value = url.searchParams.get('filing') ?? 'all';
+    queries.push({ filing: value, view: url.searchParams.get('view'), page: url.searchParams.get('page') });
+    const match = (value === 'all' || value === filing) &&
+      url.searchParams.get('view') !== 'trash';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        assets: match ? [{ ...asset, filing }] : [],
+        page: 1, pages: match ? 1 : 0, total: match ? 1 : 0, filing: value,
+        quota: { used_assets: 1, max_assets: 100, used_bytes: 69, max_bytes: 128 * 1024 * 1024 },
+      } }),
+    });
+  });
+  await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: { asset: { ...asset, filing } } }),
+  }));
+  await page.route('**/api/admin/vault/' + id + '/filing', (route) => {
+    writes++;
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-csrf-token']).toBe('manage-test');
+    expect(route.request().postDataJSON()).toEqual({ filing: 'working' });
+    if (failOnce) {
+      failOnce = false;
+      return route.fulfill({ status: 403, contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'invalid_csrf', message: 'Token caducado.' } }) });
+    }
+    filing = 'working';
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: { id, filing } }) });
+  });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.addScriptTag({ url: script + '?vault-filing-e2e=1', type: 'module' });
+  await expect(page.getByText('archivo-interno.png', { exact: true })).toBeVisible();
+  await expect(page.getByText('Estado interno: Sin clasificar')).toBeVisible();
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  await page.getByLabel('Organizar imagen').selectOption('working');
+  await expect(page.getByText('Token caducado.')).toBeVisible();
+  await expect(page.getByText('Estado interno: Sin clasificar')).toBeVisible();
+  await page.getByLabel('Organizar imagen').selectOption('inbox');
+  await page.getByLabel('Organizar imagen').selectOption('working');
+  await expect(page.getByText('Estado interno: En organización')).toBeVisible();
+  await expect(page.getByText('Estado interno actualizado. No autoriza publicaciones.')).toBeVisible();
+  await page.getByLabel('Estado interno').selectOption('working');
+  await expect(page.getByText('archivo-interno.png', { exact: true })).toBeVisible();
+  await page.getByLabel('Estado interno').selectOption('inbox');
+  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await page.getByLabel('Estado interno').selectOption('all');
+  await expect(page.getByText('archivo-interno.png', { exact: true })).toBeVisible();
+  expect(queries.some((q) => q.filing === 'working' && q.page === '1')).toBe(true);
+  expect(queries.some((q) => q.filing === 'inbox' && q.page === '1')).toBe(true);
+  expect(writes).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
 test('S2 mobile edits a tenant-private note, handles CSRF, clears and reads it as viewer', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/preview');

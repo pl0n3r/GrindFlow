@@ -189,3 +189,15 @@ claves y monitoreo. Una copia en el mismo host no cubre pérdida de host o disco
 El catálogo Symfony incorpora `private_note` nullable, con un máximo de 280 caracteres visibles y sin semántica de autorización ni publicación. Toda copia staged preparada con esta versión incluye la nota para cada recurso, activo o en papelera, dentro de `manifest.json` protegido (0700/0600). `audit`, `stage`, `verify-stage` y `verify-restore` comparten exactamente el mismo conjunto de campos: si las notas no coinciden con la BD restaurada, la huella difiere aunque los blobs sigan íntegros. No imprimir notas en JSON de diagnóstico.
 
 **Compatibilidad:** un stage generado antes de v0.1.60 no contiene `private_note` en su manifiesto y NO debe presentarse como recuperable bajo el nuevo contrato. Crear un stage compatible desde una fuente íntegra, tras detener escrituras, y ensayar respaldo/restauración completos. La migración Doctrine se aplica exclusivamente a MariaDB Symfony descartable durante CI; ni Laravel ni Hostinger se modifican.
+
+## Clasificación interna y recuperación del Vault (v0.1.61)
+
+La clasificación `filing_state` está limitada a `inbox`, `working` y
+`organized`. No representa autorización, licencia, consentimiento,
+revisión editorial ni aptitud para publicación. Los comandos `audit`,
+`stage`, `verify-stage` y `verify-restore` incluyen el estado como
+`filing` en la huella canónica y detectan una recuperación sin dicho campo
+o con clasificación distinta, incluso si los bytes originales son íntegros.
+Rehacer stages previos desde un origen válido; no editar manifestaciones a
+mano, saltarse `--expect` ni considerar un digest igual como backup integral.
+La migración solo se aplica al Symfony aislado/MariaDB de pruebas.

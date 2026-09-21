@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
+type FilingState = 'inbox' | 'working' | 'organized';
+const filingLabels: Record<FilingState, string> = {
+  inbox: 'Sin clasificar', working: 'En organización', organized: 'Organizada',
+};
+
 type Asset = {
   id: string;
   name: string;
@@ -9,6 +14,7 @@ type Asset = {
   deleted_at?: string | null;
   download_url: string;
   note?: string | null;
+  filing?: FilingState;
 };
 
 type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
@@ -38,6 +44,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
   const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp'>('all');
+  const [filing, setFiling] = useState<'all' | FilingState>('all');
   const [sort, setSort] = useState<'recent' | 'oldest' | 'name_asc' | 'name_desc' | 'size_asc' | 'size_desc'>('recent');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -104,7 +111,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setIntegrity({});
     fetch('/api/admin/vault?page=' + page + '&view=' + view +
       (search ? '&q=' + encodeURIComponent(search) : '') +
-      '&format=' + format + '&sort=' + sort, {
+      '&format=' + format + '&filing=' + filing + '&sort=' + sort, {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
@@ -134,7 +141,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [page, refresh, view, search, format, sort]);
+  }, [page, refresh, view, search, format, filing, sort]);
 
   async function verifyOriginal(asset: Asset) {
     if (checkingId || bulkChecking || busyId) return;
@@ -341,6 +348,45 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     }
   }
 
+
+  async function changeFiling(id: string, next: FilingState) {
+    if (!canUpload || !manageCsrf || busyId || detail?.id !== id) return;
+    setBusyId(id);
+    setActionFeedback('');
+    setActionError('');
+    try {
+      const response = await fetch('/api/admin/vault/' + id + '/filing', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': manageCsrf,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ filing: next }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo cambiar la clasificación.');
+      if (body?.data?.id !== id || body.data.filing !== next) {
+        throw new Error('La respuesta de clasificación no es válida.');
+      }
+      setAssets((previous) => previous.map((asset) =>
+        asset.id === id ? { ...asset, filing: next } : asset));
+      setDetail((previous) => previous?.id === id ? { ...previous, filing: next } : previous);
+      setActionFeedback('Estado interno actualizado. No autoriza publicaciones.');
+      // An edited item can leave the active filter; the backend provides
+      // the correct total, page and quota after every change.
+      if (filing !== 'all' && filing !== next) {
+        setPage(1);
+        setRefresh((previous) => previous + 1);
+      }
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo cambiar la clasificación.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function saveNote(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     if (!canUpload || !manageCsrf || busyId || detail?.id !== id) return;
@@ -488,6 +534,18 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         <option value="png">PNG</option>
         <option value="webp">WebP</option>
       </select>
+      <label htmlFor="vault-filing">Estado interno</label>
+      <select id="vault-filing" value={filing} disabled={loading}
+        onChange={(event) => {
+          setLoading(true);
+          setPage(1);
+          setFiling(event.currentTarget.value as typeof filing);
+        }}>
+        <option value="all">Todos los estados</option>
+        <option value="inbox">Sin clasificar</option>
+        <option value="working">En organización</option>
+        <option value="organized">Organizada</option>
+      </select>
       <label htmlFor="vault-sort">Ordenar por</label>
       <select id="vault-sort" value={sort} disabled={loading}
         onChange={(event) => {
@@ -600,6 +658,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           <span className="vault-details">
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
+            <small>Estado interno: {filingLabels[asset.filing ?? 'inbox']}</small>
           </span>
           <button type="button" disabled={!!checkingId || bulkChecking || !!busyId || loading}
             onClick={() => void verifyOriginal(asset)}
@@ -653,7 +712,19 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               <dt>Tamaño</dt><dd>{detail.size_bytes} bytes</dd>
               <dt>Guardada</dt><dd>{detail.created_at}</dd>
               <dt>Nota privada</dt><dd>{detail.note || 'Sin nota privada.'}</dd>
+              <dt>Estado interno</dt><dd>{filingLabels[detail.filing ?? 'inbox']}</dd>
             </dl>
+            {canUpload && manageCsrf && <div className="vault-filing-editor">
+              <label htmlFor={'vault-filing-' + asset.id}>Organizar imagen</label>
+              <select id={'vault-filing-' + asset.id} value={detail.filing ?? 'inbox'}
+                disabled={!!busyId}
+                onChange={(event) => void changeFiling(asset.id, event.currentTarget.value as FilingState)}>
+                <option value="inbox">Sin clasificar</option>
+                <option value="working">En organización</option>
+                <option value="organized">Organizada</option>
+              </select>
+              <small>Clasificación interna. No acredita permisos ni autoriza publicaciones.</small>
+            </div>}
             {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveNote(event, asset.id)}>
               <label htmlFor={'vault-note-' + asset.id}>Nota privada de la imagen (máximo 280 caracteres)</label>
               <input id={'vault-note-' + asset.id} type="text" value={noteDraft} maxLength={280}

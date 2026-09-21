@@ -76,7 +76,7 @@ final class VaultStageCommand extends Command
 
             $sql = <<<'SQL'
                 SELECT id, uploaded_by, original_name, mime_type, size_bytes, sha256,
-                       storage_key, created_at, deleted_at, deleted_by, private_note
+                       storage_key, created_at, deleted_at, deleted_by, private_note, filing_state
                 FROM gf_vault_assets WHERE organization_id = :org ORDER BY id ASC
                 SQL;
             $assets = $this->db->fetchAllAssociative($sql, ['org' => $org]);

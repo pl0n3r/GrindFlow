@@ -203,6 +203,32 @@ final class VaultTest extends WebTestCase
             $client->request('GET', '/api/admin/vault?q='.rawurlencode("a\u{200B}b"));
             self::assertResponseStatusCodeSame(422);
 
+            // Filing combines with view and search without altering the
+            // organization's quota or allowing cross-tenant results.
+            $db->update('gf_vault_assets', ['filing_state' => 'working'], ['id' => $mineAsset]);
+            $db->update('gf_vault_assets', ['filing_state' => 'organized'],
+                ['organization_id' => $mine, 'original_name' => 'pagina-0.png']);
+            $client->request('GET', '/api/admin/vault?filing=working&q=imagen-prueba');
+            self::assertResponseIsSuccessful();
+            $inProgress = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame(1, $inProgress['total']);
+            self::assertSame('working', $inProgress['filing']);
+            self::assertSame('working', $inProgress['assets'][0]['filing']);
+            self::assertSame(31, $inProgress['quota']['used_assets']);
+            $client->request('GET', '/api/admin/vault?filing=organized&q=pagina-0');
+            self::assertSame(1, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            $client->request('GET', '/api/admin/vault?filing=organized&q=imagen-prueba');
+            self::assertSame(0, json_decode((string) $client->getResponse()->getContent(), true)['data']['total']);
+            foreach (['ready', 'working,organized', ''] as $invalidFiling) {
+                if ($invalidFiling === '') continue; // Empty string is invalid below.
+                $client->request('GET', '/api/admin/vault?filing='.rawurlencode($invalidFiling));
+                self::assertResponseStatusCodeSame(422);
+            }
+            $client->request('GET', '/api/admin/vault?filing[]='.rawurlencode('working'));
+            self::assertResponseStatusCodeSame(422);
+            $client->request('GET', '/api/admin/vault?filing=');
+            self::assertResponseStatusCodeSame(422);
+
             // Format + sort use the same tenant-scoped SQL and pagination as name search.
             $db->update('gf_vault_assets', ['mime_type' => 'image/jpeg'],
                 ['organization_id' => $mine, 'original_name' => 'pagina-0.png']);

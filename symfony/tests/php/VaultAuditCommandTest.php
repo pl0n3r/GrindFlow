@@ -75,6 +75,7 @@ final class VaultAuditCommandTest extends KernelTestCase
                     'sha256' => hash('sha256', $bytes), 'storage_key' => $id,
                     'created_at' => $at,
                     'private_note' => $id === $first ? 'Referencia privada inicial' : null,
+                    'filing_state' => $id === $first ? 'working' : 'inbox',
                     'deleted_at' => $id === $second ? $at : null,
                     'deleted_by' => $id === $second ? $user : null,
                 ]);
@@ -143,6 +144,7 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame($mine, $stagedManifest['organization_id']);
             self::assertSame(2, count($stagedManifest['assets']));
             self::assertSame('Referencia privada inicial', $stagedManifest['assets'][0]['private_note']);
+            self::assertSame('working', $stagedManifest['assets'][0]['filing']);
             self::assertNull($stagedManifest['assets'][1]['private_note']);
             self::assertSame($good['manifest_sha256'], $stagedManifest['manifest_sha256']);
             self::assertStringNotContainsString($foreign, $stage->getDisplay());
@@ -227,6 +229,12 @@ final class VaultAuditCommandTest extends KernelTestCase
             self::assertSame(2, $exit);
             self::assertSame('restored_catalog_mismatch', $missingNote['code']);
             $db->update('gf_vault_assets', ['private_note' => 'Referencia privada inicial'], ['id' => $first]);
+
+            $db->update('gf_vault_assets', ['filing_state' => 'organized'], ['id' => $first]);
+            [$exit, $changedFiling] = $restoredCheck($restoreArgs);
+            self::assertSame(2, $exit);
+            self::assertSame('restored_catalog_mismatch', $changedFiling['code']);
+            $db->update('gf_vault_assets', ['filing_state' => 'working'], ['id' => $first]);
 
             $db->update('gf_vault_assets', ['original_name' => 'renamed-after-stage.png'], ['id' => $first]);
             [$exit, $changedCatalog] = $restoredCheck($restoreArgs);

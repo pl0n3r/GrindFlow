@@ -135,6 +135,9 @@ Se **conserva** la aplicación Laravel y su CI como referencia operativa durante
 - Construcción mobile-first, teclado y estados accesibles de carga, vacío, error y permisos, con compatibilidad dirigida Safari/iOS.
 - El shell Blade/Livewire existente es legado funcional hasta la conmutación probada, no patrón para nuevas pantallas Symfony.
 
+### Vault S2: clasificación interna sin permiso de publicación
+El catálogo de imágenes Symfony incluye un estado interno de organización `inbox`, `working` u `organized`. Su finalidad exclusiva es organizar el trabajo en el Vault, nunca demostrar licencia/consentimiento, estado de revisión editorial, elegibilidad ni permiso de distribución. El usuario puede filtrar por estado en listas paginadas tenant-safe junto con MIME, nombre y orden. Las modificaciones de estado exigen `content_prepare`, CSRF y reautorización transaccional; no cambian imagen, cuota, enlaces ni estado de papelera. Las copias/recuperaciones deben contrastar también la clasificación.
+
 ### Vault S2: notas de trabajo privadas
 Cada imagen de la organización puede tener una anotación interna opcional, visible solo desde el detalle autenticado del Vault. No es una validación editorial, licencia, permiso, aprobación de publicación ni titularidad; esos contratos son distintos y deben definirse e implementarse antes de distribución real. Un miembro con permiso `content_prepare` puede editar o limpiar la nota con CSRF y reautorización por transacción; la consulta sigue siendo tenant-safe, y la papelera conserva la nota sin aceptar modificaciones. El catálogo y las herramientas de recuperación deben preservar y cotejarla con el original y la base restaurada.
 
