@@ -182,6 +182,8 @@ jobs:
           bash scripts/database-test-runner-contract.sh
           python3 -m py_compile scripts/ci-performance-report.py
           python3 scripts/ci-performance-report.py --self-test
+          python3 -m py_compile scripts/ci_retry.py
+          python3 -m unittest tests/test_ci_retry.py
           python3 -m py_compile scripts/readme-dashboard.py
           python3 -m py_compile scripts/validate-governance.py
           python3 scripts/validate-governance.py --self-test
@@ -240,7 +242,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
       - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress
+        run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
       - name: Composer validation
         run: composer validate --strict
       - name: Laravel/PHP syntax
@@ -277,7 +279,7 @@ jobs:
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
-      - run: composer install --prefer-dist --no-progress
+      - run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
       - name: Prepare Laravel environment
         shell: bash
         run: |
@@ -338,7 +340,7 @@ jobs:
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
-      - run: composer install --prefer-dist --no-progress
+      - run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
       - name: Migrate test database
         shell: bash
         run: |
@@ -387,7 +389,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
       - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress
+        run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
       - name: Prepare Laravel browser environment
         shell: bash
         run: |
@@ -504,7 +506,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
       - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress
+        run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
       - name: Prepare Laravel browser environment
         shell: bash
         run: |
@@ -607,7 +609,7 @@ jobs:
       - name: Install isolated Symfony dependencies
         run: |
           composer validate --working-dir=symfony --strict
-          composer install --working-dir=symfony --prefer-dist --no-progress --no-interaction
+          python3 scripts/ci_retry.py --label "Symfony Composer dependencies" -- composer install --working-dir=symfony --prefer-dist --no-progress --no-interaction
       - name: PHP syntax and isolated MariaDB connectivity
         shell: bash
         run: |
@@ -620,7 +622,7 @@ jobs:
       - name: Build TypeScript and Vite preview
         working-directory: symfony
         run: |
-          npm ci --no-audit --no-fund
+          python3 ../scripts/ci_retry.py --label "Symfony frontend dependencies" -- npm ci --no-audit --no-fund
           npm run typecheck
           npm run build
           test -s public/build/.vite/manifest.json
@@ -674,9 +676,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ steps.chromium-cache.outputs.cache-hit }}" == "true" ]]; then
-            npx playwright install-deps chromium
+            python3 ../scripts/ci_retry.py --label "Playwright system dependencies" -- npx playwright install-deps chromium
           else
-            npx playwright install --with-deps chromium
+            python3 ../scripts/ci_retry.py --label "Playwright Chromium" -- npx playwright install --with-deps chromium
           fi
           npm run test:e2e
       - name: Upload S0 diagnostics only on failure
@@ -707,7 +709,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
+      - run: python3 scripts/ci_retry.py --label "Legacy Node dependencies" -- npm ci --prefer-offline --no-audit --no-fund
       - name: Legacy validation during migration
         shell: bash
         run: |

@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.74: destinos manuales y cola interna S4.** Base exacta `main` v0.1.73 `97dd3018e1c6b478217353455de6e203c6337c51`, con CI exact-main success. El handoff humano ahora exige un destino interno explícito tras migrar y expone una cola tenant-safe, sin proveedor ni publicación externa.
+> **Candidato v0.1.75: resiliencia de CI.** Base exacta `main` v0.1.74 `351cdeba9f9f23914b5c271453afa765dd3467ff`; la entrega añade reintentos seguros para dependencias externas sin ocultar fallos de producto.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,9 +18,9 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.74** | `config/version.php` |
+| Version objetivo | 🚧 **v0.1.75** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.73~~ | `97dd3018e1c6b478217353455de6e203c6337c51` |
-| CI del PR | 🚧 Head v0.1.74 por validar | `GrindFlow CI / validate` |
+| CI del PR | 🚧 Head v0.1.75 por validar | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Pendiente | PR |
 | CI del SHA exacto de main | ✅ ~~v0.1.73 success~~ | run `35643400862` |
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **19** | **+1872** | **−110** | **+1762** |
+| **6** | **+120** | **−35** | **+85** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -65,29 +65,16 @@ flowchart LR
 - Todos los contratos permanecen sin proveedor: `provider_calls=false`; no hay delivery, exportación de media ni publicación automática.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en Hostinger.
+Inventario de solo el deploy actual de mejora continua; no prueba despliegue Symfony en Hostinger.
 - `.github/workflows/grindflow-ci.yml`
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `docs/GRINDFLOW-SPEC.md`
-- `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/ScheduleDraftPanel.tsx`
-- `symfony/frontend/admin/WeeklyPlannerPanel.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/migrations/Version20260921195000.php`
-- `symfony/src/Http/Controller/AdminContextController.php`
-- `symfony/src/Http/Controller/ManualDestinationController.php`
-- `symfony/src/Http/Controller/ManualHandoffController.php`
-- `symfony/src/Http/Controller/ManualHandoffQueueController.php`
-- `symfony/src/Http/Controller/ScheduleDraftController.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/ManualDestinationTest.php`
-- `symfony/tests/php/ManualHandoffLegacyDestinationTest.php`
-- `symfony/tests/php/ManualHandoffTest.php`
+- `scripts/ci_retry.py`
+- `tests/test_ci_retry.py`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.74 por verificar; la base v0.1.73 tiene CI exact-main success.
+- CI/Sonar/CodeRabbit del candidato v0.1.75 por verificar; la base v0.1.74 tiene CI exact-main success.
 - El gate Symfony debe probar migración reversible, PHPUnit/MariaDB, TypeScript/Vite y Chromium móvil. Producción permanece intacta.
 
 ## Qué sigue
@@ -95,7 +82,7 @@ Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar destinos/cola S4 v0.1.74 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar resiliencia CI v0.1.75 | 🚧 CI y revisión |
 | **NEXT** | 🚧 S4 salida manual con evidencia interna más rica / preparación operativa | 🚧 Sin proveedor real |
 | **LATER** | 🚧 Distribución autorizada + Traffic Symfony | 🚧 S4–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
@@ -104,7 +91,7 @@ Inventario de solo el deploy actual (candidato); no prueba despliegue Symfony en
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Vault Symfony clasificación v0.1.63~~ |
-| **NOW** | 🚧 Destinos manuales + cola v0.1.74 | 🚧 CI y revisión |
+| **NOW** | 🚧 Reintentos seguros de CI v0.1.75 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Preparación operativa S4 | 🚧 Sin proveedor real |
 | **LATER** | 🚧 Distribución + Traffic Symfony | 🚧 S4–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
