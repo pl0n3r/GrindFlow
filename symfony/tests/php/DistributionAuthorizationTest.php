@@ -56,8 +56,7 @@ final class DistributionAuthorizationTest extends WebTestCase
             ]);
         }
 
-        try {
-            $login = $client->request('GET', '/login');
+        $login = $client->request('GET', '/login');
             $client->submit($login->filter('form.identity-form')->form([
                 'email' => $user.'@example.test', 'password' => $password,
             ]));
@@ -99,14 +98,5 @@ final class DistributionAuthorizationTest extends WebTestCase
                 'SELECT COUNT(*) FROM gf_distribution_authorization_events WHERE organization_id = :organization AND asset_id = :asset',
                 ['organization' => $mine, 'asset' => $asset],
             ));
-        } finally {
-            $db->executeStatement('DELETE FROM gf_distribution_authorization_events WHERE 1 = 0');
-            $db->delete('gf_vault_assets', ['organization_id' => $mine]);
-            $db->delete('gf_vault_assets', ['organization_id' => $foreign]);
-            $db->delete('gf_identity_memberships', ['user_id' => $user]);
-            $db->delete('gf_identity_organizations', ['id' => $mine]);
-            $db->delete('gf_identity_organizations', ['id' => $foreign]);
-            $db->delete('gf_identity_users', ['id' => $user]);
-        }
     }
 }
