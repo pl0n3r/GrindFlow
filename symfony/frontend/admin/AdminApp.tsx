@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { VaultPanel } from './VaultPanel';
+import { WeeklyPlannerPanel } from './WeeklyPlannerPanel';
 
 type Context = {
   user: { display_name: string };
@@ -8,6 +9,7 @@ type Context = {
   profile_password_csrf: string | null;
   vault_upload_csrf: string | null;
   vault_manage_csrf: string | null;
+  weekly_rule_csrf?: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -216,7 +218,7 @@ export function AdminApp() {
         <nav aria-label="Navegación administrativa">
           <a className="active" href="/admin" aria-current="page"><span>01</span>Resumen</a>
           <a href="#biblioteca"><span>02</span>Biblioteca <small>S2</small></a>
-          <span aria-disabled="true"><span>03</span>Programación <small>S3</small></span>
+          <a href="#programacion"><span>03</span>Programación <small>S3</small></a>
         </nav>
         <div className="admin-tenant">
           <small>ORGANIZACIÓN ACTUAL</small>
@@ -316,9 +318,18 @@ export function AdminApp() {
           </section>
           <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf}
             manageCsrf={context.vault_manage_csrf} />
+          {context.weekly_rule_csrf !== undefined &&
+            <WeeklyPlannerPanel canEdit={context.permissions.content_prepare} csrf={context.weekly_rule_csrf} />}
           <section className="admin-notice" role="status">
-            <strong>Alcance S2 inicial</strong>
-            <p>La biblioteca privada admite imágenes; los videos, la programación y las conexiones externas todavía no están habilitados en Symfony.</p>
+            {context.weekly_rule_csrf !== undefined
+              ? <>
+                  <strong>Alcance S3 en revisión</strong>
+                  <p>La regla semanal y su vista previa ya son visibles en Symfony. Aún no se crean publicaciones ni se conectan plataformas externas.</p>
+                </>
+              : <>
+                  <strong>Alcance S2 inicial</strong>
+                  <p>La biblioteca privada admite imágenes; los videos, la programación y las conexiones externas todavía no están habilitados en Symfony.</p>
+                </>}
           </section>
         </main>
       </section>
