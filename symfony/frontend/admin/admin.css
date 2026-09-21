@@ -222,3 +222,14 @@
 .weekly-slots li small{color:#aaa9bd;font-size:11px}
 .weekly-slots li>span{flex:0 0 auto;font-size:11px;color:#a8ffd5}
 @media(max-width:520px){.weekly-slots li{align-items:flex-start;flex-direction:column}.weekly-slots li>span{white-space:normal}}
+
+
+/* S3 explicit distribution authorization: distinct from classification and publication. */
+.weekly-asset-summary{display:grid;align-content:start;gap:7px;min-width:0}
+.weekly-authorization{justify-self:start;max-width:100%;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.2px;overflow-wrap:anywhere}
+.weekly-authorization.yes{border:1px solid #4f9c84;background:#14362f;color:#d6fff1}
+.weekly-authorization.no{border:1px solid #7a6a45;background:#302818;color:#f2dfb6}
+.weekly-asset-summary button{justify-self:start;min-height:44px;max-width:100%;padding:9px 12px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;font-size:12px;cursor:pointer}
+.weekly-asset-summary button:disabled{opacity:.55;cursor:wait}
+.weekly-asset-summary button:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+@media(max-width:520px){.weekly-asset-summary button{justify-self:stretch}}
