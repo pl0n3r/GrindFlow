@@ -14,6 +14,7 @@ type Context = {
   schedule_draft_csrf?: string | null;
   distribution_authorization_csrf?: string | null;
   manual_handoff_csrf?: string | null;
+  manual_destination_csrf?: string | null;
   organization: { id: string; name: string; role: string };
   permissions: {
     workspace_view: boolean;
@@ -336,6 +337,7 @@ export function AdminApp() {
               authorizationCsrf={context.distribution_authorization_csrf ?? null}
               canManualHandoff={context.permissions.manual_handoff_manage}
               manualHandoffCsrf={context.manual_handoff_csrf ?? null}
+              manualDestinationCsrf={context.manual_destination_csrf ?? null}
             />}
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
