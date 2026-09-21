@@ -42,7 +42,7 @@ print_http_failure() {
   printf 'ERROR: %s returned HTTP %s\n' "$label" "$status" >&2
   if [[ -s "$headers_file" ]]; then
     printf '%s\n' '---- safe response headers ----' >&2
-    grep -iE '^(server|content-type|content-length|location|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
+    grep -iE '^(server|content-type|content-length|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
   fi
   if [[ -s "$body_file" ]]; then
     python3 - "$body_file" >&2 <<'PY'
