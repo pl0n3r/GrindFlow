@@ -857,6 +857,10 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
 - Composer usa cache de descargas indexada por `composer.lock`; npm mantiene
   cache por `package-lock.json`. El cache acelera instalaciones pero no sustituye
   `composer install` ni `npm ci`.
+- `scripts/ci_retry.py` solo puede envolver instalaciones o descargas externas
+  con señal transitoria verificable (red, timeout o 429/5xx), máximo cinco
+  intentos y backoff acotado. Un fallo de test, lint, migración, contrato o
+  compilación no se reintenta: debe conservar su primera causa y su exit code.
 - Todos los jobs pesados tienen timeout explicito.
 - PR y exact-main usan la misma seleccion por diff; el merge squash vuelve a
   validar el SHA real de `main`.
