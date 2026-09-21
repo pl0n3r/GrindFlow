@@ -635,7 +635,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     {loading && <p role="status">Cargando biblioteca…</p>}
     {error && <p role="alert">{error}</p>}
     {!loading && !error && assets.length === 0 &&
-      <p role="status">{search || format !== 'all' ? 'No hay imágenes que coincidan con los filtros.' :
+      <p role="status">{search || format !== 'all' || usage !== 'all' ? 'No hay imágenes que coincidan con los filtros.' :
         view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
       <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
