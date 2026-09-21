@@ -52,7 +52,7 @@ final readonly class MembershipContext
         return is_string($name) ? $name : null;
     }
 
-    /** @return array{workspace_view: bool, organization_manage: bool, content_prepare: bool, content_review: bool, distribution_authorize: bool} */
+    /** @return array{workspace_view: bool, organization_manage: bool, content_prepare: bool, content_review: bool, content_review_decide: bool, distribution_authorize: bool} */
     public function permissions(string $role): array
     {
         return [
@@ -60,6 +60,7 @@ final readonly class MembershipContext
             'organization_manage' => in_array($role, ['admin', 'studio'], true),
             'content_prepare' => in_array($role, ['admin', 'studio', 'editor'], true),
             'content_review' => in_array($role, self::ROLES, true),
+            'content_review_decide' => in_array($role, ['admin', 'studio', 'editor'], true),
             // External distribution approval is deliberately narrower than content preparation.
             'distribution_authorize' => in_array($role, ['admin', 'studio'], true),
         ];
