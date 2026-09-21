@@ -1522,7 +1522,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       data: {
         user: { display_name: 'Estudio S3' },
         organization: { id: '00000000-0000-7000-8000-000000000067', name: 'Agenda segura', role: 'studio' },
-        permissions: { workspace_view: true, organization_manage: true, content_prepare: true, content_review: true, content_review_decide: true, distribution_authorize: true },
+        permissions: { workspace_view: true, organization_manage: true, content_prepare: true, content_review: true, content_review_decide: true, distribution_authorize: true, manual_handoff_manage: true },
         profile_name_csrf: 'profile-token',
         profile_password_csrf: 'password-token',
         vault_upload_csrf: 'vault-token',
@@ -1531,6 +1531,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         content_review_csrf: 'content-review-token',
         schedule_draft_csrf: 'schedule-token',
         distribution_authorization_csrf: 'distribution-token',
+        manual_handoff_csrf: 'manual-handoff-token',
         organization_name_csrf: 'organization-token',
       },
     }),
@@ -1624,8 +1625,39 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
             drafts: scheduleDrafts,
             total: scheduleDrafts.length,
             limit: 30,
+            manual_handoff_ready: true,
             mode: 'review_only',
             can_publish: false,
+          },
+        }),
+      });
+    }
+
+    if (url.pathname.endsWith('/manual-handoff')) {
+      expect(request.method()).toBe('PUT');
+      expect(request.headers()['x-csrf-token']).toBe('manual-handoff-token');
+      const payload = request.postDataJSON();
+      expect(['prepare', 'complete', 'fail']).toContain(payload.action);
+      const status = payload.action === 'prepare'
+        ? 'prepared'
+        : payload.action === 'complete' ? 'completed' : 'failed';
+      scheduleDrafts = scheduleDrafts.map((draft) => ({
+        ...draft,
+        manual_handoff_status: status,
+        manual_handoff_updated_at: '2026-09-21 18:45:00',
+      }));
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            draft_id: '00000000-0000-7000-8000-000000000172',
+            status,
+            changed: true,
+            updated_at: '2026-09-21 18:45:00',
+            publishes: false,
+            provider_calls: false,
+            external_evidence: false,
           },
         }),
       });
@@ -1649,6 +1681,8 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         local_date: '2026-09-22',
         local_time: '09:30',
         status: 'draft',
+        manual_handoff_status: 'none',
+        manual_handoff_updated_at: null,
       };
       const existing = scheduleDrafts.find((item) =>
         item.asset_id === payload.asset_id && item.scheduled_at_utc === payload.scheduled_at_utc
@@ -1760,6 +1794,19 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   );
   await expect(page.getByText('Historial interno · 1 borradores')).toBeVisible();
   await expect(page.getByText('Borrador reservado')).toBeVisible();
+  await expect(page.getByText('Salida manual sin preparar')).toBeVisible();
+  await page.getByRole('button', { name: 'Preparar salida manual' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Salida manual preparada. Aún no se ha publicado nada.',
+  );
+  await expect(page.getByText('Salida manual preparada', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Registrar fallo' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Fallo manual registrado. Puedes preparar un nuevo intento.',
+  );
+  await expect(page.getByText('Salida manual con fallo registrado')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar borrador de campaña.png' }).click();
   await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
     'Borrador cancelado. El registro se conserva en el historial.',

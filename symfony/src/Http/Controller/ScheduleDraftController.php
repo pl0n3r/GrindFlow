@@ -35,6 +35,27 @@ final class ScheduleDraftController extends AbstractController
             'organization' => $context['organization']['id'],
             'user' => $context['user']->id(),
         ];
+        $handoffReady = $db->createSchemaManager()->tablesExist(['gf_manual_handoff_events']);
+        $handoffSelect = $handoffReady
+            ? <<<'SQL'
+                , (
+                    SELECT handoff.action
+                    FROM gf_manual_handoff_events handoff
+                    WHERE handoff.organization_id = draft.organization_id
+                      AND handoff.draft_id = draft.id
+                    ORDER BY handoff.created_at DESC, handoff.id DESC
+                    LIMIT 1
+                ) AS manual_handoff_action,
+                (
+                    SELECT handoff.created_at
+                    FROM gf_manual_handoff_events handoff
+                    WHERE handoff.organization_id = draft.organization_id
+                      AND handoff.draft_id = draft.id
+                    ORDER BY handoff.created_at DESC, handoff.id DESC
+                    LIMIT 1
+                ) AS manual_handoff_updated_at
+                SQL
+            : ', NULL AS manual_handoff_action, NULL AS manual_handoff_updated_at';
         $scope = <<<'SQL'
             FROM gf_schedule_drafts draft
             INNER JOIN gf_vault_assets asset
@@ -46,7 +67,7 @@ final class ScheduleDraftController extends AbstractController
               AND actor.is_active = 1
             SQL;
         $rows = $db->fetchAllAssociative(
-            'SELECT draft.*, asset.original_name AS asset_name '.$scope
+            'SELECT draft.*, asset.original_name AS asset_name'.$handoffSelect.' '.$scope
             .' ORDER BY draft.created_at DESC, draft.id DESC LIMIT 30',
             $params,
         );
@@ -56,6 +77,7 @@ final class ScheduleDraftController extends AbstractController
             'drafts' => array_map($this->publicDraft(...), $rows),
             'total' => $total,
             'limit' => 30,
+            'manual_handoff_ready' => $handoffReady,
             'mode' => 'review_only',
             'can_publish' => false,
         ]]);
@@ -351,6 +373,21 @@ final class ScheduleDraftController extends AbstractController
             if ($draft['status'] === 'cancelled') {
                 return ['status' => 'ok', 'changed' => false, 'draft' => $draft];
             }
+            if ($db->createSchemaManager()->tablesExist(['gf_manual_handoff_events'])) {
+                $handoff = $db->fetchOne(
+                    <<<'SQL'
+                        SELECT action
+                        FROM gf_manual_handoff_events
+                        WHERE organization_id = :organization AND draft_id = :draft
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                        SQL,
+                    ['organization' => $organization, 'draft' => $id],
+                );
+                if (in_array($handoff, ['prepare', 'complete'], true)) {
+                    return ['status' => 'handoff_active'];
+                }
+            }
             $now = gmdate('Y-m-d H:i:s');
             $db->executeStatement(
                 <<<'SQL'
@@ -373,6 +410,13 @@ final class ScheduleDraftController extends AbstractController
         }
         if ($result['status'] === 'missing') {
             return $this->error(404, 'draft_not_found', 'El borrador no existe en tu organización.');
+        }
+        if ($result['status'] === 'handoff_active') {
+            return $this->error(
+                409,
+                'manual_handoff_active',
+                'Cierra o registra como fallida la salida manual antes de cancelar el borrador.',
+            );
         }
 
         return $this->privateJson(['data' => [
@@ -415,6 +459,15 @@ final class ScheduleDraftController extends AbstractController
             'local_date' => (string) $row['local_date'],
             'local_time' => (string) $row['local_time'],
             'status' => (string) $row['status'],
+            'manual_handoff_status' => match ($row['manual_handoff_action'] ?? null) {
+                'prepare' => 'prepared',
+                'complete' => 'completed',
+                'fail' => 'failed',
+                default => 'none',
+            },
+            'manual_handoff_updated_at' => ($row['manual_handoff_updated_at'] ?? null) === null
+                ? null
+                : (string) $row['manual_handoff_updated_at'],
             'created_at' => (string) $row['created_at'],
             'cancelled_at' => $row['cancelled_at'] === null ? null : (string) $row['cancelled_at'],
         ];

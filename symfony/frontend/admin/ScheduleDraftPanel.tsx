@@ -23,6 +23,8 @@ type Draft = {
   local_date: string;
   local_time: string;
   status: 'draft' | 'cancelled';
+  manual_handoff_status: 'none' | 'prepared' | 'completed' | 'failed';
+  manual_handoff_updated_at: string | null;
 };
 
 type Props = {
@@ -30,11 +32,16 @@ type Props = {
   assets: Asset[];
   canEdit: boolean;
   csrf: string | null;
+  canManualHandoff: boolean;
+  manualHandoffCsrf: string | null;
 };
 
-export function ScheduleDraftPanel({ slots, assets, canEdit, csrf }: Props) {
+export function ScheduleDraftPanel({
+  slots, assets, canEdit, csrf, canManualHandoff, manualHandoffCsrf,
+}: Props) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [total, setTotal] = useState(0);
+  const [handoffReady, setHandoffReady] = useState(false);
   const [assetId, setAssetId] = useState('');
   const [utcSlot, setUtcSlot] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -57,6 +64,7 @@ export function ScheduleDraftPanel({ slots, assets, canEdit, csrf }: Props) {
       }
       setDrafts(body.data.drafts as Draft[]);
       setTotal(body.data.total as number);
+      setHandoffReady(body.data.manual_handoff_ready === true);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return;
       setError(caught instanceof Error ? caught.message : 'No se pudo abrir la agenda.');
@@ -135,6 +143,53 @@ export function ScheduleDraftPanel({ slots, assets, canEdit, csrf }: Props) {
     }
   }
 
+  async function updateManualHandoff(
+    draft: Draft,
+    action: 'prepare' | 'complete' | 'fail',
+  ) {
+    if (!canManualHandoff || !manualHandoffCsrf || !handoffReady
+      || busyId !== null || draft.status !== 'draft') return;
+
+    setBusyId('handoff-' + draft.id);
+    setFeedback('');
+    setError('');
+    try {
+      const response = await fetch(
+        '/api/admin/schedules/' + encodeURIComponent(draft.id) + '/manual-handoff',
+        {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': manualHandoffCsrf,
+          },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo registrar la salida manual.');
+      }
+      if (body?.data?.publishes !== false || body?.data?.provider_calls !== false) {
+        throw new Error('No se confirmó el límite de salida manual segura.');
+      }
+
+      const labels: Record<typeof action, string> = {
+        prepare: 'Salida manual preparada. Aún no se ha publicado nada.',
+        complete: 'Salida manual registrada como realizada por una persona.',
+        fail: 'Fallo manual registrado. Puedes preparar un nuevo intento.',
+      };
+      setFeedback(labels[action]);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo registrar la salida manual.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+
   return (
     <section className="schedule-draft-panel" aria-labelledby="schedule-draft-title">
       <div>
@@ -181,19 +236,48 @@ export function ScheduleDraftPanel({ slots, assets, canEdit, csrf }: Props) {
                     <strong>{draft.asset_name}</strong>
                     <span>{draft.local_date} · {draft.local_time} ({draft.timezone})</span>
                     <small>{draft.status === 'draft' ? 'Borrador reservado' : 'Borrador cancelado'}</small>
+                    {handoffReady &&
+                      <small className={'manual-handoff-status ' + draft.manual_handoff_status}>
+                        {draft.manual_handoff_status === 'prepared' && 'Salida manual preparada'}
+                        {draft.manual_handoff_status === 'completed' && 'Salida manual registrada como realizada'}
+                        {draft.manual_handoff_status === 'failed' && 'Salida manual con fallo registrado'}
+                        {draft.manual_handoff_status === 'none' && 'Salida manual sin preparar'}
+                      </small>}
                   </div>
-                  {canEdit && csrf && draft.status === 'draft' &&
-                    <button type="button" disabled={busyId !== null}
-                      aria-label={'Cancelar borrador de ' + draft.asset_name}
-                      onClick={() => void cancel(draft)}>
-                      {busyId === draft.id ? 'Cancelando…' : 'Cancelar borrador'}
-                    </button>}
+                  <div className="schedule-draft-actions">
+                    {canManualHandoff && manualHandoffCsrf && handoffReady && draft.status === 'draft' &&
+                      <>
+                        {(draft.manual_handoff_status === 'none' || draft.manual_handoff_status === 'failed') &&
+                          <button type="button" disabled={busyId !== null}
+                            onClick={() => void updateManualHandoff(draft, 'prepare')}>
+                            {busyId === 'handoff-' + draft.id ? 'Guardando…' : 'Preparar salida manual'}
+                          </button>}
+                        {draft.manual_handoff_status === 'prepared' &&
+                          <>
+                            <button type="button" disabled={busyId !== null}
+                              onClick={() => void updateManualHandoff(draft, 'complete')}>
+                              {busyId === 'handoff-' + draft.id ? 'Guardando…' : 'Registrar realizada'}
+                            </button>
+                            <button type="button" disabled={busyId !== null}
+                              onClick={() => void updateManualHandoff(draft, 'fail')}>
+                              {busyId === 'handoff-' + draft.id ? 'Guardando…' : 'Registrar fallo'}
+                            </button>
+                          </>}
+                      </>}
+                    {canEdit && csrf && draft.status === 'draft'
+                      && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
+                      <button type="button" disabled={busyId !== null}
+                        aria-label={'Cancelar borrador de ' + draft.asset_name}
+                        onClick={() => void cancel(draft)}>
+                        {busyId === draft.id ? 'Cancelando…' : 'Cancelar borrador'}
+                      </button>}
+                  </div>
                 </li>)}
             </ul>
           </div>}
       <p className="weekly-safety">
-        <strong>Solo agenda interna.</strong> Los borradores no son publicaciones, envíos ni promesas
-        de capacidad de proveedor. La autorización se revalida al guardar y no habilita distribución externa.
+        <strong>Solo agenda y handoff humano.</strong> Preparar o cerrar una salida manual registra una decisión
+        interna; no llama proveedores, no mueve contenido fuera de GrindFlow y no prueba una publicación externa.
       </p>
     </section>
   );

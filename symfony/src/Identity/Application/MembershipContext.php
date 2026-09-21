@@ -59,7 +59,8 @@ final readonly class MembershipContext
      *   content_prepare: bool,
      *   content_review: bool,
      *   content_review_decide: bool,
-     *   distribution_authorize: bool
+     *   distribution_authorize: bool,
+     *   manual_handoff_manage: bool
      * }
      */
     public function permissions(string $role): array
@@ -72,6 +73,7 @@ final readonly class MembershipContext
             'content_review_decide' => in_array($role, ['admin', 'studio', 'editor'], true),
             // External distribution approval is deliberately narrower than content preparation.
             'distribution_authorize' => in_array($role, ['admin', 'studio'], true),
+            'manual_handoff_manage' => in_array($role, ['admin', 'studio'], true),
         ];
     }
 }

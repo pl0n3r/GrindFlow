@@ -154,6 +154,25 @@ distribution attempt, provider job ni publicación. Cualquier futura entrega deb
 revalidar sus propias compuertas y nunca interpretar un borrador histórico como
 autorización vigente.
 
+### S4 · Handoff manual auditado
+
+El siguiente paso después de un borrador puede ser un **handoff humano** explícito,
+no una publicación automática. Admin/Studio registra eventos `prepare`,
+`complete` o `fail` en un ledger tenant-owned append-only. El estado se deriva
+del último evento y no reescribe el borrador.
+
+`prepare` puede anticipar el trabajo. `complete` y `fail` solo se aceptan
+cuando el horario UTC ya llegó y existe un `prepare` vigente. Un fallo permite
+preparar un nuevo intento; `complete` cierra el flujo. Cancelar un borrador con
+handoff preparado o completado queda bloqueado para evitar historias
+contradictorias.
+
+Este ledger es evidencia de una **acción interna declarada por una persona**,
+no evidencia de plataforma externa. No contiene credenciales, payloads,
+respuestas de proveedor, media ni URL privada. El endpoint y la UI deben
+declarar `publishes=false`, `provider_calls=false` y
+`external_evidence=false`.
+
 ## 4. Non-negotiable invariants
 
 1. Tenant data must not cross organization boundaries.

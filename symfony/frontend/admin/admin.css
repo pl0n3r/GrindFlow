@@ -255,3 +255,13 @@
 .schedule-draft-history li strong,.schedule-draft-history li span{overflow-wrap:anywhere}
 .schedule-draft-history li small{color:#a8ffd5}
 @media(max-width:520px){.schedule-draft-history li{flex-direction:column}.schedule-draft-history button,.schedule-draft-form button{justify-self:stretch;width:100%}}
+
+.schedule-draft-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;min-width:0}
+.schedule-draft-actions button{min-height:42px;max-width:100%;padding:8px 11px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;font-size:12px;cursor:pointer}
+.schedule-draft-actions button:disabled{cursor:not-allowed;opacity:.55}
+.manual-handoff-status{font-weight:700}
+.manual-handoff-status.prepared{color:#d9c9ff}
+.manual-handoff-status.completed{color:#a8ffd5}
+.manual-handoff-status.failed{color:#ffb7c6}
+.manual-handoff-status.none{color:#9699ae}
+@media(max-width:520px){.schedule-draft-actions{width:100%;justify-content:stretch}.schedule-draft-actions button{width:100%}}
