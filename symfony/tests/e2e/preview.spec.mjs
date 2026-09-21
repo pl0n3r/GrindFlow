@@ -1936,6 +1936,17 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   );
   await expect(page.getByText('Borrador cancelado', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Trabajo manual pendiente · 0' })).toBeVisible();
+  await page.getByRole('button', { name: 'Desactivar' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Destino manual desactivado para nuevas preparaciones.',
+  );
+  await expect(page.getByText('Desactivado', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reactivar' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Destino manual reactivado.',
+  );
+  await expect(page.getByText('Activo para nuevas preparaciones', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Revocar autorización' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
   await expect(page.getByText('Distribución sin autorizar')).toBeVisible();
