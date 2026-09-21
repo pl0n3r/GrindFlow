@@ -1570,6 +1570,14 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
     body: JSON.stringify({
       data: {
         rule: savedRule,
+        slots: savedRule ? [{
+          local_date: '2026-09-22',
+          weekday: 'tue',
+          local_time: '09:30',
+          timezone: 'America/Bogota',
+          capacity: 2,
+          scheduled_at_utc: '2026-09-22T14:30:00Z',
+        }] : [],
         assets: [{
           id: '00000000-0000-7000-8000-000000000099',
           name: 'campaña.png',
@@ -1609,6 +1617,9 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   await expect(page.getByText('Falta autorización explícita de distribución')).toBeVisible();
   await expect(page.getByText('Falta guardar una regla semanal')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Actualizar regla' })).toBeVisible();
+  await expect(page.getByText('Próximos slots')).toBeVisible();
+  await expect(page.getByText('2026-09-22 · 09:30')).toBeVisible();
+  await expect(page.getByText('Capacidad 2/día')).toBeVisible();
 
   const overflow = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
