@@ -391,9 +391,9 @@ export function WeeklyPlannerPanel({
             canEdit={canEdit} csrf={scheduleCsrf} />}
 
         <p className="weekly-safety">
-          <strong>Publicación bloqueada.</strong> “Listo para programar” solo confirma los contratos internos S3:
-          regla, revisión humana y autorización de distribución. No crea schedules, no llama proveedores y no certifica
-          derechos, consentimiento ni aceptación de una plataforma.
+          <strong>Publicación bloqueada.</strong> “Listo para programar” solo confirma los contratos internos S3.
+          El bloque S4 puede persistir un borrador de agenda, pero ninguno de estos estados llama proveedores,
+          distribuye contenido ni certifica derechos, consentimiento o aceptación de una plataforma.
         </p>
       </div>
     </section>
