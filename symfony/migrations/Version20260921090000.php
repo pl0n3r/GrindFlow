@@ -29,10 +29,7 @@ final class Version20260921090000 extends AbstractMigration
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
                 PRIMARY KEY (organization_id),
-                CONSTRAINT fk_gf_content_rules_org FOREIGN KEY (organization_id)
-                    REFERENCES gf_identity_organizations (id) ON DELETE CASCADE,
-                CONSTRAINT fk_gf_content_rules_user FOREIGN KEY (updated_by)
-                    REFERENCES gf_identity_users (id) ON DELETE RESTRICT
+                INDEX idx_gf_content_rules_updated_by (updated_by)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             SQL);
     }
