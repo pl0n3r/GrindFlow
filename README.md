@@ -67,7 +67,7 @@ flowchart LR
 - La configuración del secreto E2E cerró #1, pero el smoke de producción v0.1.76 falló con HTTP 302 en Dashboard; diagnóstico registrado en #73. Sin publicación externa, deploy de Symfony ni migraciones productivas.
 
 ## Archivos modificados en este deploy
-Inventario del candidato v0.1.77; no prueba despliegue Symfony en Hostinger.
+Inventario del candidato v0.1.77. El contrato histórico del tablero usa «solo el deploy actual» como marcador de snapshot; NO prueba despliegue Symfony en Hostinger.
 - `AGENTS.md`
 - `README.md`
 - `config/version.php`
