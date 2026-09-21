@@ -26,5 +26,11 @@ final class SecurityHeadersSubscriber
             $headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         }
         $headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+        // Apply to redirects and exceptions as well as successful private responses.
+        // Login errors and authenticated routes must never be stored by a browser
+        // or an intermediary, even if a controller omits its own cache policy.
+        if (preg_match('#^/(?:login|logout|admin|organizations|api/admin)(?:/|$)#D', $event->getRequest()->getPathInfo()) === 1) {
+            $headers->set('Cache-Control', 'no-store, private');
+        }
     }
 }

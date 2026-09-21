@@ -60,4 +60,26 @@ final class PreviewTest extends WebTestCase
         $client->request('GET', '/inexistente');
         self::assertResponseStatusCodeSame(404);
     }
+
+    public function testPrivateResponsesCannotBeCachedOnSuccessRedirectOrError(): void
+    {
+        $client = static::createClient();
+        foreach ([
+            ['/login', 200],
+            ['/admin', 302],
+            ['/organizations', 302],
+            ['/api/admin/context', 401],
+            ['/api/admin/missing', 404],
+        ] as [$path, $status]) {
+            $client->request('GET', $path, server: ['HTTP_ACCEPT' => 'application/json']);
+            self::assertResponseStatusCodeSame($status);
+            $cache = (string) $client->getResponse()->headers->get('Cache-Control');
+            self::assertStringContainsString('no-store', $cache, $path);
+            self::assertStringContainsString('private', $cache, $path);
+        }
+
+        $client->request('GET', '/');
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+    }
 }

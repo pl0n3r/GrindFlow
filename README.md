@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.51: comprobación privada de integridad de originales Vault S2, todavía no desplegada.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; los cambios Symfony se registran como candidato, nunca como prueba de despliegue. Base `main` v0.1.50 `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28`, CI exact-main success. Verifica tamaño y SHA-256 a petición del usuario, tanto en biblioteca como en papelera, sin borrar, mover, ni divulgar archivos privados. Symfony aún no desplegado en Hostinger.
+> **Candidato v0.1.52: cabeceras de privacidad para rutas Symfony, todavía no desplegado.** La lectura «solo el deploy actual» corresponde al runtime Laravel observado; los cambios Symfony siguen aislados. Base `main` v0.1.51 `ff63576bdf877a31ed0e53087628d19f32c35e47`, CI exact-main success. Evita almacenar login, área privada y API, incluso ante redirecciones y errores. Symfony aún no desplegado en Hostinger.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,9 +18,9 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.51** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.50~~ | `a7fc82a2fc19f9f4b7fb6dc6499f5fe7a4a29d28` |
-| CI del PR | 🚧 Revalidación del head corregido pendiente | `GrindFlow CI / validate` |
+| Version objetivo | 🚧 **v0.1.52** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.51~~ | `ff63576bdf877a31ed0e53087628d19f32c35e47` |
+| CI del PR | 🚧 Validación del nuevo head pendiente | `GrindFlow CI / validate` |
 | Sonar | 🚧 Pendiente | SonarCloud PR |
 | CodeRabbit | 🚧 Hallazgos atendidos; revalidación pendiente | PR |
 | CI del SHA exacto de main | 🚧 Después del merge | CI PR no lo sustituye |
@@ -33,14 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+332** | **−22** | **+310** |
+| **4** | **+44** | **−22** | **+22** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | S2: comprobación SHA-256/tamaño privada y alertas por archivo |
+| Alcance | Respuesta no almacenable en rutas privadas Symfony, incluidos errores y redirecciones |
 | Revisiones | CI/Sonar/CodeRabbit, exact-main y Hostinger son independientes |
 
 ## Flujo de entrega
@@ -58,34 +58,28 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nueva API `GET /api/admin/vault/{id}/integrity` confirma estado `verified|missing|mismatch|unavailable` tras validar sesión, pertenencia, bytes y huella SHA-256, incluso en papelera.
-- La respuesta no contiene clave, ruta, hash ni bytes; el chequeo es explícito y de solo lectura, sin política destructiva ni backup engañoso.
-- React móvil añade «Verificar integridad» por imagen, feedback accesible y aviso si faltan originales o no coincide su huella.
-- PHPUnit/MariaDB prueba original sano, tamaño o hash alterado, desaparición, enlaces simbólicos y actor ajeno/revocado; Chromium 360 px comprueba cuatro estados, cambios de vista y cuota.
+- El suscriptor HTTP aplica `Cache-Control: no-store, private` a `/login`, `/logout`, `/admin`, `/organizations` y `/api/admin` (y sus subrutas), incluso ante redirecciones y errores.
+- Se preservan CSP, políticas más estrictas de privacidad y cabeceras de archivos privados ya existentes. Las rutas públicas no reciben esta nueva restricción.
+- PHPUnit comprueba que login, redirección del admin, selección de organización, API sin sesión y ruta privada inexistente no sean cacheables; el home público conserva su contrato.
 
 ## Archivos modificados en este deploy
 
 Este inventario corresponde al **cambio candidato en el PR**, no a archivos desplegados en Hostinger.
 - `README.md`
 - `config/version.php`
-- `symfony/README.md`
-- `symfony/frontend/admin/VaultPanel.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/src/Http/Controller/VaultController.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-
-- `symfony/tests/php/VaultTrashTest.php`
+- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
+- `symfony/tests/php/PreviewTest.php`
 
 ## Validación
-- Los tests PHP/MariaDB y Chromium se comprueban en CI del PR; sin checkout local en esta sesión.
-- CI exact-main v0.1.50 success; CI/Sonar/CodeRabbit del nuevo head y Hostinger son señales separadas. Sin migración ni cutover Symfony.
+- El nuevo caso PHPUnit Symfony se comprueba en CI del PR; sin checkout local en esta sesión.
+- CI exact-main v0.1.51 success; CI/Sonar/CodeRabbit del head v0.1.52 y Hostinger son señales separadas. Sin migraciones ni cutover Symfony.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar integridad privada Vault S2 v0.1.51 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar privacidad HTTP Symfony v0.1.52 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y purga con política explícita | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Vault móvil → reglas → distribución autorizada → piloto | 🚧 Planificado |
 | **BLOCKED / EXTERNAL** | ⛔ Cutover sin paridad/datos migrados; Smoke sin credencial | ⛔ Dependencia externa |
@@ -94,7 +88,7 @@ Este inventario corresponde al **cambio candidato en el PR**, no a archivos desp
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Dashboard Laravel v0.1.30~~ | ✅ ~~Esquema Symfony S1 v0.1.31~~ |
-| **NOW** | 🚧 Validar integridad privada Vault S2 v0.1.51 | 🚧 CI y revisión |
+| **NOW** | 🚧 Validar privacidad HTTP Symfony v0.1.52 | 🚧 CI y revisión |
 | **NEXT** | 🚧 Storage durable, backup y retención | 🚧 Pendiente de definir política de retención y backup |
 | **LATER** | 🚧 Automatización de contenido | 🚧 S2–S5 |
 | **BLOCKED / EXTERNAL** | ⛔ Sin cutover Symfony | ⛔ Sin credencial Smoke |
