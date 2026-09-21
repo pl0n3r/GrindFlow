@@ -1999,3 +1999,20 @@ test('preview and private workspace share responsive navigation without horizont
     await page.unroute('**/api/admin/context');
   }
 });
+
+test('identity navigation reuses the public brand without overflowing mobile and tablet layouts', async ({ page }) => {
+  for (const width of [360, 820]) {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto('/login');
+    const navigation = page.getByRole('navigation', { name: 'Navegación de acceso' });
+    await expect(navigation.getByRole('link', { name: 'Inicio' })).toBeVisible();
+    await expect(navigation.getByText('Ingresar', { exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('link', { name: 'GrindFlow, inicio' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ingresa a tu espacio/ })).toBeVisible();
+    await expect(page.locator('input[name="_csrf_token"]')).toHaveAttribute('value', /.+/);
+    const preview = navigation.getByRole('link', { name: 'Vista previa' });
+    if (width <= 590) await expect(preview).toBeHidden();
+    else await expect(preview).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+});

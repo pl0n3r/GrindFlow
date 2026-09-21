@@ -32,6 +32,13 @@ Each requirement should contain:
 
 **Aceptación:** a 360 y 820 px ambos espacios muestran navegación utilizable sin desbordamiento horizontal de la página; los conceptos de preview usan botones con `aria-pressed`, las rutas/secciones reales usan enlaces con `aria-current` cuando corresponde y el enlace «Saltar al contenido» tiene un destino en el admin. Prueba Chromium sobre el build Symfony aislado y sin tocar Hostinger.
 
+### GF-UX-002 — Continuidad de acceso público a privado
+**Estado:** implementado en candidato v0.1.77; CI/Hostinger pendientes.
+
+**Enunciado:** el ingreso y selector de organización Symfony reutilizan una misma cabecera de marca y navegación, sin duplicar logos ni presentar el preview como área autenticada.
+
+**Aceptación:** enlaces reales y estado visible por página, navegación sin desbordamiento a 360/820 px y CSRF/login/membresía existentes sin regresión. PHP prueba la cabecera de selección autenticada; Chromium prueba ambas anchuras del ingreso. No modifica cuentas ni despliega Symfony.
+
 ### GF-ARCH-002 — Paridad de datos y tenencia
 **Estado:** definido, pendiente de ejecución.
 
