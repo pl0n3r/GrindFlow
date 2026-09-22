@@ -177,7 +177,9 @@ jobs:
             scripts/run-production-migrations.sh \
             scripts/mariadb-structure-snapshot-contract.sh \
             scripts/symfony-disposable-restore-drill.sh \
-            scripts/symfony-disposable-restore-drill-contract.sh
+            scripts/symfony-disposable-restore-drill-contract.sh \
+            scripts/symfony-post-restore-tenant-guard.sh \
+            scripts/symfony-post-restore-tenant-guard-contract.sh
           do
             [[ -f "$script" ]] && bash -n "$script"
           done
