@@ -89,6 +89,13 @@ final class IdentityLoginTest extends WebTestCase
             ]));
             self::assertResponseRedirects('/organizations');
 
+            $client->request('GET', '/login');
+            self::assertResponseRedirects('/organizations');
+            $loginRedirectCache = (string) $client->getResponse()->headers->get('Cache-Control');
+            self::assertStringContainsString('no-store', $loginRedirectCache);
+            self::assertStringContainsString('private', $loginRedirectCache);
+            self::assertStringNotContainsString('public', $loginRedirectCache);
+
             $list = $client->request('GET', '/organizations');
             self::assertResponseIsSuccessful();
             self::assertSelectorTextContains('h1', 'Elige tu organización');
@@ -183,6 +190,16 @@ final class IdentityLoginTest extends WebTestCase
                 'password' => 'only-for-isolated-ci',
             ]));
             self::assertResponseRedirects('/login');
+
+            $client->request('GET', '/login');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorTextContains('[role="alert"]', 'No se pudo iniciar sesión');
+            $errorCache = (string) $client->getResponse()->headers->get('Cache-Control');
+            self::assertStringContainsString('no-store', $errorCache);
+            self::assertStringContainsString('private', $errorCache);
+            self::assertStringNotContainsString('public', $errorCache);
+            self::assertStringNotContainsString('only-for-isolated-ci', (string) $client->getResponse()->getContent());
+
             $client->request('GET', '/organizations');
             self::assertResponseRedirects('/login');
         } finally {
