@@ -695,6 +695,15 @@ jobs:
           GF_RESTORE_DRILL_APPROVED: '1'
         run: bash scripts/symfony-disposable-restore-drill.sh
 
+      - name: Verify restored tenant isolation and IDOR guards
+        working-directory: symfony
+        shell: bash
+        run: |
+          set -euo pipefail
+          php vendor/bin/simple-phpunit -c phpunit.xml.dist tests/php/VaultTest.php
+          php vendor/bin/simple-phpunit -c phpunit.xml.dist tests/php/VaultBulkUsageTest.php
+          php vendor/bin/simple-phpunit -c phpunit.xml.dist tests/php/VaultTrashTest.php
+
       - name: Start isolated Symfony server
         shell: bash
         run: |
