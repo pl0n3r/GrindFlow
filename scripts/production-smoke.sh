@@ -72,27 +72,44 @@ print_http_failure() {
   printf 'ERROR: %s returned HTTP %s incident_id=%s\n' "$label" "$status" "$incident" >&2
 }
 
-# Report only a short path: never leak redirect host, query strings, fragments or tokens.
+# Report only known local paths, including strict same-origin absolute redirects.
+# Never retain host, query string, fragment or any unrecognized redirect value.
 safe_redirect_path() {
-  python3 - "$1" <<'PY'
+  python3 - "$1" "$BASE_URL" <<'PY'
 import sys
 from urllib.parse import urlsplit
 
-with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
-    for line in handle:
-        if not line.lower().startswith("location:"):
-            continue
-        try:
-            redirect = urlsplit(line.partition(":")[2].strip())
-            # Only classify same-origin relative redirects; a URL with a host
-            # must never masquerade as an allowlisted local path.
-            path = redirect.path if not redirect.scheme and not redirect.netloc else None
-        except ValueError:
-            path = None
-        print(path if path in {"/login", "/dashboard", "/organizations", "/admin", "/admin/system"} else "(redacted)")
-        break
-    else:
-        print("(missing)")
+ALLOWLIST = {"/login", "/dashboard", "/organizations", "/admin", "/admin/system"}
+
+def effective_port(url):
+    return url.port if url.port is not None else {"http": 80, "https": 443}.get(url.scheme)
+
+try:
+    origin = urlsplit(sys.argv[2])
+    if origin.scheme not in {"http", "https"} or not origin.hostname or origin.username or origin.password:
+        raise ValueError("invalid smoke origin")
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not line.lower().startswith("location:"):
+                continue
+            destination = urlsplit(line.partition(":")[2].strip())
+            if destination.scheme or destination.netloc:
+                allowed_origin = (
+                    destination.scheme == origin.scheme
+                    and destination.hostname == origin.hostname
+                    and effective_port(destination) == effective_port(origin)
+                    and destination.username is None
+                    and destination.password is None
+                )
+                path = destination.path if allowed_origin else None
+            else:
+                path = destination.path
+            print(path if path in ALLOWLIST else "(redacted)")
+            break
+        else:
+            print("(missing)")
+except (OSError, ValueError):
+    print("(redacted)")
 PY
 }
 
