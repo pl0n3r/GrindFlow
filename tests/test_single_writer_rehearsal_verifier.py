@@ -115,7 +115,9 @@ class SingleWriterRehearsalVerifierTest(unittest.TestCase):
         for module in ("identity", "vault"):
             report = SINGLE.build_report(self.envelope(module))
             self.assertEqual(module, report["module"])
-            self.assertTrue(report["single_writer_rehearsal_verified"])
+            self.assertTrue(report["single_writer_rehearsal_reference_verified"])
+            self.assertFalse(report["receipt_content_verified"])
+            self.assertEqual("redacted_rehearsal_reference_only", report["scope"])
             self.assertFalse(report["production_ready"])
             self.assertFalse(report["production_authorized"])
             self.assertEqual(
