@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.93: reversión Symfony derivada automáticamente de las migraciones reales.** Base exacta `main` v0.1.92 `372216785f6cc9789a0da0761bce99987e2b6088`; elimina la lista manual que permitió omitir migraciones del restore drill.
+> **Candidato v0.1.94: aislamiento cross-tenant/IDOR verificado después del restore.** Base exacta `main` v0.1.93 `a9ddf45215c50df9397f257f6e822f9fa29816ea`; reutiliza regresiones de Vault, organización y autorización sobre la MariaDB restaurada.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,20 +18,20 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.93** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.92~~ | `372216785f6cc9789a0da0761bce99987e2b6088` |
+| Version objetivo | 🚧 **v0.1.94** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.93~~ | `a9ddf45215c50df9397f257f6e822f9fa29816ea` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.92 | Señal post-merge separada |
+| CI del SHA exacto de main | 🚧 No observado para v0.1.93 | Señal post-merge separada |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Plan source-only; ejecución solo en DB CI descartable |
+| Datos productivos | ✅ ~~No tocados~~ | Regresiones post-restore solo sobre DB CI descartable |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+194** | **−38** | **+156** |
+| **8** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -39,7 +39,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Plan automático newest-first para revertir todas las migraciones Symfony |
+| Alcance | Cross-tenant/IDOR post-restore: Vault, organización y autorización |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -61,13 +61,13 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/symfony-migration-reversal-plan.py`: descubre todas las migraciones `VersionYYYYMMDDHHMMSS.php` y produce clases Doctrine en orden newest-first.
-- El plan es source-only: no conecta ni modifica MariaDB.
-- Rechaza nombres de migración inesperados, versiones duplicadas y directorios vacíos.
-- Cuatro tests verifican que el plan cubra el directorio real completo, conserve clase↔archivo y falle cerrado ante entradas inválidas.
-- `symfony-preview` deja de mantener una lista manual de `doctrine:migrations:execute --down`; consume directamente `--classes` del plan.
-- Una migración nueva entra automáticamente a la prueba de reversibilidad y al restore drill, evitando repetir la omisión detectada en v0.1.92.
-- `ci-scope.sh` fuerza el gate Symfony cuando cambia el planner y su contrato lo prueba.
+- Nuevo `scripts/symfony-post-restore-tenant-guard.sh`: ejecuta regresiones de aislamiento únicamente después del restore drill.
+- Reutiliza `VaultTest` para comprobar 404 en detalle/preview/download de activos ajenos y bloqueo tras revocar membresía.
+- Reutiliza `OrganizationSettingsTest` para rechazar mutaciones IDOR mediante `organization_id`, roles insuficientes y CSRF inválido.
+- Reutiliza `DistributionAuthorizationTest` para impedir autorizar recursos de otra organización.
+- El guard exige `APP_ENV=test` y `CI=true`; un contrato shell prueba ambas barreras antes de depender de PHPUnit.
+- `symfony-preview` ejecuta estas regresiones **después** de restaurar MariaDB + Vault y antes de arrancar el preview HTTP.
+- `ci-scope.sh` fuerza el gate Symfony si cambia cualquiera de los scripts del guard.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
@@ -78,29 +78,29 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `docs/DATA-CUTOVER-INVENTORY.md`
 - `scripts/ci-scope-contract.sh`
 - `scripts/ci-scope.sh`
-- `scripts/symfony-migration-reversal-plan.py`
-- `tests/test_symfony_migration_reversal_plan.py`
+- `scripts/symfony-post-restore-tenant-guard-contract.sh`
+- `scripts/symfony-post-restore-tenant-guard.sh`
 
 ## Validación
 - La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
-- El plan se deriva **solo del árbol de migraciones del repositorio**; el rollback sigue ejecutándose únicamente dentro de `symfony-preview` sobre MariaDB descartable.
-- Esta entrega no acredita backup productivo, RPO/RTO, secretos/configuración restaurados ni SHA Hostinger.
+- Las regresiones crean y destruyen datos sintéticos y se ejecutan **solo después del restore** sobre MariaDB descartable.
+- Esta entrega no acredita datos productivos, RPO/RTO, secretos/configuración restaurados ni SHA Hostinger.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Automatizar cobertura total de reversión Symfony | 🚧 v0.1.93 candidata |
-| **NEXT** | 🚧 Prueba cross-tenant/IDOR sobre copia restaurada sintética | 🚧 GF-ARCH-002 |
+| **NOW** | 🚧 Verificar aislamiento tenant después del restore | 🚧 v0.1.94 candidata |
+| **NEXT** | 🚧 Inventario real autorizado + contrato de cutover por módulo | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.92 fusionada~~ | ✅ ~~restore drill MariaDB + Vault descartable~~ |
-| **NOW** | 🚧 Automatic migration reversal | 🚧 v0.1.93 |
-| **NEXT** | 🚧 Aislamiento cross-tenant sobre copia restaurada | 🚧 Sin cutover |
+| **DONE** | ✅ ~~v0.1.93 fusionada~~ | ✅ ~~reversión automática de todas las migraciones~~ |
+| **NOW** | 🚧 Post-restore tenant isolation | 🚧 v0.1.94 |
+| **NEXT** | 🚧 Snapshot real autorizado + contrato de cutover | 🚧 Sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
