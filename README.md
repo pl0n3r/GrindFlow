@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+708** | **−33** | **+675** |
+| **8** | **+729** | **−49** | **+680** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -86,6 +86,7 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 - `docs/DATA-CUTOVER-INVENTORY.md`
 - `scripts/cutover-ownership-plan.py`
 - `scripts/data-schema-inventory.py`
+- `scripts/readme-dashboard.py`
 - `tests/test_cutover_ownership_plan.py`
 
 ## Validación
