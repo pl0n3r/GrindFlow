@@ -7,6 +7,7 @@ A structurally valid plan is NOT evidence of data parity or permission to cut ov
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -167,9 +168,13 @@ def build_report(source: Any, plan: Any) -> dict[str, Any]:
     if set(plan["laravel_tables"]) & set(plan["symfony_tables"]):
         fail("two runtimes cannot own the same table")
 
+    source_bytes = json.dumps(
+        source, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")
     return {
         "contract": REPORT_CONTRACT,
         "module": module,
+        "source_inventory_sha256": hashlib.sha256(source_bytes).hexdigest(),
         "source_only": True,
         "database_contacted": False,
         "cutover_authorized": False,
@@ -178,6 +183,10 @@ def build_report(source: Any, plan: Any) -> dict[str, Any]:
         "rollback_writer": "laravel",
         "table_ownership": {
             runtime: sorted(grouping[runtime]) for runtime in ("laravel", "symfony")
+        },
+        "outside_this_proposal": {
+            runtime: sorted(inventory[runtime] - set(grouping[runtime]))
+            for runtime in ("laravel", "symfony")
         },
         "pending_preconditions": list(PRECONDITIONS),
         "next_action": "review evidence and authorize a separate rehearsal; do not run cutover",
