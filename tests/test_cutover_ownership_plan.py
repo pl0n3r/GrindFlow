@@ -77,7 +77,13 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         source["symfony"] = [
             row for row in source["symfony"] if row["table"] != "gf_identity_users"
         ]
-        with self.assertRaisesRegex(ValueError, "source migrations"):
+        with self.assertRaisesRegex(ValueError, "checked-in migrations"):
+            CUTOVER.build_report(source, self.plan())
+
+    def test_forged_source_migration_provenance_fails(self):
+        source = self.source()
+        source["laravel"][0]["migration"] = "invented.php"
+        with self.assertRaisesRegex(ValueError, "checked-in migrations"):
             CUTOVER.build_report(source, self.plan())
 
     def test_incomplete_module_ownership_fails(self):
