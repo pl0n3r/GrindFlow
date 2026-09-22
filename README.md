@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.83: privacidad del throttle del login y regresión de sesión anónima.** Base exacta `main` v0.1.82 `e41cb3245286d407b7e2967fb7ef4f810fcd1e40`; sin migraciones, edición de cuentas ni secretos productivos.
+> **Candidato v0.1.84: continuidad anónima tras un intento E2E rechazado.** Base exacta `main` v0.1.83 `2c6ab470ae941aff183049dd493e781a9b3afba6`; no modifica usuarios, secretos, MariaDB ni despliega Symfony.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.83** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.82~~ | `e41cb3245286d407b7e2967fb7ef4f810fcd1e40` |
-| CI del PR / Sonar / CodeRabbit | 🚧 Revalidar HEAD actual | CI #35688983744 y Sonar OK en HEAD anterior; revisión final sobre nuevo HEAD pendiente |
-| CI del SHA exacto de main | ✅ ~~v0.1.82 success~~ | run `35688491389` |
-| Deploy Observer | ✅ ~~v0.1.82 observado~~ | run `35688491348`, release humano, NO SHA Hostinger |
-| Production Smoke | ⛔ Fallo autenticado | run `35688491347`, [incidente #73](https://github.com/pl0n3r/GrindFlow/issues/73) |
-| Symfony en Hostinger | ⛔ NO desplegado | CI aislado |
-| Migraciones | ✅ ~~Sin cambios de esquema~~ | Producción intacta |
+| Version objetivo | 🚧 **v0.1.84** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.83~~ | `2c6ab470ae941aff183049dd493e781a9b3afba6` |
+| CI / Sonar / CodeRabbit del PR | 🚧 Pendientes para HEAD final | No heredar gates previos |
+| CI del SHA exacto de main | ✅ ~~v0.1.83 success~~ | run `35689866959` |
+| Deploy Observer | ✅ ~~v0.1.83 observado~~ | run `35689866963`, versión humana; NO SHA Hostinger |
+| Production Smoke | ⛔ Login E2E devuelve /login | run `35689866922`, [#73](https://github.com/pl0n3r/GrindFlow/issues/73) |
+| Symfony en Hostinger | ⛔ NO desplegado | Solo CI aislado |
+| Migraciones | ✅ ~~Sin cambio de esquema~~ | Producción intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+97** | **−34** | **+63** |
+| **4** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · browser · real-stack** |
-| Gate agregador obligatorio | **validate**: exige éxito de cada job seleccionado; Sonar y CodeRabbit se revisan aparte |
-| Alcance | Hash HMAC de identificador del throttle y contrato HTTP GET×2 → POST válido |
-| Revisiones | PR HEAD final, squash, CI exact-main y observación productiva separadas |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
+| Alcance | Un GET seguro después de redirect /login, sin repetir el POST |
+| Revisiones | CI/Sonar/CodeRabbit del mismo HEAD, CI exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
 ```mermaid
@@ -59,36 +59,37 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- La clave de limitación de intentos conserva la combinación de email normalizado e IP, pero los datos dejan de aparecer en claro en nombres de claves de caché: HMAC-SHA256 con la clave de aplicación y prefijo `login:`. No cambia el mensaje de validación ni el límite de cinco intentos.
-- Un test de regresión crea una cuenta **sintética descartable**, solicita dos veces el formulario de login en la misma sesión, compara el CSRF y verifica un único POST correcto; el test de lockout verifica cinco intentos en la clave privada y ningún contador en la clave legible. Una regresión adicional comprueba que un login correcto, con email normalizado, limpia el contador HMAC previo sin crear la clave en claro.
-- Las pruebas no usan el usuario E2E productivo ni modifican cuentas/contraseñas del hosting. El cambio de formato deja de consultar contadores temporales previos a esta versión; no resolverá por sí solo el bloqueo de [#73](https://github.com/pl0n3r/GrindFlow/issues/73).
+- El [Smoke v0.1.83](https://github.com/pl0n3r/GrindFlow/actions/runs/35689866922) confirmó dos GET anónimos con CSRF consistente, luego un único POST que retornó a `/login`. Esto no identifica la causa ni demuestra que el login funcione.
+- Solo si el POST retorna 302/303 al `/login` local, el smoke hace **un GET adicional sin credenciales** con la misma cookie jar. Compara en privado el CSRF posterior con el usado en el POST y emite exclusivamente `LOGIN_FAILURE_SESSION_CHECK=stable|changed|unavailable`. La ausencia/cambio de token **no demuestra** contraseña incorrecta o sesión rota por sí solo.
+- Se preservan salida 7, un único POST, cero accesos al dashboard después del rechazo y ninguna impresión de CSRF, cookies, URL privadas o cuerpos remotos. Ninguna operación productiva de usuario/DB.
+- Contratos mock verifican los tres resultados, 3 GET solo en esa rama, 2 GET en las otras y que solo se emite un marcador por fallo sin revelar tokens ni reintentar credenciales.
 
 ## Archivos modificados en este deploy
-Inventario del candidato v0.1.83, no prueba de publicación; solo el deploy actual.
+Inventario del candidato v0.1.84, no evidencia de publicación; solo el deploy actual.
 - `README.md`
-- `app/Http/Requests/Auth/LoginRequest.php`
 - `config/version.php`
-- `tests/Feature/AuthenticationTest.php`
+- `scripts/production-smoke-contract.sh`
+- `scripts/production-smoke.sh`
 
 ## Validación
-- Las suites de PHPUnit, browser/real-stack, PHP quality, Sonar y revisión completa CodeRabbit deben comprobarse en el HEAD de este PR. No atribuir el CI verde de v0.1.82 a los cambios aún candidatos.
-- Production Smoke es un control independiente y sigue bloqueado hasta demostrar una sesión E2E real de solo lectura. No reintentar credenciales a ciegas.
+- CI/Sonar/CodeRabbit de v0.1.84 deben ejecutarse en su HEAD final; la CI exact-main 35689866959 solo prueba v0.1.83. El contrato nunca usa credenciales productivas.
+- El Smoke posterior al merge, incluso con `stable`, seguirá bloqueado si el POST regresa a `/login`; el estado de cuenta y secretos requiere revisión por operador autorizado sin reintentos ciegos.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Login privado y test de sesión v0.1.83 | 🚧 Revisiones de PR |
-| **NEXT** | 🚧 Diagnóstico seguro de auth #73 | 🚧 Causa exacta sin acreditar |
-| **LATER** | 🚧 Paridad de seguridad y operación del runtime Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 | ⛔ Verificación externa de cuenta/configuración |
+| **NOW** | 🚧 Diagnóstico CSRF tras fallo v0.1.84 | 🚧 PR/gates |
+| **NEXT** | 🚧 Verificar origen de rechazo E2E #73 | 🚧 No inferir causa de marcador |
+| **LATER** | 🚧 Paridad Symfony en entorno aislado | 🚧 Sin cutover |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 | ⛔ Revisión autorizada de cuenta/configuración |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.82 fusionada en main~~ | ✅ ~~CI exact-main success; Observer vio release humano~~ |
-| **NOW** | 🚧 Protección del throttle y regresión E2E | 🚧 Candidato v0.1.83 |
-| **NEXT** | 🚧 Aislar causa de login E2E | 🚧 Sin modificar cuentas |
-| **LATER** | 🚧 Integración Symfony portable | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado | ⛔ Symfony no desplegado |
+| **DONE** | ✅ ~~v0.1.83 fusionada y CI exact-main success~~ | ✅ ~~Observer v0.1.83 humana success~~ |
+| **NOW** | 🚧 Una lectura adicional tras login rechazado | 🚧 Candidato v0.1.84 |
+| **NEXT** | 🚧 Diagnóstico de autenticación E2E | 🚧 Sin modificar credenciales |
+| **LATER** | 🚧 Transición Symfony | 🚧 No desplegada |
+| **BLOCKED / EXTERNAL** | ⛔ Validación productiva autenticada | ⛔ Causa login pendiente |
