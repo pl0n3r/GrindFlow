@@ -70,8 +70,8 @@ flowchart LR
 - `production_ready` y `production_authorized` quedan fijados siempre en `false`; los prechecks reales permanecen explícitamente pendientes.
 - El parser limita stdin a 1.000.000 bytes, exige UTF-8 estricto, rechaza UTF-16/UTF-32 y no reproduce payloads fallidos.
 - La suite instala una audit barrier para detectar intentos de sockets o subprocess externos y valida que el CLI siga siendo offline.
-- `symfony-preview` crea los recibos únicamente después de que pasen los checks anteriores del job y escribe un archivo temporal de resultados ligado al mismo SHA/run id; `--template` lo exige y ya no puede autodeclarar los checks como `passed`.
-- El archivo temporal de gates y los envelopes completos se borran antes del upload; solo los reportes mínimos se suben como artifact `gf-arch-002-disposable-evidence`.
+- `symfony-preview` crea los recibos únicamente después de que pasen los checks anteriores del job y escribe resultados temporales ligados al mismo SHA/run id; `--template` los consume por stdin y ya no puede autodeclarar los checks como `passed`.
+- Los resultados temporales de gates y los envelopes completos se borran antes del upload; solo los reportes mínimos se suben como artifact `gf-arch-002-disposable-evidence`.
 - El artifact conserva retención de **1 día** y no contiene credenciales, row data, blobs ni un permiso de cutover.
 - No toca Hostinger, MariaDB productiva, cuentas reales ni ownership efectivo.
 
@@ -89,7 +89,7 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 - La rama debe pasar `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
 - Por modificar `.github/workflows/grindflow-ci.yml`, el scope es completo e incluye `symfony-preview`.
 - La evidencia se genera solo después de paridad, reversibilidad, restore y guards post-restore exitosos dentro del mismo job.
-- Los receipts `identity` y `vault` deben conservar `ci.disposable=true`, `production_ready=false` y `production_authorized=false`, con SHA/run id iguales a los resultados de gates.
+- Los receipts `identity` y `vault` deben conservar `ci.disposable=true`, `production_ready=false` y `production_authorized=false`, con SHA/run id iguales a los resultados de gates recibidos por stdin.
 - Exact-main, Deploy Observer y Production Smoke siguen siendo señales separadas del artifact descartable.
 - Esta entrega no acredita backup real, RPO/RTO, freeze/single-writer ni inventario autorizado de producción.
 
