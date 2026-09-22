@@ -24,6 +24,42 @@ python3 scripts/data-schema-inventory.py --json
 
 El JSON usa el contrato `gf-arch-002-source-inventory-v1`, registra la migración que introduce cada tabla y marca explícitamente `database_contacted=false`.
 
+## Comparación contra un snapshot read-only
+
+`scripts/data-schema-parity.py` permite comparar ese inventario con un snapshot de metadatos capturado por un operador autorizado. El comparador **no tiene código de conexión a MariaDB**: recibe dos archivos JSON y por diseño no puede usar `DATABASE_URL`.
+
+El snapshot usa el contrato `gf-arch-002-db-snapshot-v1` y debe declarar explícitamente:
+
+- `metadata_only=true`;
+- `contains_row_data=false`;
+- `tables` como lista de objetos `{"name": "tabla"}`.
+
+Ejemplo mínimo:
+
+```json
+{
+  "contract": "gf-arch-002-db-snapshot-v1",
+  "metadata_only": true,
+  "contains_row_data": false,
+  "tables": [{"name": "users"}, {"name": "gf_organizations"}]
+}
+```
+
+Flujo reproducible:
+
+1. Generar el inventario fuente con `data-schema-inventory.py --json`.
+2. Capturar el snapshot metadata-only por un canal autorizado.
+3. Formar un único envelope JSON `{"source": {...}, "snapshot": {...}}`.
+4. Entregar el envelope por **stdin** al comparador:
+
+```bash
+cat envelope.json | python3 scripts/data-schema-parity.py --json
+```
+
+El comparador no acepta rutas de archivos como argumentos, reduciendo el riesgo de lectura arbitraria por path traversal. El archivo `envelope.json` del ejemplo es local/temporal y **no debe versionarse si proviene de un entorno real**.
+
+La comparación falla cerrado cuando falta una tabla declarada por fuente, el snapshot repite un nombre o aparece una tabla `gf_*` que Symfony no declara. Tablas adicionales sin prefijo `gf_` se reportan como informativas porque una base existente puede contener tablas operativas o históricas que esta transición no administra. **Este nivel comprueba presencia de tablas, no columnas, índices, claves, triggers, conteos ni contenido.**
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
