@@ -97,11 +97,10 @@ bash scripts/mariadb-structure-snapshot-contract.sh
 
 CI ejecuta además una prueba end-to-end sobre la MariaDB **descartable** de `symfony-preview`: migra Symfony, captura el snapshot metadata-only y lo compara contra el estado final reconstruido desde las migraciones. Esa validación comprueba que el capturador y el comparador acuerdan sobre una base efímera; **no constituye autorización ni evidencia de una captura productiva**.
 
-Ejemplo operativo, solo para un entorno previamente autorizado:
+Ejemplo operativo, solo para un entorno previamente autorizado. `DATABASE_URL` debe llegar al proceso desde el gestor de secretos o mecanismo de inyección del entorno; **no** escribir la URI con credenciales en la línea de comandos ni en el historial del shell:
 
 ```bash
 GF_METADATA_SNAPSHOT_APPROVED=1 \
-DATABASE_URL='mysql://usuario:clave@host:3306/base' \
 php scripts/mariadb-structure-snapshot.php > /tmp/gf-structure.json
 ```
 
