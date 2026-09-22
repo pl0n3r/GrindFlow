@@ -283,32 +283,52 @@ def quoted_add_sql(line: str, quote: str) -> str | None:
     return line[start:end].replace(f"\\{quote}", quote).strip()
 
 
+def is_heredoc_start(line: str) -> bool:
+    """Return whether a line opens a SQL heredoc addSql call."""
+    return "addSql(<<<'SQL'" in line or 'addSql(<<<"SQL"' in line
+
+
+def consume_heredoc_line(
+    buffer: list[str],
+    line: str,
+    statements: list[str],
+) -> list[str] | None:
+    """Consume one heredoc line and return the next buffer state."""
+    if line.strip() != "SQL);":
+        buffer.append(line)
+        return buffer
+
+    sql = "\n".join(buffer).strip()
+    if sql:
+        statements.append(sql)
+    return None
+
+
+def quoted_sql_from_line(line: str) -> str | None:
+    """Return the first supported one-line quoted addSql body."""
+    for quote in ("'", '"'):
+        sql = quoted_add_sql(line, quote)
+        if sql is not None:
+            return sql
+    return None
+
+
 def extract_up_sql(text: str) -> list[str]:
     """Extract addSql statements from up() in declaration order."""
     statements: list[str] = []
     heredoc: list[str] | None = None
 
     for line in up_section(text).splitlines():
-        stripped = line.strip()
         if heredoc is not None:
-            if stripped == "SQL);":
-                sql = "\n".join(heredoc).strip()
-                if sql:
-                    statements.append(sql)
-                heredoc = None
-            else:
-                heredoc.append(line)
+            heredoc = consume_heredoc_line(heredoc, line, statements)
             continue
-
-        if "addSql(<<<'SQL'" in line or 'addSql(<<<"SQL"' in line:
+        if is_heredoc_start(line):
             heredoc = []
             continue
 
-        for quote in ("'", '"'):
-            sql = quoted_add_sql(line, quote)
-            if sql is not None:
-                statements.append(sql)
-                break
+        sql = quoted_sql_from_line(line)
+        if sql is not None:
+            statements.append(sql)
 
     if heredoc is not None:
         raise ValueError("unterminated addSql heredoc")
