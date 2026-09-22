@@ -48,7 +48,13 @@ final class AccountSecurityController extends AbstractController
             return $response;
         }
 
-        $body = json_decode($request->getContent(), true);
+        // Bound parsing work for a CSRF-valid request. This does not replace web-server
+        // request-size limits; it prevents decoding unexpectedly large JSON payloads.
+        $raw = $request->getContent();
+        if (strlen($raw) > 4096) {
+            return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
+        }
+        $body = json_decode($raw, true, 16);
         if (!is_array($body) || $request->request->all() !== [] || $request->files->all() !== []) {
             return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
         }
