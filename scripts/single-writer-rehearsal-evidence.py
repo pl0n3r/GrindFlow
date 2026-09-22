@@ -12,6 +12,7 @@ from datetime import datetime
 import hashlib
 import importlib.util
 import json
+import math
 from pathlib import Path
 import re
 import sys
@@ -171,6 +172,11 @@ def validate_operator_report(report: Any, module_name: str) -> dict[str, Any]:
     }
     if len(reference_digests) != len(references):
         fail("operator evidence references must remain distinct")
+    if reference_digests & {
+        source_digest,
+        report["evidence_bundle_sha256"],
+    }:
+        fail("operator evidence digests must remain distinct")
     return report
 
 
@@ -292,6 +298,19 @@ def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def reject_nonfinite_number(value: str) -> None:
+    """Reject JavaScript-style non-finite constants; they are not valid JSON."""
+    fail("single-writer evidence contains a non-finite number")
+
+
+def parse_finite_float(value: str) -> float:
+    """Reject finite-notation values that overflow Python's float range."""
+    number = float(value)
+    if not math.isfinite(number):
+        fail("single-writer evidence contains a non-finite number")
+    return number
+
+
 def read_stdin_json() -> Any:
     raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
     if len(raw) > MAX_STDIN_BYTES:
@@ -299,6 +318,8 @@ def read_stdin_json() -> Any:
     return json.loads(
         raw.decode("utf-8"),
         object_pairs_hook=reject_duplicate_keys,
+        parse_constant=reject_nonfinite_number,
+        parse_float=parse_finite_float,
     )
 
 
