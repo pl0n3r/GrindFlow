@@ -19,8 +19,11 @@ fail() {
 db_parts_raw="$(
   php -r '
     $parts = parse_url((string) getenv("DATABASE_URL"));
+    if (!is_array($parts)) {
+        exit(2);
+    }
     $scheme = strtolower((string) ($parts["scheme"] ?? ""));
-    if (!is_array($parts) || !in_array($scheme, ["mysql", "mariadb"], true)) {
+    if (!in_array($scheme, ["mysql", "mariadb"], true)) {
         exit(2);
     }
 
