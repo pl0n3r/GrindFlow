@@ -746,7 +746,7 @@ jobs:
               --template "$module" \
               --head-sha "$GF_EVIDENCE_HEAD_SHA" \
               --run-id "$GF_EVIDENCE_RUN_ID" \
-              --gate-results "$gate_results" > "$envelope"
+              < "$gate_results" > "$envelope"
             python3 scripts/disposable-rehearsal-evidence.py --json \
               < "$envelope" > "$report"
             rm -f "$envelope"
