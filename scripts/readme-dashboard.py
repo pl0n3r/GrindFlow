@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 README_PATH = ROOT / "README.md"
 SCOPE_PATH = ROOT / "scripts" / "ci-scope.sh"
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
+CHANGED_FILES_HEADING = CHANGED_FILES_HEADING
 DELTA_ROW_PATTERN = re.compile(
     r"^\| \*\*\d+\*\* \| \*\*\+\d+\*\* \| \*\*−\d+\*\* \| \*\*[+-]\d+\*\* \|$",
     flags=re.M,
@@ -119,7 +120,7 @@ def replace_once(pattern: re.Pattern[str], content: str, replacement: str, label
 
 
 def update_changed_files(readme: str, files: list[str]) -> str:
-    heading = "## Archivos modificados en este deploy"
+    heading = CHANGED_FILES_HEADING
     start = readme.find(heading)
     if start < 0:
         fail("cannot regenerate changed files; section is missing")
@@ -165,7 +166,7 @@ def require_markers(readme: str) -> None:
         "<!-- grindflow:gate-plan -->",
         "## Flujo de entrega",
         "## Qué se hizo",
-        "## Archivos modificados en este deploy",
+        CHANGED_FILES_HEADING,
         "## Validación",
         "## Qué sigue",
         "## Panorama general pendiente",
@@ -200,7 +201,7 @@ def validate_gate_plan(readme: str, scope: dict[str, str]) -> None:
 
 
 def validate_changed_files(readme: str, files: list[str]) -> None:
-    changed = section(readme, "## Archivos modificados en este deploy")
+    changed = section(readme, CHANGED_FILES_HEADING)
     listed = sorted(FILE_ROW_PATTERN.findall(changed))
     if files != listed:
         fail("changed-file list is stale. Run readme-dashboard.py --update.")
