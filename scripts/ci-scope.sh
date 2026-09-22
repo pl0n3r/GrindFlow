@@ -137,7 +137,7 @@ grindflow_ci_classify_files() {
     esac
 
     case "$file" in
-      scripts/mariadb-structure-snapshot.php|scripts/mariadb-structure-snapshot-contract.sh|scripts/symfony-schema-structure.py|scripts/data-schema-structure-parity.py|scripts/symfony-disposable-restore-drill.sh|scripts/symfony-disposable-restore-drill-contract.sh|scripts/symfony-migration-reversal-plan.py)
+      scripts/mariadb-structure-snapshot.php|scripts/mariadb-structure-snapshot-contract.sh|scripts/symfony-schema-structure.py|scripts/data-schema-structure-parity.py|scripts/symfony-disposable-restore-drill.sh|scripts/symfony-disposable-restore-drill-contract.sh|scripts/symfony-migration-reversal-plan.py|scripts/symfony-post-restore-tenant-guard.sh|scripts/symfony-post-restore-tenant-guard-contract.sh)
         grindflow_ci_scope_add_area "Symfony schema parity tooling"
         GRINDFLOW_SCOPE_RUN_SYMFONY=true
         ;;

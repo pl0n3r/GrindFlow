@@ -135,6 +135,18 @@ Este ejercicio demuestra que **la mecánica de recuperación del stack Symfony a
 
 El contrato es source-only: no conecta MariaDB y no ejecuta migraciones por sí mismo. CI prueba el plan contra el directorio real y luego `symfony-preview` consume `--classes` para revertir **cada migración descubierta** antes de reaplicarlas. De este modo, agregar una migración nueva no exige editar una segunda lista manual y no puede quedar silenciosamente fuera del restore drill.
 
+## Aislamiento tenant después del restore
+
+Después de completar el restore drill, `scripts/symfony-post-restore-tenant-guard.sh` vuelve a ejecutar sobre la base restaurada regresiones de seguridad existentes:
+
+- `VaultTest`: lectura, detalle, preview y descarga de recursos ajenos deben devolver 404, y revocación de membresía debe bloquear acceso;
+- `VaultBulkUsageTest`: un lote con IDs de otro tenant se rechaza completo, sin mutación parcial;
+- `VaultTrashTest`: papelera/restauración conserva tenant, membresía y privacidad del original;
+- `OrganizationSettingsTest`: un actor no puede mutar otra organización enviando `organization_id` y los permisos/CSRF se reevalúan;
+- `DistributionAuthorizationTest`: la autorización de distribución permanece tenant-safe y un recurso de otra organización no puede autorizarse.
+
+El guard es CI-only y test-only. No introduce rutas, fixtures persistentes ni acceso a datos reales; reutiliza pruebas que crean y destruyen sus propios datos sintéticos sobre la copia restaurada.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
@@ -150,4 +162,4 @@ El contrato es source-only: no conecta MariaDB y no ejecuta migraciones por sí 
 
 ## Criterio para declarar GF-ARCH-002 completado
 
-Esta entrega **no** cierra GF-ARCH-002. Para cerrarlo todavía faltan: inventario del esquema real autorizado, contrato reversible de migración por módulo, backup restaurado, prueba cross-tenant/IDOR Symfony+Doctrine y evidencia de un único escritor durante el ensayo/cutover. La guardia de fuente reduce riesgo antes de llegar a esa fase.
+Esta entrega **no** cierra GF-ARCH-002. Para cerrarlo todavía faltan: inventario del esquema real autorizado, contrato reversible de migración por módulo, backup real restaurado y evidencia de un único escritor durante el ensayo/cutover. La prueba cross-tenant/IDOR Symfony+Doctrine ya queda cubierta en CI descartable, no en producción. La guardia de fuente reduce riesgo antes de llegar a esa fase.

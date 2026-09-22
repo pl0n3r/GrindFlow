@@ -83,6 +83,9 @@ expect_flag "$restore_drill" $RUN_SYMFONY_ENABLED "restore drill selects Symfony
 migration_plan="$(run_scope pull_request scripts/symfony-migration-reversal-plan.py)"
 expect_flag "$migration_plan" $RUN_SYMFONY_ENABLED "migration reversal planner selects Symfony gate"
 
+post_restore_guard="$(run_scope pull_request scripts/symfony-post-restore-tenant-guard.sh)"
+expect_flag "$post_restore_guard" $RUN_SYMFONY_ENABLED "post-restore tenant guard selects Symfony gate"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
