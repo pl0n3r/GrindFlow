@@ -241,11 +241,12 @@ def build_report(envelope: Any) -> dict[str, Any]:
     ):
         fail("single-writer receipt operator evidence mismatch")
     references = operator_report["validated_receipt_references"]
-    operator_digests = {
+    prerequisite_digests = {
+        operator_report["source_inventory_sha256"],
         operator_report["evidence_bundle_sha256"],
         *(reference["evidence_sha256"] for reference in references.values()),
     }
-    if receipt["evidence_sha256"] in operator_digests:
+    if receipt["evidence_sha256"] in prerequisite_digests:
         fail("single-writer receipt must reference distinct evidence")
     latest_operator_observation = max(
         reference["observed_at_utc"] for reference in references.values()
