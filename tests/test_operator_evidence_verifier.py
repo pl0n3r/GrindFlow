@@ -223,7 +223,7 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
 
         wrong_module = self.envelope()
         wrong_module["module"] = "finance"
-        self.assert_rejected("reviewed", wrong_module)
+        self.assert_rejected("module mismatch", wrong_module)
 
 
 if __name__ == "__main__":
