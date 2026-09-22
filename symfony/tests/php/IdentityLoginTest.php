@@ -21,10 +21,20 @@ final class IdentityLoginTest extends WebTestCase
     {
         $client = static::createClient();
 
+        $initialToken = null;
         for ($request = 0; $request < 2; $request++) {
-            $client->request('GET', '/login');
+            $crawler = $client->request('GET', '/login');
             self::assertResponseIsSuccessful();
             self::assertSelectorExists('form.identity-form input[name="_csrf_token"]');
+
+            $token = $crawler->filter('form.identity-form input[name="_csrf_token"]')->attr('value');
+            self::assertNotNull($token);
+            self::assertNotSame('', $token);
+            if ($initialToken === null) {
+                $initialToken = $token;
+            } else {
+                self::assertSame($initialToken, $token, 'Anonymous GETs in one session must reuse the CSRF token.');
+            }
 
             $cacheControl = (string) $client->getResponse()->headers->get('Cache-Control');
             self::assertStringContainsString('no-store', $cacheControl);
