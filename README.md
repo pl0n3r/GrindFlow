@@ -20,9 +20,9 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.95** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.94~~ | `50a5d48f8b9a743d799d3c194b48b27cf04adeb7` |
-| CI del PR | ✅ ~~GrindFlow CI #541 success~~ | HEAD previo validado; revalidar SHA corregido |
-| Sonar del PR | ✅ ~~Quality Gate OK · 0 issues · 0 hotspots~~ | HEAD previo validado; revalidar SHA corregido |
-| CodeRabbit del PR | 🚧 Pendiente | Hallazgo README corregido; falta full review del SHA corregido |
+| CI del PR | 🚧 Pendiente | Revalidar HEAD final |
+| Sonar del PR | 🚧 Pendiente | Revalidar HEAD final |
+| CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
 | CI del SHA exacto de main | 🚧 No observado para v0.1.94 | Señal post-merge separada |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+174** | **−133** | **+41** |
+| **7** | **+186** | **−144** | **+42** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -68,6 +68,7 @@ flowchart LR
 - Corrige tildes y redacción española del catálogo sin alterar la variante válida `periodo`.
 - El hint de revisión pendiente usa traducción en vez de texto quemado.
 - El layout genera metadata por locale desde `app.name` y `app.tagline`, evitando descripción española en `/en`.
+- Documenta las funciones de layout/upload tocadas para mantener el contrato de revisión del repositorio.
 - No cambia migraciones, API, permisos, datos productivos ni contratos de backend.
 
 ## Archivos modificados en este deploy
