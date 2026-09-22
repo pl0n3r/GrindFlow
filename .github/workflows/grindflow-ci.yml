@@ -193,6 +193,8 @@ jobs:
           python3 -m unittest tests/test_data_schema_parity.py
           python3 -m py_compile scripts/data-schema-inventory.py scripts/cutover-ownership-plan.py
           python3 -m unittest tests/test_cutover_ownership_plan.py
+          python3 -m py_compile scripts/disposable-rehearsal-evidence.py
+          python3 -m unittest tests/test_disposable_rehearsal_evidence.py
           python3 -m py_compile scripts/symfony-schema-structure.py
           python3 -m unittest tests/test_symfony_schema_structure.py
           python3 scripts/symfony-schema-structure.py
@@ -705,6 +707,52 @@ jobs:
         env:
           CI: 'true'
         run: bash scripts/symfony-post-restore-tenant-guard.sh
+
+      - name: Build disposable GF-ARCH-002 rehearsal evidence
+        shell: bash
+        env:
+          GF_EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GF_EVIDENCE_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          evidence_dir="/tmp/gf-arch-002-evidence"
+          install -d -m 0700 "$evidence_dir"
+          for module in identity vault; do
+            envelope="$evidence_dir/$module-envelope.json"
+            report="$evidence_dir/$module.json"
+            python3 scripts/disposable-rehearsal-evidence.py \
+              --template "$module" \
+              --head-sha "$GF_EVIDENCE_HEAD_SHA" \
+              --run-id "$GF_EVIDENCE_RUN_ID" > "$envelope"
+            python3 scripts/disposable-rehearsal-evidence.py --json \
+              < "$envelope" > "$report"
+            rm -f "$envelope"
+          done
+          python3 - "$evidence_dir" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          directory = Path(sys.argv[1])
+          reports = [json.loads(path.read_text()) for path in sorted(directory.glob("*.json"))]
+          if [report["module"] for report in reports] != ["identity", "vault"]:
+              raise SystemExit("unexpected rehearsal evidence modules")
+          for report in reports:
+              if report["production_ready"] is not False:
+                  raise SystemExit("disposable evidence cannot declare production ready")
+              if report["production_authorized"] is not False:
+                  raise SystemExit("disposable evidence cannot authorize production")
+              if report["scope"] != "ci_disposable_only":
+                  raise SystemExit("unexpected rehearsal evidence scope")
+          PY
+
+      - name: Upload disposable GF-ARCH-002 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gf-arch-002-disposable-evidence
+          path: /tmp/gf-arch-002-evidence/*.json
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Start isolated Symfony server
         shell: bash
