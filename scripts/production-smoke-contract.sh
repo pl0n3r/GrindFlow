@@ -278,4 +278,30 @@ for mode in login_body_secret login_body_secret_invalid_id; do
   assert_absent_fixed 'never-print-header-invalid-id' "$workdir/$mode.log"
   printf 'PASS production smoke contract: %s redaction\n' "$mode"
 done
+# Test the pure redirect classifier without invoking a real HTTP request or credentials.
+sed -n '/^safe_redirect_path() {/,/^}/p' "$script_dir/production-smoke.sh" > "$workdir/redirect-classifier.sh"
+# shellcheck disable=SC1090
+source "$workdir/redirect-classifier.sh"
+printf 'HTTP/1.1 302 Found\r\nLocation: http://mock:80/dashboard?private-query-do-not-print\r\n' > "$workdir/redirect-origin.headers"
+for origin in 'http://mock' 'http://mock:80'; do
+  observed="$(BASE_URL="$origin" safe_redirect_path "$workdir/redirect-origin.headers")"
+  if [[ "$observed" != /dashboard ]]; then
+    printf 'FAIL production smoke contract: equivalent default HTTP origin\n' >&2
+    exit 1
+  fi
+done
+for origin in 'http://@mock' 'http://:@mock'; do
+  observed="$(BASE_URL="$origin" safe_redirect_path "$workdir/redirect-origin.headers")"
+  if [[ "$observed" != '(redacted)' ]]; then
+    printf 'FAIL production smoke contract: empty syntactic userinfo accepted\n' >&2
+    exit 1
+  fi
+done
+printf 'HTTP/1.1 302 Found\r\nLocation: https://mock:443/dashboard?private-query-do-not-print\r\n' > "$workdir/redirect-origin.headers"
+observed="$(BASE_URL=https://mock safe_redirect_path "$workdir/redirect-origin.headers")"
+if [[ "$observed" != /dashboard ]]; then
+  printf 'FAIL production smoke contract: equivalent default HTTPS origin\n' >&2
+  exit 1
+fi
+printf 'PASS production smoke contract: default ports and empty-userinfo rejection\n'
 printf 'PASS production smoke contract: unknown\n'
