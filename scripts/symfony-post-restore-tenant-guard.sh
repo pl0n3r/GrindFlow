@@ -15,6 +15,11 @@ fail() {
 
 cd "$SYMFONY_DIR"
 
-php vendor/bin/simple-phpunit -c phpunit.xml.dist   tests/php/VaultTest.php   tests/php/OrganizationSettingsTest.php   tests/php/DistributionAuthorizationTest.php
+php vendor/bin/simple-phpunit -c phpunit.xml.dist \
+  tests/php/VaultTest.php \
+  tests/php/VaultBulkUsageTest.php \
+  tests/php/VaultTrashTest.php \
+  tests/php/OrganizationSettingsTest.php \
+  tests/php/DistributionAuthorizationTest.php
 
 printf 'GF-ARCH-002 post-restore tenant/IDOR guard: OK\n'
