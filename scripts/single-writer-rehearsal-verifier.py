@@ -39,6 +39,8 @@ RECEIPT_FIELDS = frozenset({
     "freeze_evidence_sha256",
     "observed_at_utc",
     "window_started_at_utc",
+    "old_writer_blocked_at_utc",
+    "new_writer_enabled_at_utc",
     "window_ended_at_utc",
     "environment",
     "previous_writer",
@@ -141,10 +143,18 @@ def validate_receipt(
     exact_bool(receipt, "contains_secrets", False)
 
     started = parse_utc(receipt["window_started_at_utc"], "window_started_at_utc")
+    blocked = parse_utc(
+        receipt["old_writer_blocked_at_utc"],
+        "old_writer_blocked_at_utc",
+    )
+    enabled = parse_utc(
+        receipt["new_writer_enabled_at_utc"],
+        "new_writer_enabled_at_utc",
+    )
     ended = parse_utc(receipt["window_ended_at_utc"], "window_ended_at_utc")
     observed = parse_utc(receipt["observed_at_utc"], "observed_at_utc")
-    if started >= ended:
-        fail("single-writer rehearsal window must have positive duration")
+    if not started <= blocked < enabled <= ended:
+        fail("single-writer writer transition timestamps are out of order")
     if observed < ended:
         fail("operator observation cannot predate rehearsal completion")
     return receipt
@@ -176,6 +186,8 @@ def build_report(envelope: Any) -> dict[str, Any]:
         "operator_evidence_bundle_sha256": operator_report["evidence_bundle_sha256"],
         "freeze_evidence_sha256": receipt["freeze_evidence_sha256"],
         "window_started_at_utc": receipt["window_started_at_utc"],
+        "old_writer_blocked_at_utc": receipt["old_writer_blocked_at_utc"],
+        "new_writer_enabled_at_utc": receipt["new_writer_enabled_at_utc"],
         "window_ended_at_utc": receipt["window_ended_at_utc"],
         "observed_at_utc": receipt["observed_at_utc"],
         "environment": EXPECTED_ENVIRONMENT,
