@@ -175,7 +175,9 @@ jobs:
             scripts/production-smoke-contract.sh \
             scripts/fetch-production-diagnostics.sh \
             scripts/run-production-migrations.sh \
-            scripts/mariadb-structure-snapshot-contract.sh
+            scripts/mariadb-structure-snapshot-contract.sh \
+            scripts/symfony-disposable-restore-drill.sh \
+            scripts/symfony-disposable-restore-drill-contract.sh
           do
             [[ -f "$script" ]] && bash -n "$script"
           done
