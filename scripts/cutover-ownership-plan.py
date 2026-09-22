@@ -128,28 +128,41 @@ def list_of_unique_strings(value: Any) -> set[str]:
     return set(value)
 
 
+def validate_catalog_group(
+    runtime: str,
+    module: str,
+    tables: Any,
+    inventory: dict[str, set[str]],
+    claimed: dict[str, str],
+) -> None:
+    """Validate one module/runtime table group against source migrations."""
+    if not isinstance(tables, tuple) or not tables:
+        fail("module catalog must define nonempty runtime tuples")
+    for table in tables:
+        if not isinstance(table, str) or not table:
+            fail("module catalog contains an invalid table")
+        if table in claimed:
+            fail("module catalog assigns one table to multiple modules")
+        if table not in inventory[runtime]:
+            fail("module catalog references a table missing from migrations")
+        claimed[table] = module
+
+
 def validated_module_catalog(inventory: dict[str, set[str]]) -> None:
     """Every reviewed table belongs to at most one module per runtime."""
     for runtime in ("laravel", "symfony"):
         claimed: dict[str, str] = {}
         for module, grouping in MODULE_TABLES.items():
-            tables = grouping.get(runtime)
-            if not isinstance(tables, tuple) or not tables:
-                fail("module catalog must define nonempty runtime tuples")
-            for table in tables:
-                if not isinstance(table, str) or not table:
-                    fail("module catalog contains an invalid table")
-                previous = claimed.get(table)
-                if previous is not None:
-                    fail("module catalog assigns one table to multiple modules")
-                claimed[table] = module
-                if table not in inventory[runtime]:
-                    fail("module catalog references a table missing from migrations")
+            validate_catalog_group(
+                runtime,
+                module,
+                grouping.get(runtime),
+                inventory,
+                claimed,
+            )
 
 
-def build_report(source: Any, plan: Any) -> dict[str, Any]:
-    inventory = validated_source(source)
-    validated_module_catalog(inventory)
+def validated_plan_header(plan: Any) -> tuple[dict[str, Any], str]:
     if not isinstance(plan, dict) or set(plan) != EXPECTED_FIELDS:
         fail("plan must have exactly the offline ownership contract fields")
     if plan["contract"] != PLAN_CONTRACT:
@@ -157,36 +170,66 @@ def build_report(source: Any, plan: Any) -> dict[str, Any]:
     module = plan["module"]
     if not isinstance(module, str) or module not in MODULE_TABLES:
         fail("unsupported module: an explicit reviewed table mapping is required")
-    if (
-        plan["mode"] != "planning_only"
-        or plan["source_only"] is not True
-        or plan["database_contacted"] is not False
-        or plan["production_authorized"] is not False
-        or plan["single_writer_required"] is not True
-    ):
+    return plan, module
+
+
+def validate_plan_mode(plan: dict[str, Any]) -> None:
+    expected = {
+        "mode": "planning_only",
+        "source_only": True,
+        "database_contacted": False,
+        "production_authorized": False,
+        "single_writer_required": True,
+    }
+    if any(plan[key] != value for key, value in expected.items()):
         fail("plan must be source-only, non-operational and unauthorized")
-    if (
-        plan["current_writer"] != "laravel"
-        or plan["proposed_writer"] != "symfony"
-        or plan["rollback_writer"] != "laravel"
-    ):
+
+
+def validate_writer_transition(plan: dict[str, Any]) -> None:
+    expected = {
+        "current_writer": "laravel",
+        "proposed_writer": "symfony",
+        "rollback_writer": "laravel",
+    }
+    if any(plan[key] != value for key, value in expected.items()):
         fail("writer transition or rollback is not the documented proposal")
+
+
+def validate_readiness(plan: dict[str, Any]) -> None:
     readiness = plan["readiness"]
     if not isinstance(readiness, dict) or set(readiness) != set(PRECONDITIONS):
         fail("all required cutover preconditions must be present")
-    if any(value != "pending" for value in readiness.values()):
+    if set(readiness.values()) != {"pending"}:
         fail("an offline proposal cannot certify readiness or authorization")
 
+
+def validate_table_coverage(
+    plan: dict[str, Any],
+    module: str,
+    inventory: dict[str, set[str]],
+) -> dict[str, tuple[str, ...]]:
     grouping = MODULE_TABLES[module]
+    planned: dict[str, set[str]] = {}
     for runtime in ("laravel", "symfony"):
         names = list_of_unique_strings(plan[f"{runtime}_tables"])
         if names != set(grouping[runtime]):
             fail("module table coverage differs from the reviewed mapping")
         if not names <= inventory[runtime]:
             fail("planned tables are missing from the source migrations")
-
-    if set(plan["laravel_tables"]) & set(plan["symfony_tables"]):
+        planned[runtime] = names
+    if planned["laravel"] & planned["symfony"]:
         fail("two runtimes cannot own the same table")
+    return grouping
+
+
+def build_report(source: Any, plan: Any) -> dict[str, Any]:
+    inventory = validated_source(source)
+    validated_module_catalog(inventory)
+    validated_plan, module = validated_plan_header(plan)
+    validate_plan_mode(validated_plan)
+    validate_writer_transition(validated_plan)
+    validate_readiness(validated_plan)
+    grouping = validate_table_coverage(validated_plan, module, inventory)
 
     source_bytes = json.dumps(
         source, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -231,7 +274,7 @@ def draft_envelope(module: str) -> dict[str, Any]:
         "laravel_tables": list(grouping["laravel"]),
         "symfony_tables": list(grouping["symfony"]),
         "single_writer_required": True,
-        "readiness": {name: "pending" for name in PRECONDITIONS},
+        "readiness": dict.fromkeys(PRECONDITIONS, "pending"),
     }
     build_report(source, plan)
     return {"source": source, "plan": plan}
@@ -258,7 +301,7 @@ def main() -> int:
         if not isinstance(envelope, dict) or set(envelope) != {"source", "plan"}:
             fail("envelope must contain source and plan objects only")
         report = build_report(envelope["source"], envelope["plan"])
-    except (ValueError, TypeError, UnicodeError):
+    except (ValueError, TypeError):
         print("ERROR: offline ownership plan validation failed", file=sys.stderr)
         return 2
 
