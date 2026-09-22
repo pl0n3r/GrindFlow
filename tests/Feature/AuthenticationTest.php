@@ -19,6 +19,28 @@ class AuthenticationTest extends TestCase
         $this->get('/login')->assertOk();
     }
 
+    public function test_two_anonymous_login_gets_keep_csrf_and_allow_one_successful_post(): void
+    {
+        $user = User::factory()->create([
+            'password' => 'correct-password',
+        ]);
+
+        $first = $this->get('/login')->assertOk();
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $first->getContent(), $initialToken));
+
+        $second = $this->get('/login')->assertOk();
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $second->getContent(), $currentToken));
+        self::assertSame($initialToken[1], $currentToken[1]);
+
+        $this->post('/login', [
+            '_token' => $currentToken[1],
+            'email' => $user->email,
+            'password' => 'correct-password',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_user_can_authenticate_and_logout(): void
     {
         $user = User::factory()->create([
@@ -57,7 +79,11 @@ class AuthenticationTest extends TestCase
 
         $email = 'lockout@example.com';
         $ip = '203.0.113.10';
-        $throttleKey = Str::transliterate(Str::lower($email).'|'.$ip);
+        $rawKey = Str::transliterate(Str::lower($email).'|'.$ip);
+        $throttleKey = 'login:'.hash_hmac('sha256', $rawKey, (string) config('app.key'));
+
+        self::assertStringNotContainsString($email, $throttleKey);
+        self::assertStringNotContainsString($ip, $throttleKey);
 
         RateLimiter::clear($throttleKey);
 
@@ -72,6 +98,8 @@ class AuthenticationTest extends TestCase
                 ->assertSessionHasErrors('email');
         }
 
+        self::assertSame(5, RateLimiter::attempts($throttleKey));
+        self::assertSame(0, RateLimiter::attempts($rawKey));
         Event::assertNotDispatched(Lockout::class);
 
         $this->withServerVariables(['REMOTE_ADDR' => $ip])
