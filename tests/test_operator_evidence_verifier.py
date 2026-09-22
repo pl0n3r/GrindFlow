@@ -78,6 +78,8 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
             self.assertEqual(module, report["module"])
             self.assertFalse(report["production_ready"])
             self.assertFalse(report["production_authorized"])
+            self.assertEqual("redacted_references_only", report["scope"])
+            self.assertFalse(report["receipt_content_verified"])
             self.assertEqual(
                 list(EVIDENCE.PENDING_PRECONDITIONS),
                 report["remaining_preconditions"],
@@ -88,7 +90,7 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         report = EVIDENCE.build_report(self.envelope())
         self.assertEqual(
             set(EVIDENCE.EVIDENCE_TYPES),
-            set(report["verified_evidence"]),
+            set(report["validated_receipt_references"]),
         )
         serialized = json.dumps(report)
         self.assertNotIn("operator_observed", serialized)
@@ -124,6 +126,12 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
             envelope = self.envelope()
             envelope["receipts"]["authorized_metadata_inventory"][field] = value
             self.assert_rejected(pattern, envelope)
+
+    def test_receipts_must_reference_distinct_evidence(self):
+        envelope = self.envelope()
+        digest = envelope["receipts"]["authorized_metadata_inventory"]["evidence_sha256"]
+        envelope["receipts"]["real_backup_restore_rehearsal"]["evidence_sha256"] = digest
+        self.assert_rejected("distinct evidence", envelope)
 
     def test_receipt_digest_and_timestamp_are_strict(self):
         for field, value, pattern in (
