@@ -76,10 +76,10 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         for module in ("identity", "vault"):
             report = EVIDENCE.build_report(self.envelope(module))
             self.assertEqual(module, report["module"])
-            self.assertIs(report["production_ready"], False)
-            self.assertIs(report["production_authorized"], False)
+            self.assertIs(False, report["production_ready"])
+            self.assertIs(False, report["production_authorized"])
             self.assertEqual("redacted_references_only", report["scope"])
-            self.assertIs(report["receipt_content_verified"], False)
+            self.assertIs(False, report["receipt_content_verified"])
             self.assertEqual(
                 list(EVIDENCE.PENDING_PRECONDITIONS),
                 report["remaining_preconditions"],
@@ -195,7 +195,7 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("private-secret", result.stdout)
         self.assertNotIn("private-secret", result.stderr)
-        self.assertIs(json.loads(result.stdout)["production_ready"], False)
+        self.assertIs(False, json.loads(result.stdout)["production_ready"])
 
     def test_cli_rejects_duplicate_json_keys_at_any_depth(self):
         cmd = [
