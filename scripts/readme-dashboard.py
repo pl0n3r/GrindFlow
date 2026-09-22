@@ -120,23 +120,19 @@ def replace_once(pattern: re.Pattern[str], content: str, replacement: str, label
 
 
 def update_changed_files(readme: str, files: list[str]) -> str:
-    heading = CHANGED_FILES_HEADING
-    start = readme.find(heading)
+    start = readme.find(CHANGED_FILES_HEADING)
     if start < 0:
         fail("cannot regenerate changed files; section is missing")
-    end = readme.find("\n## ", start + len(heading))
+    end = readme.find("\n## ", start + len(CHANGED_FILES_HEADING))
     if end < 0:
         fail("cannot regenerate changed files; following section is missing")
 
     block = readme[start:end]
-    rows = FILE_ROW_PATTERN.findall(block)
-    if not rows:
-        fail("cannot regenerate changed files; existing generated rows are missing")
-    first_row = block.find("- `")
-    if first_row < 0:
-        fail("cannot regenerate changed files; generated row boundary is missing")
+    marker = block.find(CHANGED_FILES_MARKER)
+    if marker < 0:
+        fail("cannot regenerate changed files; structural marker is missing")
 
-    prefix = block[:first_row]
+    prefix = block[: marker + len(CHANGED_FILES_MARKER)] + "\n"
     return readme[:start] + prefix + generated_file_rows(files) + "\n" + readme[end:]
 
 
@@ -177,7 +173,6 @@ def require_markers(readme: str) -> None:
         "PR + snapshot exacto",
         "CodeRabbit",
         "CI del SHA exacto de main",
-        "solo el deploy actual",
     ]
     missing = [marker for marker in markers if marker not in readme]
     if missing:
@@ -307,6 +302,7 @@ def self_test() -> None:
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual:
+<!-- grindflow:changed-files -->
 - `old.txt`
 
 ## Validación
