@@ -31,7 +31,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+823** | **−26** | **+797** |
+| **8** | **+1015** | **−26** | **+989** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -61,11 +61,11 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/symfony-schema-structure.py`: extrae estructura canónica directamente de las migraciones Doctrine, sin conexión a base de datos.
+- Nuevo `scripts/symfony-schema-structure.py`: reconstruye el estado final desde los `up()` Doctrine, incluyendo `ALTER TABLE` aditivos, sin conexión a base de datos.
 - Nuevo `scripts/data-schema-structure-parity.py`: compara esa fuente con un snapshot metadata-only recibido por stdin.
 - La comparación cubre columnas (tipo/nulabilidad), índices (unicidad/orden), claves foráneas (referencias/`ON DELETE`) y triggers (tabla/timing/evento).
 - Tablas no `gf_*` permanecen informativas; un `gf_*` inesperado o cualquier diferencia estructural falla cerrado.
-- 10 pruebas nuevas cubren parser SQL, comas anidadas, prefijo `gf_`, estructura exacta, columnas, índices, tablas, triggers, row-data y fuente inconsistente.
+- 12 pruebas nuevas cubren parser SQL, `CREATE` + `ALTER`, exclusión de rollback, rechazo de ALTER destructivo, prefijo `gf_`, estructura exacta, columnas, índices, tablas, triggers, row-data y fuente inconsistente.
 - El gate `fast` compila y ejecuta ambos contratos estructurales; al tocar workflow se exige la matriz completa.
 - No se ejecutan migraciones productivas, consultas MariaDB, restore, cutover ni cambio de writer.
 
