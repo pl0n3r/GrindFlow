@@ -20,8 +20,9 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.80** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.79~~ | `3d79eb53f2ad0e3e53d5ea48df104ec2654a090c` |
-| CI del PR S5 | 🚧 No ejecutado todavía | PR candidato; verificar HEAD final |
-| Sonar / CodeRabbit | 🚧 Pendiente | Revisión completa sobre HEAD final, no check skipped |
+| CI del PR S5 | ✅ ~~Completado~~ | run `35682108196` success; HEAD `67d3e5eba5180a84b7183ff7d6af78c9b634deeb` |
+| Sonar | ✅ ~~Completado~~ | Quality Gate OK, 0 issues nuevos en `67d3e5e` |
+| CodeRabbit | 🚧 Revisión final posterior a corrección README | Full review completada en `67d3e5e`, 1 hallazgo documental atendido aquí |
 | CI del SHA exacto de main | ✅ ~~v0.1.79 success~~ | run `35681696260` |
 | Deploy Observer | ✅ ~~Release v0.1.79 observado~~ | run `35681696462`; NO prueba SHA remoto |
 | Production Smoke | ⛔ Auth E2E sin validar | run `35681696196` failure; [#73](https://github.com/pl0n3r/GrindFlow/issues/73) |
@@ -32,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+718** | **−36** | **+682** |
+| **9** | **+719** | **−36** | **+683** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -78,7 +79,7 @@ Inventario del candidato v0.1.80, no evidencia de publicación. «solo el deploy
 - `symfony/tests/php/PilotWeeklySummaryTest.php`
 
 ## Validación
-- Candidato fuente preparado sobre main v0.1.79 con CI exact-main success. CI Symfony, Sonar y CodeRabbit de v0.1.80 **pendientes**, no deducidos de la rama fuente original.
+- Candidato fuente preparado sobre main v0.1.79 con CI exact-main success. CI Symfony y Sonar de v0.1.80 **completados** en `67d3e5e` (run `35682108196`); corregido un hallazgo README de CodeRabbit; revalidar el nuevo HEAD antes del merge.
 - Production Smoke v0.1.79 falló; investigar solo con evidencia saneada [#73](https://github.com/pl0n3r/GrindFlow/issues/73). No reintentar credenciales ciegamente, ni asociar falla a Symfony no desplegado.
 
 ## Qué sigue
