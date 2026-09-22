@@ -60,7 +60,7 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Captura `Location` del POST login y GET dashboard; emite solo rutas estáticas permitidas, sin consultas, dominios, identificadores o secretos. El logger general también excluye `Location` cruda.
+- Captura `Location` del POST login y GET dashboard; emite solo rutas locales permitidas (nunca URL con esquema/host), sin consultas, dominios, identificadores o secretos. El logger general también excluye `Location` cruda.
 - Redirecciones de autenticación y HTTP 401/403/419/422/429 del login **o dashboard** se detienen tras un solo login; fallos transitorios conservan su política.
 - Contrato sintético: login/dashboard HTTP 401/403/419/422/429, redirects 302/303, rutas censuradas y aserciones negativas fail-closed. No se imprimen cuerpos HTTP.
 - #73 sigue abierto: instrumentación NO equivale a corregir las credenciales/sesión reales ni demuestra deploy. Sin cambios de datos, cuenta ni Symfony.

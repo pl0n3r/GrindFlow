@@ -57,7 +57,13 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
     for line in handle:
         if not line.lower().startswith("location:"):
             continue
-        path = urlsplit(line.partition(":")[2].strip()).path
+        try:
+            redirect = urlsplit(line.partition(":")[2].strip())
+            # Only classify same-origin relative redirects; a URL with a host
+            # must never masquerade as an allowlisted local path.
+            path = redirect.path if not redirect.scheme and not redirect.netloc else None
+        except ValueError:
+            path = None
         print(path if path in {"/login", "/dashboard", "/organizations", "/admin", "/admin/system"} else "(redacted)")
         break
     else:
@@ -262,6 +268,10 @@ run_smoke() {
   printf 'LOGIN_REDIRECT_PATH=%s\n' "$login_redirect"
   if [[ "$login_redirect" == "/login" ]]; then
     printf 'ERROR: login redirected back to /login; credentials or account/session require investigation. No repeated login attempts.\n' >&2
+    return 7
+  fi
+  if [[ "$login_redirect" != "/dashboard" ]]; then
+    printf 'ERROR: login redirect was not a recognized local dashboard path; no repeated login attempts.\n' >&2
     return 7
   fi
 

@@ -37,6 +37,8 @@ case "$url" in
     if [[ "$method" == POST ]]; then
       status=302; redirect="/dashboard"
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_login ]]; then redirect="/login?private-query-do-not-print"; fi
+      if [[ "${MOCK_AUTH_MODE:-ok}" == post_external ]]; then redirect="https://external.invalid/dashboard?private-query-do-not-print"; fi
+      if [[ "${MOCK_AUTH_MODE:-ok}" == post_network ]]; then redirect="//external.invalid/dashboard?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_303 ]]; then status=303; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^post_(401|403|419|422|429)$ ]]; then status="${BASH_REMATCH[1]}"; redirect=""; fi
     else
@@ -45,6 +47,8 @@ case "$url" in
     fi;;
   http://mock/dashboard)
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_login ]]; then status=302; redirect="/login?private-query-do-not-print"; fi
+    if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_external ]]; then status=302; redirect="https://external.invalid/login?private-query-do-not-print"; fi
+    if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_network ]]; then status=302; redirect="//external.invalid/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_other ]]; then status=302; redirect="/organizations?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_secret ]]; then status=302; redirect="/l/private-query-do-not-print?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_303 ]]; then status=303; redirect="/login?private-query-do-not-print"; fi
@@ -139,9 +143,10 @@ run_case() {
       ;;
     current_vault_failure|current_vault_link_missing)
       grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; assert_absent_fixed "$NO_RETRY_MARKER" "$log";;
-    auth_post_login|auth_dashboard_login|auth_dashboard_other|auth_dashboard_secret|auth_dashboard_303|auth_post_401|auth_post_403|auth_post_419|auth_post_422|auth_post_429|auth_dashboard_401|auth_dashboard_403|auth_dashboard_419|auth_dashboard_422|auth_dashboard_429)
+    auth_post_login|auth_post_external|auth_post_network|auth_dashboard_login|auth_dashboard_external|auth_dashboard_network|auth_dashboard_other|auth_dashboard_secret|auth_dashboard_303|auth_post_401|auth_post_403|auth_post_419|auth_post_422|auth_post_429|auth_dashboard_401|auth_dashboard_403|auth_dashboard_419|auth_dashboard_422|auth_dashboard_429)
       grep -Fq 'ERROR: authentication failure is deterministic; do not retry credentials.' "$log"
       assert_absent_fixed 'private-query-do-not-print' "$log"
+      assert_absent_fixed 'external.invalid' "$log"
       assert_absent_fixed "$NO_RETRY_MARKER" "$log"
       [[ "$(grep -c "$LOGIN_POST_PATTERN" "$requests")" -eq 1 ]]
       if [[ "$auth_mode" =~ ^post_(401|403|419|422|429)$ ]]; then
@@ -151,6 +156,13 @@ run_case() {
         grep -Fxq 'LOGIN_REDIRECT_PATH=/login' "$log"
         grep -Fq 'ERROR: login redirected back to /login;' "$log"
         assert_absent_fixed 'GET http://mock/dashboard' "$requests"
+      elif [[ "$auth_mode" == post_external || "$auth_mode" == post_network ]]; then
+        grep -Fxq 'LOGIN_REDIRECT_PATH=(redacted)' "$log"
+        grep -Fq 'login redirect was not a recognized local dashboard path;' "$log"
+        assert_absent_fixed 'GET http://mock/dashboard' "$requests"
+      elif [[ "$auth_mode" == dashboard_external || "$auth_mode" == dashboard_network ]]; then
+        grep -Fxq 'LOGIN_REDIRECT_PATH=/dashboard' "$log"
+        grep -Fq 'redirect path (redacted)' "$log"
       elif [[ "$auth_mode" == dashboard_secret ]]; then
         grep -Fxq 'LOGIN_REDIRECT_PATH=/dashboard' "$log"
         grep -Fq 'redirect path (redacted)' "$log"
@@ -181,6 +193,10 @@ run_case current_missing_release 0 6 valid ok ok ok missing
 run_case current_vault_failure 0 4 valid failed
 run_case current_vault_link_missing 0 4 valid missing_link
 run_case auth_post_login 0 7 valid ok ok ok current post_login
+run_case auth_post_external 0 7 valid ok ok ok current post_external
+run_case auth_post_network 0 7 valid ok ok ok current post_network
+run_case auth_dashboard_external 0 7 valid ok ok ok current dashboard_external
+run_case auth_dashboard_network 0 7 valid ok ok ok current dashboard_network
 run_case auth_post_419 0 7 valid ok ok ok current post_419
 run_case auth_dashboard_login 0 7 valid ok ok ok current dashboard_login
 run_case auth_dashboard_other 0 7 valid ok ok ok current dashboard_other
