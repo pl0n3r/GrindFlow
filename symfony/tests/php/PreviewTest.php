@@ -23,7 +23,11 @@ final class PreviewTest extends WebTestCase
         $data = json_decode((string) $client->getResponse()->getContent(), true);
         self::assertSame('s0-preview', $data['stage']);
         self::assertSame((new ProductVersion(dirname(__DIR__, 3)))->human(), $data['version']);
+        self::assertSame(['compatible' => true, 'contract' => 'symfony-mariadb-v1'], $data['runtime']);
         self::assertArrayNotHasKey('release_sha', $data);
+        self::assertArrayNotHasKey('php_version', $data);
+        self::assertArrayNotHasKey('extensions', $data);
+        self::assertArrayNotHasKey('sapi', $data);
         self::assertNotEmpty($client->getResponse()->headers->get('X-Request-Id'));
         self::assertNotEmpty($client->getResponse()->headers->get('Content-Security-Policy'));
     }
