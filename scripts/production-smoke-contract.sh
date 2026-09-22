@@ -40,6 +40,7 @@ case "$url" in
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_external ]]; then redirect="https://external.invalid/dashboard?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_network ]]; then redirect="//external.invalid/dashboard?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_303 ]]; then status=303; fi
+       if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^post_(301|307|308)$ ]]; then status="${BASH_REMATCH[1]}"; redirect="/login?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^post_(401|403|419|422|429)$ ]]; then status="${BASH_REMATCH[1]}"; redirect=""; fi
     else
       body='<form><input name="_token" value="fake-csrf"></form>'
@@ -54,6 +55,7 @@ case "$url" in
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_other ]]; then status=302; redirect="/organizations?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_secret ]]; then status=302; redirect="/l/private-query-do-not-print?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_303 ]]; then status=303; redirect="/login?private-query-do-not-print"; fi
+     if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^dashboard_(301|307|308)$ ]]; then status="${BASH_REMATCH[1]}"; redirect="/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^dashboard_(401|403|419|422|429)$ ]]; then status="${BASH_REMATCH[1]}"; fi
     if [[ "${MOCK_VAULT_MODE:-ok}" == missing_link ]]; then body='<h1>Overview</h1>Tenant isolation active'; else body='<h1>Overview</h1>Tenant isolation active <a href="/organizations/example/vault">Vault</a>'; fi;;
   http://mock/admin/system)
@@ -149,13 +151,17 @@ run_case() {
       ;;
     current_vault_failure|current_vault_link_missing)
       grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; assert_absent_fixed "$NO_RETRY_MARKER" "$log";;
-    auth_post_login|auth_post_external|auth_post_network|auth_dashboard_login|auth_dashboard_external|auth_dashboard_network|auth_dashboard_other|auth_dashboard_secret|auth_dashboard_303|auth_post_401|auth_post_403|auth_post_419|auth_post_422|auth_post_429|auth_dashboard_401|auth_dashboard_403|auth_dashboard_419|auth_dashboard_422|auth_dashboard_429)
+    auth_post_login|auth_post_external|auth_post_network|auth_dashboard_login|auth_dashboard_external|auth_dashboard_network|auth_dashboard_other|auth_dashboard_secret|auth_dashboard_303|auth_post_301|auth_post_307|auth_post_308|auth_dashboard_301|auth_dashboard_307|auth_dashboard_308|auth_post_401|auth_post_403|auth_post_419|auth_post_422|auth_post_429|auth_dashboard_401|auth_dashboard_403|auth_dashboard_419|auth_dashboard_422|auth_dashboard_429)
       grep -Fq 'ERROR: authentication failure is deterministic; do not retry credentials.' "$log"
       assert_absent_fixed 'private-query-do-not-print' "$log"
       assert_absent_fixed 'external.invalid' "$log"
       assert_absent_fixed "$NO_RETRY_MARKER" "$log"
       [[ "$(grep -c "$LOGIN_POST_PATTERN" "$requests")" -eq 1 ]]
-      if [[ "$auth_mode" =~ ^post_(401|403|419|422|429)$ ]]; then
+      if [[ "$auth_mode" =~ ^post_(301|307|308)$ ]]; then
+        grep -Fxq 'LOGIN_REDIRECT_PATH=/login' "$log"
+        grep -Fq "ERROR: login returned HTTP ${BASH_REMATCH[1]}; stop authentication retries on unexpected redirect." "$log"
+        assert_absent_fixed 'GET http://mock/dashboard' "$requests"
+      elif [[ "$auth_mode" =~ ^post_(401|403|419|422|429)$ ]]; then
         grep -Fq "ERROR: login returned HTTP ${BASH_REMATCH[1]}; stop authentication retries." "$log"
         assert_absent_fixed 'GET http://mock/dashboard' "$requests"
       elif [[ "$auth_mode" == post_login ]]; then
@@ -174,8 +180,8 @@ run_case() {
         grep -Fq 'redirect path (redacted)' "$log"
       elif [[ "$auth_mode" =~ ^dashboard_(401|403|419|422|429)$ ]]; then
         grep -Fq "ERROR: authenticated dashboard returned HTTP ${BASH_REMATCH[1]}; stop authentication retries." "$log"
-      elif [[ "$auth_mode" == dashboard_303 ]]; then
-        grep -Fq 'authenticated dashboard returned HTTP 303, redirect path /login' "$log"
+      elif [[ "$auth_mode" =~ ^dashboard_(301|303|307|308)$ ]]; then
+        grep -Fq "authenticated dashboard returned HTTP ${BASH_REMATCH[1]}, redirect path /login" "$log"
       else
         grep -Fxq 'LOGIN_REDIRECT_PATH=/dashboard' "$log"
         grep -Fq "redirect path /$( [[ "$auth_mode" == dashboard_login ]] && printf login || printf organizations)" "$log"
@@ -208,6 +214,12 @@ run_case auth_dashboard_login 0 7 valid ok ok ok current dashboard_login
 run_case auth_dashboard_other 0 7 valid ok ok ok current dashboard_other
 run_case auth_dashboard_secret 0 7 valid ok ok ok current dashboard_secret
 run_case auth_post_303 0 0 valid ok ok ok current post_303
+run_case auth_post_301 0 7 valid ok ok ok current post_301
+run_case auth_post_307 0 7 valid ok ok ok current post_307
+run_case auth_post_308 0 7 valid ok ok ok current post_308
+run_case auth_dashboard_301 0 7 valid ok ok ok current dashboard_301
+run_case auth_dashboard_307 0 7 valid ok ok ok current dashboard_307
+run_case auth_dashboard_308 0 7 valid ok ok ok current dashboard_308
 run_case auth_dashboard_303 0 7 valid ok ok ok current dashboard_303
 run_case auth_post_401 0 7 valid ok ok ok current post_401
 run_case auth_post_403 0 7 valid ok ok ok current post_403
