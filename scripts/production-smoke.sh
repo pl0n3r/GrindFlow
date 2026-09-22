@@ -310,6 +310,21 @@ check_workspace_modules() {
   printf 'MODULE_READ_ONLY=traffic-csv:ok\n'
 }
 
+# Authentication diagnostics are local allowlisted classes only. They never
+# encode remote response bodies, account existence, credentials, cookies or CSRF.
+emit_auth_failure_class() {
+  case "$1" in
+    anonymous_session_unavailable|anonymous_session_inconsistent|login_csrf_rejected|login_rate_limited|login_http_rejected|login_rejected_session_stable|login_rejected_session_changed|login_rejected_session_unavailable|login_redirect_unrecognized|authenticated_session_lost|authenticated_redirect_unrecognized|authenticated_request_rejected)
+      printf 'AUTH_FAILURE_CLASS=%s\n' "$1"
+      ;;
+    *)
+      printf 'AUTH_FAILURE_CLASS=unknown\n'
+      ;;
+  esac
+}
+
+login_failure_session_state=unavailable
+
 # One anonymous GET after a rejected POST checks if the session/CSRF persisted.
 # Only allowlisted markers leave the private workspace; NEVER re-POST credentials.
 # A changed token is a diagnostic signal, not proof of an invalid password.
@@ -317,23 +332,28 @@ check_failed_login_session() {
   local check_status after_token before_token
   check_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --output "$login_failure_html" --dump-header "$login_failure_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
   if [[ "$check_status" != "200" ]]; then
+    login_failure_session_state=unavailable
     printf 'LOGIN_FAILURE_SESSION_CHECK=unavailable\n'
     return
   fi
   if ! after_token="$(extract_csrf "$login_failure_html")"; then
+    login_failure_session_state=unavailable
     printf 'LOGIN_FAILURE_SESSION_CHECK=unavailable\n'
     return
   fi
   before_token="$(<"$csrf_file")"
   if [[ "$after_token" == "$before_token" ]]; then
+    login_failure_session_state=stable
     printf 'LOGIN_FAILURE_SESSION_CHECK=stable\n'
   else
+    login_failure_session_state=changed
     printf 'LOGIN_FAILURE_SESSION_CHECK=changed\n'
   fi
   unset after_token before_token
 }
 
 run_smoke() {
+  login_failure_session_state=unavailable
   rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
@@ -360,12 +380,14 @@ run_smoke() {
   fi
   if ! current_token="$(extract_csrf "$login_recheck_html")"; then
     unset initial_token
+    emit_auth_failure_class anonymous_session_unavailable
     printf 'ERROR: second login page did not expose a CSRF token.\n' >&2
     return 7
   fi
   if [[ "$current_token" != "$initial_token" ]]; then
     unset current_token initial_token
     printf 'LOGIN_SESSION_PREFLIGHT=inconsistent\n'
+    emit_auth_failure_class anonymous_session_inconsistent
     printf 'ERROR: anonymous session/CSRF changed across identical GET requests; no login POST was sent.\n' >&2
     return 7
   fi
@@ -379,9 +401,21 @@ run_smoke() {
     302|303) ;;
     3[0-9][0-9])
       printf 'LOGIN_REDIRECT_PATH=%s\n' "$(safe_redirect_path "$login_post_headers")"
+      emit_auth_failure_class login_redirect_unrecognized
       printf 'ERROR: login returned HTTP %s; stop authentication retries on unexpected redirect.\n' "$login_status" >&2
       return 7 ;;
-    401|403|419|422|429) printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2; return 7 ;;
+    419)
+      emit_auth_failure_class login_csrf_rejected
+      printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2
+      return 7 ;;
+    429)
+      emit_auth_failure_class login_rate_limited
+      printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2
+      return 7 ;;
+    401|403|422)
+      emit_auth_failure_class login_http_rejected
+      printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2
+      return 7 ;;
     *) printf 'ERROR: login returned HTTP %s\n' "$login_status" >&2; return 1 ;;
   esac
   local login_redirect
@@ -389,22 +423,37 @@ run_smoke() {
   printf 'LOGIN_REDIRECT_PATH=%s\n' "$login_redirect"
   if [[ "$login_redirect" == "/login" ]]; then
     check_failed_login_session
+    case "$login_failure_session_state" in
+      stable) emit_auth_failure_class login_rejected_session_stable ;;
+      changed) emit_auth_failure_class login_rejected_session_changed ;;
+      *) emit_auth_failure_class login_rejected_session_unavailable ;;
+    esac
     printf 'ERROR: login redirected back to /login; credentials or account/session require investigation. No repeated login attempts.\n' >&2
     return 7
   fi
   if [[ "$login_redirect" != "/dashboard" ]]; then
+    emit_auth_failure_class login_redirect_unrecognized
     printf 'ERROR: login redirect was not a recognized local dashboard path; no repeated login attempts.\n' >&2
     return 7
   fi
 
-  local dashboard_status
+  local dashboard_status dashboard_redirect
   dashboard_status="$(curl_common --cookie "$cookie_jar" --dump-header "$dashboard_headers" --output "$dashboard_html" --write-out '%{http_code}' "$BASE_URL/dashboard")"
   if [[ "$dashboard_status" =~ ^3[0-9][0-9]$ ]]; then
-    printf 'ERROR: authenticated dashboard returned HTTP %s, redirect path %s; check authentication/session. No repeated login attempts.\n' "$dashboard_status" "$(safe_redirect_path "$dashboard_headers")" >&2
+    dashboard_redirect="$(safe_redirect_path "$dashboard_headers")"
+    if [[ "$dashboard_redirect" == "/login" ]]; then
+      emit_auth_failure_class authenticated_session_lost
+    else
+      emit_auth_failure_class authenticated_redirect_unrecognized
+    fi
+    printf 'ERROR: authenticated dashboard returned HTTP %s, redirect path %s; check authentication/session. No repeated login attempts.\n' "$dashboard_status" "$dashboard_redirect" >&2
     return 7
   fi
   case "$dashboard_status" in
-    401|403|419|422|429) printf 'ERROR: authenticated dashboard returned HTTP %s; stop authentication retries.\n' "$dashboard_status" >&2; return 7 ;;
+    401|403|419|422|429)
+      emit_auth_failure_class authenticated_request_rejected
+      printf 'ERROR: authenticated dashboard returned HTTP %s; stop authentication retries.\n' "$dashboard_status" >&2
+      return 7 ;;
   esac
   if [[ "$dashboard_status" != "200" ]]; then printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2; print_diagnostics; return 1; fi
   if ! assert_contains "$dashboard_html" "Overview"; then print_diagnostics; return 1; fi
