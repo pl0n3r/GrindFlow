@@ -141,6 +141,8 @@ grindflow_ci_classify_files() {
         grindflow_ci_scope_add_area "Symfony schema parity tooling"
         GRINDFLOW_SCOPE_RUN_SYMFONY=true
         ;;
+      *)
+        ;;
     esac
   done <<< "$changed_file_list"
 
