@@ -97,6 +97,8 @@ bash scripts/mariadb-structure-snapshot-contract.sh
 
 CI ejecuta además una prueba end-to-end sobre la MariaDB **descartable** de `symfony-preview`: migra Symfony, captura el snapshot metadata-only y lo compara contra el estado final reconstruido desde las migraciones. Esa validación comprueba que el capturador y el comparador acuerdan sobre una base efímera; **no constituye autorización ni evidencia de una captura productiva**.
 
+La comparación normaliza dos detalles físicos propios de MariaDB/InnoDB que no representan drift lógico: los display widths de tipos enteros (`int(10)`, `smallint(5)`, etc.) y los índices de soporte que InnoDB crea automáticamente con el mismo nombre/columnas que una FK cuando no existe un índice explícito. Cualquier otro índice extra continúa fallando la paridad.
+
 Ejemplo operativo, solo para un entorno previamente autorizado. `DATABASE_URL` debe llegar al proceso desde el gestor de secretos o mecanismo de inyección del entorno; **no** escribir la URI con credenciales en la línea de comandos ni en el historial del shell:
 
 ```bash
