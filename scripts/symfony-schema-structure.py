@@ -63,7 +63,7 @@ def normalize_space(value: str) -> str:
 def normalize_type(value: str) -> str:
     """Normalize MariaDB-like column type spelling for stable comparison."""
     compact = normalize_space(value).lower()
-    return re.sub(r"\s*,\s*", ",", compact)
+    return ",".join(part.strip() for part in compact.split(","))
 
 
 def sql_identifier(value: str) -> str:
