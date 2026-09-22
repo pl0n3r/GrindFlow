@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -46,13 +45,15 @@ FOREIGN_KEY = re.compile(
 )
 
 
-@dataclass
 class ScanState:
     """Mutable state for safe top-level SQL comma scanning."""
 
-    depth: int = 0
-    quote: str | None = None
-    escaped: bool = False
+    __slots__ = ("depth", "quote", "escaped")
+
+    def __init__(self) -> None:
+        self.depth = 0
+        self.quote: str | None = None
+        self.escaped = False
 
 
 def normalize_space(value: str) -> str:
