@@ -30,8 +30,20 @@ def source_table_names(source: dict[str, Any]) -> set[str]:
     """Return all declared Laravel and Symfony table names from source inventory."""
     if source.get("contract") != SOURCE_CONTRACT:
         raise ValueError(f"source contract must be {SOURCE_CONTRACT}")
+    if source.get("source_only") is not True:
+        raise ValueError("source inventory must explicitly state source_only=true")
     if source.get("database_contacted") is not False:
         raise ValueError("source inventory must explicitly state database_contacted=false")
+
+    checks = source.get("checks")
+    if not isinstance(checks, dict):
+        raise ValueError("source inventory field checks must be an object")
+    for check in ("table_name_collisions", "symfony_tables_without_gf_prefix"):
+        values = checks.get(check)
+        if not isinstance(values, list):
+            raise ValueError(f"source inventory check {check} must be a list")
+        if values:
+            raise ValueError(f"source inventory is not clean: {check}")
 
     names: set[str] = set()
     for runtime in ("laravel", "symfony"):
