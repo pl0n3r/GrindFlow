@@ -1,0 +1,233 @@
+"""Contracts for disposable GF-ARCH-002 rehearsal evidence."""
+from __future__ import annotations
+
+import copy
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load(path: str, name: str):
+    spec = importlib.util.spec_from_file_location(name, ROOT / path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load contract module")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+EVIDENCE = load(
+    "scripts/disposable-rehearsal-evidence.py",
+    "disposable_rehearsal_evidence",
+)
+
+
+class DisposableRehearsalEvidenceTest(unittest.TestCase):
+    HEAD = "a" * 40
+    RUN_ID = "123456"
+
+    def envelope(self, module="identity"):
+        return EVIDENCE.draft_envelope(module, self.HEAD, self.RUN_ID)
+
+    def assert_rejected(self, pattern, envelope):
+        with self.assertRaisesRegex(ValueError, pattern):
+            EVIDENCE.build_report(envelope)
+
+    def test_identity_report_is_disposable_and_never_authorizes_production(self):
+        report = EVIDENCE.build_report(self.envelope())
+        self.assertEqual(EVIDENCE.REPORT_CONTRACT, report["contract"])
+        self.assertEqual("identity", report["module"])
+        self.assertEqual("ci_disposable_only", report["scope"])
+        self.assertTrue(report["disposable_evidence"])
+        self.assertFalse(report["production_ready"])
+        self.assertFalse(report["production_authorized"])
+        self.assertEqual(list(EVIDENCE.CHECKS), report["passed_checks"])
+        self.assertEqual(
+            list(EVIDENCE.EXTERNAL_PRECONDITIONS),
+            report["external_preconditions_pending"],
+        )
+        self.assertRegex(report["evidence_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_vault_template_round_trip(self):
+        envelope = self.envelope("vault")
+        report = EVIDENCE.build_report(envelope)
+        self.assertEqual("vault", report["module"])
+        self.assertEqual(
+            envelope["ownership_report"]["source_inventory_sha256"],
+            report["source_inventory_sha256"],
+        )
+
+    def test_input_digest_is_canonical_across_root_key_order(self):
+        envelope = self.envelope()
+        first = EVIDENCE.build_report(envelope)
+        reordered = dict(reversed(list(envelope.items())))
+        second = EVIDENCE.build_report(reordered)
+        self.assertEqual(first["evidence_sha256"], second["evidence_sha256"])
+
+    def test_rejects_production_authorization(self):
+        envelope = self.envelope()
+        envelope["production_authorized"] = True
+        self.assert_rejected("cannot authorize production", envelope)
+
+    def test_rejects_integer_boolean_substitution(self):
+        envelope = self.envelope()
+        envelope["production_authorized"] = 0
+        self.assert_rejected("cannot authorize production", envelope)
+        envelope = self.envelope()
+        envelope["ci"]["disposable"] = 1
+        self.assert_rejected("disposable CI", envelope)
+
+    def test_rejects_non_github_or_invalid_ci_provenance(self):
+        envelope = self.envelope()
+        envelope["ci"]["provider"] = "local"
+        self.assert_rejected("CI provider", envelope)
+
+        envelope = self.envelope()
+        envelope["ci"]["head_sha"] = "main"
+        self.assert_rejected("head SHA", envelope)
+
+        envelope = self.envelope()
+        envelope["ci"]["run_id"] = "0"
+        self.assert_rejected("run id", envelope)
+
+    def test_requires_every_disposable_check_to_pass(self):
+        for name in EVIDENCE.CHECKS:
+            envelope = self.envelope()
+            envelope["checks"][name] = "failed"
+            self.assert_rejected("must have passed", envelope)
+
+    def test_rejects_missing_or_extra_check(self):
+        envelope = self.envelope()
+        envelope["checks"].pop(EVIDENCE.CHECKS[0])
+        self.assert_rejected("exact disposable contract", envelope)
+
+        envelope = self.envelope()
+        envelope["checks"]["production_smoke"] = "passed"
+        self.assert_rejected("exact disposable contract", envelope)
+
+    def test_rejects_ownership_report_that_claims_cutover_or_db_contact(self):
+        envelope = self.envelope()
+        envelope["ownership_report"]["cutover_authorized"] = True
+        self.assert_rejected("source-only and unauthorized", envelope)
+
+        envelope = self.envelope()
+        envelope["ownership_report"]["database_contacted"] = True
+        self.assert_rejected("source-only and unauthorized", envelope)
+
+    def test_rejects_modified_ownership_contract_or_digest(self):
+        envelope = self.envelope()
+        envelope["ownership_report"]["contract"] = "other"
+        self.assert_rejected("ownership report contract", envelope)
+
+        envelope = self.envelope()
+        envelope["ownership_report"]["source_inventory_sha256"] = "x"
+        self.assert_rejected("inventory digest", envelope)
+
+    def test_rejects_removed_pending_preconditions(self):
+        envelope = self.envelope()
+        envelope["ownership_report"]["pending_preconditions"] = []
+        self.assert_rejected("retain pending preconditions", envelope)
+
+    def test_rejects_extra_root_and_ci_fields(self):
+        envelope = self.envelope()
+        envelope["database_url"] = "secret"
+        self.assert_rejected("envelope fields", envelope)
+
+        envelope = self.envelope()
+        envelope["ci"]["token"] = "secret"
+        self.assert_rejected("CI provenance", envelope)
+
+    def test_report_does_not_copy_untrusted_payload_fields(self):
+        envelope = self.envelope()
+        report = EVIDENCE.build_report(envelope)
+        serialized = json.dumps(report, sort_keys=True)
+        self.assertNotIn("table_ownership", serialized)
+        self.assertNotIn("outside_this_proposal", serialized)
+        self.assertNotIn("next_action", serialized)
+
+    def test_cli_template_requires_ci_identifiers(self):
+        cmd = [
+            sys.executable,
+            str(ROOT / "scripts/disposable-rehearsal-evidence.py"),
+            "--template",
+            "identity",
+        ]
+        result = subprocess.run(
+            cmd,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("", result.stdout)
+
+    def test_cli_template_round_trip(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        generated = subprocess.run(
+            [
+                sys.executable,
+                script,
+                "--template",
+                "vault",
+                "--head-sha",
+                self.HEAD,
+                "--run-id",
+                self.RUN_ID,
+            ],
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, generated.returncode, generated.stderr)
+        checked = subprocess.run(
+            [sys.executable, script, "--json"],
+            input=generated.stdout,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, checked.returncode, checked.stderr)
+        report = json.loads(checked.stdout)
+        self.assertFalse(report["production_ready"])
+        self.assertFalse(report["production_authorized"])
+
+    def test_cli_does_not_echo_malformed_or_secret_input(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        secret = "do-not-echo-rehearsal-secret"
+        result = subprocess.run(
+            [sys.executable, script, "--json"],
+            input='{"secret":"' + secret + '"}',
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertNotIn(secret, result.stderr)
+
+    def test_cli_byte_limit_is_deterministic(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        payload = "á" * ((EVIDENCE.MAX_STDIN_BYTES // 2) + 1)
+        result = subprocess.run(
+            [sys.executable, script],
+            input=payload,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("", result.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()
