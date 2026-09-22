@@ -101,14 +101,16 @@ class DataSchemaStructureParityTest(unittest.TestCase):
     def test_snapshot_with_row_data_is_rejected(self) -> None:
         snapshot = self.snapshot()
         snapshot["contains_row_data"] = True
+        source = self.source()
         with self.assertRaisesRegex(ValueError, "contains_row_data=false"):
-            MODULE.build_report(self.source(), snapshot)
+            MODULE.build_report(source, snapshot)
 
     def test_dirty_source_is_rejected(self) -> None:
         source = self.source()
         source["checks"]["duplicate_tables"] = ["gf_child"]
+        snapshot = self.snapshot()
         with self.assertRaisesRegex(ValueError, "source structure is not clean"):
-            MODULE.build_report(source, self.snapshot())
+            MODULE.build_report(source, snapshot)
 
 
 if __name__ == "__main__":
