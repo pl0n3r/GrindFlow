@@ -269,7 +269,7 @@ El receipt debe conservar únicamente referencias verificables: módulo, huella 
 - `contains_row_data=false`;
 - `contains_secrets=false`.
 
-El receipt queda ligado al `evidence_bundle_sha256` de la etapa anterior y su propio `evidence_sha256` no puede reutilizar el hash del bundle ni ninguno de los receipts de metadata/restore. La observación single-writer debe ser posterior a ambos receipts previos. Los receipts previos también deben mantener digests distintos entre sí.
+El receipt queda ligado al `evidence_bundle_sha256` de la etapa anterior y su propio `evidence_sha256` no puede reutilizar el hash del bundle ni ninguno de los receipts de metadata/restore. La observación single-writer debe ser posterior a ambos receipts previos. Los receipts previos también deben mantener digests distintos entre sí. La huella `source_inventory_sha256` del reporte previo se contrasta otra vez con las migraciones del checkout actual: dos receipts con el mismo digest inventado no cumplen el contrato, ni se admite un módulo sin mapeo de ownership revisado.
 
 La entrada exige UTF-8, máximo 1.000.000 bytes y objetos JSON sin claves duplicadas, incluso anidados. El CLI no abre sockets, no lanza subprocesses, no lee rutas del caller y no se conecta a MariaDB. El reporte resultante mantiene:
 
