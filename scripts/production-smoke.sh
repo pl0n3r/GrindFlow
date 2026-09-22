@@ -44,14 +44,10 @@ curl_common() {
   "$CURL_BIN" --silent --show-error --max-time 20 --user-agent "$SMOKE_USER_AGENT" --header "Accept: $SMOKE_ACCEPT" --header "Accept-Language: en-US,en;q=0.8" "$@"
 }
 
+# Never retain remote response headers or bodies in GitHub Actions artifacts.
 print_http_failure() {
-  local label="$1" status="$2" headers_file="$3"
+  local label="$1" status="$2"
   printf 'ERROR: %s returned HTTP %s\n' "$label" "$status" >&2
-  if [[ -s "$headers_file" ]]; then
-    printf '%s\n' '---- safe response headers ----' >&2
-    grep -iE '^(server|content-type|content-length|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
-  fi
-  printf '%s\n' '-------------------------------' >&2
 }
 
 # Report only a short path: never leak redirect host, query strings, fragments or tokens.
@@ -270,11 +266,11 @@ run_smoke() {
   rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
-  if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers" "$up_body"; return 1; fi
+  if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status"; return 1; fi
 
   local login_page_status
   login_page_status="$(curl_common --cookie-jar "$cookie_jar" --output "$login_html" --dump-header "$login_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
-  if [[ "$login_page_status" != "200" ]]; then print_http_failure "login page GET /login" "$login_page_status" "$login_headers" "$login_html"; return 1; fi
+  if [[ "$login_page_status" != "200" ]]; then print_http_failure "login page GET /login" "$login_page_status"; return 1; fi
 
   local token
   if ! token="$(extract_csrf)"; then printf 'ERROR: login page did not expose a CSRF token.\n' >&2; return 1; fi
