@@ -102,6 +102,29 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checked-in migrations"):
             CUTOVER.build_report(source, self.plan())
 
+    def test_module_catalog_rejects_overlapping_table_ownership(self):
+        original = copy.deepcopy(CUTOVER.MODULE_TABLES)
+        try:
+            CUTOVER.MODULE_TABLES["vault"]["laravel"] = (
+                "media_assets",
+                "users",
+            )
+            with self.assertRaisesRegex(ValueError, "multiple modules"):
+                CUTOVER.build_report(self.source(), self.plan())
+        finally:
+            CUTOVER.MODULE_TABLES.clear()
+            CUTOVER.MODULE_TABLES.update(original)
+
+    def test_module_catalog_rejects_stale_table_mapping(self):
+        original = copy.deepcopy(CUTOVER.MODULE_TABLES)
+        try:
+            CUTOVER.MODULE_TABLES["vault"]["symfony"] = ("gf_missing_table",)
+            with self.assertRaisesRegex(ValueError, "missing from migrations"):
+                CUTOVER.build_report(self.source(), self.plan())
+        finally:
+            CUTOVER.MODULE_TABLES.clear()
+            CUTOVER.MODULE_TABLES.update(original)
+
     def test_incomplete_module_ownership_fails(self):
         plan = self.plan()
         plan["laravel_tables"].pop()
@@ -227,6 +250,14 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
             r = subprocess.run(cmd, input=payload, text=True, capture_output=True, check=False)
             self.assertEqual(2, r.returncode)
             self.assertEqual("", r.stdout)
+
+    def test_input_limit_is_measured_in_bytes(self):
+        cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py")]
+        payload = "á" * ((CUTOVER.MAX_STDIN_BYTES // 2) + 1)
+        r = subprocess.run(cmd, input=payload, text=True, capture_output=True, check=False)
+        self.assertEqual(2, r.returncode)
+        self.assertEqual("", r.stdout)
+        self.assertIn("validation failed", r.stderr)
 
 
 if __name__ == "__main__":
