@@ -86,7 +86,7 @@ def effective_port(url):
 
 try:
     origin = urlsplit(sys.argv[2])
-    if origin.scheme not in {"http", "https"} or not origin.hostname or origin.username or origin.password:
+    if origin.scheme not in {"http", "https"} or not origin.hostname or origin.username is not None or origin.password is not None:
         raise ValueError("invalid smoke origin")
     with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
         for line in handle:
