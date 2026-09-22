@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.80: S5, resumen semanal privado del piloto.** Base exacta `main` v0.1.79 `3d79eb53f2ad0e3e53d5ea48df104ec2654a090c`; Symfony solo en entorno aislado, sin cutover ni migraciones productivas.
+> **Candidato v0.1.81: diagnóstico de redirects absolutos same-origin (#73).** Base main v0.1.80 `25fbf66b5ac31255a38405ba03d18bf03bc8a016`; sin migraciones ni mutación productiva.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,37 +18,36 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.80** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.79~~ | `3d79eb53f2ad0e3e53d5ea48df104ec2654a090c` |
-| CI del PR S5 | ✅ ~~Completado~~ | run `35682108196` success; HEAD `67d3e5eba5180a84b7183ff7d6af78c9b634deeb` |
-| Sonar | ✅ ~~Completado~~ | Quality Gate OK, 0 issues nuevos en `67d3e5e` |
-| CodeRabbit | 🚧 Revisión final posterior a corrección README | Full review completada en `67d3e5e`, 1 hallazgo documental atendido aquí |
-| CI del SHA exacto de main | ✅ ~~v0.1.79 success~~ | run `35681696260` |
-| Deploy Observer | ✅ ~~Release v0.1.79 observado~~ | run `35681696462`; NO prueba SHA remoto |
-| Production Smoke | ⛔ Auth E2E sin validar | run `35681696196` failure; [#73](https://github.com/pl0n3r/GrindFlow/issues/73) |
-| Symfony en Hostinger | ⛔ NO desplegado | Solo CI aislado |
-| Migraciones | ✅ ~~Sin cambios de esquema~~ | S5 reutiliza ledger existente en Symfony |
+| Version objetivo | 🚧 **v0.1.81** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.80~~ | `25fbf66b5ac31255a38405ba03d18bf03bc8a016` |
+| CI del PR | 🚧 Pendiente | Contratos exactos por validar |
+| Sonar / CodeRabbit | 🚧 Pendiente | Full review sobre HEAD final |
+| CI del SHA exacto de main | 🚧 v0.1.80 en ejecución | run `35683135770` |
+| Deploy Observer | 🚧 v0.1.80 en observación | run `35683135669`; no prueba SHA remoto |
+| Production Smoke | ⛔ Auth E2E no validada | [#73](https://github.com/pl0n3r/GrindFlow/issues/73), run `35683135795` failure |
+| Symfony en Hostinger | ⛔ NO desplegado | S5 solo en CI aislado |
+| Migraciones | ✅ ~~Sin cambios de esquema~~ | DB productiva intacta |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+719** | **−36** | **+683** |
+| **4** | **+88** | **−62** | **+26** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | GET/CSV privado, consulta tenant-safe MariaDB, React responsive, PHPUnit y Playwright |
-| Revisiones | CI/Sonar/CodeRabbit mismo HEAD antes del squash; exact-main y Hostinger separados |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Alcance | Parser estricto de redirect del mismo origen y contratos negativos |
+| Revisiones | CI/Sonar/CodeRabbit del head exacto; squash, exact-main y producción por separado |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
  P --> F["fast contracts"]
- F --> V["symfony-preview"]
+ F --> V["validate"]
  A --> S["Sonar"]
  A --> C["CodeRabbit final"]
  V --> M["Squash merge"]
@@ -60,43 +59,37 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- S5: `GET /api/admin/pilot/weekly-summary` consulta un lunes UTC de las últimas 12 semanas; muestra siete días de eventos internos `prepare/complete/fail` agregados por organización y membresía vigente.
-- `GET /api/admin/pilot/weekly-summary.csv` exporta solamente siete filas agregadas tras la misma autorización; ambos endpoints usan `no-store, private`. Semana inválida → 422; ledger no migrado → métricas no disponibles.
-- React añade pestaña **Piloto** al workspace, totales diarios, navegación semanal, estado vacío/error y exportación CSV; diseño responsive a 360 px.
-- Tráfico Symfony, publicaciones externas e ingresos **no están integrados**: se muestran como no disponibles, nunca como cero inventado o publicación verificada.
-- Tests PHPUnit con dos organizaciones, revocación de membresía, CSV/fecha inválida y Playwright sintético móvil. Requisito `GF-FR-018` documentado.
+- #73: un `Location` absoluto puede ser legítimo en producción; el parser anterior lo etiquetaba `(redacted)` incluso si era el mismo origen, sin diagnosticar la ruta.
+- `safe_redirect_path` permite **solo** rutas estáticas reconocidas cuando un redirect relativo o absoluto coincide en esquema, hostname, puerto efectivo y ausencia de userinfo con `BASE_URL`. Nunca imprime host, query, fragment, URL remota o ruta desconocida.
+- Contratos mock: login absoluto same-origin a `/dashboard`, dashboard absoluto a `/login`; rechazos de externo, protocol-relative, esquema, puerto, host y userinfo diferentes.
+- Conserva fail-fast, privados 0600 e `incident_id` validado de v0.1.79. **No prueba credenciales ni corrige por sí solo la sesión E2E.** #73 sigue abierto.
 
 ## Archivos modificados en este deploy
-Inventario del candidato v0.1.80, no evidencia de publicación. «solo el deploy actual» conserva el marcador de control del snapshot README.
+Inventario del candidato v0.1.81; no es prueba de publicación. «solo el deploy actual» conserva el snapshot.
 - `README.md`
 - `config/version.php`
-- `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/PilotWeeklySummaryPanel.tsx`
-- `symfony/frontend/admin/admin.css`
-- `symfony/src/Http/Controller/PilotWeeklySummaryController.php`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/PilotWeeklySummaryTest.php`
+- `scripts/production-smoke-contract.sh`
+- `scripts/production-smoke.sh`
 
 ## Validación
-- Candidato fuente preparado sobre main v0.1.79 con CI exact-main success. CI Symfony y Sonar de v0.1.80 **completados** en `67d3e5e` (run `35682108196`); corregido un hallazgo README de CodeRabbit; revalidar el nuevo HEAD antes del merge.
-- Production Smoke v0.1.79 falló; investigar solo con evidencia saneada [#73](https://github.com/pl0n3r/GrindFlow/issues/73). No reintentar credenciales ciegamente, ni asociar falla a Symfony no desplegado.
+- Código sobre `main` v0.1.80, sin CI ni full CodeRabbit de v0.1.81 aún. El smoke de PR utiliza solo curl simulado, nunca credenciales productivas.
+- El `LOGIN_REDIRECT_PATH=(redacted)` real puede tener otras causas: observar solo la ruta saneada en un smoke posterior al deploy, sin repetir login ciegamente.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar S5 piloto v0.1.80 | 🚧 CI/Sonar/CodeRabbit |
-| **NEXT** | 🚧 Analizar fallo Smoke #73 sin nuevas mutaciones | 🚧 Diagnóstico seguro |
-| **LATER** | 🚧 S4/S5 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y paridad cutover | ⛔ Producción no verificada |
+| **NOW** | 🚧 Same-origin v0.1.81 | 🚧 CI y revisión |
+| **NEXT** | 🚧 Diagnosticar el redirect real #73 | 🚧 Solo lectura |
+| **LATER** | 🚧 Paridad Symfony y Traffic | 🚧 Sin cutover |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke E2E #73 | ⛔ Credenciales no confirmadas |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Smoke seguro y fail-fast v0.1.79 PR #75~~ | ✅ ~~Fusionada con CodeRabbit final y CI exact-main~~ |
-| **NOW** | 🚧 S5 resumen semanal privado | 🚧 PR y gates pendientes |
-| **NEXT** | 🚧 Corregir causa #73 basada en evidencia | 🚧 No inferir credenciales |
-| **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado y paridad | ⛔ Hostinger no verificado |
+| **DONE** | ✅ ~~S5 v0.1.80 PR #79 fusionada~~ | ✅ ~~CodeRabbit y CI PR exitosos~~ |
+| **NOW** | 🚧 Smoke seguro v0.1.81 | 🚧 Validación pendiente |
+| **NEXT** | 🚧 Resolver #73 con diagnóstico real | 🚧 Causa exacta no demostrada |
+| **LATER** | 🚧 Distribution y Traffic Symfony | 🚧 Sin cutover |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado | ⛔ Symfony no desplegado |
