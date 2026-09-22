@@ -49,9 +49,9 @@ Each requirement should contain:
 
 **Enunciado:** el formulario anónimo `GET /login` contiene un CSRF de sesión y puede mostrar el correo empleado anteriormente, por lo que ninguna caché de navegador o proxy debe almacenar su respuesta HTML.
 
-**Aceptación:** en el runtime Symfony aislado, los GET anónimos responden con `Cache-Control: no-store, private`; el formulario mantiene el CSRF y dos GET dentro de la misma sesión presentan el mismo token. No exponer el token, datos de cuenta o HTML privado en logs; no cambiar autenticación Laravel ni Hostinger por esta entrega.
+**Aceptación:** en el runtime Symfony aislado, los GET anónimos responden con `Cache-Control: no-store, private`; el formulario mantiene el CSRF y dos GET dentro de la misma sesión presentan cada uno un token CSRF no vacío; no se exige igualdad textual entre representaciones del token. No exponer el token, datos de cuenta o HTML privado en logs; no cambiar autenticación Laravel ni Hostinger por esta entrega.
 
-**Verificación:** PHPUnit HTTP con cliente y sesión sintéticos para dos GET, cabeceras de caché, CSRF no vacío y estable; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
+**Verificación:** PHPUnit HTTP con cliente y sesión sintéticos para dos GET, cabeceras de caché, CSRF presente en ambas respuestas, sin asumir igualdad de bytes; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
 
 ### GF-ARCH-002 — Paridad de datos y tenencia
 **Estado:** definido, pendiente de ejecución.
