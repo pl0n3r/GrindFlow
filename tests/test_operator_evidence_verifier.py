@@ -163,6 +163,17 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         envelope["ownership_report"]["source_inventory_sha256"] = "f" * 64
         self.assert_rejected("checked-in migrations", envelope)
 
+    def test_ownership_boolean_fields_require_exact_types(self):
+        for field, numeric in (
+            ("source_only", 1),
+            ("database_contacted", 0),
+            ("cutover_authorized", 0),
+        ):
+            with self.subTest(field=field):
+                envelope = self.envelope()
+                envelope["ownership_report"][field] = numeric
+                self.assert_rejected("ownership report boolean fields", envelope)
+
     def test_cli_is_offline_and_does_not_echo_secrets(self):
         payload = json.dumps(self.envelope())
         with tempfile.TemporaryDirectory() as tmp:
