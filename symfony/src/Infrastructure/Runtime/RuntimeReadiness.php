@@ -21,9 +21,9 @@ final class RuntimeReadiness
     ];
 
     /**
-     * Public readiness must stay coarse-grained: callers learn whether the
-     * runtime satisfies the contract, never the exact PHP version, SAPI or
-     * installed extension inventory.
+     * Public readiness stays coarse-grained: callers learn whether the runtime
+     * satisfies the contract, never its exact PHP version, SAPI or extension
+     * inventory.
      *
      * @return array{compatible: bool, contract: string}
      */
@@ -37,12 +37,24 @@ final class RuntimeReadiness
 
     public function isCompatible(): bool
     {
-        if (PHP_VERSION_ID < self::MINIMUM_PHP_VERSION_ID || PHP_VERSION_ID >= self::MAXIMUM_PHP_VERSION_ID) {
+        return $this->supports(PHP_VERSION_ID, get_loaded_extensions());
+    }
+
+    /**
+     * Pure contract evaluation keeps incompatible runtimes testable without
+     * altering the process environment.
+     *
+     * @param list<string> $loadedExtensions
+     */
+    public function supports(int $phpVersionId, array $loadedExtensions): bool
+    {
+        if ($phpVersionId < self::MINIMUM_PHP_VERSION_ID || $phpVersionId >= self::MAXIMUM_PHP_VERSION_ID) {
             return false;
         }
 
+        $loaded = array_fill_keys(array_map('strtolower', $loadedExtensions), true);
         foreach (self::REQUIRED_EXTENSIONS as $extension) {
-            if (!extension_loaded($extension)) {
+            if (!isset($loaded[$extension])) {
                 return false;
             }
         }
