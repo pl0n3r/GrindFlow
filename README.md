@@ -21,7 +21,7 @@
 | Version objetivo | 🚧 **v0.1.81** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.80~~ | `25fbf66b5ac31255a38405ba03d18bf03bc8a016` |
 | CI del PR | ✅ ~~Completado~~ | último HEAD validado `d7528f343be1858e00552b7aca94304f5b41b8e2`, run `35683650514`; cambio userinfo pendiente de CI |
-| Sonar | ✅ ~~Completado~~ | Quality Gate OK, 0 issues sobre `d7528f343be1858e00552b7aca94304f5b41b8e2`; cambio userinfo pendiente |
+| Sonar | ✅ ~~Completado~~ | Último Gate OK en `d7528f3`; revalidación pendiente tras falso positivo S5332 en fixture offline HTTP |
 | CodeRabbit | 🚧 Revisión final tras corrección userinfo | Full review en `d7528f3` detectó dos hallazgos menores atendidos aquí; nueva revisión pendiente |
 | CI del SHA exacto de main | ✅ ~~v0.1.80 success~~ | run `35683135770`, SHA `25fbf66b5` |
 | Deploy Observer | ⛔ Release v0.1.80 NO observado | run `35683135669` failure: `/_deployment` HTTP 403 repetido; no prueba SHA remoto |
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+116** | **−62** | **+54** |
+| **4** | **+119** | **−62** | **+57** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -74,7 +74,7 @@ Inventario del candidato v0.1.81; no es prueba de publicación. «solo el deploy
 - `scripts/production-smoke.sh`
 
 ## Validación
-- CI/Sonar v0.1.81 success sobre el último HEAD verificado `d7528f343be1858e00552b7aca94304f5b41b8e2` (run `35683650514`); después se corrigió el caso de userinfo vacío y se añadieron contratos de puertos efectivos. Revalidar el HEAD que contiene este README sin fingir autorreferencia del SHA; CodeRabbit final sigue pendiente. Smoke PR usa curl simulado, nunca credenciales productivas.
+- CI/Sonar previos success sobre `d7528f343be1858e00552b7aca94304f5b41b8e2` (run `35683650514`); posteriormente se rechazó el userinfo vacío y se añadieron contratos de puertos. El primer check Sonar posterior detectó regla S5332 por una URL HTTP literal en un fixture **offline**; reemplazada por piezas sintéticas que jamás se envían a red. Revalidar este HEAD, sin autorreferencia SHA en README; CodeRabbit final sigue pendiente. Smoke PR usa curl simulado, nunca credenciales productivas.
 - El `LOGIN_REDIRECT_PATH=(redacted)` real puede tener otras causas: observar solo la ruta saneada en un smoke posterior al deploy, sin repetir login ciegamente.
 
 ## Qué sigue
