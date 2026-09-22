@@ -305,7 +305,7 @@ def main() -> int:
             return 0
 
         report = build_report(read_stdin_json(MAX_STDIN_BYTES, "input"))
-    except (ValueError, TypeError):
+    except (RecursionError, TypeError, ValueError):
         print("ERROR: disposable rehearsal evidence validation failed", file=sys.stderr)
         return 2
 
