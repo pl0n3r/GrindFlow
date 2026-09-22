@@ -212,11 +212,24 @@ def build_report(envelope: Any) -> dict[str, Any]:
     }
 
 
+def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects before contract validation."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            fail("operator evidence contains duplicate fields")
+        result[key] = value
+    return result
+
+
 def read_stdin_json() -> Any:
     raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
     if len(raw) > MAX_STDIN_BYTES:
         fail("operator evidence exceeds safety limit")
-    return json.loads(raw.decode("utf-8"))
+    return json.loads(
+        raw.decode("utf-8"),
+        object_pairs_hook=reject_duplicate_keys,
+    )
 
 
 def main() -> int:
