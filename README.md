@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.87: readiness segura del runtime Symfony sin fingerprint sensible.** Base exacta `main` v0.1.86 `457312fcb68d743f0d460b34e25bf458ad452cee`; no cambia el runtime Laravel productivo ni ejecuta cutover.
+> **Candidato v0.1.88: inventario reproducible y guardas de coexistencia de datos.** Base exacta `main` v0.1.87 `e70b723d68e44ab1f182a01ae937ea21294f1aa4`; no conecta MariaDB, no ejecuta migraciones y no realiza cutover.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,38 +18,36 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.87** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.86~~ | `457312fcb68d743f0d460b34e25bf458ad452cee` |
+| Version objetivo | 🚧 **v0.1.88** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.87~~ | `e70b723d68e44ab1f182a01ae937ea21294f1aa4` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 Sin run observado aún | Validación post-merge v0.1.86 separada |
-| Deploy Observer | 🚧 Sin run observado aún | No inferir checkout remoto |
+| CI del SHA exacto de main | 🚧 Pendiente | Se valida solo después del merge |
+| Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
-| Symfony en Hostinger | ⛔ NO desplegado | `symfony-preview` es aislado |
-| Migraciones | ✅ ~~Sin cambio de esquema~~ | Ninguna migración productiva |
+| Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
+| Migraciones | ✅ ~~No ejecutadas~~ | Inventario source-only |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+178** | **−35** | **+143** |
+| **4** | **+164** | **−31** | **+133** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts]** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Readiness pública del proceso Symfony; sin fingerprint ni acceso a producción |
-| Revisiones | CI/Sonar/CodeRabbit HEAD, exact-main, Observer y Smoke separados |
+| Alcance | Inventario estático de tablas y frontera de escritores Laravel/Symfony |
+| Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
  P --> F["fast contracts"]
- P --> Y["Symfony preview"]
  F --> V["validate"]
- Y --> V
  A --> S["Sonar"]
  A --> C["CodeRabbit"]
  V --> M["Squash merge"]
@@ -61,42 +59,38 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo contrato `symfony-mariadb-v1`: PHP >= 8.3 y < 9.0, `ctype`, `iconv`, PDO y `pdo_mysql`; falla cerrado si falta una capacidad.
-- `GET /health` añade únicamente `runtime.compatible` y el identificador estable del contrato. Un runtime incompatible responde 503/`degraded`; uno compatible 200/`ok`.
-- La respuesta nunca publica versión exacta de PHP, SAPI, inventario de extensiones, URL de base de datos ni SHA de deploy.
-- PHPUnit cubre límites de PHP y extensión ausente; el smoke HTTP real comprueba la forma pública. No se toca Hostinger, credenciales, datos ni migraciones.
+- `scripts/data-schema-inventory.py` inventaría tablas declaradas por migraciones Laravel y Symfony sin abrir `DATABASE_URL` ni conectarse a una base.
+- La guardia falla cerrado ante colisiones nominales y ante tablas Symfony nuevas que no respeten el prefijo `gf_`.
+- El resultado JSON estable `gf-arch-002-source-inventory-v1` registra tabla, migración y escritor para revisión reproducible.
+- `docs/DATA-CUTOVER-INVENTORY.md` fija frontera de escritores, requisitos de backup/restauración, ensayo descartable, verificación y rollback antes de cualquier cutover.
+- GF-ARCH-002 permanece abierto: este cambio reduce riesgo pero no acredita paridad con datos productivos.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidata, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
-- `docs/GRINDFLOW-SPEC.md`
-- `docs/REQUIREMENTS.md`
-- `symfony/src/Http/Controller/HealthController.php`
-- `symfony/src/Infrastructure/Runtime/RuntimeReadiness.php`
-- `symfony/tests/contract/smoke.sh`
-- `symfony/tests/php/PreviewTest.php`
-- `symfony/tests/php/RuntimeReadinessTest.php`
+- `docs/DATA-CUTOVER-INVENTORY.md`
+- `scripts/data-schema-inventory.py`
 
 ## Validación
-- La rama debe pasar `preflight`, `fast[contracts]`, `symfony-preview`, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
-- Readiness significa compatibilidad del proceso Symfony ejecutado; **no** acredita MariaDB productiva, migraciones, SHA Hostinger, cutover ni login productivo.
+- La rama debe pasar `preflight`, `fast[contracts]`, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
+- El inventario source-only **no** acredita MariaDB productiva, contenido real, restauración, paridad cross-tenant, SHA Hostinger ni cutover.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar readiness segura Symfony | 🚧 v0.1.87 candidata |
-| **NEXT** | 🚧 Inventario/paridad de datos antes de cutover | 🚧 GF-ARCH-002 |
+| **NOW** | 🚧 Validar inventario/paridad source-only | 🚧 v0.1.88 candidata |
+| **NEXT** | 🚧 Inventario real restaurado + pruebas de paridad | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.86 fusionada~~ | ✅ ~~PR #85 CI/Sonar/CodeRabbit exact-HEAD~~ |
-| **NOW** | 🚧 Runtime readiness sin fingerprint | 🚧 v0.1.87 |
+| **DONE** | ✅ ~~v0.1.87 fusionada~~ | ✅ ~~readiness Symfony segura~~ |
+| **NOW** | 🚧 Guardia de coexistencia de esquema | 🚧 v0.1.88 |
 | **NEXT** | 🚧 Paridad/propietario de escritura por módulo | 🚧 Sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
