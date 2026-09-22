@@ -112,8 +112,14 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 1. Leer el inicio rápido de `AGENTS.md`, las reglas del área modificada
    y la documentación relevante; no releer todo el repositorio después
    de cada ajuste menor ni activar notas del archivo histórico.
-2. Inspeccionar `main`, PRs abiertos, `GrindFlow CI / validate` del SHA exacto
-   y el roadmap [#2](https://github.com/pl0n3r/GrindFlow/issues/2).
+2. Inspeccionar `main`, la versión en `config/version.php`, PRs abiertos,
+   `GrindFlow CI / validate` del SHA exacto y el roadmap [#2](https://github.com/pl0n3r/GrindFlow/issues/2).
+   Antes de abrir un Issue o rama nueva, revisar también los PRs/Issues en
+   curso: una tarea con más de **30 minutos** sin commit ni comentario humano
+   útil se recupera antes que una tarea disponible nueva, reutilizando su rama
+   y PR, salvo que el Issue esté bloqueado explícitamente hasta resolver su
+   dependencia. `updated_at` del PR, bots, CI, Sonar, CodeRabbit, etiquetas
+   y cambios de metadatos no prueban avance ni renuevan esta ventana.
 3. Si un PR activo cubre el trabajo, terminarlo y verificar sus gates antes
    de abrir otro PR dependiente. Si `main` no tiene CI verde, investigar primero.
 4. Aplicar los requisitos de `docs/GRINDFLOW-SPEC.md`, `docs/REQUIREMENTS.md`

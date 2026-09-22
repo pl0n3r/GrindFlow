@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.77: navegación continua de acceso + compuerta CodeRabbit obligatoria.** Base exacta `main` v0.1.76 `10da41703359bc3455bb5939be08e371e60f1293`. Symfony aislado, NO desplegado ni migrado en Hostinger.
+> **Candidato v0.1.78: recuperación de trabajo inactivo sin duplicar ramas ni PRs.** Base exacta `main` v0.1.77 `4b5ebeba23e535b845caec943e1b713dd5379165`. Solo reglas de colaboración; Symfony continúa aislado y sin cutover.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.77** | `config/version.php` |
-| Base exacta | ✅ ~~main v0.1.76~~ | `10da41703359bc3455bb5939be08e371e60f1293` |
-| CI del PR | 🚧 Head v0.1.77 por validar | `GrindFlow CI / validate` |
-| Sonar | 🚧 Pendiente del head estable | SonarCloud PR |
-| CodeRabbit | 🚧 Pendiente del head estable | PR |
-| CI del SHA exacto de main | ✅ ~~v0.1.76 success~~ | run `35664374136` |
-| Deploy Observer | ✅ ~~v0.1.76 release observado~~ | run `35664374124`; versión humana, NO SHA Hostinger |
-| Production Smoke | ⛔ Credencial ya configurada; autenticación no verificada | run `35664937043` falló: `/dashboard` HTTP 302 tras POST; [Issue #73](https://github.com/pl0n3r/GrindFlow/issues/73). #1 cerrado |
+| Version objetivo | 🚧 **v0.1.78** | `config/version.php` |
+| Base exacta | ✅ ~~main v0.1.77~~ | `4b5ebeba23e535b845caec943e1b713dd5379165` |
+| CI del PR | ✅ ~~VALIDATED IN CODE v0.1.78~~ | `GrindFlow CI / validate` run `35671057434`; confirmar gates del nuevo HEAD antes de merge |
+| Sonar | ✅ ~~Quality Gate de v0.1.78 success~~ | SonarCloud PR, sin issues nuevos; revalidar nuevo HEAD antes del merge |
+| CodeRabbit | ⛔ Revisión final obligatoria pendiente tras rate limit | PR #78; no fusionar hasta review completa |
+| CI del SHA exacto de main | ✅ ~~v0.1.77 success~~ | run `35667874191` |
+| Deploy Observer | ✅ ~~v0.1.77 release observada~~ | run `35667874090`; versión humana, NO SHA Hostinger |
+| Production Smoke | ⛔ Autenticación productiva pendiente | [Issue #73](https://github.com/pl0n3r/GrindFlow/issues/73); no lo corrige esta entrega de gobierno |
 | Symfony en Hostinger | ⛔ NO desplegado | Solo entorno aislado CI |
-| Migraciones | ✅ ~~Sin migraciones nuevas en el candidato~~ | Producción intacta |
+| Migraciones | ✅ ~~Sin cambios de esquema~~ | Solo reglas, README y versión humana |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+149** | **−49** | **+100** |
+| **4** | **+50** | **−41** | **+9** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
-| Alcance | GF-UX-002: misma cabecera login/organizaciones Symfony, navegación 360/820 px y CSRF; regla bloqueante CodeRabbit |
+| Gates seleccionados | **preflight · fast[contracts]** |
+| Alcance | [Issue #77](https://github.com/pl0n3r/GrindFlow/issues/77): prioridad de recuperar trabajos tras 30 min sin actividad humana útil; no duplicar rama/PR |
 | Revisiones | CI + Sonar + **CodeRabbit terminado sobre head final ANTES de merge**; exact-main y Hostinger separados |
 
 ## Flujo de entrega
@@ -60,46 +60,38 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Cabecera Symfony compartida entre login y selección de organización; enlaces reales a inicio/vista previa y sección actual accesible, sin duplicar marca ni exponer funciones privadas.
-- CSS acotado para la cabecera de identidad, enlaces y tarjetas a 360/820 px; CSRF y membresías sin cambios.
-- Regresión PHPUnit del selector autenticado y Chromium del ingreso responsive, CSRF y ausencia de desbordamiento.
-- **Regla dura en AGENTS.md + docs/GOVERNANCE.md:** si CodeRabbit no finaliza sobre el SHA último, el merge permanece bloqueado; PR #72 documentada como incidente de proceso.
-- La configuración del secreto E2E cerró #1, pero el smoke de producción v0.1.76 falló con HTTP 302 en Dashboard; diagnóstico registrado en #73. Sin publicación externa, deploy de Symfony ni migraciones productivas.
+- Se prioriza recuperar una tarea/PR existente si lleva más de 30 minutos sin commit ni comentario humano útil, antes de iniciar otro frente disponible.
+- Eventos de bots, CI, Sonar, CodeRabbit, etiquetas, metadatos o `updated_at` no reinician artificialmente el reloj; se conserva la rama, el issue y el PR originales.
+- Un Issue con dependencia explícitamente bloqueada no se recupera hasta desbloquearse. La regla complementa, sin reemplazar, los gates obligatorios de CI, Sonar y revisión CodeRabbit final.
+- Este cambio es de gobierno, no cambia autorización, runtime ni datos productivos; [PR #75](https://github.com/pl0n3r/GrindFlow/pull/75) sigue separada y tendrá que reconciliar versión tras este release.
 
 ## Archivos modificados en este deploy
-Inventario del candidato v0.1.77. El contrato histórico del tablero usa «solo el deploy actual» como marcador de snapshot; NO prueba despliegue Symfony en Hostinger.
+Inventario de **solo el deploy actual** candidato, no prueba checkout SHA remoto en Hostinger.
 - `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `docs/GOVERNANCE.md`
-- `docs/REQUIREMENTS.md`
-- `symfony/public/assets/grindflow.css`
-- `symfony/templates/identity/_header.html.twig`
-- `symfony/templates/identity/login.html.twig`
-- `symfony/templates/identity/organizations.html.twig`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/IdentityLoginTest.php`
 
 ## Validación
-- CI/Sonar/CodeRabbit del candidato v0.1.77 pendientes; **sin aprobación ni merge hasta revisión final explícita de CodeRabbit**.
-- `symfony-preview` debe ejecutar PHPUnit/MariaDB, Vite y Chromium a 360/820 px. No hubo pruebas locales; la rama aún requiere CI de PR.
-- El smoke v0.1.76 detectó 15 redirecciones HTTP 302 al consultar el dashboard, pero no distingue aún contraseña inválida de sesión no conservada. #73 registra diagnóstico.
+- CI #35671057434 pasó tras corregir versión y título; esta actualización del snapshot requiere validar el SHA final de nuevo antes de fusionar.
+- Verificar CI `validate`, Sonar y la revisión final explícita CodeRabbit sobre el mismo HEAD definitivo antes del merge.
+- Sin despliegue Symfony, migraciones, escrituras productivas ni declaración de smoke autenticado en verde.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Acceso visual v0.1.77 + gate CodeRabbit final; diagnosticar #73 | 🚧 PR/revisión y producción separados |
-| **NEXT** | 🚧 Corregir origen del 302 E2E sin reintentos de autenticación innecesarios; seguir S4 | 🚧 Con evidencia de diagnóstico |
-| **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y cutover Symfony pendiente de paridad | ⛔ No declarar producción validada |
+| **NOW** | 🚧 Integrar gobierno anti-starvation #77; continuar seguridad del smoke #73 por PR separada | 🚧 Gate CodeRabbit final obligatorio |
+| **NEXT** | 🚧 Reconciliar versión PR #75 si v0.1.78 se fusiona antes; investigar #73 | 🚧 Merges seriales |
+| **LATER** | 🚧 S4/S5 Symfony y paridad previa a cutover | 🚧 Sin datos productivos |
+| **BLOCKED / EXTERNAL** | ⛔ #73: smoke autenticado; Symfony Hostinger sin desplegar | ⛔ No confundir CI con producción |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~Navegación workspace v0.1.76, secreto E2E configurado #1~~ | ✅ ~~CI exact-main v0.1.76; release observado~~ |
-| **NOW** | 🚧 Acceso visual v0.1.77 + gate CodeRabbit final; diagnosticar #73 | 🚧 PR/revisión y producción separados |
-| **NEXT** | 🚧 Corregir origen del 302 E2E sin reintentos de autenticación innecesarios; seguir S4 | 🚧 Con evidencia de diagnóstico |
-| **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y cutover Symfony pendiente de paridad | ⛔ No declarar producción validada |
+| **DONE** | ✅ ~~v0.1.77 navegación/identidad y gate CodeRabbit~~ | ✅ ~~Exact-main #35667874191 success; Observer release observado~~ |
+| **NOW** | 🚧 Integrar gobierno anti-starvation #77; continuar seguridad del smoke #73 por PR separada | 🚧 Gate CodeRabbit final obligatorio |
+| **NEXT** | 🚧 Reconciliar versión PR #75 si v0.1.78 se fusiona antes; investigar #73 | 🚧 Merges seriales |
+| **LATER** | 🚧 S4/S5 Symfony y paridad previa a cutover | 🚧 Sin datos productivos |
+| **BLOCKED / EXTERNAL** | ⛔ #73: smoke autenticado; Symfony Hostinger sin desplegar | ⛔ No confundir CI con producción |

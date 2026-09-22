@@ -34,6 +34,17 @@ El Issue #2 conserva **todas las entradas históricas** de trabajo hasta por lo 
 
 No incluir en el roadmap políticas permanentes, guías, manuales o especificaciones. Mover únicamente ese texto normativo a `AGENTS.md` / este documento / especificación, sin eliminar entradas de ejecución.
 
+## Recuperación de trabajo y anti-starvation
+
+Antes de iniciar trabajo nuevo, los agentes revisan Issues y PRs abiertos que
+representen trabajo reservado/en curso. Si una rama no tiene commit ni un
+comentario humano útil en su Issue o PR durante 30 minutos, su continuación tiene prioridad
+sobre abrir otro frente. La recuperación conserva el Issue, la rama y el PR:
+no duplica la implementación ni borra trabajo. Actualizaciones de bots,
+`updated_at` del PR, CI, Sonar, CodeRabbit, etiquetas y metadata no cuentan
+como actividad de implementación ni extienden el lease. Un Issue bloqueado se
+excluye hasta que su dependencia se resuelva explícitamente.
+
 ## Gobierno GitHub y automatización
 
 Las plantillas de Issue exigen objetivo, alcance, aceptación y riesgos; PR aporta versión y validación. `.github/labels.json` declara un **conjunto mínimo** de etiquetas en español que el workflow sincroniza aditivamente: **no** elimina etiquetas existentes ni retitula Issues o PRs históricos. Los milestones de hito se crean solo cuando el objetivo sea real, no uno por cada patch.
