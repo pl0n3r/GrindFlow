@@ -33,13 +33,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+149** | **−49** | **+100** |
+| **4** | **+45** | **−37** | **+8** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts]** |
 | Alcance | [Issue #77](https://github.com/pl0n3r/GrindFlow/issues/77): prioridad de recuperar trabajos tras 30 min sin actividad humana útil; no duplicar rama/PR |
 | Revisiones | CI + Sonar + **CodeRabbit terminado sobre head final ANTES de merge**; exact-main y Hostinger separados |
 
