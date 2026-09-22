@@ -5,6 +5,7 @@ import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server
 import { routing, type Locale } from '@/i18n/routing';
 import '../globals.css';
 
+/** Build page metadata from the validated locale catalog. */
 export async function generateMetadata({
   params,
 }: {
@@ -26,10 +27,12 @@ export async function generateMetadata({
   };
 }
 
+/** Enumerate every supported locale for static route generation. */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
+/** Render the locale-scoped application shell with its translation messages. */
 export default async function LocaleLayout({
   children,
   params,
