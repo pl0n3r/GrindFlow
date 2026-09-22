@@ -257,4 +257,78 @@ final class AccountSecurityTest extends WebTestCase
             $db->delete('gf_identity_users', ['id' => $actor]);
         }
     }
+
+    public function testPasswordJsonDepthIsBoundedBeforeValidation(): void
+    {
+        $client = static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $actor = Uuid::v7()->toRfc4122();
+        $organization = Uuid::v7()->toRfc4122();
+        $at = gmdate('Y-m-d H:i:s');
+        $password = 'synthetic-depth-password-123';
+
+        $db->insert('gf_identity_users', [
+            'id' => $actor, 'name' => 'Cuenta depth', 'email' => $actor.'@example.test',
+            'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+            'platform_role' => 'model', 'is_active' => 1,
+            'created_at' => $at, 'updated_at' => $at,
+        ]);
+
+        try {
+            $db->insert('gf_identity_organizations', [
+                'id' => $organization, 'name' => 'Organización depth',
+                'slug' => 'depth-'.substr($organization, 0, 30), 'type' => 'independent',
+                'created_at' => $at, 'updated_at' => $at,
+            ]);
+            $db->insert('gf_identity_memberships', [
+                'id' => Uuid::v7()->toRfc4122(), 'user_id' => $actor,
+                'organization_id' => $organization, 'role' => 'model',
+                'created_at' => $at, 'updated_at' => $at,
+            ]);
+
+            $login = $client->request('GET', '/login');
+            $client->submit($login->filter('form.identity-form')->form([
+                'email' => $actor.'@example.test', 'password' => $password,
+            ]));
+            self::assertResponseRedirects('/organizations');
+            $selector = $client->request('GET', '/organizations');
+            $client->submit($selector->filter('.identity-orgs form')->form());
+            self::assertResponseRedirects('/admin');
+
+            $client->request('GET', '/api/admin/context');
+            self::assertResponseIsSuccessful();
+            $csrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
+
+            // 17 nested arrays exceed the controller's json_decode depth of 16
+            // while remaining far below the independent 4 KiB byte ceiling.
+            $nested = json_encode([
+                'current_password' => $password,
+                'new_password' => array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
+                    array_fill(0, 1, array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
+                    array_fill(0, 1, array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
+                    array_fill(0, 1, array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
+                    array_fill(0, 1, array_fill(0, 1, 'blocked'))))))))))))))))),
+                'confirm_password' => $password,
+            ], JSON_THROW_ON_ERROR);
+            self::assertLessThan(4096, strlen($nested));
+
+            $client->request('POST', '/api/admin/profile/password', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $csrf,
+            ], $nested);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_password', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertTrue(password_verify($password, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
+        } finally {
+            $db->delete('gf_identity_memberships', ['user_id' => $actor]);
+            $db->delete('gf_identity_organizations', ['id' => $organization]);
+            $db->delete('gf_identity_users', ['id' => $actor]);
+        }
+    }
+
 }
