@@ -138,6 +138,13 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
         envelope["single_writer_receipt"]["source_inventory_sha256"] = forged
         self.assert_rejected("checked-in migrations", envelope)
 
+    def test_rejects_reusing_source_inventory_digest_as_single_writer_evidence(self):
+        envelope = self.envelope()
+        envelope["single_writer_receipt"]["evidence_sha256"] = (
+            envelope["operator_evidence_report"]["source_inventory_sha256"]
+        )
+        self.assert_rejected("distinct evidence", envelope)
+
     def test_rejects_unreviewed_module_even_with_consistent_receipts(self):
         envelope = self.envelope()
         envelope["module"] = "unreviewed_module"
