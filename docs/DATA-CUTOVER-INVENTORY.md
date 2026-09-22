@@ -167,6 +167,46 @@ El primer comando emite **un solo documento JSON válido**; el mensaje de éxito
 
 El reporte `gf-arch-002-cutover-ownership-report-v1` incluye una huella SHA-256 del inventario fuente canónico (`source_inventory_sha256`) para identificar la versión exacta del conjunto de metadatos revisado; **no es un SHA de Git ni prueba de deploy**. `outside_this_proposal` enumera explícitamente las tablas de ambos runtimes que quedan fuera del módulo propuesto y cuyo ownership no se transfiere. Siempre declara `cutover_authorized=false` y `database_contacted=false`. Un plan estructuralmente válido **no certifica** backups, paridad de datos, bloqueo del escritor, RPO/RTO, smoke, consentimiento operativo ni autorización del propietario. Es insumo para revisión humana y un ensayo separado, nunca una orden ejecutable. No modificar la versión desplegada, `public_html` o el owner real de las tablas por obtener este reporte.
 
+## Evidencia machine-readable del rehearsal descartable
+
+`scripts/disposable-rehearsal-evidence.py` resume en JSON la evidencia que ya produce `symfony-preview` **después** de pasar paridad estructural, reversibilidad de migraciones, restore MariaDB+Vault y regresiones cross-tenant/IDOR. No ejecuta ninguna de esas operaciones: solo valida y compacta sus resultados dentro del contrato `gf-arch-002-disposable-rehearsal-report-v1`.
+
+El input `gf-arch-002-disposable-rehearsal-input-v1` exige:
+
+- provenance de GitHub Actions con SHA de 40 hex, `run_id` numérico y `disposable=true`;
+- un reporte `gf-arch-002-cutover-ownership-report-v1` que coincida exactamente con las migraciones del mismo checkout;
+- los cuatro checks descartables en `passed`: paridad de snapshot, reversibilidad, restore DB+Vault y guards post-restore;
+- `production_authorized=false` con tipo booleano exacto.
+
+El reporte conserva únicamente provenance mínima, módulo, huella del inventario y checks aprobados. Deliberadamente fija:
+
+```json
+{
+  "scope": "ci_disposable_only",
+  "disposable_evidence": true,
+  "production_ready": false,
+  "production_authorized": false
+}
+```
+
+También mantiene pendientes explícitos que **no pueden** cerrarse con CI sintético: inventario metadata-only autorizado de producción, restore de backup real, evidencia de freeze/single-writer, autorización del owner y smoke productivo.
+
+`symfony-preview` genera recibos separados para `identity` y `vault` solo si todos los pasos anteriores del job han pasado. Los envelopes temporales se eliminan antes del upload y únicamente los reportes reducidos se publican como artifact `gf-arch-002-disposable-evidence`, con retención de **1 día**. Esos artifacts son trazabilidad de CI, no evidencia de deploy, RPO/RTO ni permiso de cutover.
+
+Ejemplo offline reproducible:
+
+```bash
+python3 scripts/disposable-rehearsal-evidence.py \
+  --template identity \
+  --head-sha 0123456789abcdef0123456789abcdef01234567 \
+  --run-id 123456 > /tmp/gf-rehearsal-envelope.json
+
+python3 scripts/disposable-rehearsal-evidence.py --json \
+  < /tmp/gf-rehearsal-envelope.json
+```
+
+El validador limita stdin a 1.000.000 de bytes, no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
