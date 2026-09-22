@@ -274,7 +274,9 @@ Incluso con un receipt válido, el reporte mantiene:
 
 ```json
 {
-  "single_writer_rehearsal_verified": true,
+  "scope": "redacted_rehearsal_reference_only",
+  "single_writer_rehearsal_reference_verified": true,
+  "receipt_content_verified": false,
   "production_ready": false,
   "production_authorized": false,
   "remaining_preconditions": [
@@ -285,7 +287,7 @@ Incluso con un receipt válido, el reporte mantiene:
 }
 ```
 
-Por diseño, un rehearsal no acredita que el writer viejo esté congelado en producción ni que Symfony pueda asumir escritura productiva. La evidencia de freeze productivo, autorización del propietario y smoke autenticado siguen siendo señales externas y separadas.
+Por diseño, el verificador solo acredita la **forma y encadenamiento de la referencia redacted**; no inspecciona ni valida el contenido real del receipt. Un rehearsal no acredita que el writer viejo esté congelado en producción ni que Symfony pueda asumir escritura productiva. La evidencia de freeze productivo, autorización del propietario y smoke autenticado siguen siendo señales externas y separadas.
 
 ## Secuencia obligatoria antes de un cutover real
 
