@@ -127,6 +127,12 @@ def validate_receipt(
     evidence_digest = receipt["freeze_evidence_sha256"]
     if not isinstance(evidence_digest, str) or not SHA256_RE.fullmatch(evidence_digest):
         fail("single-writer evidence digest is invalid")
+    prior_digests = {
+        evidence["evidence_sha256"]
+        for evidence in operator_report["verified_evidence"].values()
+    }
+    if evidence_digest in prior_digests:
+        fail("single-writer evidence must be distinct from prior evidence")
 
     if receipt["environment"] != EXPECTED_ENVIRONMENT:
         fail("single-writer rehearsal environment is invalid")
