@@ -108,6 +108,10 @@ export function PilotWeeklySummaryPanel() {
             <strong>{state.summary.totals.completed_reports}</strong></div>
           <div><small>Intentos fallidos</small><strong>{state.summary.totals.failed_attempts}</strong></div>
         </div>
+        {state.summary.totals.prepared_attempts === 0
+          && state.summary.totals.completed_reports === 0
+          && state.summary.totals.failed_attempts === 0
+          && <p role="status">No hay actividad interna registrada en esta semana.</p>}
         <a className="pilot-csv-download"
           href={'/api/admin/pilot/weekly-summary.csv?week=' + encodeURIComponent(week)}>
           Descargar resumen CSV
