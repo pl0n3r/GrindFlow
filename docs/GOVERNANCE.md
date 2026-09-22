@@ -37,8 +37,8 @@ No incluir en el roadmap políticas permanentes, guías, manuales o especificaci
 ## Recuperación de trabajo y anti-starvation
 
 Antes de iniciar trabajo nuevo, los agentes revisan Issues y PRs abiertos que
-representen trabajo reservado/en curso. Si una rama no tiene commit ni el Issue
-un comentario humano útil durante 30 minutos, su continuación tiene prioridad
+representen trabajo reservado/en curso. Si una rama no tiene commit ni un
+comentario humano útil en su Issue o PR durante 30 minutos, su continuación tiene prioridad
 sobre abrir otro frente. La recuperación conserva el Issue, la rama y el PR:
 no duplica la implementación ni borra trabajo. Actualizaciones de bots,
 `updated_at` del PR, CI, Sonar, CodeRabbit, etiquetas y metadata no cuentan
