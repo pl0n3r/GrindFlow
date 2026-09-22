@@ -7,7 +7,9 @@ A structurally valid plan is NOT evidence of data parity or permission to cut ov
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -169,13 +171,50 @@ def build_report(source: Any, plan: Any) -> dict[str, Any]:
     }
 
 
+
+def draft_envelope(module: str) -> dict[str, Any]:
+    """Build a pending-only example from checked-in migration source, never DB."""
+    path = Path(__file__).with_name("data-schema-inventory.py")
+    spec = importlib.util.spec_from_file_location("gf_schema_inventory", path)
+    if spec is None or spec.loader is None:
+        fail("source migration scanner unavailable")
+    scanner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(scanner)
+    source = scanner.build_inventory()
+    grouping = MODULE_TABLES[module]
+    plan = {
+        "contract": PLAN_CONTRACT,
+        "module": module,
+        "mode": "planning_only",
+        "source_only": True,
+        "database_contacted": False,
+        "production_authorized": False,
+        "current_writer": "laravel",
+        "proposed_writer": "symfony",
+        "rollback_writer": "laravel",
+        "laravel_tables": list(grouping["laravel"]),
+        "symfony_tables": list(grouping["symfony"]),
+        "single_writer_required": True,
+        "readiness": {name: "pending" for name in PRECONDITIONS},
+    }
+    build_report(source, plan)
+    return {"source": source, "plan": plan}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Validate one proposed module ownership plan from stdin, offline."
     )
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--template", choices=sorted(MODULE_TABLES),
+        help="emit a pending-only envelope using checked-in migrations",
+    )
     args = parser.parse_args()
     try:
+        if args.template is not None:
+            print(json.dumps(draft_envelope(args.template), sort_keys=True, indent=2))
+            return 0
         raw = sys.stdin.read(MAX_STDIN_BYTES + 1)
         if len(raw) > MAX_STDIN_BYTES:
             fail("input exceeds safety limit")
