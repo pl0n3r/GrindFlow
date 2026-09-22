@@ -281,6 +281,10 @@ run_smoke() {
   login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --dump-header "$login_post_headers" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token@$csrf_file" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password@$password_file" "$BASE_URL/login")"
   case "$login_status" in
     302|303) ;;
+    3[0-9][0-9])
+      printf 'LOGIN_REDIRECT_PATH=%s\n' "$(safe_redirect_path "$login_post_headers")"
+      printf 'ERROR: login returned HTTP %s; stop authentication retries on unexpected redirect.\n' "$login_status" >&2
+      return 7 ;;
     401|403|419|422|429) printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2; return 7 ;;
     *) printf 'ERROR: login returned HTTP %s\n' "$login_status" >&2; return 1 ;;
   esac
@@ -298,7 +302,7 @@ run_smoke() {
 
   local dashboard_status
   dashboard_status="$(curl_common --cookie "$cookie_jar" --dump-header "$dashboard_headers" --output "$dashboard_html" --write-out '%{http_code}' "$BASE_URL/dashboard")"
-  if [[ "$dashboard_status" == "302" || "$dashboard_status" == "303" ]]; then
+  if [[ "$dashboard_status" =~ ^3[0-9][0-9]$ ]]; then
     printf 'ERROR: authenticated dashboard returned HTTP %s, redirect path %s; check authentication/session. No repeated login attempts.\n' "$dashboard_status" "$(safe_redirect_path "$dashboard_headers")" >&2
     return 7
   fi
