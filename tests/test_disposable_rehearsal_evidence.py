@@ -128,6 +128,17 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         envelope["ownership_report"]["source_inventory_sha256"] = "x"
         self.assert_rejected("inventory digest", envelope)
 
+    def test_rejects_forged_but_well_shaped_ownership_report(self):
+        envelope = self.envelope()
+        envelope["ownership_report"]["next_action"] = "pretend this is approved"
+        self.assert_rejected("checked-in migrations", envelope)
+
+        envelope = self.envelope()
+        envelope["ownership_report"]["outside_this_proposal"]["laravel"].append(
+            "invented_table"
+        )
+        self.assert_rejected("checked-in migrations", envelope)
+
     def test_rejects_removed_pending_preconditions(self):
         envelope = self.envelope()
         envelope["ownership_report"]["pending_preconditions"] = []
@@ -142,13 +153,13 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         envelope["ci"]["token"] = "secret"
         self.assert_rejected("CI provenance", envelope)
 
-    def test_report_does_not_copy_untrusted_payload_fields(self):
+    def test_report_does_not_copy_detailed_ownership_payload(self):
         envelope = self.envelope()
         report = EVIDENCE.build_report(envelope)
-        serialized = json.dumps(report, sort_keys=True)
-        self.assertNotIn("table_ownership", serialized)
-        self.assertNotIn("outside_this_proposal", serialized)
-        self.assertNotIn("next_action", serialized)
+        self.assertNotIn("table_ownership", report)
+        self.assertNotIn("outside_this_proposal", report)
+        self.assertNotIn("pending_preconditions", report)
+        self.assertIn("next_action", report)
 
     def test_cli_template_requires_ci_identifiers(self):
         cmd = [
