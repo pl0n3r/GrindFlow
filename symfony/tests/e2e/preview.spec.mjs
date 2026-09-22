@@ -2100,7 +2100,8 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
   expect(visited).toContain(thisWeek);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await weeks.getByRole('button', { name: 'Semana anterior' }).click();
-  await expect(page.getByRole('alert')).toContainText('Resumen sintético temporalmente no disponible.');
+  await expect(page.locator('.pilot-summary').getByRole('alert'))
+    .toContainText('Resumen sintético temporalmente no disponible.');
   await expect(page.locator('.pilot-totals')).toHaveCount(0);
   await expect(weeks).toContainText(unavailableWeek);
 });
