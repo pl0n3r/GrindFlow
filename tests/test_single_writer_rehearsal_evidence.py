@@ -236,6 +236,16 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
         )
         self.assert_rejected("distinct evidence", envelope)
 
+    def test_operator_reference_cannot_reuse_source_or_bundle_digest(self):
+        for digest_field in ("source_inventory_sha256", "evidence_bundle_sha256"):
+            envelope = self.envelope()
+            report = envelope["operator_evidence_report"]
+            references = report["validated_receipt_references"]
+            references["authorized_metadata_inventory"]["evidence_sha256"] = (
+                report[digest_field]
+            )
+            self.assert_rejected("operator evidence digests must remain distinct", envelope)
+
     def test_single_writer_observation_must_follow_operator_receipts(self):
         for timestamp in ("2026-09-22T12:05:00Z", "2026-09-22T12:10:00Z"):
             envelope = self.envelope()
@@ -320,6 +330,28 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
             self.assertEqual(b"", result.stdout)
             self.assertNotIn(b"Traceback", result.stderr)
             self.assertIn(b"validation failed", result.stderr)
+
+    def test_cli_rejects_nonfinite_json_before_digest_calculation(self):
+        cmd = [
+            sys.executable,
+            str(ROOT / "scripts/single-writer-rehearsal-evidence.py"),
+            "--json",
+        ]
+        envelope = self.envelope()
+        envelope["operator_evidence_report"]["next_action"] = "NONFINITE_SENTINEL"
+        valid = json.dumps(envelope, separators=(",", ":"))
+        for literal in ("NaN", "Infinity", "-Infinity", "1e9999"):
+            raw = valid.replace('"NONFINITE_SENTINEL"', literal, 1).encode("utf-8")
+            result = subprocess.run(
+                cmd,
+                input=raw,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(2, result.returncode, literal)
+            self.assertEqual(b"", result.stdout)
+            self.assertIn(b"validation failed", result.stderr)
+            self.assertNotIn(b"Traceback", result.stderr)
 
     def test_cli_rejects_non_utf8_large_and_recursive_input(self):
         cmd = [
