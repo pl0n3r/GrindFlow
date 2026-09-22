@@ -73,6 +73,37 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    /** A valid login clears the same private limiter key used for failed attempts. */
+    public function test_successful_login_clears_the_private_throttle_key(): void
+    {
+        $user = User::factory()->create(['password' => 'correct-password']);
+        $ip = '203.0.113.11';
+        $rawKey = Str::transliterate(Str::lower($user->email).'|'.$ip);
+        $throttleKey = 'login:'.hash_hmac('sha256', $rawKey, (string) config('app.key'));
+
+        RateLimiter::clear($throttleKey);
+
+        $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->from('/login')
+            ->post('/login', [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertRedirect('/login')->assertSessionHasErrors('email');
+
+        self::assertSame(1, RateLimiter::attempts($throttleKey));
+        self::assertSame(0, RateLimiter::attempts($rawKey));
+
+        $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->post('/login', [
+                'email' => Str::upper($user->email),
+                'password' => 'correct-password',
+            ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
+        self::assertSame(0, RateLimiter::attempts($throttleKey));
+        self::assertSame(0, RateLimiter::attempts($rawKey));
+    }
+
     public function test_login_is_rate_limited_after_five_failed_attempts(): void
     {
         Event::fake([Lockout::class]);
