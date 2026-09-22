@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.96: contrato offline de ownership de escritura por módulo.** Base exacta `main` v0.1.95 `755fdc232067de67780b86cd3e74a2f0e7ba7561`; valida propuestas Laravel→Symfony contra las migraciones versionadas sin conectarse a MariaDB ni autorizar cutover.
+> **Candidato v0.1.97: recibos mínimos de rehearsal descartable para GF-ARCH-002.** Base exacta `main` v0.1.96 `59351bceb55d85223308e4e06815bc63408f38fb`; enlaza evidencia CI de paridad, reversibilidad, restore e IDOR sin declarar producción lista ni autorizada.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.96** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.95~~ | `755fdc232067de67780b86cd3e74a2f0e7ba7561` |
+| Version objetivo | 🚧 **v0.1.97** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.96~~ | `59351bceb55d85223308e4e06815bc63408f38fb` |
 | CI del PR | 🚧 Pendiente | Revalidar HEAD final |
 | Sonar del PR | 🚧 Pendiente | Revalidar HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.95 | Señal post-merge separada |
+| CI del SHA exacto de main | ✅ ~~validate success~~ | v0.1.96 `59351bce`; Production Smoke separado y rojo |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Validación source-only; sin conexión a DB |
+| Datos productivos | ✅ ~~No tocados~~ | Evidencia CI descartable; sin datos ni secretos reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+755** | **−51** | **+704** |
+| **6** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-ARCH-002: inventario fuente + ownership offline identity/Vault |
+| Alcance | GF-ARCH-002: recibos CI descartables identity/Vault, no evidencia productiva |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,19 +63,17 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/cutover-ownership-plan.py`: valida propuestas de ownership Laravel→Symfony completamente offline.
-- El contrato solo admite `planning_only`, `source_only=true`, `database_contacted=false` y `production_authorized=false`.
-- Los primeros grupos revisados son `identity` y `vault`; no se inventan equivalencias para módulos sin mapeo explícito.
-- Cada envelope se coteja de nuevo contra las migraciones del mismo checkout; inventarios fabricados o de otra revisión fallan cerrado.
-- El reporte incluye SHA-256 canónico del inventario y enumera tablas fuera de la propuesta para evitar interpretar un cutover parcial como total.
-- El catálogo completo rechaza tablas asignadas a más de un módulo y mapeos obsoletos que ya no existan en las migraciones.
-- Los flags booleanos exigen tipo exacto; `0`/`1` no pueden suplantar `false`/`true`.
-- La entrada está limitada a 1.000.000 de bytes reales, exige UTF-8 estricto y rechaza envelopes UTF-16/UTF-32; los errores nunca reproducen el payload.
-- La regresión CLI instala una barrera de auditoría que falla si el proceso intenta abrir sockets o lanzar procesos externos.
-- `data-schema-inventory.py --json` ahora emite un único documento JSON limpio para composición entre herramientas.
-- La suite `tests/test_cutover_ownership_plan.py` cubre provenance, rollback, autorización, solapamientos, límites de entrada y round-trip de templates.
-- `fast` ejecuta compilación y regresiones del nuevo contrato; el cambio del workflow fuerza validación completa del PR.
-- No ejecuta SQL, migraciones, freezes, escrituras, cambios de owner ni operaciones en Hostinger.
+- Nuevo `scripts/disposable-rehearsal-evidence.py`: construye y valida recibos reducidos de rehearsal para `identity` y `vault`.
+- Los recibos solo aceptan provenance de GitHub Actions, SHA de 40 hex, run id positivo y `disposable=true`.
+- Cada recibo vuelve a comprobar el ownership report contra las migraciones del mismo checkout; evidencia forjada o alterada falla cerrado.
+- Solo se aceptan cuatro checks descartables: paridad estructural, reversibilidad de migraciones, restore MariaDB+Vault y guards post-restore tenant/roles.
+- `production_ready` y `production_authorized` quedan fijados siempre en `false`; los prechecks reales permanecen explícitamente pendientes.
+- El parser limita stdin a 1.000.000 bytes, exige UTF-8 estricto, rechaza UTF-16/UTF-32 y no reproduce payloads fallidos.
+- La suite instala una audit barrier para detectar intentos de sockets o subprocess externos y valida que el CLI siga siendo offline.
+- `symfony-preview` crea los recibos únicamente después de que pasen los checks anteriores del job.
+- Los envelopes completos se borran antes del upload; solo los reportes mínimos se suben como artifact `gf-arch-002-disposable-evidence`.
+- El artifact conserva retención de **1 día** y no contiene credenciales, row data, blobs ni un permiso de cutover.
+- No toca Hostinger, MariaDB productiva, cuentas reales ni ownership efectivo.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
@@ -84,33 +82,32 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 - `README.md`
 - `config/version.php`
 - `docs/DATA-CUTOVER-INVENTORY.md`
-- `scripts/cutover-ownership-plan.py`
-- `scripts/data-schema-inventory.py`
-- `scripts/readme-dashboard.py`
-- `tests/test_cutover_ownership_plan.py`
+- `scripts/disposable-rehearsal-evidence.py`
+- `tests/test_disposable_rehearsal_evidence.py`
 
 ## Validación
 - La rama debe pasar `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
 - Por modificar `.github/workflows/grindflow-ci.yml`, el scope es completo e incluye `symfony-preview`.
-- Los ejemplos `--template identity` y `--template vault` deben hacer round-trip por `--json` manteniendo todas las precondiciones en `pending`.
-- Un reporte válido sigue declarando `cutover_authorized=false`; no constituye autorización, deploy ni prueba de producción.
-- Esta entrega no toca Hostinger, MariaDB productiva ni blobs reales.
+- La evidencia se genera solo después de paridad, reversibilidad, restore y guards post-restore exitosos dentro del mismo job.
+- Los receipts `identity` y `vault` deben conservar `production_ready=false` y `production_authorized=false`.
+- Exact-main, Deploy Observer y Production Smoke siguen siendo señales separadas del artifact descartable.
+- Esta entrega no acredita backup real, RPO/RTO, freeze/single-writer ni inventario autorizado de producción.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Contrato offline de ownership por módulo | 🚧 v0.1.96 candidata |
-| **NEXT** | 🚧 Inventario real autorizado + rehearsal con evidencia | 🚧 GF-ARCH-002 |
+| **NOW** | 🚧 Recibos de rehearsal descartable | 🚧 v0.1.97 candidata |
+| **NEXT** | 🚧 Inventario real autorizado + restore real observado | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.95 fusionada~~ | ✅ ~~UI copy + i18n por locale~~ |
-| **NOW** | 🚧 Ownership plan offline | 🚧 v0.1.96 |
-| **NEXT** | 🚧 Snapshot real autorizado + rehearsal reversible | 🚧 Sin cutover |
+| **DONE** | ✅ ~~v0.1.96 fusionada~~ | ✅ ~~ownership plan offline identity/Vault~~ |
+| **NOW** | 🚧 Disposable rehearsal evidence | 🚧 v0.1.97 |
+| **NEXT** | 🚧 Snapshot real autorizado + restore real reversible | 🚧 Sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
