@@ -64,7 +64,7 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
             set(report["outside_this_proposal"]["laravel"]),
         )
 
-    def test_report_fingerprint_is_canonical_and_changes_with_migrations(self):
+    def test_report_fingerprint_is_stable_across_key_order(self):
         source = self.source()
         first = CUTOVER.build_report(source, self.plan())
         reordered = dict(reversed(list(source.items())))
