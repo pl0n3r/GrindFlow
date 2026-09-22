@@ -33,13 +33,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+730** | **−49** | **+681** |
+| **8** | **+755** | **−51** | **+704** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
 | Alcance | GF-ARCH-002: inventario fuente + ownership offline identity/Vault |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
@@ -70,7 +70,7 @@ flowchart LR
 - El reporte incluye SHA-256 canónico del inventario y enumera tablas fuera de la propuesta para evitar interpretar un cutover parcial como total.
 - El catálogo completo rechaza tablas asignadas a más de un módulo y mapeos obsoletos que ya no existan en las migraciones.
 - Los flags booleanos exigen tipo exacto; `0`/`1` no pueden suplantar `false`/`true`.
-- La entrada está limitada a 1.000.000 de bytes reales y los errores nunca reproducen el payload.
+- La entrada está limitada a 1.000.000 de bytes reales, exige UTF-8 estricto y rechaza envelopes UTF-16/UTF-32; los errores nunca reproducen el payload.
 - La regresión CLI instala una barrera de auditoría que falla si el proceso intenta abrir sockets o lanzar procesos externos.
 - `data-schema-inventory.py --json` ahora emite un único documento JSON limpio para composición entre herramientas.
 - La suite `tests/test_cutover_ownership_plan.py` cubre provenance, rollback, autorización, solapamientos, límites de entrada y round-trip de templates.

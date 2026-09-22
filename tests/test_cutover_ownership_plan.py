@@ -317,6 +317,20 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         self.assertEqual("", r.stdout)
         self.assertIn("validation failed", r.stderr)
 
+    def test_cli_rejects_utf16_and_utf32_json(self):
+        cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py"), "--json"]
+        payload = json.dumps({"source": self.source(), "plan": self.plan()})
+        for encoding in ("utf-16", "utf-32"):
+            result = subprocess.run(
+                cmd,
+                input=payload.encode(encoding),
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(2, result.returncode, encoding)
+            self.assertEqual(b"", result.stdout, encoding)
+            self.assertIn(b"validation failed", result.stderr, encoding)
+
 
 if __name__ == "__main__":
     unittest.main()

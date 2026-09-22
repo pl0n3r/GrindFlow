@@ -300,7 +300,7 @@ def main() -> int:
         raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
         if len(raw) > MAX_STDIN_BYTES:
             fail("input exceeds safety limit")
-        envelope = json.loads(raw)
+        envelope = json.loads(raw.decode("utf-8"))
         if not isinstance(envelope, dict) or set(envelope) != {"source", "plan"}:
             fail("envelope must contain source and plan objects only")
         report = build_report(envelope["source"], envelope["plan"])
