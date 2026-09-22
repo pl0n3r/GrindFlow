@@ -45,6 +45,8 @@ case "$url" in
       body='<form><input name="_token" value="fake-csrf"></form>'
       if [[ "${MOCK_AUTH_MODE:-ok}" == login_body_secret ]]; then status=500; body="never-print-body-secret"; fi
     fi;;
+  http://mock/admin/diagnostics.json)
+    body='{"entries":[{"timestamp":"never-print-diag-date","incident_id":"never-print-diag-id","status":500,"request":{"method":"GET","path":"/private?never-print-diag-path"},"exception":"never-print-diag-exception","message":"never-print-diag-message","location":"never-print-diag-location","trace":[{"file":"never-print-diag-trace","line":9,"call":"never-print-diag-call"}]}]}';;
   http://mock/dashboard)
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_login ]]; then status=302; redirect="/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_external ]]; then status=302; redirect="https://external.invalid/login?private-query-do-not-print"; fi
@@ -125,6 +127,9 @@ run_case() {
     current_module_failure|current_csv_failure)
       grep -Fxq 'MODULE_READ_ONLY=failed' "$log"
       grep -Fq 'ERROR: read-only workspace module check failed; no repeated login requests.' "$log"
+      grep -Fxq 'Recorded incidents (up to 5): 1' "$log"
+      grep -Fxq 'Incident #1: HTTP=500 method=GET' "$log"
+      assert_absent_fixed 'never-print-diag-' "$log"
       assert_absent_fixed "$NO_RETRY_MARKER" "$log"
       [[ "$(grep -c "$LOGIN_POST_PATTERN" "$requests")" -eq 1 ]]
       ;;

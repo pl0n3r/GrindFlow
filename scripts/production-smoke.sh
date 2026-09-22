@@ -178,19 +178,34 @@ print_diagnostics() {
     printf '%s\n' '-------------------------------------------' >&2
     return 0
   fi
+  # The remote JSON is untrusted. Never put message, paths, traces,
+  # identifiers or timestamps into the retained GitHub Actions artifact.
   python3 - "$diagnostics_json" >&2 <<'PY'
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as handle: payload = json.load(handle)
-entries = payload.get("entries", [])[:5]
-if not entries: print("No recorded 5xx incidents.")
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        payload = json.load(handle)
+    entries = payload.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("invalid incident collection")
+except (OSError, UnicodeError, ValueError, TypeError, AttributeError):
+    print("Incident summary unavailable (invalid diagnostics response).")
 else:
-    for entry in entries:
-        request = entry.get("request", {})
-        print(f"[{entry.get('timestamp', '?')}] incident={entry.get('incident_id', '?')} HTTP={entry.get('status', '?')} {request.get('method', '?')} {request.get('path', '?')}")
-        print(f"  {entry.get('exception', 'Exception')}: {entry.get('message', '')}")
-        print(f"  at {entry.get('location', '?')}")
-        for frame in entry.get("trace", [])[:6]: print(f"    {frame.get('file', '?')}:{frame.get('line', '?')} {frame.get('call', '')}")
-        print()
+    if not entries:
+        print("No recorded 5xx incidents.")
+    else:
+        print(f"Recorded incidents (up to 5): {min(len(entries), 5)}")
+        for index, item in enumerate(entries[:5], start=1):
+            entry = item if isinstance(item, dict) else {}
+            raw_status = entry.get("status")
+            status = raw_status if type(raw_status) is int and 100 <= raw_status <= 599 else "unknown"
+            request = entry.get("request")
+            request = request if isinstance(request, dict) else {}
+            method = request.get("method")
+            method = method if method in ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS") else "unknown"
+            print(f"Incident #{index}: HTTP={status} method={method}")
 PY
   printf '%s\n' '-------------------------------------------' >&2
 }
