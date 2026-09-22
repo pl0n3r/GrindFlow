@@ -237,7 +237,11 @@ grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unkno
 assert_absent_regex '^MIGRATIONS_PENDING=' "$workdir/unknown.log"
 if MOCK_PENDING=0 MOCK_AUTH_MODE=login_body_secret MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/body-secret.log" 2>&1; then
   printf 'FAIL: synthetic login error unexpectedly passed.\n' >&2; exit 1
+else
+  result=$?
 fi
+[[ "$result" -eq 1 ]]
+grep -Fxq 'ERROR: login page GET /login returned HTTP 500' "$workdir/body-secret.log"
 assert_absent_fixed 'never-print-body-secret' "$workdir/body-secret.log"
 printf 'PASS production smoke contract: body redaction\n'
 printf 'PASS production smoke contract: unknown\n'
