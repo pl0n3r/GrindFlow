@@ -71,12 +71,22 @@ def classify(log: str) -> dict[str, str]:
         or len(login_errors) > 1
         or (dashboard_errors and login_errors)
         or (dashboard_errors and redirect != "/dashboard")
+        or (recheck != "unobserved" and redirect != "/login")
+        or (login_errors and recheck != "unobserved")
+        or (login_errors and redirect != "unobserved"
+            and not login_errors.issubset({"301", "307", "308"}))
+        or (preflight == "inconsistent" and (
+            redirect != "unobserved" or recheck != "unobserved"
+            or dashboard_errors or login_errors
+        ))
     ):
         raise ValueError("conflicting authentication outcomes")
 
     diagnosis = "not_classified"
     if preflight == "inconsistent":
         diagnosis = "anonymous_session_inconsistent"
+    elif preflight == "consistent" and login_errors:
+        diagnosis = "login_http_rejected"
     elif preflight == "consistent" and redirect == "/login":
         if recheck == "stable":
             diagnosis = "login_rejected_anonymous_session_stable"
@@ -86,8 +96,6 @@ def classify(log: str) -> dict[str, str]:
             diagnosis = "login_rejected_recheck_unavailable"
     elif preflight == "consistent" and redirect == "/dashboard" and dashboard_errors:
         diagnosis = "dashboard_authentication_redirect"
-    elif preflight == "consistent" and login_errors:
-        diagnosis = "login_http_rejected"
 
     return {
         "contract": "grindflow-production-smoke-auth-triage-v1",
