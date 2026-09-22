@@ -10,7 +10,9 @@ import json,sys
 with open(sys.argv[1],encoding="utf-8") as f: body=json.load(f)
 assert body["status"] == "ok" and body["stage"] == "s0-preview"
 assert isinstance(body["version"],str) and body["version"] != "unavailable"
-assert "release_sha" not in body and "database_url" not in body
+assert body["runtime"] == {"compatible": True, "contract": "symfony-mariadb-v1"}
+for forbidden in ("release_sha", "database_url", "php_version", "extensions", "sapi"):
+    assert forbidden not in body
 PY
 grep -qi '^x-request-id: [0-9a-f]\{24\}' "$tmp/health-headers"
 grep -qi '^content-security-policy:' "$tmp/health-headers"

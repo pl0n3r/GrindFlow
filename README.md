@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.86: login Symfony privado también tras autenticación o rechazo.** Base exacta `main` v0.1.85 `677f6ee863bcfaa8ea447e7ab3e94055f9dfb273`; Laravel productivo y Symfony aislado conservan sus límites.
+> **Candidato v0.1.87: readiness segura del runtime Symfony sin fingerprint sensible.** Base exacta `main` v0.1.86 `457312fcb68d743f0d460b34e25bf458ad452cee`; no cambia el runtime Laravel productivo ni ejecuta cutover.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,20 +18,20 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.86** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.85~~ | `677f6ee863bcfaa8ea447e7ab3e94055f9dfb273` |
-| CI / Sonar / CodeRabbit del PR | 🚧 Revalidar HEAD final | No heredar checks de un HEAD anterior |
-| CI del SHA exacto de main | ✅ ~~v0.1.85 success~~ | [#35693080276](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080276) |
-| Deploy Observer | ✅ ~~v0.1.85 humana observada~~ | [#35693080236](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080236); NO checkout SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | [#35693080266](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080266); #73 |
-| Symfony en Hostinger | ⛔ NO desplegado | `symfony-preview` solo CI aislado |
-| Migraciones | ✅ ~~Sin cambio de esquema~~ | No se ejecutan en producción |
+| Version objetivo | 🚧 **v0.1.87** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.86~~ | `457312fcb68d743f0d460b34e25bf458ad452cee` |
+| CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
+| CI del SHA exacto de main | 🚧 Sin run observado aún | Validación post-merge v0.1.86 separada |
+| Deploy Observer | 🚧 Sin run observado aún | No inferir checkout remoto |
+| Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
+| Symfony en Hostinger | ⛔ NO desplegado | `symfony-preview` es aislado |
+| Migraciones | ✅ ~~Sin cambio de esquema~~ | Ninguna migración productiva |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+48** | **−24** | **+24** |
+| **9** | **+178** | **−35** | **+143** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -39,8 +39,8 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Redirección autenticada y error genérico de login Symfony; sin cambio al login Laravel |
-| Revisiones | CI/Sonar/CodeRabbit HEAD, CI exact-main, Observer y Smoke separados |
+| Alcance | Readiness pública del proceso Symfony; sin fingerprint ni acceso a producción |
+| Revisiones | CI/Sonar/CodeRabbit HEAD, exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
 ```mermaid
@@ -61,38 +61,42 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- v0.1.85 impide cachear el HTML del formulario Symfony con CSRF privado. v0.1.86 aplica **el mismo Cache-Control: no-store, private** al GET de `/login` que redirige a `/organizations` cuando la sesión ya está autenticada, evitando reutilización de redirecciones dependientes de identidad.
-- PHPUnit HTTP/MariaDB descartable amplía el recorrido autenticado: GET de `/login` redirige de forma privada; tras rechazo de cuenta inactiva, el GET de `/login` vuelve a mostrar mensaje genérico, respuesta no cacheable, nunca refleja la contraseña en HTML y prueba que tampoco expone el motivo de inactividad.
-- Se extendió [GF-SEC-006](docs/REQUIREMENTS.md) sin cambiar autenticación Laravel, cuentas productivas, secretos ni migraciones.
-- [Smoke v0.1.85](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080266) no pasó; autenticación productiva independiente de Symfony aislado. [Incidente #73](https://github.com/pl0n3r/GrindFlow/issues/73) permanece abierto; no se infiere causa ni se reintentan credenciales.
+- Nuevo contrato `symfony-mariadb-v1`: PHP >= 8.3 y < 9.0, `ctype`, `iconv`, PDO y `pdo_mysql`; falla cerrado si falta una capacidad.
+- `GET /health` añade únicamente `runtime.compatible` y el identificador estable del contrato. Un runtime incompatible responde 503/`degraded`; uno compatible 200/`ok`.
+- La respuesta nunca publica versión exacta de PHP, SAPI, inventario de extensiones, URL de base de datos ni SHA de deploy.
+- PHPUnit cubre límites de PHP y extensión ausente; el smoke HTTP real comprueba la forma pública. No se toca Hostinger, credenciales, datos ni migraciones.
 
 ## Archivos modificados en este deploy
-Inventario de solo el deploy actual: candidato, no evidencia de publicación:
+Inventario de solo el deploy actual: candidata, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
+- `docs/GRINDFLOW-SPEC.md`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Http/Controller/LoginController.php`
-- `symfony/tests/php/IdentityLoginTest.php`
+- `symfony/src/Http/Controller/HealthController.php`
+- `symfony/src/Infrastructure/Runtime/RuntimeReadiness.php`
+- `symfony/tests/contract/smoke.sh`
+- `symfony/tests/php/PreviewTest.php`
+- `symfony/tests/php/RuntimeReadinessTest.php`
 
 ## Validación
-- La candidata v0.1.86 necesita `preflight`, `fast[contracts]`, `symfony-preview` y `validate` sobre HEAD exacto, además de Sonar y CodeRabbit final. No hay prueba local ni deploy Symfony.
-- La CI exact-main v0.1.85 [#35693080276](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080276) se verifica de forma separada; la versión humana v0.1.85 observada no verifica SHA Hostinger.
+- La rama debe pasar `preflight`, `fast[contracts]`, `symfony-preview`, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
+- Readiness significa compatibilidad del proceso Symfony ejecutado; **no** acredita MariaDB productiva, migraciones, SHA Hostinger, cutover ni login productivo.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Bloquear caché también en redirect autenticado y comprobar error privado | 🚧 PR/gates v0.1.86 |
-| **NEXT** | 🚧 Resolver origen del rechazo E2E #73 | 🚧 Operación autorizada, sin reintentos ciegos |
-| **LATER** | 🚧 Paridad/cutover Symfony aislado | 🚧 No desplegado |
-| **BLOCKED / EXTERNAL** | ⛔ Validación productiva autenticada | ⛔ Cuenta/configuración por verificar |
+| **NOW** | 🚧 Validar readiness segura Symfony | 🚧 v0.1.87 candidata |
+| **NEXT** | 🚧 Inventario/paridad de datos antes de cutover | 🚧 GF-ARCH-002 |
+| **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
+| **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.85 fusionada y versión humana observada~~ | ✅ ~~CI exact-main #35693080276 success~~ |
-| **NOW** | 🚧 Redirect y error de login Symfony privados | 🚧 v0.1.86 candidata |
-| **NEXT** | 🚧 Incidente de acceso E2E #73 | 🚧 Sin tocar credenciales |
-| **LATER** | 🚧 Transición Symfony | 🚧 Aislada |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado completo | ⛔ Rechazo de login |
+| **DONE** | ✅ ~~v0.1.86 fusionada~~ | ✅ ~~PR #85 CI/Sonar/CodeRabbit exact-HEAD~~ |
+| **NOW** | 🚧 Runtime readiness sin fingerprint | 🚧 v0.1.87 |
+| **NEXT** | 🚧 Paridad/propietario de escritura por módulo | 🚧 Sin cutover |
+| **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |

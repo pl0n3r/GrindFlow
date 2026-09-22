@@ -63,6 +63,16 @@ Each requirement should contain:
 
 **Aceptación:** mantener gate agregado `GrindFlow CI / validate` y jobs Laravel/legado mientras existan; añadir Composer/Symfony, Doctrine/MariaDB, TypeScript/Vite y Playwright; CI del PR, Sonar y CI exact-main independientes; release identity y smoke de solo lectura sin credenciales ni contenido sensible en logs; deploy no se infiere por version.php.
 
+### GF-OPS-010 — Readiness segura del runtime Symfony
+
+**Estado:** implementado en código; despliegue y producción se verifican por separado.
+
+**Enunciado:** el runtime Symfony expone en `GET /health` una señal pública y mínima de compatibilidad con su contrato técnico sin revelar fingerprint detallado del servidor.
+
+**Aceptación:** el contrato `symfony-mariadb-v1` exige PHP >= 8.3 y < 9.0, además de `ctype`, `iconv`, PDO y `pdo_mysql`. Un runtime compatible responde HTTP 200 con `status=ok` y `runtime.compatible=true`; uno incompatible falla cerrado con HTTP 503, `status=degraded` y `runtime.compatible=false`. La respuesta conserva `Cache-Control: no-store` y `X-Content-Type-Options: nosniff` y nunca publica versión exacta de PHP, SAPI, inventario de extensiones, URL de base de datos ni SHA de despliegue. Esta señal no demuestra conectividad a MariaDB, migraciones aplicadas, identidad exacta del checkout Hostinger ni que Symfony esté desplegado en producción.
+
+**Verificación:** prueba pura de compatibilidad cubre versión mínima, límite mayor y extensión requerida ausente; PHPUnit HTTP y el smoke Symfony real comprueban el resumen público y la ausencia de fingerprint sensible en el entorno aislado de CI.
+
 ### GF-FR-008 — Primer ciclo de valor del piloto
 **Estado:** definido a nivel de recorrido, funcionalidad integral pendiente.
 
