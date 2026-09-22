@@ -18,10 +18,10 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Versión objetivo | 🚧 **v0.1.85** | `config/version.php`; no publicada |
+| Version objetivo | 🚧 **v0.1.85** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.84~~ | `fa7f8413bfda489bdf2a9d55a19237ca3dd6c697` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Revalidar HEAD final | No heredar checks del PR #83 |
-| CI del SHA exacto main | ✅ ~~v0.1.84 success~~ | [#35691546669](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546669) |
+| CI del SHA exacto de main | ✅ ~~v0.1.84 success~~ | [#35691546669](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546669) |
 | Deploy Observer | ✅ ~~v0.1.84 humana observada~~ | [#35691546770](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546770); NO checkout SHA remoto |
 | Production Smoke | ⛔ Login E2E no validado | [#35691546677](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546677); #73 |
 | Symfony en Hostinger | ⛔ NO desplegado | `symfony-preview` solo CI aislado |
@@ -67,7 +67,7 @@ flowchart LR
 - El [Smoke de v0.1.84](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546677) falló. Artifact privado: preflight CSRF `consistent`, POST `/login`, GET anónimo adicional `LOGIN_FAILURE_SESSION_CHECK=stable`. Esto reduce la incertidumbre sobre continuidad del token, pero **no demuestra credenciales válidas ni explica el rechazo**; #73 sigue abierto.
 
 ## Archivos modificados en este deploy
-Inventario del candidato, no evidencia de publicación:
+Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
