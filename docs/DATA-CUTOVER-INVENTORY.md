@@ -173,9 +173,9 @@ El reporte `gf-arch-002-cutover-ownership-report-v1` incluye una huella SHA-256 
 
 El input `gf-arch-002-disposable-rehearsal-input-v1` exige:
 
-- provenance de GitHub Actions con SHA de 40 hex, `run_id` numérico y `disposable=true`;
+- provenance de GitHub Actions con SHA de 40 hex, `run_id` numérico y `disposable=true`; ese flag también se conserva dentro del receipt reducido;
 - un reporte `gf-arch-002-cutover-ownership-report-v1` que coincida exactamente con las migraciones del mismo checkout;
-- los cuatro checks descartables en `passed`: paridad de snapshot, reversibilidad, restore DB+Vault y guards post-restore;
+- los cuatro checks descartables en `passed`: paridad de snapshot, reversibilidad, restore DB+Vault y guards post-restore; `--template` ya no puede fabricarlos y exige un archivo `--gate-results` del mismo `head_sha`/`run_id`;
 - `production_authorized=false` con tipo booleano exacto.
 
 El reporte conserva únicamente provenance mínima, módulo, huella del inventario y checks aprobados. Deliberadamente fija:
@@ -191,19 +191,35 @@ El reporte conserva únicamente provenance mínima, módulo, huella del inventar
 
 También mantiene pendientes explícitos que **no pueden** cerrarse con CI sintético: inventario metadata-only autorizado de producción, restore de backup real, evidencia de freeze/single-writer, autorización del owner y smoke productivo.
 
-`symfony-preview` genera recibos separados para `identity` y `vault` solo si todos los pasos anteriores del job han pasado. Los envelopes temporales se eliminan antes del upload y únicamente los reportes reducidos se publican como artifact `gf-arch-002-disposable-evidence`, con retención de **1 día**. Esos artifacts son trazabilidad de CI, no evidencia de deploy, RPO/RTO ni permiso de cutover.
+`symfony-preview` genera recibos separados para `identity` y `vault` solo si todos los pasos anteriores del job han pasado. En ese punto crea un archivo temporal de resultados con el SHA/run id actuales y los cuatro estados `passed`; el CLI exige que esos identificadores coincidan antes de construir el envelope. El archivo de gates y los envelopes temporales se eliminan antes del upload y únicamente los reportes reducidos se publican como artifact `gf-arch-002-disposable-evidence`, con retención de **1 día**. Esos artifacts son trazabilidad de CI, no evidencia de deploy, RPO/RTO ni permiso de cutover.
 
-Ejemplo offline reproducible:
+Ejemplo offline reproducible con resultados explícitos y sintéticos:
 
 ```bash
+cat > /tmp/gf-gates.json <<'JSON'
+{
+  "head_sha": "0123456789abcdef0123456789abcdef01234567",
+  "run_id": "123456",
+  "checks": {
+    "schema_snapshot_parity": "passed",
+    "migration_reversibility": "passed",
+    "database_and_vault_restore": "passed",
+    "post_restore_tenant_and_role_guards": "passed"
+  }
+}
+JSON
+
 python3 scripts/disposable-rehearsal-evidence.py \
   --template identity \
   --head-sha 0123456789abcdef0123456789abcdef01234567 \
-  --run-id 123456 > /tmp/gf-rehearsal-envelope.json
+  --run-id 123456 \
+  --gate-results /tmp/gf-gates.json > /tmp/gf-rehearsal-envelope.json
 
 python3 scripts/disposable-rehearsal-evidence.py --json \
   < /tmp/gf-rehearsal-envelope.json
 ```
+
+Este ejemplo solo demuestra la forma del contrato. Un archivo `gate-results` escrito manualmente **no prueba** que GitHub Actions haya ejecutado esos gates; la evidencia de CI depende del workflow y del run enlazado.
 
 El validador limita stdin a 1.000.000 de bytes, exige UTF-8 estricto (rechaza JSON UTF-16/UTF-32), no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
 
