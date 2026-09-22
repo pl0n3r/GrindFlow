@@ -163,9 +163,65 @@ python3 scripts/cutover-ownership-plan.py --template vault |
   python3 scripts/cutover-ownership-plan.py --json
 ```
 
-El primer comando emite **un solo documento JSON válido**; el mensaje de éxito para uso humano solo aparece sin `--json`. Los templates se derivan de las migraciones versionadas, con todos los requisitos en `pending` y escritor actual Laravel. El comparador reconstruye independientemente el inventario desde ese mismo checkout y rechaza envelopes fabricados o generados desde otra revisión de migraciones. El validador exige inventario sin colisiones, cobertura exacta de las tablas mapeadas, ausencia de duplicados, escritor previo/rollback Laravel y escritor propuesto Symfony. También valida el catálogo completo: una tabla no puede pertenecer a dos módulos y ningún mapeo puede apuntar a una tabla que ya no exista en las migraciones. Los flags booleanos requieren tipo booleano exacto: enteros `0`/`1` no son equivalentes válidos. La entrada se limita a 1.000.000 de bytes reales, no caracteres, exige decodificación UTF-8 estricta antes de `json.loads` y rechaza JSON UTF-16/UTF-32 aunque Python pudiera autodetectarlo por BOM. Los errores no reproducen el payload. La regresión del CLI instala además un audit hook en el proceso hijo que falla si intenta abrir sockets o lanzar procesos externos. Rechaza cualquier intento de marcar aprobación, operación productiva o comprobaciones como completas dentro del plan offline.
+El primer comando emite **un solo documento JSON válido**; el mensaje de éxito para uso humano solo aparece sin `--json`. Los templates se derivan de las migraciones versionadas, con todos los requisitos en `pending` y escritor actual Laravel. El comparador reconstruye independientemente el inventario desde ese mismo checkout y rechaza envelopes fabricados o generados desde otra revisión de migraciones. El validador exige inventario sin colisiones, cobertura exacta de las tablas mapeadas, ausencia de duplicados, escritor previo/rollback Laravel y escritor propuesto Symfony. También valida el catálogo completo: una tabla no puede pertenecer a dos módulos y ningún mapeo puede apuntar a una tabla que ya no exista en las migraciones. Los flags booleanos requieren tipo booleano exacto: enteros `0`/`1` no son equivalentes válidos. La entrada se limita a 1.000.000 de bytes reales, no caracteres, y los errores no reproducen el payload. La regresión del CLI instala además un audit hook en el proceso hijo que falla si intenta abrir sockets o lanzar procesos externos. Rechaza cualquier intento de marcar aprobación, operación productiva o comprobaciones como completas dentro del plan offline.
 
 El reporte `gf-arch-002-cutover-ownership-report-v1` incluye una huella SHA-256 del inventario fuente canónico (`source_inventory_sha256`) para identificar la versión exacta del conjunto de metadatos revisado; **no es un SHA de Git ni prueba de deploy**. `outside_this_proposal` enumera explícitamente las tablas de ambos runtimes que quedan fuera del módulo propuesto y cuyo ownership no se transfiere. Siempre declara `cutover_authorized=false` y `database_contacted=false`. Un plan estructuralmente válido **no certifica** backups, paridad de datos, bloqueo del escritor, RPO/RTO, smoke, consentimiento operativo ni autorización del propietario. Es insumo para revisión humana y un ensayo separado, nunca una orden ejecutable. No modificar la versión desplegada, `public_html` o el owner real de las tablas por obtener este reporte.
+
+## Evidencia machine-readable del rehearsal descartable
+
+`scripts/disposable-rehearsal-evidence.py` resume en JSON la evidencia que ya produce `symfony-preview` **después** de pasar paridad estructural, reversibilidad de migraciones, restore MariaDB+Vault y regresiones cross-tenant/IDOR. No ejecuta ninguna de esas operaciones: solo valida y compacta sus resultados dentro del contrato `gf-arch-002-disposable-rehearsal-report-v1`.
+
+El input `gf-arch-002-disposable-rehearsal-input-v1` exige:
+
+- provenance de GitHub Actions con SHA de 40 hex, `run_id` numérico y `disposable=true`; ese flag también se conserva dentro del receipt reducido;
+- un reporte `gf-arch-002-cutover-ownership-report-v1` que coincida exactamente con las migraciones del mismo checkout;
+- los cuatro checks descartables en `passed`: paridad de snapshot, reversibilidad, restore DB+Vault y guards post-restore; `--template` ya no puede fabricarlos y exige recibir por stdin resultados del mismo `head_sha`/`run_id`;
+- `production_authorized=false` con tipo booleano exacto.
+
+El reporte conserva únicamente provenance mínima, módulo, huella del inventario y checks aprobados. Deliberadamente fija:
+
+```json
+{
+  "scope": "ci_disposable_only",
+  "disposable_evidence": true,
+  "production_ready": false,
+  "production_authorized": false
+}
+```
+
+También mantiene pendientes explícitos que **no pueden** cerrarse con CI sintético: inventario metadata-only autorizado de producción, restore de backup real, evidencia de freeze/single-writer, autorización del owner y smoke productivo.
+
+`symfony-preview` genera recibos separados para `identity` y `vault` solo si todos los pasos anteriores del job han pasado. En ese punto crea un archivo temporal de resultados con el SHA/run id actuales y los cuatro estados `passed`; el CLI exige que esos identificadores coincidan antes de construir el envelope. El archivo de gates y los envelopes temporales se eliminan antes del upload y únicamente los reportes reducidos se publican como artifact `gf-arch-002-disposable-evidence`, con retención de **1 día**. Esos artifacts son trazabilidad de CI, no evidencia de deploy, RPO/RTO ni permiso de cutover.
+
+Ejemplo offline reproducible con resultados explícitos y sintéticos:
+
+```bash
+cat > /tmp/gf-gates.json <<'JSON'
+{
+  "head_sha": "0123456789abcdef0123456789abcdef01234567",
+  "run_id": "123456",
+  "checks": {
+    "schema_snapshot_parity": "passed",
+    "migration_reversibility": "passed",
+    "database_and_vault_restore": "passed",
+    "post_restore_tenant_and_role_guards": "passed"
+  }
+}
+JSON
+
+python3 scripts/disposable-rehearsal-evidence.py \
+  --template identity \
+  --head-sha 0123456789abcdef0123456789abcdef01234567 \
+  --run-id 123456 \
+  < /tmp/gf-gates.json > /tmp/gf-rehearsal-envelope.json
+
+python3 scripts/disposable-rehearsal-evidence.py --json \
+  < /tmp/gf-rehearsal-envelope.json
+```
+
+Este ejemplo solo demuestra la forma del contrato. Un JSON de gate-results escrito manualmente **no prueba** que GitHub Actions haya ejecutado esos gates; la evidencia de CI depende del workflow y del run enlazado. El CLI consume esos resultados por stdin y no acepta rutas de archivo suministradas por el caller.
+
+El validador limita stdin a 1.000.000 de bytes, exige UTF-8 estricto (rechaza JSON UTF-16/UTF-32), no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
 
 ## Secuencia obligatoria antes de un cutover real
 
