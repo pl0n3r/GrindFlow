@@ -224,12 +224,18 @@ def build_report(envelope: Any) -> dict[str, Any]:
         != operator_report["evidence_bundle_sha256"]
     ):
         fail("single-writer receipt operator evidence mismatch")
+    references = operator_report["validated_receipt_references"]
     operator_digests = {
-        reference["evidence_sha256"]
-        for reference in operator_report["validated_receipt_references"].values()
+        operator_report["evidence_bundle_sha256"],
+        *(reference["evidence_sha256"] for reference in references.values()),
     }
     if receipt["evidence_sha256"] in operator_digests:
         fail("single-writer receipt must reference distinct evidence")
+    latest_operator_observation = max(
+        reference["observed_at_utc"] for reference in references.values()
+    )
+    if receipt["observed_at_utc"] < latest_operator_observation:
+        fail("single-writer evidence predates prerequisite operator evidence")
 
     canonical = json.dumps(
         envelope,
