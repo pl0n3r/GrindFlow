@@ -32,7 +32,11 @@ comprobación de configuración autorizada y documentada.
 - Lee como máximo 1.000.000 bytes UTF-8 desde stdin; rechaza entrada excesiva
   o inválida con un error fijo, sin eco del contenido.
 - Solo reconoce claves de telemetría y valores exactos en una allowlist cerrada.
-  Los valores contradictorios o no permitidos fallan cerrado.
+  Los valores contradictorios o no permitidos fallan cerrado: un error de
+  dashboard requiere redirect del POST a `/dashboard`; un recheck solo puede
+  acompañar el retorno a `/login`; un preflight inconsistente nunca coexiste
+  con señales de etapas posteriores. Redirects HTTP inesperados del POST se
+  distinguen de un rechazo normal con recheck, sin inferir credenciales.
 - Nunca publica headers completos, cookies, CSRF, contraseña, correo,
   HTML, destinos externos, consultas ni mensajes de servidor libres.
 - El workflow captura un fallo del resumen con una frase fija y mantiene la
