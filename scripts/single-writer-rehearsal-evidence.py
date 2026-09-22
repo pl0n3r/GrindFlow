@@ -250,8 +250,8 @@ def build_report(envelope: Any) -> dict[str, Any]:
     latest_operator_observation = max(
         reference["observed_at_utc"] for reference in references.values()
     )
-    if receipt["observed_at_utc"] < latest_operator_observation:
-        fail("single-writer evidence predates prerequisite operator evidence")
+    if receipt["observed_at_utc"] <= latest_operator_observation:
+        fail("single-writer evidence must be later than prerequisite operator evidence")
 
     canonical = json.dumps(
         envelope,
