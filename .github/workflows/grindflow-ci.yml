@@ -716,20 +716,45 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="/tmp/gf-arch-002-evidence"
+          gate_results="/tmp/gf-arch-002-gate-results.json"
           install -d -m 0700 "$evidence_dir"
+          python3 - "$gate_results" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          checks = {
+              "schema_snapshot_parity": "passed",
+              "migration_reversibility": "passed",
+              "database_and_vault_restore": "passed",
+              "post_restore_tenant_and_role_guards": "passed",
+          }
+          payload = {
+              "head_sha": os.environ["GF_EVIDENCE_HEAD_SHA"],
+              "run_id": os.environ["GF_EVIDENCE_RUN_ID"],
+              "checks": checks,
+          }
+          path = Path(sys.argv[1])
+          path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+          path.chmod(0o600)
+          PY
           for module in identity vault; do
             envelope="$evidence_dir/$module-envelope.json"
             report="$evidence_dir/$module.json"
             python3 scripts/disposable-rehearsal-evidence.py \
               --template "$module" \
               --head-sha "$GF_EVIDENCE_HEAD_SHA" \
-              --run-id "$GF_EVIDENCE_RUN_ID" > "$envelope"
+              --run-id "$GF_EVIDENCE_RUN_ID" \
+              --gate-results "$gate_results" > "$envelope"
             python3 scripts/disposable-rehearsal-evidence.py --json \
               < "$envelope" > "$report"
             rm -f "$envelope"
           done
+          rm -f "$gate_results"
           python3 - "$evidence_dir" <<'PY'
           import json
+          import os
           import sys
           from pathlib import Path
 
@@ -744,6 +769,12 @@ jobs:
                   raise SystemExit("disposable evidence cannot authorize production")
               if report["scope"] != "ci_disposable_only":
                   raise SystemExit("unexpected rehearsal evidence scope")
+              if report["ci"]["disposable"] is not True:
+                  raise SystemExit("receipt lost disposable CI provenance")
+              if report["ci"]["head_sha"] != os.environ["GF_EVIDENCE_HEAD_SHA"]:
+                  raise SystemExit("receipt head SHA does not match the CI run")
+              if report["ci"]["run_id"] != os.environ["GF_EVIDENCE_RUN_ID"]:
+                  raise SystemExit("receipt run id does not match the CI run")
           PY
 
       - name: Upload disposable GF-ARCH-002 evidence
