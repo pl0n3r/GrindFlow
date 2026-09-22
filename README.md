@@ -31,7 +31,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+170** | **−132** | **+38** |
+| **7** | **+171** | **−132** | **+39** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -82,6 +82,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 ## Validación
 - La rama debe pasar `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
 - El scope conserva `legacy` y, por clasificación conservadora del catálogo, ejecuta también PHP/DB/browser/real-stack.
+- `/es` y `/en` deben resolver metadata desde su propio catálogo; build/typecheck valida `generateMetadata`.
 - Esta entrega no acredita deploy Hostinger ni cambia el estado del Production Smoke.
 
 ## Qué sigue
