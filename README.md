@@ -71,6 +71,7 @@ flowchart LR
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
+<!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
 - `AGENTS.md`
 - `README.md`
