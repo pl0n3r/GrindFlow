@@ -8,7 +8,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "data-schema-parity.py"
 SPEC = importlib.util.spec_from_file_location("data_schema_parity", SCRIPT)
-assert SPEC is not None and SPEC.loader is not None
+if SPEC is None:
+    raise RuntimeError("unable to create module spec")
+if SPEC.loader is None:
+    raise RuntimeError("schema parity module loader is unavailable")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
@@ -67,15 +70,23 @@ class DataSchemaParityTest(unittest.TestCase):
         """A source inventory with a known collision cannot be used as parity evidence."""
         source = self.source()
         source["checks"]["table_name_collisions"] = ["users"]
+        snapshot = self.snapshot("users", "gf_accounts")
         with self.assertRaisesRegex(ValueError, "source inventory is not clean"):
-            MODULE.build_report(source, self.snapshot("users", "gf_accounts"))
+            MODULE.build_report(source, snapshot)
 
     def test_snapshot_must_prohibit_row_data(self) -> None:
         """Snapshots without an explicit no-row-data guarantee are rejected."""
+        source = self.source()
         snapshot = self.snapshot("users", "gf_accounts")
         snapshot["contains_row_data"] = True
         with self.assertRaisesRegex(ValueError, "contains_row_data=false"):
-            MODULE.build_report(self.source(), snapshot)
+            MODULE.build_report(source, snapshot)
+
+    def test_envelope_requires_objects(self) -> None:
+        """The stdin envelope rejects non-object source or snapshot payloads."""
+        raw = '{"source": [], "snapshot": {}}'
+        with self.assertRaisesRegex(ValueError, "source must be an object"):
+            MODULE.load_envelope(raw)
 
 
 if __name__ == "__main__":
