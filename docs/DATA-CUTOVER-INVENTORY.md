@@ -119,8 +119,8 @@ El ensayo:
 3. ejecuta `vault:audit`, `vault:stage` y `vault:verify-stage`;
 4. captura el inventario estructural previo;
 5. genera un dump completo de la MariaDB descartable con la imagen fijada `mariadb:11.4`, incluidos triggers;
-6. elimina la base descartable y la raíz original;
-7. restaura la base desde el dump y los blobs desde el stage privado;
+6. vacía todas las tablas de la base descartable con las FKs suspendidas durante esa limpieza y elimina la raíz original, **sin borrar el schema/base de datos del servicio CI**;
+7. restaura las tablas dentro de esa misma base desde el dump y los blobs desde el stage privado;
 8. exige `vault:verify-restore`, `doctrine:schema:validate` y paridad estructural;
 9. compara el snapshot estructural anterior y posterior byte a byte;
 10. elimina la fixture sintética y destruye todos los temporales al salir.
