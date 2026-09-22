@@ -276,6 +276,23 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertEqual("", result.stdout)
 
+    def test_cli_rejects_utf16_and_utf32_json(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        payload = json.dumps(self.envelope())
+        for encoding in ("utf-16", "utf-32"):
+            result = subprocess.run(
+                [sys.executable, script, "--json"],
+                input=payload.encode(encoding),
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual(b"", result.stdout)
+            self.assertIn(
+                b"disposable rehearsal evidence validation failed",
+                result.stderr,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
