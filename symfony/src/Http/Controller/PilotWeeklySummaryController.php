@@ -12,6 +12,7 @@ use GrindFlow\Identity\Entity\IdentityUser;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -128,6 +129,38 @@ final class PilotWeeklySummaryController extends AbstractController
             'external_publications_verified' => null,
             'provider_calls' => false,
         ]]);
+    }
+
+    /** Download the exact same bounded and authorized daily aggregates, never event-level data. */
+    #[Route('/api/admin/pilot/weekly-summary.csv', name: 'grindflow_pilot_weekly_csv', methods: ['GET'])]
+    public function export(Request $request, MembershipContext $memberships, Connection $db): Response
+    {
+        $summary = $this->__invoke($request, $memberships, $db);
+        if ($summary->getStatusCode() !== 200) {
+            return $summary;
+        }
+
+        $data = json_decode((string) $summary->getContent(), true);
+        if (!is_array($data) || ($data['data']['ready'] ?? false) !== true) {
+            return $this->error(503, 'pilot_weekly_schema_required', 'La auditoría del piloto todavía no está migrada.');
+        }
+
+        $csv = "date_utc,prepared_attempts,completed_reports,failed_attempts\r\n";
+        foreach ($data['data']['days'] as $day) {
+            $csv .= implode(',', [
+                (string) $day['date_utc'],
+                (int) $day['prepared_attempts'],
+                (int) $day['completed_reports'],
+                (int) $day['failed_attempts'],
+            ])."\r\n";
+        }
+
+        return new Response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="grindflow-pilot-weekly.csv"',
+            'Cache-Control' => 'no-store, private',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     private function invalidWeek(): JsonResponse
