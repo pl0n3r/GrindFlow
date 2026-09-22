@@ -98,6 +98,10 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   distingue objetivo, release observado, CI, SHA exacto main, checkout
   remoto no verificado y validación producción. No reutilizar etiqueta
   de release como evidencia de SHA Hostinger.
+- Los campos derivados del diff en README (huella, gates y lista de archivos)
+  **no se editan manualmente**. Antes del HEAD estable ejecutar
+  `python3 scripts/readme-dashboard.py --update --base <base_sha> --head <head_sha>`
+  y commitear el README generado; CI repite la generación y muestra el diff exacto si quedó stale.
 - Plantillas GitHub y etiquetas nuevas en español son aditivas; workflow
   `sincronizar-gobierno` solo crea/actualiza labels declarados, **nunca**
   borra etiquetas, Issues o milestones. No modificar permisos productivos.
