@@ -13,7 +13,7 @@ if env -u GF_METADATA_SNAPSHOT_APPROVED -u DATABASE_URL php "$script" >"$stdout_
   echo "ERROR: snapshot script must refuse missing approval" >&2
   exit 1
 fi
-test ! -s "$stdout_file"
+[[ ! -s "$stdout_file" ]]
 grep -Fxq "ERROR: metadata snapshot requires explicit approval." "$stderr_file"
 
 : >"$stdout_file"
@@ -22,7 +22,7 @@ if env -u DATABASE_URL GF_METADATA_SNAPSHOT_APPROVED=1 php "$script" >"$stdout_f
   echo "ERROR: snapshot script must refuse missing DATABASE_URL" >&2
   exit 1
 fi
-test ! -s "$stdout_file"
+[[ ! -s "$stdout_file" ]]
 grep -Fxq "ERROR: DATABASE_URL is required." "$stderr_file"
 
 echo "GF-ARCH-002 MariaDB metadata snapshot contract: OK"
