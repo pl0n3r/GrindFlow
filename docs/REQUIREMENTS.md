@@ -213,7 +213,8 @@ piloto sin inferir publicaciones, visitas, conversiones ni ingresos externos.
   no disponibles. Traffic Symfony no implementado se representa con
   `clicks=null`, jamás con un cero inventado. No estimar conversiones ni ingresos.
 - React muestra navegación semanal, estados vacío/error/esquema faltante, totales,
-  días UTC y explicación de límites. Debe funcionar a 360 px sin desbordamiento.
+  días UTC, descarga CSV tenant-safe de siete filas agregadas y explicación de límites.
+  La descarga no contiene IDs, nombres ni eventos individuales. Debe funcionar a 360 px sin desbordamiento.
   No se integra proveedor, no se visita enlace de clic y no se muta producción.
 
 **Verificación:** PHPUnit/MariaDB con anonimato, tenant ajeno, lector Model,
