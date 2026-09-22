@@ -90,6 +90,27 @@ class ProductionSmokeAuthTriageTest(unittest.TestCase):
         self.assertEqual("", result.stdout)
         self.assertEqual("ERROR: smoke auth summary unavailable\n", result.stderr)
 
+    def test_dashboard_error_requires_a_dashboard_login_redirect(self):
+        """Reject incompatible login paths without exposing a contaminated log."""
+        dashboard_error = (
+            "ERROR: authenticated dashboard returned HTTP 302, redirect path /login; "
+            "check authentication/session. No repeated login attempts."
+        )
+        for redirect in ("/login", "/admin", "(missing)"):
+            with self.subTest(redirect=redirect):
+                log = "\n".join([
+                    "LOGIN_SESSION_PREFLIGHT=consistent",
+                    "LOGIN_REDIRECT_PATH=" + redirect,
+                    "LOGIN_FAILURE_SESSION_CHECK=stable" if redirect == "/login" else "",
+                    dashboard_error,
+                ])
+                result = self.run_cli(log, "--markdown")
+                self.assertEqual(2, result.returncode)
+                self.assertEqual("", result.stdout)
+                self.assertEqual(
+                    "ERROR: smoke auth summary unavailable\n", result.stderr,
+                )
+
     def test_login_http_rejection_is_reported_without_echo(self):
         """Report HTTP rejection without echoing the log."""
         log = "\n".join([
