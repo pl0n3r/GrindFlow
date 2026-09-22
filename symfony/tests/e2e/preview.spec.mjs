@@ -2030,6 +2030,9 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
   const lastWeekDate = new Date(monday);
   lastWeekDate.setUTCDate(lastWeekDate.getUTCDate() - 7);
   const lastWeek = lastWeekDate.toISOString().slice(0, 10);
+  const twoWeeksBack = new Date(lastWeekDate);
+  twoWeeksBack.setUTCDate(twoWeeksBack.getUTCDate() - 7);
+  const unavailableWeek = twoWeeksBack.toISOString().slice(0, 10);
   const visited = [];
 
   await page.route('**/api/admin/context', (route) => route.fulfill({
@@ -2045,6 +2048,12 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
     expect(route.request().method()).toBe('GET');
     const date = new URL(route.request().url()).searchParams.get('week');
     visited.push(date);
+    if (date === unavailableWeek) {
+      return route.fulfill({
+        status: 503, contentType: 'application/json',
+        body: JSON.stringify({ error: { message: 'Resumen sintético temporalmente no disponible.' } }),
+      });
+    }
     const days = Array.from({ length: 7 }, (_, index) => {
       const day = new Date(date + 'T00:00:00Z');
       day.setUTCDate(day.getUTCDate() + index);
@@ -2086,4 +2095,8 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
   await expect.poll(() => visited.includes(lastWeek)).toBe(true);
   expect(visited).toContain(thisWeek);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await weeks.getByRole('button', { name: 'Semana anterior' }).click();
+  await expect(page.getByRole('alert')).toContainText('Resumen sintético temporalmente no disponible.');
+  await expect(page.locator('.pilot-totals')).toHaveCount(0);
+  await expect(weeks).toContainText(unavailableWeek);
 });
