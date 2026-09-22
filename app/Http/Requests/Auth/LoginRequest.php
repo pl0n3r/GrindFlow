@@ -68,7 +68,13 @@ class LoginRequest extends FormRequest
 
     private function throttleKey(): string
     {
-        return Str::transliterate($this->normalizedEmail().'|'.$this->ip());
+        // Avoid exposing email and IP as plaintext keys in cache/Redis inventories.
+        // Keep the same normalized identity/IP pair for the existing lockout boundary.
+        return 'login:'.hash_hmac(
+            'sha256',
+            Str::transliterate($this->normalizedEmail().'|'.$this->ip()),
+            (string) config('app.key'),
+        );
     }
 
     private function normalizedEmail(): string
