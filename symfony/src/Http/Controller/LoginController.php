@@ -16,7 +16,12 @@ final class LoginController extends AbstractController
     public function __invoke(AuthenticationUtils $auth, ProductVersion $version): Response
     {
         if ($this->getUser() !== null) {
-            return $this->redirectToRoute('grindflow_organizations');
+            // The redirect depends on the current identity; caches must not
+            // replay an authenticated location to another browser/session.
+            $response = $this->redirectToRoute('grindflow_organizations');
+            $response->headers->set('Cache-Control', 'no-store, private');
+
+            return $response;
         }
 
         $response = $this->render('identity/login.html.twig', [
