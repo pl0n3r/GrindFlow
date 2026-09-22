@@ -57,6 +57,22 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         self.assertFalse(report["cutover_authorized"])
         self.assertEqual(list(CUTOVER.PRECONDITIONS), report["pending_preconditions"])
         self.assertEqual("laravel", report["current_writer"])
+        self.assertEqual(64, len(report["source_inventory_sha256"]))
+        self.assertEqual(
+            set(row["table"] for row in self.source()["laravel"])
+            - set(CUTOVER.MODULE_TABLES["identity"]["laravel"]),
+            set(report["outside_this_proposal"]["laravel"]),
+        )
+
+    def test_report_fingerprint_is_canonical_and_changes_with_migrations(self):
+        source = self.source()
+        first = CUTOVER.build_report(source, self.plan())
+        reordered = dict(reversed(list(source.items())))
+        second = CUTOVER.build_report(reordered, self.plan())
+        self.assertEqual(
+            first["source_inventory_sha256"], second["source_inventory_sha256"],
+        )
+        self.assertRegex(first["source_inventory_sha256"], r"^[0-9a-f]{64}$")
 
     def test_vault_uses_actual_repository_inventory(self):
         report = CUTOVER.build_report(self.source(), self.plan("vault"))
