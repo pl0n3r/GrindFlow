@@ -222,7 +222,7 @@ def main() -> int:
 
     try:
         report = build_report(read_stdin_json())
-    except (RecursionError, TypeError, UnicodeError, ValueError):
+    except (RecursionError, TypeError, ValueError):
         print("ERROR: operator evidence validation failed", file=sys.stderr)
         return 2
 
