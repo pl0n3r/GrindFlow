@@ -44,10 +44,10 @@ case "$url" in
       if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^post_(401|403|419|422|429)$ ]]; then status="${BASH_REMATCH[1]}"; redirect=""; fi
     else
       body='<form><input name="_token" value="fake-csrf"></form>'
-      if [[ "${MOCK_AUTH_MODE:-ok}" == login_body_secret ]]; then status=500; body="never-print-body-secret"; fi
+      if [[ "${MOCK_AUTH_MODE:-ok}" == login_body_secret || "${MOCK_AUTH_MODE:-ok}" == login_body_secret_invalid_id ]]; then status=500; body="never-print-body-secret"; fi
     fi;;
   http://mock/admin/diagnostics.json)
-    body='{"entries":[{"timestamp":"never-print-diag-date","incident_id":"never-print-diag-id","status":500,"request":{"method":"GET","path":"/private?never-print-diag-path"},"exception":"never-print-diag-exception","message":"never-print-diag-message","location":"never-print-diag-location","trace":[{"file":"never-print-diag-trace","line":9,"call":"never-print-diag-call"}]}]}';;
+    body='{"entries":[{"timestamp":"never-print-diag-date","incident_id":"00000000-0000-4000-8000-000000000001","status":500,"request":{"method":"GET","path":"/private?never-print-diag-path"},"exception":"never-print-diag-exception","message":"never-print-diag-message","location":"never-print-diag-location","trace":[{"file":"never-print-diag-trace","line":9,"call":"never-print-diag-call"}]}]}';;
   http://mock/dashboard)
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_login ]]; then status=302; redirect="/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_external ]]; then status=302; redirect="https://external.invalid/login?private-query-do-not-print"; fi
@@ -81,6 +81,9 @@ case "$url" in
     ;;
   *) status=404;;
 esac
+if [[ "${MOCK_DIAGNOSTIC_MODE:-valid}" == invalid && "$url" == http://mock/admin/diagnostics.json ]]; then
+  body="${body//00000000-0000-4000-8000-000000000001/never-print-diag-invalid-id}"
+fi
 if [[ "${MOCK_MODULE_MODE:-ok}" == failed && "$url" == http://mock/organizations/example/traffic ]]; then
   status=500; body="synthetic module failure"
 fi
@@ -88,7 +91,9 @@ if [[ "${MOCK_CSV_MODE:-ok}" == failed && "$url" == http://mock/organizations/ex
   body="invalid report"
 fi
 [[ "$output" == /dev/null ]] || printf '%s' "$body" > "$output"
-[[ -z "$headers" ]] || printf 'HTTP/1.1 %s\r\n%sX-Request-Id: never-print-header-private\r\n' "$status" "$csv_headers" > "$headers"
+incident_header='00000000-0000-4000-8000-000000000002'
+[[ "${MOCK_AUTH_MODE:-ok}" == login_body_secret_invalid_id ]] && incident_header='never-print-header-invalid-id'
+[[ -z "$headers" ]] || printf 'HTTP/1.1 %s\r\n%sX-Request-Id: never-print-header-private\r\nX-Incident-ID: %s\r\n' "$status" "$csv_headers" "$incident_header" > "$headers"
 [[ -z "$headers" || -z "$redirect" ]] || printf 'Location: %s\r\n' "$redirect" >> "$headers"
 [[ -z "$write_out" ]] || printf '%s' "$status"
 MOCK
@@ -104,10 +109,11 @@ run_case() {
   local csv_mode="${7:-ok}"
   local release_mode="${8:-current}"
   local auth_mode="${9:-ok}"
+  local diagnostic_mode="${10:-valid}"
   local log="$workdir/$label.log"
   local requests="$workdir/$label.requests"
   local result
-  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
+  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
   assert_absent_fixed 'never-print-header-private' "$log"
   case "$label" in
@@ -127,11 +133,15 @@ run_case() {
       [[ "$(grep -c "$LOGIN_POST_PATTERN" "$requests")" -eq 1 ]]
       [[ "$(grep -c '^GET http://mock/organizations/example/traffic/export$' "$requests")" -eq 1 ]]
       ;;
-    current_module_failure|current_csv_failure)
+    current_module_failure|current_csv_failure|current_module_failure_invalid_id)
       grep -Fxq 'MODULE_READ_ONLY=failed' "$log"
       grep -Fq 'ERROR: read-only workspace module check failed; no repeated login requests.' "$log"
       grep -Fxq 'Recorded incidents (up to 5): 1' "$log"
-      grep -Fxq 'Incident #1: HTTP=500 method=GET' "$log"
+      if [[ "$diagnostic_mode" == invalid ]]; then
+        grep -Fxq 'Incident #1: HTTP=500 method=GET incident_id=unknown' "$log"
+      else
+        grep -Fxq 'Incident #1: HTTP=500 method=GET incident_id=00000000-0000-4000-8000-000000000001' "$log"
+      fi
       assert_absent_fixed 'never-print-diag-' "$log"
       assert_absent_fixed "$NO_RETRY_MARKER" "$log"
       [[ "$(grep -c "$LOGIN_POST_PATTERN" "$requests")" -eq 1 ]]
@@ -199,6 +209,7 @@ run_case pending_vault_failure 3 3 valid failed
 run_case pending_vault_link_missing 3 3 valid missing_link
 run_case current 0 0
 run_case current_module_failure 0 5 valid ok failed
+run_case current_module_failure_invalid_id 0 5 valid ok failed ok current ok invalid
 run_case current_csv_failure 0 5 valid ok ok failed
 run_case current_stale_release 0 6 valid ok ok ok stale
 run_case current_missing_release 0 6 valid ok ok ok missing
@@ -235,13 +246,20 @@ if MOCK_PENDING=unknown MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mo
 [[ "$result" -eq 1 ]]
 grep -Fq 'ERROR: production migration inventory is unavailable.' "$workdir/unknown.log"
 assert_absent_regex '^MIGRATIONS_PENDING=' "$workdir/unknown.log"
-if MOCK_PENDING=0 MOCK_AUTH_MODE=login_body_secret MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/body-secret.log" 2>&1; then
-  printf 'FAIL: synthetic login error unexpectedly passed.\n' >&2; exit 1
-else
-  result=$?
-fi
-[[ "$result" -eq 1 ]]
-grep -Fxq 'ERROR: login page GET /login returned HTTP 500' "$workdir/body-secret.log"
-assert_absent_fixed 'never-print-body-secret' "$workdir/body-secret.log"
-printf 'PASS production smoke contract: body redaction\n'
+for mode in login_body_secret login_body_secret_invalid_id; do
+  if MOCK_PENDING=0 MOCK_AUTH_MODE="$mode" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=1 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$workdir/$mode.log" 2>&1; then
+    printf 'FAIL: synthetic login error unexpectedly passed.\n' >&2; exit 1
+  else
+    result=$?
+  fi
+  [[ "$result" -eq 1 ]]
+  if [[ "$mode" == login_body_secret ]]; then
+    grep -Fxq 'ERROR: login page GET /login returned HTTP 500 incident_id=00000000-0000-4000-8000-000000000002' "$workdir/$mode.log"
+  else
+    grep -Fxq 'ERROR: login page GET /login returned HTTP 500 incident_id=unknown' "$workdir/$mode.log"
+  fi
+  assert_absent_fixed 'never-print-body-secret' "$workdir/$mode.log"
+  assert_absent_fixed 'never-print-header-invalid-id' "$workdir/$mode.log"
+  printf 'PASS production smoke contract: %s redaction\n' "$mode"
+done
 printf 'PASS production smoke contract: unknown\n'
