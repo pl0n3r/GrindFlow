@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 README_PATH = ROOT / "README.md"
 SCOPE_PATH = ROOT / "scripts" / "ci-scope.sh"
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
-CHANGED_FILES_HEADING = "## Archivos modificados en este deploy"
 CHANGED_FILES_MARKER = "<!-- grindflow:changed-files -->"
 DELTA_ROW_PATTERN = re.compile(
     r"^\| \*\*\d+\*\* \| \*\*\+\d+\*\* \| \*\*−\d+\*\* \| \*\*[+-]\d+\*\* \|$",
@@ -120,21 +119,27 @@ def replace_once(pattern: re.Pattern[str], content: str, replacement: str, label
     return updated
 
 
-def update_changed_files(readme: str, files: list[str]) -> str:
-    start = readme.find(CHANGED_FILES_HEADING)
-    if start < 0:
-        fail("cannot regenerate changed files; section is missing")
-    end = readme.find("\n## ", start + len(CHANGED_FILES_HEADING))
-    if end < 0:
-        fail("cannot regenerate changed files; following section is missing")
-
-    block = readme[start:end]
-    marker = block.find(CHANGED_FILES_MARKER)
+def changed_files_block(readme: str) -> tuple[int, int]:
+    """Locate the generated file list by its stable structural marker."""
+    marker = readme.find(CHANGED_FILES_MARKER)
     if marker < 0:
-        fail("cannot regenerate changed files; structural marker is missing")
+        fail("cannot locate changed files; structural marker is missing")
+    end = readme.find("\n## ", marker + len(CHANGED_FILES_MARKER))
+    if end < 0:
+        fail("cannot locate changed files; following section is missing")
+    return marker, end
 
-    prefix = block[: marker + len(CHANGED_FILES_MARKER)] + "\n"
-    return readme[:start] + prefix + generated_file_rows(files) + "\n" + readme[end:]
+
+def update_changed_files(readme: str, files: list[str]) -> str:
+    marker, end = changed_files_block(readme)
+    prefix_end = marker + len(CHANGED_FILES_MARKER)
+    return (
+        readme[:prefix_end]
+        + "\n"
+        + generated_file_rows(files)
+        + "\n"
+        + readme[end:]
+    )
 
 
 def generated_readme(readme: str, files: list[str], additions: int, deletions: int, scope: dict[str, str]) -> str:
@@ -163,7 +168,6 @@ def require_markers(readme: str) -> None:
         "<!-- grindflow:gate-plan -->",
         "## Flujo de entrega",
         "## Qué se hizo",
-        CHANGED_FILES_HEADING,
         CHANGED_FILES_MARKER,
         "## Validación",
         "## Qué sigue",
@@ -198,7 +202,8 @@ def validate_gate_plan(readme: str, scope: dict[str, str]) -> None:
 
 
 def validate_changed_files(readme: str, files: list[str]) -> None:
-    changed = section(readme, CHANGED_FILES_HEADING)
+    marker, end = changed_files_block(readme)
+    changed = readme[marker:end]
     listed = sorted(FILE_ROW_PATTERN.findall(changed))
     if files != listed:
         fail("changed-file list is stale. Run readme-dashboard.py --update.")
@@ -326,7 +331,7 @@ def self_test() -> None:
 | --- | --- |
 | Gates seleccionados | **manual** |
 
-## Archivos modificados en este deploy
+## Archivos modificados en esta entrega candidata
 Inventario de solo el deploy actual:
 <!-- grindflow:changed-files -->
 - `old.txt`
