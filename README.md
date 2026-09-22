@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.92: restore drill destructivo y reversible sobre MariaDB + Vault descartables.** Base exacta `main` v0.1.91 `d5e6acfc1ba77e0bef794b3a90b0d556c089fb39`; destruye y restaura únicamente la base CI `grindflow_symfony_ci` y blobs sintéticos temporales.
+> **Candidato v0.1.92: restore drill destructivo y reversible sobre MariaDB + Vault descartables.** Base exacta `main` v0.1.91 `d5e6acfc1ba77e0bef794b3a90b0d556c089fb39`; vacía y restaura únicamente las tablas de la base CI `grindflow_symfony_ci`, junto con blobs sintéticos temporales.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -63,10 +63,10 @@ flowchart LR
 ## Qué se hizo
 - Nuevo `scripts/symfony-disposable-restore-drill.sh`: ensaya backup, destrucción y restauración de MariaDB + blobs sobre infraestructura sintética.
 - Las guardas exigen `GF_RESTORE_DRILL_APPROVED=1`, `APP_ENV=test`, `CI=true`, host loopback, puerto 3306 y base exacta `grindflow_symfony_ci`.
-- El drill crea una fixture mínima, audita el Vault, prepara un stage privado, genera dump completo con triggers, elimina DB/originales y restaura ambos lados.
+- El drill crea una fixture mínima, audita el Vault, prepara un stage privado, genera dump con datos/esquema/triggers, vacía las tablas del schema CI y elimina los originales temporales antes de restaurar ambos lados.
 - Tras restaurar exige `vault:verify-restore`, `doctrine:schema:validate`, paridad estructural y snapshot pre/post idéntico.
 - El dump/stage viven en temporales privados y se destruyen al finalizar; no se publican como artefactos ni aceptan Hostinger/remotos.
-- Nuevo contrato shell prueba rechazo sin opt-in, entorno no-test, ejecución fuera de CI, host remoto y nombre de DB distinto.
+- Nuevo contrato shell prueba rechazo sin opt-in, entorno no-test, ejecución fuera de CI, esquema de URL no-MariaDB, host remoto y nombre de DB distinto.
 - `ci-scope.sh` selecciona obligatoriamente `symfony-preview` si cambia cualquiera de los scripts del restore drill.
 - La prueba corre antes de iniciar el preview HTTP, sobre la MariaDB de servicio descartable de GitHub Actions.
 
@@ -92,7 +92,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Ensayar destrucción/restauración MariaDB + Vault en CI | 🚧 v0.1.92 candidata |
+| **NOW** | 🚧 Ensayar vaciado/restauración MariaDB + Vault en CI | 🚧 v0.1.92 candidata |
 | **NEXT** | 🚧 Snapshot real autorizado + prueba cross-tenant restaurada | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
