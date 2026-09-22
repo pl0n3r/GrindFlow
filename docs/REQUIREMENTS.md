@@ -45,13 +45,13 @@ Each requirement should contain:
 
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
-**Estado:** implementado en candidato v0.1.85; integración, despliegue y producción se comprueban por separado.
+**Estado:** v0.1.85 fusionada: formulario Symfony no cacheable; extensión v0.1.86 candidata: redirección autenticada y formulario tras rechazo.
 
-**Enunciado:** el formulario anónimo `GET /login` contiene un CSRF de sesión y puede mostrar el correo empleado anteriormente, por lo que ninguna caché de navegador o proxy debe almacenar su respuesta HTML.
+**Enunciado:** el formulario anónimo `GET /login` contiene un CSRF de sesión y puede mostrar el correo empleado anteriormente. La redirección desde `GET /login` ya autenticado también depende de la identidad; ni el HTML ni esa redirección pueden reutilizarse desde cachés.
 
-**Aceptación:** en el runtime Symfony aislado, los GET anónimos responden con `Cache-Control: no-store, private`; el formulario mantiene el CSRF y dos GET dentro de la misma sesión presentan cada uno un token CSRF no vacío; no se exige igualdad textual entre representaciones del token. No exponer el token, datos de cuenta o HTML privado en logs; no cambiar autenticación Laravel ni Hostinger por esta entrega.
+**Aceptación:** en el runtime Symfony aislado, tanto los GET anónimos como los GET tras intento de login rechazado responden con `Cache-Control: no-store, private`, mensaje de error genérico y nunca contraseña en el HTML. Un GET de `/login` tras autenticación redirige a `/organizations` con el mismo control de caché. El formulario mantiene el CSRF y dos GET dentro de la misma sesión presentan cada uno un token CSRF no vacío; no se exige igualdad textual entre representaciones del token. No exponer el token, datos de cuenta o HTML privado en logs; no cambiar autenticación Laravel ni Hostinger por esta entrega.
 
-**Verificación:** PHPUnit HTTP con cliente y sesión sintéticos para dos GET, cabeceras de caché, CSRF presente en ambas respuestas, sin asumir igualdad de bytes; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
+**Verificación:** PHPUnit HTTP con cliente y sesión sintéticos: dos GET anónimos, GET posterior a rechazo de cuenta inactiva, GET tras autenticación, cabeceras, CSRF presente y ausencia de contraseña en HTML; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
 
 ### GF-ARCH-002 — Paridad de datos y tenencia
 **Estado:** definido, pendiente de ejecución.
