@@ -147,7 +147,7 @@ def validate_receipts(
 ) -> dict[str, dict[str, Any]]:
     if not isinstance(receipts, dict) or set(receipts) != set(EVIDENCE_TYPES):
         fail("operator evidence must contain exactly the reviewed receipt types")
-    return {
+    validated = {
         evidence_type: validate_receipt(
             receipts[evidence_type],
             evidence_type,
@@ -156,6 +156,10 @@ def validate_receipts(
         )
         for evidence_type in EVIDENCE_TYPES
     }
+    digests = {receipt["evidence_sha256"] for receipt in validated.values()}
+    if len(digests) != len(validated):
+        fail("operator receipts must reference distinct evidence")
+    return validated
 
 
 def build_report(envelope: Any) -> dict[str, Any]:
@@ -188,7 +192,9 @@ def build_report(envelope: Any) -> dict[str, Any]:
         "evidence_bundle_sha256": hashlib.sha256(canonical).hexdigest(),
         "module": module_name,
         "source_inventory_sha256": source_digest,
-        "verified_evidence": {
+        "scope": "redacted_references_only",
+        "receipt_content_verified": False,
+        "validated_receipt_references": {
             evidence_type: {
                 "evidence_sha256": receipt["evidence_sha256"],
                 "observed_at_utc": receipt["observed_at_utc"],
