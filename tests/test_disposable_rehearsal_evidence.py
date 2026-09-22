@@ -152,7 +152,7 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
 
         envelope = self.envelope()
         envelope["ci"]["token"] = "secret"
-        self.assert_rejected("CI provenance", envelope)
+        self.assert_rejected("ci provenance", envelope)
 
     def test_report_does_not_copy_detailed_ownership_payload(self):
         envelope = self.envelope()
