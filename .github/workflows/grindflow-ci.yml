@@ -195,6 +195,8 @@ jobs:
           python3 -m unittest tests/test_cutover_ownership_plan.py
           python3 -m py_compile scripts/disposable-rehearsal-evidence.py
           python3 -m unittest tests/test_disposable_rehearsal_evidence.py
+          python3 -m py_compile scripts/operator-evidence-verifier.py
+          python3 -m unittest tests/test_operator_evidence_verifier.py
           python3 -m py_compile scripts/symfony-schema-structure.py
           python3 -m unittest tests/test_symfony_schema_structure.py
           python3 scripts/symfony-schema-structure.py

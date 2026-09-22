@@ -223,6 +223,35 @@ Este ejemplo solo demuestra la forma del contrato. Un JSON de gate-results escri
 
 El validador limita stdin a 1.000.000 de bytes, exige UTF-8 estricto (rechaza JSON UTF-16/UTF-32), no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
 
+## Verificador offline de evidencia aportada por operador
+
+`scripts/operator-evidence-verifier.py` valida **referencias redacted** a los dos siguientes insumos externos de GF-ARCH-002: inventario metadata-only autorizado y restore real observado en un entorno aislado. No captura ninguno de ellos, no abre archivos indicados por el caller, no usa red, no ejecuta subprocesses y no se conecta a MariaDB.
+
+El contrato `gf-arch-002-operator-evidence-input-v1` exige un módulo ya revisado (`identity` o `vault`), el reporte de ownership del mismo checkout y exactamente dos receipts `gf-arch-002-operator-receipt-v1`:
+
+- `authorized_metadata_inventory` con `environment=authorized_read_only_capture`;
+- `real_backup_restore_rehearsal` con `environment=isolated_restore_observation`.
+
+Cada receipt contiene solo módulo, huella SHA-256 de la evidencia revisada fuera de banda, huella del inventario fuente, timestamp UTC y flags estrictos. Debe declarar `operator_observed=true`, `contains_row_data=false` y `contains_secrets=false`. Los dos tipos deben referenciar digests distintos para impedir reutilizar un único artefacto como inventario y restore. Campos adicionales como URL, path, usuario, credencial, nota libre o contenido de filas se rechazan por contrato.
+
+El verificador vuelve a construir el ownership report desde las migraciones del checkout y exige coincidencia exacta. También limita stdin a 1.000.000 bytes, exige UTF-8 estricto y no reproduce payloads rechazados.
+
+El reporte `gf-arch-002-operator-evidence-report-v1` conserva únicamente hashes y timestamps de los dos receipts. Declara `scope=redacted_references_only` y `receipt_content_verified=false`: valida la forma y consistencia de las referencias, no el contenido de los artefactos. Incluso con ambos presentes mantiene:
+
+```json
+{
+  "production_ready": false,
+  "production_authorized": false,
+  "remaining_preconditions": [
+    "single_writer_freeze_evidence",
+    "owner_authorization",
+    "production_smoke"
+  ]
+}
+```
+
+Por tanto, este contrato **no valida el contenido real** de un backup ni de un snapshot, no prueba RPO/RTO, no verifica un freeze, no sustituye autorización del propietario y no demuestra producción saludable. Solo asegura que un operador entregue referencias mínimas, redacted y consistentes con el checkout antes de una revisión humana separada.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
