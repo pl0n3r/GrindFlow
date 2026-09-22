@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.86** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.85~~ | `677f6ee863bcfaa8ea447e7ab3e94055f9dfb273` |
-| CI / Sonar / CodeRabbit del PR | 🚧 Revalidar HEAD final | No heredar checks del PR #84 |
+| CI / Sonar / CodeRabbit del PR | 🚧 Revalidar HEAD final | No heredar checks de un HEAD anterior |
 | CI del SHA exacto de main | ✅ ~~v0.1.85 success~~ | [#35693080276](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080276) |
 | Deploy Observer | ✅ ~~v0.1.85 humana observada~~ | [#35693080236](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080236); NO checkout SHA remoto |
 | Production Smoke | ⛔ Login E2E no validado | [#35693080266](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080266); #73 |
@@ -31,7 +31,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+46** | **−24** | **+22** |
+| **5** | **+48** | **−24** | **+24** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -62,7 +62,7 @@ flowchart LR
 
 ## Qué se hizo
 - v0.1.85 impide cachear el HTML del formulario Symfony con CSRF privado. v0.1.86 aplica **el mismo Cache-Control: no-store, private** al GET de `/login` que redirige a `/organizations` cuando la sesión ya está autenticada, evitando reutilización de redirecciones dependientes de identidad.
-- PHPUnit HTTP/MariaDB descartable amplía el recorrido autenticado: GET de `/login` redirige de forma privada; tras rechazo de cuenta inactiva, el GET de `/login` vuelve a mostrar mensaje genérico, respuesta no cacheable y nunca refleja la contraseña en HTML.
+- PHPUnit HTTP/MariaDB descartable amplía el recorrido autenticado: GET de `/login` redirige de forma privada; tras rechazo de cuenta inactiva, el GET de `/login` vuelve a mostrar mensaje genérico, respuesta no cacheable, nunca refleja la contraseña en HTML y prueba que tampoco expone el motivo de inactividad.
 - Se extendió [GF-SEC-006](docs/REQUIREMENTS.md) sin cambiar autenticación Laravel, cuentas productivas, secretos ni migraciones.
 - [Smoke v0.1.85](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080266) no pasó; autenticación productiva independiente de Symfony aislado. [Incidente #73](https://github.com/pl0n3r/GrindFlow/issues/73) permanece abierto; no se infiere causa ni se reintentan credenciales.
 
