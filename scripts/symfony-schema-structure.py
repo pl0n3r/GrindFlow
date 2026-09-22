@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Inventory Symfony gf_* table structure from Doctrine migration SQL only.
+"""Inventory final Symfony gf_* structure from Doctrine migration SQL only.
 
 GF-ARCH-002 guardrail: this parser reads migration source and never connects to
-MariaDB. It emits deterministic metadata for columns, indexes, foreign keys and
-triggers so an authorized metadata-only database snapshot can be compared later.
+MariaDB. It evaluates supported DDL from each migration's up() method in order,
+so later ALTER TABLE operations are reflected in the final structural contract.
 """
 from __future__ import annotations
 
@@ -20,12 +20,16 @@ REGEX_FLAGS = re.I | re.S | re.A
 IDENTIFIER = r"\w+"
 
 CREATE_TABLE = re.compile(
-    rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?({IDENTIFIER})`?\s*\((.*?)\)\s*ENGINE\s*=",
+    rf"^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?({IDENTIFIER})`?\s*\((.*)\)\s*ENGINE\s*=",
     REGEX_FLAGS,
 )
 CREATE_TRIGGER = re.compile(
-    rf"CREATE\s+TRIGGER\s+`?({IDENTIFIER})`?\s+"
+    rf"^CREATE\s+TRIGGER\s+`?({IDENTIFIER})`?\s+"
     rf"(BEFORE|AFTER)\s+(INSERT|UPDATE|DELETE)\s+ON\s+`?({IDENTIFIER})`?",
+    REGEX_FLAGS,
+)
+ALTER_TABLE = re.compile(
+    rf"^ALTER\s+TABLE\s+`?({IDENTIFIER})`?\s+(.+)$",
     REGEX_FLAGS,
 )
 PRIMARY_KEY = re.compile(r"^PRIMARY\s+KEY\s*\(([^)]+)\)$", REGEX_FLAGS)
@@ -40,7 +44,7 @@ PLAIN_INDEX = re.compile(
 FOREIGN_KEY = re.compile(
     rf"^CONSTRAINT\s+`?({IDENTIFIER})`?\s+FOREIGN\s+KEY\s*\(([^)]+)\)\s+"
     rf"REFERENCES\s+`?({IDENTIFIER})`?\s*\(([^)]+)\)"
-    r"(?:\s+ON\s+DELETE\s+(CASCADE|RESTRICT|SET\s+NULL|NO\s+ACTION))?",
+    r"(?:\s+ON\s+DELETE\s+(CASCADE|RESTRICT|SET\s+NULL|NO\s+ACTION))?$",
     REGEX_FLAGS,
 )
 
@@ -139,7 +143,7 @@ def split_top_level(raw: str) -> list[str]:
 
 
 def parse_type_prefix(raw: str) -> tuple[str, str]:
-    """Separate a simple MariaDB column type from the remaining modifiers."""
+    """Separate a simple MariaDB column type from remaining modifiers."""
     text = raw.strip()
     boundary = 0
     while boundary < len(text) and (text[boundary].isalnum() or text[boundary] == "_"):
@@ -176,70 +180,228 @@ def parse_column(item: str) -> dict[str, Any]:
     }
 
 
+def append_named(table: dict[str, Any], field: str, row: dict[str, Any]) -> None:
+    """Append a named structural row while rejecting duplicate final-state names."""
+    if any(existing["name"] == row["name"] for existing in table[field]):
+        raise ValueError(f"duplicate {field} definition on {table['name']}: {row['name']}")
+    table[field].append(row)
+
+
 def parse_table_item(item: str, table: dict[str, Any]) -> None:
-    """Classify one CREATE TABLE item into structural metadata."""
+    """Classify one CREATE/ALTER table item into structural metadata."""
     normalized = normalize_space(item)
 
     match = PRIMARY_KEY.match(normalized)
     if match:
-        table["indexes"].append(
-            {"name": "PRIMARY", "unique": True, "columns": identifier_list(match.group(1))}
+        append_named(
+            table,
+            "indexes",
+            {"name": "PRIMARY", "unique": True, "columns": identifier_list(match.group(1))},
         )
         return
 
     match = UNIQUE_INDEX.match(normalized)
     if match:
-        table["indexes"].append(
-            {"name": match.group(1), "unique": True, "columns": identifier_list(match.group(2))}
+        append_named(
+            table,
+            "indexes",
+            {"name": match.group(1), "unique": True, "columns": identifier_list(match.group(2))},
         )
         return
 
     match = PLAIN_INDEX.match(normalized)
     if match:
-        table["indexes"].append(
-            {"name": match.group(1), "unique": False, "columns": identifier_list(match.group(2))}
+        append_named(
+            table,
+            "indexes",
+            {"name": match.group(1), "unique": False, "columns": identifier_list(match.group(2))},
         )
         return
 
     match = FOREIGN_KEY.match(normalized)
     if match:
-        table["foreign_keys"].append(
+        append_named(
+            table,
+            "foreign_keys",
             {
                 "name": match.group(1),
                 "columns": identifier_list(match.group(2)),
                 "referenced_table": match.group(3),
                 "referenced_columns": identifier_list(match.group(4)),
                 "on_delete": normalize_space(match.group(5) or "RESTRICT").upper(),
-            }
+            },
         )
         return
 
     if normalized.upper().startswith(("CONSTRAINT ", "CHECK ")):
         return
-    table["columns"].append(parse_column(normalized))
+    append_named(table, "columns", parse_column(normalized))
 
 
-def parse_table(name: str, body: str, migration: str) -> dict[str, Any]:
-    """Parse one CREATE TABLE body into deterministic metadata."""
+def new_table(name: str, migration: str) -> dict[str, Any]:
+    """Create an empty normalized table record."""
     if not name.startswith("gf_"):
         raise ValueError(f"Symfony structure table must use gf_ prefix: {name}")
-
-    table: dict[str, Any] = {
+    return {
         "name": name,
         "migration": migration,
         "columns": [],
         "indexes": [],
         "foreign_keys": [],
     }
+
+
+def parse_table(name: str, body: str, migration: str) -> dict[str, Any]:
+    """Parse one CREATE TABLE body into deterministic metadata."""
+    table = new_table(name, migration)
     for item in split_top_level(body):
         parse_table_item(item, table)
-
-    for field in ("columns", "indexes", "foreign_keys"):
-        table[field] = sorted(
-            table[field],
-            key=lambda row: (row["name"], json.dumps(row, sort_keys=True)),
-        )
     return table
+
+
+def up_section(text: str) -> str:
+    """Return only the migration up() source, excluding rollback SQL."""
+    _, found, remainder = text.partition("public function up")
+    if not found:
+        raise ValueError("migration is missing public function up")
+    body, found_down, _ = remainder.partition("public function down")
+    if not found_down:
+        raise ValueError("migration is missing public function down")
+    return body
+
+
+def quoted_add_sql(line: str, quote: str) -> str | None:
+    """Extract a one-line addSql quoted string when present."""
+    prefix = f"$this->addSql({quote}"
+    start = line.find(prefix)
+    if start < 0:
+        return None
+    start += len(prefix)
+    end = line.rfind(f"{quote});")
+    if end < start:
+        raise ValueError("unterminated one-line addSql")
+    return line[start:end].replace(f"\\{quote}", quote).strip()
+
+
+def extract_up_sql(text: str) -> list[str]:
+    """Extract addSql statements from up() in declaration order."""
+    statements: list[str] = []
+    heredoc: list[str] | None = None
+
+    for line in up_section(text).splitlines():
+        stripped = line.strip()
+        if heredoc is not None:
+            if stripped == "SQL);":
+                sql = "\n".join(heredoc).strip()
+                if sql:
+                    statements.append(sql)
+                heredoc = None
+            else:
+                heredoc.append(line)
+            continue
+
+        if "addSql(<<<'SQL'" in line or 'addSql(<<<"SQL"' in line:
+            heredoc = []
+            continue
+
+        for quote in ("'", '"'):
+            sql = quoted_add_sql(line, quote)
+            if sql is not None:
+                statements.append(sql)
+                break
+
+    if heredoc is not None:
+        raise ValueError("unterminated addSql heredoc")
+    return statements
+
+
+def apply_create_table(
+    statement: str,
+    migration: str,
+    tables: dict[str, dict[str, Any]],
+    duplicates: set[str],
+) -> None:
+    """Apply one CREATE TABLE statement to the in-memory final schema."""
+    match = CREATE_TABLE.match(statement)
+    if match is None:
+        raise ValueError(f"unsupported CREATE TABLE statement in {migration}")
+    name, body = match.groups()
+    if name in tables:
+        duplicates.add(name)
+        return
+    tables[name] = parse_table(name, body, migration)
+
+
+def apply_alter_table(statement: str, tables: dict[str, dict[str, Any]]) -> None:
+    """Apply supported additive ALTER TABLE operations to an existing table."""
+    match = ALTER_TABLE.match(normalize_space(statement))
+    if match is None:
+        raise ValueError("unsupported ALTER TABLE statement")
+
+    name, operations = match.groups()
+    if not name.startswith("gf_"):
+        raise ValueError(f"Symfony ALTER TABLE must target gf_ table: {name}")
+    table = tables.get(name)
+    if table is None:
+        raise ValueError(f"ALTER TABLE targets unknown table: {name}")
+
+    for operation in split_top_level(operations):
+        normalized = normalize_space(operation)
+        if not normalized.upper().startswith("ADD "):
+            raise ValueError(f"unsupported non-additive ALTER operation: {normalized}")
+        addition = normalized[4:].strip()
+        if addition.upper().startswith("COLUMN "):
+            addition = addition[7:].strip()
+        parse_table_item(addition, table)
+
+
+def apply_trigger(
+    statement: str,
+    migration: str,
+    triggers: dict[str, dict[str, str]],
+    duplicates: set[str],
+) -> None:
+    """Apply one CREATE TRIGGER statement to the final source inventory."""
+    match = CREATE_TRIGGER.match(normalize_space(statement))
+    if match is None:
+        raise ValueError(f"unsupported CREATE TRIGGER statement in {migration}")
+
+    trigger, timing, event, table_name = match.groups()
+    if not table_name.startswith("gf_"):
+        raise ValueError(f"Symfony trigger must target gf_ table: {trigger}")
+    if trigger in triggers:
+        duplicates.add(trigger)
+        return
+    triggers[trigger] = {
+        "name": trigger,
+        "table": table_name,
+        "timing": timing.upper(),
+        "event": event.upper(),
+        "migration": migration,
+    }
+
+
+def apply_statement(
+    statement: str,
+    migration: str,
+    tables: dict[str, dict[str, Any]],
+    triggers: dict[str, dict[str, str]],
+    duplicate_tables: set[str],
+    duplicate_triggers: set[str],
+) -> None:
+    """Apply one supported up() DDL statement or fail closed."""
+    normalized = normalize_space(statement)
+    upper = normalized.upper()
+    if upper.startswith("CREATE TABLE "):
+        apply_create_table(statement, migration, tables, duplicate_tables)
+        return
+    if upper.startswith("ALTER TABLE "):
+        apply_alter_table(statement, tables)
+        return
+    if upper.startswith("CREATE TRIGGER "):
+        apply_trigger(statement, migration, triggers, duplicate_triggers)
+        return
+    raise ValueError(f"unsupported migration SQL in {migration}: {normalized[:80]}")
 
 
 def migration_name(path: Path) -> str:
@@ -247,52 +409,37 @@ def migration_name(path: Path) -> str:
     return path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else path.name
 
 
-def register_tables(
-    text: str,
-    migration: str,
-    tables: dict[str, dict[str, Any]],
-    duplicates: set[str],
-) -> None:
-    """Register CREATE TABLE statements from one migration."""
-    for name, body in CREATE_TABLE.findall(text):
-        if name in tables:
-            duplicates.add(name)
-        tables[name] = parse_table(name, body, migration)
-
-
-def register_triggers(
-    text: str,
-    migration: str,
-    triggers: dict[str, dict[str, str]],
-    duplicates: set[str],
-) -> None:
-    """Register CREATE TRIGGER statements from one migration."""
-    for trigger, timing, event, table_name in CREATE_TRIGGER.findall(text):
-        if not table_name.startswith("gf_"):
-            raise ValueError(f"Symfony trigger must target gf_ table: {trigger}")
-        if trigger in triggers:
-            duplicates.add(trigger)
-        triggers[trigger] = {
-            "name": trigger,
-            "table": table_name,
-            "timing": timing.upper(),
-            "event": event.upper(),
-            "migration": migration,
-        }
+def sort_table(table: dict[str, Any]) -> None:
+    """Sort normalized table collections for deterministic JSON output."""
+    for field in ("columns", "indexes", "foreign_keys"):
+        table[field] = sorted(
+            table[field],
+            key=lambda row: (row["name"], json.dumps(row, sort_keys=True)),
+        )
 
 
 def build_inventory(directory: Path = MIGRATIONS_DIR) -> dict[str, Any]:
-    """Parse every Doctrine migration and return a source-only structure contract."""
+    """Apply every migration up() and return the final source-only structure."""
     tables: dict[str, dict[str, Any]] = {}
     triggers: dict[str, dict[str, str]] = {}
     duplicate_tables: set[str] = set()
     duplicate_triggers: set[str] = set()
 
     for path in sorted(directory.glob("*.php")):
-        text = path.read_text(encoding="utf-8")
         migration = migration_name(path)
-        register_tables(text, migration, tables, duplicate_tables)
-        register_triggers(text, migration, triggers, duplicate_triggers)
+        text = path.read_text(encoding="utf-8")
+        for statement in extract_up_sql(text):
+            apply_statement(
+                statement,
+                migration,
+                tables,
+                triggers,
+                duplicate_tables,
+                duplicate_triggers,
+            )
+
+    for table in tables.values():
+        sort_table(table)
 
     return {
         "contract": CONTRACT,
@@ -318,7 +465,7 @@ def render_summary(inventory: dict[str, Any], as_json: bool) -> None:
 
 
 def main() -> int:
-    """Emit source structure and fail closed if duplicate definitions are found."""
+    """Emit source structure and fail closed if unsupported/duplicate DDL exists."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true", help="print stable JSON structure inventory")
     args = parser.parse_args()
