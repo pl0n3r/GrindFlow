@@ -69,7 +69,7 @@ flowchart LR
 - `docs/DATA-CUTOVER-INVENTORY.md` documenta formato, límites y flujo reproducible. Sigue sin existir autorización de cutover productivo.
 
 ## Archivos modificados en este deploy
-Inventario de solo el candidato actual, no evidencia de publicación:
+Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
