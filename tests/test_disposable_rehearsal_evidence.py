@@ -32,8 +32,20 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
     HEAD = "a" * 40
     RUN_ID = "123456"
 
+    def gate_results(self):
+        return {
+            "head_sha": self.HEAD,
+            "run_id": self.RUN_ID,
+            "checks": dict.fromkeys(EVIDENCE.CHECKS, "passed"),
+        }
+
     def envelope(self, module="identity"):
-        return EVIDENCE.draft_envelope(module, self.HEAD, self.RUN_ID)
+        return EVIDENCE.draft_envelope(
+            module,
+            self.HEAD,
+            self.RUN_ID,
+            self.gate_results()["checks"],
+        )
 
     def assert_rejected(self, pattern, envelope):
         with self.assertRaisesRegex(ValueError, pattern):
@@ -44,6 +56,7 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(EVIDENCE.REPORT_CONTRACT, report["contract"])
         self.assertEqual("identity", report["module"])
         self.assertEqual("ci_disposable_only", report["scope"])
+        self.assertTrue(report["ci"]["disposable"])
         self.assertTrue(report["disposable_evidence"])
         self.assertFalse(report["production_ready"])
         self.assertFalse(report["production_authorized"])
@@ -162,7 +175,7 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertNotIn("pending_preconditions", report)
         self.assertIn("next_action", report)
 
-    def test_cli_template_requires_ci_identifiers(self):
+    def test_cli_template_requires_ci_identifiers_and_gate_results(self):
         cmd = [
             sys.executable,
             str(ROOT / "scripts/disposable-rehearsal-evidence.py"),
@@ -179,24 +192,50 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertEqual("", result.stdout)
 
+    def test_gate_results_must_match_same_ci_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gates.json"
+            payload = self.gate_results()
+            payload["run_id"] = "999999"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "do not match"):
+                EVIDENCE.load_gate_results(str(path), self.HEAD, self.RUN_ID)
+
+    def test_gate_results_require_all_explicit_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gates.json"
+            payload = self.gate_results()
+            payload["checks"][EVIDENCE.CHECKS[0]] = "pending"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "must have passed"):
+                EVIDENCE.load_gate_results(str(path), self.HEAD, self.RUN_ID)
+
     def test_cli_template_round_trip(self):
         script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
-        generated = subprocess.run(
-            [
-                sys.executable,
-                script,
-                "--template",
-                "vault",
-                "--head-sha",
-                self.HEAD,
-                "--run-id",
-                self.RUN_ID,
-            ],
-            text=True,
-            encoding="utf-8",
-            capture_output=True,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            gate_results = Path(directory) / "gates.json"
+            gate_results.write_text(
+                json.dumps(self.gate_results()),
+                encoding="utf-8",
+            )
+            generated = subprocess.run(
+                [
+                    sys.executable,
+                    script,
+                    "--template",
+                    "vault",
+                    "--head-sha",
+                    self.HEAD,
+                    "--run-id",
+                    self.RUN_ID,
+                    "--gate-results",
+                    str(gate_results),
+                ],
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                check=False,
+            )
         self.assertEqual(0, generated.returncode, generated.stderr)
         checked = subprocess.run(
             [sys.executable, script, "--json"],
@@ -208,6 +247,7 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         )
         self.assertEqual(0, checked.returncode, checked.stderr)
         report = json.loads(checked.stdout)
+        self.assertTrue(report["ci"]["disposable"])
         self.assertFalse(report["production_ready"])
         self.assertFalse(report["production_authorized"])
 
