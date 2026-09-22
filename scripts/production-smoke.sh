@@ -38,20 +38,11 @@ curl_common() {
 }
 
 print_http_failure() {
-  local label="$1" status="$2" headers_file="$3" body_file="$4"
+  local label="$1" status="$2" headers_file="$3"
   printf 'ERROR: %s returned HTTP %s\n' "$label" "$status" >&2
   if [[ -s "$headers_file" ]]; then
     printf '%s\n' '---- safe response headers ----' >&2
     grep -iE '^(server|content-type|content-length|retry-after|via|x-cache|x-request-id|x-correlation-id|x-hostinger|cf-ray):' "$headers_file" >&2 || true
-  fi
-  if [[ -s "$body_file" ]]; then
-    python3 - "$body_file" >&2 <<'PY'
-import sys
-with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
-    snippet = " ".join(handle.read(4096).split())[:500]
-if snippet:
-    print(f"Body snippet: {snippet}")
-PY
   fi
   printf '%s\n' '-------------------------------' >&2
 }
@@ -280,6 +271,9 @@ run_smoke() {
     printf 'ERROR: authenticated dashboard returned HTTP %s, redirect path %s; check authentication/session. No repeated login attempts.\n' "$dashboard_status" "$(safe_redirect_path "$dashboard_headers")" >&2
     return 7
   fi
+  case "$dashboard_status" in
+    401|403|419|422|429) printf 'ERROR: authenticated dashboard returned HTTP %s; stop authentication retries.\n' "$dashboard_status" >&2; return 7 ;;
+  esac
   if [[ "$dashboard_status" != "200" ]]; then printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2; print_diagnostics; return 1; fi
   if ! assert_contains "$dashboard_html" "Overview"; then print_diagnostics; return 1; fi
   if ! assert_contains "$dashboard_html" "Tenant isolation active"; then print_diagnostics; return 1; fi
