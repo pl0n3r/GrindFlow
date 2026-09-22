@@ -3,27 +3,24 @@
 import { useState, type ChangeEvent } from 'react';
 import { useTranslations } from 'next-intl';
 
-/**
- * Subida directa del navegador a R2.
- *
- * El archivo NO pasa por el servidor de Next: se pide una URL prefirmada y el
- * PUT va directo al bucket. Un video de 2 GB cruzando una funcion serverless
- * seria lento, caro y chocaria con los limites de cuerpo de peticion.
- *
- * Las cabeceras del PUT tienen que coincidir exactamente con las que devuelve el
- * endpoint: van dentro de la firma, asi que R2 rechaza cualquier desviacion de
- * tipo o de tamano. El limite de peso no es una cortesia del cliente.
- */
 type Status =
   | { kind: 'idle' }
   | { kind: 'uploading'; name: string }
   | { kind: 'done'; count: number }
   | { kind: 'error'; message: string };
 
+/**
+ * Upload files directly from the browser to R2 through signed URLs.
+ *
+ * Files never cross the Next server. The signed PUT headers are treated as a
+ * strict contract and uploads run sequentially to remain reliable on mobile
+ * connections.
+ */
 export function UploadClient({ token }: { token: string }) {
   const t = useTranslations('upload');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
+  /** Upload one file using a freshly requested signed destination. */
   async function uploadOne(file: File): Promise<void> {
     setStatus({ kind: 'uploading', name: file.name });
 
@@ -62,6 +59,7 @@ export function UploadClient({ token }: { token: string }) {
     }
   }
 
+  /** Process the current picker selection sequentially and expose its status. */
   async function onSelect(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
