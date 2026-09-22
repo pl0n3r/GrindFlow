@@ -82,6 +82,14 @@ def validate_ci(ci: Any) -> dict[str, Any]:
     return ci
 
 
+def checked_in_ownership_report(module_name: str) -> dict[str, Any]:
+    ownership = ownership_module()
+    if module_name not in ownership.MODULE_TABLES:
+        fail("ownership module is not reviewed in this checkout")
+    draft = ownership.draft_envelope(module_name)
+    return ownership.build_report(draft["source"], draft["plan"])
+
+
 def validate_ownership(report: Any) -> dict[str, Any]:
     if not isinstance(report, dict):
         fail("ownership report must be an object")
@@ -133,6 +141,8 @@ def validate_ownership(report: Any) -> dict[str, Any]:
         fail("ownership report must retain pending preconditions")
     if any(not isinstance(value, str) or not value for value in pending):
         fail("ownership pending preconditions are invalid")
+    if report != checked_in_ownership_report(report["module"]):
+        fail("ownership report differs from checked-in migrations")
     return report
 
 
