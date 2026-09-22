@@ -698,6 +698,12 @@ jobs:
           GF_RESTORE_DRILL_APPROVED: '1'
         run: bash scripts/symfony-disposable-restore-drill.sh
 
+      - name: Verify post-restore tenant and IDOR guards
+        shell: bash
+        env:
+          CI: 'true'
+        run: bash scripts/symfony-post-restore-tenant-guard.sh
+
       - name: Start isolated Symfony server
         shell: bash
         run: |
