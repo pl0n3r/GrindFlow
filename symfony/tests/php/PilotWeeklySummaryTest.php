@@ -106,7 +106,7 @@ final class PilotWeeklySummaryTest extends WebTestCase
 
         foreach ([
             [$mine, $mineDraft, 'prepare', $thisWeek.' 00:00:00'],
-            [$mine, $mineDraft, 'complete', $now],
+            [$mine, $mineDraft, 'complete', $thisWeek.' 00:01:00'],
             [$mine, $mineDraft, 'fail', $lastWeek.' 10:00:00'],
             [$other, $otherDraft, 'prepare', $thisWeek.' 10:00:00'],
             [$other, $otherDraft, 'fail', $thisWeek.' 11:00:00'],
