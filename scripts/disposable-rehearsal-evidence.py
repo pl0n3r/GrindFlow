@@ -229,7 +229,11 @@ def build_report(envelope: Any) -> dict[str, Any]:
 
 def load_gate_results(path: str, head_sha: str, run_id: str) -> dict[str, str]:
     """Load same-run disposable gate results from a bounded UTF-8 JSON file."""
-    raw = Path(path).read_bytes()
+    try:
+        with Path(path).open("rb") as handle:
+            raw = handle.read(MAX_GATE_RESULTS_BYTES + 1)
+    except OSError:
+        fail("gate results unavailable")
     if len(raw) > MAX_GATE_RESULTS_BYTES:
         fail("gate results exceed safety limit")
     payload = json.loads(raw.decode("utf-8"))
