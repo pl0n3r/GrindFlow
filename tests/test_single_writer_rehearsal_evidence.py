@@ -85,6 +85,7 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
             "contract": SINGLE.RECEIPT_CONTRACT,
             "module": module,
             "source_inventory_sha256": report["source_inventory_sha256"],
+            "operator_evidence_bundle_sha256": report["evidence_bundle_sha256"],
             "evidence_sha256": "c" * 64,
             "observed_at_utc": "2026-09-22T12:30:00Z",
             "environment": "authorized_nonproduction_rehearsal",
@@ -117,10 +118,10 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
         for module in ("identity", "vault"):
             report = SINGLE.build_report(self.envelope(module))
             self.assertEqual(module, report["module"])
-            self.assertTrue(report["single_writer_receipt_validated"])
-            self.assertFalse(report["receipt_content_verified"])
-            self.assertFalse(report["production_ready"])
-            self.assertFalse(report["production_authorized"])
+            self.assertIs(True, report["single_writer_receipt_validated"])
+            self.assertIs(False, report["receipt_content_verified"])
+            self.assertIs(False, report["production_ready"])
+            self.assertIs(False, report["production_authorized"])
             self.assertEqual(
                 list(SINGLE.REMAINING_PRECONDITIONS),
                 report["remaining_preconditions"],
@@ -186,6 +187,27 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
             envelope["single_writer_receipt"][field] = value
             self.assert_rejected(field, envelope)
 
+    def test_single_writer_receipt_must_bind_to_operator_bundle(self):
+        envelope = self.envelope()
+        envelope["single_writer_receipt"]["operator_evidence_bundle_sha256"] = "f" * 64
+        self.assert_rejected("operator evidence mismatch", envelope)
+
+    def test_evidence_digest_cannot_be_reused_across_stages(self):
+        envelope = self.envelope()
+        operator_digest = envelope["operator_evidence_report"][
+            "validated_receipt_references"
+        ]["authorized_metadata_inventory"]["evidence_sha256"]
+        envelope["single_writer_receipt"]["evidence_sha256"] = operator_digest
+        self.assert_rejected("distinct evidence", envelope)
+
+    def test_operator_report_rejects_reused_receipt_digests(self):
+        envelope = self.envelope()
+        references = envelope["operator_evidence_report"]["validated_receipt_references"]
+        references["real_backup_restore_rehearsal"]["evidence_sha256"] = (
+            references["authorized_metadata_inventory"]["evidence_sha256"]
+        )
+        self.assert_rejected("remain distinct", envelope)
+
     def test_receipt_provenance_digest_timestamp_and_environment_are_strict(self):
         cases = (
             ("source_inventory_sha256", "f" * 64, "source inventory"),
@@ -243,6 +265,27 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("private-secret", result.stdout)
         self.assertNotIn("private-secret", result.stderr)
+
+    def test_cli_rejects_duplicate_json_keys_at_any_depth(self):
+        cmd = [
+            sys.executable,
+            str(ROOT / "scripts/single-writer-rehearsal-evidence.py"),
+            "--json",
+        ]
+        payload = json.dumps(self.envelope(), separators=(",", ":"))
+        root_duplicate = payload[:-1] + ',"production_authorized":false}'
+        needle = '"contains_secrets":false'
+        nested_duplicate = payload.replace(
+            needle,
+            needle + ',"contains_secrets":false',
+            1,
+        )
+        for raw in (root_duplicate.encode("utf-8"), nested_duplicate.encode("utf-8")):
+            result = subprocess.run(cmd, input=raw, capture_output=True, check=False)
+            self.assertEqual(2, result.returncode)
+            self.assertEqual(b"", result.stdout)
+            self.assertNotIn(b"Traceback", result.stderr)
+            self.assertIn(b"validation failed", result.stderr)
 
     def test_cli_rejects_non_utf8_large_and_recursive_input(self):
         cmd = [
