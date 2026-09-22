@@ -69,7 +69,7 @@ python3 scripts/symfony-schema-structure.py --json > /tmp/grindflow-symfony-stru
 cat structure-envelope.json | python3 scripts/data-schema-structure-parity.py --json
 ```
 
-`symfony-schema-structure.py` analiza únicamente las migraciones Doctrine del repositorio. Su contrato `gf-arch-002-symfony-structure-v1` registra columnas (nombre, tipo SQL canónico y nulabilidad), índices (nombre, unicidad y columnas ordenadas), claves foráneas (columnas, tabla/columnas referenciadas y `ON DELETE`) y triggers (nombre, tabla, momento y evento).
+`symfony-schema-structure.py` analiza únicamente los métodos `up()` de las migraciones Doctrine y reconstruye su estado final en orden, incluyendo los `ALTER TABLE` aditivos soportados; el SQL de `down()` no puede borrar metadatos del inventario final. Un `ALTER` destructivo/no soportado falla cerrado en vez de omitirse. Su contrato `gf-arch-002-symfony-structure-v1` registra columnas (nombre, tipo SQL canónico y nulabilidad), índices (nombre, unicidad y columnas ordenadas), claves foráneas (columnas, tabla/columnas referenciadas y `ON DELETE`) y triggers (nombre, tabla, momento y evento).
 
 El snapshot autorizado usa `gf-arch-002-db-structure-snapshot-v1`, declara `metadata_only=true` y `contains_row_data=false`, y usa el mismo modelo normalizado. Los tipos se expresan en minúscula canónica, por ejemplo `char(36)`, `varchar(120)` o `decimal(12,2)`.
 
