@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 README_PATH = ROOT / "README.md"
 SCOPE_PATH = ROOT / "scripts" / "ci-scope.sh"
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
-CHANGED_FILES_HEADING = CHANGED_FILES_HEADING
+CHANGED_FILES_HEADING = "## Archivos modificados en este deploy"
+CHANGED_FILES_MARKER = "<!-- grindflow:changed-files -->"
 DELTA_ROW_PATTERN = re.compile(
     r"^\| \*\*\d+\*\* \| \*\*\+\d+\*\* \| \*\*−\d+\*\* \| \*\*[+-]\d+\*\* \|$",
     flags=re.M,
@@ -163,6 +164,7 @@ def require_markers(readme: str) -> None:
         "## Flujo de entrega",
         "## Qué se hizo",
         CHANGED_FILES_HEADING,
+        CHANGED_FILES_MARKER,
         "## Validación",
         "## Qué sigue",
         "## Panorama general pendiente",
