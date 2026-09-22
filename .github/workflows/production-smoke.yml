@@ -167,8 +167,148 @@ jobs:
               echo "Cause: inspect the short-lived diagnostic artifact."
             fi
             echo
+            # Publish only a locally generated allowlisted auth class. Never
+            # copy remote validation text, cookies, CSRF, email or response HTML.
+            auth_failure_line="$(grep -E '^AUTH_FAILURE_CLASS=(anonymous_session_unavailable|anonymous_session_inconsistent|login_csrf_rejected|login_rate_limited|login_http_rejected|login_rejected_session_stable|login_rejected_session_changed|login_rejected_session_unavailable|login_redirect_unrecognized|authenticated_session_lost|authenticated_redirect_unrecognized|authenticated_request_rejected)
+            observed_line="$(grep -E '^RELEASE_UI_OBSERVED=(v[0-9]+[.][0-9]+[.][0-9]+|unknown)$' production-smoke.log | tail -n 1 || true)"
+            if [[ -n "$expected_line" ]]; then
+              echo "Expected human release: ${expected_line#*=}"
+              if [[ -n "$observed_line" ]]; then
+                echo "Observed human release: ${observed_line#*=}"
+              else
+                echo "Observed human release: not reached by read-only smoke"
+              fi
+              echo "Human release label does not establish the deployed Git SHA."
+              echo
+            fi
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
+            echo "Retention: 3 days"
+            echo
+            echo "The diagnostic payload is kept out of the public issue body."
+            echo "Authorized agents can retrieve the short-lived artifact through GitHub."
+          } > /tmp/grindflow-production-failure.md
+
+          cat /tmp/grindflow-production-failure.md >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body-file /tmp/grindflow-production-failure.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-production-failure.md
+          fi
+
+      - name: Publish production recovery
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "## Production smoke passed"
+            echo
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Checked: /up, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
+            echo "Observed release: $(grep -E '^RELEASE_UI_OBSERVED=' production-smoke.log | tail -1 | cut -d= -f2)"
+            echo "Exact deployed Git SHA: not established by this smoke"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
+            gh issue close "$issue_number"
+          fi
+
+      - name: Fail workflow after publishing diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+      - name: Fail unconfigured authenticated production smoke
+        if: steps.credentials.outputs.configured == 'false'
+        shell: bash
+        run: |
+          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
+          exit 1
+ production-smoke.log | tail -n 1 || true)"
+            if [[ -n "$auth_failure_line" ]]; then
+              echo "Authentication diagnostic class: `${auth_failure_line#*=}`"
+              echo "This local class narrows the failing stage; it does not prove account existence, password validity or root cause."
+              echo
+            fi
             # Publish only strict allowlisted release metadata; never response HTML.
-            expected_line="$(grep -E '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' production-smoke.log | tail -n 1 || true)"
+            expected_line="$(grep -E '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+
+            observed_line="$(grep -E '^RELEASE_UI_OBSERVED=(v[0-9]+[.][0-9]+[.][0-9]+|unknown)$' production-smoke.log | tail -n 1 || true)"
+            if [[ -n "$expected_line" ]]; then
+              echo "Expected human release: ${expected_line#*=}"
+              if [[ -n "$observed_line" ]]; then
+                echo "Observed human release: ${observed_line#*=}"
+              else
+                echo "Observed human release: not reached by read-only smoke"
+              fi
+              echo "Human release label does not establish the deployed Git SHA."
+              echo
+            fi
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
+            echo "Retention: 3 days"
+            echo
+            echo "The diagnostic payload is kept out of the public issue body."
+            echo "Authorized agents can retrieve the short-lived artifact through GitHub."
+          } > /tmp/grindflow-production-failure.md
+
+          cat /tmp/grindflow-production-failure.md >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body-file /tmp/grindflow-production-failure.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-production-failure.md
+          fi
+
+      - name: Publish production recovery
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "## Production smoke passed"
+            echo
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Checked: /up, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
+            echo "Observed release: $(grep -E '^RELEASE_UI_OBSERVED=' production-smoke.log | tail -1 | cut -d= -f2)"
+            echo "Exact deployed Git SHA: not established by this smoke"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
+            gh issue close "$issue_number"
+          fi
+
+      - name: Fail workflow after publishing diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+      - name: Fail unconfigured authenticated production smoke
+        if: steps.credentials.outputs.configured == 'false'
+        shell: bash
+        run: |
+          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
+          exit 1
+ production-smoke.log | tail -n 1 || true)"
             observed_line="$(grep -E '^RELEASE_UI_OBSERVED=(v[0-9]+[.][0-9]+[.][0-9]+|unknown)$' production-smoke.log | tail -n 1 || true)"
             if [[ -n "$expected_line" ]]; then
               echo "Expected human release: ${expected_line#*=}"
