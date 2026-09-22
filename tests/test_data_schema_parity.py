@@ -20,9 +20,14 @@ class DataSchemaParityTest(unittest.TestCase):
         """Build a minimal valid source inventory."""
         return {
             "contract": MODULE.SOURCE_CONTRACT,
+            "source_only": True,
             "database_contacted": False,
             "laravel": [{"table": "users"}],
             "symfony": [{"table": "gf_accounts"}],
+            "checks": {
+                "table_name_collisions": [],
+                "symfony_tables_without_gf_prefix": [],
+            },
         }
 
     def snapshot(self, *names: str) -> dict:
@@ -57,6 +62,13 @@ class DataSchemaParityTest(unittest.TestCase):
         report = MODULE.build_report(self.source(), self.snapshot("users", "users", "gf_accounts"))
         self.assertFalse(report["compatible"])
         self.assertEqual(["users"], report["checks"]["duplicate_snapshot_tables"])
+
+    def test_dirty_source_inventory_is_rejected(self) -> None:
+        """A source inventory with a known collision cannot be used as parity evidence."""
+        source = self.source()
+        source["checks"]["table_name_collisions"] = ["users"]
+        with self.assertRaisesRegex(ValueError, "source inventory is not clean"):
+            MODULE.build_report(source, self.snapshot("users", "gf_accounts"))
 
     def test_snapshot_must_prohibit_row_data(self) -> None:
         """Snapshots without an explicit no-row-data guarantee are rejected."""
