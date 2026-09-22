@@ -290,3 +290,28 @@
   .manual-queue-state{text-align:left}
   .schedule-draft-actions select{width:100%;min-width:0}
 }
+
+/* S5: weekly internal work summary, scoped to the selected tenant. */
+.pilot-summary{margin-top:28px;padding:clamp(18px,3vw,28px);min-width:0;border:1px solid #47405f;border-radius:18px;background:#171823;scroll-margin-top:20px}
+.pilot-summary h2{font-size:clamp(24px,3vw,34px);margin:14px 0 10px}
+.pilot-summary>p{font-size:13px;line-height:1.65;color:#c8c4d6;overflow-wrap:anywhere}
+.pilot-week-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:19px 0}
+.pilot-week-controls strong{font-size:12px;color:#e5e0f1}
+.pilot-week-controls button{min-height:44px;padding:10px 13px;border:1px solid #716287;border-radius:9px;background:#242037;color:#f5edff;font:inherit;font-size:12px;cursor:pointer}
+.pilot-week-controls button:disabled{opacity:.45;cursor:not-allowed}
+.pilot-week-controls button:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+.pilot-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+.pilot-totals>div{display:grid;gap:12px;padding:17px;min-width:0;border:1px solid #39384d;border-radius:12px;background:#11131e}
+.pilot-totals small{font-size:11px;line-height:1.45;color:#bfb8cd;overflow-wrap:anywhere}
+.pilot-totals strong{font-size:clamp(28px,4vw,38px);color:#d6fff1}
+.pilot-csv-download{display:inline-flex;align-items:center;min-height:44px;margin:4px 0 12px;padding:10px 14px;border:1px solid #716287;border-radius:9px;color:#d6fff1;font-size:12px;font-weight:700;text-decoration:none}
+.pilot-csv-download:hover{background:#242037}
+.pilot-csv-download:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
+.pilot-day-scroll{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.pilot-day-scroll table{width:100%;min-width:440px;border-collapse:collapse;text-align:left;font-size:12px}
+.pilot-day-scroll caption{text-align:left;padding:14px 0;color:#c8c4d6}
+.pilot-day-scroll th,.pilot-day-scroll td{padding:12px 10px;border-bottom:1px solid #39384d}
+.pilot-day-scroll th{color:#d9c9ff}
+.pilot-day-scroll td{font-variant-numeric:tabular-nums}
+.pilot-summary .pilot-traffic-note{margin:18px 0 0;padding:13px;border:1px solid #55456d;border-radius:10px;color:#d5c6ed;background:#242037}
+@media(max-width:520px){.pilot-totals{grid-template-columns:minmax(0,1fr)}.pilot-week-controls strong{flex:1 0 100%;order:-1}}
