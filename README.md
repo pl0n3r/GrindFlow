@@ -42,6 +42,22 @@
 | Alcance | Inventario estático de tablas y frontera de escritores Laravel/Symfony |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
+## Flujo de entrega
+```mermaid
+flowchart LR
+ A["PR + snapshot exacto"] --> P["preflight"]
+ P --> F["fast contracts"]
+ F --> V["validate"]
+ A --> S["Sonar"]
+ A --> C["CodeRabbit"]
+ V --> M["Squash merge"]
+ S --> M
+ C --> M
+ M --> X["CI exact-main"]
+ X --> O["Observer release"]
+ O --> T["Smoke separado"]
+```
+
 ## Qué se hizo
 - `scripts/data-schema-inventory.py` inventaría tablas declaradas por migraciones Laravel y Symfony sin abrir `DATABASE_URL` ni conectarse a una base.
 - La guardia falla cerrado ante colisiones nominales y ante tablas Symfony nuevas que no respeten el prefijo `gf_`.
