@@ -23,7 +23,7 @@
 | CI del PR | 🚧 Pendiente | Revalidar HEAD final |
 | Sonar del PR | 🚧 Pendiente | Revalidar HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.98 | Production Smoke separado y rojo |
+| CI del SHA exacto de main | 🚧 No observado para v0.1.98 | Production Smoke separado y no validado |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
