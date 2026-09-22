@@ -110,7 +110,7 @@ El snapshot generado desde un entorno real debe permanecer fuera del repositorio
 
 ## Restore drill descartable de MariaDB + Vault
 
-`scripts/symfony-disposable-restore-drill.sh` ejecuta en CI un ensayo destructivo **solo** sobre la base `grindflow_symfony_ci` en loopback y con `APP_ENV=test`. Requiere además `GF_RESTORE_DRILL_APPROVED=1`; cualquier otro host, puerto, base o entorno falla antes de tocar datos.
+`scripts/symfony-disposable-restore-drill.sh` ejecuta en CI un ensayo destructivo **solo** sobre la base `grindflow_symfony_ci` en loopback, con `APP_ENV=test` y `CI=true`. Requiere además `GF_RESTORE_DRILL_APPROVED=1`; cualquier otro host, puerto, base o entorno falla antes de tocar datos.
 
 El ensayo:
 
@@ -125,7 +125,7 @@ El ensayo:
 9. compara el snapshot estructural anterior y posterior byte a byte;
 10. elimina la fixture sintética y destruye todos los temporales al salir.
 
-El dump y el stage contienen solo datos sintéticos de CI, se guardan bajo un directorio temporal 0700/0600 y no se suben como artefactos. El script no admite Hostinger, hosts remotos ni otro nombre de base. `scripts/symfony-disposable-restore-drill-contract.sh` prueba que las guardas rechacen falta de aprobación, entorno no-test, host remoto y base distinta.
+El dump y el stage contienen solo datos sintéticos de CI, se guardan bajo un directorio temporal 0700/0600 y no se suben como artefactos. El script no admite ejecución fuera de CI, Hostinger, hosts remotos ni otro nombre de base. `scripts/symfony-disposable-restore-drill-contract.sh` prueba que las guardas rechacen falta de aprobación, entorno no-test, `CI=false`, host remoto y base distinta.
 
 Este ejercicio demuestra que **la mecánica de recuperación del stack Symfony aislado es ejecutable** sobre infraestructura desechable. No demuestra que exista un backup productivo, no acredita RPO/RTO, no valida secretos/configuración externa y no autoriza ejecutar el mismo procedimiento contra producción.
 
