@@ -116,9 +116,9 @@ def markdown(summary: dict[str, str]) -> str:
     return "\n".join([
         "### Diagnóstico de autenticación (señales permitidas)",
         "",
-        f"- Preflight anónimo: \`{summary['preflight']}\`.",
-        f"- Redirect del login: \`{summary['login_redirect']}\`.",
-        f"- Recheck anónimo: \`{summary['recheck']}\`.",
+        f"- Preflight anónimo: `{summary['preflight']}`.",
+        f"- Redirect del login: `{summary['login_redirect']}`.",
+        f"- Recheck anónimo: `{summary['recheck']}`.",
         f"- Resultado: {labels[summary['diagnosis']]}",
         "- No determina si la contraseña, cuenta, rate-limit o configuración productiva son correctos.",
         "- No autoriza reintentos de credenciales ni cambios de cuentas.",
@@ -135,7 +135,7 @@ def main() -> int:
         if len(raw) > MAX_BYTES:
             raise ValueError("log exceeds limit")
         summary = classify(raw.decode("utf-8"))
-    except (ValueError, UnicodeError):
+    except ValueError:
         print("ERROR: smoke auth summary unavailable", file=sys.stderr)
         return 2
 
