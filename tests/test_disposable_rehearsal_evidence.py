@@ -338,6 +338,27 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertEqual("", result.stdout)
 
+    def test_cli_rejects_deeply_nested_json_without_traceback(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        depth = 2_000
+        payload = ("[" * depth) + ("0") + ("]" * depth)
+        self.assertLess(len(payload.encode("utf-8")), EVIDENCE.MAX_STDIN_BYTES)
+        result = subprocess.run(
+            [sys.executable, script, "--json"],
+            input=payload,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertEqual(
+            "ERROR: disposable rehearsal evidence validation failed\n",
+            result.stderr,
+        )
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_cli_rejects_utf16_and_utf32_json(self):
         script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
         payload = json.dumps(self.envelope())
