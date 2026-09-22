@@ -215,6 +215,7 @@ run_case() {
           post_login) grep -Fxq 'LOGIN_FAILURE_SESSION_CHECK=stable' "$log" ;;
           post_login_changed) grep -Fxq 'LOGIN_FAILURE_SESSION_CHECK=changed' "$log" ;;
           post_login_unavailable) grep -Fxq 'LOGIN_FAILURE_SESSION_CHECK=unavailable' "$log" ;;
+          *) printf 'FAIL: unexpected synthetic post-login session mode.\n' >&2; exit 1 ;;
         esac
         [[ "$(grep -c '^LOGIN_FAILURE_SESSION_CHECK=' "$log")" -eq 1 ]]
         assert_absent_fixed 'GET http://mock/dashboard' "$requests"
