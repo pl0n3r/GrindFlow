@@ -66,11 +66,11 @@ flowchart LR
 - Nuevo `scripts/operator-evidence-verifier.py`: valida offline referencias redacted a evidencia externa de GF-ARCH-002.
 - Solo admite módulos ya mapeados por ownership (`identity` y `vault`) y vuelve a cotejar el ownership report contra las migraciones del mismo checkout.
 - Exige exactamente dos receipts: `authorized_metadata_inventory` y `real_backup_restore_rehearsal`.
-- Cada receipt conserva únicamente SHA-256, timestamp UTC, módulo, huella del inventario y entorno esperado.
+- Cada receipt conserva únicamente SHA-256, timestamp UTC, módulo, huella del inventario y entorno esperado; inventario y restore deben usar digests distintos.
 - Requiere `operator_observed=true`, `contains_row_data=false` y `contains_secrets=false`; campos adicionales como URL, path, usuario, nota o credencial se rechazan.
 - La entrada está limitada a 1.000.000 bytes, exige UTF-8 y falla cerrado ante JSON recursivo o malformado sin reproducir el payload.
 - La suite instala una audit barrier para detectar sockets, subprocesses u operaciones externas y comprueba que `DATABASE_URL` no se filtra.
-- El reporte final mantiene siempre `production_ready=false` y `production_authorized=false`.
+- El reporte declara `scope=redacted_references_only` y `receipt_content_verified=false`; mantiene siempre `production_ready=false` y `production_authorized=false`.
 - Siguen pendientes y separados: evidencia de single-writer/freeze, autorización del owner y Production Smoke.
 - `fast` compila y ejecuta la suite del nuevo contrato; no se toca Hostinger, MariaDB productiva, cuentas ni blobs reales.
 
