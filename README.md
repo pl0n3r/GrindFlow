@@ -20,8 +20,8 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.78** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.77~~ | `4b5ebeba23e535b845caec943e1b713dd5379165` |
-| CI del PR | 🚧 Revalidar v0.1.78 tras corregir versionado | `GrindFlow CI / validate`; anterior #35669894474 falló con 0.1.77→0.1.77 |
-| Sonar | 🚧 Volver a comprobar head estable | SonarCloud PR; análisis anterior quality gate verde |
+| CI del PR | ✅ ~~VALIDATED IN CODE v0.1.78~~ | `GrindFlow CI / validate` run `35671057434`; confirmar gates del nuevo HEAD antes de merge |
+| Sonar | ✅ ~~Quality Gate de v0.1.78 success~~ | SonarCloud PR, sin issues nuevos; revalidar nuevo HEAD antes del merge |
 | CodeRabbit | ⛔ Revisión final obligatoria pendiente tras rate limit | PR #78; no fusionar hasta review completa |
 | CI del SHA exacto de main | ✅ ~~v0.1.77 success~~ | run `35667874191` |
 | Deploy Observer | ✅ ~~v0.1.77 release observada~~ | run `35667874090`; versión humana, NO SHA Hostinger |
@@ -73,8 +73,8 @@ Inventario de **solo el deploy actual** candidato, no prueba checkout SHA remoto
 - `docs/GOVERNANCE.md`
 
 ## Validación
-- CI inicial #35669894474 falló por versión sin incrementar; #35670647076 por título desfasado. Ambos se corrigieron en el código y en la PR, pendiente nueva CI.
-- Volver a verificar CI `validate`, Sonar y la revisión final explícita CodeRabbit sobre el mismo head antes de merge.
+- CI #35671057434 pasó tras corregir versión y título; esta actualización del snapshot requiere validar el SHA final de nuevo antes de fusionar.
+- Verificar CI `validate`, Sonar y la revisión final explícita CodeRabbit sobre el mismo HEAD definitivo antes del merge.
 - Sin despliegue Symfony, migraciones, escrituras productivas ni declaración de smoke autenticado en verde.
 
 ## Qué sigue
