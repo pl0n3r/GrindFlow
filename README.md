@@ -62,11 +62,11 @@ flowchart LR
 
 ## Qué se hizo
 - Nuevo `scripts/symfony-disposable-restore-drill.sh`: ensaya backup, destrucción y restauración de MariaDB + blobs sobre infraestructura sintética.
-- Las guardas exigen `GF_RESTORE_DRILL_APPROVED=1`, `APP_ENV=test`, host loopback, puerto 3306 y base exacta `grindflow_symfony_ci`.
+- Las guardas exigen `GF_RESTORE_DRILL_APPROVED=1`, `APP_ENV=test`, `CI=true`, host loopback, puerto 3306 y base exacta `grindflow_symfony_ci`.
 - El drill crea una fixture mínima, audita el Vault, prepara un stage privado, genera dump completo con triggers, elimina DB/originales y restaura ambos lados.
 - Tras restaurar exige `vault:verify-restore`, `doctrine:schema:validate`, paridad estructural y snapshot pre/post idéntico.
 - El dump/stage viven en temporales privados y se destruyen al finalizar; no se publican como artefactos ni aceptan Hostinger/remotos.
-- Nuevo contrato shell prueba rechazo sin opt-in, en entorno no-test, host remoto y nombre de DB distinto.
+- Nuevo contrato shell prueba rechazo sin opt-in, entorno no-test, ejecución fuera de CI, host remoto y nombre de DB distinto.
 - `ci-scope.sh` selecciona obligatoriamente `symfony-preview` si cambia cualquiera de los scripts del restore drill.
 - La prueba corre antes de iniciar el preview HTTP, sobre la MariaDB de servicio descartable de GitHub Actions.
 
