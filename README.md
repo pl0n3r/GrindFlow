@@ -64,7 +64,7 @@ flowchart LR
 - Nuevo `scripts/data-schema-parity.py`: compara el inventario de migraciones con un snapshot JSON de metadatos, sin código de conexión a base de datos.
 - El contrato `gf-arch-002-db-snapshot-v1` exige `metadata_only=true` y `contains_row_data=false`.
 - La validación falla cerrado ante tablas fuente ausentes, nombres duplicados o tablas `gf_*` desconocidas; extras no Symfony quedan informativos.
-- Seis pruebas unitarias cubren éxito, faltantes, drift Symfony, duplicados y rechazo explícito de snapshots con datos de filas.
+- Siete pruebas unitarias cubren éxito, faltantes, drift Symfony, duplicados y rechazo explícito de snapshots con datos de filas.
 - El gate `fast` compila el comparador y ejecuta sus tests; al modificar el workflow, el selector exige la matriz completa de CI.
 - `docs/DATA-CUTOVER-INVENTORY.md` documenta formato, límites y flujo reproducible. Sigue sin existir autorización de cutover productivo.
 
