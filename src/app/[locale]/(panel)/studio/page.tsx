@@ -45,7 +45,7 @@ export default async function StudioDashboard({
           label={tm('pendingSanitize')}
           value={n(pendingSanitize.count)}
           tone={(pendingSanitize.count ?? 0) > 0 ? 'warn' : 'ok'}
-          hint="Sin sanitizar no se puede programar"
+          hint={tm('pendingSanitizeHint')}
         />
         <Metric label={tm('scheduled')} value={n(scheduled.count)} />
         <Metric label={tm('models')} value={n(models.count)} />

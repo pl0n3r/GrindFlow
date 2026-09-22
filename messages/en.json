@@ -1,23 +1,23 @@
 {
   "app": {
     "name": "GrindFlow",
-    "tagline": "Content vault, automated distribution and traffic funnels"
+    "tagline": "Store your content, publish automatically and bring in more traffic"
   },
   "nav": {
     "dashboard": "Dashboard",
-    "vault": "Vault",
-    "schedule": "Schedule",
+    "vault": "My content",
+    "schedule": "Posting calendar",
     "links": "Links",
-    "analytics": "Analytics",
+    "analytics": "Stats",
     "finance": "Finance",
-    "compliance": "Compliance",
+    "compliance": "Verification",
     "models": "Models",
-    "organizations": "Organizations",
-    "jobs": "Processing",
+    "organizations": "Agencies",
+    "jobs": "Tasks in progress",
     "settings": "Settings",
     "signOut": "Sign out",
-    "triage": "Triage",
-    "connectors": "Connectors"
+    "triage": "Files to assign",
+    "connectors": "Connections"
   },
   "roles": {
     "admin": "Platform admin",
@@ -34,36 +34,37 @@
     "signedOut": "Signed out"
   },
   "home": {
-    "heading": "GrindFlow & Traffic Engine",
-    "body": "Multi-tenant platform for studios and independent models.",
+    "heading": "GrindFlow",
+    "body": "The platform for studios and independent models to organize their content and grow their audience.",
     "cta": "Open dashboard"
   },
   "dashboard": {
     "welcome": "Hi, {name}",
-    "adminTitle": "Platform dashboard",
+    "adminTitle": "Overview",
     "studioTitle": "Studio dashboard",
     "modelTitle": "My dashboard",
-    "empty": "Nothing to show yet."
+    "empty": "Nothing to show here yet."
   },
   "metrics": {
-    "assets": "Assets in vault",
-    "pendingSanitize": "Pending sanitization",
+    "assets": "Files stored",
+    "pendingSanitize": "Pending review",
     "scheduled": "Scheduled posts",
     "clicks": "Clicks this period",
     "models": "Active models",
-    "organizations": "Organizations",
-    "grossAmount": "Gross revenue",
-    "netAmount": "Model net",
+    "organizations": "Agencies",
+    "grossAmount": "Total billed",
+    "netAmount": "What the model receives",
     "agencyFee": "Agency fee",
-    "deadJobs": "Failed jobs"
+    "deadJobs": "Tasks that failed",
+    "pendingSanitizeHint": "You can't schedule posts until these files are reviewed"
   },
   "compliance": {
-    "status": "Record status",
+    "status": "Verification status",
     "verified": "Verified",
-    "pending": "Pending",
+    "pending": "Under review",
     "expired": "Expired",
     "rejected": "Rejected",
-    "blocked": "Publishing blocked: 2257 record unverified or expired.",
+    "blocked": "You can't publish yet: your identity verification (2257 form) is expired or unconfirmed.",
     "expiresOn": "Expires on {date}"
   },
   "errors": {
@@ -72,10 +73,10 @@
     "generic": "Something went wrong. Please try again."
   },
   "triage": {
-    "title": "Ingest triage",
-    "intro": "Files found in the cloud that could not be matched to a model. They are not downloaded yet: assigning them is what starts the download.",
-    "empty": "Nothing to triage",
-    "emptyHint": "When a scan finds files it cannot assign on its own, they show up here.",
+    "title": "Files to assign",
+    "intro": "These files were found in the cloud but we don't yet know which model they belong to. They haven't been downloaded yet: they download as soon as you assign them to a model.",
+    "empty": "No files pending",
+    "emptyHint": "When we find files we can't assign automatically, they'll show up here.",
     "selectAll": "Select all",
     "clearAll": "Clear selection",
     "selectedCount": "{count} selected",
@@ -92,6 +93,24 @@
       "perfil_no_encontrado": "That model does not exist in your agency.",
       "sin_permiso": "You do not have permission to assign in this agency.",
       "no_se_pudo_asignar": "The assignment could not be completed. Please try again."
+    }
+  },
+  "upload": {
+    "pickFiles": "Tap to choose photos or videos",
+    "uploading": "Uploading {name}...",
+    "done": "Done: uploaded {count} file(s).",
+    "genericError": "The file could not be uploaded.",
+    "storageError": "Storage rejected the file.",
+    "unexpectedError": "An unexpected error occurred.",
+    "errors": {
+      "enlace_no_valido": "This link is not valid.",
+      "enlace_revocado": "This link was revoked.",
+      "enlace_caducado": "This link has expired. Ask for a new one.",
+      "cuota_agotada": "This link already reached its file limit.",
+      "tipo_no_permitido": "That file type is not allowed.",
+      "archivo_demasiado_grande": "The file exceeds the maximum allowed size.",
+      "peticion_invalida": "The request could not be processed.",
+      "reintenta": "There was a conflict. Please try again."
     }
   }
 }

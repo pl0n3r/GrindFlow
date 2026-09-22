@@ -1,23 +1,23 @@
 {
   "app": {
     "name": "GrindFlow",
-    "tagline": "Vault de contenido, distribucion automatizada y embudos de trafico"
+    "tagline": "Guarda tu contenido, publica en automático y trae más tráfico"
   },
   "nav": {
     "dashboard": "Panel",
-    "vault": "Vault",
-    "schedule": "Programacion",
+    "vault": "Mi contenido",
+    "schedule": "Calendario de publicaciones",
     "links": "Enlaces",
-    "analytics": "Analitica",
+    "analytics": "Estadísticas",
     "finance": "Finanzas",
-    "compliance": "Cumplimiento",
+    "compliance": "Verificación",
     "models": "Modelos",
-    "organizations": "Organizaciones",
-    "jobs": "Procesamiento",
+    "organizations": "Agencias",
+    "jobs": "Tareas en curso",
     "settings": "Ajustes",
-    "signOut": "Cerrar sesion",
-    "triage": "Triaje",
-    "connectors": "Conectores"
+    "signOut": "Cerrar sesión",
+    "triage": "Archivos por asignar",
+    "connectors": "Conexiones"
   },
   "roles": {
     "admin": "Admin de plataforma",
@@ -26,72 +26,91 @@
     "editor": "Editor"
   },
   "auth": {
-    "signIn": "Iniciar sesion",
-    "email": "Correo electronico",
-    "password": "Contrasena",
+    "signIn": "Iniciar sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
     "signInCta": "Entrar",
-    "invalidCredentials": "Correo o contrasena incorrectos",
-    "signedOut": "Sesion cerrada"
+    "invalidCredentials": "Correo o contraseña incorrectos",
+    "signedOut": "Sesión cerrada"
   },
   "home": {
-    "heading": "GrindFlow & Traffic Engine",
-    "body": "Plataforma multi-tenant para estudios y modelos independientes.",
+    "heading": "GrindFlow",
+    "body": "La plataforma para que estudios y modelos independientes organicen su contenido y hagan crecer su audiencia.",
     "cta": "Entrar al panel"
   },
   "dashboard": {
     "welcome": "Hola, {name}",
-    "adminTitle": "Panel de plataforma",
+    "adminTitle": "Panel general",
     "studioTitle": "Panel del estudio",
     "modelTitle": "Mi panel",
-    "empty": "Todavia no hay datos que mostrar."
+    "empty": "Todavía no hay nada que mostrar aquí."
   },
   "metrics": {
-    "assets": "Assets en el vault",
-    "pendingSanitize": "Pendientes de sanitizar",
+    "assets": "Archivos guardados",
+    "pendingSanitize": "Pendientes de revisar",
     "scheduled": "Publicaciones programadas",
-    "clicks": "Clics del periodo",
+    "clicks": "Clics en este periodo",
     "models": "Modelos activas",
-    "organizations": "Organizaciones",
-    "grossAmount": "Facturado bruto",
-    "netAmount": "Neto de la modelo",
-    "agencyFee": "Comision de agencia",
-    "deadJobs": "Trabajos fallidos"
+    "organizations": "Agencias",
+    "grossAmount": "Total facturado",
+    "netAmount": "Lo que recibe la modelo",
+    "agencyFee": "Comisión de la agencia",
+    "deadJobs": "Tareas que fallaron",
+    "pendingSanitizeHint": "No puedes programar publicaciones hasta revisar estos archivos"
   },
   "compliance": {
-    "status": "Estado del expediente",
+    "status": "Estado de tu verificación",
     "verified": "Verificado",
-    "pending": "Pendiente",
-    "expired": "Caducado",
+    "pending": "En revisión",
+    "expired": "Vencido",
     "rejected": "Rechazado",
-    "blocked": "Publicacion bloqueada: expediente 2257 sin verificar o caducado.",
+    "blocked": "No puedes publicar todavía: tu verificación de identidad está vencida o sin confirmar.",
     "expiresOn": "Vence el {date}"
   },
   "errors": {
-    "unauthorized": "No tienes acceso a esta seccion.",
+    "unauthorized": "No tienes acceso a esta sección.",
     "notFound": "No encontrado.",
-    "generic": "Algo salio mal. Intenta de nuevo."
+    "generic": "Algo salió mal. Intenta de nuevo."
   },
   "triage": {
-    "title": "Triaje de ingesta",
-    "intro": "Archivos encontrados en la nube que no se pudieron asignar a ninguna modelo. Todavia no se han descargado: asignarlos es lo que dispara la descarga.",
-    "empty": "Nada pendiente de triaje",
-    "emptyHint": "Cuando un escaneo encuentre archivos que no pueda asignar solo, apareceran aqui.",
-    "selectAll": "Seleccionar todo",
-    "clearAll": "Quitar seleccion",
+    "title": "Archivos por asignar",
+    "intro": "Estos archivos se encontraron en la nube pero todavía no sabemos de qué modelo son. No se han descargado todavía: se descargan en cuanto los asignes a una modelo.",
+    "empty": "No hay archivos pendientes",
+    "emptyHint": "Cuando encontremos archivos que no podamos asignar automáticamente, aparecerán aquí.",
+    "selectAll": "Seleccionar todos",
+    "clearAll": "Quitar selección",
     "selectedCount": "{count} seleccionados",
     "choose": "Elegir modelo...",
     "assign": "Asignar y descargar",
-    "assigned": "{assigned} asignados. {untouched} sin cambios (alguien los asigno antes).",
-    "noFolder": "Sin subcarpeta",
+    "assigned": "{assigned} archivos asignados. {untouched} no se tocaron porque ya estaban asignados por otra persona.",
+    "noFolder": "Sin carpeta",
     "filesInFolder": "{count} archivos",
     "errors": {
-      "sin_seleccion": "No hay nada seleccionado.",
-      "lote_demasiado_grande": "Demasiados archivos de una vez: maximo 200 por lote.",
-      "datos_invalidos": "La seleccion no es valida.",
-      "sin_sesion": "Tu sesion caduco. Vuelve a entrar.",
+      "sin_seleccion": "No has seleccionado nada.",
+      "lote_demasiado_grande": "Estás seleccionando demasiados archivos a la vez: el máximo es 200.",
+      "datos_invalidos": "La selección no es válida.",
+      "sin_sesion": "Tu sesión caducó. Vuelve a iniciar sesión.",
       "perfil_no_encontrado": "Esa modelo no existe en tu agencia.",
-      "sin_permiso": "No tienes permiso para asignar en esta agencia.",
-      "no_se_pudo_asignar": "No se pudo completar la asignacion. Intenta de nuevo."
+      "sin_permiso": "No tienes permiso para asignar archivos en esta agencia.",
+      "no_se_pudo_asignar": "No se pudo completar la asignación. Inténtalo de nuevo."
+    }
+  },
+  "upload": {
+    "pickFiles": "Toca para elegir fotos o videos",
+    "uploading": "Subiendo {name}...",
+    "done": "Listo: subiste {count} archivo(s).",
+    "genericError": "No se pudo subir el archivo.",
+    "storageError": "El servidor de almacenamiento rechazó el archivo.",
+    "unexpectedError": "Ocurrió un error inesperado.",
+    "errors": {
+      "enlace_no_valido": "Este enlace no es válido.",
+      "enlace_revocado": "Este enlace fue revocado.",
+      "enlace_caducado": "Este enlace ya caducó. Pide uno nuevo.",
+      "cuota_agotada": "Este enlace ya alcanzó su límite de archivos.",
+      "tipo_no_permitido": "Ese tipo de archivo no está permitido.",
+      "archivo_demasiado_grande": "El archivo supera el peso máximo permitido.",
+      "peticion_invalida": "No se pudo procesar la petición.",
+      "reintenta": "Hubo un conflicto. Intenta de nuevo."
     }
   }
 }
