@@ -73,7 +73,7 @@ Inventario de **solo el deploy actual** candidato, no prueba checkout SHA remoto
 - `docs/GOVERNANCE.md`
 
 ## Validación
-- CI anterior #35669894474 falló únicamente porque la PR conservaba la versión `0.1.77`; aquí se corrige a `0.1.78`.
+- CI inicial #35669894474 falló por versión sin incrementar; #35670647076 por título desfasado. Ambos se corrigieron en el código y en la PR, pendiente nueva CI.
 - Volver a verificar CI `validate`, Sonar y la revisión final explícita CodeRabbit sobre el mismo head antes de merge.
 - Sin despliegue Symfony, migraciones, escrituras productivas ni declaración de smoke autenticado en verde.
 
