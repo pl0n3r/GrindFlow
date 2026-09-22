@@ -48,6 +48,12 @@ CI_FIELDS = frozenset({
     "run_id",
     "disposable",
 })
+GATE_RESULT_FIELDS = frozenset({
+    "head_sha",
+    "run_id",
+    "checks",
+})
+MAX_GATE_RESULTS_BYTES = 64_000
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 RUN_ID_RE = re.compile(r"^[1-9]\d*$")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -205,6 +211,7 @@ def build_report(envelope: Any) -> dict[str, Any]:
             "provider": ci["provider"],
             "head_sha": ci["head_sha"],
             "run_id": ci["run_id"],
+            "disposable": ci["disposable"],
         },
         "module": ownership["module"],
         "source_inventory_sha256": ownership["source_inventory_sha256"],
@@ -220,7 +227,26 @@ def build_report(envelope: Any) -> dict[str, Any]:
     }
 
 
-def draft_envelope(module: str, head_sha: str, run_id: str) -> dict[str, Any]:
+def load_gate_results(path: str, head_sha: str, run_id: str) -> dict[str, str]:
+    """Load same-run disposable gate results from a bounded UTF-8 JSON file."""
+    raw = Path(path).read_bytes()
+    if len(raw) > MAX_GATE_RESULTS_BYTES:
+        fail("gate results exceed safety limit")
+    payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, dict) or set(payload) != GATE_RESULT_FIELDS:
+        fail("gate results fields do not match the contract")
+    if payload["head_sha"] != head_sha or payload["run_id"] != run_id:
+        fail("gate results do not match the CI run")
+    return validate_checks(payload["checks"])
+
+
+def draft_envelope(
+    module: str,
+    head_sha: str,
+    run_id: str,
+    checks: dict[str, str],
+) -> dict[str, Any]:
+    """Build a disposable envelope from explicitly validated same-run gates."""
     ownership = ownership_module()
     draft = ownership.draft_envelope(module)
     ownership_report = ownership.build_report(draft["source"], draft["plan"])
@@ -233,7 +259,7 @@ def draft_envelope(module: str, head_sha: str, run_id: str) -> dict[str, Any]:
             "disposable": True,
         },
         "ownership_report": ownership_report,
-        "checks": dict.fromkeys(CHECKS, "passed"),
+        "checks": validate_checks(checks),
         "production_authorized": False,
     }
     build_report(envelope)
@@ -248,14 +274,24 @@ def main() -> int:
     parser.add_argument("--template", choices=("identity", "vault"))
     parser.add_argument("--head-sha")
     parser.add_argument("--run-id")
+    parser.add_argument("--gate-results")
     args = parser.parse_args()
 
     try:
         if args.template is not None:
-            if args.head_sha is None or args.run_id is None:
-                fail("--template requires --head-sha and --run-id")
+            if (
+                args.head_sha is None
+                or args.run_id is None
+                or args.gate_results is None
+            ):
+                fail("--template requires --head-sha, --run-id and --gate-results")
+            checks = load_gate_results(
+                args.gate_results,
+                args.head_sha,
+                args.run_id,
+            )
             print(json.dumps(
-                draft_envelope(args.template, args.head_sha, args.run_id),
+                draft_envelope(args.template, args.head_sha, args.run_id, checks),
                 sort_keys=True,
                 indent=2,
             ))
