@@ -34,6 +34,7 @@ LOGIN_HTTP_FAILURE = re.compile(
 
 
 def parse_signals(log: str) -> dict[str, str]:
+    """Extract permitted telemetry and reject conflicting values."""
     signals: dict[str, str] = {}
     for line in log.splitlines():
         for name, allowed in SIGNALS.items():
@@ -50,6 +51,7 @@ def parse_signals(log: str) -> dict[str, str]:
 
 
 def classify(log: str) -> dict[str, str]:
+    """Classify one authentication outcome without echoing the source log."""
     signals = parse_signals(log)
     preflight = signals.get("LOGIN_SESSION_PREFLIGHT", "unobserved")
     redirect = signals.get("LOGIN_REDIRECT_PATH", "unobserved")
@@ -92,6 +94,7 @@ def classify(log: str) -> dict[str, str]:
 
 
 def markdown(summary: dict[str, str]) -> str:
+    """Render a fixed-vocabulary incident summary without remote content."""
     labels = {
         "not_classified": "Sin diagnóstico de autenticación concluyente.",
         "anonymous_session_inconsistent": (
@@ -127,6 +130,7 @@ def markdown(summary: dict[str, str]) -> str:
 
 
 def main() -> int:
+    """Read bounded input and emit a safe summary or a fixed error."""
     parser = argparse.ArgumentParser(description="Safe offline production smoke auth summary")
     parser.add_argument("--markdown", action="store_true")
     args = parser.parse_args()
