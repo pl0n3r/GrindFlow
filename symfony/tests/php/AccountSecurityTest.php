@@ -129,13 +129,28 @@ final class AccountSecurityTest extends WebTestCase
             $client->request('GET', '/api/admin/context');
             $freshCsrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
             $freshHeaders = $jsonHeaders + ['HTTP_X_CSRF_TOKEN' => $freshCsrf];
-            for ($attempt = 0; $attempt < 2; ++$attempt) {
-                $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
-                    'current_password' => 'wrong-current', 'new_password' => $old,
-                    'confirm_password' => $old,
-                ], JSON_THROW_ON_ERROR));
-                self::assertResponseStatusCodeSame(422);
-            }
+            // A syntactically valid request padded beyond the 4 KiB input ceiling
+            // must fail before JSON decoding or any password change. It still counts
+            // against the per-identity limiter, even across renewed sessions.
+            $oversized = str_repeat(' ', 4097).json_encode([
+                'current_password' => $next, 'new_password' => $old,
+                'confirm_password' => $old,
+            ], JSON_THROW_ON_ERROR);
+            $client->request('POST', $endpoint, [], [], $freshHeaders, $oversized);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_password', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertStringNotContainsString($oversized, (string) $client->getResponse()->getContent());
+            self::assertTrue(password_verify($next, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
+
+            $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
+                'current_password' => 'wrong-current', 'new_password' => $old,
+                'confirm_password' => $old,
+            ], JSON_THROW_ON_ERROR));
+            self::assertResponseStatusCodeSame(422);
             $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
                 'current_password' => $next, 'new_password' => $old,
                 'confirm_password' => $old,
