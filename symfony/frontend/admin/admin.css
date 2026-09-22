@@ -304,6 +304,9 @@
 .pilot-totals>div{display:grid;gap:12px;padding:17px;min-width:0;border:1px solid #39384d;border-radius:12px;background:#11131e}
 .pilot-totals small{font-size:11px;line-height:1.45;color:#bfb8cd;overflow-wrap:anywhere}
 .pilot-totals strong{font-size:clamp(28px,4vw,38px);color:#d6fff1}
+.pilot-csv-download{display:inline-flex;align-items:center;min-height:44px;margin:4px 0 12px;padding:10px 14px;border:1px solid #716287;border-radius:9px;color:#d6fff1;font-size:12px;font-weight:700;text-decoration:none}
+.pilot-csv-download:hover{background:#242037}
+.pilot-csv-download:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
 .pilot-day-scroll{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
 .pilot-day-scroll table{width:100%;min-width:440px;border-collapse:collapse;text-align:left;font-size:12px}
 .pilot-day-scroll caption{text-align:left;padding:14px 0;color:#c8c4d6}
