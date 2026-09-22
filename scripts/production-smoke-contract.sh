@@ -137,6 +137,7 @@ run_case() {
       grep -Fxq 'LOGIN_SESSION_PREFLIGHT=inconsistent' "$log"
       grep -Fq 'anonymous session/CSRF changed across identical GET requests; no login POST was sent.' "$log"
       grep -Fq 'ERROR: authentication failure is deterministic; do not retry credentials.' "$log"
+      assert_absent_fixed 'fake-csrf' "$log"
       assert_absent_fixed 'never-print-csrf-rotated' "$log"
       assert_absent_fixed "$NO_RETRY_MARKER" "$log"
       assert_absent_regex "$LOGIN_POST_PATTERN" "$requests"
