@@ -58,7 +58,24 @@ cat envelope.json | python3 scripts/data-schema-parity.py --json
 
 El comparador no acepta rutas de archivos como argumentos, reduciendo el riesgo de lectura arbitraria por path traversal. El archivo `envelope.json` del ejemplo es local/temporal y **no debe versionarse si proviene de un entorno real**.
 
-La comparación falla cerrado cuando falta una tabla declarada por fuente, el snapshot repite un nombre o aparece una tabla `gf_*` que Symfony no declara. Tablas adicionales sin prefijo `gf_` se reportan como informativas porque una base existente puede contener tablas operativas o históricas que esta transición no administra. **Este nivel comprueba presencia de tablas, no columnas, índices, claves, triggers, conteos ni contenido.**
+La comparación falla cerrado cuando falta una tabla declarada por fuente, el snapshot repite un nombre o aparece una tabla `gf_*` que Symfony no declara. Tablas adicionales sin prefijo `gf_` se reportan como informativas porque una base existente puede contener tablas operativas o históricas que esta transición no administra.
+
+## Paridad estructural del esquema Symfony
+
+La segunda capa comprueba el esquema aislado `gf_*` con dos herramientas también offline:
+
+```bash
+python3 scripts/symfony-schema-structure.py --json > /tmp/grindflow-symfony-structure.json
+cat structure-envelope.json | python3 scripts/data-schema-structure-parity.py --json
+```
+
+`symfony-schema-structure.py` analiza únicamente las migraciones Doctrine del repositorio. Su contrato `gf-arch-002-symfony-structure-v1` registra columnas (nombre, tipo SQL canónico y nulabilidad), índices (nombre, unicidad y columnas ordenadas), claves foráneas (columnas, tabla/columnas referenciadas y `ON DELETE`) y triggers (nombre, tabla, momento y evento).
+
+El snapshot autorizado usa `gf-arch-002-db-structure-snapshot-v1`, declara `metadata_only=true` y `contains_row_data=false`, y usa el mismo modelo normalizado. Los tipos se expresan en minúscula canónica, por ejemplo `char(36)`, `varchar(120)` o `decimal(12,2)`.
+
+El comparador falla cerrado si una tabla `gf_*`, columna, índice, FK o trigger falta, aparece de más o cambia de estructura. Las tablas no `gf_*` siguen siendo informativas: este slice **no declara paridad estructural de Laravel**, que continúa como escritor legado hasta un cutover explícito.
+
+Esta capa todavía **no** acredita defaults/check constraints, conteos, contenido, secuencia de migraciones aplicada, backup restaurable ni aislamiento cross-tenant sobre datos reales.
 
 ## Secuencia obligatoria antes de un cutover real
 
