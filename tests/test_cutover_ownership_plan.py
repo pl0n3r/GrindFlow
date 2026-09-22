@@ -173,6 +173,32 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         self.assertEqual("", bad.stdout)
         self.assertNotIn("secret-injected-credential", bad.stderr)
 
+    def test_source_inventory_json_is_one_document(self):
+        cmd = [sys.executable, str(ROOT / "scripts/data-schema-inventory.py"), "--json"]
+        r = subprocess.run(cmd, text=True, capture_output=True, check=False)
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertEqual("", r.stderr)
+        self.assertEqual(self.source(), json.loads(r.stdout))
+        self.assertNotIn("source schema guard: OK", r.stdout)
+
+    def test_template_round_trip_stays_pending_and_offline(self):
+        cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py")]
+        for module in ("identity", "vault"):
+            generated = subprocess.run(
+                [*cmd, "--template", module],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(0, generated.returncode, generated.stderr)
+            draft = json.loads(generated.stdout)
+            self.assertFalse(draft["plan"]["production_authorized"])
+            self.assertFalse(draft["source"]["database_contacted"])
+            checked = subprocess.run(
+                [*cmd, "--json"],
+                input=generated.stdout, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(0, checked.returncode, checked.stderr)
+            self.assertFalse(json.loads(checked.stdout)["cutover_authorized"])
+
     def test_large_or_malformed_envelope_is_rejected(self):
         cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py")]
         for payload in ("x" * (CUTOVER.MAX_STDIN_BYTES + 1), '{"source":[]}', "[]"):
