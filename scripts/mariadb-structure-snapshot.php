@@ -11,7 +11,6 @@ declare(strict_types=1);
  * - application rows are never selected;
  * - credentials, schema name and connection errors are never emitted.
  */
-
 const GF_SNAPSHOT_CONTRACT = 'gf-arch-002-db-structure-snapshot-v1';
 
 /** @return array{host:string,port:int,database:string,user:string,password:string} */
@@ -215,6 +214,7 @@ function normalizeTriggers(array $rows): array
     }
 
     usort($triggers, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+
     return $triggers;
 }
 
@@ -327,12 +327,14 @@ function main(): int
 {
     if (getenv('GF_METADATA_SNAPSHOT_APPROVED') !== '1') {
         fwrite(STDERR, "ERROR: metadata snapshot requires explicit approval.\n");
+
         return 2;
     }
 
     $databaseUrl = getenv('DATABASE_URL');
     if (! is_string($databaseUrl) || $databaseUrl === '') {
         fwrite(STDERR, "ERROR: DATABASE_URL is required.\n");
+
         return 2;
     }
 
@@ -341,9 +343,11 @@ function main(): int
         $pdo = connectMetadataDatabase($config);
         $snapshot = captureSnapshot($pdo, $config['database']);
         echo json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), "\n";
+
         return 0;
     } catch (Throwable) {
         fwrite(STDERR, "ERROR: metadata snapshot could not be captured.\n");
+
         return 2;
     }
 }
