@@ -198,7 +198,9 @@ final class IdentityLoginTest extends WebTestCase
             self::assertStringContainsString('no-store', $errorCache);
             self::assertStringContainsString('private', $errorCache);
             self::assertStringNotContainsString('public', $errorCache);
-            self::assertStringNotContainsString('only-for-isolated-ci', (string) $client->getResponse()->getContent());
+            $errorBody = (string) $client->getResponse()->getContent();
+            self::assertStringNotContainsString('only-for-isolated-ci', $errorBody);
+            self::assertStringNotContainsString('inactiv', strtolower($errorBody));
 
             $client->request('GET', '/organizations');
             self::assertResponseRedirects('/login');
