@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ChangeEvent } from 'react';
+import { useTranslations } from 'next-intl';
 
 /**
  * Subida directa del navegador a R2.
@@ -19,18 +20,8 @@ type Status =
   | { kind: 'done'; count: number }
   | { kind: 'error'; message: string };
 
-const MESSAGES: Record<string, string> = {
-  enlace_no_valido: 'Este enlace no es valido.',
-  enlace_revocado: 'Este enlace fue revocado.',
-  enlace_caducado: 'Este enlace ya caduco. Pide uno nuevo.',
-  cuota_agotada: 'Este enlace ya alcanzo su limite de archivos.',
-  tipo_no_permitido: 'Ese tipo de archivo no esta permitido.',
-  archivo_demasiado_grande: 'El archivo supera el peso maximo permitido.',
-  peticion_invalida: 'No se pudo procesar la solicitud.',
-  reintenta: 'Hubo un conflicto. Intenta de nuevo.',
-};
-
 export function UploadClient({ token }: { token: string }) {
+  const t = useTranslations('upload');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
   async function uploadOne(file: File): Promise<void> {
@@ -51,7 +42,9 @@ export function UploadClient({ token }: { token: string }) {
       const { error } = (await presignResponse.json().catch(() => ({}))) as {
         error?: string;
       };
-      throw new Error(MESSAGES[error ?? ''] ?? 'No se pudo subir el archivo.');
+      const key = error ?? '';
+      const message = t.has(`errors.${key}`) ? t(`errors.${key}`) : t('genericError');
+      throw new Error(message);
     }
 
     const { uploadUrl, requiredHeaders } = (await presignResponse.json()) as {
@@ -65,7 +58,7 @@ export function UploadClient({ token }: { token: string }) {
 
     const put = await fetch(uploadUrl, { method: 'PUT', headers, body: file });
     if (!put.ok) {
-      throw new Error('El almacenamiento rechazo el archivo.');
+      throw new Error(t('storageError'));
     }
   }
 
@@ -83,7 +76,7 @@ export function UploadClient({ token }: { token: string }) {
     } catch (error) {
       setStatus({
         kind: 'error',
-        message: error instanceof Error ? error.message : 'Error inesperado.',
+        message: error instanceof Error ? error.message : t('unexpectedError'),
       });
     } finally {
       event.target.value = '';
@@ -101,16 +94,14 @@ export function UploadClient({ token }: { token: string }) {
           className="sr-only"
           disabled={status.kind === 'uploading'}
         />
-        <span className="text-sm text-ink-200">Toca para elegir fotos o videos</span>
+        <span className="text-sm text-ink-200">{t('pickFiles')}</span>
       </label>
 
       {status.kind === 'uploading' && (
-        <p className="text-sm text-ink-400">Subiendo {status.name}...</p>
+        <p className="text-sm text-ink-400">{t('uploading', { name: status.name })}</p>
       )}
       {status.kind === 'done' && (
-        <p className="text-sm text-ok-500">
-          Listo: {status.count} archivo(s) subidos.
-        </p>
+        <p className="text-sm text-ok-500">{t('done', { count: status.count })}</p>
       )}
       {status.kind === 'error' && (
         <p role="alert" className="text-sm text-danger-500">

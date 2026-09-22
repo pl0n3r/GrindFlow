@@ -7,7 +7,7 @@ import '../globals.css';
 
 export const metadata: Metadata = {
   title: 'GrindFlow',
-  description: 'Vault de contenido, distribucion automatizada y embudos de trafico',
+  description: 'Guarda tu contenido, publica en automatico y trae mas trafico',
   // Este panel no debe aparecer en buscadores bajo ninguna circunstancia.
   robots: { index: false, follow: false },
 };
