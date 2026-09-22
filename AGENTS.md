@@ -116,8 +116,9 @@ continúa siendo el archivo operativo canónico para todos los agentes.
    y el roadmap [#2](https://github.com/pl0n3r/GrindFlow/issues/2).
    Antes de abrir un Issue o rama nueva, revisar también los PRs/Issues en
    curso: una tarea con más de **30 minutos** sin commit ni comentario humano
-   útil se recupera antes que una tarea disponible nueva, siempre reutilizando
-   su rama y PR. `updated_at` del PR, bots, CI, Sonar, CodeRabbit, etiquetas
+   útil se recupera antes que una tarea disponible nueva, reutilizando su rama
+   y PR, salvo que el Issue esté bloqueado explícitamente hasta resolver su
+   dependencia. `updated_at` del PR, bots, CI, Sonar, CodeRabbit, etiquetas
    y cambios de metadatos no prueban avance ni renuevan esta ventana.
 3. Si un PR activo cubre el trabajo, terminarlo y verificar sus gates antes
    de abrir otro PR dependiente. Si `main` no tiene CI verde, investigar primero.
