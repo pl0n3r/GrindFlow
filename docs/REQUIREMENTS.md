@@ -54,9 +54,11 @@ Each requirement should contain:
 **Verificación:** PHPUnit HTTP con cliente y sesión sintéticos: dos GET anónimos, GET posterior a rechazo de cuenta inactiva, GET tras autenticación, cabeceras, CSRF presente, ausencia de contraseña y ausencia del motivo de inactividad en HTML; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
 
 ### GF-ARCH-002 — Paridad de datos y tenencia
-**Estado:** definido, pendiente de ejecución.
+**Estado:** definido; validación descartable parcial implementada, operación real pendiente.
 
 **Aceptación:** inventario completo de tablas/IDs/índices/triggers de Laravel y legado, contrato de migración reversible y backup; un único dueño de escritura por módulo; prueba de cross-tenant/IDOR de lectura y mutación con Symfony+Doctrine; no usar `schema:update --force` ni auto-migrar producción.
+
+**Verificación descartable:** `symfony-preview` restaura MariaDB + Vault sintéticos y, sobre esa base recuperada, vuelve a ejecutar regresiones HTTP+Doctrine de Vault, clasificación masiva, papelera, configuración de organización y autorización de distribución. Debe demostrar que recursos ajenos no aparecen en lecturas, detail/preview/download de otro tenant permanecen ocultos, un lote con IDs mezclados falla sin mutación parcial y las mutaciones de organización/autorización no aceptan IDs ajenos. Esta evidencia es solo de CI descartable; no acredita datos ni aislamiento productivos.
 
 ### GF-ARCH-003 — Pruebas y operación en coexistencia
 **Estado:** definido, pendiente de ejecución.
