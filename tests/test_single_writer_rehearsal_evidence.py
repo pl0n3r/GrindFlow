@@ -237,9 +237,10 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
         self.assert_rejected("distinct evidence", envelope)
 
     def test_single_writer_observation_must_follow_operator_receipts(self):
-        envelope = self.envelope()
-        envelope["single_writer_receipt"]["observed_at_utc"] = "2026-09-22T12:05:00Z"
-        self.assert_rejected("predates prerequisite", envelope)
+        for timestamp in ("2026-09-22T12:05:00Z", "2026-09-22T12:10:00Z"):
+            envelope = self.envelope()
+            envelope["single_writer_receipt"]["observed_at_utc"] = timestamp
+            self.assert_rejected("later than prerequisite", envelope)
 
     def test_receipt_provenance_digest_timestamp_and_environment_are_strict(self):
         cases = (
