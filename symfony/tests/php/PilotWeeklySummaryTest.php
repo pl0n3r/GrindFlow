@@ -175,11 +175,22 @@ final class PilotWeeklySummaryTest extends WebTestCase
             '/api/admin/pilot/weekly-summary?week='.$week->modify('+1 day')->format('Y-m-d'),
             '/api/admin/pilot/weekly-summary?week='.$week->modify('-12 weeks')->format('Y-m-d'),
             '/api/admin/pilot/weekly-summary?extra=1',
+            '/api/admin/pilot/weekly-summary?week[]='.$thisWeek,
+            '/api/admin/pilot/weekly-summary?week='.$thisWeek.'&organization_id='.$other,
         ] as $url) {
             $client->request('GET', $url);
             self::assertResponseStatusCodeSame(422);
             self::assertSame('invalid_pilot_week', $this->payload($client)['error']['code']);
         }
+
+        // A selected workspace never grants access after its membership is revoked.
+        $db->delete('gf_identity_memberships', ['user_id' => $user, 'organization_id' => $mine]);
+        $client->request('GET', '/api/admin/pilot/weekly-summary?week='.$thisWeek);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame('organization_access_changed', $this->payload($client)['error']['code']);
+        $client->request('GET', '/api/admin/pilot/weekly-summary.csv?week='.$thisWeek);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('organization_required', $this->payload($client)['error']['code']);
     }
 
     /** @return array<string, mixed> */
