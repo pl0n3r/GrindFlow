@@ -76,10 +76,10 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         for module in ("identity", "vault"):
             report = EVIDENCE.build_report(self.envelope(module))
             self.assertEqual(module, report["module"])
-            self.assertFalse(report["production_ready"])
-            self.assertFalse(report["production_authorized"])
+            self.assertIs(False, report["production_ready"])
+            self.assertIs(False, report["production_authorized"])
             self.assertEqual("redacted_references_only", report["scope"])
-            self.assertFalse(report["receipt_content_verified"])
+            self.assertIs(False, report["receipt_content_verified"])
             self.assertEqual(
                 list(EVIDENCE.PENDING_PRECONDITIONS),
                 report["remaining_preconditions"],
@@ -163,6 +163,17 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         envelope["ownership_report"]["source_inventory_sha256"] = "f" * 64
         self.assert_rejected("checked-in migrations", envelope)
 
+    def test_ownership_boolean_fields_require_exact_types(self):
+        for field, numeric in (
+            ("source_only", 1),
+            ("database_contacted", 0),
+            ("cutover_authorized", 0),
+        ):
+            with self.subTest(field=field):
+                envelope = self.envelope()
+                envelope["ownership_report"][field] = numeric
+                self.assert_rejected("ownership report boolean fields", envelope)
+
     def test_cli_is_offline_and_does_not_echo_secrets(self):
         payload = json.dumps(self.envelope())
         with tempfile.TemporaryDirectory() as tmp:
@@ -195,7 +206,30 @@ class OperatorEvidenceVerifierTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("private-secret", result.stdout)
         self.assertNotIn("private-secret", result.stderr)
-        self.assertFalse(json.loads(result.stdout)["production_ready"])
+        self.assertIs(False, json.loads(result.stdout)["production_ready"])
+
+    def test_cli_rejects_duplicate_json_keys_at_any_depth(self):
+        cmd = [
+            sys.executable,
+            str(ROOT / "scripts/operator-evidence-verifier.py"),
+            "--json",
+        ]
+        envelope = self.envelope()
+        payload = json.dumps(envelope, separators=(",", ":"))
+        root_duplicate = payload[:-1] + ',"production_authorized":false}'
+        nested = json.dumps(envelope, separators=(",", ":"))
+        needle = '"contains_secrets":false'
+        nested_duplicate = nested.replace(
+            needle,
+            needle + ',"contains_secrets":false',
+            1,
+        )
+        for raw in (root_duplicate.encode("utf-8"), nested_duplicate.encode("utf-8")):
+            result = subprocess.run(cmd, input=raw, capture_output=True, check=False)
+            self.assertEqual(2, result.returncode)
+            self.assertEqual(b"", result.stdout)
+            self.assertNotIn(b"Traceback", result.stderr)
+            self.assertIn(b"validation failed", result.stderr)
 
     def test_cli_rejects_utf16_utf32_large_and_recursive_input(self):
         cmd = [
