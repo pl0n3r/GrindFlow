@@ -146,11 +146,18 @@ final class AccountSecurityTest extends WebTestCase
                 'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
             )));
 
-            $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
+            // The exact 4 KiB boundary still reaches normal validation.
+            $atLimitJson = json_encode([
                 'current_password' => 'wrong-current', 'new_password' => $old,
                 'confirm_password' => $old,
-            ], JSON_THROW_ON_ERROR));
+            ], JSON_THROW_ON_ERROR);
+            $atLimitPayload = str_repeat(' ', 4096 - strlen($atLimitJson)).$atLimitJson;
+            self::assertSame(4096, strlen($atLimitPayload));
+            $client->request('POST', $endpoint, [], [], $freshHeaders, $atLimitPayload);
             self::assertResponseStatusCodeSame(422);
+            self::assertSame('current_password_invalid', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
             $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
                 'current_password' => $next, 'new_password' => $old,
                 'confirm_password' => $old,
