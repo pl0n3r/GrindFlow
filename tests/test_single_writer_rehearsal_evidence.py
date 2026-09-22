@@ -208,6 +208,18 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
         )
         self.assert_rejected("remain distinct", envelope)
 
+    def test_single_writer_evidence_cannot_reuse_operator_bundle_digest(self):
+        envelope = self.envelope()
+        envelope["single_writer_receipt"]["evidence_sha256"] = (
+            envelope["operator_evidence_report"]["evidence_bundle_sha256"]
+        )
+        self.assert_rejected("distinct evidence", envelope)
+
+    def test_single_writer_observation_must_follow_operator_receipts(self):
+        envelope = self.envelope()
+        envelope["single_writer_receipt"]["observed_at_utc"] = "2026-09-22T12:05:00Z"
+        self.assert_rejected("predates prerequisite", envelope)
+
     def test_receipt_provenance_digest_timestamp_and_environment_are_strict(self):
         cases = (
             ("source_inventory_sha256", "f" * 64, "source inventory"),
