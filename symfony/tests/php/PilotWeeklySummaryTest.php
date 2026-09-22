@@ -27,6 +27,9 @@ final class PilotWeeklySummaryTest extends WebTestCase
         $client->request('GET', '/api/admin/pilot/weekly-summary');
         self::assertResponseStatusCodeSame(401);
         self::assertSame('authentication_required', $this->payload($client)['error']['code']);
+        $client->request('GET', '/api/admin/pilot/weekly-summary.csv');
+        self::assertResponseStatusCodeSame(401);
+        self::assertSame('authentication_required', $this->payload($client)['error']['code']);
 
         $user = Uuid::v7()->toRfc4122();
         $mine = Uuid::v7()->toRfc4122();
