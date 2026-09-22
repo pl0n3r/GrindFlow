@@ -111,6 +111,55 @@ class ProductionSmokeAuthTriageTest(unittest.TestCase):
                     "ERROR: smoke auth summary unavailable\n", result.stderr,
                 )
 
+    def test_unexpected_login_redirect_is_not_a_normal_login_rejection(self):
+        """A 301 back to login is a distinct HTTP outcome, never a normal POST."""
+        log = "\n".join([
+            "LOGIN_SESSION_PREFLIGHT=consistent",
+            "LOGIN_REDIRECT_PATH=/login",
+            "ERROR: login returned HTTP 301; stop authentication retries on unexpected redirect.",
+        ])
+        self.assertEqual("login_http_rejected", TRIAGE.classify(log)["diagnosis"])
+
+    def test_outcome_signals_from_different_smoke_stages_fail_closed(self):
+        """A recheck cannot belong to a dashboard or preflight failure."""
+        cases = [
+            "\n".join([
+                "LOGIN_SESSION_PREFLIGHT=consistent",
+                "LOGIN_REDIRECT_PATH=/dashboard",
+                "LOGIN_FAILURE_SESSION_CHECK=stable",
+            ]),
+            "\n".join([
+                "LOGIN_SESSION_PREFLIGHT=inconsistent",
+                "LOGIN_REDIRECT_PATH=/login",
+            ]),
+            "\n".join([
+                "LOGIN_SESSION_PREFLIGHT=consistent",
+                "LOGIN_REDIRECT_PATH=/dashboard",
+                "ERROR: authenticated dashboard returned HTTP 302, redirect path /login; "
+                "check authentication/session. No repeated login attempts.",
+                "LOGIN_FAILURE_SESSION_CHECK=changed",
+            ]),
+            "\n".join([
+                "LOGIN_SESSION_PREFLIGHT=consistent",
+                "LOGIN_REDIRECT_PATH=/login",
+                "LOGIN_FAILURE_SESSION_CHECK=stable",
+                "ERROR: login returned HTTP 301; stop authentication retries on unexpected redirect.",
+            ]),
+            "\n".join([
+                "LOGIN_SESSION_PREFLIGHT=consistent",
+                "LOGIN_REDIRECT_PATH=/login",
+                "ERROR: login returned HTTP 401; stop authentication retries.",
+            ]),
+        ]
+        for log in cases:
+            with self.subTest(log=log.splitlines()[-1]):
+                result = self.run_cli(log, "--markdown")
+                self.assertEqual(2, result.returncode)
+                self.assertEqual("", result.stdout)
+                self.assertEqual(
+                    "ERROR: smoke auth summary unavailable\n", result.stderr,
+                )
+
     def test_login_http_rejection_is_reported_without_echo(self):
         """Report HTTP rejection without echoing the log."""
         log = "\n".join([
