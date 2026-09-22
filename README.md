@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.85: login Symfony con caché bloqueada y CSRF de sesión estable.** Base exacta `main` v0.1.84 `fa7f8413bfda489bdf2a9d55a19237ca3dd6c697`; Laravel productivo y Symfony aislado conservan sus límites.
+> **Candidato v0.1.85: login Symfony no cacheable con comprobación de CSRF presente.** Base exacta `main` v0.1.84 `fa7f8413bfda489bdf2a9d55a19237ca3dd6c697`; Laravel productivo y Symfony aislado conservan sus límites.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -39,7 +39,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Login Twig, cabeceras y sesión sintética Symfony; sin cambio al login Laravel |
+| Alcance | Login Twig, cabeceras y CSRF sintético Symfony; sin cambio al login Laravel |
 | Revisiones | CI/Sonar/CodeRabbit HEAD, CI exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -62,7 +62,7 @@ flowchart LR
 
 ## Qué se hizo
 - El formulario anónimo `GET /login` Symfony contiene token CSRF ligado a sesión y puede recordar un email; la respuesta ahora exige `Cache-Control: no-store, private` en lugar de solo `private`. No se modifica la autenticación productiva Laravel.
-- PHPUnit HTTP con sesión sintética comprueba dos GET, formulario real, token CSRF no vacío e idéntico entre ambos, y cabeceras `no-store, private` sin `public`.
+- PHPUnit HTTP con sesión sintética comprueba dos GET, formulario real, token CSRF no vacío en ambas respuestas, sin asumir igualdad textual, y cabeceras `no-store, private` sin `public`.
 - Nuevo contrato [GF-SEC-006](docs/REQUIREMENTS.md) documenta la privacidad del formulario. La rama previa de trabajo fue recuperada sobre la base actual sin saltar release.
 - El [Smoke de v0.1.84](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546677) falló. Artifact privado: preflight CSRF `consistent`, POST `/login`, GET anónimo adicional `LOGIN_FAILURE_SESSION_CHECK=stable`. Esto reduce la incertidumbre sobre continuidad del token, pero **no demuestra credenciales válidas ni explica el rechazo**; #73 sigue abierto.
 
@@ -83,7 +83,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Bloquear caché del login Symfony y probar continuidad CSRF | 🚧 PR/gates v0.1.85 |
+| **NOW** | 🚧 Bloquear caché del login Symfony y verificar token CSRF por GET | 🚧 PR/gates v0.1.85 |
 | **NEXT** | 🚧 Resolver origen del rechazo E2E #73 | 🚧 Operación autorizada, sin reintentos ciegos |
 | **LATER** | 🚧 Paridad/cutover Symfony aislado | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Validación productiva autenticada | ⛔ Cuenta/configuración por verificar |
@@ -92,7 +92,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~v0.1.84 main CI / versión humana observada~~ | ✅ ~~Nuevo diagnóstico CSRF estable tras rechazo~~ |
-| **NOW** | 🚧 Login no cacheable, prueba sintética | 🚧 v0.1.85 candidata |
+| **NOW** | 🚧 Login no cacheable y token CSRF presente en cada GET | 🚧 v0.1.85 candidata |
 | **NEXT** | 🚧 Incidente de acceso E2E #73 | 🚧 Sin tocar credenciales |
 | **LATER** | 🚧 Transición Symfony | 🚧 Aislada |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado completo | ⛔ Rechazo de login |
