@@ -252,6 +252,43 @@ El reporte `gf-arch-002-operator-evidence-report-v1` conserva únicamente hashes
 
 Por tanto, este contrato **no valida el contenido real** de un backup ni de un snapshot, no prueba RPO/RTO, no verifica un freeze, no sustituye autorización del propietario y no demuestra producción saludable. Solo asegura que un operador entregue referencias mínimas, redacted y consistentes con el checkout antes de una revisión humana separada.
 
+## Evidencia redacted de rehearsal single-writer
+
+`scripts/single-writer-rehearsal-evidence.py` valida offline la etapa siguiente a `operator-evidence-verifier.py`. No congela writers ni ejecuta migraciones: recibe un reporte previo `gf-arch-002-operator-evidence-report-v1` y un receipt mínimo `gf-arch-002-single-writer-receipt-v1` generado después de un ensayo autorizado **no productivo**.
+
+El receipt debe conservar únicamente referencias verificables: módulo, huella del inventario, hash del bundle de operator evidence, hash propio de la evidencia single-writer, timestamp UTC y flags estrictos. Debe afirmar exactamente:
+
+- `previous_writer=laravel`;
+- `candidate_writer=symfony`;
+- `rollback_writer=laravel`;
+- `legacy_writer_frozen=true`;
+- `candidate_writer_exclusive=true`;
+- `concurrent_writers_observed=false`;
+- `rollback_path_observed=true`;
+- `operator_observed=true`;
+- `contains_row_data=false`;
+- `contains_secrets=false`.
+
+El receipt queda ligado al `evidence_bundle_sha256` de la etapa anterior y su propio `evidence_sha256` no puede reutilizar la huella del inventario fuente, el hash del bundle ni ninguno de los receipts de metadata/restore. La observación single-writer debe ser posterior a ambos receipts previos. Los receipts previos también deben mantener digests distintos entre sí. La huella `source_inventory_sha256` del reporte previo se contrasta otra vez con las migraciones del checkout actual: dos receipts con el mismo digest inventado no cumplen el contrato, ni se admite un módulo sin mapeo de ownership revisado.
+
+La entrada exige UTF-8, máximo 1.000.000 bytes y objetos JSON sin claves duplicadas, incluso anidados. El CLI no abre sockets, no lanza subprocesses, no lee rutas del caller y no se conecta a MariaDB. El reporte resultante mantiene:
+
+```json
+{
+  "scope": "authorized_nonproduction_rehearsal_reference_only",
+  "receipt_content_verified": false,
+  "single_writer_receipt_validated": true,
+  "production_ready": false,
+  "production_authorized": false,
+  "remaining_preconditions": [
+    "owner_authorization",
+    "production_smoke"
+  ]
+}
+```
+
+Por diseño, un receipt estructuralmente válido **no prueba** que el freeze haya ocurrido realmente, no sustituye la revisión humana del artefacto fuera de banda y no autoriza cutover ni producción. La finalidad es encadenar evidencia mínima sin introducir secretos, filas ni rutas sensibles en GitHub.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
