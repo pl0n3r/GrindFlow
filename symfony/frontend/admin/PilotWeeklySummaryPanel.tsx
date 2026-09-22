@@ -106,6 +106,10 @@ export function PilotWeeklySummaryPanel() {
             <strong>{state.summary.totals.completed_reports}</strong></div>
           <div><small>Intentos fallidos</small><strong>{state.summary.totals.failed_attempts}</strong></div>
         </div>
+        <a className="pilot-csv-download"
+          href={'/api/admin/pilot/weekly-summary.csv?week=' + encodeURIComponent(week)}>
+          Descargar resumen CSV
+        </a>
         <div className="pilot-day-scroll">
           <table>
             <caption>Actividad por día, semana en UTC</caption>
