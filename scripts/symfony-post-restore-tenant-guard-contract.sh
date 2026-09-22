@@ -3,21 +3,20 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT="$ROOT/scripts/symfony-post-restore-tenant-guard.sh"
+TEMP_DIR="$(mktemp -d -t grindflow-post-restore-guard.XXXXXX)"
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
 assert_rejected() {
   local expected="$1"
   shift
-  local out err
-  out="$(mktemp)"
-  err="$(mktemp)"
+  local out="$TEMP_DIR/stdout"
+  local err="$TEMP_DIR/stderr"
   if "$@" >"$out" 2>"$err"; then
     printf 'ERROR: post-restore tenant guard safety contract unexpectedly succeeded\n' >&2
-    rm -f "$out" "$err"
     exit 1
   fi
   [[ ! -s "$out" ]]
   grep -Fxq "ERROR: $expected" "$err"
-  rm -f "$out" "$err"
 }
 
 assert_rejected   "post-restore tenant guard is test-only."   env APP_ENV=prod CI=true bash "$SCRIPT"
