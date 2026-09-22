@@ -47,13 +47,16 @@ Ejemplo mínimo:
 
 Flujo reproducible:
 
+1. Generar el inventario fuente con `data-schema-inventory.py --json`.
+2. Capturar el snapshot metadata-only por un canal autorizado.
+3. Formar un único envelope JSON `{"source": {...}, "snapshot": {...}}`.
+4. Entregar el envelope por **stdin** al comparador:
+
 ```bash
-python3 scripts/data-schema-inventory.py --json > /tmp/grindflow-source-schema.json
-python3 scripts/data-schema-parity.py \
-  --source /tmp/grindflow-source-schema.json \
-  --snapshot /ruta/autorizada/schema-snapshot.json \
-  --json
+cat envelope.json | python3 scripts/data-schema-parity.py --json
 ```
+
+El comparador no acepta rutas de archivos como argumentos, reduciendo el riesgo de lectura arbitraria por path traversal. El archivo `envelope.json` del ejemplo es local/temporal y **no debe versionarse si proviene de un entorno real**.
 
 La comparación falla cerrado cuando falta una tabla declarada por fuente, el snapshot repite un nombre o aparece una tabla `gf_*` que Symfony no declara. Tablas adicionales sin prefijo `gf_` se reportan como informativas porque una base existente puede contener tablas operativas o históricas que esta transición no administra. **Este nivel comprueba presencia de tablas, no columnas, índices, claves, triggers, conteos ni contenido.**
 
