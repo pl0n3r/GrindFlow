@@ -135,6 +135,18 @@ Este ejercicio demuestra que **la mecánica de recuperación del stack Symfony a
 
 El contrato es source-only: no conecta MariaDB y no ejecuta migraciones por sí mismo. CI prueba el plan contra el directorio real y luego `symfony-preview` consume `--classes` para revertir **cada migración descubierta** antes de reaplicarlas. De este modo, agregar una migración nueva no exige editar una segunda lista manual y no puede quedar silenciosamente fuera del restore drill.
 
+## Aislamiento cross-tenant después de restauración
+
+La restauración solo cuenta como evidencia útil si el runtime recuperado mantiene sus fronteras de autorización. Por eso `symfony-preview` ejecuta, **después** de `symfony-disposable-restore-drill.sh`, un conjunto de pruebas HTTP+Doctrine sobre la misma MariaDB restaurada:
+
+- `VaultTest.php`: lectura, detalle, preview y descarga de recursos ajenos permanecen ocultos; la organización nunca se toma de un campo enviado por el cliente.
+- `VaultBulkUsageTest.php`: un lote con IDs de otro tenant se rechaza completo, sin mutación parcial.
+- `VaultTrashTest.php`: mover y restaurar recursos conserva membresía, tenant y privacidad del original.
+
+El orden es deliberado: la suite Symfony completa valida el estado recién migrado, el restore drill destruye y reconstruye tablas/blobs, y estas pruebas vuelven a recorrer autorización **sobre el estado recuperado**. Un restore que preserve bytes pero debilite ACL/tenant debe fallar el gate.
+
+La evidencia sigue siendo sintética y descartable. No lee Hostinger, no usa cuentas reales, no prueba que un backup productivo exista y no autoriza cutover.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
