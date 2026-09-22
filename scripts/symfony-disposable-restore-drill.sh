@@ -13,6 +13,7 @@ fail() {
 
 [[ "${GF_RESTORE_DRILL_APPROVED:-}" == "1" ]] || fail "restore drill requires explicit approval."
 [[ "${APP_ENV:-}" == "test" ]] || fail "restore drill is test-only."
+[[ "${CI:-}" == "true" ]] || fail "restore drill is CI-only."
 [[ -n "${DATABASE_URL:-}" ]] || fail "DATABASE_URL is required."
 
 mapfile -t db_parts < <(
@@ -115,16 +116,27 @@ php bin/console grindflow:vault:verify-stage   --directory="$stage"   --expect="
 cd "$ROOT"
 GF_METADATA_SNAPSHOT_APPROVED=1   php scripts/mariadb-structure-snapshot.php > "$source_structure"
 
-export MARIADB_PWD="$db_password"
-docker run --rm --network host --env MARIADB_PWD "$MARIADB_IMAGE"   mariadb-dump     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --single-transaction     --routines     --triggers     --events     --databases "$db_name" > "$dump"
+export MYSQL_PWD="$db_password"
+docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb-dump     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --single-transaction     --quick     --skip-lock-tables     --triggers     --hex-blob     --skip-comments "$db_name" > "$dump"
 chmod 0600 "$dump"
 [[ -s "$dump" ]] || fail "database dump is empty."
 
-docker run --rm --network host --env MARIADB_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --execute="DROP DATABASE \`$EXPECTED_DB\`;"
+tables="$(docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name"     --batch --skip-column-names     --execute='SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;')"
+{
+  printf 'SET FOREIGN_KEY_CHECKS=0;\n'
+  while IFS= read -r table; do
+    [[ -z "$table" ]] && continue
+    [[ "$table" =~ ^[A-Za-z0-9_]+$ ]] || fail "unexpected table name in disposable database."
+    printf 'DROP TABLE IF EXISTS `%s`;\n' "$table"
+  done <<< "$tables"
+  printf 'SET FOREIGN_KEY_CHECKS=1;\n'
+} | docker run --rm --interactive --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name" >/dev/null
+
+remaining="$(docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name"     --batch --skip-column-names     --execute='SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();' | tr -d '\r\n')"
+[[ "$remaining" == "0" ]] || fail "disposable database was not fully cleared before restore."
 
 rm -rf "$source_vault"
-docker run --rm --interactive --network host --env MARIADB_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user" < "$dump"
-
+docker run --rm --interactive --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name" < "$dump"
 install -d -m 0700 "$restored_vault"
 find "$stage/blobs" -maxdepth 1 -type f -name '*.blob' -exec install -m 0600 {} "$restored_vault/" \;
 
