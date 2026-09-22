@@ -15,6 +15,8 @@ EXPECTED_RELEASE="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'(
 [[ "$EXPECTED_RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'ERROR: expected release version is unavailable.\n' >&2; exit 1; }
 
 workdir="$(mktemp -d)"
+cleanup() { rm -rf "$workdir"; }
+trap cleanup EXIT
 # Curl reads the credential from a private file, never from its process argv.
 umask 077
 password_file="$workdir/login-password"
@@ -36,9 +38,6 @@ dashboard_headers="$workdir/dashboard.headers"
 module_html="$workdir/module.html"
 csv_body="$workdir/traffic.csv"
 csv_headers="$workdir/traffic.headers"
-
-cleanup() { rm -rf "$workdir"; }
-trap cleanup EXIT
 
 curl_common() {
   "$CURL_BIN" --silent --show-error --max-time 20 --user-agent "$SMOKE_USER_AGENT" --header "Accept: $SMOKE_ACCEPT" --header "Accept-Language: en-US,en;q=0.8" "$@"
