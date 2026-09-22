@@ -71,6 +71,20 @@ class ProductionSmokeAuthTriageTest(unittest.TestCase):
             TRIAGE.classify(log)["diagnosis"],
         )
 
+    def test_dashboard_and_login_errors_are_mutually_exclusive(self):
+        """Contaminated logs with incompatible outcomes must fail without leaking input."""
+        log = "\n".join([
+            "LOGIN_SESSION_PREFLIGHT=consistent",
+            "LOGIN_REDIRECT_PATH=/dashboard",
+            "ERROR: authenticated dashboard returned HTTP 302, redirect path /login; "
+            "check authentication/session. No repeated login attempts.",
+            "ERROR: login returned HTTP 429; stop authentication retries.",
+        ])
+        result = self.run_cli(log, "--markdown")
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertEqual("ERROR: smoke auth summary unavailable\n", result.stderr)
+
     def test_login_http_rejection_is_reported_without_echo(self):
         log = "\n".join([
             "LOGIN_SESSION_PREFLIGHT=consistent",
