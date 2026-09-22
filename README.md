@@ -20,10 +20,11 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.81** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.80~~ | `25fbf66b5ac31255a38405ba03d18bf03bc8a016` |
-| CI del PR | 🚧 Pendiente | Contratos exactos por validar |
-| Sonar / CodeRabbit | 🚧 Pendiente | Full review sobre HEAD final |
-| CI del SHA exacto de main | 🚧 v0.1.80 en ejecución | run `35683135770` |
-| Deploy Observer | 🚧 v0.1.80 en observación | run `35683135669`; no prueba SHA remoto |
+| CI del PR | ✅ ~~Completado~~ | run `35683360552`, HEAD `ccb910b5d164a4fc9465dd35b8d46e9cc4e22724` |
+| Sonar | ✅ ~~Completado~~ | Quality Gate OK, 0 issues sobre `ccb910b5` |
+| CodeRabbit | 🚧 Revisión final tras corrección README | Full review previa encontró un único hallazgo documental |
+| CI del SHA exacto de main | ✅ ~~v0.1.80 success~~ | run `35683135770`, SHA `25fbf66b5` |
+| Deploy Observer | ⛔ Release v0.1.80 NO observado | run `35683135669` failure: `/_deployment` HTTP 403 repetido; no prueba SHA remoto |
 | Production Smoke | ⛔ Auth E2E no validada | [#73](https://github.com/pl0n3r/GrindFlow/issues/73), run `35683135795` failure |
 | Symfony en Hostinger | ⛔ NO desplegado | S5 solo en CI aislado |
 | Migraciones | ✅ ~~Sin cambios de esquema~~ | DB productiva intacta |
@@ -32,13 +33,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+88** | **−62** | **+26** |
+| **4** | **+90** | **−62** | **+28** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts]** |
+| Gate agregador obligatorio | **validate**: exige éxito de todos los jobs seleccionados y Sonar se verifica por separado |
 | Alcance | Parser estricto de redirect del mismo origen y contratos negativos |
 | Revisiones | CI/Sonar/CodeRabbit del head exacto; squash, exact-main y producción por separado |
 
@@ -72,7 +74,7 @@ Inventario del candidato v0.1.81; no es prueba de publicación. «solo el deploy
 - `scripts/production-smoke.sh`
 
 ## Validación
-- Código sobre `main` v0.1.80, sin CI ni full CodeRabbit de v0.1.81 aún. El smoke de PR utiliza solo curl simulado, nunca credenciales productivas.
+- CI/Sonar v0.1.81 success sobre `ccb910b5` (run `35683360552`); CodeRabbit full review detectó una nota documental ya corregida en este snapshot. Revalidar el commit que contiene README: no se autoincluye su SHA literal. Smoke PR usa curl simulado, nunca credenciales productivas.
 - El `LOGIN_REDIRECT_PATH=(redacted)` real puede tener otras causas: observar solo la ruta saneada en un smoke posterior al deploy, sin repetir login ciegamente.
 
 ## Qué sigue
@@ -80,7 +82,7 @@ Inventario del candidato v0.1.81; no es prueba de publicación. «solo el deploy
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Same-origin v0.1.81 | 🚧 CI y revisión |
+| **NOW** | 🚧 Same-origin v0.1.81 | 🚧 Revisión final y merge |
 | **NEXT** | 🚧 Diagnosticar el redirect real #73 | 🚧 Solo lectura |
 | **LATER** | 🚧 Paridad Symfony y Traffic | 🚧 Sin cutover |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke E2E #73 | ⛔ Credenciales no confirmadas |
@@ -89,7 +91,7 @@ Inventario del candidato v0.1.81; no es prueba de publicación. «solo el deploy
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~S5 v0.1.80 PR #79 fusionada~~ | ✅ ~~CodeRabbit y CI PR exitosos~~ |
-| **NOW** | 🚧 Smoke seguro v0.1.81 | 🚧 Validación pendiente |
+| **NOW** | 🚧 Smoke seguro v0.1.81 | 🚧 CodeRabbit final pendiente |
 | **NEXT** | 🚧 Resolver #73 con diagnóstico real | 🚧 Causa exacta no demostrada |
 | **LATER** | 🚧 Distribution y Traffic Symfony | 🚧 Sin cutover |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado | ⛔ Symfony no desplegado |
