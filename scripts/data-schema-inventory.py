@@ -22,22 +22,27 @@ SYMFONY_CREATE = re.compile(r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([A-
 
 
 def scan(directory: Path, create_pattern: re.Pattern[str], runtime: str) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
+    inventory: dict[str, dict[str, str]] = {}
     for path in sorted(directory.glob("*.php")):
         text = path.read_text(encoding="utf-8")
-        names = set(create_pattern.findall(text))
-        if runtime == "laravel":
-            for old, new in LARAVEL_RENAME.findall(text):
-                names.discard(old)
-                names.add(new)
-        for table in sorted(names):
-            rows.append({
+        migration = path.relative_to(ROOT).as_posix()
+        for table in sorted(set(create_pattern.findall(text))):
+            inventory[table] = {
                 "runtime": runtime,
                 "table": table,
-                "migration": path.relative_to(ROOT).as_posix(),
+                "migration": migration,
                 "writer": runtime,
-            })
-    return rows
+            }
+        if runtime == "laravel":
+            for old, new in LARAVEL_RENAME.findall(text):
+                previous = inventory.pop(old, None)
+                inventory[new] = {
+                    "runtime": runtime,
+                    "table": new,
+                    "migration": migration if previous is None else previous["migration"],
+                    "writer": runtime if previous is None else previous["writer"],
+                }
+    return [inventory[name] for name in sorted(inventory)]
 
 
 def build_inventory() -> dict[str, object]:
