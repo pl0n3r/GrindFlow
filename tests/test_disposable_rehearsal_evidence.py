@@ -176,14 +176,9 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertIn("next_action", report)
 
     def test_cli_template_requires_ci_identifiers_and_gate_results(self):
-        cmd = [
-            sys.executable,
-            str(ROOT / "scripts/disposable-rehearsal-evidence.py"),
-            "--template",
-            "identity",
-        ]
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
         result = subprocess.run(
-            cmd,
+            [sys.executable, script, "--template", "identity"],
             text=True,
             encoding="utf-8",
             capture_output=True,
@@ -192,62 +187,77 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertEqual("", result.stdout)
 
-    def test_gate_results_missing_file_fails_closed(self):
-        missing = ROOT / "tests" / "does-not-exist-gate-results.json"
-        with self.assertRaisesRegex(ValueError, "unavailable"):
-            EVIDENCE.load_gate_results(str(missing), self.HEAD, self.RUN_ID)
+        result = subprocess.run(
+            [
+                sys.executable,
+                script,
+                "--template",
+                "identity",
+                "--head-sha",
+                self.HEAD,
+                "--run-id",
+                self.RUN_ID,
+            ],
+            input="",
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("", result.stdout)
 
-    def test_gate_results_respect_bounded_input(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "gates.json"
-            path.write_bytes(b"x" * (EVIDENCE.MAX_GATE_RESULTS_BYTES + 1))
-            with self.assertRaisesRegex(ValueError, "safety limit"):
-                EVIDENCE.load_gate_results(str(path), self.HEAD, self.RUN_ID)
+    def test_gate_results_respect_bounded_stdin(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        result = subprocess.run(
+            [
+                sys.executable,
+                script,
+                "--template",
+                "identity",
+                "--head-sha",
+                self.HEAD,
+                "--run-id",
+                self.RUN_ID,
+            ],
+            input=b"x" * (EVIDENCE.MAX_GATE_RESULTS_BYTES + 1),
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertEqual(b"", result.stdout)
 
     def test_gate_results_must_match_same_ci_run(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "gates.json"
-            payload = self.gate_results()
-            payload["run_id"] = "999999"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "do not match"):
-                EVIDENCE.load_gate_results(str(path), self.HEAD, self.RUN_ID)
+        payload = self.gate_results()
+        payload["run_id"] = "999999"
+        with self.assertRaisesRegex(ValueError, "do not match"):
+            EVIDENCE.validate_gate_results(payload, self.HEAD, self.RUN_ID)
 
     def test_gate_results_require_all_explicit_passes(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "gates.json"
-            payload = self.gate_results()
-            payload["checks"][EVIDENCE.CHECKS[0]] = "pending"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "must have passed"):
-                EVIDENCE.load_gate_results(str(path), self.HEAD, self.RUN_ID)
+        payload = self.gate_results()
+        payload["checks"][EVIDENCE.CHECKS[0]] = "pending"
+        with self.assertRaisesRegex(ValueError, "must have passed"):
+            EVIDENCE.validate_gate_results(payload, self.HEAD, self.RUN_ID)
 
     def test_cli_template_round_trip(self):
         script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
-        with tempfile.TemporaryDirectory() as directory:
-            gate_results = Path(directory) / "gates.json"
-            gate_results.write_text(
-                json.dumps(self.gate_results()),
-                encoding="utf-8",
-            )
-            generated = subprocess.run(
-                [
-                    sys.executable,
-                    script,
-                    "--template",
-                    "vault",
-                    "--head-sha",
-                    self.HEAD,
-                    "--run-id",
-                    self.RUN_ID,
-                    "--gate-results",
-                    str(gate_results),
-                ],
-                text=True,
-                encoding="utf-8",
-                capture_output=True,
-                check=False,
-            )
+        generated = subprocess.run(
+            [
+                sys.executable,
+                script,
+                "--template",
+                "vault",
+                "--head-sha",
+                self.HEAD,
+                "--run-id",
+                self.RUN_ID,
+            ],
+            input=json.dumps(self.gate_results()),
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
         self.assertEqual(0, generated.returncode, generated.stderr)
         checked = subprocess.run(
             [sys.executable, script, "--json"],
