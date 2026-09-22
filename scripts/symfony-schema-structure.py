@@ -502,11 +502,13 @@ def main() -> int:
     render_summary(inventory, args.json)
 
     if failures:
-        for failure in failures:
-            print(f"ERROR: {failure}: {', '.join(checks[failure])}")
+        if not args.json:
+            for failure in failures:
+                print(f"ERROR: {failure}: {', '.join(checks[failure])}")
         return 1
 
-    print("GF-ARCH-002 Symfony structure source guard: OK")
+    if not args.json:
+        print("GF-ARCH-002 Symfony structure source guard: OK")
     return 0
 
 
