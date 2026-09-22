@@ -695,6 +695,7 @@ jobs:
       - name: Verify disposable MariaDB and Vault restore drill
         shell: bash
         env:
+          CI: 'true'
           GF_RESTORE_DRILL_APPROVED: '1'
         run: bash scripts/symfony-disposable-restore-drill.sh
 
