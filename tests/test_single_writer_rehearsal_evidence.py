@@ -131,6 +131,20 @@ class SingleWriterRehearsalEvidenceTest(unittest.TestCase):
                 report["scope"],
             )
 
+    def test_rejects_forged_inventory_even_when_both_stages_agree(self):
+        envelope = self.envelope()
+        forged = "d" * 64
+        envelope["operator_evidence_report"]["source_inventory_sha256"] = forged
+        envelope["single_writer_receipt"]["source_inventory_sha256"] = forged
+        self.assert_rejected("checked-in migrations", envelope)
+
+    def test_rejects_unreviewed_module_even_with_consistent_receipts(self):
+        envelope = self.envelope()
+        envelope["module"] = "unreviewed_module"
+        envelope["operator_evidence_report"]["module"] = "unreviewed_module"
+        envelope["single_writer_receipt"]["module"] = "unreviewed_module"
+        self.assert_rejected("not reviewed", envelope)
+
     def test_operator_report_must_be_same_module_and_safe(self):
         wrong_module = self.envelope()
         wrong_module["operator_evidence_report"]["module"] = "vault"
