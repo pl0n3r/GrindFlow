@@ -256,35 +256,59 @@ def validate(base: str, head: str) -> None:
     )
 
 
-def assert_head(head: str) -> None:
-    current = subprocess.run(
+def current_head() -> str:
+    return subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=ROOT,
         check=True,
         text=True,
         capture_output=True,
     ).stdout.strip().lower()
-    if current != head:
-        fail(f"--update requires HEAD={head}, got {current}")
+
+
+def head_is_ancestor(head: str, current: str) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", head, current],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def regenerate_once(base: str, head: str | None) -> bool:
+    files = changed_files(base, head)
+    additions, deletions = diff_metrics(base, head)
+    scope = ci_scope(files)
+    current = README_PATH.read_text(encoding="utf-8")
+    require_markers(current)
+    regenerated = generated_readme(current, files, additions, deletions, scope)
+    if regenerated == current:
+        return False
+    README_PATH.write_text(regenerated, encoding="utf-8")
+    return True
 
 
 def update(base: str, head: str) -> None:
-    """Regenerate dashboard rows from base plus the current working tree until stable."""
-    assert_head(head)
+    """Regenerate exact dashboard facts locally or from GitHub's synthetic PR merge."""
+    current = current_head()
+    if current != head:
+        if not head_is_ancestor(head, current):
+            fail(f"--update head {head} is not an ancestor of checked-out HEAD {current}")
+        regenerate_once(base, head)
+        print("README dashboard regenerated from exact PR head diff")
+        return
+
     for _ in range(5):
-        files = changed_files(base, None)
-        additions, deletions = diff_metrics(base, None)
-        scope = ci_scope(files)
-        current = README_PATH.read_text(encoding="utf-8")
-        require_markers(current)
-        regenerated = generated_readme(current, files, additions, deletions, scope)
-        if regenerated == current:
+        if not regenerate_once(base, None):
+            files = changed_files(base, None)
+            additions, deletions = diff_metrics(base, None)
             print(
                 "README dashboard already generated: "
-                f"{len(files)} files, +{additions}/-{deletions}; gates={gate_plan(scope)}"
+                f"{len(files)} files, +{additions}/-{deletions}; gates={gate_plan(ci_scope(files))}"
             )
             return
-        README_PATH.write_text(regenerated, encoding="utf-8")
 
     fail("README dashboard did not stabilize after 5 regeneration passes")
 
