@@ -20,7 +20,9 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.95** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.94~~ | `50a5d48f8b9a743d799d3c194b48b27cf04adeb7` |
-| CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
+| CI del PR | ✅ ~~GrindFlow CI #541 success~~ | HEAD previo validado; revalidar SHA corregido |
+| Sonar del PR | ✅ ~~Quality Gate OK · 0 issues · 0 hotspots~~ | HEAD previo validado; revalidar SHA corregido |
+| CodeRabbit del PR | 🚧 Pendiente | Hallazgo README corregido; falta full review del SHA corregido |
 | CI del SHA exacto de main | 🚧 No observado para v0.1.94 | Señal post-merge separada |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
