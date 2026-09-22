@@ -205,7 +205,7 @@ python3 scripts/disposable-rehearsal-evidence.py --json \
   < /tmp/gf-rehearsal-envelope.json
 ```
 
-El validador limita stdin a 1.000.000 de bytes, no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
+El validador limita stdin a 1.000.000 de bytes, exige UTF-8 estricto (rechaza JSON UTF-16/UTF-32), no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
 
 ## Secuencia obligatoria antes de un cutover real
 
