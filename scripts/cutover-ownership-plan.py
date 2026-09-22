@@ -80,6 +80,17 @@ def table_names(source: dict[str, Any], runtime: str) -> set[str]:
     return names
 
 
+def checked_in_inventory() -> dict[str, Any]:
+    """Rebuild source ownership from this checkout, not untrusted JSON claims."""
+    path = Path(__file__).with_name("data-schema-inventory.py")
+    spec = importlib.util.spec_from_file_location("gf_schema_inventory", path)
+    if spec is None or spec.loader is None:
+        fail("source migration scanner unavailable")
+    scanner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(scanner)
+    return scanner.build_inventory()
+
+
 def validated_source(source: Any) -> dict[str, set[str]]:
     if not isinstance(source, dict):
         fail("source must be an object")
@@ -101,6 +112,8 @@ def validated_source(source: Any) -> dict[str, set[str]]:
         fail("source runtimes share a table name")
     if any(not name.startswith("gf_") for name in names["symfony"]):
         fail("Symfony source table lacks gf_ prefix")
+    if source != checked_in_inventory():
+        fail("source inventory differs from checked-in migrations")
     return names
 
 
@@ -174,13 +187,7 @@ def build_report(source: Any, plan: Any) -> dict[str, Any]:
 
 def draft_envelope(module: str) -> dict[str, Any]:
     """Build a pending-only example from checked-in migration source, never DB."""
-    path = Path(__file__).with_name("data-schema-inventory.py")
-    spec = importlib.util.spec_from_file_location("gf_schema_inventory", path)
-    if spec is None or spec.loader is None:
-        fail("source migration scanner unavailable")
-    scanner = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(scanner)
-    source = scanner.build_inventory()
+    source = checked_in_inventory()
     grouping = MODULE_TABLES[module]
     plan = {
         "contract": PLAN_CONTRACT,
