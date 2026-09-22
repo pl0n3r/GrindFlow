@@ -2054,19 +2054,21 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
         body: JSON.stringify({ error: { message: 'Resumen sintético temporalmente no disponible.' } }),
       });
     }
+    const empty = date === lastWeek;
     const days = Array.from({ length: 7 }, (_, index) => {
       const day = new Date(date + 'T00:00:00Z');
       day.setUTCDate(day.getUTCDate() + index);
       return { date_utc: day.toISOString().slice(0, 10),
-        prepared_attempts: index === 0 ? 2 : 0,
-        completed_reports: index === 0 ? 1 : 0,
-        failed_attempts: index === 0 ? 1 : 0 };
+        prepared_attempts: !empty && index === 0 ? 2 : 0,
+        completed_reports: !empty && index === 0 ? 1 : 0,
+        failed_attempts: !empty && index === 0 ? 1 : 0 };
     });
     return route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: {
         ready: true, week_start_utc: date, week_end_exclusive_utc: '',
-        days, totals: { prepared_attempts: 2, completed_reports: 1, failed_attempts: 1 },
+        days, totals: { prepared_attempts: empty ? 0 : 2,
+          completed_reports: empty ? 0 : 1, failed_attempts: empty ? 0 : 1 },
         traffic: { ready: false, clicks: null }, external_publications_verified: null,
         provider_calls: false,
       } }),
@@ -2093,6 +2095,8 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
   await weeks.getByRole('button', { name: 'Semana anterior' }).click();
   await expect(weeks).toContainText(lastWeek);
   await expect.poll(() => visited.includes(lastWeek)).toBe(true);
+  await expect(page.getByRole('status').getByText('No hay actividad interna registrada en esta semana.')).toBeVisible();
+  await expect(page.locator('.pilot-totals strong')).toHaveText(['0', '0', '0']);
   expect(visited).toContain(thisWeek);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await weeks.getByRole('button', { name: 'Semana anterior' }).click();
