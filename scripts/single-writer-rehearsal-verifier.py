@@ -197,7 +197,9 @@ def build_report(envelope: Any) -> dict[str, Any]:
         "window_ended_at_utc": receipt["window_ended_at_utc"],
         "observed_at_utc": receipt["observed_at_utc"],
         "environment": EXPECTED_ENVIRONMENT,
-        "single_writer_rehearsal_verified": True,
+        "scope": "redacted_rehearsal_reference_only",
+        "single_writer_rehearsal_reference_verified": True,
+        "receipt_content_verified": False,
         "production_ready": False,
         "production_authorized": False,
         "remaining_preconditions": list(REMAINING_PRECONDITIONS),
@@ -231,7 +233,8 @@ def main() -> int:
         print(json.dumps(report, sort_keys=True, indent=2))
     else:
         print(f"GF-ARCH-002 single-writer rehearsal: {report['module']}")
-        print("Single writer rehearsal: verified structurally")
+        print("Single writer rehearsal reference: verified structurally")
+        print("Receipt content verified: no")
         print("Production ready: no")
         print("Production authorized: no")
     return 0
