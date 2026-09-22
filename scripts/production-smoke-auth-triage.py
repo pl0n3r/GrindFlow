@@ -13,10 +13,12 @@ import re
 import sys
 
 MAX_BYTES = 1_000_000
+LOGIN_PATH = "/login"
+DASHBOARD_PATH = "/dashboard"
 SIGNALS = {
     "LOGIN_SESSION_PREFLIGHT": frozenset({"consistent", "inconsistent"}),
     "LOGIN_REDIRECT_PATH": frozenset({
-        "/login", "/dashboard", "(missing)", "(redacted)", "/organizations",
+        LOGIN_PATH, DASHBOARD_PATH, "(missing)", "(redacted)", "/organizations",
         "/admin", "/admin/system",
     }),
     "LOGIN_FAILURE_SESSION_CHECK": frozenset({"stable", "changed", "unavailable"}),
@@ -50,6 +52,31 @@ def parse_signals(log: str) -> dict[str, str]:
     return signals
 
 
+
+def validate_outcomes(
+    preflight: str,
+    redirect: str,
+    recheck: str,
+    dashboard_errors: set[tuple[str, str]],
+    login_errors: set[str],
+) -> None:
+    """Reject outcomes that cannot arise within one smoke login attempt."""
+    if len(dashboard_errors) > 1 or len(login_errors) > 1:
+        raise ValueError("conflicting authentication outcomes")
+    if dashboard_errors and (login_errors or redirect != DASHBOARD_PATH):
+        raise ValueError("conflicting authentication outcomes")
+    if recheck != "unobserved" and (redirect != LOGIN_PATH or login_errors):
+        raise ValueError("conflicting authentication outcomes")
+    if (login_errors and redirect != "unobserved"
+        and not login_errors.issubset({"301", "307", "308"})):
+        raise ValueError("conflicting authentication outcomes")
+    if preflight == "inconsistent" and (
+        redirect != "unobserved" or recheck != "unobserved"
+        or dashboard_errors or login_errors
+    ):
+        raise ValueError("conflicting authentication outcomes")
+
+
 def classify(log: str) -> dict[str, str]:
     """Classify one authentication outcome without echoing the source log."""
     signals = parse_signals(log)
@@ -66,35 +93,21 @@ def classify(log: str) -> dict[str, str]:
         for line in log.splitlines()
         if (match := LOGIN_HTTP_FAILURE.fullmatch(line))
     }
-    if (
-        len(dashboard_errors) > 1
-        or len(login_errors) > 1
-        or (dashboard_errors and login_errors)
-        or (dashboard_errors and redirect != "/dashboard")
-        or (recheck != "unobserved" and redirect != "/login")
-        or (login_errors and recheck != "unobserved")
-        or (login_errors and redirect != "unobserved"
-            and not login_errors.issubset({"301", "307", "308"}))
-        or (preflight == "inconsistent" and (
-            redirect != "unobserved" or recheck != "unobserved"
-            or dashboard_errors or login_errors
-        ))
-    ):
-        raise ValueError("conflicting authentication outcomes")
+    validate_outcomes(preflight, redirect, recheck, dashboard_errors, login_errors)
 
     diagnosis = "not_classified"
     if preflight == "inconsistent":
         diagnosis = "anonymous_session_inconsistent"
     elif preflight == "consistent" and login_errors:
         diagnosis = "login_http_rejected"
-    elif preflight == "consistent" and redirect == "/login":
+    elif preflight == "consistent" and redirect == LOGIN_PATH:
         if recheck == "stable":
             diagnosis = "login_rejected_anonymous_session_stable"
         elif recheck == "changed":
             diagnosis = "login_rejected_anonymous_session_changed"
         else:
             diagnosis = "login_rejected_recheck_unavailable"
-    elif preflight == "consistent" and redirect == "/dashboard" and dashboard_errors:
+    elif preflight == "consistent" and redirect == DASHBOARD_PATH and dashboard_errors:
         diagnosis = "dashboard_authentication_redirect"
 
     return {
