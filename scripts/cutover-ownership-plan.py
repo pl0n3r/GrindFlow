@@ -10,8 +10,8 @@ import argparse
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 SOURCE_CONTRACT = "gf-arch-002-source-inventory-v1"
@@ -238,7 +238,7 @@ def main() -> int:
         if not isinstance(envelope, dict) or set(envelope) != {"source", "plan"}:
             fail("envelope must contain source and plan objects only")
         report = build_report(envelope["source"], envelope["plan"])
-    except (ValueError, TypeError, json.JSONDecodeError):
+    except (ValueError, TypeError):
         print("ERROR: offline ownership plan validation failed", file=sys.stderr)
         return 2
 
