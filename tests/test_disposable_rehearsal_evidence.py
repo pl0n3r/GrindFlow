@@ -192,6 +192,18 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertEqual("", result.stdout)
 
+    def test_gate_results_missing_file_fails_closed(self):
+        missing = ROOT / "tests" / "does-not-exist-gate-results.json"
+        with self.assertRaisesRegex(ValueError, "unavailable"):
+            EVIDENCE.load_gate_results(str(missing), self.HEAD, self.RUN_ID)
+
+    def test_gate_results_respect_bounded_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gates.json"
+            path.write_bytes(b"x" * (EVIDENCE.MAX_GATE_RESULTS_BYTES + 1))
+            with self.assertRaisesRegex(ValueError, "safety limit"):
+                EVIDENCE.load_gate_results(str(path), self.HEAD, self.RUN_ID)
+
     def test_gate_results_must_match_same_ci_run(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "gates.json"
