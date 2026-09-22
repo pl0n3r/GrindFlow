@@ -20,8 +20,8 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.79** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.78~~ | `1872c40c69eb6c815007980b874ce19b83eb2c90` |
-| CI del PR | ✅ ~~VALIDATED IN CODE v0.1.79~~ | run `35679246632` success sobre `52e7ef11a3fc525b3bf72afeb950f82f7cc37a7c`; nuevo commit README pendiente de CI |
-| Sonar | ✅ ~~Quality Gate v0.1.79 success~~ | check success sobre `52e7ef11a3fc525b3bf72afeb950f82f7cc37a7c`; nuevo commit README pendiente de Sonar |
+| CI del PR | ✅ ~~VALIDATED IN CODE v0.1.79~~ | run `35680232478` success sobre `9f36665af04d045194ed5c0907ed3a2796541fd1`; fix incident_id pendiente de nueva CI |
+| Sonar | ✅ ~~Quality Gate v0.1.79 success~~ | check success sobre `9f36665af04d045194ed5c0907ed3a2796541fd1`; fix incident_id pendiente de nuevo Sonar |
 | CodeRabbit | 🚧 Esperar revisión completa del head final | PR y AGENTS.md |
 | CI del SHA exacto de main | ✅ ~~v0.1.78 success~~ | run `35672544872` |
 | Deploy Observer | ✅ ~~v0.1.78 release observado~~ | run `35672544877`; versión humana, NO SHA Hostinger |
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+255** | **−81** | **+174** |
+| **4** | **+303** | **−83** | **+220** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -63,7 +63,7 @@ flowchart LR
 - Captura `Location` del POST login y GET dashboard; emite solo rutas locales permitidas (nunca URL con esquema/host), sin consultas, dominios, identificadores o secretos. El logger general también excluye `Location` cruda.
 - Redirecciones 3xx de autenticación y HTTP 401/403/419/422/429 del login **o dashboard** se detienen tras un solo login; fallos transitorios conservan su política.
 - La contraseña y el CSRF se entregan a curl mediante archivos privados 0600, sin expandir secretos en argv; el trap de limpieza se instala antes de escribir secretos.
-- Contrato sintético: login/dashboard HTTP 401/403/419/422/429, redirects 301/302/303/307/308, rutas censuradas, diagnóstico remoto reducido a conteo/HTTP/método permitido y aserciones negativas fail-closed. No se imprimen cuerpos, valores de headers HTTP ni trazas/mensajes remotos.
+- Contrato sintético: login/dashboard HTTP 401/403/419/422/429, redirects 301/302/303/307/308, rutas censuradas, diagnóstico remoto limitado a conteo/HTTP/método e incident_id UUIDv4 validado (o unknown), con aserciones negativas fail-closed. No se imprimen cuerpos, headers crudos, identificadores inválidos ni trazas/mensajes remotos; del header X-Incident-ID solo se conserva un UUIDv4 permitido.
 - #73 sigue abierto: instrumentación NO equivale a corregir las credenciales/sesión reales ni demuestra deploy. Sin cambios de datos, cuenta ni Symfony.
 
 ## Archivos modificados en este deploy
@@ -74,7 +74,7 @@ Inventario del candidato v0.1.79, no evidencia de archivos publicados. «solo el
 - `scripts/production-smoke.sh`
 
 ## Validación
-- CI `35679246632` y Sonar success sobre `52e7ef11a3fc525b3bf72afeb950f82f7cc37a7c`; CI/Sonar verificados en el SHA citado; revalidar sobre el commit que incluye este snapshot y completar CodeRabbit sin fingir que el README conoce el hash del commit que lo contiene. `fast[contracts]` usa mocks, nunca la contraseña E2E real.
+- CI `35680232478` y Sonar success sobre `9f36665af04d045194ed5c0907ed3a2796541fd1`; CI/Sonar verificados en el SHA citado; revalidar tras el cambio de correlación incident_id y completar CodeRabbit sobre el HEAD estable, sin fingir que el README conoce el hash del commit que lo contiene. `fast[contracts]` usa mocks, nunca la contraseña E2E real.
 - Smoke #59 encontró `/dashboard HTTP 302` sin `Location`; una vez integrado v0.1.79 se registrará solo el destino saneado para investigar #73.
 - No repetir pruebas manuales ciegas ni inferir deploy exacto desde el número de versión.
 
