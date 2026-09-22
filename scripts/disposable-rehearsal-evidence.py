@@ -243,8 +243,8 @@ def main() -> int:
         raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
         if len(raw) > MAX_STDIN_BYTES:
             fail("input exceeds safety limit")
-        report = build_report(json.loads(raw))
-    except (ValueError, TypeError):
+        report = build_report(json.loads(raw.decode("utf-8")))
+    except (ValueError, TypeError, UnicodeError):
         print("ERROR: disposable rehearsal evidence validation failed", file=sys.stderr)
         return 2
 
