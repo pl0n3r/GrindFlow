@@ -147,6 +147,26 @@ Después de completar el restore drill, `scripts/symfony-post-restore-tenant-gua
 
 El guard es CI-only y test-only. No introduce rutas, fixtures persistentes ni acceso a datos reales; reutiliza pruebas que crean y destruyen sus propios datos sintéticos sobre la copia restaurada.
 
+## Contrato offline de propiedad de escritura por módulo
+
+`scripts/cutover-ownership-plan.py` verifica propuestas de traspaso de escritura **sin conectarse a MariaDB**. Lee un envelope JSON `{"source": {...}, "plan": {...}}` por stdin y reutiliza `gf-arch-002-source-inventory-v1`. Su contrato `gf-arch-002-cutover-ownership-plan-v1` solo admite `mode=planning_only`, `source_only=true`, `database_contacted=false` y `production_authorized=false`. No acepta URI, secretos, SQL, paths externos ni campos arbitrarios en el plan.
+
+Los grupos iniciales son deliberadamente pequeños: **identidad** (`users`, `organizations`, `memberships` frente a `gf_identity_*`) y **Vault** (`media_assets`, `media_blobs` frente a `gf_vault_assets`). El mapeo enumera **propiedad de tablas en el código fuente**, no equipara sus filas, adjuntos, IDs ni semántica. Otros módulos requieren un mapeo revisado antes de figurar aquí; no se inventa equivalencia entre, por ejemplo, publicaciones Laravel y borradores Symfony.
+
+Ejemplo completamente reproducible y sin credenciales:
+
+```bash
+python3 scripts/data-schema-inventory.py --json > /tmp/gf-source-inventory.json
+python3 scripts/cutover-ownership-plan.py --template identity > /tmp/gf-identity-plan.json
+python3 scripts/cutover-ownership-plan.py --json < /tmp/gf-identity-plan.json
+python3 scripts/cutover-ownership-plan.py --template vault |
+  python3 scripts/cutover-ownership-plan.py --json
+```
+
+El primer comando emite **un solo documento JSON válido**; el mensaje de éxito para uso humano solo aparece sin `--json`. Los templates se derivan de las migraciones versionadas, con todos los requisitos en `pending` y escritor actual Laravel. El comparador reconstruye independientemente el inventario desde ese mismo checkout y rechaza envelopes fabricados o generados desde otra revisión de migraciones. El validador exige inventario sin colisiones, cobertura exacta de las tablas mapeadas, ausencia de duplicados, escritor previo/rollback Laravel y escritor propuesto Symfony. También valida el catálogo completo: una tabla no puede pertenecer a dos módulos y ningún mapeo puede apuntar a una tabla que ya no exista en las migraciones. Los flags booleanos requieren tipo booleano exacto: enteros `0`/`1` no son equivalentes válidos. La entrada se limita a 1.000.000 de bytes reales, no caracteres, exige decodificación UTF-8 estricta antes de `json.loads` y rechaza JSON UTF-16/UTF-32 aunque Python pudiera autodetectarlo por BOM. Los errores no reproducen el payload. La regresión del CLI instala además un audit hook en el proceso hijo que falla si intenta abrir sockets o lanzar procesos externos. Rechaza cualquier intento de marcar aprobación, operación productiva o comprobaciones como completas dentro del plan offline.
+
+El reporte `gf-arch-002-cutover-ownership-report-v1` incluye una huella SHA-256 del inventario fuente canónico (`source_inventory_sha256`) para identificar la versión exacta del conjunto de metadatos revisado; **no es un SHA de Git ni prueba de deploy**. `outside_this_proposal` enumera explícitamente las tablas de ambos runtimes que quedan fuera del módulo propuesto y cuyo ownership no se transfiere. Siempre declara `cutover_authorized=false` y `database_contacted=false`. Un plan estructuralmente válido **no certifica** backups, paridad de datos, bloqueo del escritor, RPO/RTO, smoke, consentimiento operativo ni autorización del propietario. Es insumo para revisión humana y un ensayo separado, nunca una orden ejecutable. No modificar la versión desplegada, `public_html` o el owner real de las tablas por obtener este reporte.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.

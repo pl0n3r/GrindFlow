@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,9 +88,10 @@ def main() -> int:
 
     if failures:
         for failure in failures:
-            print(f"ERROR: {failure}")
+            print(f"ERROR: {failure}", file=sys.stderr)
         return 1
-    print("GF-ARCH-002 source schema guard: OK")
+    if not args.json:
+        print("GF-ARCH-002 source schema guard: OK")
     return 0
 
 
