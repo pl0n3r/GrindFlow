@@ -18,12 +18,14 @@ assert_absent_regex() {
 cat > "$workdir/mock-curl" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
-method=GET; output=/dev/null; headers=""; write_out=""; url=""
+method=GET; output=/dev/null; headers=""; write_out=""; url=""; cookie_in=""; cookie_out=""
 while (( $# > 0 )); do
   case "$1" in
     --output|--dump-header|--write-out|--request)
       case "$1" in --output) output="$2";; --dump-header) headers="$2";; --write-out) write_out="$2";; --request) method="$2";; esac; shift 2;;
-    --cookie|--cookie-jar|--max-time|--user-agent|--header|--data-urlencode) shift 2;;
+    --cookie) cookie_in="$2"; shift 2;;
+    --cookie-jar) cookie_out="$2"; shift 2;;
+    --max-time|--user-agent|--header|--data-urlencode) shift 2;;
     --silent|--show-error) shift;;
     http://mock/*) url="$1"; shift;;
     *) printf 'unexpected fake-curl argument: %s\n' "$1" >&2; exit 2;;
@@ -31,12 +33,14 @@ while (( $# > 0 )); do
 done
 status=200; body=""; csv_headers=""; redirect=""
 [[ -z "${MOCK_REQUEST_LOG:-}" ]] || printf '%s %s\n' "$method" "$url" >> "$MOCK_REQUEST_LOG"
+# Paths only, no cookies or headers. Keep this separate from the request log.
+[[ -z "${MOCK_COOKIE_LOG:-}" ]] || printf '%s\t%s\t%s\t%s\n' "$method" "$url" "$cookie_in" "$cookie_out" >> "$MOCK_COOKIE_LOG"
 case "$url" in
   http://mock/up) body="ok";;
   http://mock/login)
     if [[ "$method" == POST ]]; then
       status=302; redirect="/dashboard"
-      if [[ "${MOCK_AUTH_MODE:-ok}" == post_login ]]; then redirect="/login?private-query-do-not-print"; fi
+      if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^post_login(_changed|_unavailable)?$ ]]; then redirect="/login?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_external ]]; then redirect="https://external.invalid/dashboard?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_network ]]; then redirect="//external.invalid/dashboard?private-query-do-not-print"; fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == post_absolute_ok ]]; then redirect="http://mock/dashboard?private-query-do-not-print"; fi
@@ -51,6 +55,12 @@ case "$url" in
       body='<form><input name="_token" value="fake-csrf"></form>'
       if [[ "${MOCK_AUTH_MODE:-ok}" == login_csrf_rotates ]] && [[ -n "${MOCK_REQUEST_LOG:-}" ]] && [[ "$(grep -c '^GET http://mock/login$' "$MOCK_REQUEST_LOG")" -ge 2 ]]; then
         body='<form><input name="_token" value="never-print-csrf-rotated"></form>'
+      fi
+      if [[ "${MOCK_AUTH_MODE:-ok}" == post_login_changed ]] && [[ "$(grep -c '^GET http://mock/login$' "$MOCK_REQUEST_LOG")" -ge 3 ]]; then
+        body='<form><input name="_token" value="never-print-post-failure-csrf"></form>'
+      fi
+      if [[ "${MOCK_AUTH_MODE:-ok}" == post_login_unavailable ]] && [[ "$(grep -c '^GET http://mock/login$' "$MOCK_REQUEST_LOG")" -ge 3 ]]; then
+        status=500; body='never-print-login-failure-html'
       fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == login_body_secret || "${MOCK_AUTH_MODE:-ok}" == login_body_secret_invalid_id ]]; then status=500; body="never-print-body-secret"; fi
     fi;;
@@ -122,11 +132,16 @@ run_case() {
   local diagnostic_mode="${10:-valid}"
   local log="$workdir/$label.log"
   local requests="$workdir/$label.requests"
+  local cookie_requests="$workdir/$label.cookie-paths"
   local result
-  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
+  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_COOKIE_LOG="$cookie_requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
   assert_absent_fixed 'never-print-header-private' "$log"
-  [[ "$(grep -c '^GET http://mock/login$' "$requests")" -eq 2 ]] || { printf 'FAIL %s: expected exactly two read-only login GETs.\n' "$label" >&2; exit 1; }
+  local expected_login_gets=2
+  if [[ "$auth_mode" == post_login || "$auth_mode" == post_login_changed || "$auth_mode" == post_login_unavailable ]]; then
+    expected_login_gets=3
+  fi
+  [[ "$(grep -c '^GET http://mock/login$' "$requests")" -eq "$expected_login_gets" ]] || { printf 'FAIL %s: expected %s read-only login GETs.\n' "$label" "$expected_login_gets" >&2; exit 1; }
   case "$label" in
     pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
@@ -182,7 +197,7 @@ run_case() {
       ;;
     current_vault_failure|current_vault_link_missing)
       grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed on the current schema; no repeated login requests.' "$log"; assert_absent_fixed "$NO_RETRY_MARKER" "$log";;
-    auth_post_login|auth_post_external|auth_post_network|auth_post_absolute_scheme|auth_post_absolute_port|auth_post_absolute_host|auth_post_absolute_userinfo|auth_dashboard_login|auth_dashboard_external|auth_dashboard_network|auth_dashboard_absolute_login|auth_dashboard_absolute_external|auth_dashboard_other|auth_dashboard_secret|auth_dashboard_303|auth_post_301|auth_post_307|auth_post_308|auth_dashboard_301|auth_dashboard_307|auth_dashboard_308|auth_post_401|auth_post_403|auth_post_419|auth_post_422|auth_post_429|auth_dashboard_401|auth_dashboard_403|auth_dashboard_419|auth_dashboard_422|auth_dashboard_429)
+    auth_post_login|auth_post_login_changed|auth_post_login_unavailable|auth_post_external|auth_post_network|auth_post_absolute_scheme|auth_post_absolute_port|auth_post_absolute_host|auth_post_absolute_userinfo|auth_dashboard_login|auth_dashboard_external|auth_dashboard_network|auth_dashboard_absolute_login|auth_dashboard_absolute_external|auth_dashboard_other|auth_dashboard_secret|auth_dashboard_303|auth_post_301|auth_post_307|auth_post_308|auth_dashboard_301|auth_dashboard_307|auth_dashboard_308|auth_post_401|auth_post_403|auth_post_419|auth_post_422|auth_post_429|auth_dashboard_401|auth_dashboard_403|auth_dashboard_419|auth_dashboard_422|auth_dashboard_429)
       grep -Fq 'ERROR: authentication failure is deterministic; do not retry credentials.' "$log"
       assert_absent_fixed 'private-query-do-not-print' "$log"
       assert_absent_fixed 'external.invalid' "$log"
@@ -195,9 +210,32 @@ run_case() {
       elif [[ "$auth_mode" =~ ^post_(401|403|419|422|429)$ ]]; then
         grep -Fq "ERROR: login returned HTTP ${BASH_REMATCH[1]}; stop authentication retries." "$log"
         assert_absent_fixed 'GET http://mock/dashboard' "$requests"
-      elif [[ "$auth_mode" == post_login ]]; then
+      elif [[ "$auth_mode" == post_login || "$auth_mode" == post_login_changed || "$auth_mode" == post_login_unavailable ]]; then
         grep -Fxq 'LOGIN_REDIRECT_PATH=/login' "$log"
         grep -Fq 'ERROR: login redirected back to /login;' "$log"
+        assert_absent_fixed 'fake-csrf' "$log"
+        assert_absent_fixed 'never-print-post-failure-csrf' "$log"
+        assert_absent_fixed 'never-print-login-failure-html' "$log"
+        case "$auth_mode" in
+          post_login) grep -Fxq 'LOGIN_FAILURE_SESSION_CHECK=stable' "$log" ;;
+          post_login_changed) grep -Fxq 'LOGIN_FAILURE_SESSION_CHECK=changed' "$log" ;;
+          post_login_unavailable) grep -Fxq 'LOGIN_FAILURE_SESSION_CHECK=unavailable' "$log" ;;
+          *) printf 'FAIL: unexpected synthetic post-login session mode.\n' >&2; exit 1 ;;
+        esac
+        [[ "$(grep -c '^LOGIN_FAILURE_SESSION_CHECK=' "$log")" -eq 1 ]]
+        # Verify --cookie AND --cookie-jar on the POST and third GET point
+        # to the exact same private jar. A new or missing jar is a regression
+        # even if the response mock returns the same synthetic CSRF.
+        local post_jar_in post_jar_out recheck_jar_in recheck_jar_out
+        post_jar_in="$(awk -F '\t' '$1 == "POST" && $2 == "http://mock/login" {print $3}' "$cookie_requests")"
+        post_jar_out="$(awk -F '\t' '$1 == "POST" && $2 == "http://mock/login" {print $4}' "$cookie_requests")"
+        recheck_jar_in="$(awk -F '\t' '$1 == "GET" && $2 == "http://mock/login" {value=$3} END {print value}' "$cookie_requests")"
+        recheck_jar_out="$(awk -F '\t' '$1 == "GET" && $2 == "http://mock/login" {value=$4} END {print value}' "$cookie_requests")"
+        if [[ -z "$post_jar_in" || "$post_jar_in" != "$post_jar_out" ||
+              "$post_jar_in" != "$recheck_jar_in" || "$post_jar_in" != "$recheck_jar_out" ]]; then
+          printf 'FAIL %s: rejected-login POST and anonymous recheck must share the same cookie jar.\n' "$label" >&2
+          exit 1
+        fi
         assert_absent_fixed 'GET http://mock/dashboard' "$requests"
       elif [[ "$auth_mode" == post_external || "$auth_mode" == post_network || "$auth_mode" =~ ^post_absolute_(scheme|port|host|userinfo)$ ]]; then
         grep -Fxq 'LOGIN_REDIRECT_PATH=(redacted)' "$log"
@@ -240,6 +278,8 @@ run_case current_vault_failure 0 4 valid failed
 run_case current_vault_link_missing 0 4 valid missing_link
 run_case auth_login_csrf_rotates 0 7 valid ok ok ok current login_csrf_rotates
 run_case auth_post_login 0 7 valid ok ok ok current post_login
+run_case auth_post_login_changed 0 7 valid ok ok ok current post_login_changed
+run_case auth_post_login_unavailable 0 7 valid ok ok ok current post_login_unavailable
 run_case auth_post_external 0 7 valid ok ok ok current post_external
 run_case auth_post_network 0 7 valid ok ok ok current post_network
 run_case auth_post_absolute_ok 0 0 valid ok ok ok current post_absolute_ok

@@ -27,6 +27,8 @@ cookie_jar="$workdir/cookies.txt"
 login_html="$workdir/login.html"
 login_recheck_html="$workdir/login-recheck.html"
 login_recheck_headers="$workdir/login-recheck.headers"
+login_failure_html="$workdir/login-failure-recheck.html"
+login_failure_headers="$workdir/login-failure-recheck.headers"
 dashboard_html="$workdir/dashboard.html"
 system_html="$workdir/system.html"
 vault_html="$workdir/vault.html"
@@ -308,8 +310,31 @@ check_workspace_modules() {
   printf 'MODULE_READ_ONLY=traffic-csv:ok\n'
 }
 
+# One anonymous GET after a rejected POST checks if the session/CSRF persisted.
+# Only allowlisted markers leave the private workspace; NEVER re-POST credentials.
+# A changed token is a diagnostic signal, not proof of an invalid password.
+check_failed_login_session() {
+  local check_status after_token before_token
+  check_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --output "$login_failure_html" --dump-header "$login_failure_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
+  if [[ "$check_status" != "200" ]]; then
+    printf 'LOGIN_FAILURE_SESSION_CHECK=unavailable\n'
+    return
+  fi
+  if ! after_token="$(extract_csrf "$login_failure_html")"; then
+    printf 'LOGIN_FAILURE_SESSION_CHECK=unavailable\n'
+    return
+  fi
+  before_token="$(<"$csrf_file")"
+  if [[ "$after_token" == "$before_token" ]]; then
+    printf 'LOGIN_FAILURE_SESSION_CHECK=stable\n'
+  else
+    printf 'LOGIN_FAILURE_SESSION_CHECK=changed\n'
+  fi
+  unset after_token before_token
+}
+
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
+  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
   if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers"; return 1; fi
@@ -363,6 +388,7 @@ run_smoke() {
   login_redirect="$(safe_redirect_path "$login_post_headers")"
   printf 'LOGIN_REDIRECT_PATH=%s\n' "$login_redirect"
   if [[ "$login_redirect" == "/login" ]]; then
+    check_failed_login_session
     printf 'ERROR: login redirected back to /login; credentials or account/session require investigation. No repeated login attempts.\n' >&2
     return 7
   fi
