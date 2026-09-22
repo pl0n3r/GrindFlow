@@ -129,6 +129,12 @@ El dump y el stage contienen solo datos sintéticos de CI, se guardan bajo un di
 
 Este ejercicio demuestra que **la mecánica de recuperación del stack Symfony aislado es ejecutable** sobre infraestructura desechable. No demuestra que exista un backup productivo, no acredita RPO/RTO, no valida secretos/configuración externa y no autoriza ejecutar el mismo procedimiento contra producción.
 
+## Plan automático de reversión de migraciones
+
+`scripts/symfony-migration-reversal-plan.py` elimina la lista manual de migraciones del gate de reversibilidad. Descubre todos los archivos `symfony/migrations/VersionYYYYMMDDHHMMSS.php`, rechaza nombres inesperados/duplicados y emite las clases Doctrine en orden descendente para ejecutar `--down`.
+
+El contrato es source-only: no conecta MariaDB y no ejecuta migraciones por sí mismo. CI prueba el plan contra el directorio real y luego `symfony-preview` consume `--classes` para revertir **cada migración descubierta** antes de reaplicarlas. De este modo, agregar una migración nueva no exige editar una segunda lista manual y no puede quedar silenciosamente fuera del restore drill.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
