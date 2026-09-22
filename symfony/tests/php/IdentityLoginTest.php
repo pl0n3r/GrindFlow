@@ -17,6 +17,22 @@ final class IdentityLoginTest extends WebTestCase
         return Kernel::class;
     }
 
+    public function testAnonymousLoginFormIsPrivateAndNeverCached(): void
+    {
+        $client = static::createClient();
+
+        for ($request = 0; $request < 2; $request++) {
+            $client->request('GET', '/login');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorExists('form.identity-form input[name="_csrf_token"]');
+
+            $cacheControl = (string) $client->getResponse()->headers->get('Cache-Control');
+            self::assertStringContainsString('no-store', $cacheControl);
+            self::assertStringContainsString('private', $cacheControl);
+            self::assertStringNotContainsString('public', $cacheControl);
+        }
+    }
+
     public function testLoginSelectTenantReauthorizeAndLogout(): void
     {
         $client = static::createClient();
