@@ -25,6 +25,8 @@ chmod 600 "$password_file"
 unset E2E_USER_PASSWORD
 cookie_jar="$workdir/cookies.txt"
 login_html="$workdir/login.html"
+login_recheck_html="$workdir/login-recheck.html"
+login_recheck_headers="$workdir/login-recheck.headers"
 dashboard_html="$workdir/dashboard.html"
 system_html="$workdir/system.html"
 vault_html="$workdir/vault.html"
@@ -114,7 +116,7 @@ PY
 }
 
 extract_csrf() {
-  python3 - "$login_html" <<'PY'
+  python3 - "${1:-$login_html}" <<'PY'
 from html.parser import HTMLParser
 import sys
 class TokenParser(HTMLParser):
@@ -307,7 +309,7 @@ check_workspace_modules() {
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
+  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
   if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers"; return 1; fi
@@ -316,11 +318,36 @@ run_smoke() {
   login_page_status="$(curl_common --cookie-jar "$cookie_jar" --output "$login_html" --dump-header "$login_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
   if [[ "$login_page_status" != "200" ]]; then print_http_failure "login page GET /login" "$login_page_status" "$login_headers"; return 1; fi
 
-  local token
-  if ! token="$(extract_csrf)"; then printf 'ERROR: login page did not expose a CSRF token.\n' >&2; return 1; fi
-  # Keep the CSRF token out of curl argv as well; regenerate it each login.
-  printf '%s' "$token" > "$csrf_file"
-  unset token
+  local initial_token current_token recheck_status
+  if ! initial_token="$(extract_csrf)"; then
+    printf 'ERROR: login page did not expose a CSRF token.\n' >&2
+    return 1
+  fi
+
+  # A second read-only GET must preserve the anonymous session/CSRF across
+  # requests using the same cookie jar. If it does not, never spend a login
+  # attempt or classify the account/password as invalid.
+  recheck_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --output "$login_recheck_html" --dump-header "$login_recheck_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
+  if [[ "$recheck_status" != "200" ]]; then
+    unset initial_token
+    print_http_failure "login session recheck GET /login" "$recheck_status" "$login_recheck_headers"
+    return 1
+  fi
+  if ! current_token="$(extract_csrf "$login_recheck_html")"; then
+    unset initial_token
+    printf 'ERROR: second login page did not expose a CSRF token.\n' >&2
+    return 7
+  fi
+  if [[ "$current_token" != "$initial_token" ]]; then
+    unset current_token initial_token
+    printf 'LOGIN_SESSION_PREFLIGHT=inconsistent\n'
+    printf 'ERROR: anonymous session/CSRF changed across identical GET requests; no login POST was sent.\n' >&2
+    return 7
+  fi
+  printf 'LOGIN_SESSION_PREFLIGHT=consistent\n'
+  # Keep the CSRF token out of curl argv; always use the rechecked token.
+  printf '%s' "$current_token" > "$csrf_file"
+  unset current_token initial_token
   local login_status
   login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --dump-header "$login_post_headers" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token@$csrf_file" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password@$password_file" "$BASE_URL/login")"
   case "$login_status" in

@@ -49,6 +49,9 @@ case "$url" in
       if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^post_(401|403|419|422|429)$ ]]; then status="${BASH_REMATCH[1]}"; redirect=""; fi
     else
       body='<form><input name="_token" value="fake-csrf"></form>'
+      if [[ "${MOCK_AUTH_MODE:-ok}" == login_csrf_rotates ]] && [[ -n "${MOCK_REQUEST_LOG:-}" ]] && [[ "$(grep -c '^GET http://mock/login$' "$MOCK_REQUEST_LOG")" -ge 2 ]]; then
+        body='<form><input name="_token" value="never-print-csrf-rotated"></form>'
+      fi
       if [[ "${MOCK_AUTH_MODE:-ok}" == login_body_secret || "${MOCK_AUTH_MODE:-ok}" == login_body_secret_invalid_id ]]; then status=500; body="never-print-body-secret"; fi
     fi;;
   http://mock/admin/diagnostics.json)
@@ -123,12 +126,23 @@ run_case() {
   if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
   assert_absent_fixed 'never-print-header-private' "$log"
+  [[ "$(grep -c '^GET http://mock/login$' "$requests")" -eq 2 ]] || { printf 'FAIL %s: expected exactly two read-only login GETs.\n' "$label" >&2; exit 1; }
   case "$label" in
     pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
       if [[ "$vault_mode" == failed || "$vault_mode" == missing_link ]]; then grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed while migrations remain pending' "$log"; else grep -Fxq 'VAULT_READ_ONLY=ok' "$log"; grep -Fxq 'MEDIA_STORAGE_READY=0' "$log"; fi
       if [[ "$inventory_mode" == valid ]]; then grep -Fxq 'MIGRATION_INVENTORY_STATUS=verified' "$log"; grep -Fxq 'MIGRATION_NAME=2026_09_19_000001_first' "$log"; grep -Fxq 'MIGRATION_NAME=2026_09_19_000002_second' "$log"; grep -Fxq 'MIGRATION_NAME=2026_09_19_000003_third' "$log"; grep -Eq '^MIGRATION_BATCH_SHA256=[a-f0-9]{64}$' "$log"; [[ "$(grep -c '^MIGRATION_NAME=' "$log")" -eq 3 ]]; else grep -Fxq 'MIGRATION_INVENTORY_STATUS=unavailable' "$log"; assert_absent_regex '^MIGRATION_(NAME|BATCH_SHA256)=' "$log"; fi
       assert_absent_fixed 'do-not-leak-csrf' "$log"; assert_absent_fixed 'never-print' "$log"; assert_absent_fixed "$NO_RETRY_MARKER" "$log"; assert_absent_regex '/(scheduler|distribution|traffic|finance)' "$requests";;
+    auth_login_csrf_rotates)
+      grep -Fxq 'LOGIN_SESSION_PREFLIGHT=inconsistent' "$log"
+      grep -Fq 'anonymous session/CSRF changed across identical GET requests; no login POST was sent.' "$log"
+      grep -Fq 'ERROR: authentication failure is deterministic; do not retry credentials.' "$log"
+      assert_absent_fixed 'fake-csrf' "$log"
+      assert_absent_fixed 'never-print-csrf-rotated' "$log"
+      assert_absent_fixed "$NO_RETRY_MARKER" "$log"
+      assert_absent_regex "$LOGIN_POST_PATTERN" "$requests"
+      assert_absent_fixed 'GET http://mock/dashboard' "$requests"
+      ;;
     current|auth_post_303|auth_post_absolute_ok)
       grep -Fxq 'VAULT_READ_ONLY=ok' "$log"
       grep -Eq '^RELEASE_UI_OBSERVED=v[0-9]+\.[0-9]+\.[0-9]+$' "$log"
@@ -224,6 +238,7 @@ run_case current_stale_release 0 6 valid ok ok ok stale
 run_case current_missing_release 0 6 valid ok ok ok missing
 run_case current_vault_failure 0 4 valid failed
 run_case current_vault_link_missing 0 4 valid missing_link
+run_case auth_login_csrf_rotates 0 7 valid ok ok ok current login_csrf_rotates
 run_case auth_post_login 0 7 valid ok ok ok current post_login
 run_case auth_post_external 0 7 valid ok ok ok current post_external
 run_case auth_post_network 0 7 valid ok ok ok current post_network
