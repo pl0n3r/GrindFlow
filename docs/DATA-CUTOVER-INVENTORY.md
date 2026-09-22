@@ -175,7 +175,7 @@ El input `gf-arch-002-disposable-rehearsal-input-v1` exige:
 
 - provenance de GitHub Actions con SHA de 40 hex, `run_id` numérico y `disposable=true`; ese flag también se conserva dentro del receipt reducido;
 - un reporte `gf-arch-002-cutover-ownership-report-v1` que coincida exactamente con las migraciones del mismo checkout;
-- los cuatro checks descartables en `passed`: paridad de snapshot, reversibilidad, restore DB+Vault y guards post-restore; `--template` ya no puede fabricarlos y exige un archivo `--gate-results` del mismo `head_sha`/`run_id`;
+- los cuatro checks descartables en `passed`: paridad de snapshot, reversibilidad, restore DB+Vault y guards post-restore; `--template` ya no puede fabricarlos y exige recibir por stdin resultados del mismo `head_sha`/`run_id`;
 - `production_authorized=false` con tipo booleano exacto.
 
 El reporte conserva únicamente provenance mínima, módulo, huella del inventario y checks aprobados. Deliberadamente fija:
@@ -213,13 +213,13 @@ python3 scripts/disposable-rehearsal-evidence.py \
   --template identity \
   --head-sha 0123456789abcdef0123456789abcdef01234567 \
   --run-id 123456 \
-  --gate-results /tmp/gf-gates.json > /tmp/gf-rehearsal-envelope.json
+  < /tmp/gf-gates.json > /tmp/gf-rehearsal-envelope.json
 
 python3 scripts/disposable-rehearsal-evidence.py --json \
   < /tmp/gf-rehearsal-envelope.json
 ```
 
-Este ejemplo solo demuestra la forma del contrato. Un archivo `gate-results` escrito manualmente **no prueba** que GitHub Actions haya ejecutado esos gates; la evidencia de CI depende del workflow y del run enlazado.
+Este ejemplo solo demuestra la forma del contrato. Un JSON de gate-results escrito manualmente **no prueba** que GitHub Actions haya ejecutado esos gates; la evidencia de CI depende del workflow y del run enlazado. El CLI consume esos resultados por stdin y no acepta rutas de archivo suministradas por el caller.
 
 El validador limita stdin a 1.000.000 de bytes, exige UTF-8 estricto (rechaza JSON UTF-16/UTF-32), no acepta campos arbitrarios, no imprime payloads rechazados y no importa clientes de red/base de datos. Un digest válido identifica el contenido del envelope, **no prueba que GitHub ni producción hayan ejecutado nada fuera del run indicado**.
 
