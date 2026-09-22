@@ -67,7 +67,7 @@ flowchart LR
 - PHPUnit cubre límites de PHP y extensión ausente; el smoke HTTP real comprueba la forma pública. No se toca Hostinger, credenciales, datos ni migraciones.
 
 ## Archivos modificados en este deploy
-Inventario exacto de la candidata:
+Inventario de solo el deploy actual: candidata, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
 - `docs/GRINDFLOW-SPEC.md`
