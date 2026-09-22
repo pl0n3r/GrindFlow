@@ -21,7 +21,7 @@
 | Version objetivo | 🚧 **v0.1.86** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.85~~ | `677f6ee863bcfaa8ea447e7ab3e94055f9dfb273` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Revalidar HEAD final | No heredar checks del PR #84 |
-| CI del SHA exacto de main | 🚧 v0.1.85 en comprobación | [#35693080276](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080276) |
+| CI del SHA exacto de main | ✅ ~~v0.1.85 success~~ | [#35693080276](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080276) |
 | Deploy Observer | ✅ ~~v0.1.85 humana observada~~ | [#35693080236](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080236); NO checkout SHA remoto |
 | Production Smoke | ⛔ Login E2E no validado | [#35693080266](https://github.com/pl0n3r/GrindFlow/actions/runs/35693080266); #73 |
 | Symfony en Hostinger | ⛔ NO desplegado | `symfony-preview` solo CI aislado |
@@ -91,7 +91,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.85 fusionada y versión humana observada~~ | 🚧 CI exact-main pendiente de comprobación |
+| **DONE** | ✅ ~~v0.1.85 fusionada y versión humana observada~~ | ✅ ~~CI exact-main #35693080276 success~~ |
 | **NOW** | 🚧 Redirect y error de login Symfony privados | 🚧 v0.1.86 candidata |
 | **NEXT** | 🚧 Incidente de acceso E2E #73 | 🚧 Sin tocar credenciales |
 | **LATER** | 🚧 Transición Symfony | 🚧 Aislada |
