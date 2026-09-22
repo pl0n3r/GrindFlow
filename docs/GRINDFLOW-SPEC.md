@@ -514,3 +514,22 @@ productivas, proveedores externos ni escrituras en producción.
   `can_publish=false` and `review_only` even after distribution authorization
   and human review are granted.
 
+
+## 25. Safe Symfony runtime readiness
+
+- `GET /health` reports product health plus a coarse runtime object with only
+  `compatible` and the stable contract identifier `symfony-mariadb-v1`.
+- The current contract requires PHP >= 8.3 and < 9.0 with `ctype`, `iconv`,
+  PDO and `pdo_mysql`. Compatibility is evaluated locally by the running
+  Symfony process and fails closed.
+- A compatible runtime returns HTTP 200 and `status=ok`; an incompatible one
+  returns HTTP 503 and `status=degraded`. Both remain non-cacheable.
+- The public response must not expose the exact PHP version, SAPI, complete
+  extension inventory, database URL, credentials, deployment SHA or hosting
+  internals.
+- Runtime readiness is only capability evidence for that process. It does not
+  prove MariaDB connectivity, migration state, the exact Hostinger checkout,
+  a Symfony production cutover or authenticated production correctness.
+- CI verifies both synthetic incompatible cases and the real isolated
+  Symfony/MariaDB preview path before merge.
+
