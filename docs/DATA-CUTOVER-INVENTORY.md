@@ -252,6 +252,41 @@ El reporte `gf-arch-002-operator-evidence-report-v1` conserva únicamente hashes
 
 Por tanto, este contrato **no valida el contenido real** de un backup ni de un snapshot, no prueba RPO/RTO, no verifica un freeze, no sustituye autorización del propietario y no demuestra producción saludable. Solo asegura que un operador entregue referencias mínimas, redacted y consistentes con el checkout antes de una revisión humana separada.
 
+## Evidencia redacted de rehearsal single-writer
+
+`scripts/single-writer-rehearsal-verifier.py` encadena los contratos anteriores sin convertirlos en autorización. Recibe el envelope completo de `operator-evidence-verifier.py` y un receipt `gf-arch-002-single-writer-rehearsal-receipt-v1` que describe un ensayo **aislado y autorizado**, no producción.
+
+El receipt exige:
+
+- mismo módulo, inventario fuente y bundle de evidencia del operador;
+- `previous_writer=laravel` y `proposed_writer=symfony`;
+- `old_writer_writes_blocked=true` antes de concluir la ventana;
+- `new_writer_writes_enabled=true`;
+- `overlapping_writes_observed=false`;
+- observación humana explícita y flags exactos `contains_row_data=false` / `contains_secrets=false`;
+- SHA-256 de la evidencia revisada fuera de banda;
+- ventana UTC con duración positiva y timestamp de observación posterior al cierre;
+- `environment=authorized_isolated_rehearsal`.
+
+El verificador vuelve a ejecutar el contrato de evidencia del operador y, por transitividad, el ownership reconstruido desde las migraciones del checkout. No acepta paths, URLs, credenciales ni contenido de filas. Stdin está limitado a 1.000.000 bytes y UTF-8 estricto; las regresiones instalan una barrera que falla ante sockets o subprocesses.
+
+Incluso con un receipt válido, el reporte mantiene:
+
+```json
+{
+  "single_writer_rehearsal_verified": true,
+  "production_ready": false,
+  "production_authorized": false,
+  "remaining_preconditions": [
+    "production_single_writer_freeze",
+    "owner_authorization",
+    "production_smoke"
+  ]
+}
+```
+
+Por diseño, un rehearsal no acredita que el writer viejo esté congelado en producción ni que Symfony pueda asumir escritura productiva. La evidencia de freeze productivo, autorización del propietario y smoke autenticado siguen siendo señales externas y separadas.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.
