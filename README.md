@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.94: aislamiento cross-tenant/IDOR verificado después del restore.** Base exacta `main` v0.1.93 `a9ddf45215c50df9397f257f6e822f9fa29816ea`; reutiliza regresiones de Vault, clasificación masiva, papelera, organización y autorización sobre la MariaDB restaurada.
+> **Candidato v0.1.95: interfaz más clara e i18n coherente por locale.** Base exacta `main` v0.1.94 `50a5d48f8b9a743d799d3c194b48b27cf04adeb7`; simplifica copy ES/EN, elimina strings visibles quemados y localiza metadata/upload sin cambiar datos ni backend.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,28 +18,28 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.94** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.93~~ | `a9ddf45215c50df9397f257f6e822f9fa29816ea` |
+| Version objetivo | 🚧 **v0.1.95** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.94~~ | `50a5d48f8b9a743d799d3c194b48b27cf04adeb7` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.93 | Señal post-merge separada |
+| CI del SHA exacto de main | 🚧 No observado para v0.1.94 | Señal post-merge separada |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Regresiones post-restore solo sobre DB CI descartable |
+| Datos productivos | ✅ ~~No tocados~~ | Cambio de copy/i18n y metadata |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+108** | **−28** | **+80** |
+| **7** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Cross-tenant/IDOR post-restore: Vault, bulk, trash, organización y autorización |
+| Alcance | Copy ES/EN, catálogo i18n, upload UI y metadata por locale |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -61,40 +61,35 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/symfony-post-restore-tenant-guard.sh`: ejecuta regresiones de aislamiento únicamente después del restore drill.
-- Reutiliza `VaultTest` para comprobar 404 en detalle/preview/download de activos ajenos y bloqueo tras revocar membresía.
-- Añade `VaultBulkUsageTest` post-restore para exigir rechazo atómico de lotes con IDs de otro tenant, sin mutación parcial.
-- Añade `VaultTrashTest` post-restore para comprobar aislamiento y privacidad al mover/restaurar recursos.
-- Reutiliza `OrganizationSettingsTest` para rechazar mutaciones IDOR mediante `organization_id`, roles insuficientes y CSRF inválido.
-- Reutiliza `DistributionAuthorizationTest` para impedir autorizar recursos de otra organización.
-- El guard exige `APP_ENV=test` y `CI=true`; un contrato shell prueba ambas barreras antes de depender de PHPUnit.
-- `symfony-preview` ejecuta estas regresiones **después** de restaurar MariaDB + Vault y antes de arrancar el preview HTTP.
-- `ci-scope.sh` fuerza el gate Symfony si cambia cualquiera de los scripts del guard.
+- Simplifica etiquetas ES/EN para navegación, dashboard, métricas, cumplimiento y archivos por asignar.
+- Mueve mensajes visibles del flujo de upload al catálogo i18n y elimina literales de error/progreso del componente.
+- Corrige tildes y redacción española del catálogo sin alterar la variante válida `periodo`.
+- El hint de revisión pendiente usa traducción en vez de texto quemado.
+- El layout genera metadata por locale desde `app.name` y `app.tagline`, evitando descripción española en `/en`.
+- No cambia migraciones, API, permisos, datos productivos ni contratos de backend.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 <!-- grindflow:changed-files -->
-- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
-- `docs/DATA-CUTOVER-INVENTORY.md`
-- `docs/REQUIREMENTS.md`
-- `scripts/ci-scope-contract.sh`
-- `scripts/ci-scope.sh`
-- `scripts/symfony-post-restore-tenant-guard-contract.sh`
-- `scripts/symfony-post-restore-tenant-guard.sh`
+- `messages/en.json`
+- `messages/es.json`
+- `src/app/[locale]/(panel)/studio/page.tsx`
+- `src/app/[locale]/layout.tsx`
+- `src/app/[locale]/u/[token]/upload-client.tsx`
 
 ## Validación
-- La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
-- Las cinco regresiones crean y destruyen datos sintéticos y se ejecutan **solo después del restore** sobre MariaDB descartable.
-- Esta entrega no acredita datos productivos, RPO/RTO, secretos/configuración restaurados ni SHA Hostinger.
+- La rama debe pasar `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
+- El scope conserva `legacy` y, por clasificación conservadora del catálogo, ejecuta también PHP/DB/browser/real-stack.
+- Esta entrega no acredita deploy Hostinger ni cambia el estado del Production Smoke.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Verificar aislamiento tenant después del restore | 🚧 v0.1.94 candidata |
+| **NOW** | 🚧 Copy/i18n de interfaz y metadata por locale | 🚧 v0.1.95 candidata |
 | **NEXT** | 🚧 Inventario real autorizado + contrato de cutover por módulo | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -102,8 +97,8 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.93 fusionada~~ | ✅ ~~reversión automática de todas las migraciones~~ |
-| **NOW** | 🚧 Post-restore tenant isolation | 🚧 v0.1.94 |
+| **DONE** | ✅ ~~v0.1.94 fusionada~~ | ✅ ~~aislamiento tenant post-restore~~ |
+| **NOW** | 🚧 UI copy + i18n | 🚧 v0.1.95 |
 | **NEXT** | 🚧 Snapshot real autorizado + contrato de cutover | 🚧 Sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
