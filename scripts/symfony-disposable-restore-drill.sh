@@ -16,19 +16,32 @@ fail() {
 [[ "${CI:-}" == "true" ]] || fail "restore drill is CI-only."
 [[ -n "${DATABASE_URL:-}" ]] || fail "DATABASE_URL is required."
 
-mapfile -t db_parts < <(
+db_parts_raw="$(
   php -r '
     $parts = parse_url((string) getenv("DATABASE_URL"));
-    if (!is_array($parts)) {
+    $scheme = strtolower((string) ($parts["scheme"] ?? ""));
+    if (!is_array($parts) || !in_array($scheme, ["mysql", "mariadb"], true)) {
         exit(2);
     }
-    echo rawurldecode((string) ($parts["host"] ?? "")), "\n";
+
+    $host = rawurldecode((string) ($parts["host"] ?? ""));
+    $database = rawurldecode(ltrim((string) ($parts["path"] ?? ""), "/"));
+    $user = rawurldecode((string) ($parts["user"] ?? ""));
+    $password = rawurldecode((string) ($parts["pass"] ?? ""));
+    foreach ([$host, $database, $user, $password] as $value) {
+        if (str_contains($value, "\n") || str_contains($value, "\r")) {
+            exit(2);
+        }
+    }
+
+    echo $host, "\n";
     echo (int) ($parts["port"] ?? 3306), "\n";
-    echo rawurldecode(ltrim((string) ($parts["path"] ?? ""), "/")), "\n";
-    echo rawurldecode((string) ($parts["user"] ?? "")), "\n";
-    echo rawurldecode((string) ($parts["pass"] ?? "")), "\n";
+    echo $database, "\n";
+    echo $user, "\n";
+    echo $password, "\n";
   '
-) || fail "DATABASE_URL could not be parsed."
+)" || fail "DATABASE_URL could not be parsed."
+mapfile -t db_parts <<< "$db_parts_raw"
 
 db_host="${db_parts[0]:-}"
 db_port="${db_parts[1]:-}"
