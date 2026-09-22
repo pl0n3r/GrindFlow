@@ -187,6 +187,7 @@ jobs:
           python3 -m py_compile scripts/data-schema-parity.py
           python3 -m unittest tests/test_data_schema_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
+          python3 scripts/readme-dashboard.py --self-test
           python3 -m py_compile scripts/validate-governance.py
           python3 scripts/validate-governance.py --self-test
           python3 scripts/validate-governance.py
@@ -216,10 +217,20 @@ jobs:
 
       - name: Verify README dashboard matches the exact delta
         if: github.event_name != 'workflow_dispatch'
-        run: >-
-          python3 scripts/readme-dashboard.py --check
-          --base "${{ needs.preflight.outputs.base_sha }}"
-          --head "${{ needs.preflight.outputs.head_sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/readme-dashboard.py --update \
+            --base "${{ needs.preflight.outputs.base_sha }}" \
+            --head "${{ needs.preflight.outputs.head_sha }}"
+          if ! git diff --quiet -- README.md; then
+            echo "::error::README dashboard was stale. Commit the auto-generated README below."
+            git --no-pager diff -- README.md
+            exit 1
+          fi
+          python3 scripts/readme-dashboard.py --check \
+            --base "${{ needs.preflight.outputs.base_sha }}" \
+            --head "${{ needs.preflight.outputs.head_sha }}"
 
   php-quality:
     name: php-quality
