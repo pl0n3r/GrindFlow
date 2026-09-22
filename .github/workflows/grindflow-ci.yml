@@ -192,6 +192,8 @@ jobs:
           python3 -m py_compile scripts/symfony-schema-structure.py
           python3 -m unittest tests/test_symfony_schema_structure.py
           python3 scripts/symfony-schema-structure.py
+          python3 -m py_compile scripts/symfony-migration-reversal-plan.py
+          python3 -m unittest tests/test_symfony_migration_reversal_plan.py
           php -l scripts/mariadb-structure-snapshot.php
           bash scripts/mariadb-structure-snapshot-contract.sh
           bash scripts/symfony-disposable-restore-drill-contract.sh
