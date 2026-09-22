@@ -10,7 +10,9 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 import hashlib
+import importlib.util
 import json
+from pathlib import Path
 import re
 import sys
 from typing import Any
@@ -122,6 +124,18 @@ def validate_operator_reference(
     return reference
 
 
+def checked_in_source_digest(module_name: str) -> str:
+    """Bind the receipt chain to the reviewed migration inventory in this checkout."""
+    path = Path(__file__).with_name("operator-evidence-verifier.py")
+    spec = importlib.util.spec_from_file_location("gf_operator_evidence", path)
+    if spec is None or spec.loader is None:
+        fail("operator evidence validator unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    report = module.checked_in_ownership_report(module_name)
+    return validate_digest(report["source_inventory_sha256"], "checked-in inventory")
+
+
 def validate_operator_report(report: Any, module_name: str) -> dict[str, Any]:
     if not isinstance(report, dict) or set(report) != OPERATOR_REPORT_FIELDS:
         fail("operator evidence report fields do not match the contract")
@@ -135,6 +149,8 @@ def validate_operator_report(report: Any, module_name: str) -> dict[str, Any]:
         report["source_inventory_sha256"],
         "source inventory",
     )
+    if source_digest != checked_in_source_digest(module_name):
+        fail("operator evidence inventory differs from checked-in migrations")
     if report["scope"] != "redacted_references_only":
         fail("operator evidence report scope is invalid")
     exact_bool(report, "receipt_content_verified", False)
