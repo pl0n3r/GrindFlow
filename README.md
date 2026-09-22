@@ -66,7 +66,7 @@ flowchart LR
 - Nuevo `scripts/operator-evidence-verifier.py`: valida offline referencias redacted a evidencia externa de GF-ARCH-002.
 - Solo admite módulos ya mapeados por ownership (`identity` y `vault`) y vuelve a cotejar el ownership report contra las migraciones del mismo checkout.
 - Exige exactamente dos receipts: `authorized_metadata_inventory` y `real_backup_restore_rehearsal`.
-- Cada receipt conserva únicamente SHA-256, timestamp UTC, módulo, huella del inventario y entorno esperado; inventario y restore deben usar digests distintos.
+- Cada receipt conserva únicamente SHA-256, timestamp UTC, módulo, huella del inventario y entorno esperado; inventario y restore deben usar digests distintos. El ownership report exige booleanos exactos, no enteros `0`/`1`.
 - Requiere `operator_observed=true`, `contains_row_data=false` y `contains_secrets=false`; campos adicionales como URL, path, usuario, nota o credencial se rechazan.
 - La entrada está limitada a 1.000.000 bytes, exige UTF-8 y falla cerrado ante JSON recursivo o malformado sin reproducir el payload.
 - La suite instala una audit barrier para detectar sockets, subprocesses u operaciones externas y comprueba que `DATABASE_URL` no se filtra.
@@ -87,7 +87,7 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 ## Validación
 - La rama debe pasar `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
 - Por modificar `.github/workflows/grindflow-ci.yml`, el scope es completo e incluye `symfony-preview`.
-- Los receipts de `identity` y `vault` deben coincidir con el ownership report reconstruido desde las migraciones actuales.
+- Para el módulo seleccionado (`identity` **o** `vault`), los dos receipts deben pertenecer a ese mismo módulo y coincidir con su ownership report reconstruido desde las migraciones actuales.
 - El CLI no debe abrir sockets, procesos externos, archivos del caller ni conexiones a base de datos.
 - Incluso con ambos receipts válidos, el reporte debe mantener `production_ready=false` y `production_authorized=false`.
 - Exact-main, Deploy Observer y Production Smoke siguen siendo señales separadas.
