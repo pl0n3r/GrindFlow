@@ -80,6 +80,9 @@ expect_flag "$schema_contract" $RUN_SYMFONY_ENABLED "schema parity tooling selec
 restore_drill="$(run_scope pull_request scripts/symfony-disposable-restore-drill.sh)"
 expect_flag "$restore_drill" $RUN_SYMFONY_ENABLED "restore drill selects Symfony recovery gate"
 
+migration_plan="$(run_scope pull_request scripts/symfony-migration-reversal-plan.py)"
+expect_flag "$migration_plan" $RUN_SYMFONY_ENABLED "migration reversal planner selects Symfony gate"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
