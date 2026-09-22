@@ -49,7 +49,7 @@ CI_FIELDS = frozenset({
     "disposable",
 })
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-RUN_ID_RE = re.compile(r"^[1-9][0-9]*$")
+RUN_ID_RE = re.compile(r"^[1-9]\d*$")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -90,10 +90,8 @@ def checked_in_ownership_report(module_name: str) -> dict[str, Any]:
     return ownership.build_report(draft["source"], draft["plan"])
 
 
-def validate_ownership(report: Any) -> dict[str, Any]:
-    if not isinstance(report, dict):
-        fail("ownership report must be an object")
-    required = {
+def ownership_required_fields() -> set[str]:
+    return {
         "contract",
         "module",
         "source_inventory_sha256",
@@ -108,8 +106,9 @@ def validate_ownership(report: Any) -> dict[str, Any]:
         "pending_preconditions",
         "next_action",
     }
-    if set(report) != required:
-        fail("ownership report fields do not match the contract")
+
+
+def validate_ownership_identity(report: dict[str, Any]) -> None:
     if report["contract"] != OWNERSHIP_CONTRACT:
         fail("unsupported ownership report contract")
     if not isinstance(report["module"], str) or not report["module"]:
@@ -117,30 +116,52 @@ def validate_ownership(report: Any) -> dict[str, Any]:
     digest = report["source_inventory_sha256"]
     if not isinstance(digest, str) or not DIGEST_RE.fullmatch(digest):
         fail("ownership inventory digest is invalid")
-    if (
-        type(report["source_only"]) is not bool
-        or report["source_only"] is not True
-        or type(report["database_contacted"]) is not bool
-        or report["database_contacted"] is not False
-        or type(report["cutover_authorized"]) is not bool
-        or report["cutover_authorized"] is not False
+
+
+def validate_ownership_safety(report: dict[str, Any]) -> None:
+    expected = {
+        "source_only": True,
+        "database_contacted": False,
+        "cutover_authorized": False,
+    }
+    if any(
+        type(report[key]) is not bool or report[key] is not value
+        for key, value in expected.items()
     ):
         fail("ownership evidence must remain source-only and unauthorized")
-    if (
-        report["current_writer"] != "laravel"
-        or report["proposed_writer"] != "symfony"
-        or report["rollback_writer"] != "laravel"
-    ):
+
+
+def validate_ownership_transition(report: dict[str, Any]) -> None:
+    expected = {
+        "current_writer": "laravel",
+        "proposed_writer": "symfony",
+        "rollback_writer": "laravel",
+    }
+    if any(report[key] != value for key, value in expected.items()):
         fail("ownership writer transition is not the reviewed proposal")
     if not isinstance(report["table_ownership"], dict):
         fail("ownership table mapping is invalid")
     if not isinstance(report["outside_this_proposal"], dict):
         fail("ownership outside-scope mapping is invalid")
+
+
+def validate_ownership_pending(report: dict[str, Any]) -> None:
     pending = report["pending_preconditions"]
     if not isinstance(pending, list) or not pending:
         fail("ownership report must retain pending preconditions")
     if any(not isinstance(value, str) or not value for value in pending):
         fail("ownership pending preconditions are invalid")
+
+
+def validate_ownership(report: Any) -> dict[str, Any]:
+    if not isinstance(report, dict):
+        fail("ownership report must be an object")
+    if set(report) != ownership_required_fields():
+        fail("ownership report fields do not match the contract")
+    validate_ownership_identity(report)
+    validate_ownership_safety(report)
+    validate_ownership_transition(report)
+    validate_ownership_pending(report)
     if report != checked_in_ownership_report(report["module"]):
         fail("ownership report differs from checked-in migrations")
     return report
@@ -167,7 +188,7 @@ def build_report(envelope: Any) -> dict[str, Any]:
 
     ci = validate_ci(envelope["ci"])
     ownership = validate_ownership(envelope["ownership_report"])
-    checks = validate_checks(envelope["checks"])
+    validate_checks(envelope["checks"])
 
     canonical = json.dumps(
         envelope,
@@ -244,7 +265,7 @@ def main() -> int:
         if len(raw) > MAX_STDIN_BYTES:
             fail("input exceeds safety limit")
         report = build_report(json.loads(raw.decode("utf-8")))
-    except (ValueError, TypeError, UnicodeError):
+    except (ValueError, TypeError):
         print("ERROR: disposable rehearsal evidence validation failed", file=sys.stderr)
         return 2
 
