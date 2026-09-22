@@ -66,7 +66,12 @@ def classify(log: str) -> dict[str, str]:
         for line in log.splitlines()
         if (match := LOGIN_HTTP_FAILURE.fullmatch(line))
     }
-    if len(dashboard_errors) > 1 or len(login_errors) > 1 or (dashboard_errors and login_errors):
+    if (
+        len(dashboard_errors) > 1
+        or len(login_errors) > 1
+        or (dashboard_errors and login_errors)
+        or (dashboard_errors and redirect != "/dashboard")
+    ):
         raise ValueError("conflicting authentication outcomes")
 
     diagnosis = "not_classified"
