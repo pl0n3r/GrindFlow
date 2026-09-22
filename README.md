@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.85: login Symfony no cacheable con comprobación de CSRF presente.** Base exacta `main` v0.1.84 `fa7f8413bfda489bdf2a9d55a19237ca3dd6c697`; Laravel productivo y Symfony aislado conservan sus límites.
+> **Candidato v0.1.94: aislamiento cross-tenant/IDOR verificado después del restore.** Base exacta `main` v0.1.93 `a9ddf45215c50df9397f257f6e822f9fa29816ea`; reutiliza regresiones de Vault, clasificación masiva, papelera, organización y autorización sobre la MariaDB restaurada.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,38 +18,38 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.85** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.84~~ | `fa7f8413bfda489bdf2a9d55a19237ca3dd6c697` |
-| CI / Sonar / CodeRabbit del PR | 🚧 Revalidar HEAD final | No heredar checks del PR #83 |
-| CI del SHA exacto de main | ✅ ~~v0.1.84 success~~ | [#35691546669](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546669) |
-| Deploy Observer | ✅ ~~v0.1.84 humana observada~~ | [#35691546770](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546770); NO checkout SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | [#35691546677](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546677); #73 |
-| Symfony en Hostinger | ⛔ NO desplegado | `symfony-preview` solo CI aislado |
-| Migraciones | ✅ ~~Sin cambio de esquema~~ | No se ejecutan en producción |
+| Version objetivo | 🚧 **v0.1.94** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.93~~ | `a9ddf45215c50df9397f257f6e822f9fa29816ea` |
+| CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
+| CI del SHA exacto de main | 🚧 No observado para v0.1.93 | Señal post-merge separada |
+| Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
+| Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
+| Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
+| Datos productivos | ✅ ~~No tocados~~ | Regresiones post-restore solo sobre DB CI descartable |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+74** | **−36** | **+38** |
+| **9** | **+108** | **−28** | **+80** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[contracts] · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Login Twig, cabeceras y CSRF sintético Symfony; sin cambio al login Laravel |
-| Revisiones | CI/Sonar/CodeRabbit HEAD, CI exact-main, Observer y Smoke separados |
+| Alcance | Cross-tenant/IDOR post-restore: Vault, bulk, trash, organización y autorización |
+| Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
- P --> F["fast contracts"]
- P --> Y["Symfony preview"]
+ P --> F["fast + parity tests"]
+ P --> H["gates completos"]
  F --> V["validate"]
- Y --> V
+ H --> V
  A --> S["Sonar"]
  A --> C["CodeRabbit"]
  V --> M["Squash merge"]
@@ -61,38 +61,49 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- El formulario anónimo `GET /login` Symfony contiene token CSRF ligado a sesión y puede recordar un email; la respuesta ahora exige `Cache-Control: no-store, private` en lugar de solo `private`. No se modifica la autenticación productiva Laravel.
-- PHPUnit HTTP con sesión sintética comprueba dos GET, formulario real, token CSRF no vacío en ambas respuestas, sin asumir igualdad textual, y cabeceras `no-store, private` sin `public`.
-- Nuevo contrato [GF-SEC-006](docs/REQUIREMENTS.md) documenta la privacidad del formulario. La rama previa de trabajo fue recuperada sobre la base actual sin saltar release.
-- El [Smoke de v0.1.84](https://github.com/pl0n3r/GrindFlow/actions/runs/35691546677) falló. Artifact privado: preflight CSRF `consistent`, POST `/login`, GET anónimo adicional `LOGIN_FAILURE_SESSION_CHECK=stable`. Esto reduce la incertidumbre sobre continuidad del token, pero **no demuestra credenciales válidas ni explica el rechazo**; #73 sigue abierto.
+- Nuevo `scripts/symfony-post-restore-tenant-guard.sh`: ejecuta regresiones de aislamiento únicamente después del restore drill.
+- Reutiliza `VaultTest` para comprobar 404 en detalle/preview/download de activos ajenos y bloqueo tras revocar membresía.
+- Añade `VaultBulkUsageTest` post-restore para exigir rechazo atómico de lotes con IDs de otro tenant, sin mutación parcial.
+- Añade `VaultTrashTest` post-restore para comprobar aislamiento y privacidad al mover/restaurar recursos.
+- Reutiliza `OrganizationSettingsTest` para rechazar mutaciones IDOR mediante `organization_id`, roles insuficientes y CSRF inválido.
+- Reutiliza `DistributionAuthorizationTest` para impedir autorizar recursos de otra organización.
+- El guard exige `APP_ENV=test` y `CI=true`; un contrato shell prueba ambas barreras antes de depender de PHPUnit.
+- `symfony-preview` ejecuta estas regresiones **después** de restaurar MariaDB + Vault y antes de arrancar el preview HTTP.
+- `ci-scope.sh` fuerza el gate Symfony si cambia cualquiera de los scripts del guard.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
+<!-- grindflow:changed-files -->
+- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
+- `docs/DATA-CUTOVER-INVENTORY.md`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Http/Controller/LoginController.php`
-- `symfony/tests/php/IdentityLoginTest.php`
+- `scripts/ci-scope-contract.sh`
+- `scripts/ci-scope.sh`
+- `scripts/symfony-post-restore-tenant-guard-contract.sh`
+- `scripts/symfony-post-restore-tenant-guard.sh`
 
 ## Validación
-- El test se ejecuta exclusivamente en MariaDB Symfony descartable dentro de `symfony-preview`; CI/Sonar/CodeRabbit del HEAD final siguen pendientes hasta que concluyan. No hay prueba local ni deploy Symfony.
-- El Smoke de Hostinger mide Laravel y no sustituye el test Symfony. El marcador humano v0.1.84 observado no verifica el SHA desplegado.
+- La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
+- Las cinco regresiones crean y destruyen datos sintéticos y se ejecutan **solo después del restore** sobre MariaDB descartable.
+- Esta entrega no acredita datos productivos, RPO/RTO, secretos/configuración restaurados ni SHA Hostinger.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Bloquear caché del login Symfony y verificar token CSRF por GET | 🚧 PR/gates v0.1.85 |
-| **NEXT** | 🚧 Resolver origen del rechazo E2E #73 | 🚧 Operación autorizada, sin reintentos ciegos |
-| **LATER** | 🚧 Paridad/cutover Symfony aislado | 🚧 No desplegado |
-| **BLOCKED / EXTERNAL** | ⛔ Validación productiva autenticada | ⛔ Cuenta/configuración por verificar |
+| **NOW** | 🚧 Verificar aislamiento tenant después del restore | 🚧 v0.1.94 candidata |
+| **NEXT** | 🚧 Inventario real autorizado + contrato de cutover por módulo | 🚧 GF-ARCH-002 |
+| **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
+| **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.84 main CI / versión humana observada~~ | ✅ ~~Nuevo diagnóstico CSRF estable tras rechazo~~ |
-| **NOW** | 🚧 Login no cacheable y token CSRF presente en cada GET | 🚧 v0.1.85 candidata |
-| **NEXT** | 🚧 Incidente de acceso E2E #73 | 🚧 Sin tocar credenciales |
-| **LATER** | 🚧 Transición Symfony | 🚧 Aislada |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado completo | ⛔ Rechazo de login |
+| **DONE** | ✅ ~~v0.1.93 fusionada~~ | ✅ ~~reversión automática de todas las migraciones~~ |
+| **NOW** | 🚧 Post-restore tenant isolation | 🚧 v0.1.94 |
+| **NEXT** | 🚧 Snapshot real autorizado + contrato de cutover | 🚧 Sin cutover |
+| **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |

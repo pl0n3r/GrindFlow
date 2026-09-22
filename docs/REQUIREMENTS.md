@@ -45,23 +45,35 @@ Each requirement should contain:
 
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
-**Estado:** implementado en candidato v0.1.85; integración, despliegue y producción se comprueban por separado.
+**Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
 
-**Enunciado:** el formulario anónimo `GET /login` contiene un CSRF de sesión y puede mostrar el correo empleado anteriormente, por lo que ninguna caché de navegador o proxy debe almacenar su respuesta HTML.
+**Enunciado:** el formulario anónimo `GET /login` contiene un CSRF de sesión y puede mostrar el correo empleado anteriormente. La redirección desde `GET /login` ya autenticado también depende de la identidad; ni el HTML ni esa redirección pueden reutilizarse desde cachés.
 
-**Aceptación:** en el runtime Symfony aislado, los GET anónimos responden con `Cache-Control: no-store, private`; el formulario mantiene el CSRF y dos GET dentro de la misma sesión presentan cada uno un token CSRF no vacío; no se exige igualdad textual entre representaciones del token. No exponer el token, datos de cuenta o HTML privado en logs; no cambiar autenticación Laravel ni Hostinger por esta entrega.
+**Aceptación:** en el runtime Symfony aislado, tanto los GET anónimos como los GET tras intento de login rechazado responden con `Cache-Control: no-store, private` y nunca incluyen la contraseña en el HTML. Los GET de `/login` posteriores a un intento de login rechazado muestran un mensaje de error genérico y no revelan el motivo interno del rechazo, incluido el estado de cuenta inactiva. Un GET de `/login` tras autenticación redirige a `/organizations` con el mismo control de caché. El formulario mantiene el CSRF y dos GET dentro de la misma sesión presentan cada uno un token CSRF no vacío; no se exige igualdad textual entre representaciones del token. No exponer el token, datos de cuenta o HTML privado en logs; no cambiar autenticación Laravel ni Hostinger por esta entrega.
 
-**Verificación:** PHPUnit HTTP con cliente y sesión sintéticos para dos GET, cabeceras de caché, CSRF presente en ambas respuestas, sin asumir igualdad de bytes; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
+**Verificación:** PHPUnit HTTP con cliente y sesión sintéticos: dos GET anónimos, GET posterior a rechazo de cuenta inactiva, GET tras autenticación, cabeceras, CSRF presente, ausencia de contraseña y ausencia del motivo de inactividad en HTML; gate `symfony-preview` con MariaDB descartable. El marcador de versión humana no prueba el SHA desplegado.
 
 ### GF-ARCH-002 — Paridad de datos y tenencia
-**Estado:** definido, pendiente de ejecución.
+**Estado:** definido; validación descartable parcial implementada, operación real pendiente.
 
 **Aceptación:** inventario completo de tablas/IDs/índices/triggers de Laravel y legado, contrato de migración reversible y backup; un único dueño de escritura por módulo; prueba de cross-tenant/IDOR de lectura y mutación con Symfony+Doctrine; no usar `schema:update --force` ni auto-migrar producción.
+
+**Verificación descartable:** `symfony-preview` restaura MariaDB + Vault sintéticos y, sobre esa base recuperada, vuelve a ejecutar regresiones HTTP+Doctrine de Vault, clasificación masiva, papelera, configuración de organización y autorización de distribución. Debe demostrar que recursos ajenos no aparecen en lecturas, detail/preview/download de otro tenant permanecen ocultos, un lote con IDs mezclados falla sin mutación parcial y las mutaciones de organización/autorización no aceptan IDs ajenos. Esta evidencia es solo de CI descartable; no acredita datos ni aislamiento productivos.
 
 ### GF-ARCH-003 — Pruebas y operación en coexistencia
 **Estado:** definido, pendiente de ejecución.
 
 **Aceptación:** mantener gate agregado `GrindFlow CI / validate` y jobs Laravel/legado mientras existan; añadir Composer/Symfony, Doctrine/MariaDB, TypeScript/Vite y Playwright; CI del PR, Sonar y CI exact-main independientes; release identity y smoke de solo lectura sin credenciales ni contenido sensible en logs; deploy no se infiere por version.php.
+
+### GF-OPS-010 — Readiness segura del runtime Symfony
+
+**Estado:** implementado en código; despliegue y producción se verifican por separado.
+
+**Enunciado:** el runtime Symfony expone en `GET /health` una señal pública y mínima de compatibilidad con su contrato técnico sin revelar fingerprint detallado del servidor.
+
+**Aceptación:** el contrato `symfony-mariadb-v1` exige PHP >= 8.3 y < 9.0, además de `ctype`, `iconv`, PDO y `pdo_mysql`. Un runtime compatible responde HTTP 200 con `status=ok` y `runtime.compatible=true`; uno incompatible falla cerrado con HTTP 503, `status=degraded` y `runtime.compatible=false`. La respuesta conserva `Cache-Control: no-store` y `X-Content-Type-Options: nosniff` y nunca publica versión exacta de PHP, SAPI, inventario de extensiones, URL de base de datos ni SHA de despliegue. Esta señal no demuestra conectividad a MariaDB, migraciones aplicadas, identidad exacta del checkout Hostinger ni que Symfony esté desplegado en producción.
+
+**Verificación:** prueba pura de compatibilidad cubre versión mínima, límite mayor y extensión requerida ausente; PHPUnit HTTP y el smoke Symfony real comprueban el resumen público y la ausencia de fingerprint sensible en el entorno aislado de CI.
 
 ### GF-FR-008 — Primer ciclo de valor del piloto
 **Estado:** definido a nivel de recorrido, funcionalidad integral pendiente.
