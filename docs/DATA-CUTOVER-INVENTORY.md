@@ -232,11 +232,11 @@ El contrato `gf-arch-002-operator-evidence-input-v1` exige un módulo ya revisad
 - `authorized_metadata_inventory` con `environment=authorized_read_only_capture`;
 - `real_backup_restore_rehearsal` con `environment=isolated_restore_observation`.
 
-Cada receipt contiene solo módulo, huella SHA-256 de la evidencia revisada fuera de banda, huella del inventario fuente, timestamp UTC y flags estrictos. Debe declarar `operator_observed=true`, `contains_row_data=false` y `contains_secrets=false`. Campos adicionales como URL, path, usuario, credencial, nota libre o contenido de filas se rechazan por contrato.
+Cada receipt contiene solo módulo, huella SHA-256 de la evidencia revisada fuera de banda, huella del inventario fuente, timestamp UTC y flags estrictos. Debe declarar `operator_observed=true`, `contains_row_data=false` y `contains_secrets=false`. Los dos tipos deben referenciar digests distintos para impedir reutilizar un único artefacto como inventario y restore. Campos adicionales como URL, path, usuario, credencial, nota libre o contenido de filas se rechazan por contrato.
 
 El verificador vuelve a construir el ownership report desde las migraciones del checkout y exige coincidencia exacta. También limita stdin a 1.000.000 bytes, exige UTF-8 estricto y no reproduce payloads rechazados.
 
-El reporte `gf-arch-002-operator-evidence-report-v1` conserva únicamente hashes y timestamps de los dos receipts. Incluso con ambos presentes mantiene:
+El reporte `gf-arch-002-operator-evidence-report-v1` conserva únicamente hashes y timestamps de los dos receipts. Declara `scope=redacted_references_only` y `receipt_content_verified=false`: valida la forma y consistencia de las referencias, no el contenido de los artefactos. Incluso con ambos presentes mantiene:
 
 ```json
 {
