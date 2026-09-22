@@ -84,6 +84,8 @@ class SingleWriterRehearsalVerifierTest(unittest.TestCase):
             "freeze_evidence_sha256": "c" * 64,
             "observed_at_utc": "2026-09-22T12:15:00Z",
             "window_started_at_utc": "2026-09-22T12:05:00Z",
+            "old_writer_blocked_at_utc": "2026-09-22T12:06:00Z",
+            "new_writer_enabled_at_utc": "2026-09-22T12:07:00Z",
             "window_ended_at_utc": "2026-09-22T12:10:00Z",
             "environment": SINGLE.EXPECTED_ENVIRONMENT,
             "previous_writer": "laravel",
@@ -156,16 +158,30 @@ class SingleWriterRehearsalVerifierTest(unittest.TestCase):
             envelope["receipt"][field] = value
             self.assert_rejected(field, envelope)
 
-    def test_rehearsal_window_is_ordered_and_observed_after_completion(self):
-        zero = self.envelope()
-        zero["receipt"]["window_ended_at_utc"] = zero["receipt"][
-            "window_started_at_utc"
-        ]
-        self.assert_rejected("positive duration", zero)
+    def test_rehearsal_window_and_writer_transition_are_ordered(self):
+        blocked_before_start = self.envelope()
+        blocked_before_start["receipt"]["old_writer_blocked_at_utc"] = (
+            "2026-09-22T12:04:00Z"
+        )
+        self.assert_rejected("out of order", blocked_before_start)
 
-        reversed_window = self.envelope()
-        reversed_window["receipt"]["window_ended_at_utc"] = "2026-09-22T12:00:00Z"
-        self.assert_rejected("positive duration", reversed_window)
+        enabled_before_block = self.envelope()
+        enabled_before_block["receipt"]["new_writer_enabled_at_utc"] = (
+            "2026-09-22T12:05:30Z"
+        )
+        self.assert_rejected("out of order", enabled_before_block)
+
+        simultaneous = self.envelope()
+        simultaneous["receipt"]["new_writer_enabled_at_utc"] = simultaneous[
+            "receipt"
+        ]["old_writer_blocked_at_utc"]
+        self.assert_rejected("out of order", simultaneous)
+
+        enabled_after_end = self.envelope()
+        enabled_after_end["receipt"]["new_writer_enabled_at_utc"] = (
+            "2026-09-22T12:11:00Z"
+        )
+        self.assert_rejected("out of order", enabled_after_end)
 
         early_observation = self.envelope()
         early_observation["receipt"]["observed_at_utc"] = "2026-09-22T12:06:00Z"
@@ -176,6 +192,8 @@ class SingleWriterRehearsalVerifierTest(unittest.TestCase):
             ("freeze_evidence_sha256", "ABC", "digest"),
             ("observed_at_utc", "2026-09-22", "UTC"),
             ("window_started_at_utc", "2026-99-99T12:00:00Z", "invalid"),
+            ("old_writer_blocked_at_utc", "invalid", "UTC"),
+            ("new_writer_enabled_at_utc", "invalid", "UTC"),
             ("environment", "production", "environment"),
         )
         for field, value, pattern in cases:
