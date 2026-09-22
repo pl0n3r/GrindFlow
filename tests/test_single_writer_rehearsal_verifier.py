@@ -132,6 +132,14 @@ class SingleWriterRehearsalVerifierTest(unittest.TestCase):
         operator_mismatch["receipt"]["operator_evidence_bundle_sha256"] = "f" * 64
         self.assert_rejected("operator evidence", operator_mismatch)
 
+    def test_single_writer_evidence_must_be_distinct_from_prior_receipts(self):
+        envelope = self.envelope()
+        prior = envelope["operator_evidence_input"]["receipts"][
+            "authorized_metadata_inventory"
+        ]["evidence_sha256"]
+        envelope["receipt"]["freeze_evidence_sha256"] = prior
+        self.assert_rejected("distinct from prior evidence", envelope)
+
     def test_writer_transition_is_exact(self):
         previous = self.envelope()
         previous["receipt"]["previous_writer"] = "symfony"
