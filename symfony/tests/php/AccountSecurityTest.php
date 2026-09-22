@@ -302,13 +302,13 @@ final class AccountSecurityTest extends WebTestCase
 
             // 17 nested arrays exceed the controller's json_decode depth of 16
             // while remaining far below the independent 4 KiB byte ceiling.
+            $nestedValue = 'blocked';
+            for ($depth = 0; $depth < 17; ++$depth) {
+                $nestedValue = [$nestedValue];
+            }
             $nested = json_encode([
                 'current_password' => $password,
-                'new_password' => array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
-                    array_fill(0, 1, array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
-                    array_fill(0, 1, array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
-                    array_fill(0, 1, array_fill(0, 1, array_fill(0, 1, array_fill(0, 1,
-                    array_fill(0, 1, array_fill(0, 1, 'blocked'))))))))))))))))),
+                'new_password' => $nestedValue,
                 'confirm_password' => $password,
             ], JSON_THROW_ON_ERROR);
             self::assertLessThan(4096, strlen($nested));
