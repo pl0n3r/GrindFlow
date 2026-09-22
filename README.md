@@ -20,8 +20,8 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.79** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.78~~ | `1872c40c69eb6c815007980b874ce19b83eb2c90` |
-| CI del PR | ✅ ~~VALIDATED IN CODE v0.1.79~~ | run `35678738050` success sobre `3b57b3d03446cb1d71490412ed8afbe106eeedf2`; head actual pendiente de CI |
-| Sonar | ✅ ~~Quality Gate v0.1.79 success~~ | check success sobre `3b57b3d03446cb1d71490412ed8afbe106eeedf2`; head actual pendiente de Sonar |
+| CI del PR | ✅ ~~VALIDATED IN CODE v0.1.79~~ | run `35679246632` success sobre `52e7ef11a3fc525b3bf72afeb950f82f7cc37a7c`; nuevo commit README pendiente de CI |
+| Sonar | ✅ ~~Quality Gate v0.1.79 success~~ | check success sobre `52e7ef11a3fc525b3bf72afeb950f82f7cc37a7c`; nuevo commit README pendiente de Sonar |
 | CodeRabbit | 🚧 Esperar revisión completa del head final | PR y AGENTS.md |
 | CI del SHA exacto de main | ✅ ~~v0.1.78 success~~ | run `35672544872` |
 | Deploy Observer | ✅ ~~v0.1.78 release observado~~ | run `35672544877`; versión humana, NO SHA Hostinger |
@@ -74,7 +74,7 @@ Inventario del candidato v0.1.79, no evidencia de archivos publicados. «solo el
 - `scripts/production-smoke.sh`
 
 ## Validación
-- CI `35678738050` y Sonar success sobre `3b57b3d03446cb1d71490412ed8afbe106eeedf2`; verificar CI/Sonar y CodeRabbit del nuevo SHA tras endurecer limpieza de secretos y el contrato de log. `fast[contracts]` usa mocks, nunca la contraseña E2E real.
+- CI `35679246632` y Sonar success sobre `52e7ef11a3fc525b3bf72afeb950f82f7cc37a7c`; CI/Sonar verificados en el SHA citado; revalidar sobre el commit que incluye este snapshot y completar CodeRabbit sin fingir que el README conoce el hash del commit que lo contiene. `fast[contracts]` usa mocks, nunca la contraseña E2E real.
 - Smoke #59 encontró `/dashboard HTTP 302` sin `Location`; una vez integrado v0.1.79 se registrará solo el destino saneado para investigar #73.
 - No repetir pruebas manuales ciegas ni inferir deploy exacto desde el número de versión.
 
@@ -83,7 +83,7 @@ Inventario del candidato v0.1.79, no evidencia de archivos publicados. «solo el
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar diagnóstico seguro v0.1.79 #73 | 🚧 CI/Sonar/CodeRabbit para último fix |
+| **NOW** | 🚧 Validar diagnóstico seguro v0.1.79 #73 | 🚧 CI/Sonar completos en head anterior; CodeRabbit/revalidación final pendiente |
 | **NEXT** | 🚧 Determinar causa real del redirect con una prueba posterior | 🚧 Evidencia saneada |
 | **LATER** | 🚧 S4, Distribution + Traffic Symfony | 🚧 Sin cutover |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado #73 y paridad cutover | ⛔ Producción no verificada |
@@ -92,7 +92,7 @@ Inventario del candidato v0.1.79, no evidencia de archivos publicados. «solo el
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Navegación de identidad + CodeRabbit obligatorio v0.1.77; secret #1~~ | ✅ ~~PR #74 fusionada con revisión final~~ |
-| **NOW** | 🚧 Smoke seguro y fail-fast v0.1.79 | 🚧 Último fix pendiente de CI/revisión |
+| **NOW** | 🚧 Smoke seguro y fail-fast v0.1.79 | 🚧 CI/Sonar verificados antes de snapshot; revisión final pendiente |
 | **NEXT** | 🚧 Corregir causa #73 después de conocer destino 302 | 🚧 No inferir fallo de contraseña |
 | **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado y cutover sin paridad | ⛔ Hostinger no verificado |
