@@ -14,22 +14,16 @@ declare(strict_types=1);
 
 const GF_SNAPSHOT_CONTRACT = 'gf-arch-002-db-structure-snapshot-v1';
 
-function fail(string $message, int $code = 2): never
-{
-    fwrite(STDERR, "ERROR: {$message}\n");
-    exit($code);
-}
-
 /** @return array{host:string,port:int,database:string,user:string,password:string} */
 function parseDatabaseUrl(string $url): array
 {
     $parts = parse_url($url);
-    if (!is_array($parts)) {
+    if (! is_array($parts)) {
         throw new RuntimeException('invalid DATABASE_URL');
     }
 
     $scheme = strtolower((string) ($parts['scheme'] ?? ''));
-    if (!in_array($scheme, ['mysql', 'mariadb'], true)) {
+    if (! in_array($scheme, ['mysql', 'mariadb'], true)) {
         throw new RuntimeException('DATABASE_URL must use mysql or mariadb');
     }
 
@@ -55,7 +49,7 @@ function connectMetadataDatabase(array $config): PDO
         'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
         $config['host'],
         $config['port'],
-        $config['database']
+        $config['database'],
     );
 
     return new PDO(
@@ -66,7 +60,7 @@ function connectMetadataDatabase(array $config): PDO
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
-        ]
+        ],
     );
 }
 
@@ -76,7 +70,7 @@ function queryRows(PDO $pdo, string $sql, string $schema): array
     $statement = $pdo->prepare($sql);
     $statement->execute(['schema' => $schema]);
     $rows = $statement->fetchAll();
-    if (!is_array($rows)) {
+    if (! is_array($rows)) {
         throw new RuntimeException('metadata query returned invalid result');
     }
 
@@ -89,7 +83,7 @@ function emptyTables(array $tableRows): array
     $tables = [];
     foreach ($tableRows as $row) {
         $name = (string) ($row['TABLE_NAME'] ?? '');
-        if ($name === '' || !str_starts_with($name, 'gf_')) {
+        if ($name === '' || ! str_starts_with($name, 'gf_')) {
             throw new RuntimeException('invalid gf_ table metadata');
         }
         $tables[$name] = [
@@ -107,7 +101,7 @@ function addColumns(array &$tables, array $rows): void
 {
     foreach ($rows as $row) {
         $table = (string) ($row['TABLE_NAME'] ?? '');
-        if (!isset($tables[$table])) {
+        if (! isset($tables[$table])) {
             throw new RuntimeException('column references unknown table');
         }
 
@@ -133,13 +127,13 @@ function addIndexes(array &$tables, array $rows): void
         $table = (string) ($row['TABLE_NAME'] ?? '');
         $name = (string) ($row['INDEX_NAME'] ?? '');
         $column = (string) ($row['COLUMN_NAME'] ?? '');
-        if (!isset($tables[$table]) || $name === '' || $column === '') {
+        if (! isset($tables[$table]) || $name === '' || $column === '') {
             throw new RuntimeException('invalid index metadata');
         }
 
-        $key = $table . "\0" . $name;
+        $key = $table."\0".$name;
         $unique = (int) ($row['NON_UNIQUE'] ?? 1) === 0;
-        if (!isset($grouped[$key])) {
+        if (! isset($grouped[$key])) {
             $grouped[$key] = [
                 'table' => $table,
                 'row' => ['name' => $name, 'unique' => $unique, 'columns' => []],
@@ -177,8 +171,8 @@ function addForeignKeys(array &$tables, array $rows): void
             throw new RuntimeException('invalid foreign key metadata');
         }
 
-        $key = $table . "\0" . $name;
-        if (!isset($grouped[$key])) {
+        $key = $table."\0".$name;
+        if (! isset($grouped[$key])) {
             $grouped[$key] = [
                 'table' => $table,
                 'row' => [
@@ -214,13 +208,13 @@ function normalizeTriggers(array $rows): array
         $table = (string) ($row['EVENT_OBJECT_TABLE'] ?? '');
         $timing = strtoupper((string) ($row['ACTION_TIMING'] ?? ''));
         $event = strtoupper((string) ($row['EVENT_MANIPULATION'] ?? ''));
-        if ($name === '' || !str_starts_with($table, 'gf_') || $timing === '' || $event === '') {
+        if ($name === '' || ! str_starts_with($table, 'gf_') || $timing === '' || $event === '') {
             throw new RuntimeException('invalid trigger metadata');
         }
         $triggers[] = compact('name', 'table', 'timing', 'event');
     }
 
-    usort($triggers, static fn(array $a, array $b): int => strcmp($a['name'], $b['name']));
+    usort($triggers, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
     return $triggers;
 }
 
@@ -230,7 +224,7 @@ function sortTables(array &$tables): void
         foreach (['columns', 'indexes', 'foreign_keys'] as $field) {
             usort(
                 $table[$field],
-                static fn(array $a, array $b): int => strcmp((string) $a['name'], (string) $b['name'])
+                static fn (array $a, array $b): int => strcmp((string) $a['name'], (string) $b['name']),
             );
         }
     }
@@ -253,7 +247,7 @@ function captureSnapshot(PDO $pdo, string $schema): array
                AND TABLE_TYPE = 'BASE TABLE'
                AND LEFT(TABLE_NAME, 3) = 'gf_'
              ORDER BY TABLE_NAME",
-            $schema
+            $schema,
         ));
 
         $columnRows = queryRows(
@@ -263,7 +257,7 @@ function captureSnapshot(PDO $pdo, string $schema): array
              WHERE TABLE_SCHEMA = :schema
                AND LEFT(TABLE_NAME, 3) = 'gf_'
              ORDER BY TABLE_NAME, ORDINAL_POSITION",
-            $schema
+            $schema,
         );
         addColumns($tables, $columnRows);
 
@@ -274,7 +268,7 @@ function captureSnapshot(PDO $pdo, string $schema): array
              WHERE TABLE_SCHEMA = :schema
                AND LEFT(TABLE_NAME, 3) = 'gf_'
              ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
-            $schema
+            $schema,
         );
         addIndexes($tables, $indexRows);
 
@@ -296,7 +290,7 @@ function captureSnapshot(PDO $pdo, string $schema): array
                AND k.REFERENCED_TABLE_NAME IS NOT NULL
                AND LEFT(k.TABLE_NAME, 3) = 'gf_'
              ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION",
-            $schema
+            $schema,
         );
         addForeignKeys($tables, $foreignKeyRows);
 
@@ -307,7 +301,7 @@ function captureSnapshot(PDO $pdo, string $schema): array
              WHERE TRIGGER_SCHEMA = :schema
                AND LEFT(EVENT_OBJECT_TABLE, 3) = 'gf_'
              ORDER BY TRIGGER_NAME",
-            $schema
+            $schema,
         ));
 
         sortTables($tables);
@@ -337,7 +331,7 @@ function main(): int
     }
 
     $databaseUrl = getenv('DATABASE_URL');
-    if (!is_string($databaseUrl) || $databaseUrl === '') {
+    if (! is_string($databaseUrl) || $databaseUrl === '') {
         fwrite(STDERR, "ERROR: DATABASE_URL is required.\n");
         return 2;
     }
@@ -348,7 +342,7 @@ function main(): int
         $snapshot = captureSnapshot($pdo, $config['database']);
         echo json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), "\n";
         return 0;
-    } catch (Throwable $error) {
+    } catch (Throwable) {
         fwrite(STDERR, "ERROR: metadata snapshot could not be captured.\n");
         return 2;
     }
