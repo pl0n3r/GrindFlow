@@ -70,6 +70,12 @@ expect_flag "$symfony_docs" "run_symfony=false" "Symfony documentation skips hea
 symfony_mixed="$(run_scope pull_request symfony/README.md symfony/src/Kernel.php)"
 expect_flag "$symfony_mixed" "run_symfony=true" "Symfony source cannot be masked by docs"
 
+schema_tooling="$(run_scope pull_request scripts/mariadb-structure-snapshot.php)"
+expect_flag "$schema_tooling" "run_symfony=true" "schema snapshot tooling selects Symfony parity gate"
+
+schema_contract="$(run_scope pull_request scripts/data-schema-structure-parity.py)"
+expect_flag "$schema_contract" "run_symfony=true" "schema parity tooling selects Symfony parity gate"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
