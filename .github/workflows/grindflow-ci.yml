@@ -194,6 +194,7 @@ jobs:
           python3 scripts/symfony-schema-structure.py
           php -l scripts/mariadb-structure-snapshot.php
           bash scripts/mariadb-structure-snapshot-contract.sh
+          bash scripts/symfony-disposable-restore-drill-contract.sh
           python3 -m py_compile scripts/data-schema-structure-parity.py
           python3 -m unittest tests/test_data_schema_structure_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
