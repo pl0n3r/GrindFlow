@@ -174,7 +174,8 @@ jobs:
             scripts/production-smoke.sh \
             scripts/production-smoke-contract.sh \
             scripts/fetch-production-diagnostics.sh \
-            scripts/run-production-migrations.sh
+            scripts/run-production-migrations.sh \
+            scripts/mariadb-structure-snapshot-contract.sh
           do
             [[ -f "$script" ]] && bash -n "$script"
           done
@@ -189,6 +190,8 @@ jobs:
           python3 -m py_compile scripts/symfony-schema-structure.py
           python3 -m unittest tests/test_symfony_schema_structure.py
           python3 scripts/symfony-schema-structure.py
+          php -l scripts/mariadb-structure-snapshot.php
+          bash scripts/mariadb-structure-snapshot-contract.sh
           python3 -m py_compile scripts/data-schema-structure-parity.py
           python3 -m unittest tests/test_data_schema_structure_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
@@ -270,7 +273,15 @@ jobs:
           find app bootstrap config database routes tests -type f -name '*.php' -print0 2>/dev/null |
             xargs -0 -r -n1 php -l
       - name: Pint
-        run: vendor/bin/pint --test
+        shell: bash
+        run: |
+          set -euo pipefail
+          vendor/bin/pint
+          if ! git diff --quiet -- '*.php'; then
+            echo "::error::Pint formatting differs. Commit the formatter output below."
+            git --no-pager diff -- '*.php'
+            exit 1
+          fi
       - name: Static analysis
         run: vendor/bin/phpstan analyse --no-progress
 
@@ -637,6 +648,22 @@ jobs:
           php bin/console doctrine:query:sql 'SELECT 1'
           php bin/console doctrine:migrations:migrate --no-interaction
           php bin/console doctrine:schema:validate --skip-sync
+      - name: Verify metadata-only schema snapshot parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          GF_METADATA_SNAPSHOT_APPROVED=1 php scripts/mariadb-structure-snapshot.php > /tmp/gf-db-structure.json
+          python3 scripts/symfony-schema-structure.py --json > /tmp/gf-source-structure.json
+          python3 - <<'PY' > /tmp/gf-structure-envelope.json
+          import json
+          from pathlib import Path
+
+          source = json.loads(Path("/tmp/gf-source-structure.json").read_text())
+          snapshot = json.loads(Path("/tmp/gf-db-structure.json").read_text())
+          print(json.dumps({"source": source, "snapshot": snapshot}, sort_keys=True))
+          PY
+          python3 scripts/data-schema-structure-parity.py < /tmp/gf-structure-envelope.json
+
       - name: Build TypeScript and Vite preview
         working-directory: symfony
         run: |

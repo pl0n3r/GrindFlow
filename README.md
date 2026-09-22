@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.90: paridad estructural offline del esquema Symfony `gf_*`.** Base exacta `main` v0.1.89 `d816d131d2a5ed5dd5bf136d625174c940a4ab0b`; compara columnas, índices, FKs y triggers sin conectar MariaDB ni ejecutar cutover.
+> **Candidato v0.1.91: captura controlada de metadatos MariaDB + paridad end-to-end descartable.** Base exacta `main` v0.1.90 `4c57314c913811be8c0a6aa9d864ca97b2842b3f`; consulta solo `information_schema`, no filas de aplicación y no ejecuta cutover.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,20 +18,20 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.90** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.89~~ | `d816d131d2a5ed5dd5bf136d625174c940a4ab0b` |
+| Version objetivo | 🚧 **v0.1.91** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.90~~ | `4c57314c913811be8c0a6aa9d864ca97b2842b3f` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.89 | Señal post-merge separada |
+| CI del SHA exacto de main | 🚧 No observado para v0.1.90 | Señal post-merge separada |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Fuente + comparación offline de metadatos |
+| Datos productivos | ✅ ~~No tocados~~ | Captura CI solo sobre MariaDB descartable |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+1036** | **−26** | **+1010** |
+| **11** | **+582** | **−33** | **+549** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -39,7 +39,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Paridad estructural Symfony `gf_*`: columnas, índices, FKs y triggers |
+| Alcance | Captura `information_schema` de `gf_*` + comparación estructural automática |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -61,13 +61,14 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/symfony-schema-structure.py`: reconstruye el estado final desde los `up()` Doctrine, incluyendo `ALTER TABLE` aditivos, sin conexión a base de datos.
-- Nuevo `scripts/data-schema-structure-parity.py`: compara esa fuente con un snapshot metadata-only recibido por stdin.
-- La comparación cubre columnas (tipo/nulabilidad), índices (unicidad/orden), claves foráneas (referencias/`ON DELETE`) y triggers (tabla/timing/evento).
-- Tablas no `gf_*` permanecen informativas; un `gf_*` inesperado o cualquier diferencia estructural falla cerrado.
-- 12 pruebas nuevas cubren parser SQL, `CREATE` + `ALTER`, exclusión de rollback, rechazo de ALTER destructivo, prefijo `gf_`, estructura exacta, columnas, índices, tablas, triggers, row-data y fuente inconsistente.
-- El gate `fast` compila y ejecuta ambos contratos estructurales; al tocar workflow se exige la matriz completa.
-- No se ejecutan migraciones productivas, consultas MariaDB, restore, cutover ni cambio de writer.
+- Nuevo `scripts/mariadb-structure-snapshot.php`: captura tablas `gf_*`, columnas, índices, FKs y triggers desde `information_schema`.
+- Exige `GF_METADATA_SNAPSHOT_APPROVED=1` y `DATABASE_URL`; sin aprobación explícita falla cerrado antes de conectar.
+- La captura inicia transacción read-only, no selecciona filas de aplicación y no imprime credenciales, esquema ni errores de conexión.
+- Nuevo contrato `scripts/mariadb-structure-snapshot-contract.sh` verifica que el opt-in y la URL sean obligatorios y que stdout quede vacío al rechazar.
+- `symfony-preview` migra la MariaDB descartable, genera el inventario Doctrine como JSON puro, captura el snapshot y los compara automáticamente.
+- La paridad normaliza display widths enteros de MariaDB e índices implícitos de soporte FK, pero sigue fallando ante índices estructurales realmente inesperados.
+- `ci-scope.sh` fuerza `symfony-preview` cuando cambian las herramientas de snapshot/paridad; el contrato de scope lo cubre explícitamente.
+- El pipeline no versiona snapshots reales ni ejecuta esta herramienta contra Hostinger/producción.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
@@ -76,14 +77,17 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
 - `docs/DATA-CUTOVER-INVENTORY.md`
+- `scripts/ci-scope-contract.sh`
+- `scripts/ci-scope.sh`
 - `scripts/data-schema-structure-parity.py`
+- `scripts/mariadb-structure-snapshot-contract.sh`
+- `scripts/mariadb-structure-snapshot.php`
 - `scripts/symfony-schema-structure.py`
 - `tests/test_data_schema_structure_parity.py`
-- `tests/test_symfony_schema_structure.py`
 
 ## Validación
 - La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
-- El reporte estructural cubre **solo el esquema Symfony `gf_*` declarado en migraciones**. No acredita defaults/check constraints, conteos, contenido, versión de migraciones aplicada, backup restaurable, tenant isolation productivo ni SHA Hostinger.
+- La captura integrada se ejecuta **solo sobre MariaDB descartable de CI**. No acredita esquema productivo, defaults/check constraints, conteos, contenido, backup restaurable, tenant isolation productivo ni SHA Hostinger.
 - Ningún snapshot real se incluye en el repositorio por esta entrega.
 
 ## Qué sigue
@@ -91,16 +95,16 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Validar paridad estructural Symfony contra snapshot seguro | 🚧 v0.1.90 candidata |
-| **NEXT** | 🚧 Captura read-only autorizada + restore drill descartable | 🚧 GF-ARCH-002 |
+| **NOW** | 🚧 Capturar y cotejar metadata `gf_*` en MariaDB descartable | 🚧 v0.1.91 candidata |
+| **NEXT** | 🚧 Restore drill MariaDB+blobs en entorno descartable | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.89 fusionada~~ | ✅ ~~paridad table-level + README autogenerado~~ |
-| **NOW** | 🚧 Structural parity Symfony | 🚧 v0.1.90 |
-| **NEXT** | 🚧 Snapshot real autorizado + backup restaurado | 🚧 Sin cutover |
+| **DONE** | ✅ ~~v0.1.90 fusionada~~ | ✅ ~~paridad estructural Symfony `gf_*`~~ |
+| **NOW** | 🚧 Metadata capture + parity E2E | 🚧 v0.1.91 |
+| **NEXT** | 🚧 Captura real autorizada + restore drill | 🚧 Sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |

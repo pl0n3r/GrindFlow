@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCOPE="$ROOT/scripts/ci-scope.sh"
 RUN_REALSTACK_ENABLED="run_realstack=true"
+RUN_SYMFONY_ENABLED="run_symfony=true"
 
 run_scope() {
   local event="$1"
@@ -60,7 +61,7 @@ expect_flag "$view" "run_browser=true" "view selects browser"
 expect_flag "$view" $RUN_REALSTACK_ENABLED "view selects real-stack"
 
 symfony="$(run_scope pull_request symfony/src/Kernel.php)"
-expect_flag "$symfony" "run_symfony=true" "Symfony source selects its gate"
+expect_flag "$symfony" $RUN_SYMFONY_ENABLED "Symfony source selects its gate"
 expect_flag "$symfony" "run_legacy=false" "Symfony source does not select legacy Node"
 expect_flag "$symfony" "run_php_quality=false" "Symfony source does not select Laravel quality"
 
@@ -68,7 +69,13 @@ symfony_docs="$(run_scope pull_request symfony/README.md symfony/docs/operations
 expect_flag "$symfony_docs" "run_symfony=false" "Symfony documentation skips heavy Symfony gate"
 
 symfony_mixed="$(run_scope pull_request symfony/README.md symfony/src/Kernel.php)"
-expect_flag "$symfony_mixed" "run_symfony=true" "Symfony source cannot be masked by docs"
+expect_flag "$symfony_mixed" $RUN_SYMFONY_ENABLED "Symfony source cannot be masked by docs"
+
+schema_tooling="$(run_scope pull_request scripts/mariadb-structure-snapshot.php)"
+expect_flag "$schema_tooling" $RUN_SYMFONY_ENABLED "schema snapshot tooling selects Symfony parity gate"
+
+schema_contract="$(run_scope pull_request scripts/data-schema-structure-parity.py)"
+expect_flag "$schema_contract" $RUN_SYMFONY_ENABLED "schema parity tooling selects Symfony parity gate"
 
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
@@ -98,7 +105,7 @@ expect_flag "$mixed" $RUN_REALSTACK_ENABLED "mixed unions real-stack"
 expect_flag "$mixed" "run_legacy=true" "mixed unions legacy"
 
 new_mixed="$(run_scope pull_request symfony/src/Kernel.php src/lib/example.ts)"
-expect_flag "$new_mixed" "run_symfony=true" "new stack selected alongside legacy"
+expect_flag "$new_mixed" $RUN_SYMFONY_ENABLED "new stack selected alongside legacy"
 expect_flag "$new_mixed" "run_legacy=true" "legacy remains selected alongside Symfony"
 
 printf 'GrindFlow CI scope contract passed.\n'

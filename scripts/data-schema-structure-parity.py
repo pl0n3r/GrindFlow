@@ -80,10 +80,26 @@ def normalized_rows(rows: Any, field: str, required: tuple[str, ...]) -> dict[st
     return result
 
 
+INTEGER_TYPES = ("tinyint", "smallint", "mediumint", "int", "integer", "bigint")
+
+
+def canonical_sql_type(value: str) -> str:
+    """Normalize engine-only integer display widths without hiding real type drift."""
+    compact = " ".join(value.strip().lower().split())
+    head, separator, tail = compact.partition(" ")
+    for integer_type in INTEGER_TYPES:
+        prefix = f"{integer_type}("
+        if head.startswith(prefix) and head.endswith(")") and head[len(prefix):-1].isdigit():
+            head = integer_type
+            break
+    normalized = head if not separator else f"{head} {tail}"
+    return ",".join(part.strip() for part in normalized.split(","))
+
+
 def canonical_column(row: dict[str, Any]) -> tuple[Any, ...]:
     if not isinstance(row.get("type"), str) or not isinstance(row.get("nullable"), bool):
         raise ValueError("column requires string type and boolean nullable")
-    return (row["name"], row["type"].strip().lower(), row["nullable"])
+    return (row["name"], canonical_sql_type(row["type"]), row["nullable"])
 
 
 def canonical_index(row: dict[str, Any]) -> tuple[Any, ...]:
@@ -149,17 +165,53 @@ def compare_named_collection(
     return failures
 
 
+def is_fk_support_index(index: dict[str, Any], foreign_keys: list[dict[str, Any]]) -> bool:
+    """Recognize InnoDB's implicit FK support index without masking other indexes."""
+    index_name, _unique, index_columns = canonical_index(index)
+    for foreign_key in foreign_keys:
+        fk_name, fk_columns, _table, _referenced_columns, _delete = canonical_fk(foreign_key)
+        if index_name == fk_name and index_columns == fk_columns:
+            return True
+    return False
+
+
+def comparable_snapshot_indexes(
+    expected_indexes: list[dict[str, Any]],
+    actual_indexes: list[dict[str, Any]],
+    actual_foreign_keys: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Drop only engine-generated FK indexes absent from the source declaration."""
+    expected_names = {
+        row["name"]
+        for row in expected_indexes
+        if isinstance(row, dict) and isinstance(row.get("name"), str)
+    }
+    return [
+        row
+        for row in actual_indexes
+        if row.get("name") in expected_names or not is_fk_support_index(row, actual_foreign_keys)
+    ]
+
+
 def compare_table(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
     failures: list[str] = []
+    expected_indexes = expected.get("indexes", [])
+    actual_indexes = actual.get("indexes", [])
+    actual_foreign_keys = actual.get("foreign_keys", [])
+
     failures += compare_named_collection(
         expected.get("columns", []), actual.get("columns", []), canonical_column, "columns", expected["name"]
     )
     failures += compare_named_collection(
-        expected.get("indexes", []), actual.get("indexes", []), canonical_index, "indexes", expected["name"]
+        expected_indexes,
+        comparable_snapshot_indexes(expected_indexes, actual_indexes, actual_foreign_keys),
+        canonical_index,
+        "indexes",
+        expected["name"],
     )
     failures += compare_named_collection(
         expected.get("foreign_keys", []),
-        actual.get("foreign_keys", []),
+        actual_foreign_keys,
         canonical_fk,
         "foreign_keys",
         expected["name"],

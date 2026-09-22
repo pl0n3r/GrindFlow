@@ -81,6 +81,38 @@ class DataSchemaStructureParityTest(unittest.TestCase):
         report = MODULE.build_report(self.source(), snapshot)
         self.assertIn("gf_child:indexes:mismatch:PRIMARY", report["checks"]["structure_mismatches"])
 
+    def test_mariadb_integer_display_width_is_semantically_ignored(self) -> None:
+        source = self.source()
+        source["tables"][0]["columns"].append(
+            {"name": "counter", "type": "smallint unsigned", "nullable": False}
+        )
+        snapshot = self.snapshot()
+        snapshot["tables"][0]["columns"].append(
+            {"name": "counter", "type": "smallint(5) unsigned", "nullable": False}
+        )
+        report = MODULE.build_report(source, snapshot)
+        self.assertTrue(report["compatible"])
+
+    def test_mariadb_implicit_fk_support_index_is_ignored(self) -> None:
+        snapshot = self.snapshot()
+        snapshot["tables"][0]["indexes"].append({
+            "name": "fk_child_parent",
+            "unique": False,
+            "columns": ["parent_id"],
+        })
+        report = MODULE.build_report(self.source(), snapshot)
+        self.assertTrue(report["compatible"])
+
+    def test_unrelated_unexpected_index_still_fails(self) -> None:
+        snapshot = self.snapshot()
+        snapshot["tables"][0]["indexes"].append({
+            "name": "ix_unexpected",
+            "unique": False,
+            "columns": ["parent_id"],
+        })
+        report = MODULE.build_report(self.source(), snapshot)
+        self.assertIn("gf_child:indexes:unexpected:ix_unexpected", report["checks"]["structure_mismatches"])
+
     def test_unknown_gf_table_fails(self) -> None:
         snapshot = self.snapshot()
         snapshot["tables"].append({
