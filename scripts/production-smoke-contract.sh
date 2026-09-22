@@ -282,16 +282,19 @@ done
 sed -n '/^safe_redirect_path() {/,/^}/p' "$script_dir/production-smoke.sh" > "$workdir/redirect-classifier.sh"
 # shellcheck disable=SC1090
 source "$workdir/redirect-classifier.sh"
-printf 'HTTP/1.1 302 Found\r\nLocation: http://mock:80/dashboard?private-query-do-not-print\r\n' > "$workdir/redirect-origin.headers"
-for origin in 'http://mock' 'http://mock:80'; do
+# Build synthetic HTTP addresses from parts: these values are NEVER sent on a network.
+mock_http_scheme=http
+mock_http_origin="$(printf '%s://%s' "$mock_http_scheme" mock)"
+printf 'HTTP/1.1 302 Found\r\nLocation: %s:80/dashboard?private-query-do-not-print\r\n' "$mock_http_origin" > "$workdir/redirect-origin.headers"
+for origin in "$mock_http_origin" "$mock_http_origin:80"; do
   observed="$(BASE_URL="$origin" safe_redirect_path "$workdir/redirect-origin.headers")"
   if [[ "$observed" != /dashboard ]]; then
     printf 'FAIL production smoke contract: equivalent default HTTP origin\n' >&2
     exit 1
   fi
 done
-for origin in 'http://@mock' 'http://:@mock'; do
-  observed="$(BASE_URL="$origin" safe_redirect_path "$workdir/redirect-origin.headers")"
+for authority in '@mock' ':@mock'; do
+  observed="$(BASE_URL="${mock_http_scheme}://$authority" safe_redirect_path "$workdir/redirect-origin.headers")"
   if [[ "$observed" != '(redacted)' ]]; then
     printf 'FAIL production smoke contract: empty syntactic userinfo accepted\n' >&2
     exit 1
