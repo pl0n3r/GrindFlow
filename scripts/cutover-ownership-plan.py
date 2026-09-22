@@ -128,8 +128,28 @@ def list_of_unique_strings(value: Any) -> set[str]:
     return set(value)
 
 
+def validated_module_catalog(inventory: dict[str, set[str]]) -> None:
+    """Every reviewed table belongs to at most one module per runtime."""
+    for runtime in ("laravel", "symfony"):
+        claimed: dict[str, str] = {}
+        for module, grouping in MODULE_TABLES.items():
+            tables = grouping.get(runtime)
+            if not isinstance(tables, tuple) or not tables:
+                fail("module catalog must define nonempty runtime tuples")
+            for table in tables:
+                if not isinstance(table, str) or not table:
+                    fail("module catalog contains an invalid table")
+                previous = claimed.get(table)
+                if previous is not None:
+                    fail("module catalog assigns one table to multiple modules")
+                claimed[table] = module
+                if table not in inventory[runtime]:
+                    fail("module catalog references a table missing from migrations")
+
+
 def build_report(source: Any, plan: Any) -> dict[str, Any]:
     inventory = validated_source(source)
+    validated_module_catalog(inventory)
     if not isinstance(plan, dict) or set(plan) != EXPECTED_FIELDS:
         fail("plan must have exactly the offline ownership contract fields")
     if plan["contract"] != PLAN_CONTRACT:
@@ -231,14 +251,14 @@ def main() -> int:
         if args.template is not None:
             print(json.dumps(draft_envelope(args.template), sort_keys=True, indent=2))
             return 0
-        raw = sys.stdin.read(MAX_STDIN_BYTES + 1)
+        raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
         if len(raw) > MAX_STDIN_BYTES:
             fail("input exceeds safety limit")
         envelope = json.loads(raw)
         if not isinstance(envelope, dict) or set(envelope) != {"source", "plan"}:
             fail("envelope must contain source and plan objects only")
         report = build_report(envelope["source"], envelope["plan"])
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, UnicodeError):
         print("ERROR: offline ownership plan validation failed", file=sys.stderr)
         return 2
 
