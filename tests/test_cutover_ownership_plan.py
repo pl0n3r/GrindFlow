@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -169,6 +170,15 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         plan["production_authorized"] = True
         self.assert_rejected("non-operational", plan=plan)
 
+    def test_boolean_contract_rejects_integer_aliases(self):
+        source_only = self.plan()
+        source_only["source_only"] = 1
+        self.assert_rejected("non-operational", plan=source_only)
+
+        production_authorized = self.plan()
+        production_authorized["production_authorized"] = 0
+        self.assert_rejected("non-operational", plan=production_authorized)
+
     def test_all_readiness_is_pending_even_if_user_claims_green(self):
         plan = self.plan()
         plan["readiness"]["restored_database_and_blobs"] = "passed"
@@ -197,18 +207,63 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         fake["database_contacted"] = True
         self.assert_rejected("provenance", source=fake)
 
-    def test_cli_is_offline_and_does_not_echo_untrusted_input(self):
+    def test_cli_is_offline_under_audit_barrier(self):
+        payload = json.dumps({"source": self.source(), "plan": self.plan()})
+        cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py"), "--json"]
+        with tempfile.TemporaryDirectory() as directory:
+            guard = Path(directory) / "sitecustomize.py"
+            guard.write_text(
+                "import sys\n"
+                "def _block_external(event, args):\n"
+                "    blocked = {\n"
+                "        'socket.connect', 'subprocess.Popen', 'os.system',\n"
+                "        'os.posix_spawn', 'os.posix_spawnp',\n"
+                "    }\n"
+                "    if event in blocked or event.startswith('os.spawn'):\n"
+                "        raise RuntimeError('external contact blocked by audit hook')\n"
+                "sys.addaudithook(_block_external)\n",
+                encoding="utf-8",
+            )
+            env = dict(os.environ)
+            env["PYTHONPATH"] = (
+                str(directory)
+                + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+            )
+            result = subprocess.run(
+                cmd,
+                input=payload,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                env=env,
+                check=False,
+            )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertFalse(json.loads(result.stdout)["database_contacted"])
+
+    def test_cli_does_not_echo_untrusted_input_or_environment(self):
         payload = json.dumps({"source": self.source(), "plan": self.plan()})
         env = dict(os.environ, DATABASE_URL="secret-injected-credential")
         cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py"), "--json"]
-        ok = subprocess.run(cmd, input=payload, text=True, capture_output=True, env=env, check=False)
+        ok = subprocess.run(
+            cmd,
+            input=payload,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            env=env,
+            check=False,
+        )
         self.assertEqual(0, ok.returncode, ok.stderr)
-        report = json.loads(ok.stdout)
-        self.assertFalse(report["database_contacted"])
         self.assertNotIn("secret-injected-credential", ok.stdout)
         bad = subprocess.run(
-            cmd, input=payload + "secret-injected-credential", text=True,
-            capture_output=True, env=env, check=False,
+            cmd,
+            input=payload + "secret-injected-credential",
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            env=env,
+            check=False,
         )
         self.assertEqual(2, bad.returncode)
         self.assertEqual("", bad.stdout)
@@ -250,7 +305,14 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
     def test_input_limit_is_measured_in_bytes(self):
         cmd = [sys.executable, str(ROOT / "scripts/cutover-ownership-plan.py")]
         payload = "á" * ((CUTOVER.MAX_STDIN_BYTES // 2) + 1)
-        r = subprocess.run(cmd, input=payload, text=True, capture_output=True, check=False)
+        r = subprocess.run(
+            cmd,
+            input=payload,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=False,
+        )
         self.assertEqual(2, r.returncode)
         self.assertEqual("", r.stdout)
         self.assertIn("validation failed", r.stderr)
