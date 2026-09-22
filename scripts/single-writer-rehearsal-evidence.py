@@ -59,6 +59,7 @@ RECEIPT_FIELDS = frozenset({
     "contract",
     "module",
     "source_inventory_sha256",
+    "operator_evidence_bundle_sha256",
     "evidence_sha256",
     "observed_at_utc",
     "environment",
@@ -149,6 +150,11 @@ def validate_operator_report(report: Any, module_name: str) -> dict[str, Any]:
         fail("operator evidence report references are incomplete")
     for evidence_type in OPERATOR_REFERENCE_ENVIRONMENTS:
         validate_operator_reference(evidence_type, references[evidence_type])
+    reference_digests = {
+        reference["evidence_sha256"] for reference in references.values()
+    }
+    if len(reference_digests) != len(references):
+        fail("operator evidence references must remain distinct")
     return report
 
 
@@ -166,6 +172,10 @@ def validate_single_writer_receipt(
     if receipt["source_inventory_sha256"] != source_inventory_sha256:
         fail("single-writer receipt source inventory mismatch")
 
+    validate_digest(
+        receipt["operator_evidence_bundle_sha256"],
+        "operator evidence bundle",
+    )
     validate_digest(receipt["evidence_sha256"], "single-writer evidence")
     validate_timestamp(receipt["observed_at_utc"], "single-writer evidence")
     if receipt["environment"] != "authorized_nonproduction_rehearsal":
@@ -209,6 +219,17 @@ def build_report(envelope: Any) -> dict[str, Any]:
         module_name,
         operator_report["source_inventory_sha256"],
     )
+    if (
+        receipt["operator_evidence_bundle_sha256"]
+        != operator_report["evidence_bundle_sha256"]
+    ):
+        fail("single-writer receipt operator evidence mismatch")
+    operator_digests = {
+        reference["evidence_sha256"]
+        for reference in operator_report["validated_receipt_references"].values()
+    }
+    if receipt["evidence_sha256"] in operator_digests:
+        fail("single-writer receipt must reference distinct evidence")
 
     canonical = json.dumps(
         envelope,
@@ -238,11 +259,24 @@ def build_report(envelope: Any) -> dict[str, Any]:
     }
 
 
+def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects before contract validation."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            fail("single-writer evidence contains duplicate fields")
+        result[key] = value
+    return result
+
+
 def read_stdin_json() -> Any:
     raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
     if len(raw) > MAX_STDIN_BYTES:
         fail("single-writer evidence exceeds safety limit")
-    return json.loads(raw.decode("utf-8"))
+    return json.loads(
+        raw.decode("utf-8"),
+        object_pairs_hook=reject_duplicate_keys,
+    )
 
 
 def main() -> int:
