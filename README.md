@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+746** | **−32** | **+714** |
+| **6** | **+799** | **−32** | **+767** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -67,7 +67,7 @@ flowchart LR
 - Conecta el reporte previo de evidencia de operador al nuevo receipt mediante hashes SHA-256, módulo y huella del inventario.
 - Vuelve a comprobar la huella del inventario contra las migraciones del checkout y rechaza módulos sin ownership revisado.
 - Exige escritor anterior y rollback Laravel, escritor candidato Symfony, freeze declarado, exclusividad del candidato y ausencia de writers concurrentes.
-- Rechaza reutilizar como evidencia single-writer la huella del inventario, el bundle o receipts previos; también rechaza observaciones cronológicamente anteriores, campos adicionales, enteros como booleanos y JSON con claves duplicadas.
+- Rechaza reutilizar huellas de inventario o bundle como digest de referencias, o evidencia single-writer entre etapas; también rechaza observaciones cronológicamente anteriores, campos adicionales, enteros como booleanos y JSON con claves duplicadas o números no finitos.
 - Limita stdin a 1.000.000 bytes UTF-8; no usa red, SQL, procesos externos ni rutas proporcionadas por el caller.
 - El reporte mantiene `receipt_content_verified=false`, `production_ready=false` y `production_authorized=false`; autorización y smoke siguen pendientes.
 - Suite de regresión incluida en el gate `fast`. No cambia la infraestructura productiva ni el dueño real de escritura.
