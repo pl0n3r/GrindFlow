@@ -227,16 +227,20 @@ def build_report(envelope: Any) -> dict[str, Any]:
     }
 
 
-def load_gate_results(path: str, head_sha: str, run_id: str) -> dict[str, str]:
-    """Load same-run disposable gate results from a bounded UTF-8 JSON file."""
-    try:
-        with Path(path).open("rb") as handle:
-            raw = handle.read(MAX_GATE_RESULTS_BYTES + 1)
-    except OSError:
-        fail("gate results unavailable")
-    if len(raw) > MAX_GATE_RESULTS_BYTES:
-        fail("gate results exceed safety limit")
-    payload = json.loads(raw.decode("utf-8"))
+def read_stdin_json(max_bytes: int, label: str) -> Any:
+    """Read one bounded UTF-8 JSON document from stdin."""
+    raw = sys.stdin.buffer.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        fail(f"{label} exceed safety limit")
+    return json.loads(raw.decode("utf-8"))
+
+
+def validate_gate_results(
+    payload: Any,
+    head_sha: str,
+    run_id: str,
+) -> dict[str, str]:
+    """Validate explicit same-run disposable gate results."""
     if not isinstance(payload, dict) or set(payload) != GATE_RESULT_FIELDS:
         fail("gate results fields do not match the contract")
     if payload["head_sha"] != head_sha or payload["run_id"] != run_id:
@@ -278,19 +282,18 @@ def main() -> int:
     parser.add_argument("--template", choices=("identity", "vault"))
     parser.add_argument("--head-sha")
     parser.add_argument("--run-id")
-    parser.add_argument("--gate-results")
     args = parser.parse_args()
 
     try:
         if args.template is not None:
-            if (
-                args.head_sha is None
-                or args.run_id is None
-                or args.gate_results is None
-            ):
-                fail("--template requires --head-sha, --run-id and --gate-results")
-            checks = load_gate_results(
-                args.gate_results,
+            if args.head_sha is None or args.run_id is None:
+                fail("--template requires --head-sha and --run-id")
+            gate_results = read_stdin_json(
+                MAX_GATE_RESULTS_BYTES,
+                "gate results",
+            )
+            checks = validate_gate_results(
+                gate_results,
                 args.head_sha,
                 args.run_id,
             )
@@ -301,10 +304,7 @@ def main() -> int:
             ))
             return 0
 
-        raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
-        if len(raw) > MAX_STDIN_BYTES:
-            fail("input exceeds safety limit")
-        report = build_report(json.loads(raw.decode("utf-8")))
+        report = build_report(read_stdin_json(MAX_STDIN_BYTES, "input"))
     except (ValueError, TypeError):
         print("ERROR: disposable rehearsal evidence validation failed", file=sys.stderr)
         return 2
