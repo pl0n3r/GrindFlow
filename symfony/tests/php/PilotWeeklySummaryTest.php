@@ -145,12 +145,27 @@ final class PilotWeeklySummaryTest extends WebTestCase
         self::assertStringNotContainsString('foreign.png', (string) $client->getResponse()->getContent());
         self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
 
+        $client->request('GET', '/api/admin/pilot/weekly-summary.csv?week='.$thisWeek);
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('text/csv', (string) $client->getResponse()->headers->get('Content-Type'));
+        self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+        $csv = (string) $client->getResponse()->getContent();
+        self::assertCount(8, array_filter(explode("\r\n", $csv), static fn (string $line): bool => $line !== ''));
+        self::assertStringStartsWith("date_utc,prepared_attempts,completed_reports,failed_attempts\r\n", $csv);
+        self::assertStringContainsString($thisWeek.',1,1,0', $csv);
+        self::assertStringNotContainsString('foreign.png', $csv);
+        self::assertStringNotContainsString($other, $csv);
+
         $client->request('GET', '/api/admin/pilot/weekly-summary?week='.$lastWeek);
         self::assertResponseIsSuccessful();
         self::assertSame(
             ['prepared_attempts' => 0, 'completed_reports' => 0, 'failed_attempts' => 1],
             $this->payload($client)['data']['totals'],
         );
+
+        $client->request('GET', '/api/admin/pilot/weekly-summary.csv?week=2026-02-30');
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame('invalid_pilot_week', $this->payload($client)['error']['code']);
 
         foreach ([
             '/api/admin/pilot/weekly-summary?week=2026-02-30',
