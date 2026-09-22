@@ -18,12 +18,14 @@ assert_absent_regex() {
 cat > "$workdir/mock-curl" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
-method=GET; output=/dev/null; headers=""; write_out=""; url=""
+method=GET; output=/dev/null; headers=""; write_out=""; url=""; cookie_in=""; cookie_out=""
 while (( $# > 0 )); do
   case "$1" in
     --output|--dump-header|--write-out|--request)
       case "$1" in --output) output="$2";; --dump-header) headers="$2";; --write-out) write_out="$2";; --request) method="$2";; esac; shift 2;;
-    --cookie|--cookie-jar|--max-time|--user-agent|--header|--data-urlencode) shift 2;;
+    --cookie) cookie_in="$2"; shift 2;;
+    --cookie-jar) cookie_out="$2"; shift 2;;
+    --max-time|--user-agent|--header|--data-urlencode) shift 2;;
     --silent|--show-error) shift;;
     http://mock/*) url="$1"; shift;;
     *) printf 'unexpected fake-curl argument: %s\n' "$1" >&2; exit 2;;
@@ -31,6 +33,8 @@ while (( $# > 0 )); do
 done
 status=200; body=""; csv_headers=""; redirect=""
 [[ -z "${MOCK_REQUEST_LOG:-}" ]] || printf '%s %s\n' "$method" "$url" >> "$MOCK_REQUEST_LOG"
+# Paths only, no cookies or headers. Keep this separate from the request log.
+[[ -z "${MOCK_COOKIE_LOG:-}" ]] || printf '%s\t%s\t%s\t%s\n' "$method" "$url" "$cookie_in" "$cookie_out" >> "$MOCK_COOKIE_LOG"
 case "$url" in
   http://mock/up) body="ok";;
   http://mock/login)
@@ -128,8 +132,9 @@ run_case() {
   local diagnostic_mode="${10:-valid}"
   local log="$workdir/$label.log"
   local requests="$workdir/$label.requests"
+  local cookie_requests="$workdir/$label.cookie-paths"
   local result
-  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
+  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_COOKIE_LOG="$cookie_requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
   assert_absent_fixed 'never-print-header-private' "$log"
   local expected_login_gets=2
@@ -218,6 +223,19 @@ run_case() {
           *) printf 'FAIL: unexpected synthetic post-login session mode.\n' >&2; exit 1 ;;
         esac
         [[ "$(grep -c '^LOGIN_FAILURE_SESSION_CHECK=' "$log")" -eq 1 ]]
+        # Verify --cookie AND --cookie-jar on the POST and third GET point
+        # to the exact same private jar. A new or missing jar is a regression
+        # even if the response mock returns the same synthetic CSRF.
+        local post_jar_in post_jar_out recheck_jar_in recheck_jar_out
+        post_jar_in="$(awk -F '\t' '$1 == "POST" && $2 == "http://mock/login" {print $3}' "$cookie_requests")"
+        post_jar_out="$(awk -F '\t' '$1 == "POST" && $2 == "http://mock/login" {print $4}' "$cookie_requests")"
+        recheck_jar_in="$(awk -F '\t' '$1 == "GET" && $2 == "http://mock/login" {value=$3} END {print value}' "$cookie_requests")"
+        recheck_jar_out="$(awk -F '\t' '$1 == "GET" && $2 == "http://mock/login" {value=$4} END {print value}' "$cookie_requests")"
+        if [[ -z "$post_jar_in" || "$post_jar_in" != "$post_jar_out" ||
+              "$post_jar_in" != "$recheck_jar_in" || "$post_jar_in" != "$recheck_jar_out" ]]; then
+          printf 'FAIL %s: rejected-login POST and anonymous recheck must share the same cookie jar.\n' "$label" >&2
+          exit 1
+        fi
         assert_absent_fixed 'GET http://mock/dashboard' "$requests"
       elif [[ "$auth_mode" == post_external || "$auth_mode" == post_network || "$auth_mode" =~ ^post_absolute_(scheme|port|host|userinfo)$ ]]; then
         grep -Fxq 'LOGIN_REDIRECT_PATH=(redacted)' "$log"
