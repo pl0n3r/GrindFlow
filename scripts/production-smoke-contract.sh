@@ -86,7 +86,7 @@ if [[ "${MOCK_CSV_MODE:-ok}" == failed && "$url" == http://mock/organizations/ex
   body="invalid report"
 fi
 [[ "$output" == /dev/null ]] || printf '%s' "$body" > "$output"
-[[ -z "$headers" ]] || printf 'HTTP/1.1 %s\r\n%s' "$status" "$csv_headers" > "$headers"
+[[ -z "$headers" ]] || printf 'HTTP/1.1 %s\r\n%sX-Request-Id: never-print-header-private\r\n' "$status" "$csv_headers" > "$headers"
 [[ -z "$headers" || -z "$redirect" ]] || printf 'Location: %s\r\n' "$redirect" >> "$headers"
 [[ -z "$write_out" ]] || printf '%s' "$status"
 MOCK
@@ -107,6 +107,7 @@ run_case() {
   local result
   if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_REQUEST_LOG="$requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
+  assert_absent_fixed 'never-print-header-private' "$log"
   case "$label" in
     pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
