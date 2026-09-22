@@ -265,7 +265,7 @@ El receipt exige:
 - `overlapping_writes_observed=false`;
 - observación humana explícita y flags exactos `contains_row_data=false` / `contains_secrets=false`;
 - SHA-256 de la evidencia revisada fuera de banda;
-- ventana UTC con duración positiva y timestamp de observación posterior al cierre;
+- timestamps UTC que prueben el orden `inicio ≤ bloqueo Laravel < habilitación Symfony ≤ fin`, más observación posterior al cierre;
 - `environment=authorized_isolated_rehearsal`.
 
 El verificador vuelve a ejecutar el contrato de evidencia del operador y, por transitividad, el ownership reconstruido desde las migraciones del checkout. No acepta paths, URLs, credenciales ni contenido de filas. Stdin está limitado a 1.000.000 bytes y UTF-8 estricto; las regresiones instalan una barrera que falla ante sockets o subprocesses.
