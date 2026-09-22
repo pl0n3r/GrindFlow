@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.83** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.82~~ | `e41cb3245286d407b7e2967fb7ef4f810fcd1e40` |
-| CI del PR / Sonar / CodeRabbit | 🚧 Candidato sin validar | Comprobar en HEAD final, no heredar checks anteriores |
+| CI del PR / Sonar / CodeRabbit | 🚧 Revalidar HEAD actual | CI #35688983744 y Sonar OK en HEAD anterior; revisión final sobre nuevo HEAD pendiente |
 | CI del SHA exacto de main | ✅ ~~v0.1.82 success~~ | run `35688491389` |
 | Deploy Observer | ✅ ~~v0.1.82 observado~~ | run `35688491348`, release humano, NO SHA Hostinger |
 | Production Smoke | ⛔ Fallo autenticado | run `35688491347`, [incidente #73](https://github.com/pl0n3r/GrindFlow/issues/73) |
@@ -60,7 +60,7 @@ flowchart LR
 
 ## Qué se hizo
 - La clave de limitación de intentos conserva la combinación de email normalizado e IP, pero los datos dejan de aparecer en claro en nombres de claves de caché: HMAC-SHA256 con la clave de aplicación y prefijo `login:`. No cambia el mensaje de validación ni el límite de cinco intentos.
-- Un test de regresión crea una cuenta **sintética descartable**, solicita dos veces el formulario de login en la misma sesión, compara el CSRF y verifica un único POST correcto; el test de lockout verifica cinco intentos en la clave privada y ningún contador en la clave legible.
+- Un test de regresión crea una cuenta **sintética descartable**, solicita dos veces el formulario de login en la misma sesión, compara el CSRF y verifica un único POST correcto; el test de lockout verifica cinco intentos en la clave privada y ningún contador en la clave legible. Una regresión adicional comprueba que un login correcto, con email normalizado, limpia el contador HMAC previo sin crear la clave en claro.
 - Las pruebas no usan el usuario E2E productivo ni modifican cuentas/contraseñas del hosting. El cambio de formato deja de consultar contadores temporales previos a esta versión; no resolverá por sí solo el bloqueo de [#73](https://github.com/pl0n3r/GrindFlow/issues/73).
 
 ## Archivos modificados en este deploy
