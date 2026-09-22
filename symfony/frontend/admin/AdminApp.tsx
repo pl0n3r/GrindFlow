@@ -2,6 +2,7 @@ import { WorkspaceNavigation } from './WorkspaceNavigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { VaultPanel } from './VaultPanel';
 import { WeeklyPlannerPanel } from './WeeklyPlannerPanel';
+import { PilotWeeklySummaryPanel } from './PilotWeeklySummaryPanel';
 
 type Context = {
   user: { display_name: string };
@@ -57,13 +58,15 @@ export function AdminApp() {
   const [activeSection, setActiveSection] = useState(() => {
     if (window.location.hash === '#biblioteca') return 'biblioteca';
     if (window.location.hash === '#programacion') return 'programacion';
+    if (window.location.hash === '#piloto') return 'piloto';
     return 'resumen';
   });
 
   useEffect(() => {
     const synchronizeSection = () => {
       setActiveSection(window.location.hash === '#biblioteca' ? 'biblioteca'
-        : window.location.hash === '#programacion' ? 'programacion' : 'resumen');
+        : window.location.hash === '#programacion' ? 'programacion'
+          : window.location.hash === '#piloto' ? 'piloto' : 'resumen');
     };
     window.addEventListener('hashchange', synchronizeSection);
     return () => window.removeEventListener('hashchange', synchronizeSection);
@@ -241,6 +244,9 @@ export function AdminApp() {
           { id: 'resumen', number: '01', label: 'Resumen', href: '/admin' },
           { id: 'biblioteca', number: '02', label: 'Biblioteca', href: '#biblioteca', stage: 'S2' },
           { id: 'programacion', number: '03', label: 'Programación', href: '#programacion', stage: 'S4' },
+          ...(context.weekly_rule_csrf !== undefined
+            ? [{ id: 'piloto', number: '04', label: 'Piloto', href: '#piloto', stage: 'S5' }]
+            : []),
         ]}
         footer={<div className="admin-tenant">
           <small>ORGANIZACIÓN ACTUAL</small>
@@ -353,6 +359,7 @@ export function AdminApp() {
               manualHandoffCsrf={context.manual_handoff_csrf ?? null}
               manualDestinationCsrf={context.manual_destination_csrf ?? null}
             />}
+          {context.weekly_rule_csrf !== undefined && <PilotWeeklySummaryPanel />}
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
               ? <>

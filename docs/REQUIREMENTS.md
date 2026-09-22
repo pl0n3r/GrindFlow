@@ -192,6 +192,36 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit/MariaDB para CRUD reversible, duplicado idempotente, CSRF/rol/cross-tenant, destino inactivo/ajeno, prepare con destino, cambio tras fail, cola tenant-safe y trazabilidad; Chromium móvil cubre crear destino → crear borrador → preparar con destino → ver cola → registrar fallo → cancelar.
 
+### GF-FR-018 — Resumen semanal interno del piloto Symfony S5
+**Estado:** implementación en rama aislada; CI, merge y despliegue pendientes.
+
+**Enunciado:** los miembros de una organización pueden consultar los eventos internos
+de handoff manual por semana UTC para obtener una línea base de actividad del
+piloto sin inferir publicaciones, visitas, conversiones ni ingresos externos.
+
+**Aceptación:**
+- API GET privada de solo lectura con semana ISO obligatoriamente lunes UTC,
+  por defecto semana actual y ventana máxima de doce semanas; rechaza fechas,
+  arrays y filtros extra inválidos, sin crear ni modificar eventos.
+- Cuenta activa, organización de sesión y membresía vigentes son obligatorias.
+  Todos los roles con acceso al workspace consultan exclusivamente los eventos
+  de su tenant. La organización no se elige mediante parámetro público.
+- Agrega por día UTC exactamente siete fechas y separa intentos preparados,
+  reportes humanos de realización e intentos fallidos; reintentos se cuentan como
+  eventos, nunca como publicaciones únicas verificadas.
+- Si falta la migración del ledger se informa `ready=false` y totales
+  no disponibles. Traffic Symfony no implementado se representa con
+  `clicks=null`, jamás con un cero inventado. No estimar conversiones ni ingresos.
+- React muestra navegación semanal, estados vacío/error/esquema faltante, totales,
+  días UTC, descarga CSV tenant-safe de siete filas agregadas y explicación de límites.
+  La descarga no contiene IDs, nombres ni eventos individuales. Debe funcionar a 360 px sin desbordamiento.
+  No se integra proveedor, no se visita enlace de clic y no se muta producción.
+
+**Verificación:** PHPUnit/MariaDB con anonimato, tenant ajeno, lector Model,
+límites de semana y ventana UTC; Chromium móvil con datos sintéticos, navegación
+y estado explícito de Traffic no integrado. La integración real de Traffic y
+la línea base comercial siguen como slices posteriores del roadmap #2.
+
 ### GF-UX-001 — Shell de navegación consistente y responsive
 **Estado:** integrado en main v0.1.70; despliegue y producción se verifican por separado.
 
