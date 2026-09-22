@@ -15,6 +15,7 @@ import sys
 MAX_BYTES = 1_000_000
 LOGIN_PATH = "/login"
 DASHBOARD_PATH = "/dashboard"
+CONFLICTING_OUTCOMES = "conflicting authentication outcomes"
 SIGNALS = {
     "LOGIN_SESSION_PREFLIGHT": frozenset({"consistent", "inconsistent"}),
     "LOGIN_REDIRECT_PATH": frozenset({
@@ -62,19 +63,19 @@ def validate_outcomes(
 ) -> None:
     """Reject outcomes that cannot arise within one smoke login attempt."""
     if len(dashboard_errors) > 1 or len(login_errors) > 1:
-        raise ValueError("conflicting authentication outcomes")
+        raise ValueError(CONFLICTING_OUTCOMES)
     if dashboard_errors and (login_errors or redirect != DASHBOARD_PATH):
-        raise ValueError("conflicting authentication outcomes")
+        raise ValueError(CONFLICTING_OUTCOMES)
     if recheck != "unobserved" and (redirect != LOGIN_PATH or login_errors):
-        raise ValueError("conflicting authentication outcomes")
+        raise ValueError(CONFLICTING_OUTCOMES)
     if (login_errors and redirect != "unobserved"
         and not login_errors.issubset({"301", "307", "308"})):
-        raise ValueError("conflicting authentication outcomes")
+        raise ValueError(CONFLICTING_OUTCOMES)
     if preflight == "inconsistent" and (
         redirect != "unobserved" or recheck != "unobserved"
         or dashboard_errors or login_errors
     ):
-        raise ValueError("conflicting authentication outcomes")
+        raise ValueError(CONFLICTING_OUTCOMES)
 
 
 def classify(log: str) -> dict[str, str]:
