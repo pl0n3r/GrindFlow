@@ -1,12 +1,13 @@
 """Contracts for disposable GF-ARCH-002 rehearsal evidence."""
 from __future__ import annotations
 
-import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -207,6 +208,42 @@ class DisposableRehearsalEvidenceTest(unittest.TestCase):
         )
         self.assertEqual(0, checked.returncode, checked.stderr)
         report = json.loads(checked.stdout)
+        self.assertFalse(report["production_ready"])
+        self.assertFalse(report["production_authorized"])
+
+    def test_cli_is_offline_under_audit_barrier(self):
+        script = str(ROOT / "scripts/disposable-rehearsal-evidence.py")
+        payload = json.dumps(self.envelope())
+        with tempfile.TemporaryDirectory() as directory:
+            guard = Path(directory) / "sitecustomize.py"
+            guard.write_text(
+                "import sys\n"
+                "def _block_external(event, args):\n"
+                "    blocked = {\n"
+                "        'socket.connect', 'subprocess.Popen', 'os.system',\n"
+                "        'os.posix_spawn', 'os.posix_spawnp',\n"
+                "    }\n"
+                "    if event in blocked or event.startswith('os.spawn'):\n"
+                "        raise RuntimeError('external contact blocked by audit hook')\n"
+                "sys.addaudithook(_block_external)\n",
+                encoding="utf-8",
+            )
+            env = dict(os.environ)
+            env["PYTHONPATH"] = (
+                str(directory)
+                + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+            )
+            result = subprocess.run(
+                [sys.executable, script, "--json"],
+                input=payload,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                env=env,
+                check=False,
+            )
+        self.assertEqual(0, result.returncode, result.stderr)
+        report = json.loads(result.stdout)
         self.assertFalse(report["production_ready"])
         self.assertFalse(report["production_authorized"])
 
