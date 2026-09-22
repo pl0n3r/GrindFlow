@@ -161,7 +161,7 @@ function addForeignKeys(array &$tables, array $rows): void
         $deleteRule = strtoupper((string) ($row['DELETE_RULE'] ?? ''));
 
         if (
-            !isset($tables[$table])
+            ! isset($tables[$table])
             || $name === ''
             || $column === ''
             || $referencedTable === ''
