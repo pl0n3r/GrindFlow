@@ -43,10 +43,33 @@ curl_common() {
   "$CURL_BIN" --silent --show-error --max-time 20 --user-agent "$SMOKE_USER_AGENT" --header "Accept: $SMOKE_ACCEPT" --header "Accept-Language: en-US,en;q=0.8" "$@"
 }
 
-# Never retain remote response headers or bodies in GitHub Actions artifacts.
+# Keep only canonical v4 incident UUIDs, never arbitrary remote header values.
+safe_incident_from_headers() {
+  python3 - "$1" <<'PY'
+import re
+import sys
+
+identifier = "unknown"
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            name, separator, value = line.partition(":")
+            if separator and name.lower() == "x-incident-id":
+                candidate = value.strip()
+                if re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", candidate):
+                    identifier = candidate
+                break
+except OSError:
+    pass
+print(identifier)
+PY
+}
+
+# Only emit status, local label and an allowlisted incident UUID (or unknown).
 print_http_failure() {
-  local label="$1" status="$2"
-  printf 'ERROR: %s returned HTTP %s\n' "$label" "$status" >&2
+  local label="$1" status="$2" headers="${3:-}" incident="unknown"
+  if [[ -n "$headers" ]]; then incident="$(safe_incident_from_headers "$headers")"; fi
+  printf 'ERROR: %s returned HTTP %s incident_id=%s\n' "$label" "$status" "$incident" >&2
 }
 
 # Report only a short path: never leak redirect host, query strings, fragments or tokens.
@@ -184,6 +207,7 @@ print_diagnostics() {
   # identifiers or timestamps into the retained GitHub Actions artifact.
   python3 - "$diagnostics_json" >&2 <<'PY'
 import json
+import re
 import sys
 
 try:
@@ -207,7 +231,11 @@ else:
             request = request if isinstance(request, dict) else {}
             method = request.get("method")
             method = method if method in ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS") else "unknown"
-            print(f"Incident #{index}: HTTP={status} method={method}")
+            raw_identifier = entry.get("incident_id")
+            incident_id = raw_identifier if isinstance(raw_identifier, str) and re.fullmatch(
+                r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", raw_identifier
+            ) else "unknown"
+            print(f"Incident #{index}: HTTP={status} method={method} incident_id={incident_id}")
 PY
   printf '%s\n' '-------------------------------------------' >&2
 }
@@ -265,11 +293,11 @@ run_smoke() {
   rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
-  if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status"; return 1; fi
+  if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers"; return 1; fi
 
   local login_page_status
   login_page_status="$(curl_common --cookie-jar "$cookie_jar" --output "$login_html" --dump-header "$login_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
-  if [[ "$login_page_status" != "200" ]]; then print_http_failure "login page GET /login" "$login_page_status"; return 1; fi
+  if [[ "$login_page_status" != "200" ]]; then print_http_failure "login page GET /login" "$login_page_status" "$login_headers"; return 1; fi
 
   local token
   if ! token="$(extract_csrf)"; then printf 'ERROR: login page did not expose a CSRF token.\n' >&2; return 1; fi
