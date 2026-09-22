@@ -31,7 +31,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+87** | **−38** | **+49** |
+| **4** | **+108** | **−41** | **+67** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -62,7 +62,7 @@ flowchart LR
 - El [Smoke v0.1.83](https://github.com/pl0n3r/GrindFlow/actions/runs/35689866922) confirmó dos GET anónimos con CSRF consistente, luego un único POST que retornó a `/login`. Esto no identifica la causa ni demuestra que el login funcione.
 - Solo si el POST retorna 302/303 al `/login` local, el smoke hace **un GET adicional sin credenciales** con la misma cookie jar. Compara en privado el CSRF posterior con el usado en el POST y emite exclusivamente `LOGIN_FAILURE_SESSION_CHECK=stable|changed|unavailable`. La ausencia/cambio de token **no demuestra** contraseña incorrecta o sesión rota por sí solo.
 - Se preservan salida 7, un único POST, cero accesos al dashboard después del rechazo y ninguna impresión de CSRF, cookies, URL privadas o cuerpos remotos. Ninguna operación productiva de usuario/DB.
-- Contratos mock verifican los tres resultados, 3 GET solo en esa rama, 2 GET en las otras y que solo se emite un marcador por fallo sin revelar tokens ni reintentar credenciales.
+- Contratos mock verifican los tres resultados, 3 GET solo en esa rama, 2 GET en las otras, **la misma ruta privada de cookie jar en el POST y el GET posterior para lectura y escritura**, y un marcador por fallo sin revelar tokens ni reintentar credenciales.
 
 ## Archivos modificados en este deploy
 Inventario del candidato v0.1.84, no evidencia de publicación; solo el deploy actual.
