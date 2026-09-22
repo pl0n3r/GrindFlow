@@ -65,7 +65,7 @@ flowchart LR
 - Exige `GF_METADATA_SNAPSHOT_APPROVED=1` y `DATABASE_URL`; sin aprobación explícita falla cerrado antes de conectar.
 - La captura inicia transacción read-only, no selecciona filas de aplicación y no imprime credenciales, esquema ni errores de conexión.
 - Nuevo contrato `scripts/mariadb-structure-snapshot-contract.sh` verifica que el opt-in y la URL sean obligatorios y que stdout quede vacío al rechazar.
-- `symfony-preview` migra la MariaDB descartable, captura el snapshot y lo compara automáticamente contra el estado final reconstruido desde Doctrine.
+- `symfony-preview` migra la MariaDB descartable, genera el inventario Doctrine como JSON puro, captura el snapshot y los compara automáticamente.
 - El pipeline no versiona snapshots reales ni ejecuta esta herramienta contra Hostinger/producción.
 
 ## Archivos modificados en este deploy
@@ -77,6 +77,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `docs/DATA-CUTOVER-INVENTORY.md`
 - `scripts/mariadb-structure-snapshot-contract.sh`
 - `scripts/mariadb-structure-snapshot.php`
+- `scripts/symfony-schema-structure.py`
 
 ## Validación
 - La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
