@@ -20,9 +20,9 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.81** | `config/version.php` |
 | Base exacta | ✅ ~~main v0.1.80~~ | `25fbf66b5ac31255a38405ba03d18bf03bc8a016` |
-| CI del PR | ✅ ~~Completado~~ | run `35683360552`, HEAD `ccb910b5d164a4fc9465dd35b8d46e9cc4e22724` |
-| Sonar | ✅ ~~Completado~~ | Quality Gate OK, 0 issues sobre `ccb910b5` |
-| CodeRabbit | 🚧 Revisión final tras corrección README | Full review previa encontró un único hallazgo documental |
+| CI del PR | ✅ ~~Completado~~ | último HEAD validado `d7528f343be1858e00552b7aca94304f5b41b8e2`, run `35683650514`; cambio userinfo pendiente de CI |
+| Sonar | ✅ ~~Completado~~ | Quality Gate OK, 0 issues sobre `d7528f343be1858e00552b7aca94304f5b41b8e2`; cambio userinfo pendiente |
+| CodeRabbit | 🚧 Revisión final tras corrección userinfo | Full review en `d7528f3` detectó dos hallazgos menores atendidos aquí; nueva revisión pendiente |
 | CI del SHA exacto de main | ✅ ~~v0.1.80 success~~ | run `35683135770`, SHA `25fbf66b5` |
 | Deploy Observer | ⛔ Release v0.1.80 NO observado | run `35683135669` failure: `/_deployment` HTTP 403 repetido; no prueba SHA remoto |
 | Production Smoke | ⛔ Auth E2E no validada | [#73](https://github.com/pl0n3r/GrindFlow/issues/73), run `35683135795` failure |
@@ -63,7 +63,7 @@ flowchart LR
 ## Qué se hizo
 - #73: un `Location` absoluto puede ser legítimo en producción; el parser anterior lo etiquetaba `(redacted)` incluso si era el mismo origen, sin diagnosticar la ruta.
 - `safe_redirect_path` permite **solo** rutas estáticas reconocidas cuando un redirect relativo o absoluto coincide en esquema, hostname, puerto efectivo y ausencia de userinfo con `BASE_URL`. Nunca imprime host, query, fragment, URL remota o ruta desconocida.
-- Contratos mock: login absoluto same-origin a `/dashboard`, dashboard absoluto a `/login`; rechazos de externo, protocol-relative, esquema, puerto, host y userinfo diferentes.
+- Contratos mock: login absoluto same-origin a `/dashboard`, dashboard absoluto a `/login`; rechazos de externo, protocol-relative, esquema, puerto, host y userinfo diferentes; rechazo de userinfo vacío en BASE_URL y equivalencia de puertos HTTP 80/HTTPS 443.
 - Conserva fail-fast, privados 0600 e `incident_id` validado de v0.1.79. **No prueba credenciales ni corrige por sí solo la sesión E2E.** #73 sigue abierto.
 
 ## Archivos modificados en este deploy
@@ -74,7 +74,7 @@ Inventario del candidato v0.1.81; no es prueba de publicación. «solo el deploy
 - `scripts/production-smoke.sh`
 
 ## Validación
-- CI/Sonar v0.1.81 success sobre `ccb910b5` (run `35683360552`); CodeRabbit full review detectó una nota documental ya corregida en este snapshot. Revalidar el commit que contiene README: no se autoincluye su SHA literal. Smoke PR usa curl simulado, nunca credenciales productivas.
+- CI/Sonar v0.1.81 success sobre el último HEAD verificado `d7528f343be1858e00552b7aca94304f5b41b8e2` (run `35683650514`); después se corrigió el caso de userinfo vacío y se añadieron contratos de puertos efectivos. Revalidar el HEAD que contiene este README sin fingir autorreferencia del SHA; CodeRabbit final sigue pendiente. Smoke PR usa curl simulado, nunca credenciales productivas.
 - El `LOGIN_REDIRECT_PATH=(redacted)` real puede tener otras causas: observar solo la ruta saneada en un smoke posterior al deploy, sin repetir login ciegamente.
 
 ## Qué sigue
