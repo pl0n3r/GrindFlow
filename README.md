@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.94: aislamiento cross-tenant/IDOR verificado después del restore.** Base exacta `main` v0.1.93 `a9ddf45215c50df9397f257f6e822f9fa29816ea`; reutiliza regresiones de Vault, organización y autorización sobre la MariaDB restaurada.
+> **Candidato v0.1.94: aislamiento cross-tenant/IDOR verificado después del restore.** Base exacta `main` v0.1.93 `a9ddf45215c50df9397f257f6e822f9fa29816ea`; reutiliza regresiones de Vault, clasificación masiva, papelera, organización y autorización sobre la MariaDB restaurada.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -39,7 +39,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Cross-tenant/IDOR post-restore: Vault, organización y autorización |
+| Alcance | Cross-tenant/IDOR post-restore: Vault, bulk, trash, organización y autorización |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,6 +63,8 @@ flowchart LR
 ## Qué se hizo
 - Nuevo `scripts/symfony-post-restore-tenant-guard.sh`: ejecuta regresiones de aislamiento únicamente después del restore drill.
 - Reutiliza `VaultTest` para comprobar 404 en detalle/preview/download de activos ajenos y bloqueo tras revocar membresía.
+- Añade `VaultBulkUsageTest` post-restore para exigir rechazo atómico de lotes con IDs de otro tenant, sin mutación parcial.
+- Añade `VaultTrashTest` post-restore para comprobar aislamiento y privacidad al mover/restaurar recursos.
 - Reutiliza `OrganizationSettingsTest` para rechazar mutaciones IDOR mediante `organization_id`, roles insuficientes y CSRF inválido.
 - Reutiliza `DistributionAuthorizationTest` para impedir autorizar recursos de otra organización.
 - El guard exige `APP_ENV=test` y `CI=true`; un contrato shell prueba ambas barreras antes de depender de PHPUnit.
@@ -76,6 +78,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
 - `docs/DATA-CUTOVER-INVENTORY.md`
+- `docs/REQUIREMENTS.md`
 - `scripts/ci-scope-contract.sh`
 - `scripts/ci-scope.sh`
 - `scripts/symfony-post-restore-tenant-guard-contract.sh`
@@ -83,7 +86,7 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 
 ## Validación
 - La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
-- Las regresiones crean y destruyen datos sintéticos y se ejecutan **solo después del restore** sobre MariaDB descartable.
+- Las cinco regresiones crean y destruyen datos sintéticos y se ejecutan **solo después del restore** sobre MariaDB descartable.
 - Esta entrega no acredita datos productivos, RPO/RTO, secretos/configuración restaurados ni SHA Hostinger.
 
 ## Qué sigue
