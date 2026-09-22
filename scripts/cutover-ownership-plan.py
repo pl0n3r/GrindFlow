@@ -181,7 +181,10 @@ def validate_plan_mode(plan: dict[str, Any]) -> None:
         "production_authorized": False,
         "single_writer_required": True,
     }
-    if any(plan[key] != value for key, value in expected.items()):
+    if any(
+        type(plan[key]) is not type(value) or plan[key] != value
+        for key, value in expected.items()
+    ):
         fail("plan must be source-only, non-operational and unauthorized")
 
 
