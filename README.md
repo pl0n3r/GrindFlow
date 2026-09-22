@@ -77,8 +77,8 @@ flowchart LR
 - `fast` ejecuta compilación y regresiones del nuevo contrato; el cambio del workflow fuerza validación completa del PR.
 - No ejecuta SQL, migraciones, freezes, escrituras, cambios de owner ni operaciones en Hostinger.
 
-## Archivos modificados en este deploy
-Inventario de solo el deploy actual: candidato, no evidencia de publicación:
+## Archivos modificados en esta entrega candidata
+Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
 <!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
 - `README.md`
