@@ -2016,3 +2016,72 @@ test('identity navigation reuses the public brand without overflowing mobile and
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   }
 });
+
+
+test('S5 weekly pilot overview is tenant-context read-only and responsive at 360px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  const now = new Date();
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),
+    now.getUTCDate() - ((now.getUTCDay() + 6) % 7)));
+  const thisWeek = monday.toISOString().slice(0, 10);
+  const lastWeekDate = new Date(monday);
+  lastWeekDate.setUTCDate(lastWeekDate.getUTCDate() - 7);
+  const lastWeek = lastWeekDate.toISOString().slice(0, 10);
+  const visited = [];
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Lectura sintética' },
+      organization: { id: '00000000-0000-7000-8000-000000000088', name: 'Piloto privado', role: 'model' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: false, content_review: true },
+      weekly_rule_csrf: null,
+    } }),
+  }));
+  await page.route('**/api/admin/pilot/weekly-summary?week=*', (route) => {
+    expect(route.request().method()).toBe('GET');
+    const date = new URL(route.request().url()).searchParams.get('week');
+    visited.push(date);
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(date + 'T00:00:00Z');
+      day.setUTCDate(day.getUTCDate() + index);
+      return { date_utc: day.toISOString().slice(0, 10),
+        prepared_attempts: index === 0 ? 2 : 0,
+        completed_reports: index === 0 ? 1 : 0,
+        failed_attempts: index === 0 ? 1 : 0 };
+    });
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: {
+        ready: true, week_start_utc: date, week_end_exclusive_utc: '',
+        days, totals: { prepared_attempts: 2, completed_reports: 1, failed_attempts: 1 },
+        traffic: { ready: false, clicks: null }, external_publications_verified: null,
+        provider_calls: false,
+      } }),
+    });
+  });
+
+  await page.evaluate(() => {
+    document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>';
+  });
+  await page.addScriptTag({ url: asset + '?pilot-e2e=1', type: 'module' });
+  const navigation = page.getByRole('navigation', { name: 'Navegación administrativa' });
+  await navigation.getByRole('link', { name: /Piloto/ }).click();
+  await expect(navigation.getByRole('link', { name: /Piloto/ }))
+    .toHaveAttribute('aria-current', 'location');
+  await expect(page.getByRole('heading', { name: 'Resumen semanal del piloto' })).toBeVisible();
+  await expect(page.getByText('Realizadas según registro humano')).toBeVisible();
+  await expect(page.locator('.pilot-totals strong')).toHaveText(['2', '1', '1']);
+  await expect(page.locator('.pilot-day-scroll tbody tr')).toHaveCount(7);
+  await expect(page.getByText(/Tráfico y conversiones: aún no integrados/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  const weeks = page.getByRole('navigation', { name: 'Semanas del piloto' });
+  await weeks.getByRole('button', { name: 'Semana anterior' }).click();
+  await expect(weeks).toContainText(lastWeek);
+  await expect.poll(() => visited.includes(lastWeek)).toBe(true);
+  expect(visited).toContain(thisWeek);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
