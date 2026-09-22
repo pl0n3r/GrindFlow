@@ -40,7 +40,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts]** |
-| Alcance | #73: inspección segura de redirect login/dashboard, manejo 419, abortar reintentos deterministas |
+| Alcance | #73: sanitización de redirect y HTTP 401/403/419/422/429, diagnósticos sin body y fail-fast |
 | Revisiones | CI/Sonar/CodeRabbit sobre el mismo SHA antes del merge; exact-main y Hostinger separados |
 
 ## Flujo de entrega
@@ -74,7 +74,7 @@ Inventario del candidato v0.1.79, no evidencia de archivos publicados. «solo el
 
 ## Validación
 - CI/Sonar/CodeRabbit del nuevo head pendientes. El gate `fast[contracts]` debe ejecutar mocks y no usa contraseña E2E real.
-- Smoke #59 encontró `/dashboard HTTP 302` sin `Location`; una vez integrado v0.1.78 se registrará solo el destino saneado para investigar #73.
+- Smoke #59 encontró `/dashboard HTTP 302` sin `Location`; una vez integrado v0.1.79 se registrará solo el destino saneado para investigar #73.
 - No repetir pruebas manuales ciegas ni inferir deploy exacto desde el número de versión.
 
 ## Qué sigue
@@ -91,7 +91,7 @@ Inventario del candidato v0.1.79, no evidencia de archivos publicados. «solo el
 | Lane | Frente | Estado |
 | --- | --- | --- |
 | **DONE** | ✅ ~~Navegación de identidad + CodeRabbit obligatorio v0.1.77; secret #1~~ | ✅ ~~PR #74 fusionada con revisión final~~ |
-| **NOW** | 🚧 Smoke seguro y fail-fast v0.1.78 | 🚧 Head pendiente de CI/revisión |
+| **NOW** | 🚧 Smoke seguro y fail-fast v0.1.79 | 🚧 Head pendiente de CI/revisión |
 | **NEXT** | 🚧 Corregir causa #73 después de conocer destino 302 | 🚧 No inferir fallo de contraseña |
 | **LATER** | 🚧 Distribution + Traffic Symfony | 🚧 Sin cutover |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado y cutover sin paridad | ⛔ Hostinger no verificado |
