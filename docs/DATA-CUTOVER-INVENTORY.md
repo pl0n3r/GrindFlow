@@ -140,6 +140,8 @@ El contrato es source-only: no conecta MariaDB y no ejecuta migraciones por sí 
 Después de completar el restore drill, `scripts/symfony-post-restore-tenant-guard.sh` vuelve a ejecutar sobre la base restaurada regresiones de seguridad existentes:
 
 - `VaultTest`: lectura, detalle, preview y descarga de recursos ajenos deben devolver 404, y revocación de membresía debe bloquear acceso;
+- `VaultBulkUsageTest`: un lote con IDs de otro tenant se rechaza completo, sin mutación parcial;
+- `VaultTrashTest`: papelera/restauración conserva tenant, membresía y privacidad del original;
 - `OrganizationSettingsTest`: un actor no puede mutar otra organización enviando `organization_id` y los permisos/CSRF se reevalúan;
 - `DistributionAuthorizationTest`: la autorización de distribución permanece tenant-safe y un recurso de otra organización no puede autorizarse.
 
@@ -160,4 +162,4 @@ El guard es CI-only y test-only. No introduce rutas, fixtures persistentes ni ac
 
 ## Criterio para declarar GF-ARCH-002 completado
 
-Esta entrega **no** cierra GF-ARCH-002. Para cerrarlo todavía faltan: inventario del esquema real autorizado, contrato reversible de migración por módulo, backup restaurado, prueba cross-tenant/IDOR Symfony+Doctrine y evidencia de un único escritor durante el ensayo/cutover. La guardia de fuente reduce riesgo antes de llegar a esa fase.
+Esta entrega **no** cierra GF-ARCH-002. Para cerrarlo todavía faltan: inventario del esquema real autorizado, contrato reversible de migración por módulo, backup real restaurado y evidencia de un único escritor durante el ensayo/cutover. La prueba cross-tenant/IDOR Symfony+Doctrine ya queda cubierta en CI descartable, no en producción. La guardia de fuente reduce riesgo antes de llegar a esa fase.
