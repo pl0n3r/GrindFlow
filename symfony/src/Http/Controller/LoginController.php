@@ -19,11 +19,17 @@ final class LoginController extends AbstractController
             return $this->redirectToRoute('grindflow_organizations');
         }
 
-        return $this->render('identity/login.html.twig', [
+        $response = $this->render('identity/login.html.twig', [
             'app_version' => $version->human(),
             'last_email' => $auth->getLastUsername(),
             'login_error' => $auth->getLastAuthenticationError(),
-        ])->setPrivate();
+        ]);
+
+        // The form contains a session-bound CSRF token and may echo a prior email.
+        // It must not be cached by browsers or intermediate/shared proxies.
+        $response->headers->set('Cache-Control', 'no-store, private');
+
+        return $response;
     }
 
     #[Route('/logout', name: 'grindflow_logout', methods: ['POST'])]
