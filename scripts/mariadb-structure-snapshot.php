@@ -256,7 +256,7 @@ function captureSnapshot(PDO $pdo, string $schema): array
             $schema
         ));
 
-        addColumns($tables, queryRows(
+        $columnRows = queryRows(
             $pdo,
             "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
              FROM information_schema.COLUMNS
@@ -264,9 +264,10 @@ function captureSnapshot(PDO $pdo, string $schema): array
                AND LEFT(TABLE_NAME, 3) = 'gf_'
              ORDER BY TABLE_NAME, ORDINAL_POSITION",
             $schema
-        ));
+        );
+        addColumns($tables, $columnRows);
 
-        addIndexes($tables, queryRows(
+        $indexRows = queryRows(
             $pdo,
             "SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
              FROM information_schema.STATISTICS
@@ -274,9 +275,10 @@ function captureSnapshot(PDO $pdo, string $schema): array
                AND LEFT(TABLE_NAME, 3) = 'gf_'
              ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX",
             $schema
-        ));
+        );
+        addIndexes($tables, $indexRows);
 
-        addForeignKeys($tables, queryRows(
+        $foreignKeyRows = queryRows(
             $pdo,
             "SELECT
                  k.TABLE_NAME,
@@ -295,7 +297,8 @@ function captureSnapshot(PDO $pdo, string $schema): array
                AND LEFT(k.TABLE_NAME, 3) = 'gf_'
              ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION",
             $schema
-        ));
+        );
+        addForeignKeys($tables, $foreignKeyRows);
 
         $triggers = normalizeTriggers(queryRows(
             $pdo,
