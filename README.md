@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+639** | **−31** | **+608** |
+| **7** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -69,7 +69,9 @@ flowchart LR
 - Cada envelope se coteja de nuevo contra las migraciones del mismo checkout; inventarios fabricados o de otra revisión fallan cerrado.
 - El reporte incluye SHA-256 canónico del inventario y enumera tablas fuera de la propuesta para evitar interpretar un cutover parcial como total.
 - El catálogo completo rechaza tablas asignadas a más de un módulo y mapeos obsoletos que ya no existan en las migraciones.
+- Los flags booleanos exigen tipo exacto; `0`/`1` no pueden suplantar `false`/`true`.
 - La entrada está limitada a 1.000.000 de bytes reales y los errores nunca reproducen el payload.
+- La regresión CLI instala una barrera de auditoría que falla si el proceso intenta abrir sockets o lanzar procesos externos.
 - `data-schema-inventory.py --json` ahora emite un único documento JSON limpio para composición entre herramientas.
 - La suite `tests/test_cutover_ownership_plan.py` cubre provenance, rollback, autorización, solapamientos, límites de entrada y round-trip de templates.
 - `fast` ejecuta compilación y regresiones del nuevo contrato; el cambio del workflow fuerza validación completa del PR.
