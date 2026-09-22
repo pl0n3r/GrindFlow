@@ -15,6 +15,12 @@ EXPECTED_RELEASE="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'(
 [[ "$EXPECTED_RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'ERROR: expected release version is unavailable.\n' >&2; exit 1; }
 
 workdir="$(mktemp -d)"
+# Curl reads the credential from a private file, never from its process argv.
+umask 077
+password_file="$workdir/login-password"
+printf '%s' "$E2E_USER_PASSWORD" > "$password_file"
+chmod 600 "$password_file"
+unset E2E_USER_PASSWORD
 cookie_jar="$workdir/cookies.txt"
 login_html="$workdir/login.html"
 dashboard_html="$workdir/dashboard.html"
@@ -25,6 +31,7 @@ up_body="$workdir/up.body"
 up_headers="$workdir/up.headers"
 login_headers="$workdir/login.headers"
 login_post_headers="$workdir/login-post.headers"
+csrf_file="$workdir/login-csrf"
 dashboard_headers="$workdir/dashboard.headers"
 module_html="$workdir/module.html"
 csv_body="$workdir/traffic.csv"
@@ -260,7 +267,7 @@ check_workspace_modules() {
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers"
+  rm -f "$cookie_jar" "$login_html" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
   local up_status
   up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
   if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers" "$up_body"; return 1; fi
@@ -271,8 +278,11 @@ run_smoke() {
 
   local token
   if ! token="$(extract_csrf)"; then printf 'ERROR: login page did not expose a CSRF token.\n' >&2; return 1; fi
+  # Keep the CSRF token out of curl argv as well; regenerate it each login.
+  printf '%s' "$token" > "$csrf_file"
+  unset token
   local login_status
-  login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --dump-header "$login_post_headers" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token=$token" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password=$E2E_USER_PASSWORD" "$BASE_URL/login")"
+  login_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --dump-header "$login_post_headers" --output /dev/null --write-out '%{http_code}' --request POST --data-urlencode "_token@$csrf_file" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password@$password_file" "$BASE_URL/login")"
   case "$login_status" in
     302|303) ;;
     401|403|419|422|429) printf 'ERROR: login returned HTTP %s; stop authentication retries.\n' "$login_status" >&2; return 7 ;;
