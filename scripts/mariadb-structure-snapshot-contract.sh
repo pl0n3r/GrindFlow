@@ -18,7 +18,7 @@ grep -Fxq "ERROR: metadata snapshot requires explicit approval." "$stderr_file"
 
 : >"$stdout_file"
 : >"$stderr_file"
-if env GF_METADATA_SNAPSHOT_APPROVED=1 -u DATABASE_URL php "$script" >"$stdout_file" 2>"$stderr_file"; then
+if env -u DATABASE_URL GF_METADATA_SNAPSHOT_APPROVED=1 php "$script" >"$stdout_file" 2>"$stderr_file"; then
   echo "ERROR: snapshot script must refuse missing DATABASE_URL" >&2
   exit 1
 fi
