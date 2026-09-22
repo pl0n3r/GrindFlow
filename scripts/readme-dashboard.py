@@ -79,7 +79,7 @@ def ci_scope(files: list[str]) -> dict[str, str]:
 
 
 def gate_plan(scope: dict[str, str]) -> str:
-    selected = ["preflight", "fast[contracts]"]
+    selected = ["preflight", "fast[operational contracts + automation syntax + README dashboard]"]
     selected.extend(
         label
         for key, label in (
@@ -120,10 +120,10 @@ def replace_once(pattern: re.Pattern[str], content: str, replacement: str, label
 
 
 def changed_files_block(readme: str) -> tuple[int, int]:
-    """Locate the generated file list by its stable structural marker."""
+    """Locate the generated file list by its unique structural marker."""
+    if readme.count(CHANGED_FILES_MARKER) != 1:
+        fail("cannot locate changed files; expected exactly one structural marker")
     marker = readme.find(CHANGED_FILES_MARKER)
-    if marker < 0:
-        fail("cannot locate changed files; structural marker is missing")
     end = readme.find("\n## ", marker + len(CHANGED_FILES_MARKER))
     if end < 0:
         fail("cannot locate changed files; following section is missing")
@@ -342,8 +342,17 @@ ok
     scope = {"run_tests": "true", "run_database": "true"}
     generated = generated_readme(sample, ["README.md", "app.php"], 12, 3, scope)
     assert "| **2** | **+12** | **−3** | **+9** |" in generated
-    assert "**preflight · fast[contracts] · PHPUnit · MariaDB**" in generated
+    assert "**preflight · fast[operational contracts + automation syntax + README dashboard] · PHPUnit · MariaDB**" in generated
     assert "- `README.md`\n- `app.php`" in generated
+
+    duplicate = sample + "\n" + CHANGED_FILES_MARKER + "\n"
+    try:
+        changed_files_block(duplicate)
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("duplicate changed-files marker must be rejected")
+
     print("README dashboard self-test: OK")
 
 
