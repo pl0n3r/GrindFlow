@@ -50,6 +50,12 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
             "readiness": {key: "pending" for key in CUTOVER.PRECONDITIONS},
         }
 
+    def assert_rejected(self, pattern, source=None, plan=None):
+        source_value = self.source() if source is None else source
+        plan_value = self.plan() if plan is None else plan
+        with self.assertRaisesRegex(ValueError, pattern):
+            CUTOVER.build_report(source_value, plan_value)
+
     def test_identity_uses_actual_repository_inventory(self):
         report = CUTOVER.build_report(self.source(), self.plan())
         self.assertEqual("identity", report["module"])
@@ -93,34 +99,34 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
         source["symfony"] = [
             row for row in source["symfony"] if row["table"] != "gf_identity_users"
         ]
-        with self.assertRaisesRegex(ValueError, "checked-in migrations"):
-            CUTOVER.build_report(source, self.plan())
+        self.assert_rejected("checked-in migrations", source=source)
 
     def test_forged_source_migration_provenance_fails(self):
         source = self.source()
         source["laravel"][0]["migration"] = "invented.php"
-        with self.assertRaisesRegex(ValueError, "checked-in migrations"):
-            CUTOVER.build_report(source, self.plan())
+        self.assert_rejected("checked-in migrations", source=source)
 
     def test_module_catalog_rejects_overlapping_table_ownership(self):
         original = copy.deepcopy(CUTOVER.MODULE_TABLES)
+        source = self.source()
+        plan = self.plan()
         try:
             CUTOVER.MODULE_TABLES["vault"]["laravel"] = (
                 "media_assets",
                 "users",
             )
-            with self.assertRaisesRegex(ValueError, "multiple modules"):
-                CUTOVER.build_report(self.source(), self.plan())
+            self.assert_rejected("multiple modules", source=source, plan=plan)
         finally:
             CUTOVER.MODULE_TABLES.clear()
             CUTOVER.MODULE_TABLES.update(original)
 
     def test_module_catalog_rejects_stale_table_mapping(self):
         original = copy.deepcopy(CUTOVER.MODULE_TABLES)
+        source = self.source()
+        plan = self.plan()
         try:
             CUTOVER.MODULE_TABLES["vault"]["symfony"] = ("gf_missing_table",)
-            with self.assertRaisesRegex(ValueError, "missing from migrations"):
-                CUTOVER.build_report(self.source(), self.plan())
+            self.assert_rejected("missing from migrations", source=source, plan=plan)
         finally:
             CUTOVER.MODULE_TABLES.clear()
             CUTOVER.MODULE_TABLES.update(original)
@@ -128,78 +134,68 @@ class CutoverOwnershipPlanTest(unittest.TestCase):
     def test_incomplete_module_ownership_fails(self):
         plan = self.plan()
         plan["laravel_tables"].pop()
-        with self.assertRaisesRegex(ValueError, "coverage"):
-            CUTOVER.build_report(self.source(), plan)
+        self.assert_rejected("coverage", plan=plan)
 
     def test_cross_module_table_fails(self):
         plan = self.plan()
         plan["symfony_tables"][0] = "gf_vault_assets"
-        with self.assertRaisesRegex(ValueError, "coverage"):
-            CUTOVER.build_report(self.source(), plan)
+        self.assert_rejected("coverage", plan=plan)
 
     def test_duplicate_planned_table_fails(self):
         plan = self.plan()
         plan["laravel_tables"].append(plan["laravel_tables"][0])
-        with self.assertRaisesRegex(ValueError, "duplicate"):
-            CUTOVER.build_report(self.source(), plan)
+        self.assert_rejected("duplicate", plan=plan)
 
     def test_dirty_source_or_unprefixed_table_fails(self):
-        source = self.source()
-        source["checks"]["table_name_collisions"] = ["users"]
-        with self.assertRaisesRegex(ValueError, "not clean"):
-            CUTOVER.build_report(source, self.plan())
-        source = self.source()
-        source["symfony"][0]["table"] = "bad_table"
-        with self.assertRaisesRegex(ValueError, "gf_ prefix"):
-            CUTOVER.build_report(source, self.plan())
+        dirty = self.source()
+        dirty["checks"]["table_name_collisions"] = ["users"]
+        self.assert_rejected("not clean", source=dirty)
+
+        unprefixed = self.source()
+        unprefixed["symfony"][0]["table"] = "bad_table"
+        self.assert_rejected("gf_ prefix", source=unprefixed)
 
     def test_wrong_writer_and_missing_rollback_fail(self):
-        plan = self.plan()
-        plan["current_writer"] = "symfony"
-        with self.assertRaisesRegex(ValueError, "writer transition"):
-            CUTOVER.build_report(self.source(), plan)
-        plan = self.plan()
-        plan["rollback_writer"] = "symfony"
-        with self.assertRaisesRegex(ValueError, "rollback"):
-            CUTOVER.build_report(self.source(), plan)
+        wrong_writer = self.plan()
+        wrong_writer["current_writer"] = "symfony"
+        self.assert_rejected("writer transition", plan=wrong_writer)
+
+        wrong_rollback = self.plan()
+        wrong_rollback["rollback_writer"] = "symfony"
+        self.assert_rejected("rollback", plan=wrong_rollback)
 
     def test_production_authorization_cannot_be_embedded(self):
         plan = self.plan()
         plan["production_authorized"] = True
-        with self.assertRaisesRegex(ValueError, "non-operational"):
-            CUTOVER.build_report(self.source(), plan)
+        self.assert_rejected("non-operational", plan=plan)
 
     def test_all_readiness_is_pending_even_if_user_claims_green(self):
         plan = self.plan()
         plan["readiness"]["restored_database_and_blobs"] = "passed"
-        with self.assertRaisesRegex(ValueError, "cannot certify"):
-            CUTOVER.build_report(self.source(), plan)
+        self.assert_rejected("cannot certify", plan=plan)
 
     def test_extra_fields_and_missing_preconditions_fail(self):
-        plan = self.plan()
-        plan["production_database_url"] = "private"
-        with self.assertRaisesRegex(ValueError, "exactly"):
-            CUTOVER.build_report(self.source(), plan)
-        plan = self.plan()
-        plan["readiness"].pop("owner_authorization")
-        with self.assertRaisesRegex(ValueError, "preconditions"):
-            CUTOVER.build_report(self.source(), plan)
+        extra = self.plan()
+        extra["production_database_url"] = "private"
+        self.assert_rejected("exactly", plan=extra)
+
+        missing = self.plan()
+        missing["readiness"].pop("owner_authorization")
+        self.assert_rejected("preconditions", plan=missing)
 
     def test_unsupported_module_fails_closed(self):
         plan = self.plan()
         plan["module"] = "finance"
-        with self.assertRaisesRegex(ValueError, "unsupported module"):
-            CUTOVER.build_report(self.source(), plan)
+        self.assert_rejected("unsupported module", plan=plan)
 
     def test_source_duplicate_or_fake_provenance_fails(self):
-        source = self.source()
-        source["laravel"].append(copy.deepcopy(source["laravel"][0]))
-        with self.assertRaisesRegex(ValueError, "duplicate source"):
-            CUTOVER.build_report(source, self.plan())
-        source = self.source()
-        source["database_contacted"] = True
-        with self.assertRaisesRegex(ValueError, "provenance"):
-            CUTOVER.build_report(source, self.plan())
+        duplicate = self.source()
+        duplicate["laravel"].append(copy.deepcopy(duplicate["laravel"][0]))
+        self.assert_rejected("duplicate source", source=duplicate)
+
+        fake = self.source()
+        fake["database_contacted"] = True
+        self.assert_rejected("provenance", source=fake)
 
     def test_cli_is_offline_and_does_not_echo_untrusted_input(self):
         payload = json.dumps({"source": self.source(), "plan": self.plan()})
