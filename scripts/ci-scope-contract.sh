@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCOPE="$ROOT/scripts/ci-scope.sh"
 RUN_REALSTACK_ENABLED="run_realstack=true"
-RUN_SYMFONY_ENABLED=$RUN_SYMFONY_ENABLED
+RUN_SYMFONY_ENABLED="run_symfony=true"
 
 run_scope() {
   local event="$1"
