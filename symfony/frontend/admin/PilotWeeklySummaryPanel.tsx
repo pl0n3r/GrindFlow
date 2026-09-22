@@ -66,9 +66,11 @@ export function PilotWeeklySummaryPanel() {
         }
         return data;
       })
-      .then((summary) => setState({ kind: 'ready', summary }))
+      .then((summary) => {
+        if (!controller.signal.aborted) setState({ kind: 'ready', summary });
+      })
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (controller.signal.aborted) return;
         setState({
           kind: 'error',
           message: error instanceof Error ? error.message : 'No se pudo consultar la semana.',
