@@ -31,13 +31,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+338** | **−24** | **+314** |
+| **8** | **+512** | **−57** | **+455** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast · php-quality · tests · database · browser · real-stack · legacy · symfony-preview** |
+| Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
 | Alcance | Comparador offline de tablas declaradas vs snapshot de metadatos |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
@@ -66,15 +66,18 @@ flowchart LR
 - La validación falla cerrado ante tablas fuente ausentes, nombres duplicados o tablas `gf_*` desconocidas; extras no Symfony quedan informativos.
 - Siete pruebas unitarias cubren éxito, faltantes, drift Symfony, duplicados y rechazo explícito de snapshots con datos de filas.
 - El gate `fast` compila el comparador y ejecuta sus tests; al modificar el workflow, el selector exige la matriz completa de CI.
+- `scripts/readme-dashboard.py --update` regenera huella, gates y lista de archivos; CI ejecuta el generador y muestra el diff exacto si alguien deja el README stale.
 - `docs/DATA-CUTOVER-INVENTORY.md` documenta formato, límites y flujo reproducible. Sigue sin existir autorización de cutover productivo.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `.github/workflows/grindflow-ci.yml`
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `docs/DATA-CUTOVER-INVENTORY.md`
 - `scripts/data-schema-parity.py`
+- `scripts/readme-dashboard.py`
 - `tests/test_data_schema_parity.py`
 
 ## Validación
