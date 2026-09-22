@@ -2076,6 +2076,8 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
   await expect(page.getByText('Realizadas según registro humano')).toBeVisible();
   await expect(page.locator('.pilot-totals strong')).toHaveText(['2', '1', '1']);
   await expect(page.locator('.pilot-day-scroll tbody tr')).toHaveCount(7);
+  await expect(page.getByRole('link', { name: 'Descargar resumen CSV' }))
+    .toHaveAttribute('href', '/api/admin/pilot/weekly-summary.csv?week=' + thisWeek);
   await expect(page.getByText(/Tráfico y conversiones: aún no integrados/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   const weeks = page.getByRole('navigation', { name: 'Semanas del piloto' });
