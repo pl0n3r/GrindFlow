@@ -66,6 +66,8 @@ flowchart LR
 - La captura inicia transacción read-only, no selecciona filas de aplicación y no imprime credenciales, esquema ni errores de conexión.
 - Nuevo contrato `scripts/mariadb-structure-snapshot-contract.sh` verifica que el opt-in y la URL sean obligatorios y que stdout quede vacío al rechazar.
 - `symfony-preview` migra la MariaDB descartable, genera el inventario Doctrine como JSON puro, captura el snapshot y los compara automáticamente.
+- La paridad normaliza display widths enteros de MariaDB e índices implícitos de soporte FK, pero sigue fallando ante índices estructurales realmente inesperados.
+- `ci-scope.sh` fuerza `symfony-preview` cuando cambian las herramientas de snapshot/paridad; el contrato de scope lo cubre explícitamente.
 - El pipeline no versiona snapshots reales ni ejecuta esta herramienta contra Hostinger/producción.
 
 ## Archivos modificados en este deploy
@@ -75,9 +77,13 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `README.md`
 - `config/version.php`
 - `docs/DATA-CUTOVER-INVENTORY.md`
+- `scripts/ci-scope-contract.sh`
+- `scripts/ci-scope.sh`
+- `scripts/data-schema-structure-parity.py`
 - `scripts/mariadb-structure-snapshot-contract.sh`
 - `scripts/mariadb-structure-snapshot.php`
 - `scripts/symfony-schema-structure.py`
+- `tests/test_data_schema_structure_parity.py`
 
 ## Validación
 - La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
