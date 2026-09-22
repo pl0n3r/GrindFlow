@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.91: captura controlada de metadatos MariaDB + paridad end-to-end descartable.** Base exacta `main` v0.1.90 `4c57314c913811be8c0a6aa9d864ca97b2842b3f`; consulta solo `information_schema`, no filas de aplicación y no ejecuta cutover.
+> **Candidato v0.1.92: restore drill destructivo y reversible sobre MariaDB + Vault descartables.** Base exacta `main` v0.1.91 `d5e6acfc1ba77e0bef794b3a90b0d556c089fb39`; vacía y restaura únicamente las tablas de la base CI `grindflow_symfony_ci`, junto con blobs sintéticos temporales.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,20 +18,20 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.91** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.90~~ | `4c57314c913811be8c0a6aa9d864ca97b2842b3f` |
+| Version objetivo | 🚧 **v0.1.92** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.91~~ | `d5e6acfc1ba77e0bef794b3a90b0d556c089fb39` |
 | CI / Sonar / CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.90 | Señal post-merge separada |
+| CI del SHA exacto de main | 🚧 No observado para v0.1.91 | Señal post-merge separada |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Captura CI solo sobre MariaDB descartable |
+| Datos productivos | ✅ ~~No tocados~~ | Restore drill limitado por guardas a CI descartable |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+582** | **−33** | **+549** |
+| **8** | **+287** | **−30** | **+257** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -39,7 +39,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[contracts] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Captura `information_schema` de `gf_*` + comparación estructural automática |
+| Alcance | Backup/restore real de MariaDB CI + stage/restore de Vault sintético |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -61,14 +61,14 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/mariadb-structure-snapshot.php`: captura tablas `gf_*`, columnas, índices, FKs y triggers desde `information_schema`.
-- Exige `GF_METADATA_SNAPSHOT_APPROVED=1` y `DATABASE_URL`; sin aprobación explícita falla cerrado antes de conectar.
-- La captura inicia transacción read-only, no selecciona filas de aplicación y no imprime credenciales, esquema ni errores de conexión.
-- Nuevo contrato `scripts/mariadb-structure-snapshot-contract.sh` verifica que el opt-in y la URL sean obligatorios y que stdout quede vacío al rechazar.
-- `symfony-preview` migra la MariaDB descartable, genera el inventario Doctrine como JSON puro, captura el snapshot y los compara automáticamente.
-- La paridad normaliza display widths enteros de MariaDB e índices implícitos de soporte FK, pero sigue fallando ante índices estructurales realmente inesperados.
-- `ci-scope.sh` fuerza `symfony-preview` cuando cambian las herramientas de snapshot/paridad; el contrato de scope lo cubre explícitamente.
-- El pipeline no versiona snapshots reales ni ejecuta esta herramienta contra Hostinger/producción.
+- Nuevo `scripts/symfony-disposable-restore-drill.sh`: ensaya backup, destrucción y restauración de MariaDB + blobs sobre infraestructura sintética.
+- Las guardas exigen `GF_RESTORE_DRILL_APPROVED=1`, `APP_ENV=test`, `CI=true`, host loopback, puerto 3306 y base exacta `grindflow_symfony_ci`.
+- El drill crea una fixture mínima, audita el Vault, prepara un stage privado, genera dump con datos/esquema/triggers, vacía las tablas del schema CI y elimina los originales temporales antes de restaurar ambos lados.
+- Tras restaurar exige `vault:verify-restore`, `doctrine:schema:validate`, paridad estructural y snapshot pre/post idéntico.
+- El dump/stage viven en temporales privados y se destruyen al finalizar; no se publican como artefactos ni aceptan Hostinger/remotos.
+- Nuevo contrato shell prueba rechazo sin opt-in, entorno no-test, ejecución fuera de CI, esquema de URL no-MariaDB, host remoto y nombre de DB distinto.
+- `ci-scope.sh` selecciona obligatoriamente `symfony-preview` si cambia cualquiera de los scripts del restore drill.
+- La prueba corre antes de iniciar el preview HTTP, sobre la MariaDB de servicio descartable de GitHub Actions.
 
 ## Archivos modificados en este deploy
 Inventario de solo el deploy actual: candidato, no evidencia de publicación:
@@ -79,32 +79,29 @@ Inventario de solo el deploy actual: candidato, no evidencia de publicación:
 - `docs/DATA-CUTOVER-INVENTORY.md`
 - `scripts/ci-scope-contract.sh`
 - `scripts/ci-scope.sh`
-- `scripts/data-schema-structure-parity.py`
-- `scripts/mariadb-structure-snapshot-contract.sh`
-- `scripts/mariadb-structure-snapshot.php`
-- `scripts/symfony-schema-structure.py`
-- `tests/test_data_schema_structure_parity.py`
+- `scripts/symfony-disposable-restore-drill-contract.sh`
+- `scripts/symfony-disposable-restore-drill.sh`
 
 ## Validación
 - La rama debe pasar la matriz completa seleccionada por el cambio del workflow, `validate`, Sonar y revisión final CodeRabbit sobre el mismo HEAD.
-- La captura integrada se ejecuta **solo sobre MariaDB descartable de CI**. No acredita esquema productivo, defaults/check constraints, conteos, contenido, backup restaurable, tenant isolation productivo ni SHA Hostinger.
-- Ningún snapshot real se incluye en el repositorio por esta entrega.
+- El restore drill se ejecuta **solo sobre MariaDB/Vault descartables de CI** y usa datos sintéticos. No acredita backup productivo, RPO/RTO, secretos/configuración restaurados ni SHA Hostinger.
+- Ningún dump, stage o snapshot real se incluye en el repositorio por esta entrega.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Capturar y cotejar metadata `gf_*` en MariaDB descartable | 🚧 v0.1.91 candidata |
-| **NEXT** | 🚧 Restore drill MariaDB+blobs en entorno descartable | 🚧 GF-ARCH-002 |
+| **NOW** | 🚧 Ensayar vaciado/restauración MariaDB + Vault en CI | 🚧 v0.1.92 candidata |
+| **NEXT** | 🚧 Snapshot real autorizado + prueba cross-tenant restaurada | 🚧 GF-ARCH-002 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.90 fusionada~~ | ✅ ~~paridad estructural Symfony `gf_*`~~ |
-| **NOW** | 🚧 Metadata capture + parity E2E | 🚧 v0.1.91 |
-| **NEXT** | 🚧 Captura real autorizada + restore drill | 🚧 Sin cutover |
+| **DONE** | ✅ ~~v0.1.91 fusionada~~ | ✅ ~~captura metadata-only + paridad E2E~~ |
+| **NOW** | 🚧 Disposable restore drill | 🚧 v0.1.92 |
+| **NEXT** | 🚧 Captura real autorizada + aislamiento cross-tenant restaurado | 🚧 Sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |

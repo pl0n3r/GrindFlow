@@ -108,6 +108,27 @@ php scripts/mariadb-structure-snapshot.php > /tmp/gf-structure.json
 
 El snapshot generado desde un entorno real debe permanecer fuera del repositorio salvo que haya sido revisado y saneado explícitamente.
 
+## Restore drill descartable de MariaDB + Vault
+
+`scripts/symfony-disposable-restore-drill.sh` ejecuta en CI un ensayo destructivo **solo** sobre la base `grindflow_symfony_ci` en loopback, con `APP_ENV=test` y `CI=true`. Requiere además `GF_RESTORE_DRILL_APPROVED=1`; cualquier otro host, puerto, base o entorno falla antes de tocar datos.
+
+El ensayo:
+
+1. crea usuario, organización y recurso sintéticos en el esquema Symfony aislado;
+2. escribe un blob sintético en una raíz privada temporal;
+3. ejecuta `vault:audit`, `vault:stage` y `vault:verify-stage`;
+4. captura el inventario estructural previo;
+5. genera un dump completo de la MariaDB descartable con la imagen fijada `mariadb:11.4`, incluidos triggers;
+6. vacía todas las tablas de la base descartable con las FKs suspendidas durante esa limpieza y elimina la raíz original, **sin borrar el schema/base de datos del servicio CI**;
+7. restaura las tablas dentro de esa misma base desde el dump y los blobs desde el stage privado;
+8. exige `vault:verify-restore`, `doctrine:schema:validate` y paridad estructural;
+9. compara el snapshot estructural anterior y posterior byte a byte;
+10. elimina la fixture sintética y destruye todos los temporales al salir.
+
+El dump y el stage contienen solo datos sintéticos de CI, se guardan bajo un directorio temporal 0700/0600 y no se suben como artefactos. El script no admite ejecución fuera de CI, Hostinger, hosts remotos ni otro nombre de base. `scripts/symfony-disposable-restore-drill-contract.sh` prueba que las guardas rechacen falta de aprobación, entorno no-test, `CI=false`, host remoto y base distinta.
+
+Este ejercicio demuestra que **la mecánica de recuperación del stack Symfony aislado es ejecutable** sobre infraestructura desechable. No demuestra que exista un backup productivo, no acredita RPO/RTO, no valida secretos/configuración externa y no autoriza ejecutar el mismo procedimiento contra producción.
+
 ## Secuencia obligatoria antes de un cutover real
 
 1. Obtener inventario **read-only** del MariaDB de destino: tablas, columnas, tipos, PK/FK, índices, triggers, conteos y versión de migraciones. Guardar solo metadatos no sensibles.

@@ -175,7 +175,9 @@ jobs:
             scripts/production-smoke-contract.sh \
             scripts/fetch-production-diagnostics.sh \
             scripts/run-production-migrations.sh \
-            scripts/mariadb-structure-snapshot-contract.sh
+            scripts/mariadb-structure-snapshot-contract.sh \
+            scripts/symfony-disposable-restore-drill.sh \
+            scripts/symfony-disposable-restore-drill-contract.sh
           do
             [[ -f "$script" ]] && bash -n "$script"
           done
@@ -192,6 +194,7 @@ jobs:
           python3 scripts/symfony-schema-structure.py
           php -l scripts/mariadb-structure-snapshot.php
           bash scripts/mariadb-structure-snapshot-contract.sh
+          bash scripts/symfony-disposable-restore-drill-contract.sh
           python3 -m py_compile scripts/data-schema-structure-parity.py
           python3 -m unittest tests/test_data_schema_structure_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
@@ -683,12 +686,22 @@ jobs:
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921173000' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921163000' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921135500' --down --no-interaction
+          php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921090000' --down --no-interaction
+          php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921070000' --down --no-interaction
+          php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260921061500' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260920194000' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260920164500' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260920095500' --down --no-interaction
           php bin/console doctrine:migrations:execute 'GrindFlow\Migrations\Version20260920093100' --down --no-interaction
           php bin/console doctrine:migrations:migrate --no-interaction
           php bin/console doctrine:schema:validate --skip-sync
+      - name: Verify disposable MariaDB and Vault restore drill
+        shell: bash
+        env:
+          CI: 'true'
+          GF_RESTORE_DRILL_APPROVED: '1'
+        run: bash scripts/symfony-disposable-restore-drill.sh
+
       - name: Start isolated Symfony server
         shell: bash
         run: |

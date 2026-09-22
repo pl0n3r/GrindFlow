@@ -77,6 +77,9 @@ expect_flag "$schema_tooling" $RUN_SYMFONY_ENABLED "schema snapshot tooling sele
 schema_contract="$(run_scope pull_request scripts/data-schema-structure-parity.py)"
 expect_flag "$schema_contract" $RUN_SYMFONY_ENABLED "schema parity tooling selects Symfony parity gate"
 
+restore_drill="$(run_scope pull_request scripts/symfony-disposable-restore-drill.sh)"
+expect_flag "$restore_drill" $RUN_SYMFONY_ENABLED "restore drill selects Symfony recovery gate"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
