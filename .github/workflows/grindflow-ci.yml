@@ -186,6 +186,10 @@ jobs:
           python3 -m unittest tests/test_ci_retry.py
           python3 -m py_compile scripts/data-schema-parity.py
           python3 -m unittest tests/test_data_schema_parity.py
+          python3 -m py_compile scripts/symfony-schema-structure.py
+          python3 -m unittest tests/test_symfony_schema_structure.py
+          python3 -m py_compile scripts/data-schema-structure-parity.py
+          python3 -m unittest tests/test_data_schema_structure_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
           python3 scripts/readme-dashboard.py --self-test
           python3 -m py_compile scripts/validate-governance.py
