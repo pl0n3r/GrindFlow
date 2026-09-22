@@ -184,6 +184,8 @@ jobs:
           python3 scripts/ci-performance-report.py --self-test
           python3 -m py_compile scripts/ci_retry.py
           python3 -m unittest tests/test_ci_retry.py
+          python3 -m py_compile scripts/data-schema-parity.py
+          python3 -m unittest tests/test_data_schema_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
           python3 -m py_compile scripts/validate-governance.py
           python3 scripts/validate-governance.py --self-test
