@@ -193,7 +193,7 @@ Each requirement should contain:
 
 ### GF-FR-020 — Fundamento fail-closed de direct upload Symfony
 
-**Estado:** candidato v0.1.117; transporte a proveedor y persistencia de media grande siguen pendientes.
+**Estado:** fundamento implementado en código; transporte a proveedor y persistencia de media grande siguen pendientes.
 
 **Enunciado:** el Vault Symfony separa el quick upload de hasta 8 MiB de un futuro camino de carga directa para originales grandes. El nuevo camino solo puede considerarse disponible si coinciden un adaptador de almacenamiento compatible y protección criptográfica configurada; su ausencia no debe romper el Vault existente ni provocar I/O externo.
 
@@ -204,6 +204,7 @@ Each requirement should contain:
 - El emisor de intent no devuelve credenciales permanentes. El verificador de completion rechaza token/tenant/actor incorrectos antes de consultar storage, exige existencia y tamaño exacto, calcula SHA-256 leyendo por stream y deriva la key final tenant-safe. Esta verificación no registra todavía un asset ni habilita publicación.
 - `GET /api/admin/vault` añade únicamente readiness sanitizado: `disk`, `driver`, `max_bytes` y `configured`. No devuelve bucket, endpoint, access key, secret, token de proveedor ni rutas físicas. React muestra si la carga grande está preparada o no, conservando siempre el quick upload de 8 MiB.
 - Esta entrega no añade adaptador S3/Flysystem, rutas `intent/complete`, upload directo de browser, mutación de MariaDB por media grande, FFmpeg/ffprobe, Hostinger ni credenciales reales.
+- Antes de habilitar un adaptador real, el presign debe quedar ligado al `byte_size` aprobado y el proveedor debe purgar automáticamente objetos bajo `organizations/{tenant}/staging/` con más de 24 horas. Los tokens expiran a los 15 minutos por defecto y nunca pueden superar 60 minutos; conservar un objeto staged no prolonga ni revive el token.
 
 **Verificación:** PHPUnit puro cubre token cifrado/tamper/expiración/contexto, keys, fallback no configurado, intent con fake y completion por tamaño+SHA-256; PHPUnit/MariaDB comprueba que el Vault real arranca y devuelve readiness no configurado; Chromium 360 px muestra ese estado y mantiene funcional el quick upload. CI/Sonar/CodeRabbit se validan sobre el HEAD final y producción continúa separada.
 
