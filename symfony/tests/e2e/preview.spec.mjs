@@ -455,7 +455,7 @@ test('S2 multimedia library allows a mobile editor to upload and see a private a
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
-test('S2 mobile Vault previews a private MP4 with controls and no autoplay', async ({ page }) => {
+test('S2 mobile Vault renders private MP4 controls and fails safely on undecodable media', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/preview');
   const script = await page.locator('script[type="module"]').getAttribute('src');
@@ -574,6 +574,8 @@ test('S2 mobile Vault previews a private MP4 with controls and no autoplay', asy
   await expect(preview).toHaveAttribute('preload', 'metadata');
   await expect(preview).toHaveAttribute('src', '/api/admin/vault/' + id + '/preview');
   expect(await preview.getAttribute('autoplay')).toBeNull();
+  await expect(page.getByText('La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.')).toBeVisible();
+  await expect(preview).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
