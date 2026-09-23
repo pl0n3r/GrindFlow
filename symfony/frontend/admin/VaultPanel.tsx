@@ -29,6 +29,9 @@ const integrityLabels: Record<string, string> = {
   mismatch: 'Alerta: el tamaño o la huella SHA-256 no coinciden.',
   unavailable: 'No se puede verificar el almacenamiento privado en este momento.',
 };
+const supportedMimes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'] as const;
+const isSupportedMime = (mime: string): boolean => supportedMimes.some((supported) => supported === mime);
+const isVideoMime = (mime: string): boolean => mime === 'video/mp4' || mime === 'video/webm';
 
 // A rejection with no usable corrective action must not be retried blindly.
 // Network and server failures can be retried; a second upload of an already
@@ -44,7 +47,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [view, setView] = useState<'active' | 'trash'>('active');
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
-  const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp'>('all');
+  const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp' | 'mp4' | 'webm'>('all');
   const [usage, setUsage] = useState<'all' | UsageScope>('all');
   const [usageDraft, setUsageDraft] = useState<UsageScope>('unclassified');
   const [batchIds, setBatchIds] = useState<string[]>([]);
@@ -66,7 +69,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<File[]>([]);
-  const [localPreviews, setLocalPreviews] = useState<Array<{ index: number; url: string }>>([]);
+  const [localPreviews, setLocalPreviews] = useState<Array<{ index: number; url: string; kind: 'image' | 'video' }>>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; name: string } | null>(null);
@@ -87,14 +90,18 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   useEffect(() => () => { integrityRequest.current += 1; }, []);
 
-  // Preview only explicitly selected local JPEG/PNG/WebP images. Object URLs
-  // stay in this browser, are never sent to the server, and are revoked after
-  // selection changes, a retry, completion or unmount. Cap memory to 8 thumbs.
+  // Preview only explicitly selected local media accepted by the quick-upload
+  // contract. Object URLs stay in this browser, are never sent to the server,
+  // and are revoked after selection changes, retry, completion or unmount.
   useEffect(() => {
     const previews = selected.slice(0, 8).flatMap((file, index) =>
-      ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) &&
-      file.size > 0 && file.size <= 8 * 1024 * 1024
-        ? [{ index, url: URL.createObjectURL(file) }] : []);
+      isSupportedMime(file.type) && file.size > 0 && file.size <= 8 * 1024 * 1024
+        ? [{
+            index,
+            url: URL.createObjectURL(file),
+            kind: isVideoMime(file.type) ? 'video' as const : 'image' as const,
+          }]
+        : []);
     setLocalPreviews(previews);
     return () => { for (const preview of previews) URL.revokeObjectURL(preview.url); };
   }, [selected]);
@@ -489,14 +496,13 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     const results: UploadResult[] = [];
     let rejected = 0;
 
-    // One image per request, so a failure leaves earlier successes visible.
+    // One media file per request, so a failure leaves earlier successes visible.
     for (const file of selected) {
       let retryable = true;
       try {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
-          file.size < 1 || file.size > 8 * 1024 * 1024) {
+        if (!isSupportedMime(file.type) || file.size < 1 || file.size > 8 * 1024 * 1024) {
           retryable = false;
-          throw new Error('Se aceptan imágenes JPEG, PNG o WebP de hasta 8 MiB.');
+          throw new Error('Se aceptan JPEG, PNG, WebP, MP4 o WebM de hasta 8 MiB.');
         }
         const data = new FormData();
         data.append('file', file);
@@ -555,17 +561,17 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
 
   return <section className="admin-settings vault-section" id="biblioteca" aria-labelledby="vault-title">
     <span className="admin-kicker">S2 · BIBLIOTECA PRIVADA</span>
-    <h2 id="vault-title">Biblioteca de imágenes</h2>
-    <p>Imágenes privadas de la organización seleccionada. Nada se publica externamente.</p>
+    <h2 id="vault-title">Biblioteca de archivos</h2>
+    <p>Fotos y videos privados de la organización seleccionada. Nada se publica externamente.</p>
     <nav className="vault-tabs" aria-label="Vistas de biblioteca">
       <button type="button" aria-pressed={view === 'active'} disabled={loading || !!busyId || batchSaving}
         onClick={() => switchView('active')}>Biblioteca</button>
       <button type="button" aria-pressed={view === 'trash'} disabled={loading || !!busyId || batchSaving}
         onClick={() => switchView('trash')}>Papelera</button>
     </nav>
-    {view === 'trash' && <p>Las imágenes en papelera no se pueden descargar y conservan su original privado. No se borran definitivamente en esta versión.</p>}
+    {view === 'trash' && <p>Los archivos en papelera no se pueden descargar y conservan su original privado. No se borran definitivamente en esta versión.</p>}
     <form className="vault-search" role="search" onSubmit={searchAssets}>
-      <label htmlFor="vault-search-name">Buscar imágenes por nombre</label>
+      <label htmlFor="vault-search-name">Buscar archivos por nombre</label>
       <input id="vault-search-name" type="search" value={searchDraft} maxLength={80}
         onChange={(event) => setSearchDraft(event.currentTarget.value)}
         placeholder="Nombre de imagen" />
@@ -574,7 +580,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         onClick={clearSearch}>Limpiar búsqueda</button>}
     </form>
     {search && <p className="vault-search-status" role="status">Resultados para «{search}» en {view === 'trash' ? 'papelera' : 'biblioteca'}.</p>}
-    <div className="vault-filters" role="group" aria-label="Filtrar y ordenar imágenes">
+    <div className="vault-filters" role="group" aria-label="Filtrar y ordenar archivos">
       <label htmlFor="vault-format">Formato</label>
       <select id="vault-format" value={format} disabled={loading || batchSaving}
         onChange={(event) => {
@@ -586,6 +592,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         <option value="jpeg">JPEG</option>
         <option value="png">PNG</option>
         <option value="webp">WebP</option>
+        <option value="mp4">MP4</option>
+        <option value="webm">WebM</option>
       </select>
       <label htmlFor="vault-usage">Clasificación interna</label>
       <select id="vault-usage" value={usage} disabled={loading || batchSaving}
@@ -616,11 +624,11 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       <strong>Espacio utilizado: {(quota.used_bytes / (1024 * 1024)).toFixed(2)} de {(quota.max_bytes / (1024 * 1024)).toFixed(0)} MiB</strong>
       <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
         value={Math.min(quota.used_bytes, quota.max_bytes)} />
-      <small>{quota.used_assets} de {quota.max_assets} imágenes, incluida la papelera. Los originales retenidos siguen ocupando espacio.</small>
+      <small>{quota.used_assets} de {quota.max_assets} archivos, incluida la papelera. Los originales retenidos siguen ocupando espacio.</small>
     </div>}
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
-      <label htmlFor="vault-files">Añadir imágenes desde tu dispositivo</label>
-      <input id="vault-files" ref={fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp"
+      <label htmlFor="vault-files">Añadir fotos o videos desde tu dispositivo</label>
+      <input id="vault-files" ref={fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
         disabled={uploading || loading} onChange={(event) => {
           setSelected(Array.from(event.currentTarget.files ?? []));
           setRetryPending(false);
@@ -629,30 +637,34 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           setFeedback('');
           setHasTrashDuplicate(false);
         }} />
-      <small>JPEG, PNG o WebP · máximo 8 MiB por archivo. La subida es individual y no crea copias de imágenes idénticas.</small>
-      {selected.length > 0 && <div className="vault-selection" aria-label="Revisar imágenes elegidas">
+      <small>JPEG, PNG, WebP, MP4 o WebM · máximo 8 MiB por archivo. La subida es individual y no crea copias de archivos idénticos.</small>
+      {selected.length > 0 && <div className="vault-selection" aria-label="Revisar archivos elegidos">
         <p role="status">{selected.length} {selected.length === 1
-          ? 'imagen seleccionada antes de guardarla.' : 'imágenes seleccionadas antes de guardarlas.'}
+          ? 'archivo seleccionado antes de guardarlo.' : 'archivos seleccionados antes de guardarlos.'}
           {' '}Puedes descartar cualquiera sin enviarla.</p>
         <ul className="vault-selected-files">
           {selected.slice(0, 8).map((file, index) => {
             const thumbnail = localPreviews.find((preview) => preview.index === index);
-            const valid = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-              && file.size > 0 && file.size <= 8 * 1024 * 1024;
+            const valid = isSupportedMime(file.type) && file.size > 0 && file.size <= 8 * 1024 * 1024;
             return <li key={index}>
-              {thumbnail ? <img src={thumbnail.url} alt={'Vista local de ' + file.name}
-                loading="lazy" decoding="async" /> : <span className="vault-selected-mark" aria-hidden="true">▧</span>}
+              {thumbnail
+                ? thumbnail.kind === 'video'
+                  ? <video src={thumbnail.url} muted playsInline preload="metadata"
+                      aria-label={'Vista local de ' + file.name} />
+                  : <img src={thumbnail.url} alt={'Vista local de ' + file.name}
+                      loading="lazy" decoding="async" />
+                : <span className="vault-selected-mark" aria-hidden="true">▧</span>}
               <span className="vault-selected-details">
                 <strong>{file.name}</strong>
                 <small>{(file.size / (1024 * 1024)).toFixed(2)} MiB · {file.type || 'tipo desconocido'}</small>
-                {!valid && <small role="alert">Archivo no admitido: JPEG, PNG o WebP, de 1 byte a 8 MiB.</small>}
+                {!valid && <small role="alert">Archivo no admitido: JPEG, PNG, WebP, MP4 o WebM, de 1 byte a 8 MiB.</small>}
               </span>
               <button type="button" disabled={uploading} onClick={() => discardSelected(index)}
                 aria-label={'Descartar ' + file.name}>Descartar</button>
             </li>;
           })}
         </ul>
-        {selected.length > 8 && <small>Se muestran 8 de {selected.length} imágenes. Todas se revisarán al guardarlas.</small>}
+        {selected.length > 8 && <small>Se muestran 8 de {selected.length} archivos. Todos se revisarán al guardarlos.</small>}
       </div>}
       {retryPending && selected.length > 0 && <small role="status">{selected.length} {selected.length === 1 ? 'archivo pendiente' : 'archivos pendientes'}. Solo se reenviarán los que fallaron; seleccionar nuevos archivos reemplaza esta lista.</small>}
       {retryPending && <button type="button" disabled={uploading} onClick={() => {
@@ -664,12 +676,12 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         setHasTrashDuplicate(false);
       }}>Descartar pendientes</button>}
       <button type="submit" disabled={uploading || loading || selected.length === 0}>
-        {uploading ? 'Guardando imágenes…' : retryPending
-          ? 'Reintentar ' + selected.length + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')
-          : 'Guardar ' + (selected.length || '') + ' ' + (selected.length === 1 ? 'imagen' : 'imágenes')}
+        {uploading ? 'Guardando archivos…' : retryPending
+          ? 'Reintentar ' + selected.length + ' ' + (selected.length === 1 ? 'archivo' : 'archivos')
+          : 'Guardar ' + (selected.length || '') + ' ' + (selected.length === 1 ? 'archivo' : 'archivos')}
       </button>
       {uploadProgress && <div className="vault-upload-progress" role="status" aria-live="polite">
-        <span>Procesadas {uploadProgress.done} de {uploadProgress.total} imágenes.</span>
+        <span>Procesados {uploadProgress.done} de {uploadProgress.total} archivos.</span>
         <progress aria-label="Progreso de la carga por archivo" max={uploadProgress.total} value={uploadProgress.done} />
       </div>}
       {uploadResults.length > 0 && <ul className="vault-upload-results" aria-label="Resultado por archivo">
@@ -691,9 +703,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     {error && <p role="alert">{error}</p>}
     {!loading && !error && assets.length === 0 &&
       <p role="status">{search || format !== 'all' || usage !== 'all' ? 'No hay imágenes que coincidan con los filtros.' :
-        view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay imágenes en esta organización.'}</p>}
+        view === 'trash' ? 'La papelera está vacía.' : 'Todavía no hay archivos en esta organización.'}</p>}
     {!loading && !error && assets.length > 0 && <>
-      <p className="vault-count" role="status">{total} imágenes {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
+      <p className="vault-count" role="status">{total} archivos {view === 'trash' ? 'en papelera' : 'en esta organización'} · página {page} de {pages}.</p>
       {view === 'active' && canUpload && manageCsrf && <form className="vault-batch"
         onSubmit={(event) => void saveBatch(event)} aria-label="Clasificación de imágenes seleccionadas">
         <h3>Clasificar selección</h3>
@@ -744,7 +756,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
                 disabled={batchSaving || !!busyId || loading || bulkChecking}
                 onChange={() => toggleBatch(asset.id)} />
             </label>}
-          <span className="vault-image-mark" aria-hidden="true">▧</span>
+          <span className="vault-image-mark" aria-hidden="true">{isVideoMime(asset.mime_type) ? '▶' : '▧'}</span>
           <span className="vault-details">
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
@@ -805,7 +817,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               <dt>Clasificación interna</dt><dd>{usageLabels[detail.usage_scope ?? 'unclassified']}</dd>
             </dl>
             {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveNote(event, asset.id)}>
-              <label htmlFor={'vault-note-' + asset.id}>Nota privada de la imagen (máximo 280 caracteres)</label>
+              <label htmlFor={'vault-note-' + asset.id}>Nota privada del archivo (máximo 280 caracteres)</label>
               <input id={'vault-note-' + asset.id} type="text" value={noteDraft} maxLength={280}
                 disabled={!!busyId} onChange={(event) => setNoteDraft(event.currentTarget.value)}
                 placeholder="Añadir una referencia interna, opcional" />
@@ -817,7 +829,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
                 onClick={() => setNoteDraft(detail.note ?? '')}>Descartar cambios</button>
             </form>}
             {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveUsage(event, asset.id)}>
-              <label htmlFor={'vault-usage-' + asset.id}>Clasificar imagen para uso interno</label>
+              <label htmlFor={'vault-usage-' + asset.id}>Clasificar archivo para uso interno</label>
               <select id={'vault-usage-' + asset.id} value={usageDraft} disabled={!!busyId}
                 onChange={(event) => setUsageDraft(event.currentTarget.value as UsageScope)}>
                 {Object.entries(usageLabels).map(([value, label]) =>
@@ -833,9 +845,14 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             <figure className="vault-preview">
               {previewFailed
                 ? <p role="status">La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.</p>
-                : <img src={'/api/admin/vault/' + detail.id + '/preview'}
-                    alt={'Vista previa privada de ' + detail.name} loading="lazy" decoding="async"
-                    referrerPolicy="no-referrer" onError={() => setPreviewFailed(true)} />}
+                : isVideoMime(detail.mime_type)
+                  ? <video controls playsInline preload="metadata"
+                      src={'/api/admin/vault/' + detail.id + '/preview'}
+                      aria-label={'Vista previa privada de ' + detail.name}
+                      onError={() => setPreviewFailed(true)} />
+                  : <img src={'/api/admin/vault/' + detail.id + '/preview'}
+                      alt={'Vista previa privada de ' + detail.name} loading="lazy" decoding="async"
+                      referrerPolicy="no-referrer" onError={() => setPreviewFailed(true)} />}
               <figcaption>Vista previa privada, visible solo con acceso a esta organización.</figcaption>
             </figure>
           </>}
