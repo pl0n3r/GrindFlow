@@ -45,6 +45,9 @@ test('mobile navigation reveals active preview and private sections without page
     spacer.setAttribute('aria-hidden', 'true');
     spacer.style.height = '1000px';
     document.body.append(spacer);
+    // preview.css sets smooth scrolling on <html>; force an immediate,
+    // deterministic scroll so we can assert against its settled position.
+    document.documentElement.style.scrollBehavior = 'auto';
     window.scrollTo(0, 320);
     return { x: window.scrollX, y: window.scrollY };
   });
