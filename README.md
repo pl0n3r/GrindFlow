@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.119: cambios de sección anunciados de forma accesible en la vista previa React.** Base exacta main v0.1.118 `133bcecdb0f0fde3a657f715e14421372ee7b88c`. No modifica datos ni acredita despliegue Symfony.
+> **Candidato v0.1.120: regresión de autenticación Laravel con sesiones sintéticas descartables.** Base exacta main v0.1.119 `620012179f843338accea21c84742d306b6eb229`. No modifica el flujo de login ni corrige por sí solo el incidente productivo #73.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,30 +18,30 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.119** | `config/version.php`; candidata, no publicada |
-| Base exacta | ✅ ~~main v0.1.118~~ | `133bcecdb0f0fde3a657f715e14421372ee7b88c` |
-| CI del PR | 🚧 Pendiente | `validate` sobre HEAD final |
-| Sonar del PR | 🚧 Pendiente | Quality Gate sobre HEAD final |
-| CodeRabbit del PR | 🚧 Pendiente | Revisión terminada del mismo SHA |
-| CI del SHA exacto de main | ✅ ~~success~~ | #35903927830 sobre `133bcecd…` |
-| Deploy Observer base | ✅ ~~Marcador observado~~ | #35903927866; no acredita SHA remoto |
-| Production Smoke | ⛔ Bloqueo externo #73 | #35903927898 failure |
+| Version objetivo | 🚧 **v0.1.120** | `config/version.php`; candidata, no publicada |
+| Base exacta | ✅ ~~main v0.1.119~~ | `620012179f843338accea21c84742d306b6eb229` |
+| CI del PR | ✅ ~~success `adf5583`~~; 🚧 nuevo HEAD pendiente | #35910215166; revalidar tras cambios |
+| Sonar del PR | ✅ ~~success `adf5583`~~; 🚧 nuevo HEAD pendiente | Quality Gate del HEAD nuevo requerido |
+| CodeRabbit del PR | 🚧 Dos hallazgos nuevos del HEAD previo | Revisión completa requerida tras corregirlos |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35906880198 sobre `62001217…` |
+| Deploy Observer base | ✅ ~~Marcador observado~~ | #35906880205; no acredita SHA remoto |
+| Production Smoke | ⛔ Bloqueo externo #73 | #35906880233 failure |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Solo cambios de UI, test, versión/configuración y documentación |
+| Datos productivos | ✅ ~~No tocados~~ | Solo test, requisitos y versión de código |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+69** | **−32** | **+37** |
+| **4** | **+125** | **−29** | **+96** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-UX-003: anuncio accesible de cambios de sección en React |
+| Alcance | GF-SEC-003: estabilidad de sesión anónima ante fallo de login y bloqueo |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -49,9 +49,9 @@
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
  P --> F["fast + contratos"]
- P --> S2["symfony-preview"]
+ P -.-> S2["symfony-preview (opcional; no aplica a esta candidata)"]
  F --> V["validate"]
- S2 --> V
+ S2 -.-> V
  A --> S["Sonar"]
  A --> C["CodeRabbit"]
  V --> M["Squash merge"]
@@ -63,25 +63,22 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- La vista previa React anuncia el panel actualizado mediante `aria-live="polite"` y `aria-atomic="true"`, sin interrumpir el foco de teclado.
-- Chromium valida activación con Enter/Espacio, selección `aria-pressed` y nombre accesible de la región actualizada.
-- GF-UX-003 conserva navegación compartida y prueba responsive; sin cambios en datos, proveedores externos, Laravel ni producción.
-- [AGENTS.md](AGENTS.md) registra intervenciones productivas rutinarias y reversibles solo con acceso efectivo, procedimiento probado, recuperación viable y gates previos satisfactorios; las operaciones protegidas requieren aprobación específica.
+- PHPUnit con cuenta sintética comprueba CSRF, ID y marcador entre GET anónimos y tras rechazo; limpia atributos en memoria para exigir restauración real desde el backend con la misma cookie y verifica el login en otra solicitud.
+- El test de rate limiting exige CSRF e ID estables tras el sexto intento bloqueado con lectura de sesión persistida, sin alterar el límite.
+- GF-SEC-003 documenta la expectativa Laravel y distingue pruebas descartables de un smoke auténtico en Hostinger. No cambia controlador, credenciales ni datos reales.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de esta entrega candidata, no prueba publicación:
 <!-- grindflow:changed-files -->
-- `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/PreviewApp.tsx`
-- `symfony/tests/e2e/preview.spec.mjs`
+- `tests/Feature/AuthenticationTest.php`
 
 ## Validación
-- Exigir `preflight`, `fast`, `symfony-preview`, `validate`, Sonar y CodeRabbit sobre HEAD final.
-- CI exact-main después del squash; Production Smoke #73 sigue independiente.
-- No se ejecutan migraciones ni escrituras productivas.
+- CI exact-main v0.1.119 primero, luego `preflight`, `fast`, `php-quality`, `PHPUnit`, `validate`, Sonar y CodeRabbit sobre HEAD final.
+- Smoke #73 sigue independiente; esta entrega no reintenta el login productivo ni atribuye una causa sin evidencia.
+- No ejecutar migraciones ni escrituras de datos productivos.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -89,7 +86,7 @@ Inventario de esta entrega candidata, no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 GF-UX-003: anuncio accesible de panel React | 🚧 v0.1.119 candidata |
-| **NEXT** | 🚧 Verificar coherencia responsive, teclado y estados de error entre espacios | 🚧 pendiente |
+| **NOW** | 🚧 GF-SEC-003: regresión de sesión y CSRF ante login fallido | 🚧 v0.1.120 candidata |
+| **NEXT** | 🚧 Diagnosticar causa de autenticación productiva #73 por vía operativa autorizada | 🚧 pendiente |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
 | **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |
