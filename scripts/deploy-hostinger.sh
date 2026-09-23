@@ -44,9 +44,12 @@ chmod -R ug+rwX storage bootstrap/cache
 printf 'Laravel bootstrap check...\n'
 "$PHP_BIN" artisan about >/dev/null
 
+printf 'Reconciling synthetic Production Smoke identity...\n'
+"$PHP_BIN" artisan grindflow:provision-smoke-user
+
 if [[ -n "$SMOKE_URL" ]]; then
   command -v curl >/dev/null 2>&1 || fail "curl is required for SMOKE_URL checks."
-  HEALTH_URL="${SMOKE_URL%/}/up"
+  HEALTH_URL="${SMOKE_URL%/}/health"
   printf 'Smoke testing %s...\n' "$HEALTH_URL"
   curl --fail --silent --show-error --location --max-time 15 "$HEALTH_URL" >/dev/null
 fi
@@ -54,7 +57,7 @@ fi
 cat <<'EOF'
 Deploy preparation completed.
 
-This script intentionally does NOT run database migrations.
-Production migrations require an explicit operator action with the migration
-database role after reviewing the pending migration set.
+This script does not run destructive SQL. During APP_PHASE=construccion it
+reconciles only the reserved synthetic Production Smoke identity after taking
+its private rollback backup. Database migrations remain a separate operation.
 EOF

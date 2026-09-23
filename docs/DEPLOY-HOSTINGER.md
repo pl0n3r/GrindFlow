@@ -11,7 +11,9 @@ flujo antiguo basado en Next.js/Docker sigue documentado en
   `public/.htaccess`; no se copia `public/` manualmente sobre `public_html`.
 - El PHP de CLI de GrindFlow es `/opt/alt/php85/usr/bin/php`.
 - `.env` y secretos viven solo en el servidor.
-- Un deploy de codigo **no ejecuta migraciones de produccion automaticamente**.
+- Durante `APP_PHASE=construccion`, el deploy puede reconciliar escrituras operativas
+  idempotentes aprobadas por la decisión #126; SQL destructivo sigue prohibido.
+- Un deploy de codigo no ejecuta SQL destructivo ni contracciones automaticamente.
 - Merge, deploy y validacion en produccion son estados distintos.
 - El Redeploy de Git en hPanel actualiza archivos, pero no se asume que ejecute
   comandos Artisan o Composer del repositorio.
@@ -34,7 +36,16 @@ APP_NAME="GrindFlow"
 APP_ENV="production"
 APP_DEBUG="false"
 APP_URL="https://www.grindflow.com.co"
+APP_PHASE="construccion"
+SMOKE_USER_EMAIL="e2e-admin@grindflow.test"
+SMOKE_USER_PASSWORD="<secret>"
+SMOKE_USER_NAME="GrindFlow Production Smoke"
 ```
+
+`SMOKE_USER_PASSWORD` debe contener exactamente el mismo valor que el secret
+de GitHub Actions `PRODUCTION_E2E_PASSWORD`. Nunca copies ese valor a Issues,
+PRs, logs o comandos de chat. El correo queda limitado por código al dominio
+sintético reservado `@grindflow.test`.
 
 No copies al chat ni al repositorio `APP_KEY`, contrasenas de DB, tokens ni
 claves de almacenamiento.
@@ -71,7 +82,16 @@ El script:
 4. reconstruye caches de config, rutas y vistas;
 5. asegura directorios escribibles de Laravel;
 6. comprueba que Laravel puede arrancar;
-7. opcionalmente consulta `/up`.
+7. ejecuta `grindflow:provision-smoke-user`: toma un lock, crea un backup
+   cifrado privado antes de cualquier mutación y reconcilia solo la identidad
+   sintética reservada necesaria para el smoke;
+8. opcionalmente consulta `/health`, que exige versión y SHA Git exactos.
+
+El scheduler ejecuta además la misma reconciliación cada minuto en
+`APP_ENV=production` + `APP_PHASE=construccion` cuando el secreto existe.
+Esto cubre el redeploy Git/hPanel que no invoque el script de preparación.
+La operación es idempotente: si identidad, hash, verificación y rol ya coinciden,
+no escribe ni crea un backup adicional.
 
 ## Base de datos
 

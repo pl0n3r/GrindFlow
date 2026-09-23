@@ -18,6 +18,7 @@ use App\Http\Middleware\RequireDistributionSchema;
 use App\Http\Middleware\RequireFinanceSchema;
 use App\Http\Middleware\RequireSchedulingSchema;
 use App\Http\Middleware\RequireTrafficSchema;
+use App\Support\Deployment\CheckoutIdentity;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Session\Middleware\StartSession;
@@ -25,6 +26,21 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::get('/health', static function (CheckoutIdentity $identity): JsonResponse {
+    $commit = $identity->commit();
+    $exact = $commit !== null;
+
+    return response()->json([
+        'status' => $exact ? 'ok' : 'degraded',
+        'version' => (string) config('version.number'),
+        'commit' => $commit,
+        'exact' => $exact,
+    ], $exact ? 200 : 503)
+        ->header('Cache-Control', 'no-store, max-age=0')
+        ->header('X-Content-Type-Options', 'nosniff');
+})->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
+    ->name('health.exact');
 
 Route::get('/_deployment', static function (): JsonResponse {
     // Version humana observable, sin inferir el SHA del checkout remoto.
