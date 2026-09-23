@@ -92,6 +92,41 @@ final class PreviewTest extends WebTestCase
         }
     }
 
+    public function testHstsIsSentOnlyForSecureRequests(): void
+    {
+        $client = static::createClient();
+        foreach ([
+            ['/', 200],
+            ['/admin', 302],
+            ['/api/admin/context', 401],
+            ['/missing-route', 404],
+        ] as [$path, $status]) {
+            $client->request('GET', $path, server: [
+                'HTTPS' => 'on',
+                'HTTP_ACCEPT' => 'application/json',
+            ]);
+            self::assertResponseStatusCodeSame($status);
+            self::assertSame(
+                'max-age=31536000',
+                $client->getResponse()->headers->get('Strict-Transport-Security'),
+                $path,
+            );
+        }
+
+        $client->request('GET', '/', server: ['HTTPS' => 'off']);
+        self::assertResponseIsSuccessful();
+        self::assertFalse($client->getResponse()->headers->has('Strict-Transport-Security'));
+
+        // Reverse-proxy headers are untrusted by default; a client must not be
+        // able to turn plain HTTP into a secure request by spoofing the proto.
+        $client->request('GET', '/', server: [
+            'HTTPS' => 'off',
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+        ]);
+        self::assertResponseIsSuccessful();
+        self::assertFalse($client->getResponse()->headers->has('Strict-Transport-Security'));
+    }
+
     public function testPrivateResponsesCannotBeCachedOnSuccessRedirectOrError(): void
     {
         $client = static::createClient();
