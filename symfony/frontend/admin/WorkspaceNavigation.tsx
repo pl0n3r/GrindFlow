@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 export type WorkspaceNavItem = Readonly<{
   id: string;
@@ -21,6 +21,32 @@ type WorkspaceNavigationProps = Readonly<{
 export function WorkspaceNavigation({
   mode, items, active, footer, onSelect,
 }: WorkspaceNavigationProps) {
+  const navigationRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const nav = navigationRef.current;
+    if (!nav) return;
+
+    // Mobile menus are horizontal. Reposition only the nav's own scroll area,
+    // never the document: an anchor selection must not jump away from content.
+    const revealActive = () => {
+      if (nav.scrollWidth <= nav.clientWidth + 1) return;
+      const selected = nav.querySelector<HTMLElement>('.workspace-nav-item.active, .workspace-nav-item.selected');
+      if (!selected) return;
+      const viewport = nav.getBoundingClientRect();
+      const item = selected.getBoundingClientRect();
+      const gutter = 8;
+      if (item.left < viewport.left + gutter) {
+        nav.scrollLeft += item.left - viewport.left - gutter;
+      } else if (item.right > viewport.right - gutter) {
+        nav.scrollLeft += item.right - viewport.right + gutter;
+      }
+    };
+    revealActive();
+    window.addEventListener('resize', revealActive);
+    return () => window.removeEventListener('resize', revealActive);
+  }, [active, mode]);
+
   return (
     <aside className={'workspace-navigation ' + (mode === 'admin' ? 'admin-sidebar' : 'preview-aside')}>
       <a className="workspace-brand" href="/" aria-label="GrindFlow, inicio">
@@ -29,7 +55,8 @@ export function WorkspaceNavigation({
       <span className="workspace-navigation-label">
         {mode === 'admin' ? 'ESPACIO PRIVADO' : 'VISTA PREVIA'}
       </span>
-      <nav aria-label={mode === 'admin' ? 'Navegación administrativa' : 'Explorador de secciones'}>
+      <span className="workspace-navigation-scroll-hint">Desliza para explorar más secciones ↔</span>
+      <nav ref={navigationRef} aria-label={mode === 'admin' ? 'Navegación administrativa' : 'Explorador de secciones'}>
         {items.map((item) => {
           const selected = active === item.id;
           const contents = (
