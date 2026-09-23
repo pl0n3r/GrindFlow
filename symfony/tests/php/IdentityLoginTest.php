@@ -199,6 +199,7 @@ final class IdentityLoginTest extends WebTestCase
             self::assertSelectorExists('#identity-login-error[role="alert"]');
             self::assertSelectorExists('#identity-email[aria-invalid="true"][aria-describedby="identity-login-error"]');
             self::assertSelectorExists('#identity-password[aria-invalid="true"][aria-describedby="identity-login-error"]');
+            self::assertSelectorExists('#identity-email[value="'.$id.'@example.test"]');
             $errorCache = (string) $client->getResponse()->headers->get('Cache-Control');
             self::assertStringContainsString('no-store', $errorCache);
             self::assertStringContainsString('private', $errorCache);
