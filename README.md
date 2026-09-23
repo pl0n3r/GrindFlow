@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+63** | **−32** | **+31** |
+| **6** | **+64** | **−32** | **+32** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -66,6 +66,7 @@ flowchart LR
 - La vista previa React anuncia el panel actualizado mediante `aria-live="polite"` y `aria-atomic="true"`, sin interrumpir el foco de teclado.
 - Chromium valida activación con Enter/Espacio, selección `aria-pressed` y nombre accesible de la región actualizada.
 - GF-UX-003 conserva navegación compartida y prueba responsive; sin cambios en datos, proveedores externos, Laravel ni producción.
+- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
 - AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
 - AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
 - AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
