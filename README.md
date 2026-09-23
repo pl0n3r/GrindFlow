@@ -23,7 +23,7 @@
 | CI del PR | 🚧 Pendiente | `validate` sobre HEAD final |
 | Sonar del PR | 🚧 Pendiente | Quality Gate sobre HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Revisión terminada del mismo SHA |
-| CI del SHA exacto de main | 🚧 En ejecución | #35906880198 sobre `62001217…` |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35906880198 sobre `62001217…` |
 | Deploy Observer base | ✅ ~~Marcador observado~~ | #35906880205; no acredita SHA remoto |
 | Production Smoke | ⛔ Bloqueo externo #73 | #35906880233 failure |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
