@@ -18,7 +18,7 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Versión objetivo | 🚧 **v0.1.109** | `config/version.php`; no publicada |
+| Version objetivo | 🚧 **v0.1.109** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.108~~ | `e6d656b7e47f4825ca502134a5781456da4baa6f` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
