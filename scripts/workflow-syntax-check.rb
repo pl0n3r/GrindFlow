@@ -18,6 +18,27 @@ paths.each do |path|
   puts "PASS YAML #{File.basename(path)}"
 end
 
+# GitHub removed the Node 20 JavaScript-action runtime. Keep the official
+# actions that previously emitted runtime warnings on Node 24-capable majors.
+obsolete_node20_actions = {
+  "actions/checkout@v4" => "actions/checkout@v5+",
+  "actions/cache@v4" => "actions/cache@v5+",
+  "actions/setup-node@v4" => "actions/setup-node@v5+",
+  "actions/upload-artifact@v4" => "actions/upload-artifact@v6+",
+  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" => "actions/checkout@v5+",
+  "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" => "actions/upload-artifact@v6+",
+}.freeze
+
+paths.each do |path|
+  source = File.read(path, encoding: "UTF-8")
+  obsolete_node20_actions.each do |reference, replacement|
+    next unless source.include?(reference)
+
+    abort "#{File.basename(path)} uses obsolete Node 20 action #{reference}; use #{replacement}"
+  end
+end
+puts "PASS official GitHub Actions use Node 24-capable majors"
+
 smoke_path = File.join(root, ".github/workflows/production-smoke.yml")
 smoke = YAML.safe_load_file(smoke_path, aliases: true)
 steps = smoke.fetch("jobs").fetch("production-smoke").fetch("steps")
