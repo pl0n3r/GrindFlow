@@ -91,6 +91,12 @@ final class OrganizationSelectorAccessibilityTest extends WebTestCase
             $client->submit($cards->eq(1)->filter('form')->form());
             self::assertResponseRedirects('/admin');
 
+            $client->request('GET', '/admin');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorExists('main#contenido[tabindex="-1"] > #grindflow-admin');
+            self::assertCount(1, $client->getCrawler()->filter('main#contenido'));
+            self::assertSelectorExists('main#contenido .admin-state[aria-live="polite"]');
+
             $selected = $client->request('GET', '/organizations');
             self::assertResponseIsSuccessful();
             $current = $selected->filter('.identity-orgs li[aria-current="true"]');
