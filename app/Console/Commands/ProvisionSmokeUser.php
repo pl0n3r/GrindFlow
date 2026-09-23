@@ -162,7 +162,7 @@ class ProvisionSmokeUser extends Command
                 'id' => (string) $user->getKey(),
                 'name' => $user->name,
                 'email' => $user->email,
-                'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                'email_verified_at' => $user->getRawOriginal('email_verified_at'),
                 'password' => (string) $user->getAuthPassword(),
                 'platform_role' => $user->platform_role->value,
                 'remember_token' => $user->getRememberToken(),
