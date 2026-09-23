@@ -40,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Validar título PR y versión objetivo
@@ -136,6 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Validate repository contracts
@@ -266,6 +268,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
@@ -311,6 +315,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
@@ -372,6 +378,8 @@ jobs:
       DB_PASSWORD: grindflow
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
@@ -420,6 +428,8 @@ jobs:
       E2E_ORG_SLUG: e2e-browser-workspace
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
@@ -537,6 +547,8 @@ jobs:
       E2E_ORG_SLUG: e2e-browser-workspace
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
@@ -643,6 +655,8 @@ jobs:
       SYMFONY_DEPRECATIONS_HELPER: 'max[total]=30&max[self]=0&max[direct]=0'
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
@@ -852,6 +866,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
