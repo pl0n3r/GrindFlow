@@ -243,6 +243,7 @@ final class DirectUploadTokenCipher
             || !is_string($storageKey) || $storagePrefix === ''
             || !Uuid::isValid($stagingId) || $storageKey !== $storagePrefix.$stagingId
             || !is_string($filename) || trim($filename) === '' || strlen($filename) > 180
+            || in_array(trim($filename), ['.', '..'], true)
             || preg_match('//u', $filename) !== 1
             || basename(str_replace('\\', '/', $filename)) !== $filename
             || preg_match('/[\\x00-\\x1F\\x7F]/u', $filename) === 1
