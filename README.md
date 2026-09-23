@@ -18,12 +18,12 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Versión objetivo | 🚧 **v0.1.118** | `config/version.php`; candidata, no publicada |
+| Version objetivo | 🚧 **v0.1.118** | `config/version.php`; candidata, no publicada |
 | Base exacta | ✅ ~~main v0.1.117~~ | `c67a0f0eedcf4c5138d1060817963dccfc7d9ffa` |
 | CI del PR | 🚧 Pendiente | `validate` sobre HEAD final |
 | Sonar del PR | 🚧 Pendiente | Quality Gate sobre HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Full review terminal del mismo SHA |
-| CI exact-main de la base | ✅ ~~success~~ | #35896670636 sobre `c67a0f0…` |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35896670636 sobre `c67a0f0…` |
 | Deploy Observer base | ✅ ~~Marcador observado~~ | #35896670601; no acredita SHA remoto |
 | Production Smoke | ⛔ Bloqueo externo #73 | #35896670356 failure |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
