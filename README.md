@@ -65,7 +65,7 @@ flowchart LR
 ## Qué se hizo
 - La home Twig y la vista previa React aplican `scroll-behavior: auto` cuando el navegador indica `prefers-reduced-motion: reduce`, conservando el desplazamiento suave para otras preferencias.
 - El menú compartido conserva su regla de desplazamiento reducido y su navegación responsive.
-- Chromium sintético cubre preferencia dinámica, 360/820 px y ausencia de desbordamiento horizontal.
+- Chromium sintético cubre preferencia dinámica y 360/820 px; detectó además overflow real del título en home a 360 px y se corrigió su escala móvil.
 - GF-UX-006 documentado sin alterar cuentas, roles, Laravel, Hostinger ni cutover.
 
 ## Archivos modificados en esta entrega candidata
