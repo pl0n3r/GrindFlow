@@ -43,6 +43,16 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit prueba la cabecera de selección autenticada; Chromium prueba ambas anchuras del ingreso y ausencia de desbordamiento.
 
+### GF-UX-004 — Error de acceso Symfony perceptible y asociado a campos
+
+**Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
+
+**Enunciado:** ante un intento de acceso rechazado, el formulario Symfony conserva un mensaje genérico sin revelar si existe una cuenta o por qué no se autorizó. El mensaje se anuncia como alerta y ambos campos de credenciales lo referencian explícitamente para tecnología asistiva; las entradas reciben estado de invalidez y borde visible. El GET anónimo limpio no presenta esas marcas.
+
+**Aceptación:** después de un POST rechazado, el error tiene ID estable `identity-login-error`, `role="alert"`; correo y contraseña señalan `aria-invalid="true"` y `aria-describedby="identity-login-error"`. La contraseña sigue en `type="password"`; no se expone el valor. GET anónimos sin error no indican invalidación previa. A 360 y 820 px no existe desbordamiento horizontal por el estado de error. No cambia Symfony Security, sesiones, cuentas Laravel, Hostinger ni credenciales productivas.
+
+**Verificación:** PHPUnit HTTP con usuario inactivo sintético en MariaDB descartable y Chromium sintético a 360 y 820 px; gate `symfony-preview`. Producción y cutover son evidencias independientes.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
