@@ -156,6 +156,7 @@ jobs:
           test -f scripts/ci-scope.sh
           test -f scripts/ci-scope-contract.sh
           test -f scripts/readme-dashboard.py
+          test -f scripts/github-actions-runtime-contract.py
           if [[ -f composer.json ]]; then
             test -f composer.lock
           fi
@@ -212,6 +213,9 @@ jobs:
           python3 -m unittest tests/test_data_schema_structure_parity.py
           python3 -m py_compile scripts/readme-dashboard.py
           python3 scripts/readme-dashboard.py --self-test
+          python3 -m py_compile scripts/github-actions-runtime-contract.py
+          python3 scripts/github-actions-runtime-contract.py --self-test
+          python3 scripts/github-actions-runtime-contract.py
           python3 -m py_compile scripts/validate-governance.py
           python3 scripts/validate-governance.py --self-test
           python3 scripts/validate-governance.py
