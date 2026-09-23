@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.106: selector multiorganización accesible.** Base exacta `main` v0.1.105 `248ee1d0c20c39d2c2a31cc9cd14ef0639d6db31`; cada acción distingue su espacio y señala el seleccionado.
+> **Candidato v0.1.107: defensa de clickjacking compatible en Symfony.** Base exacta `main` v0.1.106 `609809d877efe765ee6206a0634c5a2ad9937200`; se prohíbe enmarcar páginas en navegadores modernos y antiguos.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,14 +18,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.106** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.105~~ | `248ee1d0c20c39d2c2a31cc9cd14ef0639d6db31` |
+| Version objetivo | 🚧 **v0.1.107** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.106~~ | `609809d877efe765ee6206a0634c5a2ad9937200` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir full review del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35829915605` success sobre `248ee1d0c20c39d2c2a31cc9cd14ef0639d6db31` |
-| Deploy Observer | 🚧 Pendiente | `35829915425` sin conclusión al preparar; no inferir SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35829915414` failure, #73; independiente de esta mejora |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35832037326` success sobre `609809d877efe765ee6206a0634c5a2ad9937200` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35832037334` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35832037355` failure, #73; independiente de esta mejora |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
 | Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/MariaDB descartable; sin cambio de cuentas reales |
 
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-UX-005: selector multiorganización con acción distinguible |
+| Alcance | GF-SEC-008: X-Frame-Options DENY con CSP frame-ancestors 'none' |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,10 +63,9 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Cada botón del selector Symfony identifica su organización mediante su nombre visible y describe el rol sin exponer IDs internos en el nombre accesible.
-- La fila seleccionada anuncia «Actual» y `aria-current`, además de estado visual diferenciado.
-- PHPUnit HTTP/Doctrine con MariaDB descartable crea dos membresías, verifica nombres accesibles únicos, selecciona la segunda con CSRF y confirma el contexto del tenant.
-- GF-UX-005 documentado sin alterar autorizaciones, sesiones, Laravel ni Hostinger.
+- Symfony añade `X-Frame-Options: DENY` a su CSP existente con `frame-ancestors 'none'`, para clientes que no aplican esta última directiva.
+- La regla compartida de respuesta se aplica en páginas públicas y privadas, redirecciones y errores sin excepciones para el login.
+- PHPUnit HTTP verifica la defensa contra enmarcado y `nosniff` en respuestas 200, 302, 401 y 404; GF-SEC-008 documentado sin alterar Laravel, Hostinger ni producción.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
@@ -74,21 +73,20 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/public/assets/grindflow.css`
-- `symfony/templates/identity/organizations.html.twig`
-- `symfony/tests/php/OrganizationSelectorAccessibilityTest.php`
+- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
+- `symfony/tests/php/PreviewTest.php`
 
 ## Validación
 - Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final; después CI exact-main.
-- `symfony-preview` valida PHP, MariaDB descartable, TypeScript/Vite y Chromium a 360 y 820 px sobre build aislado.
-- El release no demuestra deployment Symfony ni resuelve Production Smoke #73 del Laravel operativo.
+- `symfony-preview` valida cabeceras PHP/Symfony en rutas aisladas con MariaDB descartable, TypeScript/Vite y Chromium.
+- El release no demuestra despliegue Symfony ni resuelve Production Smoke #73 del Laravel operativo.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Selección accesible de organizaciones | 🚧 v0.1.106 candidata |
+| **NOW** | 🚧 Cabeceras antienmarcado Symfony | 🚧 v0.1.107 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -96,8 +94,8 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.105 fusionada~~ | ✅ ~~accesibilidad del error de login Symfony~~ |
-| **NOW** | 🚧 Selector multiorganización accesible | 🚧 GF-UX-005, v0.1.106 |
+| **DONE** | ✅ ~~v0.1.106 fusionada~~ | ✅ ~~selector multiorganización accesible~~ |
+| **NOW** | 🚧 Defensa de clickjacking Symfony | 🚧 GF-SEC-008, v0.1.107 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
