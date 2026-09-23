@@ -215,11 +215,14 @@ def roadmap_error(readme: str) -> str | None:
         return "canonical progress convention missing or not documented"
 
     next_section = section(readme, "## Qué sigue")
-    if "https://github.com/pl0n3r/GrindFlow/issues/2" not in next_section:
-        return "roadmap must link to canonical issue #2"
-    if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", next_section, flags=re.I):
-        return "legacy issue #88 cannot be an active roadmap destination"
-    if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", next_section):
+    issue_destinations = re.findall(
+        r"https://github\\.com/pl0n3r/GrindFlow/issues/(\\d+)\\b",
+        next_section,
+        flags=re.I,
+    )
+    if issue_destinations != ["2"]:
+        return "Qué sigue must link only the canonical issue #2 exactly once"
+    if re.search(r"\\*\\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\\*\\*", next_section):
         return "Qué sigue must only link canonical issue #2; snapshot lanes belong in Panorama"
 
     panorama = section(readme, "## Panorama general pendiente")
@@ -234,12 +237,20 @@ def roadmap_error(readme: str) -> str | None:
             return f"Panorama must contain exactly one {lane} lane"
 
     for row in panorama.splitlines():
-        if not any(lane in row for lane in lanes):
+        matching = [lane for lane in lanes if lane in row]
+        if not matching:
             continue
         if "🚧" not in row and "⛔" not in row:
             return "Panorama pending/blocked row missing status symbol"
         if "~~" in row:
             return "Panorama must not contain completed/struck-through history"
+
+        payload = row
+        for lane in matching:
+            payload = payload.replace(lane, "")
+        payload = payload.replace("🚧", "").replace("⛔", "")
+        if not any(char.isalnum() for char in payload):
+            return "Panorama lane must include current work or status content"
 
     return None
 
@@ -391,6 +402,15 @@ ok
         roadmap_sample.replace(
             "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
             "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\n| **NOW** | 🚧 duplicado | 🚧 pendiente |",
+        ),
+        roadmap_sample.replace(
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\\n"
+            "[Smoke #73](https://github.com/pl0n3r/GrindFlow/issues/73)",
+        ),
+        roadmap_sample.replace(
+            "| **NOW** | 🚧 entrega actual | 🚧 validando |",
+            "🚧 **NOW**",
         ),
     ):
         assert roadmap_error(invalid) is not None
