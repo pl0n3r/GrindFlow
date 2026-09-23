@@ -120,6 +120,14 @@ final class ProfileSettingsTest extends WebTestCase
             $client->request('POST', '/api/admin/profile/name', [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_X_CSRF_TOKEN' => $token,
+                'CONTENT_LENGTH' => '8192',
+            ], $normalName);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Cuenta original', $db->fetchOne('SELECT name FROM gf_identity_users WHERE id = ?', [$actor]));
+
+            $client->request('POST', '/api/admin/profile/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
             ], $normalName.str_repeat(' ', 4096 - strlen($normalName)));
             self::assertResponseIsSuccessful();
             $payload = json_decode((string) $client->getResponse()->getContent(), true);
