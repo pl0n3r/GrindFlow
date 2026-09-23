@@ -25,6 +25,8 @@ final class IdentityLoginTest extends WebTestCase
             $crawler = $client->request('GET', '/login');
             self::assertResponseIsSuccessful();
             self::assertSelectorExists('form.identity-form input[name="_csrf_token"]');
+            self::assertSelectorNotExists('form.identity-form input[aria-invalid="true"]');
+            self::assertSelectorNotExists('form.identity-form input[aria-describedby="identity-login-error"]');
 
             $token = $crawler->filter('form.identity-form input[name="_csrf_token"]')->attr('value');
             self::assertNotNull($token);
@@ -194,6 +196,10 @@ final class IdentityLoginTest extends WebTestCase
             $client->request('GET', '/login');
             self::assertResponseIsSuccessful();
             self::assertSelectorTextContains('[role="alert"]', 'No se pudo iniciar sesión');
+            self::assertSelectorExists('#identity-login-error[role="alert"]');
+            self::assertSelectorExists('#identity-email[aria-invalid="true"][aria-describedby="identity-login-error"]');
+            self::assertSelectorExists('#identity-password[aria-invalid="true"][aria-describedby="identity-login-error"]');
+            self::assertSelectorExists('#identity-email[value="'.$id.'@example.test"]');
             $errorCache = (string) $client->getResponse()->headers->get('Cache-Control');
             self::assertStringContainsString('no-store', $errorCache);
             self::assertStringContainsString('private', $errorCache);
@@ -201,6 +207,14 @@ final class IdentityLoginTest extends WebTestCase
             $errorBody = (string) $client->getResponse()->getContent();
             self::assertStringNotContainsString('only-for-isolated-ci', $errorBody);
             self::assertStringNotContainsString('inactiv', strtolower($errorBody));
+
+            // Symfony consumes the error once. A later clean GET must not
+            // leave either field flagged as invalid without an active alert.
+            $client->request('GET', '/login');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorNotExists('#identity-login-error');
+            self::assertSelectorNotExists('form.identity-form input[aria-invalid="true"]');
+            self::assertSelectorNotExists('form.identity-form input[aria-describedby="identity-login-error"]');
 
             $client->request('GET', '/organizations');
             self::assertResponseRedirects('/login');
