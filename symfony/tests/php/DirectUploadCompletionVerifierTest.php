@@ -11,6 +11,47 @@ use GrindFlow\Infrastructure\Storage\DirectUploadTokenCipher;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
 
+final class EndlessDirectUploadStream
+{
+    /** @var resource|null */
+    public $context;
+
+    private int $served = 0;
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        $this->served = 0;
+
+        return true;
+    }
+
+    public function stream_read(int $count): string
+    {
+        $length = min(max($count, 1), 1024);
+        $this->served += $length;
+        if ($this->served > 65_536) {
+            throw new \LogicException('Verifier read beyond the approved size limit.');
+        }
+
+        return str_repeat('x', $length);
+    }
+
+    public function stream_eof(): bool
+    {
+        return false;
+    }
+
+    /** @return array<string, int> */
+    public function stream_stat(): array
+    {
+        return [];
+    }
+
+    public function stream_close(): void
+    {
+    }
+}
+
 final class DirectUploadCompletionVerifierTest extends TestCase
 {
     private const NOW = 1_800_000_000;
@@ -150,7 +191,43 @@ final class DirectUploadCompletionVerifierTest extends TestCase
         $organization = Uuid::v7()->toRfc4122();
         $user = Uuid::v7()->toRfc4122();
         $stagingKey = 'organizations/'.$organization.'/staging/'.Uuid::v7()->toRfc4122();
-        $storage = $this->storage($stagingKey, 'longer', 5);
+        $scheme = 'gf-endless';
+        self::assertNotContains($scheme, stream_get_wrappers());
+        self::assertTrue(stream_wrapper_register($scheme, EndlessDirectUploadStream::class));
+
+        $storage = new class($stagingKey, $scheme) implements DirectUploadStorage {
+            public int $readCalls = 0;
+
+            public function __construct(
+                private readonly string $expectedKey,
+                private readonly string $scheme,
+            ) {
+            }
+
+            public function available(): bool { return true; }
+            public function disk(): string { return 'media'; }
+            public function driver(): string { return 's3'; }
+            public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
+            {
+                return ['url' => 'https://example.invalid', 'headers' => []];
+            }
+            public function exists(string $storageKey): bool { return $storageKey === $this->expectedKey; }
+            public function size(string $storageKey): ?int { return $storageKey === $this->expectedKey ? 5 : null; }
+            public function readStream(string $storageKey)
+            {
+                $this->readCalls++;
+                if ($storageKey !== $this->expectedKey) {
+                    return null;
+                }
+
+                $stream = fopen($this->scheme.'://object', 'rb');
+
+                return $stream === false ? null : $stream;
+            }
+            public function delete(string $storageKey): void {}
+            public function promote(string $stagingKey, string $finalKey): void {}
+        };
+
         $tokens = new DirectUploadTokenCipher(str_repeat('s', 32));
         $token = $tokens->issue(
             $organization,
@@ -170,8 +247,8 @@ final class DirectUploadCompletionVerifierTest extends TestCase
         try {
             $verifier->verify($token, $organization, $user, self::NOW + 1);
         } finally {
-            self::assertSame(1, $storage->existsCalls);
             self::assertSame(1, $storage->readCalls);
+            self::assertTrue(stream_wrapper_unregister($scheme));
         }
     }
 
