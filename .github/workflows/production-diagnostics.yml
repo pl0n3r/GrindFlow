@@ -31,7 +31,7 @@ jobs:
       OUTPUT_PATH: production-diagnostics.json
       LIMIT: '20'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Initialize safe diagnostics artifact
         shell: bash
@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload short-lived diagnostics artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: production-diagnostics-${{ github.run_id }}
           path: production-diagnostics.json
