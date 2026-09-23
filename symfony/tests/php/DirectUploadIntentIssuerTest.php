@@ -22,15 +22,17 @@ final class DirectUploadIntentIssuerTest extends TestCase
         $storage = new class implements DirectUploadStorage {
             public ?string $key = null;
             public ?string $mime = null;
+            public ?int $byteSize = null;
             public ?int $expiresAt = null;
 
             public function available(): bool { return true; }
             public function disk(): string { return 'media'; }
             public function driver(): string { return 's3'; }
-            public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
+            public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
             {
                 $this->key = $storageKey;
                 $this->mime = $mimeType;
+                $this->byteSize = $byteSize;
                 $this->expiresAt = $expiresAt;
 
                 return [
@@ -60,6 +62,7 @@ final class DirectUploadIntentIssuerTest extends TestCase
         self::assertSame(['Content-Type' => 'video/mp4'], $intent['headers']);
         self::assertSame('2027-01-15T08:15:00Z', $intent['expires_at']);
         self::assertSame('video/mp4', $storage->mime);
+        self::assertSame(50_000_000, $storage->byteSize);
         self::assertSame(self::NOW + DirectUploadIntentIssuer::DEFAULT_TTL_SECONDS, $storage->expiresAt);
         self::assertNotNull($storage->key);
         self::assertMatchesRegularExpression(
@@ -82,7 +85,7 @@ final class DirectUploadIntentIssuerTest extends TestCase
             public function available(): bool { return false; }
             public function disk(): string { return 'media'; }
             public function driver(): string { return 'unavailable'; }
-            public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
+            public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
             {
                 throw new \LogicException('Unavailable storage must not receive presign calls.');
             }
@@ -116,7 +119,7 @@ final class DirectUploadIntentIssuerTest extends TestCase
             public function available(): bool { return true; }
             public function disk(): string { return 'media'; }
             public function driver(): string { return 's3'; }
-            public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
+            public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
             {
                 return ['url' => '', 'headers' => []];
             }
