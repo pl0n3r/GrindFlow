@@ -60,7 +60,7 @@ final class DirectUploadTokenCipher
         ?int $now = null,
     ): string {
         if ($this->key === null) {
-            throw new \\RuntimeException('Direct upload token encryption is not configured.');
+            throw new \RuntimeException('Direct upload token encryption is not configured.');
         }
 
         $issuedAt = $now ?? time();
