@@ -121,6 +121,7 @@ final class OrganizationSettingsTest extends WebTestCase
             $client->request('POST', '/api/admin/organization/name', [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_X_CSRF_TOKEN' => $token,
+                'CONTENT_LENGTH' => '1',
             ], $oversized);
             self::assertResponseStatusCodeSame(422);
             self::assertSame('Own studio', $db->fetchOne('SELECT name FROM gf_identity_organizations WHERE id = ?', [$mine]));
