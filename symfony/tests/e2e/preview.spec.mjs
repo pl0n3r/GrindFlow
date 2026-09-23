@@ -725,7 +725,7 @@ test('S2 mobile never retries ambiguous HTTP 201 or permanent 422 with malformed
     { name: 'rechazada.png', mimeType: 'image/png', buffer: png },
   ]);
   await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
-  await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
+  await expect(page.getByText(/0 de 2 archivos guardados/)).toBeVisible();
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   expect(attempts).toBe(2);
@@ -823,7 +823,7 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
     { name: 'texto.txt', mimeType: 'text/plain', buffer: Buffer.from('no es imagen') },
   ]);
   await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
-  await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
+  await expect(page.getByText(/0 de 2 archivos guardados/)).toBeVisible();
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
