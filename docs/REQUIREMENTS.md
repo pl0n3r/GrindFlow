@@ -727,9 +727,9 @@ explicitly designed as stateless API traffic.
 **Contrato de regresión Laravel:** dos GET anónimos de `/login` deben conservar
 el token CSRF de la sesión; tras un único POST de credenciales sintéticas
 rechazadas (o bloqueadas por rate limiter), otro GET con la misma sesión debe
-conservar tanto el token CSRF como el estado anónimo y no autenticar al
-visitante. Un POST posterior con credenciales sintéticas válidas puede iniciar
-sesión y solo entonces regenerar la sesión. Validar con PHPUnit y base
+conservar el identificador de sesión, el token CSRF y el estado anónimo, sin
+autenticar al visitante. Un POST posterior con credenciales sintéticas válidas
+puede iniciar sesión y solo entonces debe regenerar su identificador. Validar con PHPUnit y base
 descartable: no utilizar el secreto E2E productivo ni reintentar contraseñas en
 Hostinger. El resultado local no acredita que el problema productivo #73 esté
 resuelto.
