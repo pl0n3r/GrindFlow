@@ -363,6 +363,7 @@ la línea base comercial siguen como slices posteriores del roadmap #2.
 
 **Aceptación:**
 - El endpoint síncrono conserva el límite fijo de 8 MiB por archivo y admite únicamente JPEG, PNG, WebP, MP4 y WebM detectados por bytes reales; extensión o MIME declarado por el cliente no bastan. Imágenes conservan validación de imagen y videos exigen firma de contenedor MP4/WebM acotada.
+- La migración Symfony amplía `ck_gf_vault_assets_mime` a esos cinco MIME. El rollback solo puede volver al constraint de imágenes cuando no queda ningún MP4/WebM retenido; si existen videos debe abortar antes de modificar el constraint.
 - Lista, búsqueda, cuota, clasificación, nota, papelera, integridad, descarga y deduplicación siguen siendo comunes a todos los originales. Los filtros exactos añaden `mp4` y `webm` sin alterar la cuota global ni mostrar recursos de otro tenant.
 - Preview autenticado entrega el MIME real únicamente después de verificar organización, membresía, estado activo, tamaño y SHA-256. Usa `no-store`, `nosniff`, `Cross-Origin-Resource-Policy: same-origin` y nombre de preview fijo; nunca expone storage key ni filename del usuario en inline.
 - React permite selección múltiple de fotos/videos, preview local limitado, progreso por archivo y reintento solo de fallos. El detalle de video usa controles nativos, `playsInline`, `preload=metadata` y nunca autoplay.
