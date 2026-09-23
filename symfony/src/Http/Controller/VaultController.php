@@ -27,7 +27,7 @@ final class VaultController extends AbstractController
     private const MAX_BYTES = 8 * 1024 * 1024;
     private const MAX_ORGANIZATION_ASSETS = 100;
     private const MAX_ORGANIZATION_BYTES = 128 * 1024 * 1024;
-    private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+    private const MIMES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'];
 
     public function __construct(
         private readonly PrivateVaultDirectory $storage,
@@ -66,7 +66,14 @@ final class VaultController extends AbstractController
             return $this->error(422, 'invalid_search', 'Indica una búsqueda de hasta 80 caracteres visibles.');
         }
         $format = $request->query->all()['format'] ?? 'all';
-        $formats = ['all' => null, 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+        $formats = [
+            'all' => null,
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+        ];
         if (!is_string($format) || !array_key_exists($format, $formats)) {
             return $this->error(422, 'invalid_format', 'Selecciona todos los formatos, JPEG, PNG o WebP.');
         }
@@ -171,8 +178,9 @@ final class VaultController extends AbstractController
             return $this->error(422, 'invalid_size', 'La imagen debe pesar entre 1 byte y 8 MiB.');
         }
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($file->getPathname());
-        if (!is_string($mime) || !in_array($mime, self::MIMES, true) || @getimagesize($file->getPathname()) === false) {
-            return $this->error(422, 'invalid_type', 'Solo se aceptan imágenes JPEG, PNG o WebP válidas.');
+        if (!is_string($mime) || !in_array($mime, self::MIMES, true)
+            || !$this->hasSupportedMediaSignature($file->getPathname(), $mime)) {
+            return $this->error(422, 'invalid_type', 'Solo se aceptan JPEG, PNG, WebP, MP4 o WebM válidos.');
         }
 
         $filename = basename(str_replace('\\', '/', $file->getClientOriginalName()));
@@ -365,7 +373,7 @@ final class VaultController extends AbstractController
 
 
     /**
-     * Browser-only inline image preview. The original stays outside public/,
+     * Browser-only inline media preview. The original stays outside public/,
      * and every request rechecks the user, tenant and active file state.
      */
     #[Route('/api/admin/vault/{id}/preview', name: 'grindflow_vault_preview', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
@@ -407,7 +415,13 @@ final class VaultController extends AbstractController
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         // Never use a user-controlled filename for inline content.
-        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime];
+        $extension = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'video/mp4' => 'mp4',
+            'video/webm' => 'webm',
+        ][$mime];
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, 'preview.'.$extension);
 
         return $response;
@@ -943,6 +957,53 @@ final class VaultController extends AbstractController
         }
 
         return ['user' => $user, 'organization' => $organization];
+    }
+
+    /**
+     * Validate a bounded media signature without invoking external tools.
+     * Quick upload stays capped at 8 MiB; deeper inspection/transcoding belongs
+     * to the asynchronous media-processing pipeline.
+     */
+    private function hasSupportedMediaSignature(string $path, string $mime): bool
+    {
+        if (str_starts_with($mime, 'image/')) {
+            return @getimagesize($path) !== false;
+        }
+
+        $handle = @fopen($path, 'rb');
+        if ($handle === false) {
+            return false;
+        }
+        try {
+            $head = fread($handle, 4096);
+        } finally {
+            fclose($handle);
+        }
+        if (!is_string($head)) {
+            return false;
+        }
+        if ($mime === 'video/webm') {
+            return strlen($head) >= 4 && substr($head, 0, 4) === "\x1A\x45\xDF\xA3";
+        }
+        if ($mime !== 'video/mp4') {
+            return false;
+        }
+
+        $offset = 0;
+        $length = strlen($head);
+        while ($offset + 8 <= $length) {
+            $size = unpack('N', substr($head, $offset, 4));
+            $boxSize = is_array($size) ? (int) ($size[1] ?? 0) : 0;
+            $type = substr($head, $offset + 4, 4);
+            if ($type === 'ftyp') {
+                return $boxSize >= 16 && $offset + $boxSize <= $length;
+            }
+            if ($boxSize < 8 || $offset + $boxSize > $length) {
+                return false;
+            }
+            $offset += $boxSize;
+        }
+        return false;
     }
 
     /** @param array<string, mixed> $asset
