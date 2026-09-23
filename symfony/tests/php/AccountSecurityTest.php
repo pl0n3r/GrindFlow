@@ -129,13 +129,38 @@ final class AccountSecurityTest extends WebTestCase
             $client->request('GET', '/api/admin/context');
             $freshCsrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
             $freshHeaders = $jsonHeaders + ['HTTP_X_CSRF_TOKEN' => $freshCsrf];
-            for ($attempt = 0; $attempt < 2; ++$attempt) {
-                $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
-                    'current_password' => 'wrong-current', 'new_password' => $old,
-                    'confirm_password' => $old,
-                ], JSON_THROW_ON_ERROR));
-                self::assertResponseStatusCodeSame(422);
-            }
+            // A valid JSON request whose trailing whitespace crosses the 4 KiB
+            // ceiling must not change the password. The test detects code that
+            // reads only 4096 bytes, since the truncated body is valid JSON.
+            $oversizedJson = json_encode([
+                'current_password' => $next, 'new_password' => $old,
+                'confirm_password' => $old,
+            ], JSON_THROW_ON_ERROR);
+            $oversized = $oversizedJson.str_repeat(' ', 4097 - strlen($oversizedJson));
+            self::assertSame(4097, strlen($oversized));
+            $client->request('POST', $endpoint, [], [],
+                $freshHeaders + ['CONTENT_LENGTH' => '1'], $oversized);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_password', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertStringNotContainsString($oversized, (string) $client->getResponse()->getContent());
+            self::assertTrue(password_verify($next, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
+
+            // The exact 4 KiB boundary still reaches normal validation.
+            $atLimitJson = json_encode([
+                'current_password' => 'wrong-current', 'new_password' => $old,
+                'confirm_password' => $old,
+            ], JSON_THROW_ON_ERROR);
+            $atLimitPayload = str_repeat(' ', 4096 - strlen($atLimitJson)).$atLimitJson;
+            self::assertSame(4096, strlen($atLimitPayload));
+            $client->request('POST', $endpoint, [], [], $freshHeaders, $atLimitPayload);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('current_password_invalid', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
             $client->request('POST', $endpoint, [], [], $freshHeaders, json_encode([
                 'current_password' => $next, 'new_password' => $old,
                 'confirm_password' => $old,
@@ -156,4 +181,159 @@ final class AccountSecurityTest extends WebTestCase
             $db->delete('gf_identity_users', ['id' => $other]);
         }
     }
+
+    /** Declared and actual request sizes are each bounded, without changing the account. */
+    public function testPasswordRequestRejectsUntrustedDeclaredAndActualLengths(): void
+    {
+        $client = static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $actor = Uuid::v7()->toRfc4122();
+        $organization = Uuid::v7()->toRfc4122();
+        $old = 'synthetic-source-password-123';
+        $next = 'synthetic-target-password-456';
+        $now = gmdate('Y-m-d H:i:s');
+        $db->insert('gf_identity_users', [
+            'id' => $actor, 'name' => 'Account size test', 'email' => $actor.'@example.test',
+            'password_hash' => password_hash($old, PASSWORD_BCRYPT),
+            'platform_role' => 'model', 'is_active' => 1,
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+
+        try {
+            $db->insert('gf_identity_organizations', [
+                'id' => $organization, 'name' => 'Size test',
+                'slug' => 'ci-'.substr($organization, 0, 30), 'type' => 'independent',
+                'created_at' => $now, 'updated_at' => $now,
+            ]);
+            $db->insert('gf_identity_memberships', [
+                'id' => Uuid::v7()->toRfc4122(), 'user_id' => $actor,
+                'organization_id' => $organization, 'role' => 'model',
+                'created_at' => $now, 'updated_at' => $now,
+            ]);
+
+            $login = $client->request('GET', '/login');
+            $client->submit($login->filter('form.identity-form')->form([
+                'email' => $actor.'@example.test', 'password' => $old,
+            ]));
+            self::assertResponseRedirects('/organizations');
+            $selector = $client->request('GET', '/organizations');
+            $client->submit($selector->filter('.identity-orgs form')->form());
+            self::assertResponseRedirects('/admin');
+            $client->request('GET', '/api/admin/context');
+            self::assertResponseIsSuccessful();
+            $csrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
+            $headers = ['CONTENT_TYPE' => 'application/json', 'HTTP_X_CSRF_TOKEN' => $csrf];
+            $payload = json_encode([
+                'current_password' => $old, 'new_password' => $next,
+                'confirm_password' => $next,
+            ], JSON_THROW_ON_ERROR);
+
+            // False oversized declarations are rejected conservatively before reading.
+            $client->request('POST', '/api/admin/profile/password', [], [],
+                $headers + ['CONTENT_LENGTH' => '8192'], $payload);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_password', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+
+            // A deceptive small declaration must not bypass the actual byte bound.
+            $largePayload = str_repeat(' ', 4097).$payload;
+            $client->request('POST', '/api/admin/profile/password', [], [],
+                $headers + ['CONTENT_LENGTH' => '1'], $largePayload);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_password', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertTrue(password_verify($old, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
+
+            $client->request('POST', '/api/admin/profile/password', [], [], $headers, $payload);
+            self::assertResponseIsSuccessful();
+            self::assertTrue(password_verify($next, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
+        } finally {
+            $db->delete('gf_identity_memberships', ['user_id' => $actor]);
+            $db->delete('gf_identity_organizations', ['id' => $organization]);
+            $db->delete('gf_identity_users', ['id' => $actor]);
+        }
+    }
+
+    public function testPasswordJsonDepthIsBoundedBeforeValidation(): void
+    {
+        $client = static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $actor = Uuid::v7()->toRfc4122();
+        $organization = Uuid::v7()->toRfc4122();
+        $at = gmdate('Y-m-d H:i:s');
+        $password = 'synthetic-depth-password-123';
+
+        $db->insert('gf_identity_users', [
+            'id' => $actor, 'name' => 'Cuenta depth', 'email' => $actor.'@example.test',
+            'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+            'platform_role' => 'model', 'is_active' => 1,
+            'created_at' => $at, 'updated_at' => $at,
+        ]);
+
+        try {
+            $db->insert('gf_identity_organizations', [
+                'id' => $organization, 'name' => 'Organización depth',
+                'slug' => 'depth-'.substr($organization, 0, 30), 'type' => 'independent',
+                'created_at' => $at, 'updated_at' => $at,
+            ]);
+            $db->insert('gf_identity_memberships', [
+                'id' => Uuid::v7()->toRfc4122(), 'user_id' => $actor,
+                'organization_id' => $organization, 'role' => 'model',
+                'created_at' => $at, 'updated_at' => $at,
+            ]);
+
+            $login = $client->request('GET', '/login');
+            $client->submit($login->filter('form.identity-form')->form([
+                'email' => $actor.'@example.test', 'password' => $password,
+            ]));
+            self::assertResponseRedirects('/organizations');
+            $selector = $client->request('GET', '/organizations');
+            $client->submit($selector->filter('.identity-orgs form')->form());
+            self::assertResponseRedirects('/admin');
+
+            $client->request('GET', '/api/admin/context');
+            self::assertResponseIsSuccessful();
+            $csrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
+
+            // The first duplicate key exceeds depth 16. An unbounded decoder
+            // accepts the final scalar instead, so removing the guard would
+            // actually change the account rather than fail at the type check.
+            $nestedValue = 'blocked';
+            for ($depth = 0; $depth < 17; ++$depth) {
+                $nestedValue = [$nestedValue];
+            }
+            $replacement = 'synthetic-next-depth-password-456';
+            $nested = '{"current_password":'.json_encode($password, JSON_THROW_ON_ERROR)
+                .',"new_password":'.json_encode($nestedValue, JSON_THROW_ON_ERROR)
+                .',"new_password":'.json_encode($replacement, JSON_THROW_ON_ERROR)
+                .',"confirm_password":'.json_encode($replacement, JSON_THROW_ON_ERROR).'}';
+            self::assertLessThan(4096, strlen($nested));
+            self::assertSame($replacement, json_decode($nested, true, 512, JSON_THROW_ON_ERROR)['new_password']);
+
+            $client->request('POST', '/api/admin/profile/password', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $csrf,
+            ], $nested);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_password', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertTrue(password_verify($password, (string) $db->fetchOne(
+                'SELECT password_hash FROM gf_identity_users WHERE id = ?', [$actor],
+            )));
+        } finally {
+            $db->delete('gf_identity_memberships', ['user_id' => $actor]);
+            $db->delete('gf_identity_organizations', ['id' => $organization]);
+            $db->delete('gf_identity_users', ['id' => $actor]);
+        }
+    }
+
 }

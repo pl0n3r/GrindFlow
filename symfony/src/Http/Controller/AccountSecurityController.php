@@ -48,7 +48,21 @@ final class AccountSecurityController extends AbstractController
             return $response;
         }
 
-        $body = json_decode($request->getContent(), true);
+        // Reject a declared oversized request before buffering its body; always check
+        // the actual byte length too, since Content-Length is not an authority.
+        // The web server must also enforce its own request-size limit.
+        $declaredLength = $request->headers->get('Content-Length');
+        if (is_string($declaredLength) && ctype_digit($declaredLength)
+            && (int) $declaredLength > 4096) {
+            return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
+        }
+        // Read one byte beyond the accepted size, never buffer an unbounded body.
+        $stream = $request->getContent(true);
+        $raw = is_resource($stream) ? stream_get_contents($stream, 4097) : false;
+        if (!is_string($raw) || strlen($raw) > 4096) {
+            return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
+        }
+        $body = json_decode($raw, true, 16);
         if (!is_array($body) || $request->request->all() !== [] || $request->files->all() !== []) {
             return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
         }
