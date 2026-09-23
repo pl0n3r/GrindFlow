@@ -16,8 +16,7 @@
 .workspace-navigation-footer .admin-tenant{margin-top:0;overflow-wrap:anywhere}
 .admin-page{display:flex;flex-direction:column}
 .admin-page>.admin-actions{position:static;z-index:auto;min-height:58px;display:flex;justify-content:flex-end;align-items:center;margin:0;padding:9px clamp(18px,4vw,50px);background:#11131e;border-bottom:1px solid #292b3b}
-.admin-page>.admin-layout{flex:1}
-.admin-page main#contenido{scroll-margin-top:16px}
+.admin-page>main#contenido{flex:1;min-width:0;scroll-margin-top:16px}
 .vault-section[id],.weekly-planner[id]{scroll-margin-top:20px}
 @media(min-width:901px) and (max-width:1120px){
   .admin-layout{grid-template-columns:224px minmax(0,1fr)}
