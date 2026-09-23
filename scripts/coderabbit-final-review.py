@@ -112,7 +112,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         status, reviews, threads = read_evidence()
-    except (OSError, ValueError, UnicodeError):
+    except (OSError, ValueError):
         print("CODERABBIT_GATE=invalid_evidence")
         return 1
     failures = verify(args.head, status, reviews, threads)
