@@ -52,6 +52,8 @@ class AuthenticationTest extends TestCase
             ->get('/login')->assertOk()
             ->assertSessionHas('synthetic_login_probe', 'session-persistent');
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $before->getContent(), $beforeToken));
+        $anonymousSessionId = $this->app['session.store']->getId();
+        self::assertNotSame('', $anonymousSessionId);
 
         $this->from('/login')->post('/login', [
             '_token' => $beforeToken[1],
@@ -59,12 +61,16 @@ class AuthenticationTest extends TestCase
             'password' => 'incorrect-synthetic-password',
         ])->assertRedirect('/login')->assertSessionHasErrors('email');
         $this->assertGuest();
+        self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
+            'Rejected login must not rotate the anonymous session identifier.');
 
         $after = $this->get('/login')->assertOk()
             ->assertSessionHas('synthetic_login_probe', 'session-persistent');
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $after->getContent(), $afterToken));
         self::assertSame($beforeToken[1], $afterToken[1],
             'A rejected login should not rotate the anonymous session CSRF token.');
+        self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
+            'The anonymous session identifier should survive the rejection recheck.');
 
         $this->post('/login', [
             '_token' => $afterToken[1],
@@ -72,6 +78,8 @@ class AuthenticationTest extends TestCase
             'password' => 'correct-synthetic-password',
         ])->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
+        self::assertNotSame($anonymousSessionId, $this->app['session.store']->getId(),
+            'Successful login must rotate the authenticated session identifier.');
     }
 
     public function test_user_can_authenticate_and_logout(): void
@@ -168,6 +176,8 @@ class AuthenticationTest extends TestCase
 
         $beforeLockout = $this->get('/login')->assertOk();
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $beforeLockout->getContent(), $beforeToken));
+        $anonymousSessionId = $this->app['session.store']->getId();
+        self::assertNotSame('', $anonymousSessionId);
 
         $this->withServerVariables(['REMOTE_ADDR' => $ip])
             ->from('/login')
@@ -179,10 +189,15 @@ class AuthenticationTest extends TestCase
             ->assertRedirect('/login')
             ->assertSessionHasErrors('email');
 
+        self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
+            'Rate limiting must not rotate the anonymous session identifier.');
+
         $afterLockout = $this->get('/login')->assertOk();
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $afterLockout->getContent(), $afterToken));
         self::assertSame($beforeToken[1], $afterToken[1],
             'Rate limiting must not rotate the anonymous session CSRF token.');
+        self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
+            'The anonymous session identifier should survive the rate-limit recheck.');
 
         Event::assertDispatched(Lockout::class);
         $this->assertGuest();
