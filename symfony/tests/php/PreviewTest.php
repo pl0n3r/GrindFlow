@@ -38,10 +38,12 @@ final class PreviewTest extends WebTestCase
         $client->request('GET', '/');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h1', 'Una carga.');
+        self::assertSelectorExists('main#contenido[tabindex="-1"]');
         $client->request('GET', '/preview');
         self::assertResponseIsSuccessful();
         $release = (new ProductVersion(dirname(__DIR__, 3)))->human();
         self::assertSelectorExists('#grindflow-preview[data-version="'.$release.'"]');
+        self::assertSelectorExists('main#contenido[tabindex="-1"]');
         self::assertSelectorExists('script[src^="/build/assets/preview-"]');
     }
 
@@ -53,6 +55,7 @@ final class PreviewTest extends WebTestCase
         $client->request('GET', '/login');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h1', 'Ingresa a tu espacio');
+        self::assertSelectorExists('main#contenido[tabindex="-1"]');
         self::assertSelectorExists('input[name="_csrf_token"]');
         $client->request('GET', '/organizations');
         self::assertResponseRedirects('/login');
