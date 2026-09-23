@@ -21,6 +21,9 @@ for (const width of [360, 820]) {
     for (const input of [email, password]) {
       await expect(input).toHaveAttribute('aria-invalid', 'true');
       await expect(input).toHaveAttribute('aria-describedby', 'identity-login-error');
+      await expect(input).toHaveAccessibleDescription(
+        'No se pudo iniciar sesión. Revisa tus datos o el estado de tu cuenta.',
+      );
     }
     await expect(password).toHaveAttribute('type', 'password');
     expect(await page.evaluate(() => document.documentElement.scrollWidth))
