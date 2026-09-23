@@ -7,18 +7,23 @@ namespace GrindFlow\Infrastructure\Storage;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Issues short-lived HMAC tickets for direct-to-object-storage uploads.
+ * Encrypts short-lived completion tokens for direct-to-object-storage uploads.
  *
- * Ticket payloads are intentionally readable by the browser: never place
- * credentials, signed provider URLs or secret material inside them.
+ * Tokens contain no provider credential and bind the staged object to one
+ * organization, actor, disk and approved upload metadata.
  */
-final class DirectUploadTicketSigner
+final class DirectUploadTokenCipher
 {
     public const MAX_BYTES = 2_147_483_648;
     public const MIN_TTL_SECONDS = 300;
     public const MAX_TTL_SECONDS = 3600;
 
     private const VERSION = 1;
+    private const PREFIX = 'v1';
+    private const CIPHER = 'aes-256-gcm';
+    private const AAD = 'grindflow:direct-upload:v1';
+    private const NONCE_BYTES = 12;
+    private const TAG_BYTES = 16;
     private const MIMES = [
         'image/jpeg',
         'image/png',
@@ -27,16 +32,24 @@ final class DirectUploadTicketSigner
         'video/webm',
     ];
 
-    public function __construct(private readonly string $secret)
+    private readonly string $key;
+
+    public function __construct(string $secret)
     {
         if (strlen($secret) < 32) {
-            throw new \InvalidArgumentException('Direct upload signing secret must contain at least 32 bytes.');
+            throw new \InvalidArgumentException('Direct upload encryption secret must contain at least 32 bytes.');
         }
+        if (!function_exists('openssl_encrypt') || !function_exists('openssl_decrypt')) {
+            throw new \RuntimeException('OpenSSL is required to protect direct upload completion tokens.');
+        }
+
+        $this->key = hash('sha256', $secret, true);
     }
 
     public function issue(
         string $organizationId,
         string $userId,
+        string $disk,
         string $storageKey,
         string $filename,
         string $mimeType,
@@ -53,6 +66,7 @@ final class DirectUploadTicketSigner
             'v' => self::VERSION,
             'organization_id' => $organizationId,
             'user_id' => $userId,
+            'disk' => $disk,
             'storage_key' => $storageKey,
             'filename' => $filename,
             'mime_type' => $mimeType,
@@ -62,13 +76,30 @@ final class DirectUploadTicketSigner
         ];
         $this->assertPayload($payload);
 
-        $encoded = self::base64UrlEncode(json_encode(
-            $payload,
-            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
-        ));
-        $signature = hash_hmac('sha256', $encoded, $this->secret, true);
+        $plaintext = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $nonce = random_bytes(self::NONCE_BYTES);
+        $tag = '';
+        $ciphertext = openssl_encrypt(
+            $plaintext,
+            self::CIPHER,
+            $this->key,
+            OPENSSL_RAW_DATA,
+            $nonce,
+            $tag,
+            self::AAD,
+            self::TAG_BYTES,
+        );
 
-        return $encoded.'.'.self::base64UrlEncode($signature);
+        if (!is_string($ciphertext) || strlen($tag) !== self::TAG_BYTES) {
+            throw new \RuntimeException('Unable to encrypt direct upload completion token.');
+        }
+
+        return implode('.', [
+            self::PREFIX,
+            self::base64UrlEncode($nonce),
+            self::base64UrlEncode($ciphertext),
+            self::base64UrlEncode($tag),
+        ]);
     }
 
     /**
@@ -76,6 +107,7 @@ final class DirectUploadTicketSigner
      *   v: int,
      *   organization_id: string,
      *   user_id: string,
+     *   disk: string,
      *   storage_key: string,
      *   filename: string,
      *   mime_type: string,
@@ -84,37 +116,55 @@ final class DirectUploadTicketSigner
      *   expires_at: int
      * }|null
      */
-    public function verify(
-        string $ticket,
+    public function decryptFor(
+        string $token,
         string $organizationId,
         string $userId,
+        string $disk,
         ?int $now = null,
     ): ?array {
-        if (strlen($ticket) > 4096 || substr_count($ticket, '.') !== 1) {
+        if (strlen($token) > 4096) {
             return null;
         }
 
-        [$encoded, $encodedSignature] = explode('.', $ticket, 2);
-        $payloadJson = self::base64UrlDecode($encoded);
-        $signature = self::base64UrlDecode($encodedSignature);
-        if ($payloadJson === null || $signature === null || strlen($signature) !== 32) {
+        $parts = explode('.', $token);
+        if (count($parts) !== 4 || $parts[0] !== self::PREFIX) {
             return null;
         }
 
-        $expected = hash_hmac('sha256', $encoded, $this->secret, true);
-        if (!hash_equals($expected, $signature)) {
+        $nonce = self::base64UrlDecode($parts[1]);
+        $ciphertext = self::base64UrlDecode($parts[2]);
+        $tag = self::base64UrlDecode($parts[3]);
+        if ($nonce === null || strlen($nonce) !== self::NONCE_BYTES
+            || $ciphertext === null || $ciphertext === ''
+            || $tag === null || strlen($tag) !== self::TAG_BYTES) {
+            return null;
+        }
+
+        $plaintext = openssl_decrypt(
+            $ciphertext,
+            self::CIPHER,
+            $this->key,
+            OPENSSL_RAW_DATA,
+            $nonce,
+            $tag,
+            self::AAD,
+        );
+        if (!is_string($plaintext)) {
             return null;
         }
 
         try {
-            $payload = json_decode($payloadJson, true, flags: JSON_THROW_ON_ERROR);
+            $payload = json_decode($plaintext, true, flags: JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             return null;
         }
+
         if (!is_array($payload) || array_keys($payload) !== [
             'v',
             'organization_id',
             'user_id',
+            'disk',
             'storage_key',
             'filename',
             'mime_type',
@@ -134,6 +184,7 @@ final class DirectUploadTicketSigner
         $clock = $now ?? time();
         if (!hash_equals($organizationId, $payload['organization_id'])
             || !hash_equals($userId, $payload['user_id'])
+            || !hash_equals($disk, $payload['disk'])
             || $payload['issued_at'] > $clock + 60
             || $payload['expires_at'] <= $clock
             || $payload['expires_at'] - $payload['issued_at'] < self::MIN_TTL_SECONDS
@@ -145,6 +196,7 @@ final class DirectUploadTicketSigner
          *   v: int,
          *   organization_id: string,
          *   user_id: string,
+         *   disk: string,
          *   storage_key: string,
          *   filename: string,
          *   mime_type: string,
@@ -161,6 +213,7 @@ final class DirectUploadTicketSigner
     {
         $organizationId = $payload['organization_id'] ?? null;
         $userId = $payload['user_id'] ?? null;
+        $disk = $payload['disk'] ?? null;
         $storageKey = $payload['storage_key'] ?? null;
         $filename = $payload['filename'] ?? null;
         $mimeType = $payload['mime_type'] ?? null;
@@ -178,6 +231,7 @@ final class DirectUploadTicketSigner
         if (($payload['v'] ?? null) !== self::VERSION
             || !is_string($organizationId) || !Uuid::isValid($organizationId)
             || !is_string($userId) || !Uuid::isValid($userId)
+            || !is_string($disk) || preg_match('/\\A[A-Za-z0-9._-]{1,64}\\z/D', $disk) !== 1
             || !is_string($storageKey) || $storagePrefix === ''
             || !Uuid::isValid($stagingId) || $storageKey !== $storagePrefix.$stagingId
             || !is_string($filename) || trim($filename) === '' || strlen($filename) > 180
@@ -188,7 +242,7 @@ final class DirectUploadTicketSigner
             || !is_int($byteSize) || $byteSize < 1 || $byteSize > self::MAX_BYTES
             || !is_int($issuedAt) || $issuedAt < 1
             || !is_int($expiresAt) || $expiresAt <= $issuedAt) {
-            throw new \InvalidArgumentException('Direct upload ticket payload is invalid.');
+            throw new \InvalidArgumentException('Direct upload completion token payload is invalid.');
         }
     }
 
