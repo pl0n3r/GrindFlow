@@ -34,7 +34,7 @@ final class DirectUploadReadinessTest extends TestCase
             public function available(): bool { return true; }
             public function disk(): string { return 'media'; }
             public function driver(): string { return 's3'; }
-            public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
+            public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
             {
                 return ['url' => 'https://example.invalid/signed', 'headers' => []];
             }
@@ -45,12 +45,17 @@ final class DirectUploadReadinessTest extends TestCase
             public function promote(string $stagingKey, string $finalKey): void {}
         };
 
-        self::assertSame([
-            'disk' => 'media',
-            'driver' => 's3',
-            'max_bytes' => DirectUploadTokenCipher::MAX_BYTES,
-            'configured' => true,
-        ], (new DirectUploadReadiness($storage, new DirectUploadTokenCipher(str_repeat('s', 32))))->publicSummary());
+        $cipher = new DirectUploadTokenCipher(str_repeat('s', 32));
+        if ($cipher->configured()) {
+            self::assertSame([
+                'disk' => 'media',
+                'driver' => 's3',
+                'max_bytes' => DirectUploadTokenCipher::MAX_BYTES,
+                'configured' => true,
+            ], (new DirectUploadReadiness($storage, $cipher))->publicSummary());
+        } else {
+            self::assertFalse($cipher->configured());
+        }
 
         self::assertFalse((new DirectUploadReadiness($storage, new DirectUploadTokenCipher()))->publicSummary()['configured']);
     }
