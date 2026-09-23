@@ -97,7 +97,7 @@ test('mobile navigation reveals active preview and private sections without page
   }));
   await page.evaluate(() => {
     window.location.hash = '';
-    document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>';
+    document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>';
   });
   await page.addScriptTag({ url: asset + '?shared-mobile-nav=1', type: 'module' });
   const admin = page.getByRole('navigation', { name: 'Navegación administrativa' });
@@ -174,7 +174,7 @@ test('React admin renders role capabilities from its tenant context contract', a
       meta: { version: '0.1.34' },
     }),
   }));
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?admin-e2e=1', type: 'module' });
 
   await expect(page.getByRole('heading', { name: /Tu espacio/ })).toBeVisible();
@@ -224,7 +224,7 @@ test('organization manager can rename selected tenant in mobile React without an
       }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?settings-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Nombre de la organización' })).toBeVisible();
   await page.getByLabel('Nombre visible').fill('Nuevo nombre');
@@ -262,7 +262,7 @@ test('editor can update only their own profile name from a 360px React panel', a
     });
   });
 
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?profile-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Perfil personal' })).toBeVisible();
   await page.getByLabel('Nombre en tu perfil').fill('Persona actualizada');
@@ -317,7 +317,7 @@ test('personal password change is available at 360px and clears all secret field
           : { data: { reauthentication_required: true } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?password-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Cambiar contraseña' })).toBeVisible();
   const current = page.getByLabel('Contraseña actual');
@@ -414,7 +414,7 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
     });
   });
 
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
   await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
@@ -493,7 +493,7 @@ test('S2 mobile vault navigates real paginated API metadata', async ({ page }) =
       } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-pages-e2e=1', type: 'module' });
   await expect(page.getByText('31 imágenes en esta organización')).toBeVisible();
   await expect(page.getByText('pagina-1.png')).toBeVisible();
@@ -549,7 +549,7 @@ test('S2 móvil conserva éxitos parciales cuando la cuota rechaza otra imagen',
       body: JSON.stringify({ data: { asset: saved } }) });
   });
 
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-quota-e2e=1', type: 'module' });
   await expect(page.getByText('99 de 100 imágenes, incluida la papelera.')).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
@@ -595,7 +595,7 @@ test('S2 mobile never retries ambiguous HTTP 201 or permanent 422 with malformed
     return route.fulfill({ status: attempts === 1 ? 201 : 422,
       contentType: 'text/plain', body: 'invalid json' });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-ambiguous-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
@@ -649,7 +649,7 @@ test('S2 private mobile image preview loads only inside active details, then dis
       headers: { 'cache-control': 'no-store, private',
         'cross-origin-resource-policy': 'same-origin' }, body: png });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-private-preview-e2e=1', type: 'module' });
   await expect(page.getByText('imagen-privada.png', { exact: true })).toBeVisible();
   const image = page.getByRole('img', { name: 'Vista previa privada de imagen-privada.png' });
@@ -693,7 +693,7 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
     return route.fulfill({ status: 409, contentType: 'application/json',
       body: JSON.stringify({ error: { code: 'vault_duplicate_active', message: 'Ya existe esta imagen.' } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-reject-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
@@ -751,7 +751,7 @@ test('S2 mobile retries only failed files after a partial multi-upload', async (
     return route.fulfill({ status: 201, contentType: 'application/json',
       body: JSON.stringify({ data: { asset: item } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: assetScript + '?vault-retry-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
@@ -821,7 +821,7 @@ test('S2 mobile trash requires confirmation, keeps quota and restores without ex
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, state: 'active' } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-trash-e2e=1', type: 'module' });
   await expect(page.getByText('foto-recuperable.png')).toBeVisible();
   await page.getByRole('button', { name: 'Mover a papelera' }).click();
@@ -897,7 +897,7 @@ test('S2 mobile upload distinguishes an active duplicate from a recoverable tras
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, state: 'active' } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: assetScript + '?vault-dedup-e2e=1', type: 'module' });
   await expect(page.getByText('guardada.png')).toBeVisible();
   await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
@@ -948,7 +948,7 @@ test('S1 revocation hides tenant workspace, while a recoverable CSRF error keeps
         : { code: 'organization_access_changed', message: 'Tu acceso a esta organización ha cambiado.' } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?session-s1=1', type: 'module' });
   await expect(page.getByText('Espacio revocable').first()).toBeVisible();
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
@@ -1010,7 +1010,7 @@ test('S2 mobile edits a tenant-private note, handles CSRF, clears and reads it a
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, note } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-notes-edit-e2e=1', type: 'module' });
   await expect(page.getByText('archivo-interno.png', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Detalles' }).click();
@@ -1033,7 +1033,7 @@ test('S2 mobile edits a tenant-private note, handles CSRF, clears and reads it a
   // A member with read-only role sees notes but cannot update or clear them.
   note = 'Referencia de lectura';
   role = 'model';
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-notes-model-e2e=1', type: 'module' });
   await expect(page.getByText('archivo-interno.png', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Detalles' }).click();
@@ -1095,7 +1095,7 @@ test('S2 mobile classifies private originals with CSRF, scoped filter and viewer
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, usage_scope: usage } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-classification-editor-e2e=1', type: 'module' });
   await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
   await expect(page.getByText('Clasificación: Sin clasificar')).toBeVisible();
@@ -1117,7 +1117,7 @@ test('S2 mobile classifies private originals with CSRF, scoped filter and viewer
   expect(seen).toContainEqual(['internal_only', 'active']);
   expect(seen).toContainEqual(['needs_review', 'trash']);
   role = 'model';
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-classification-viewer-e2e=1', type: 'module' });
   await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Detalles' }).click();
@@ -1165,7 +1165,7 @@ test('S2 mobile renames a private image without changing its download identity',
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, name } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-rename-e2e=1', type: 'module' });
   await expect(page.getByText('original.png')).toBeVisible();
   await page.getByRole('button', { name: 'Renombrar' }).click();
@@ -1217,7 +1217,7 @@ test('S2 mobile searches private filenames in library and trash without changing
       } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-search-e2e=1', type: 'module' });
   await expect(page.getByText('festival.png')).toBeVisible();
   await expect(page.getByText('ensayo.png')).toBeVisible();
@@ -1286,7 +1286,7 @@ test('S2 mobile combines MIME filters, backend ordering and search while keeping
       } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-format-sort-e2e=1', type: 'module' });
   await expect(page.getByText('lago.png')).toBeVisible();
   await expect(page.getByText('mar.webp')).toBeVisible();
@@ -1351,7 +1351,7 @@ test('S2 mobile checks retained private original without leaking a fingerprint o
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, status: results.shift() } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-integrity-e2e=1', type: 'module' });
   await expect(page.getByText('foto.png')).toBeVisible();
   const button = page.getByRole('button', { name: 'Verificar integridad de foto.png' });
@@ -1418,7 +1418,7 @@ test('S2 ignores a stale integrity response after switching views, without block
       body: JSON.stringify({ data: { id, status: call === 1 ? 'mismatch' : 'verified' } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-integrity-stale-e2e=1', type: 'module' });
   const button = page.getByRole('button', { name: 'Verificar integridad de foto.png' });
   await expect(button).toBeVisible();
@@ -1480,7 +1480,7 @@ test('S2 mobile verifies only visible originals and clears results on view switc
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { id, status: id === first ? 'verified' : 'mismatch' } }) });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-page-integrity-e2e=1', type: 'module' });
   await expect(page.getByText('imagen-1.png')).toBeVisible();
   await page.getByRole('button', { name: 'Verificar originales visibles (2)' }).click();
@@ -1544,7 +1544,7 @@ test('S2 editor classifies explicitly selected active images atomically at 360px
       body: JSON.stringify({ data: { usage_scope: state, selected_count: 2, updated_count: 2 } }),
     });
   });
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-batch-e2e=1', type: 'module' });
   await expect(page.getByRole('checkbox', { name: 'Seleccionar imagen-1.png' })).toBeVisible();
   await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
@@ -1592,7 +1592,7 @@ test('S2 viewer has no batch controls in library or trash', async ({ page }) => 
       page: 1, pages: 1, total: 1,
     } }),
   }));
-  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+  await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-batch-viewer-e2e=1', type: 'module' });
   await expect(page.getByText('visible.png')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
@@ -1957,7 +1957,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   }));
 
   await page.evaluate(() => {
-    document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>';
+    document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>';
   });
   await page.addScriptTag({ url: script + '?weekly-planner-e2e=1', type: 'module' });
 
@@ -2081,7 +2081,7 @@ test('preview and private workspace share responsive navigation without horizont
         permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
       } }),
     }));
-    await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>'; });
+    await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
     await page.addScriptTag({ url: asset + '?shared-navigation-e2e=' + width, type: 'module' });
     const adminNav = page.getByRole('navigation', { name: 'Navegación administrativa' });
     await expect(adminNav.getByRole('link', { name: /Biblioteca/ })).toHaveAttribute('href', '#biblioteca');
@@ -2172,7 +2172,7 @@ test('S5 weekly pilot overview is tenant-context read-only and responsive at 360
   });
 
   await page.evaluate(() => {
-    document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>';
+    document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>';
   });
   await page.addScriptTag({ url: asset + '?pilot-e2e=1', type: 'module' });
   const navigation = page.getByRole('navigation', { name: 'Navegación administrativa' });
