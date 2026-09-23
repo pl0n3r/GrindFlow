@@ -51,7 +51,7 @@ paths.each do |path|
 
     Array(job["steps"]).each do |step|
       next unless step.is_a?(Hash)
-      next unless step["uses"].is_a?(String) && step["uses"].start_with?("actions/checkout@")
+      next unless step["uses"].is_a?(String) && step["uses"].downcase.start_with?("actions/checkout@")
 
       options = step.fetch("with", {})
       unless options.is_a?(Hash) && options["persist-credentials"] == false
