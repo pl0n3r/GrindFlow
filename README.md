@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+131** | **−35** | **+96** |
+| **9** | **+161** | **−65** | **+96** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -78,6 +78,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `symfony/frontend/admin/workspace-navigation.css`
 - `symfony/templates/identity/admin.html.twig`
 - `symfony/tests/e2e/admin-stable-skip.spec.mjs`
+- `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/OrganizationSelectorAccessibilityTest.php`
 
 ## Validación
