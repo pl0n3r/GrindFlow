@@ -57,6 +57,10 @@ final class DirectUploadTokenCipher
         int $ttlSeconds = 900,
         ?int $now = null,
     ): string {
+        if ($this->key === null) {
+            throw new \\RuntimeException('Direct upload token encryption is not configured.');
+        }
+
         $issuedAt = $now ?? time();
         if ($ttlSeconds < self::MIN_TTL_SECONDS || $ttlSeconds > self::MAX_TTL_SECONDS) {
             throw new \InvalidArgumentException('Direct upload TTL is outside the allowed range.');
@@ -123,7 +127,7 @@ final class DirectUploadTokenCipher
         string $disk,
         ?int $now = null,
     ): ?array {
-        if (strlen($token) > 4096) {
+        if ($this->key === null || strlen($token) > 4096) {
             return null;
         }
 

@@ -117,9 +117,29 @@ final class DirectUploadTokenCipherTest extends TestCase
         }
     }
 
-    public function testEncryptionSecretMustBeHighEntropySized(): void
+    public function testMissingOrShortEncryptionSecretFailsClosedWithoutBreakingContainerUse(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        new DirectUploadTokenCipher('too-short');
+        foreach (['', 'too-short'] as $secret) {
+            $cipher = new DirectUploadTokenCipher($secret);
+            self::assertFalse($cipher->configured());
+            self::assertNull($cipher->decryptFor('not-a-token', Uuid::v7()->toRfc4122(), Uuid::v7()->toRfc4122(), 'media', self::NOW));
+
+            try {
+                $cipher->issue(
+                    Uuid::v7()->toRfc4122(),
+                    Uuid::v7()->toRfc4122(),
+                    'media',
+                    'organizations/'.Uuid::v7()->toRfc4122().'/staging/'.Uuid::v7()->toRfc4122(),
+                    'clip.mp4',
+                    'video/mp4',
+                    1,
+                    900,
+                    self::NOW,
+                );
+                self::fail('Unconfigured token encryption issued a completion token.');
+            } catch (\RuntimeException $exception) {
+                self::assertSame('Direct upload token encryption is not configured.', $exception->getMessage());
+            }
+        }
     }
 }

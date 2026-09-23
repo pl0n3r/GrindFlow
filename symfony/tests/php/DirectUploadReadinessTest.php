@@ -14,7 +14,10 @@ final class DirectUploadReadinessTest extends TestCase
 {
     public function testUnavailableSummaryIsExplicitAndContainsNoProviderSecretMaterial(): void
     {
-        $summary = (new DirectUploadReadiness(new UnavailableDirectUploadStorage('media')))->publicSummary();
+        $summary = (new DirectUploadReadiness(
+            new UnavailableDirectUploadStorage('media'),
+            new DirectUploadTokenCipher(),
+        ))->publicSummary();
 
         self::assertSame([
             'disk' => 'media',
@@ -47,6 +50,8 @@ final class DirectUploadReadinessTest extends TestCase
             'driver' => 's3',
             'max_bytes' => DirectUploadTokenCipher::MAX_BYTES,
             'configured' => true,
-        ], (new DirectUploadReadiness($storage))->publicSummary());
+        ], (new DirectUploadReadiness($storage, new DirectUploadTokenCipher(str_repeat('s', 32))))->publicSummary());
+
+        self::assertFalse((new DirectUploadReadiness($storage, new DirectUploadTokenCipher()))->publicSummary()['configured']);
     }
 }

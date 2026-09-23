@@ -11,8 +11,10 @@ namespace GrindFlow\Infrastructure\Storage;
  */
 final class DirectUploadReadiness
 {
-    public function __construct(private readonly DirectUploadStorage $storage)
-    {
+    public function __construct(
+        private readonly DirectUploadStorage $storage,
+        private readonly DirectUploadTokenCipher $tokens,
+    ) {
     }
 
     /**
@@ -24,7 +26,7 @@ final class DirectUploadReadiness
             'disk' => $this->storage->disk(),
             'driver' => $this->storage->driver(),
             'max_bytes' => DirectUploadTokenCipher::MAX_BYTES,
-            'configured' => $this->storage->available(),
+            'configured' => $this->storage->available() && $this->tokens->configured(),
         ];
     }
 }
