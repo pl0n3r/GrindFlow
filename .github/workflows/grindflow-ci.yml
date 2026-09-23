@@ -218,6 +218,8 @@ jobs:
           python3 -m py_compile scripts/release-version.py
           python3 scripts/release-version.py --self-test
           python3 -m py_compile scripts/production-migration-inventory.py
+          python3 -m py_compile scripts/production-smoke-auth-triage.py
+          python3 -m unittest tests/test_production_smoke_auth_triage.py
           python3 -m py_compile scripts/production-migration-contract.py
           python3 -m py_compile scripts/production-runtime-readiness.py
           python3 -m py_compile scripts/production-runtime-readiness-contract.py

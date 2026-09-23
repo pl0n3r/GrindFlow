@@ -167,6 +167,13 @@ jobs:
               echo "Cause: inspect the short-lived diagnostic artifact."
             fi
             echo
+            # Parse only allowlisted local signals; never publish log lines or remote HTML.
+            if python3 scripts/production-smoke-auth-triage.py --markdown < production-smoke.log; then
+              :
+            else
+              echo "Authentication signal summary unavailable; inspect the short-lived artifact."
+            fi
+            echo
             # Publish only strict allowlisted release metadata; never response HTML.
             expected_line="$(grep -E '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' production-smoke.log | tail -n 1 || true)"
             observed_line="$(grep -E '^RELEASE_UI_OBSERVED=(v[0-9]+[.][0-9]+[.][0-9]+|unknown)$' production-smoke.log | tail -n 1 || true)"

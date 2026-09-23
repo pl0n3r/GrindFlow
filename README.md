@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.99: cadena offline de evidencia single-writer para GF-ARCH-002.** Base exacta `main` v0.1.98 `8a371ae471f40f3a0b92a1eab9997e90ff9a3b02`; verifica referencias de un ensayo no productivo sin congelar escritores reales ni autorizar cutover.
+> **Candidato v0.1.100: diagnóstico seguro del fallo de login E2E en Production Smoke.** Base exacta `main` v0.1.99 `11ed123a3dbe163ae7c1a346aebba317fe25e654`; clasifica señales ya registradas sin repetir autenticación ni publicar datos de la sesión.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.99** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.98~~ | `8a371ae471f40f3a0b92a1eab9997e90ff9a3b02` |
-| CI del PR | 🚧 Pendiente | Revalidar HEAD final |
-| Sonar del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 No observado para v0.1.98 | Production Smoke separado y no validado |
+| Version objetivo | 🚧 **v0.1.100** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.99~~ | `11ed123a3dbe163ae7c1a346aebba317fe25e654` |
+| CI del PR | ✅ **VALIDATED IN CODE** | `GrindFlow CI / validate` run `35799235688` success sobre `52c6cd23bd633a9dd0790aea5ea482ba115410eb` |
+| Sonar del PR | ✅ **VALIDATED IN CODE** | SonarCloud success, 0 issues nuevos / 0 hotspots sobre `52c6cd23bd633a9dd0790aea5ea482ba115410eb` |
+| CodeRabbit del PR | 🚧 Ajuste documental pendiente | Full review completada sobre `52c6cd23bd633a9dd0790aea5ea482ba115410eb`; este sync requiere nueva revisión final |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35792566588` success sobre `11ed123a3dbe163ae7c1a346aebba317fe25e654`; Production Smoke separado |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Referencias offline; sin datos ni secretos productivos |
+| Datos productivos | ✅ ~~No tocados~~ | Clasificador offline + pruebas sintéticas; sin peticiones ni credenciales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+799** | **−32** | **+767** |
+| **7** | **+521** | **−32** | **+489** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-ARCH-002: cadena single-writer redacted, sin ejecución de cutover |
+| Alcance | Issue #73: resumen seguro de login E2E en Production Smoke |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,47 +63,48 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Nuevo `scripts/single-writer-rehearsal-evidence.py`: valida receipts mínimos del ensayo de escritor único sin ejecutar operaciones.
-- Conecta el reporte previo de evidencia de operador al nuevo receipt mediante hashes SHA-256, módulo y huella del inventario.
-- Vuelve a comprobar la huella del inventario contra las migraciones del checkout y rechaza módulos sin ownership revisado.
-- Exige escritor anterior y rollback Laravel, escritor candidato Symfony, freeze declarado, exclusividad del candidato y ausencia de writers concurrentes.
-- Rechaza reutilizar huellas de inventario o bundle como digest de referencias, o evidencia single-writer entre etapas; también rechaza observaciones cronológicamente anteriores, campos adicionales, enteros como booleanos y JSON con claves duplicadas o números no finitos.
-- Limita stdin a 1.000.000 bytes UTF-8; no usa red, SQL, procesos externos ni rutas proporcionadas por el caller.
-- El reporte mantiene `receipt_content_verified=false`, `production_ready=false` y `production_authorized=false`; autorización y smoke siguen pendientes.
-- Suite de regresión incluida en el gate `fast`. No cambia la infraestructura productiva ni el dueño real de escritura.
+- Nuevo `scripts/production-smoke-auth-triage.py`: clasifica exclusivamente señales de login que el smoke ya emitió. No hace solicitudes ni repite el POST.
+- Distingue sesión/CSRF inconsistente antes del POST, login rechazado con recheck estable/cambiado/no disponible, redirección del dashboard y HTTP de autenticación.
+- El clasificador mantiene un vocabulario cerrado y nunca imprime HTML remoto, cookies, tokens, credenciales, mensajes libres ni redirects externos.
+- La entrada está limitada a 1.000.000 bytes UTF-8; señales contradictorias o no permitidas fallan cerrado sin reproducir el log.
+- El workflow `production-smoke.yml` agrega al issue automático solo la salida `--markdown` del clasificador; si falla, publica una frase fija sin suprimir el error del smoke.
+- Nueva suite `tests/test_production_smoke_auth_triage.py` con casos de rechazo, recheck, redacción y límites; el gate `fast` la ejecuta con datos sintéticos.
+- `docs/PRODUCTION-SMOKE-AUTH-TRIAGE.md` define cada diagnóstico y sus límites: ningún resultado confirma contraseña, cuenta ni rate-limit.
+- No se cambia el login de Laravel, usuarios, secretos, Hostinger, MariaDB productiva ni estado del issue #73 antes de un smoke satisfactorio.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
 <!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
+- `.github/workflows/production-smoke.yml`
 - `README.md`
 - `config/version.php`
-- `docs/DATA-CUTOVER-INVENTORY.md`
-- `scripts/single-writer-rehearsal-evidence.py`
-- `tests/test_single_writer_rehearsal_evidence.py`
+- `docs/PRODUCTION-SMOKE-AUTH-TRIAGE.md`
+- `scripts/production-smoke-auth-triage.py`
+- `tests/test_production_smoke_auth_triage.py`
 
 ## Validación
-- Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final.
-- Por tocar workflow, CI incluye los gates completos y `symfony-preview`.
-- Los recibos anteriores y el single-writer deben compartir módulo e inventario del checkout, con hashes de evidencia distintos y orden temporal correcto.
-- Rechazar hashes inventados aunque coincidan entre etapas, módulos no revisados, JSON UTF-16/UTF-32 y duplicación de claves.
-- Ningún receipt demuestra por sí solo freeze efectivo, autorización del propietario, backup real validado, despliegue o Production Smoke.
+- El candidato debe pasar `validate`, Sonar y full review CodeRabbit sobre el mismo HEAD.
+- Por tocar el workflow principal, CI ejecuta el scope completo, incluido `symfony-preview`.
+- Probar el clasificador con un log sintético; las salidas solo pueden contener etiquetas/frases predeterminadas.
+- El resumen no demuestra que el smoke productivo funcione, ni causa de rechazo de login, ni SHA remoto.
+- CI, Production Smoke, Observer y validación productiva siguen siendo señales separadas.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Contrato offline single-writer | 🚧 v0.1.99 candidata |
-| **NEXT** | 🚧 Revisión humana de evidencia + autorización separada | 🚧 GF-ARCH-002 |
+| **NOW** | 🚧 Diagnóstico seguro de login E2E | 🚧 v0.1.100 candidata |
+| **NEXT** | 🚧 Configuración autorizada de cuenta E2E y smoke productivo | 🚧 #73 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.98 fusionada~~ | ✅ ~~verificador de evidencia de operador~~ |
-| **NOW** | 🚧 Single-writer evidence verifier | 🚧 v0.1.99 |
-| **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 Sin cutover |
+| **DONE** | ✅ ~~v0.1.99 fusionada~~ | ✅ ~~cadena offline single-writer~~ |
+| **NOW** | 🚧 Redacted smoke auth triage | 🚧 v0.1.100 |
+| **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
