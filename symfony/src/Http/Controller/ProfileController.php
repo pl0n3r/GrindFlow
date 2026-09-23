@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
+use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Entity\IdentityUser;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,7 +26,7 @@ final class ProfileController extends AbstractController
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
         }
 
-        $body = json_decode($request->getContent(), true);
+        $body = BoundedJsonBody::decode($request);
         // An authenticated actor may change only their own name, never account/tenant IDs.
         if (!is_array($body) || array_keys($body) !== ['name'] || !is_string($body['name'])) {
             return $this->error(422, 'invalid_name', 'Indica solo el nombre visible de tu perfil.');
