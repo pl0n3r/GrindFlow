@@ -729,7 +729,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
           ? <button type="button" disabled={batchSaving || !!busyId || bulkChecking || !batchIds.length}
               onClick={() => setBatchConfirm(true)}>Revisar clasificación de selección</button>
           : <div className="vault-confirm">
-              <p>¿Asignar «{usageLabels[batchUsage]}» a las {batchIds.length} archivos seleccionados?</p>
+              <p>¿Asignar «{usageLabels[batchUsage]}» a los {batchIds.length} archivos seleccionados?</p>
               <button type="submit" disabled={batchSaving || !!busyId}>
                 {batchSaving ? 'Guardando selección…' : 'Confirmar clasificación de selección'}
               </button>
