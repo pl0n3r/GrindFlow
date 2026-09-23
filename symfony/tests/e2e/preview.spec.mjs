@@ -18,6 +18,65 @@ test('React navigation changes visible section without claiming real data', asyn
   await expect(page.getByRole('heading', { name: 'Tráfico' })).toBeVisible();
 });
 
+test('mobile navigation reveals active preview and private sections without page overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+
+  const fullyVisible = (nav) => nav.evaluate((element) => {
+    const active = element.querySelector('.workspace-nav-item.selected, .workspace-nav-item.active');
+    if (!active) return false;
+    const box = element.getBoundingClientRect();
+    const item = active.getBoundingClientRect();
+    return item.left >= box.left - 1 && item.right <= box.right + 1;
+  });
+
+  const preview = page.getByRole('navigation', { name: 'Explorador de secciones' });
+  await expect(page.getByText('Desliza para explorar más secciones ↔')).toBeVisible();
+  await expect.poll(() => preview.evaluate((el) => el.scrollWidth - el.clientWidth))
+    .toBeGreaterThan(8);
+
+  // DOM clicks do not automatically scroll off-screen items as Playwright
+  // locator.click would. The component must reveal the selected item itself.
+  await preview.evaluate((el) => {
+    el.scrollLeft = 0;
+    el.querySelectorAll('button')[2].click();
+  });
+  await expect(page.getByRole('heading', { name: 'Tráfico' })).toBeVisible();
+  await expect.poll(() => fullyVisible(preview)).toBe(true);
+  expect(await preview.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+
+  await preview.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+    el.querySelectorAll('button')[0].click();
+  });
+  await expect(page.getByRole('heading', { name: 'Biblioteca' })).toBeVisible();
+  await expect.poll(() => fullyVisible(preview)).toBe(true);
+
+  const asset = await page.locator('script[type="module"]').getAttribute('src');
+  expect(asset).toBeTruthy();
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ data: {
+      user: { display_name: 'Persona sintética' },
+      organization: { id: '00000000-0000-7000-8000-000000000080', name: 'Equipo sintético', role: 'editor' },
+      permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+    } }),
+  }));
+  await page.evaluate(() => {
+    window.location.hash = '';
+    document.body.innerHTML = '<div class="admin-page"><div id="grindflow-admin"></div></div>';
+  });
+  await page.addScriptTag({ url: asset + '?shared-mobile-nav=1', type: 'module' });
+  const admin = page.getByRole('navigation', { name: 'Navegación administrativa' });
+  await expect(admin).toBeVisible();
+  await expect(admin.locator('.workspace-nav-item.active')).toHaveAttribute('href', '/admin');
+  await page.evaluate(() => { window.location.hash = '#programacion'; });
+  await expect(admin.locator('.workspace-nav-item.active')).toHaveAttribute('href', '#programacion');
+  await expect.poll(() => fullyVisible(admin)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(360);
+});
+
 test('mobile viewport keeps home and React preview usable', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/');
