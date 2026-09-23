@@ -274,7 +274,7 @@ jobs:
         name: Locate Composer cache
         shell: bash
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
@@ -320,7 +320,7 @@ jobs:
         name: Locate Composer cache
         shell: bash
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
@@ -381,7 +381,7 @@ jobs:
         name: Locate Composer cache
         shell: bash
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
@@ -419,7 +419,7 @@ jobs:
       E2E_ORG_NAME: E2E Browser Workspace
       E2E_ORG_SLUG: e2e-browser-workspace
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
@@ -429,7 +429,7 @@ jobs:
         name: Locate Composer cache
         shell: bash
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
@@ -480,7 +480,7 @@ jobs:
         run: bash scripts/browser-smoke.sh
       - name: Upload browser diagnostics
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: browser-diagnostics
           path: |
@@ -536,7 +536,7 @@ jobs:
       E2E_ORG_NAME: E2E Browser Workspace
       E2E_ORG_SLUG: e2e-browser-workspace
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
@@ -546,7 +546,7 @@ jobs:
         name: Locate Composer cache
         shell: bash
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
@@ -595,7 +595,7 @@ jobs:
         run: bash scripts/browser-smoke.sh
       - name: Upload browser diagnostics
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: realstack-diagnostics
           path: |
@@ -648,7 +648,7 @@ jobs:
           php-version: '8.5'
           extensions: ctype, iconv, mbstring, pdo_mysql, dom
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -784,7 +784,7 @@ jobs:
           PY
 
       - name: Upload disposable GF-ARCH-002 evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: gf-arch-002-disposable-evidence
           path: /tmp/gf-arch-002-evidence/*.json
@@ -813,7 +813,7 @@ jobs:
         run: bash tests/contract/smoke.sh
       - id: chromium-cache
         name: Cache Playwright Chromium by locked dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-chromium-${{ hashFiles('symfony/package-lock.json') }}
@@ -830,7 +830,7 @@ jobs:
           npm run test:e2e
       - name: Upload S0 diagnostics only on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: symfony-s0-diagnostics
           path: |
@@ -852,7 +852,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm

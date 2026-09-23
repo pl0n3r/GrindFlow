@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.113: presupuesto estricto de deprecations Symfony.** Base exacta `main` v0.1.112 `1619f1f67c2e5458cbe5acac2aa47f755862b84c`; CI bloquea deprecations propias o llamadas directas a APIs deprecadas.
+> **Candidato v0.1.114: GitHub Actions sobre runtime Node 24.** Base exacta `main` v0.1.113 `8f93a1e9e821ee498dc875ca71dd4fb8d7de3ec2`; acciones oficiales se migran a majors compatibles y CI bloquea referencias Node 20 conocidas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.113** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.112~~ | `1619f1f67c2e5458cbe5acac2aa47f755862b84c` |
-| CI del PR | ✅ **VALIDATED IN CODE** | `validate` del HEAD final debe estar `success` antes del merge |
-| Sonar del PR | ✅ **Quality Gate** | `SonarCloud Code Analysis` del HEAD final debe estar `success` antes del merge |
+| Version objetivo | 🚧 **v0.1.114** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.113~~ | `8f93a1e9e821ee498dc875ca71dd4fb8d7de3ec2` |
+| CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final en `success` |
+| Sonar del PR | 🚧 Pendiente | Exigir `SonarCloud Code Analysis` del HEAD final en `success` |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35845840089` success sobre `1619f1f67c2e5458cbe5acac2aa47f755862b84c` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35845840055` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35845840108` failure, #73; independiente |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35854276513` success sobre `8f93a1e9e821ee498dc875ca71dd4fb8d7de3ec2` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35854276670` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35854276470` failure, #73; independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Política CI; sin cuentas ni datos reales |
+| Datos productivos | ✅ ~~No tocados~~ | Cambio de workflows/CI; sin cuentas ni datos reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+161** | **−66** | **+95** |
+| **9** | **+75** | **−43** | **+32** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-OPS-012: cero deprecations Symfony propias o directas en CI |
+| Alcance | GF-OPS-013: acciones oficiales GitHub compatibles con runtime Node 24 |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,25 +63,28 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `symfony-preview` cambia de un presupuesto global permisivo a `max[total]=30&max[self]=0&max[direct]=0`.
-- Una deprecation originada en GrindFlow o una llamada directa desde GrindFlow a una API vendor deprecada falla CI aunque el total siga por debajo del límite.
-- El límite total 30 se conserva para no convertir una actualización transitoria de dependencias indirectas en un bloqueo de trabajo no relacionado.
-- GF-OPS-012 documenta la política; no cambia el runtime, autenticación, datos, Laravel, Hostinger ni el cutover Symfony.
+- `actions/checkout` pasa a v5, `actions/cache` a v5, `actions/setup-node` a v5 y `actions/upload-artifact` a v6 en los workflows que aún dependían de majors Node 20.
+- Los pins SHA existentes de checkout/upload-artifact se actualizan a releases Node 24 compatibles; permisos, triggers, secretos y comandos de aplicación no cambian.
+- `scripts/workflow-syntax-check.rb` rechaza referencias oficiales Node 20 conocidas antes de ejecutar la matriz y conserva los contratos de seguridad del smoke y del observer.
+- GF-OPS-013 documenta el contrato durable. No cambia runtime de aplicación, datos, Laravel, Hostinger ni cutover Symfony.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
 <!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
-- `AGENTS.md`
+- `.github/workflows/production-diagnostics.yml`
+- `.github/workflows/production-migration.yml`
+- `.github/workflows/production-smoke.yml`
+- `.github/workflows/sonar-pr-details.yml`
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `scripts/readme-dashboard.py`
+- `scripts/workflow-syntax-check.rb`
 
 ## Validación
 - Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
-- La base v0.1.112 ya pasó `symfony-preview` sin deprecations propias conocidas; la candidata debe pasar con `self=0` y `direct=0` activos.
-- Deprecations indirectas/vendor siguen visibles y acotadas por `max[total]=30`; Production Smoke #73 permanece separado.
+- La matriz completa debe demostrar checkout, cache, setup-node y upload-artifact con los majors nuevos, manteniendo los mismos inputs y contratos.
+- Production Smoke #73 permanece separado; esta entrega no autoriza cambios de producción ni reintentos de credenciales.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -89,7 +92,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 GF-OPS-012: deprecations propias/directas en cero | 🚧 v0.1.113 en revisión final |
-| **NEXT** | 🚧 Compatibilidad de GitHub Actions con runtime Node 24 | 🚧 evidencia CI observada; slice aún no abierto |
+| **NOW** | 🚧 GF-OPS-013: acciones oficiales sobre Node 24 | 🚧 v0.1.114 candidata |
+| **NEXT** | 🚧 Siguiente hardening CI priorizado en roadmap | 🚧 por seleccionar tras exact-main |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
 | **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |
