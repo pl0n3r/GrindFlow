@@ -30,3 +30,5 @@
   .identity-navbar nav .identity-current{padding:10px;font-size:11px}
   .identity-shell{padding:28px 16px}
 }
+@media(max-width:590px){.hero-copy h1{font-size:clamp(39px,11vw,54px);overflow-wrap:break-word}}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}

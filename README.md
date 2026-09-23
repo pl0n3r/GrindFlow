@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.107: defensa de clickjacking compatible en Symfony.** Base exacta `main` v0.1.106 `609809d877efe765ee6206a0634c5a2ad9937200`; se prohíbe enmarcar páginas en navegadores modernos y antiguos.
+> **Candidato v0.1.108: respetar la reducción de movimiento.** Base exacta `main` v0.1.107 `433498efd02ba1d45cb7de7ccaed0fef0e95b87d`; el desplazamiento público y React respeta la preferencia del sistema.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.107** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.106~~ | `609809d877efe765ee6206a0634c5a2ad9937200` |
+| Version objetivo | 🚧 **v0.1.108** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.107~~ | `433498efd02ba1d45cb7de7ccaed0fef0e95b87d` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir full review del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35832037326` success sobre `609809d877efe765ee6206a0634c5a2ad9937200` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35832037334` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35832037355` failure, #73; independiente de esta mejora |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35833000794` success sobre `433498efd02ba1d45cb7de7ccaed0fef0e95b87d` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35833000664` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35833000747` failure, #73; independiente de esta mejora |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/MariaDB descartable; sin cambio de cuentas reales |
+| Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/Chromium descartable; sin cuentas reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+56** | **−21** | **+35** |
+| **6** | **+76** | **−20** | **+56** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-SEC-008: X-Frame-Options DENY con CSP frame-ancestors 'none' |
+| Alcance | GF-UX-006: reducir movimiento en Twig y React a 360/820 px |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,9 +63,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Symfony añade `X-Frame-Options: DENY` a su CSP existente con `frame-ancestors 'none'`, para clientes que no aplican esta última directiva.
-- La regla compartida de respuesta se aplica en páginas públicas y privadas, redirecciones y errores sin excepciones para el login.
-- PHPUnit HTTP verifica la defensa contra enmarcado y `nosniff` en respuestas 200, 302, 401 y 404; GF-SEC-008 documentado sin alterar Laravel, Hostinger ni producción.
+- La home Twig y la vista previa React aplican `scroll-behavior: auto` cuando el navegador indica `prefers-reduced-motion: reduce`, conservando el desplazamiento suave para otras preferencias.
+- El menú compartido conserva su regla de desplazamiento reducido y su navegación responsive.
+- Chromium sintético cubre preferencia dinámica y 360/820 px; detectó además overflow real del título en home a 360 px y se corrigió su escala móvil.
+- GF-UX-006 documentado sin alterar cuentas, roles, Laravel, Hostinger ni cutover.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
@@ -73,20 +74,21 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
-- `symfony/tests/php/PreviewTest.php`
+- `symfony/frontend/admin/preview.css`
+- `symfony/public/assets/grindflow.css`
+- `symfony/tests/e2e/reduced-motion.spec.mjs`
 
 ## Validación
 - Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final; después CI exact-main.
-- `symfony-preview` valida cabeceras PHP/Symfony en rutas aisladas con MariaDB descartable, TypeScript/Vite y Chromium.
-- El release no demuestra despliegue Symfony ni resuelve Production Smoke #73 del Laravel operativo.
+- `symfony-preview` valida PHP, MariaDB descartable, TypeScript/Vite y Chromium a 360/820 px con `emulateMedia`.
+- La nueva versión no demuestra despliegue Symfony ni resuelve Production Smoke #73.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Cabeceras antienmarcado Symfony | 🚧 v0.1.107 candidata |
+| **NOW** | 🚧 Preferencia de movimiento reducido | 🚧 v0.1.108 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -94,8 +96,8 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.106 fusionada~~ | ✅ ~~selector multiorganización accesible~~ |
-| **NOW** | 🚧 Defensa de clickjacking Symfony | 🚧 GF-SEC-008, v0.1.107 |
+| **DONE** | ✅ ~~v0.1.107 fusionada~~ | ✅ ~~cabeceras antienmarcado Symfony~~ |
+| **NOW** | 🚧 Reducción de movimiento | 🚧 GF-UX-006, v0.1.108 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
