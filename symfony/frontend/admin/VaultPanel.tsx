@@ -500,9 +500,9 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     for (const file of selected) {
       let retryable = true;
       try {
-        if (!isSupportedMime(file.type) || file.size < 1 || file.size > 8 * 1024 * 1024) {
+        if (file.size < 1 || file.size > 8 * 1024 * 1024) {
           retryable = false;
-          throw new Error('Se aceptan JPEG, PNG, WebP, MP4 o WebM de hasta 8 MiB.');
+          throw new Error('Cada archivo debe pesar entre 1 byte y 8 MiB.');
         }
         const data = new FormData();
         data.append('file', file);
@@ -628,7 +628,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     </div>}
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir fotos o videos desde tu dispositivo</label>
-      <input id="vault-files" ref={fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+      <input id="vault-files" ref={fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,.mp4,.webm"
         disabled={uploading || loading} onChange={(event) => {
           setSelected(Array.from(event.currentTarget.files ?? []));
           setRetryPending(false);
@@ -645,7 +645,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
         <ul className="vault-selected-files">
           {selected.slice(0, 8).map((file, index) => {
             const thumbnail = localPreviews.find((preview) => preview.index === index);
-            const valid = isSupportedMime(file.type) && file.size > 0 && file.size <= 8 * 1024 * 1024;
+            const valid = file.size > 0 && file.size <= 8 * 1024 * 1024;
             return <li key={index}>
               {thumbnail
                 ? thumbnail.kind === 'video'
@@ -657,7 +657,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               <span className="vault-selected-details">
                 <strong>{file.name}</strong>
                 <small>{(file.size / (1024 * 1024)).toFixed(2)} MiB · {file.type || 'tipo desconocido'}</small>
-                {!valid && <small role="alert">Archivo no admitido: JPEG, PNG, WebP, MP4 o WebM, de 1 byte a 8 MiB.</small>}
+                {!valid && <small role="alert">Archivo no admitido: debe pesar entre 1 byte y 8 MiB.</small>}
               </span>
               <button type="button" disabled={uploading} onClick={() => discardSelected(index)}
                 aria-label={'Descartar ' + file.name}>Descartar</button>

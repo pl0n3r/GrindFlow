@@ -554,15 +554,28 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
   await page.addScriptTag({ url: script + '?vault-video-e2e=1', type: 'module' });
   await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
 
-  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles({
-    name: 'clip-prueba.mp4',
-    mimeType: 'video/mp4',
+  const input = page.getByLabel('Añadir fotos o videos desde tu dispositivo');
+  await expect(input).toHaveAttribute('accept', /\\.mp4/);
+  await expect(input).toHaveAttribute('accept', /\\.webm/);
+
+  await input.setInputFiles({
+    name: 'clip-sin-mime.mp4',
+    mimeType: '',
     buffer: mp4,
   });
-  const localVideo = page.locator('.vault-selected-files video');
-  await expect(localVideo).toHaveCount(1);
-  await expect(localVideo).toHaveAttribute('preload', 'metadata');
-  expect(await localVideo.getAttribute('autoplay')).toBeNull();
+  await expect(page.locator('.vault-selected-files video')).toHaveCount(0);
+  await expect(page.locator('.vault-selected-mark')).toHaveCount(1);
+  await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Guardar 1 archivo' })).toBeEnabled();
+
+  await input.setInputFiles({
+    name: 'clip-prueba.mp4',
+    mimeType: 'application/octet-stream',
+    buffer: mp4,
+  });
+  await expect(page.locator('.vault-selected-files video')).toHaveCount(0);
+  await expect(page.locator('.vault-selected-mark')).toHaveCount(1);
+  await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Guardar 1 archivo' }).click();
   await expect(page.getByText('clip-prueba.mp4', { exact: true })).toBeVisible();
