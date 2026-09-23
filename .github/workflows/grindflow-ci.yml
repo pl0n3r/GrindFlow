@@ -638,9 +638,9 @@ jobs:
       APP_SECRET: s0-ci-disposable-not-for-production
       DATABASE_URL: 'mysql://grindflow:grindflow@127.0.0.1:3306/grindflow_symfony_ci?serverVersion=mariadb-11.4.0&charset=utf8mb4'
       S0_BASE_URL: 'http://127.0.0.1:8765'
-      # Baseline CI: 29 upstream Doctrine ORM proxy deprecations on 3 HTTP tests.
-      # Still display all notices; fail if new deprecations exceed this bound.
-      SYMFONY_DEPRECATIONS_HELPER: 'max[total]=30'
+      # First-party and directly-called deprecated APIs are regressions.
+      # Keep a bounded total budget so an indirect vendor notice cannot block unrelated work.
+      SYMFONY_DEPRECATIONS_HELPER: 'max[total]=30&max[self]=0&max[direct]=0'
     steps:
       - uses: actions/checkout@v5
       - uses: shivammathur/setup-php@v2
