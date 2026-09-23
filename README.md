@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.114: GitHub Actions sobre runtime Node 24.** Base exacta `main` v0.1.113 `8f93a1e9e821ee498dc875ca71dd4fb8d7de3ec2`; acciones oficiales se migran a majors compatibles y CI bloquea referencias Node 20 conocidas.
+> **Candidato v0.1.115: checkout de CI sin credenciales Git persistidas.** Base exacta `main` v0.1.114 `dd6ccee58c5cf301e8f4e375a09846cc47128712`; todos los jobs que leen el repositorio desactivan la persistencia del token de `actions/checkout` y CI bloquea regresiones.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,14 +18,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.114** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.113~~ | `8f93a1e9e821ee498dc875ca71dd4fb8d7de3ec2` |
+| Version objetivo | 🚧 **v0.1.115** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.114~~ | `dd6ccee58c5cf301e8f4e375a09846cc47128712` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final en `success` |
 | Sonar del PR | 🚧 Pendiente | Exigir `SonarCloud Code Analysis` del HEAD final en `success` |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35854276513` success sobre `8f93a1e9e821ee498dc875ca71dd4fb8d7de3ec2` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35854276670` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35854276470` failure, #73; independiente |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35861799371` success sobre `dd6ccee58c5cf301e8f4e375a09846cc47128712` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35861799404` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35861799383` failure, #73; independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
 | Datos productivos | ✅ ~~No tocados~~ | Cambio de workflows/CI; sin cuentas ni datos reales |
 
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+75** | **−43** | **+32** |
+| **12** | **+1** | **−1** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-OPS-013: acciones oficiales GitHub compatibles con runtime Node 24 |
+| Alcance | GF-OPS-014: no persistir el token Git de checkout en ningún workflow |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,18 +63,21 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `actions/checkout` pasa a v5, `actions/cache` a v5, `actions/setup-node` a v5 y `actions/upload-artifact` a v6 en los workflows que aún dependían de majors Node 20.
-- Los pins SHA existentes de checkout/upload-artifact se actualizan a releases Node 24 compatibles; permisos, triggers, secretos y comandos de aplicación no cambian.
-- `scripts/workflow-syntax-check.rb` rechaza referencias oficiales Node 20 conocidas antes de ejecutar la matriz y conserva los contratos de seguridad del smoke y del observer.
-- GF-OPS-013 documenta el contrato durable. No cambia runtime de aplicación, datos, Laravel, Hostinger ni cutover Symfony.
+- Cada `actions/checkout` declara `persist-credentials: false`; los procesos posteriores ya no heredan el token inyectado en `.git/config`.
+- `scripts/workflow-syntax-check.rb` recorre todos los jobs y falla si un checkout nuevo omite el opt-out o vuelve a persistir credenciales.
+- Los workflows que escriben Issues o comentarios conservan permisos explícitos y usan `github.token`/`GITHUB_TOKEN`; no se habilita ningún push Git desde CI.
+- GF-OPS-014 documenta el contrato durable. No cambia aplicación, datos, triggers, secretos, Hostinger ni cutover Symfony.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
 <!-- grindflow:changed-files -->
+- `.github/workflows/ci-health.yml`
 - `.github/workflows/grindflow-ci.yml`
+- `.github/workflows/production-deploy-observer.yml`
 - `.github/workflows/production-diagnostics.yml`
 - `.github/workflows/production-migration.yml`
 - `.github/workflows/production-smoke.yml`
+- `.github/workflows/sincronizar-gobierno.yml`
 - `.github/workflows/sonar-pr-details.yml`
 - `README.md`
 - `config/version.php`
@@ -83,7 +86,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 
 ## Validación
 - Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
-- La matriz completa debe demostrar checkout, cache, setup-node y upload-artifact con los majors nuevos, manteniendo los mismos inputs y contratos.
+- La matriz completa debe demostrar checkout, pruebas y automatizaciones con credenciales Git no persistidas.
 - Production Smoke #73 permanece separado; esta entrega no autoriza cambios de producción ni reintentos de credenciales.
 
 ## Qué sigue
@@ -92,7 +95,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 GF-OPS-013: acciones oficiales sobre Node 24 | 🚧 v0.1.114 candidata |
-| **NEXT** | 🚧 Siguiente hardening CI priorizado en roadmap | 🚧 por seleccionar tras exact-main |
+| **NOW** | 🚧 GF-OPS-014: checkout sin credenciales persistidas | 🚧 v0.1.115 candidata |
+| **NEXT** | 🚧 Siguiente slice seguro priorizado en roadmap | 🚧 tras exact-main |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
 | **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |
