@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+69** | **−32** | **+37** |
+| **4** | **+70** | **−19** | **+51** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -70,12 +70,10 @@ flowchart LR
 ## Archivos modificados en esta entrega candidata
 Inventario de esta entrega candidata, no prueba publicación:
 <!-- grindflow:changed-files -->
-- `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/PreviewApp.tsx`
-- `symfony/tests/e2e/preview.spec.mjs`
+- `tests/Feature/AuthenticationTest.php`
 
 ## Validación
 - CI exact-main v0.1.119 primero, luego `preflight`, `fast`, `php-quality`, `PHPUnit`, `validate`, Sonar y CodeRabbit sobre HEAD final.
