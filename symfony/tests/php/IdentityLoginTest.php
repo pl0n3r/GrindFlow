@@ -207,6 +207,14 @@ final class IdentityLoginTest extends WebTestCase
             self::assertStringNotContainsString('only-for-isolated-ci', $errorBody);
             self::assertStringNotContainsString('inactiv', strtolower($errorBody));
 
+            // Symfony consumes the error once. A later clean GET must not
+            // leave either field flagged as invalid without an active alert.
+            $client->request('GET', '/login');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorNotExists('#identity-login-error');
+            self::assertSelectorNotExists('form.identity-form input[aria-invalid="true"]');
+            self::assertSelectorNotExists('form.identity-form input[aria-describedby="identity-login-error"]');
+
             $client->request('GET', '/organizations');
             self::assertResponseRedirects('/login');
         } finally {
