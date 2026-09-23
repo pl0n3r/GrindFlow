@@ -27,6 +27,8 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
     public function testStagingIsVerifiedButNotRegisteredAndRevocationDuringStreamIsDenied(): void
     {
         $client = static::createClient();
+        // Keep the disposable controller binding across BrowserKit requests.
+        $client->disableReboot();
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $user = Uuid::v7()->toRfc4122();
