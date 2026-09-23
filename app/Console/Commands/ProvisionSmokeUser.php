@@ -136,7 +136,7 @@ class ProvisionSmokeUser extends Command
 
             $this->backupBeforeMutation($user);
 
-            $user ??= new User();
+            $user ??= new User;
             $user->name = $name;
             $user->email = $email;
             $user->email_verified_at ??= now();

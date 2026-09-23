@@ -16,7 +16,7 @@ class HealthIdentityTest extends TestCase
         file_put_contents($root.'/.git/HEAD', "ref: refs/heads/main\n");
         file_put_contents($root.'/.git/refs/heads/main', $sha."\n");
 
-        self::assertSame($sha, (new CheckoutIdentity())->commit($root));
+        self::assertSame($sha, (new CheckoutIdentity)->commit($root));
 
         $this->removeDirectory($root);
     }
@@ -27,7 +27,7 @@ class HealthIdentityTest extends TestCase
         $detachedSha = str_repeat('b', 40);
         mkdir($detached.'/.git', 0777, true);
         file_put_contents($detached.'/.git/HEAD', $detachedSha."\n");
-        self::assertSame($detachedSha, (new CheckoutIdentity())->commit($detached));
+        self::assertSame($detachedSha, (new CheckoutIdentity)->commit($detached));
         $this->removeDirectory($detached);
 
         $packed = $this->temporaryRepository();
@@ -35,7 +35,7 @@ class HealthIdentityTest extends TestCase
         mkdir($packed.'/.git', 0777, true);
         file_put_contents($packed.'/.git/HEAD', "ref: refs/heads/main\n");
         file_put_contents($packed.'/.git/packed-refs', $packedSha." refs/heads/main\n");
-        self::assertSame($packedSha, (new CheckoutIdentity())->commit($packed));
+        self::assertSame($packedSha, (new CheckoutIdentity)->commit($packed));
         $this->removeDirectory($packed);
     }
 

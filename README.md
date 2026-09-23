@@ -31,7 +31,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+821** | **−68** | **+753** |
+| **16** | **+820** | **−68** | **+752** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -46,7 +46,7 @@
 ## Flujo de entrega
 ```mermaid
 flowchart LR
- A["PR v0.1.121"] --> C["CI + Sonar + CodeRabbit"]
+ A["PR + snapshot exacto"] --> C["CI + Sonar + CodeRabbit"]
  C --> M["Squash merge"]
  M --> X["CI exact-main"]
  X --> H["/health version + SHA"]

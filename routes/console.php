@@ -46,7 +46,6 @@ Schedule::command('grindflow:prune-traffic-dedupes')
     ->hourly()
     ->withoutOverlapping(5);
 
-
 Schedule::command('grindflow:provision-smoke-user')
     ->everyMinute()
     ->withoutOverlapping(5)
