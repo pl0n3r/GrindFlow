@@ -29,6 +29,8 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
         $client = static::createClient();
         // Keep the disposable controller binding across BrowserKit requests.
         $client->disableReboot();
+        // Surface the underlying synthetic failure instead of hiding it behind a 500 page.
+        $client->catchExceptions(false);
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $user = Uuid::v7()->toRfc4122();
