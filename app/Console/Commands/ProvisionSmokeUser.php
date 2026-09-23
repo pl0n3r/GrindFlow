@@ -166,8 +166,8 @@ class ProvisionSmokeUser extends Command
                 'password' => (string) $user->getAuthPassword(),
                 'platform_role' => $user->platform_role->value,
                 'remember_token' => $user->getRememberToken(),
-                'created_at' => $user->created_at?->toIso8601String(),
-                'updated_at' => $user->updated_at?->toIso8601String(),
+                'created_at' => $user->getRawOriginal('created_at'),
+                'updated_at' => $user->getRawOriginal('updated_at'),
             ],
         ];
 
