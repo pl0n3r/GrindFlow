@@ -53,7 +53,7 @@ final class DirectUploadIntentIssuer
             self::DEFAULT_TTL_SECONDS,
             $issuedAt,
         );
-        $upload = $this->storage->temporaryUpload($storageKey, $mimeType, $expiresAt);
+        $upload = $this->storage->temporaryUpload($storageKey, $mimeType, $byteSize, $expiresAt);
         $url = $upload['url'] ?? null;
         $headers = $upload['headers'] ?? null;
         if (!is_string($url) || $url === '' || !is_array($headers)) {
