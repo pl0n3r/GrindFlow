@@ -209,12 +209,7 @@ def validate_changed_files(readme: str, files: list[str]) -> None:
         fail("changed-file list is stale. Run readme-dashboard.py --update.")
 
 
-def roadmap_error(readme: str) -> str | None:
-    convention = section(readme, "## Progress convention")
-    if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
-        return "canonical progress convention missing or not documented"
-
-    next_section = section(readme, "## Qué sigue")
+def next_roadmap_error(next_section: str) -> str | None:
     issue_destinations = re.findall(
         r"https://github\.com/pl0n3r/GrindFlow/issues/(\d+)\b",
         next_section,
@@ -224,8 +219,28 @@ def roadmap_error(readme: str) -> str | None:
         return "Qué sigue must link only the canonical issue #2 exactly once"
     if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", next_section):
         return "Qué sigue must only link canonical issue #2; snapshot lanes belong in Panorama"
+    return None
 
-    panorama = section(readme, "## Panorama general pendiente")
+
+def panorama_lane_error(row: str, lanes: tuple[str, ...]) -> str | None:
+    matching = [lane for lane in lanes if lane in row]
+    if not matching:
+        return None
+    if "🚧" not in row and "⛔" not in row:
+        return "Panorama pending/blocked row missing status symbol"
+    if "~~" in row:
+        return "Panorama must not contain completed/struck-through history"
+
+    payload = row
+    for lane in matching:
+        payload = payload.replace(lane, "")
+    payload = payload.replace("🚧", "").replace("⛔", "")
+    if not any(char.isalnum() for char in payload):
+        return "Panorama lane must include current work or status content"
+    return None
+
+
+def panorama_error(panorama: str) -> str | None:
     if not panorama:
         return "README must keep the current operational Panorama snapshot"
     if "**DONE**" in panorama:
@@ -237,22 +252,21 @@ def roadmap_error(readme: str) -> str | None:
             return f"Panorama must contain exactly one {lane} lane"
 
     for row in panorama.splitlines():
-        matching = [lane for lane in lanes if lane in row]
-        if not matching:
-            continue
-        if "🚧" not in row and "⛔" not in row:
-            return "Panorama pending/blocked row missing status symbol"
-        if "~~" in row:
-            return "Panorama must not contain completed/struck-through history"
-
-        payload = row
-        for lane in matching:
-            payload = payload.replace(lane, "")
-        payload = payload.replace("🚧", "").replace("⛔", "")
-        if not any(char.isalnum() for char in payload):
-            return "Panorama lane must include current work or status content"
-
+        error = panorama_lane_error(row, lanes)
+        if error is not None:
+            return error
     return None
+
+
+def roadmap_error(readme: str) -> str | None:
+    convention = section(readme, "## Progress convention")
+    if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
+        return "canonical progress convention missing or not documented"
+
+    error = next_roadmap_error(section(readme, "## Qué sigue"))
+    if error is not None:
+        return error
+    return panorama_error(section(readme, "## Panorama general pendiente"))
 
 
 def validate_roadmap(readme: str) -> None:
