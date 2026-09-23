@@ -103,6 +103,7 @@
 /* S2 in-browser preview: protected, responsive media inside details. */
 .vault-preview{flex:1 0 100%;min-width:0;margin:0;padding:12px;border:1px solid #39384d;border-radius:10px;background:#0d0e17;display:grid;gap:10px}
 .vault-preview img,.vault-preview video{display:block;max-width:100%;width:auto;height:auto;max-height:440px;object-fit:contain;border-radius:7px;justify-self:center;background:#0d0e17}
+.vault-preview [hidden]{display:none!important}
 .vault-preview figcaption{color:#bfb8cd;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .vault-preview p{margin:0}
 
