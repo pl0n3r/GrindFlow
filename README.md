@@ -83,19 +83,3 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
-
-| Lane | Trabajo | Estado |
-| --- | --- | --- |
-| **NOW** | 🚧 Política estricta de deprecations Symfony | 🚧 v0.1.113 candidata |
-| **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
-| **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
-| **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
-
-## Panorama general pendiente
-| Lane | Frente | Estado |
-| --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.112 fusionada~~ | ✅ ~~compatibilidad anticipada Symfony Security~~ |
-| **NOW** | 🚧 Cero deprecations propias/directas | 🚧 GF-OPS-012, v0.1.113 |
-| **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
-| **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
