@@ -1,71 +1,118 @@
 #!/usr/bin/env python3
-"""Fail closed when a PR lacks CodeRabbit terminal review evidence for its exact head.
+"""Verify terminal CodeRabbit status for one exact PR commit from local JSON.
 
-Accepts GitHub API response JSON captured separately; does not make network
-requests or print raw review bodies, credentials, or provider diagnostics.
+Read-only, offline and fail-closed. Never print raw provider data.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
-from pathlib import Path
+import stat
 
 SHA = re.compile(r"[a-f0-9]{40}\Z")
-COMPLETED = re.compile(r"^review completed(?:[.! ]|\Z)", re.IGNORECASE)
+COMPLETED = re.compile(r"Review completed[.!]?\Z", re.IGNORECASE)
+EVIDENCE_NAMES = ("status.json", "reviews.json", "threads.json")
+MAX_EVIDENCE_BYTES = 1_048_576
+
+
+def extract_records(source: object, name: str) -> object:
+    if isinstance(source, list):
+        return source
+    if isinstance(source, dict):
+        return source.get(name)
+    return None
+
+
+def status_failures(head: str, status: object) -> list[str]:
+    if not isinstance(status, dict) or status.get("sha") != head:
+        return ["status_sha_mismatch"]
+    records = status.get("statuses")
+    if not isinstance(records, list):
+        return ["missing_statuses"]
+    if any(not isinstance(record, dict) for record in records):
+        return ["invalid_statuses"]
+    # The combined-status API returns statuses newest first.
+    rabbit = next(
+        (record for record in records if isinstance(record, dict) and record.get("context") == "CodeRabbit"),
+        None,
+    )
+    if rabbit is None:
+        return ["missing_coderabbit_status"]
+    description = rabbit.get("description")
+    if rabbit.get("state") != "success":
+        return ["coderabbit_not_completed"]
+    if not isinstance(description, str) or COMPLETED.fullmatch(description) is None:
+        return ["coderabbit_not_completed"]
+    return []
+
+
+def review_failures(head: str, reviews: object) -> list[str]:
+    records = extract_records(reviews, "reviews")
+    if not isinstance(records, list) or any(not isinstance(record, dict) for record in records):
+        return ["missing_reviews"]
+    if any(record.get("commit_id") == head and record.get("state") == "CHANGES_REQUESTED" for record in records):
+        return ["changes_requested_on_head"]
+    return []
+
+
+def thread_failures(threads: object) -> list[str]:
+    records = extract_records(threads, "review_threads")
+    if not isinstance(records, list):
+        return ["missing_review_threads"]
+    if any(not isinstance(record, dict) or record.get("is_resolved") is not True for record in records):
+        return ["unresolved_review_threads"]
+    return []
 
 
 def verify(head: str, statuses: object, reviews: object, threads: object) -> list[str]:
-    """Return only fixed diagnostic strings, never untrusted GitHub content."""
-    errors: list[str] = []
+    """Return bounded diagnostic codes only, not arbitrary GitHub strings."""
     if SHA.fullmatch(head) is None:
         return ["invalid_head_sha"]
+    return status_failures(head, statuses) + review_failures(head, reviews) + thread_failures(threads)
 
-    if not isinstance(statuses, dict) or statuses.get("sha") != head:
-        return ["status_sha_mismatch"]
-    records = statuses.get("statuses")
-    if not isinstance(records, list):
-        return ["missing_statuses"]
-    # GitHub /commits/{sha}/status returns statuses newest first. The latest
-    # CodeRabbit context takes precedence over any older success.
-    rabbit = next((x for x in records if isinstance(x, dict) and x.get("context") == "CodeRabbit"), None)
-    if rabbit is None:
-        errors.append("missing_coderabbit_status")
-    elif rabbit.get("state") != "success" or not isinstance(rabbit.get("description"), str) or COMPLETED.match(rabbit["description"]) is None:
-        errors.append("coderabbit_not_completed")
 
-    review_records = reviews if isinstance(reviews, list) else reviews.get("reviews") if isinstance(reviews, dict) else None
-    if not isinstance(review_records, list):
-        errors.append("missing_reviews")
-    elif any(
-        isinstance(x, dict)
-        and x.get("commit_id") == head
-        and x.get("state") == "CHANGES_REQUESTED"
-        for x in review_records
-    ):
-        errors.append("changes_requested_on_head")
+def read_evidence() -> tuple[object, object, object]:
+    """Load bounded regular files with no symlink/traversal race.
 
-    thread_records = threads if isinstance(threads, list) else threads.get("review_threads") if isinstance(threads, dict) else None
-    if not isinstance(thread_records, list):
-        errors.append("missing_review_threads")
-    elif any(not isinstance(x, dict) or x.get("is_resolved") is not True for x in thread_records):
-        errors.append("unresolved_review_threads")
-    return errors
+    Resolve no provider-supplied names: each file is opened relative to a
+    directory descriptor, with O_NOFOLLOW and O_NONBLOCK. fstat validates the
+    opened object, not a path that could change between checking and reading.
+    """
+    if not all(hasattr(os, flag) for flag in ("O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        raise ValueError("secure file opening unavailable")
+
+    directory = os.open(".", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        values = []
+        for name in EVIDENCE_NAMES:
+            descriptor = os.open(
+                name,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                dir_fd=directory,
+            )
+            with os.fdopen(descriptor, "rb") as source:
+                metadata = os.fstat(source.fileno())
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_EVIDENCE_BYTES:
+                    raise ValueError("invalid evidence file")
+                data = source.read(MAX_EVIDENCE_BYTES + 1)
+                if len(data) > MAX_EVIDENCE_BYTES:
+                    raise ValueError("oversized evidence")
+                values.append(json.loads(data.decode("utf-8")))
+        return tuple(values)
+    finally:
+        os.close(directory)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--head", required=True)
-    parser.add_argument("--statuses", type=Path, required=True)
-    parser.add_argument("--reviews", type=Path, required=True)
-    parser.add_argument("--threads", type=Path, required=True)
     args = parser.parse_args()
     try:
-        status = json.loads(args.statuses.read_text(encoding="utf-8"))
-        reviews = json.loads(args.reviews.read_text(encoding="utf-8"))
-        threads = json.loads(args.threads.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        status, reviews, threads = read_evidence()
+    except (OSError, ValueError, UnicodeError):
         print("CODERABBIT_GATE=invalid_evidence")
         return 1
     failures = verify(args.head, status, reviews, threads)

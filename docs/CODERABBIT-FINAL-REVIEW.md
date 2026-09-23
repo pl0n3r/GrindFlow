@@ -20,20 +20,26 @@ Proveer tres archivos JSON de un mismo PR, obtenidos tras estabilizar su SHA:
   No pasar la respuesta cruda de GraphQL sin normalizar. Si hay paginación,
   recuperarla entera y no convertir un resultado parcial en evidencia vacía.
 
-Ejecutar con el SHA íntegro de 40 caracteres y los archivos obtenidos para
-**ese** HEAD:
+Guardar las tres respuestas completas como archivos JSON ordinarios de nombres fijos
+en una carpeta temporal dedicada. Ejecutar **desde esa carpeta** con el SHA
+íntegro de 40 caracteres:
 
 ```bash
-python3 scripts/coderabbit-final-review.py \
-  --head "${PR_HEAD_SHA}" \
-  --statuses status.json \
-  --reviews reviews.json \
-  --threads threads.json
+python3 /ruta/al/repositorio/scripts/coderabbit-final-review.py --head "${PR_HEAD_SHA}"
 ```
+
+El programa solo abre `status.json`, `reviews.json` y `threads.json` desde
+su directorio de trabajo; no recibe rutas por CLI. En sistemas POSIX exige
+`O_NOFOLLOW`, `O_NONBLOCK` y archivos regulares, con tamaño máximo de 1 MiB
+cada uno. Usa `fstat` sobre el descriptor abierto para rechazar enlaces
+simbólicos, directorios, FIFO y cambios de ruta entre comprobación y lectura.
+Falla cerrado en plataformas sin estas garantías; no ejecutarlo directamente
+sobre una carpeta compartida sin controlar sus archivos.
 
 El comando imprime únicamente `CODERABBIT_GATE=completed_for_exact_head` o
 `CODERABBIT_GATE=blocked` con causas fijas. Nunca muestra respuestas del
-proveedor ni cuerpos de revisión. Una lectura malformada falla cerrado.
+proveedor ni cuerpos de revisión. Una lectura malformada falla cerrado. Hay 19 tests offline de este contrato,
+que se ejecutan desde el gate `fast` de la candidata.
 
 ## Lo que acepta y lo que rechaza
 
