@@ -48,7 +48,9 @@ class AuthenticationTest extends TestCase
             'password' => 'correct-synthetic-password',
         ]);
 
-        $before = $this->get('/login')->assertOk();
+        $before = $this->withSession(['synthetic_login_probe' => 'session-persistent'])
+            ->get('/login')->assertOk()
+            ->assertSessionHas('synthetic_login_probe', 'session-persistent');
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $before->getContent(), $beforeToken));
 
         $this->from('/login')->post('/login', [
@@ -58,7 +60,8 @@ class AuthenticationTest extends TestCase
         ])->assertRedirect('/login')->assertSessionHasErrors('email');
         $this->assertGuest();
 
-        $after = $this->get('/login')->assertOk();
+        $after = $this->get('/login')->assertOk()
+            ->assertSessionHas('synthetic_login_probe', 'session-persistent');
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $after->getContent(), $afterToken));
         self::assertSame($beforeToken[1], $afterToken[1],
             'A rejected login should not rotate the anonymous session CSRF token.');
