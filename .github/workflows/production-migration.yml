@@ -30,7 +30,7 @@ jobs:
       OUTPUT_PATH: production-migration-result.json
       EXPECTED_PENDING: ${{ github.event.comment.body == '/production-migrate 7 backup-verified' && '7' || '1' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Initialize migration result
         shell: bash
@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload migration result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: production-migration-${{ github.run_id }}
           path: production-migration-result.json
