@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.103: contrato JSON uniforme para cambios de cuenta y organización.** Base exacta `main` v0.1.102 `2e6f6f9fc21aa5ea50a9eacea22361e52e2e3b11`; conserva las compuertas de seguridad y centraliza la lectura acotada.
+> **Candidato v0.1.104: menú móvil coherente entre preview y admin Symfony.** Base exacta `main` v0.1.103 `47e712461d59707fd4b987cbfac94840e831414e`; al cambiar sección o anchura, la opción activa permanece visible sin desplazar el documento por el menú.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,14 +18,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.103** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.102~~ | `2e6f6f9fc21aa5ea50a9eacea22361e52e2e3b11` |
+| Version objetivo | 🚧 **v0.1.104** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.103~~ | `47e712461d59707fd4b987cbfac94840e831414e` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir full review del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35807307343` success sobre `2e6f6f9fc21aa5ea50a9eacea22361e52e2e3b11` |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35809023720` success sobre `47e712461d59707fd4b987cbfac94840e831414e` |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35807307398` failure, #73; independiente de esta mejora |
+| Production Smoke | ⛔ Login E2E no validado | `35809023690` failure, #73; independiente de esta mejora |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
 | Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/MariaDB descartable; sin cambio de cuentas reales |
 
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+121** | **−39** | **+82** |
+| **6** | **+150** | **−27** | **+123** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-SEC-005 / GF-SEC-007: lector compartido y cuerpo estricto de organización |
+| Alcance | GF-UX-003: visibilidad de sección activa y menú horizontal a 360 px |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,11 +63,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- El cambio de contraseña Symfony reutiliza `BoundedJsonBody`: control de tamaño real y declarado (máximo 4.096 bytes), lectura máxima 4.097 y profundidad JSON 16, **después** de autenticar, validar CSRF y consumir su limiter.
-- Renombrar organización rechaza ahora cualquier clave adicional a `name`, igual que renombrar perfil; no se ignoran silenciosamente campos extra.
-- Regresión HTTP en MariaDB descartable: payload de organización con `unexpected_flag` no cambia ni la organización propia ni la ajena.
-- Nueva suite PHPUnit directa para el lector compartido: frontera 4.096/4.097 bytes, cabecera falsa o no numérica, profundidad con clave duplicada, JSON malformado y escalares.
-- GF-SEC-007 actualizado; sin cambios de secretos, migraciones, cuentas reales, Hostinger ni login Laravel.
+- `WorkspaceNavigation` compartido revela dentro del scroll horizontal la opción activa cuando cambia la sección o el viewport; nunca usa `scrollIntoView` sobre el documento.
+- Menú móvil a 360 px añade pista visible para desplazar horizontalmente y scrollbar fino, conservando la misma marca, jerarquía y estados `aria-pressed` / `aria-current` en preview y admin.
+- Chromium sintético ejercita selección fuera de pantalla sin scroll automático del tester, regreso a primera opción, reducción 820→360 px y menú privado tras cambio de hash; confirma ausencia de overflow de la página.
+- GF-UX-003 actualizado sin tocar sesiones, datos, permisos, Laravel, Hostinger ni cutover.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
@@ -75,14 +74,13 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Http/Controller/AccountSecurityController.php`
-- `symfony/src/Http/Controller/AdminContextController.php`
-- `symfony/tests/php/BoundedJsonBodyTest.php`
-- `symfony/tests/php/OrganizationSettingsTest.php`
+- `symfony/frontend/admin/WorkspaceNavigation.tsx`
+- `symfony/frontend/admin/workspace-navigation.css`
+- `symfony/tests/e2e/preview.spec.mjs`
 
 ## Validación
-- Requerir `validate`, Sonar y full review CodeRabbit en el HEAD final; después, CI del SHA exacto de `main`.
-- `symfony-preview` incluye PHPUnit unitario y HTTP sobre MariaDB descartable y Chromium aislado.
+- Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final; después CI exact-main.
+- `symfony-preview` valida PHP, MariaDB descartable, TypeScript/Vite y Chromium a 360 y 820 px sobre un build aislado.
 - El release no demuestra deployment Symfony ni resuelve Production Smoke #73 del Laravel operativo.
 
 ## Qué sigue
@@ -90,7 +88,7 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Contrato JSON consistente de cuenta y organización | 🚧 v0.1.103 candidata |
+| **NOW** | 🚧 Visibilidad del menú móvil compartido | 🚧 v0.1.104 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #2 |
@@ -98,8 +96,8 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.102 fusionada~~ | ✅ ~~lector JSON acotado en renombres~~ |
-| **NOW** | 🚧 Unificar lectura y validar claves de organización | 🚧 v0.1.103 |
+| **DONE** | ✅ ~~v0.1.103 fusionada~~ | ✅ ~~contrato JSON uniforme en Symfony~~ |
+| **NOW** | 🚧 Navegación activa responsive preview/admin | 🚧 v0.1.104 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #2 |
