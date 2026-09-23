@@ -110,11 +110,13 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
 
         $tokens = new DirectUploadTokenCipher(str_repeat('test-secret-', 4));
         $keys = new DirectUploadObjectKeys();
-        static::getContainer()->set(DirectUploadController::class, new DirectUploadController(
+        $controller = new DirectUploadController(
             new DirectUploadReadiness($storage, $tokens),
             new DirectUploadIntentIssuer($storage, $tokens, $keys),
             new DirectUploadCompletionVerifier($storage, $tokens, $keys),
-        ));
+        );
+        $controller->setContainer(static::getContainer());
+        static::getContainer()->set(DirectUploadController::class, $controller);
 
         $db->insert('gf_identity_users', [
             'id' => $user, 'name' => 'Configured upload synthetic actor',
