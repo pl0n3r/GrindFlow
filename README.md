@@ -88,9 +88,9 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
 | **NOW** | 🚧 Guardas del cambio de contraseña Symfony | 🚧 v0.1.101 candidata |
-| **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #73 |
+| **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
-| **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
+| **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #2 |
 
 ## Panorama general pendiente
 | Lane | Frente | Estado |
@@ -99,4 +99,4 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 | **NOW** | 🚧 Límite JSON para cambio de contraseña | 🚧 v0.1.101 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #2 |
