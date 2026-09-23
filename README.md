@@ -72,6 +72,7 @@ flowchart LR
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
 <!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
@@ -84,3 +85,11 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+
+## Panorama general pendiente
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | 🚧 GF-OPS-012: deprecations propias/directas en cero | 🚧 v0.1.113 en revisión final |
+| **NEXT** | 🚧 Compatibilidad de GitHub Actions con runtime Node 24 | 🚧 evidencia CI observada; slice aún no abierto |
+| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
+| **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |
