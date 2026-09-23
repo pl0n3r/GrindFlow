@@ -32,18 +32,20 @@ final class DirectUploadTokenCipher
         'video/webm',
     ];
 
-    private readonly string $key;
+    private readonly ?string $key;
 
-    public function __construct(string $secret)
+    public function __construct(string $secret = '')
     {
-        if (strlen($secret) < 32) {
-            throw new \InvalidArgumentException('Direct upload encryption secret must contain at least 32 bytes.');
-        }
-        if (!function_exists('openssl_encrypt') || !function_exists('openssl_decrypt')) {
-            throw new \RuntimeException('OpenSSL is required to protect direct upload completion tokens.');
-        }
+        $this->key = strlen($secret) >= 32
+            && function_exists('openssl_encrypt')
+            && function_exists('openssl_decrypt')
+            ? hash('sha256', $secret, true)
+            : null;
+    }
 
-        $this->key = hash('sha256', $secret, true);
+    public function configured(): bool
+    {
+        return $this->key !== null;
     }
 
     public function issue(
