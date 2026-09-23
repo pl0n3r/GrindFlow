@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+635** | **−48** | **+587** |
+| **5** | **+35** | **−26** | **+9** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -72,12 +72,9 @@ Inventario de esta entrega candidata, no prueba publicación:
 <!-- grindflow:changed-files -->
 - `README.md`
 - `config/version.php`
-- `docs/GRINDFLOW-SPEC.md`
 - `docs/REQUIREMENTS.md`
-- `docs/SYMFONY-VAULT-STORAGE.md`
-- `symfony/src/Http/Controller/DirectUploadController.php`
-- `symfony/tests/php/DirectUploadConfiguredHttpTest.php`
-- `symfony/tests/php/DirectUploadHttpTest.php`
+- `symfony/frontend/admin/PreviewApp.tsx`
+- `symfony/tests/e2e/preview.spec.mjs`
 
 ## Validación
 - Exigir `preflight`, `fast`, `symfony-preview`, `validate`, Sonar y CodeRabbit sobre HEAD final.
