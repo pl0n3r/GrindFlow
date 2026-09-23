@@ -23,6 +23,26 @@ Tampoco se aceptan rutas relativas ni segmentos `.` o `..` ni una ubicación den
 del árbol del release. La carpeta debe permanecer fuera del webroot y no
 publicarse como alias del servidor HTTP.
 
+## Fundamento de carga directa para media grande (v0.1.117 candidato)
+
+El quick upload local de fotos/videos hasta 8 MiB permanece como camino simple.
+Para preparar media grande, Symfony define un port de object storage, keys opacas
+por organización, token de completion cifrado y verificación streamed de tamaño +
+SHA-256 con límite de 2 GiB. El binding predeterminado es deliberadamente
+`unavailable`: si falta adaptador o `GRINDFLOW_DIRECT_UPLOAD_SECRET` con al menos
+32 bytes, el Vault sigue arrancando y reporta la capacidad como no configurada.
+
+`GET /api/admin/vault` puede mostrar a un usuario autenticado solo el resumen
+`disk/driver/max_bytes/configured`. Nunca expone bucket, endpoint, access key,
+secret, credenciales temporales ni rutas físicas. La variable de secreto protege
+únicamente el futuro token de completion y **no configura por sí sola** un proveedor.
+
+Esta versión no implementa S3/Flysystem, no crea endpoints de presign/completion,
+no mueve originales actuales y no hace I/O productivo. Antes de activar una carga
+directa real se requiere un adaptador explícito, CORS acotado, credenciales de
+mínimo privilegio, pruebas descartables del proveedor y el flujo transaccional de
+deduplicación/promoción/registro de catálogo con reautorización tenant-safe.
+
 ## Cambio de ubicación: no es una migración automática
 
 **Nunca cambiar la ruta y luego asumir que el catálogo sigue disponible.**
