@@ -43,8 +43,14 @@ SMOKE_USER_NAME="GrindFlow Production Smoke"
 ```
 
 `SMOKE_USER_PASSWORD` debe contener exactamente el mismo valor que el secret
-de GitHub Actions `PRODUCTION_E2E_PASSWORD`. Nunca copies ese valor a Issues,
-PRs, logs o comandos de chat. El correo queda limitado por código al dominio
+de GitHub Actions `PRODUCTION_E2E_PASSWORD`. Production Smoke sincroniza ese
+valor automáticamente después de que `/health` demuestra el SHA exacto de
+`main`: obtiene un token OIDC efímero de GitHub, el servidor valida
+repositorio/IDs/ref/workflow/SHA/audiencia, guarda un backup cifrado privado de
+`.env`, persiste únicamente `SMOKE_USER_PASSWORD` y ejecuta
+`grindflow:provision-smoke-user`. Si la reconciliación falla, restaura el
+`.env` anterior y no envía ningún login. Nunca copies el valor a Issues, PRs,
+logs o comandos de chat. El correo queda limitado por código al dominio
 sintético reservado `@grindflow.test`.
 
 No copies al chat ni al repositorio `APP_KEY`, contrasenas de DB, tokens ni

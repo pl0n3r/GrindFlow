@@ -1,0 +1,111 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Support\Deployment\ProductionEnvironmentWriter;
+use Dotenv\Dotenv;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+use Tests\TestCase;
+
+class ProductionEnvironmentWriterTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+    }
+
+    public function test_it_backs_up_then_atomically_persists_the_smoke_password(): void
+    {
+        $path = $this->temporaryEnvironment("APP_ENV=production\nAPP_KEY=base64:test\n");
+
+        (new ProductionEnvironmentWriter)->withSmokePassword(
+            'secret-$-with-"quotes"',
+            static fn (): null => null,
+            $path,
+        );
+
+        $contents = (string) file_get_contents($path);
+        self::assertStringContainsString('SMOKE_USER_PASSWORD="secret-\\$-with-\\"quotes\\""', $contents);
+
+        $backups = Storage::disk('local')->allFiles('operations/environment-backups');
+        self::assertCount(1, $backups);
+        self::assertSame(
+            "APP_ENV=production\nAPP_KEY=base64:test\n",
+            Crypt::decryptString((string) Storage::disk('local')->get($backups[0])),
+        );
+
+        @unlink($path);
+    }
+
+    public function test_it_safely_replaces_existing_password_with_regex_metacharacters(): void
+    {
+        $path = $this->temporaryEnvironment("APP_ENV=production\nSMOKE_USER_PASSWORD=\"old\"\n");
+        $password = 'a\\b$1"c\\';
+
+        (new ProductionEnvironmentWriter)->withSmokePassword(
+            $password,
+            static fn (): null => null,
+            $path,
+        );
+
+        $parsed = Dotenv::parse((string) file_get_contents($path));
+        self::assertSame($password, $parsed['SMOKE_USER_PASSWORD']);
+
+        @unlink($path);
+    }
+
+    public function test_it_rolls_environment_back_when_reconciliation_fails(): void
+    {
+        $original = "APP_ENV=production\nSMOKE_USER_PASSWORD=\"old\"\n";
+        $path = $this->temporaryEnvironment($original);
+
+        try {
+            (new ProductionEnvironmentWriter)->withSmokePassword(
+                'replacement',
+                static function (): void {
+                    throw new RuntimeException('synthetic failure');
+                },
+                $path,
+            );
+            self::fail('Expected reconciliation failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('synthetic failure', $exception->getMessage());
+        }
+
+        self::assertSame($original, file_get_contents($path));
+
+        @unlink($path);
+    }
+
+    public function test_it_does_not_create_environment_backup_when_value_is_already_current(): void
+    {
+        $path = $this->temporaryEnvironment("SMOKE_USER_PASSWORD=\"same\"\n");
+        $called = false;
+
+        (new ProductionEnvironmentWriter)->withSmokePassword(
+            'same',
+            static function () use (&$called): void {
+                $called = true;
+            },
+            $path,
+        );
+
+        self::assertTrue($called);
+        self::assertSame([], Storage::disk('local')->allFiles('operations/environment-backups'));
+
+        @unlink($path);
+    }
+
+    private function temporaryEnvironment(string $contents): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'grindflow-env-test-');
+        self::assertNotFalse($path);
+        file_put_contents($path, $contents);
+        chmod($path, 0600);
+
+        return $path;
+    }
+}

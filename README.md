@@ -7,39 +7,40 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.121: recuperación de Production Smoke y prueba exacta de despliegue.** Base exacta main v0.1.120 `cd871630d427f97a09d9e6e8befdd4e85e1d7a05`. #121 corrige el aprovisionamiento de la identidad sintética y #73 sigue abierto hasta que producción quede validada.
+> **Candidato v0.1.122: bootstrap productivo del secreto sintético mediante GitHub OIDC.** Base exacta main v0.1.121 `30ffd5b9cb9c04f88c76f4dc32179eaf3570741c`. v0.1.121 ya demuestra `/health` exacto, pero #73 sigue abierto porque el runtime no tenía el secreto con el que GitHub valida el login sintético.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
 
 ## Fuentes de verdad
-[AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Transición](docs/STACK-TRANSITION-SYMFONY.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+[AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.121** | `config/version.php`; candidata |
-| Base exacta | ✅ ~~main v0.1.120~~ | `cd871630d427f97a09d9e6e8befdd4e85e1d7a05` |
+| Version objetivo | 🚧 **v0.1.122** | `config/version.php`; candidata |
+| Base exacta | ✅ ~~main v0.1.121~~ | `30ffd5b9cb9c04f88c76f4dc32179eaf3570741c` |
 | CI del PR | 🚧 pendiente | validar HEAD final |
 | Sonar del PR | 🚧 pendiente | Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 pendiente | máximo 3 rondas |
-| CI del SHA exacto de main | ✅ ~~success~~ | #35917304166 sobre `cd871630…` |
-| Production Smoke base | ⛔ #73 | #35917304261 failure |
-| Producción objetivo | 🚧 pendiente | /health exacto + flujo autenticado |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35927165744 sobre `30ffd5b9…` |
+| Health productivo base | ✅ ~~v0.1.121 + SHA exacto~~ | Smoke #35927165714 |
+| Production Smoke base | ⛔ #73 | login sintético aún vuelve a `/login` |
+| Producción objetivo | 🚧 pendiente | bootstrap OIDC + Smoke completo verde |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+820** | **−68** | **+752** |
+| **11** | **+1080** | **−39** | **+1041** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · browser · real-stack** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | #121/#73: identidad sintética, post-deploy, health exacto y Smoke |
+| Alcance | #121/#73: sincronizar el secreto sintético sin acceso SSH y recuperar Smoke |
 | Rol del PR | **SRE · Backend Laravel · Application Security** |
 | Revisiones | máximo 3 rondas automáticas; sin polling |
 
@@ -49,43 +50,40 @@ flowchart LR
  A["PR + snapshot exacto"] --> C["CI + Sonar + CodeRabbit"]
  C --> M["Squash merge"]
  M --> X["CI exact-main"]
- X --> H["/health version + SHA"]
- H --> S["Production Smoke"]
- S --> G["Cerrar #73 y declarar verde"]
+ X --> H["/health SHA exacto"]
+ H --> O["OIDC GitHub → bootstrap sintético"]
+ O --> S["Production Smoke"]
+ S --> G["Cerrar #73 · producción verde"]
 ```
 
 ## Qué se hizo
-- `grindflow:provision-smoke-user` reconcilia solo `@grindflow.test`, exige `APP_PHASE=construccion`, toma lock de filesystem y realiza backup cifrado privado antes de crear o mutar la fila sintética.
-- La cuenta no recibe memberships; usa `platform_role=admin` únicamente porque `/admin/system` exige ese rol. Contraseña/hash/email nunca se imprimen.
-- El comando corre en `deploy-hostinger.sh`, en el primer request que observa un release nuevo y como reconciliación del scheduler productivo.
-- `/health` responde 200 solo si puede demostrar versión y SHA Git exactos; Production Smoke compara ese SHA con `main` antes de gastar un intento de login y valida también home, login y dashboard.
-- Contrato de entorno: `SMOKE_USER_PASSWORD` en Hostinger debe coincidir con el secret GitHub `PRODUCTION_E2E_PASSWORD`.
+- Production Smoke obtiene un token OIDC efímero solo con `id-token: write` y espera antes a que `/health` exponga el SHA exacto de `main`.
+- El servidor valida firma GitHub, audiencia, repositorio/IDs, `refs/heads/main`, workflow exacto, runner GitHub-hosted y SHA; además exige que ese SHA sea el checkout realmente desplegado.
+- Solo en `APP_ENV=production` + `APP_PHASE=construccion` el endpoint interno puede persistir `SMOKE_USER_PASSWORD`.
+- Antes de mutar `.env` crea backup cifrado privado; la escritura es atómica y se revierte si falla la reconciliación.
+- Tras persistir el secreto invalida `config:cache`, ejecuta `grindflow:provision-smoke-user` y nunca devuelve ni registra password/hash.
+- No hay SQL destructivo, borrados, datos de cliente ni cambios de tenant.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
 <!-- grindflow:changed-files -->
-- `.env.example`
 - `.github/workflows/production-smoke.yml`
 - `README.md`
-- `app/Console/Commands/ProvisionSmokeUser.php`
-- `app/Support/Deployment/CheckoutIdentity.php`
-- `config/grindflow.php`
+- `app/Http/Controllers/Operations/ProductionSmokeBootstrapController.php`
+- `app/Support/Deployment/GitHubActionsOidcVerifier.php`
+- `app/Support/Deployment/ProductionEnvironmentWriter.php`
 - `config/version.php`
 - `docs/DEPLOY-HOSTINGER.md`
-- `public/index.php`
-- `routes/console.php`
 - `routes/web.php`
-- `scripts/deploy-hostinger.sh`
-- `scripts/production-smoke-contract.sh`
-- `scripts/production-smoke.sh`
-- `tests/Feature/HealthIdentityTest.php`
-- `tests/Feature/ProvisionSmokeUserCommandTest.php`
+- `tests/Feature/ProductionSmokeBootstrapTest.php`
+- `tests/Unit/GitHubActionsOidcVerifierTest.php`
+- `tests/Unit/ProductionEnvironmentWriterTest.php`
 
 ## Validación
-- Tests del comando: ausencia de secreto, dominio sintético, creación, idempotencia, backup cifrado previo y redacción de salida.
-- Tests de health: refs loose/packed/detached, 200 exacto sin DB y 503 fail-closed sin SHA.
-- Contrato Smoke: health exacto, home y flujo autenticado; fallos de identidad no consumen login.
-- Producción solo se declara verde con evidencia de los cinco criterios del dueño.
+- OIDC: firma RSA, repo/IDs/ref/workflow/SHA/audiencia y expiración.
+- Bootstrap: rechaza token/SHA inválidos antes de escribir y solo reconcilia la identidad reservada.
+- Entorno: backup cifrado, escritura atómica, idempotencia y rollback de `.env`.
+- Producción solo se declarará verde con los cinco criterios indicados por el dueño.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -93,7 +91,7 @@ Inventario del diff exacto:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #121 + #73: recuperar Production Smoke | 🚧 v0.1.121 |
-| **NEXT** | 🚧 CI exact-main + validación productiva | 🚧 tras merge |
-| **BLOCKED / EXTERNAL** | ⛔ Ninguno asumido | ⛔ se determina por evidencia |
+| **NOW** | 🚧 #121 + #73: recuperar Production Smoke | 🚧 v0.1.122 |
+| **NEXT** | 🚧 exact-main + Smoke + cierre incidente | 🚧 tras merge |
+| **BLOCKED / EXTERNAL** | ⛔ ninguno demostrado | ⛔ fail-closed si OIDC/bootstrap no valida |
 | **LATER** | 🚧 Roadmap de producto | 🚧 solo después de producción verde |

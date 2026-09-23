@@ -1,0 +1,134 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\UserRole;
+use App\Models\User;
+use App\Support\Deployment\CheckoutIdentity;
+use App\Support\Deployment\GitHubActionsOidcVerifier;
+use App\Support\Deployment\ProductionEnvironmentWriter;
+use Closure;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Mockery;
+use Tests\TestCase;
+
+class ProductionSmokeBootstrapTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->app->detectEnvironment(static fn (): string => 'production');
+        Storage::fake('local');
+        $identity = Mockery::mock(CheckoutIdentity::class);
+        $identity->shouldReceive('commit')->andReturn(str_repeat('a', 40));
+        $this->app->instance(CheckoutIdentity::class, $identity);
+
+        config([
+            'grindflow.phase' => 'construccion',
+            'grindflow.smoke_user.email' => 'e2e-admin@grindflow.test',
+            'grindflow.smoke_user.password' => '',
+            'grindflow.smoke_user.name' => 'GrindFlow Production Smoke',
+        ]);
+    }
+
+    public function test_verified_oidc_bootstrap_reconciles_the_synthetic_account_without_exposing_secret(): void
+    {
+        $sha = str_repeat('a', 40);
+        $password = 'workflow-secret-value';
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')
+            ->once()
+            ->with('signed-oidc-token', $sha)
+            ->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')
+            ->once()
+            ->with($password, Mockery::type(Closure::class))
+            ->andReturnUsing(static function (string $secret, Closure $afterPersist): void {
+                $afterPersist();
+            });
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $this->artisan('config:clear')->assertSuccessful();
+
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', [
+                'password' => $password,
+            ]);
+
+        $response->assertNoContent()
+            ->assertHeader('Cache-Control');
+
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        self::assertStringContainsString('no-store', $cacheControl);
+        self::assertStringContainsString('max-age=0', $cacheControl);
+
+        $user = User::query()->sole();
+        self::assertSame(UserRole::Admin, $user->platform_role);
+        self::assertSame('e2e-admin@grindflow.test', $user->email);
+        self::assertStringNotContainsString($password, (string) $response->getContent());
+    }
+
+    public function test_bootstrap_rejects_missing_oidc_before_any_database_write(): void
+    {
+        $sha = str_repeat('a', 40);
+
+        $this->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', [
+                'password' => 'never-used-secret',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_bootstrap_rejects_invalid_oidc_before_environment_or_database_write(): void
+    {
+        $sha = str_repeat('a', 40);
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')
+            ->once()
+            ->with('invalid-signed-token', $sha)
+            ->andThrow(new \RuntimeException('invalid token'));
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldNotReceive('withSmokePassword');
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $this->withHeader('Authorization', 'Bearer invalid-signed-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', [
+                'password' => 'never-used-secret',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_bootstrap_rejects_oidc_for_a_sha_not_deployed_on_the_server(): void
+    {
+        $sha = str_repeat('b', 40);
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldNotReceive('verify');
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', [
+                'password' => 'never-used-secret',
+            ])
+            ->assertConflict();
+
+        $this->assertDatabaseCount('users', 0);
+    }
+}

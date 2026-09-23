@@ -12,6 +12,7 @@ concurrency:
 permissions:
   contents: read
   issues: write
+  id-token: write
 
 jobs:
   production-smoke:
@@ -83,6 +84,69 @@ jobs:
           if [[ -n "$issue_number" ]]; then
             gh issue comment "$issue_number" --body "Production E2E credentials are now configured. Closing this automatic notice."
             gh issue close "$issue_number"
+          fi
+
+      - name: Wait for exact deployed checkout before production write
+        if: steps.credentials.outputs.configured == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_body="$(mktemp)"
+          trap 'rm -f "$health_body"' EXIT
+
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            status="$(curl --silent --show-error --max-time 20               --output "$health_body"               --write-out '%{http_code}'               "$BASE_URL/health?probe=$GITHUB_RUN_ID-$attempt" || true)"
+
+            if [[ "$status" == "200" ]] && jq -e --arg sha "$GITHUB_SHA"               'type == "object" and .status == "ok" and .exact == true and .commit == $sha'               "$health_body" >/dev/null; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -lt "$ATTEMPTS" ]]; then
+              sleep "$WAIT_SECONDS"
+            fi
+          done
+
+          echo "::error::Production never exposed the exact main SHA through /health."
+          exit 1
+
+      - name: Reconcile synthetic smoke identity through GitHub OIDC
+        if: steps.credentials.outputs.configured == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(mktemp)"
+          trap 'rm -f "$payload"' EXIT
+          chmod 600 "$payload"
+
+          GRINDFLOW_SMOKE_PASSWORD="$E2E_USER_PASSWORD" python3 - "$payload" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump({"password": os.environ["GRINDFLOW_SMOKE_PASSWORD"]}, handle)
+          PY
+
+          bootstrap_status=0
+          for attempt in 1 2 3; do
+            oidc_response="$(curl --silent --show-error --fail               --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"               "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=grindflow-production-smoke-bootstrap")"
+            oidc_token="$(jq -er '.value' <<<"$oidc_response")"
+            printf '::add-mask::%s\n' "$oidc_token"
+
+            bootstrap_status="$(curl --silent --show-error --max-time 20               --output /dev/null               --write-out '%{http_code}'               --request POST               --header "Authorization: Bearer $oidc_token"               --header "Content-Type: application/json"               --header "X-GrindFlow-Expected-Sha: $GITHUB_SHA"               --data-binary "@$payload"               "$BASE_URL/internal/production-smoke/bootstrap" || true)"
+            unset oidc_token oidc_response
+
+            if [[ "$bootstrap_status" == "204" ]]; then
+              echo "Synthetic production smoke identity reconciled through verified GitHub OIDC." >> "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [[ "$bootstrap_status" != "204" ]]; then
+            echo "::error::Synthetic production identity bootstrap failed with HTTP $bootstrap_status; no login attempt will be sent."
+            exit 1
           fi
 
       - name: Validate smoke script
