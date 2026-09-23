@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+606** | **−175** | **+431** |
+| **11** | **+655** | **−175** | **+480** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -64,6 +64,7 @@ flowchart LR
 
 ## Qué se hizo
 - Quick upload S2 acepta JPEG/PNG/WebP y ahora MP4/WebM hasta 8 MiB, con detección real de MIME y firma de contenedor; extensión/MIME cliente no bastan.
+- Migración Symfony amplía el CHECK `ck_gf_vault_assets_mime`; el rollback aborta antes de estrecharlo si quedan videos retenidos.
 - Listado incorpora filtros `mp4`/`webm`; cuota, deduplicación, clasificación, nota, papelera, integridad y descarga siguen tenant-safe y comunes a todos los originales.
 - Preview privado de video verifica sesión, tenant, estado, tamaño y SHA-256 antes de servir el MIME real con headers privados y filename fijo.
 - React admite selección múltiple de fotos/videos, preview local y detalle con controles nativos, `preload=metadata`, `playsInline` y sin autoplay.
@@ -79,6 +80,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/frontend/admin/VaultPanel.tsx`
 - `symfony/frontend/admin/admin.css`
+- `symfony/migrations/Version20260923142000.php`
 - `symfony/src/Http/Controller/VaultController.php`
 - `symfony/tests/e2e/preview.spec.mjs`
 - `symfony/tests/php/VaultVideoTest.php`
