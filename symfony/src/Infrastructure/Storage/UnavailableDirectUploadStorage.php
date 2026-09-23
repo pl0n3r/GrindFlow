@@ -29,6 +29,11 @@ final class UnavailableDirectUploadStorage implements DirectUploadStorage
         return $this->diskName;
     }
 
+    public function driver(): string
+    {
+        return 'unavailable';
+    }
+
     public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
     {
         throw $this->unavailable();

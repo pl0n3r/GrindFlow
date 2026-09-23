@@ -15,6 +15,7 @@ final class UnavailableDirectUploadStorageTest extends TestCase
 
         self::assertFalse($storage->available());
         self::assertSame('media', $storage->disk());
+        self::assertSame('unavailable', $storage->driver());
         self::assertFalse($storage->exists('organizations/example/staging/example'));
         self::assertNull($storage->size('organizations/example/staging/example'));
         self::assertNull($storage->readStream('organizations/example/staging/example'));

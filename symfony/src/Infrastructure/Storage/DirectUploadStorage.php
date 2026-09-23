@@ -16,6 +16,8 @@ interface DirectUploadStorage
 
     public function disk(): string;
 
+    public function driver(): string;
+
     /**
      * @return array{url: string, headers: array<string, string>}
      */
