@@ -632,10 +632,10 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     </div>}
     {directUpload && <div className="vault-quota vault-direct-upload" aria-label="Carga de archivos grandes">
       <strong>{directUpload.configured
-        ? 'Carga de archivos grandes preparada'
+        ? 'Infraestructura de media grande configurada'
         : 'Carga de archivos grandes no configurada'}</strong>
       <small>{directUpload.configured
-        ? 'Transporte privado preparado hasta ' + (directUpload.max_bytes / (1024 * 1024 * 1024)).toFixed(0) + ' GiB por archivo. La carga rápida de hasta 8 MiB sigue disponible.'
+        ? 'Storage y protección del token preparados hasta ' + (directUpload.max_bytes / (1024 * 1024 * 1024)).toFixed(0) + ' GiB por archivo. La carga directa aún no está habilitada en esta versión; la carga rápida de hasta 8 MiB sigue disponible.'
         : 'La carga rápida de hasta 8 MiB sigue disponible. Este entorno no enviará archivos grandes a un proveedor externo.'}</small>
     </div>}
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
