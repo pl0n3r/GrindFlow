@@ -175,7 +175,7 @@ final class VaultController extends AbstractController
 
         $size = $file->getSize();
         if (!is_int($size) || $size < 1 || $size > self::MAX_BYTES) {
-            return $this->error(422, 'invalid_size', 'La imagen debe pesar entre 1 byte y 8 MiB.');
+            return $this->error(422, 'invalid_size', 'El archivo debe pesar entre 1 byte y 8 MiB.');
         }
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($file->getPathname());
         if (!is_string($mime) || !in_array($mime, self::MIMES, true)
@@ -184,10 +184,10 @@ final class VaultController extends AbstractController
         }
 
         $filename = basename(str_replace('\\', '/', $file->getClientOriginalName()));
-        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $filename) ?: 'imagen';
+        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $filename) ?: 'archivo';
         $filename = mb_substr(trim($filename), 0, 180);
         if ($filename === '') {
-            $filename = 'imagen';
+            $filename = 'archivo';
         }
 
         $id = Uuid::v7()->toRfc4122();
@@ -199,7 +199,7 @@ final class VaultController extends AbstractController
             $actualSize = filesize($path);
             $sha256 = hash_file('sha256', $path);
             if ($actualSize === false || $sha256 === false || $actualSize !== $size) {
-                return $this->error(422, 'invalid_upload', 'La imagen no pudo verificarse.');
+                return $this->error(422, 'invalid_upload', 'El archivo no pudo verificarse.');
             }
             // Every cooperating upload locks the same organization row before counting.
             // File IO and hashing have finished before the transaction starts.
@@ -277,13 +277,13 @@ final class VaultController extends AbstractController
             });
 
             if ($uploadStatus === 'quota') {
-                return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 imágenes o 128 MiB por organización.');
+                return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 archivos o 128 MiB por organización.');
             }
             if ($uploadStatus === 'duplicate_active') {
-                return $this->error(409, 'vault_duplicate_active', 'Esta imagen ya está en tu biblioteca; no se guardó otra copia.');
+                return $this->error(409, 'vault_duplicate_active', 'Este archivo ya está en tu biblioteca; no se guardó otra copia.');
             }
             if ($uploadStatus === 'duplicate_trash') {
-                return $this->error(409, 'vault_duplicate_trash', 'Esta imagen ya está en tu papelera; puedes restaurarla.');
+                return $this->error(409, 'vault_duplicate_trash', 'Este archivo ya está en tu papelera; puedes restaurarlo.');
             }
             if ($uploadStatus !== 'stored') {
                 return $this->error(403, 'organization_access_changed', 'Tu permiso para guardar cambió.');
@@ -479,7 +479,7 @@ final class VaultController extends AbstractController
         $body = json_decode($request->getContent(), true);
         if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
             || array_keys($body) !== ['name'] || !is_string($body['name'])) {
-            return $this->error(422, 'invalid_name', 'Indica únicamente un nombre de imagen válido.');
+            return $this->error(422, 'invalid_name', 'Indica únicamente un nombre de archivo válido.');
         }
         $name = trim($body['name']);
         if (preg_match('/\\A.{2,180}\\z/usD', $name) !== 1
@@ -537,7 +537,7 @@ final class VaultController extends AbstractController
             return $written === 1 ? 'updated' : 'revoked';
         });
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
         }
         if ($result !== 'updated') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para renombrar cambió.');
@@ -626,7 +626,7 @@ final class VaultController extends AbstractController
             return $written === 1 ? 'updated' : 'revoked';
         });
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
         }
         if ($result !== 'updated') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para editar la nota cambió.');
@@ -647,7 +647,7 @@ final class VaultController extends AbstractController
             return $context;
         }
         if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
-            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar imágenes.');
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
@@ -708,7 +708,7 @@ final class VaultController extends AbstractController
             return $written === 1 ? 'updated' : 'revoked';
         });
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
         }
         if ($result !== 'updated') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
@@ -729,14 +729,14 @@ final class VaultController extends AbstractController
             return $context;
         }
         if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
-            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar imágenes.');
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
         }
         $body = json_decode($request->getContent(), true);
         if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)) {
-            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 imágenes activas.');
+            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 archivos activos.');
         }
         $keys = array_keys($body);
         sort($keys);
@@ -745,7 +745,7 @@ final class VaultController extends AbstractController
         if ($keys !== ['ids', 'usage_scope'] || !is_array($ids) || !array_is_list($ids)
             || count($ids) < 1 || count($ids) > 30 || !is_string($usage)
             || !in_array($usage, ['unclassified', 'internal_only', 'needs_review'], true)) {
-            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 imágenes y una clasificación válida.');
+            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 archivos y una clasificación válida.');
         }
         foreach ($ids as $id) {
             if (!is_string($id)
@@ -754,7 +754,7 @@ final class VaultController extends AbstractController
             }
         }
         if (count(array_unique($ids)) !== count($ids)) {
-            return $this->error(422, 'invalid_bulk_usage', 'Cada imagen debe seleccionarse una sola vez.');
+            return $this->error(422, 'invalid_bulk_usage', 'Cada archivo debe seleccionarse una sola vez.');
         }
 
         $organization = $context['organization']['id'];
@@ -827,10 +827,10 @@ final class VaultController extends AbstractController
                 return ['selected_count' => count($ids), 'updated_count' => $written];
             });
         } catch (\LogicException) {
-            return $this->error(403, 'organization_access_changed', 'Tu acceso cambió; no se clasificó ninguna imagen.');
+            return $this->error(403, 'organization_access_changed', 'Tu acceso cambió; no se clasificó ningún archivo.');
         }
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'Alguna imagen ya no está activa en esta organización.');
+            return $this->error(404, 'file_not_found', 'Algún archivo ya no está activo en esta organización.');
         }
         if ($result === 'revoked') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
