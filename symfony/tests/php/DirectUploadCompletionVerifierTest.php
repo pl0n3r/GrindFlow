@@ -115,15 +115,46 @@ final class DirectUploadCompletionVerifierTest extends TestCase
         }
     }
 
-    private function storage(string $key, string $bytes): DirectUploadStorage
+    public function testStreamLengthMismatchIsRejectedEvenWhenReportedSizeMatches(): void
     {
-        return new class($key, $bytes) implements DirectUploadStorage {
+        $organization = Uuid::v7()->toRfc4122();
+        $user = Uuid::v7()->toRfc4122();
+        $stagingKey = 'organizations/'.$organization.'/staging/'.Uuid::v7()->toRfc4122();
+        $storage = $this->storage($stagingKey, 'short', 99);
+        $tokens = new DirectUploadTokenCipher(str_repeat('s', 32));
+        $token = $tokens->issue(
+            $organization,
+            $user,
+            'media',
+            $stagingKey,
+            'clip.mp4',
+            'video/mp4',
+            99,
+            900,
+            self::NOW,
+        );
+        $verifier = new DirectUploadCompletionVerifier($storage, $tokens, new DirectUploadObjectKeys());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Direct upload object stream size does not match the approved upload.');
+        try {
+            $verifier->verify($token, $organization, $user, self::NOW + 1);
+        } finally {
+            self::assertSame(1, $storage->existsCalls);
+            self::assertSame(1, $storage->readCalls);
+        }
+    }
+
+    private function storage(string $key, string $bytes, ?int $reportedSize = null): DirectUploadStorage
+    {
+        return new class($key, $bytes, $reportedSize) implements DirectUploadStorage {
             public int $existsCalls = 0;
             public int $readCalls = 0;
 
             public function __construct(
                 private readonly string $expectedKey,
                 private readonly string $bytes,
+                private readonly ?int $reportedSize,
             ) {
             }
 
@@ -142,7 +173,9 @@ final class DirectUploadCompletionVerifierTest extends TestCase
             }
             public function size(string $storageKey): ?int
             {
-                return $storageKey === $this->expectedKey ? strlen($this->bytes) : null;
+                return $storageKey === $this->expectedKey
+                    ? ($this->reportedSize ?? strlen($this->bytes))
+                    : null;
             }
             public function readStream(string $storageKey)
             {
