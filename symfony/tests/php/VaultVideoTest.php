@@ -14,7 +14,7 @@ final class VaultVideoTest extends WebTestCase
 {
     private const MP4_HEX = '000000186674797069736f6d0000020069736f6d69736f32';
     private const WEBM_HEX = '1a45dfa39f4286810142f7810142f2810442f381084282847765626d4287810242858102';
-    private const INVALID_MP4_HEX = '000000106674797069736f6d00000000';
+    private const INVALID_MP4_HEX = '000000186674797069736f6d00000000';
 
     protected static function getKernelClass(): string
     {
