@@ -1,5 +1,6 @@
 parameters:
   grindflow_vault_root_default: ''
+  grindflow_direct_upload_secret_default: ''
 
 services:
   _defaults:
@@ -23,6 +24,13 @@ services:
     arguments:
       $projectDir: '%kernel.project_dir%'
       $rootOverride: '%env(default:grindflow_vault_root_default:GRINDFLOW_VAULT_ROOT)%'
+
+  GrindFlow\Infrastructure\Storage\DirectUploadStorage:
+    alias: GrindFlow\Infrastructure\Storage\UnavailableDirectUploadStorage
+
+  GrindFlow\Infrastructure\Storage\DirectUploadTokenCipher:
+    arguments:
+      $secret: '%env(default:grindflow_direct_upload_secret_default:GRINDFLOW_DIRECT_UPLOAD_SECRET)%'
 
   GrindFlow\Infrastructure\Storage\VaultStageCommand:
     arguments:
