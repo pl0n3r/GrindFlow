@@ -6,6 +6,7 @@ namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
+use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Shared\Version\ProductVersion;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -107,7 +108,7 @@ final class AdminContextController extends AbstractController
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
         }
 
-        $body = json_decode($request->getContent(), true);
+        $body = BoundedJsonBody::decode($request);
         if (!is_array($body) || array_key_exists('organization_id', $body) || !is_string($body['name'] ?? null)) {
             return $this->error(422, 'invalid_name', 'Indica un nombre válido, sin identificadores de organización.');
         }
