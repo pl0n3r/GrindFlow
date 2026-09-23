@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+411** | **−48** | **+363** |
+| **8** | **+625** | **−49** | **+576** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -67,7 +67,7 @@ flowchart LR
 - Intent acepta metadatos cerrados de archivo entre >8 MiB y ≤2 GiB; complete recibe solo token cifrado de longitud acotada.
 - Sin object storage, ambos POST devuelven 503 sanitizado y sin I/O externo; el quick upload local ≤8 MiB sigue intacto.
 - El resultado positivo de complete solo certifica staging: `verified_staging_only` y `registered=false`, sin promocionar blob, añadir catálogo ni publicar.
-- PHPUnit/MariaDB sintético cubre autenticación, organización, rol, revocación, CSRF, JSON acotado, MIME, tamaño y headers privados.
+- PHPUnit/MariaDB sintético cubre aislamiento de sesión, rol, revocación durante streaming, endpoints con adaptador desechable, integridad SHA-256, CSRF y respuestas privadas.
 - No hay S3, navegador de media grande, credenciales reales, FFmpeg ni cambios en Hostinger.
 
 ## Archivos modificados en esta entrega candidata
@@ -79,6 +79,7 @@ Inventario exclusivo de esta entrega candidata, no prueba publicación:
 - `docs/REQUIREMENTS.md`
 - `docs/SYMFONY-VAULT-STORAGE.md`
 - `symfony/src/Http/Controller/DirectUploadController.php`
+- `symfony/tests/php/DirectUploadConfiguredHttpTest.php`
 - `symfony/tests/php/DirectUploadHttpTest.php`
 
 ## Validación
