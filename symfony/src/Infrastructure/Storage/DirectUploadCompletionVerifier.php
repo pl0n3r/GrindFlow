@@ -71,6 +71,9 @@ final class DirectUploadCompletionVerifier
             if ($read === false) {
                 throw new \RuntimeException('Direct upload object could not be fully hashed.');
             }
+            if ($read !== $payload['byte_size']) {
+                throw new \InvalidArgumentException('Direct upload object stream size does not match the approved upload.');
+            }
             $sha256 = hash_final($hash);
         } finally {
             fclose($stream);
