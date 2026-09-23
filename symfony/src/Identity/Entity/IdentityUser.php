@@ -53,6 +53,7 @@ class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
         return ['ROLE_USER'];
     }
 
+    #[\Deprecated]
     public function eraseCredentials(): void
     {
         // No plaintext credentials are persisted in this entity.
