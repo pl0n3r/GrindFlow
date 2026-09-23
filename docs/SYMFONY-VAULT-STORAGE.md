@@ -37,8 +37,12 @@ SHA-256 con límite de 2 GiB. El binding predeterminado es deliberadamente
 secret, credenciales temporales ni rutas físicas. La variable de secreto protege
 únicamente el futuro token de completion y **no configura por sí sola** un proveedor.
 
-Esta versión no implementa S3/Flysystem, no crea endpoints de presign/completion,
-no mueve originales actuales y no hace I/O productivo. Cuando se habilite un
+El port no implementa todavía S3/Flysystem, no mueve originales actuales y
+no hace I/O productivo. Las rutas POST `direct-upload/intent` y `/complete`
+requieren sesión, rol de preparación y CSRF; el binding predeterminado responde
+503 sin contactar un proveedor. Si se instala uno, `complete` solo verifica
+staging: no crea registros en catálogo ni promociona bytes, y por tanto no
+significa que la carga se haya guardado. Cuando se habilite un
 adaptador, la URL temporal deberá quedar ligada al tamaño aprobado y el bucket
 deberá aplicar lifecycle sobre `organizations/{tenant}/staging/` para borrar
 objetos con más de 24 horas. El token expira a los 15 minutos por defecto y su

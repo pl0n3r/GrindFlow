@@ -203,10 +203,24 @@ Each requirement should contain:
 - El token de completion se cifra con AES-256-GCM cuando existe un secreto de al menos 32 bytes y queda ligado a organización, actor, disk, key, nombre, MIME declarado, tamaño y expiración de 5 a 60 minutos. Sin secreto suficiente, OpenSSL o soporte de AES-256-GCM, el servicio queda no configurado en vez de impedir arrancar el contenedor.
 - El emisor de intent no devuelve credenciales permanentes. El verificador de completion rechaza token/tenant/actor incorrectos antes de consultar storage, exige existencia y tamaño exacto, calcula SHA-256 leyendo por stream y deriva la key final tenant-safe. Esta verificación no registra todavía un asset ni habilita publicación.
 - `GET /api/admin/vault` añade únicamente readiness sanitizado: `disk`, `driver`, `max_bytes` y `configured`. No devuelve bucket, endpoint, access key, secret, token de proveedor ni rutas físicas. React muestra si la carga grande está preparada o no, conservando siempre el quick upload de 8 MiB.
-- Esta entrega no añade adaptador S3/Flysystem, rutas `intent/complete`, upload directo de browser, mutación de MariaDB por media grande, FFmpeg/ffprobe, Hostinger ni credenciales reales.
+- El fundamento no incorpora adaptador S3/Flysystem, upload directo de browser, mutación de MariaDB por media grande, FFmpeg/ffprobe, Hostinger ni credenciales reales. El contrato HTTP separado se especifica en GF-FR-021.
 - Antes de habilitar un adaptador real, el presign debe quedar ligado al `byte_size` aprobado y el proveedor debe purgar automáticamente objetos bajo `organizations/{tenant}/staging/` con más de 24 horas. Los tokens expiran a los 15 minutos por defecto y nunca pueden superar 60 minutos; conservar un objeto staged no prolonga ni revive el token.
 
 **Verificación:** PHPUnit puro cubre token cifrado/tamper/expiración/contexto, keys, fallback no configurado, intent con fake y completion por tamaño+SHA-256; PHPUnit/MariaDB comprueba que el Vault real arranca y devuelve readiness no configurado; Chromium 360 px muestra ese estado y mantiene funcional el quick upload. CI/Sonar/CodeRabbit se validan sobre el HEAD final y producción continúa separada.
+
+### GF-FR-021 — Contrato HTTP tenant-safe de direct upload (staging)
+
+**Enunciado:** la biblioteca expone endpoints POST JSON de `intent` y `complete` para conectar el transporte futuro al port GF-FR-020, sin convertir un objeto staged en asset durable ni habilitar distribución.
+
+**Aceptación:**
+- `/api/admin/vault/direct-upload/intent` recibe exclusivamente `filename`, `mime_type` y `byte_size`, con límite real de body de 4096 bytes. Acepta MIME JPEG/PNG/WebP/MP4/WebM y tamaños **mayores de 8 MiB y hasta 2 GiB**. El servidor deriva organización y actor de la sesión actual, nunca de campos del cliente.
+- `/api/admin/vault/direct-upload/complete` recibe exclusivamente `upload_token` de longitud acotada. Ambas rutas exigen cuenta activa, organización seleccionada, membresía actual con permiso `content_prepare` y CSRF del Vault. El completion debe revalidar membresía/tenant tras leer el stream antes de devolver resultados.
+- El intento exitoso devuelve únicamente URL temporal, headers temporales, token cifrado y vencimiento, con caché privada desactivada; una infraestructura no configurada devuelve `503 direct_upload_unavailable` sin I/O externo. Invalidaciones de JSON, tamaño, nombre, MIME o token reciben 422 con mensaje sanitizado.
+- El resultado exitoso de completion **solo verifica staging**: `status=verified_staging_only`, `registered=false`, SHA-256/tamaño y MIME **declarado**. No devuelve keys físicas, no registra ni promociona el blob, no asigna autorización de publicación, no afirma integridad de formato por inspección de media ni hace replay-safe una finalización de catálogo.
+- El quick upload local ≤8 MiB, el GET de readiness y el Vault actual permanecen independientes. Sin adaptador de proveedor real, ambos POST quedan indisponibles y no generan credenciales ni writes.
+- Antes de considerar media grande disponible para usuarios, faltan adaptador S3-compatible, verificación de formato real de bytes, catálogo/deduplicación/promoción transaccional y limpieza de staging. No confundir `verified_staging_only` con una subida guardada.
+
+**Verificación:** PHPUnit/MariaDB con usuario sintético prueba anónimo, sesión sin tenant, CSRF, rol, revocación, campos ajenos/extras, límites de JSON/tamaño, 503 fail-closed y headers no-store; las pruebas puras del issuer/verifier siguen cubriendo tamaño/stream/token. CI exact-main y despliegue se validan por separado.
 
 ### GF-FR-010 — Anotación privada del Vault Symfony
 **Estado:** implementado en candidato v0.1.60; código, despliegue y producción se validan por separado.

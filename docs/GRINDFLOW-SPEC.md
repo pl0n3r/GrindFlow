@@ -120,11 +120,24 @@ a organización, actor, disk, key, nombre, MIME declarado, tamaño y expiración
 La verificación de completion lee el objeto staged por stream, exige tamaño exacto,
 calcula SHA-256 real y deriva una key final tenant-safe.
 
-Esta entrega **no** añade adaptador de proveedor, endpoint `intent/complete`, carga
-directa desde navegador, registro de assets grandes ni cambios de producción.
+El fundamento no añade adaptador de proveedor ni registro de assets grandes.
+Las rutas HTTP de intent/complete pertenecen al contrato separado de staging.
 El listado existente del Vault solo expone un resumen sanitizado de readiness
 (`disk`, `driver`, `max_bytes`, `configured`) y React muestra el estado sin
 publicar bucket, endpoint, credenciales ni secretos.
+
+### S2 · API de intención y verificación de staging de media grande
+
+POST `/api/admin/vault/direct-upload/intent` y `/complete` comparten la sesión
+seleccionada, permiso de preparación y CSRF del Vault. Intent admite solo nombre,
+MIME declarado y tamaño >8 MiB y ≤2 GiB; complete acepta solo token cifrado.
+Sin proveedor, responden 503 fail-closed. Con un adaptador autorizado, intent
+puede entregar URL temporal, y complete verifica tamaño/hash del objeto staged,
+reautoriza al actor y responde `verified_staging_only`, `registered=false`.
+Ninguna ruta crea asset durable, verifica todavía formato multimedia por bytes,
+promociona un blob ni habilita distribución. El quick upload local permanece
+como alternativa independiente; incorporar proveedor y catálogo pertenece a
+entregas posteriores y requiere sus propias pruebas.
 
 ### S2 · Clasificación conservadora de recursos (integrada v0.1.62)
 
