@@ -60,9 +60,9 @@ class AuthenticationTest extends TestCase
         $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
             ->from('/login')->post('/login', [
                 '_token' => $beforeToken[1],
-            'email' => $user->email,
-            'password' => 'incorrect-synthetic-password',
-        ])->assertRedirect('/login')->assertSessionHasErrors('email');
+                'email' => $user->email,
+                'password' => 'incorrect-synthetic-password',
+            ])->assertRedirect('/login')->assertSessionHasErrors('email');
         $this->assertGuest();
         self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
             'Rejected login must not rotate the anonymous session identifier.');
