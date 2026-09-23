@@ -63,7 +63,7 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `AccountSecurityController` rechaza `Content-Length` válido superior a 4.096 bytes antes de cargar el JSON y coteja la longitud real aun si la cabecera miente o falta.
+- `AccountSecurityController` rechaza `Content-Length` válido superior a 4.096 bytes antes de cargar el JSON; lee como máximo 4.097 bytes del stream y coteja la longitud real aun si la cabecera miente o falta.
 - La profundidad de decodificación se limita a 16; cuerpos fuera de contrato reciben HTTP 422 genérico sin eco, tras consumir el cupo por identidad si su CSRF era válido.
 - Regresiones PHPUnit con usuario, organización y MariaDB descartables: longitud declarada y real, frontera exacta de 4 KiB, anidación excesiva y contraseña sin mutaciones inesperadas.
 - Actualizado el contrato GF-SEC-005 sin cambiar Laravel, secretos, usuarios productivos, Hostinger ni llamadas externas.
