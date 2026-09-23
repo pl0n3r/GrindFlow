@@ -69,7 +69,7 @@ final class DirectUploadTokenCipherTest extends TestCase
 
         $parts = explode('.', $token);
         self::assertCount(4, $parts);
-        $parts[2] = substr($parts[2], 0, -1).($parts[2][-1] === 'A' ? 'B' : 'A');
+        $parts[3] = ($parts[3][0] === 'A' ? 'B' : 'A').substr($parts[3], 1);
         self::assertNull($cipher->decryptFor(implode('.', $parts), $organization, $user, 'media', self::NOW));
         self::assertNull($cipher->decryptFor('v2.'.implode('.', array_slice(explode('.', $token), 1)), $organization, $user, 'media', self::NOW));
         self::assertNull($cipher->decryptFor('not-a-token', $organization, $user, 'media', self::NOW));
