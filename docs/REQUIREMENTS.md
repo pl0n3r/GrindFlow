@@ -83,6 +83,16 @@ Each requirement should contain:
 
 **Verificación:** Chromium aislado con `emulateMedia(reducedMotion)` sobre home, preview y navegación a 360/820 px; gate `symfony-preview`.
 
+### GF-UX-007 — Navegación por teclado en superficies Symfony
+
+**Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
+
+**Enunciado:** «Saltar al contenido» debe mover el foco, además del desplazamiento, al área principal de home, preview y acceso Symfony. Las entradas del login deben indicar claramente el foco de teclado sin exigir ratón, tanto con como sin un error de autenticación.
+
+**Aceptación:** el primer Tab en home, preview y login enfoca el enlace visible «Saltar al contenido»; al activarlo con Enter, `document.activeElement` es el `main#contenido[tabindex="-1"]` de la misma página. El selector autenticado también expone un destino `main#contenido[tabindex="-1"]`. Los inputs, selects y textareas tienen anillo de foco `:focus-visible` de 3 px con el color accesible de GrindFlow; sin desbordamiento a 360 u 820 px. No cambia autenticación, membresías, contenido de usuario ni el deploy.
+
+**Verificación:** PHPUnit HTTP de destinos home, preview, login y selector sintético; Chromium aislado navega solo con teclado y comprueba foco y estilo computado a 360 y 820 px en `symfony-preview`.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.

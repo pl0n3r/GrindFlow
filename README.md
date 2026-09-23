@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.108: respetar la reducción de movimiento.** Base exacta `main` v0.1.107 `433498efd02ba1d45cb7de7ccaed0fef0e95b87d`; el desplazamiento público y React respeta la preferencia del sistema.
+> **Candidato v0.1.109: navegación por teclado en Symfony.** Base exacta `main` v0.1.108 `e6d656b7e47f4825ca502134a5781456da4baa6f`; el enlace para saltar al contenido mueve el foco real y los formularios muestran foco visible.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.108** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.107~~ | `433498efd02ba1d45cb7de7ccaed0fef0e95b87d` |
+| Version objetivo | 🚧 **v0.1.109** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.108~~ | `e6d656b7e47f4825ca502134a5781456da4baa6f` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir full review del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35833000794` success sobre `433498efd02ba1d45cb7de7ccaed0fef0e95b87d` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35833000664` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35833000747` failure, #73; independiente de esta mejora |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35834414840` success sobre `e6d656b7e47f4825ca502134a5781456da4baa6f` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35834414868` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35834414871` failure, #73; independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/Chromium descartable; sin cuentas reales |
+| Datos productivos | ✅ ~~No tocados~~ | Symfony/Chromium descartable; sin cuentas reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+76** | **−20** | **+56** |
+| **11** | **+99** | **−27** | **+72** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-UX-006: reducir movimiento en Twig y React a 360/820 px |
+| Alcance | GF-UX-007: salto con foco real y controles de formulario visibles a 360/820 px |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,10 +63,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- La home Twig y la vista previa React aplican `scroll-behavior: auto` cuando el navegador indica `prefers-reduced-motion: reduce`, conservando el desplazamiento suave para otras preferencias.
-- El menú compartido conserva su regla de desplazamiento reducido y su navegación responsive.
-- Chromium sintético cubre preferencia dinámica y 360/820 px; detectó además overflow real del título en home a 360 px y se corrigió su escala móvil.
-- GF-UX-006 documentado sin alterar cuentas, roles, Laravel, Hostinger ni cutover.
+- Home Twig, vista previa React, ingreso y selector Symfony hacen enfocable el `main#contenido` para que «Saltar al contenido» lleve el foco al área principal y no solo desplace el viewport.
+- El foco de teclado en inputs, selects y textareas recibe el mismo anillo explícito de 3 px que enlaces y botones.
+- Chromium aislado navega con Tab/Enter por home, preview y login a 360/820 px; comprueba `document.activeElement`, anillo computado y ausencia de overflow.
+- PHPUnit HTTP asegura los destinos de home, preview, login y selector sintético; GF-UX-007 documentado sin tocar sesiones, roles, Laravel ni Hostinger.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
@@ -74,21 +74,26 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/preview.css`
 - `symfony/public/assets/grindflow.css`
-- `symfony/tests/e2e/reduced-motion.spec.mjs`
+- `symfony/templates/home/index.html.twig`
+- `symfony/templates/identity/login.html.twig`
+- `symfony/templates/identity/organizations.html.twig`
+- `symfony/templates/preview/index.html.twig`
+- `symfony/tests/e2e/keyboard-accessibility.spec.mjs`
+- `symfony/tests/php/OrganizationSelectorAccessibilityTest.php`
+- `symfony/tests/php/PreviewTest.php`
 
 ## Validación
-- Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final; después CI exact-main.
-- `symfony-preview` valida PHP, MariaDB descartable, TypeScript/Vite y Chromium a 360/820 px con `emulateMedia`.
-- La nueva versión no demuestra despliegue Symfony ni resuelve Production Smoke #73.
+- Exigir `validate`, Sonar y revisión final CodeRabbit del HEAD; después CI exact-main.
+- `symfony-preview` valida PHPUnit HTTP/MariaDB descartable y Chromium solo con teclado a 360/820 px.
+- La versión humana no acredita deploy Symfony ni resuelve Production Smoke #73.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Preferencia de movimiento reducido | 🚧 v0.1.108 candidata |
+| **NOW** | 🚧 Navegación por teclado Symfony | 🚧 v0.1.109 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -96,8 +101,8 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.107 fusionada~~ | ✅ ~~cabeceras antienmarcado Symfony~~ |
-| **NOW** | 🚧 Reducción de movimiento | 🚧 GF-UX-006, v0.1.108 |
+| **DONE** | ✅ ~~v0.1.108 fusionada~~ | ✅ ~~movimiento reducido y home sin overflow~~ |
+| **NOW** | 🚧 Foco al saltar y foco visible de formularios | 🚧 GF-UX-007, v0.1.109 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
