@@ -115,10 +115,45 @@ final class OrganizationSettingsTest extends WebTestCase
             ], json_encode(['name' => 'IDOR blocked', 'organization_id' => $foreign], JSON_THROW_ON_ERROR));
             self::assertResponseStatusCodeSame(422);
 
+            $updatedJson = '{"name":"Updated own studio"}';
+            $oversized = $updatedJson.str_repeat(' ', 4097 - strlen($updatedJson));
+            self::assertSame(4097, strlen($oversized));
             $client->request('POST', '/api/admin/organization/name', [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_X_CSRF_TOKEN' => $token,
-            ], '{"name":"Updated own studio"}');
+                'CONTENT_LENGTH' => '1',
+            ], $oversized);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Own studio', $db->fetchOne('SELECT name FROM gf_identity_organizations WHERE id = ?', [$mine]));
+
+            $client->request('POST', '/api/admin/organization/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+                'CONTENT_LENGTH' => '8192',
+            ], $updatedJson);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Own studio', $db->fetchOne('SELECT name FROM gf_identity_organizations WHERE id = ?', [$mine]));
+
+            $deepValue = 'nested';
+            for ($depth = 0; $depth < 17; ++$depth) {
+                $deepValue = [$deepValue];
+            }
+            $deepJson = '{"name":'.json_encode($deepValue, JSON_THROW_ON_ERROR)
+                .',"name":"Updated own studio"}';
+            self::assertSame('Updated own studio', json_decode($deepJson, true, 512, JSON_THROW_ON_ERROR)['name']);
+            $client->request('POST', '/api/admin/organization/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+            ], $deepJson);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Own studio', $db->fetchOne('SELECT name FROM gf_identity_organizations WHERE id = ?', [$mine]));
+
+            $atLimit = $updatedJson.str_repeat(' ', 4096 - strlen($updatedJson));
+            self::assertSame(4096, strlen($atLimit));
+            $client->request('POST', '/api/admin/organization/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+            ], $atLimit);
             self::assertResponseIsSuccessful();
             $result = json_decode((string) $client->getResponse()->getContent(), true);
             self::assertSame('Updated own studio', $result['data']['organization']['name']);

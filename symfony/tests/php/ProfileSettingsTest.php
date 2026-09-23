@@ -107,10 +107,45 @@ final class ProfileSettingsTest extends WebTestCase
             ], '{"name":"Nombre\\ninyectado"}');
             self::assertResponseStatusCodeSame(422);
 
+            $normalName = json_encode(['name' => 'Perfil actualizado'], JSON_THROW_ON_ERROR);
+            $tooLarge = $normalName.str_repeat(' ', 4097 - strlen($normalName));
+            self::assertSame(4097, strlen($tooLarge));
             $client->request('POST', '/api/admin/profile/name', [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_X_CSRF_TOKEN' => $token,
-            ], json_encode(['name' => 'Perfil actualizado'], JSON_THROW_ON_ERROR));
+                'CONTENT_LENGTH' => '1',
+            ], $tooLarge);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Cuenta original', $db->fetchOne('SELECT name FROM gf_identity_users WHERE id = ?', [$actor]));
+
+            $client->request('POST', '/api/admin/profile/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+                'CONTENT_LENGTH' => '8192',
+            ], $normalName);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Cuenta original', $db->fetchOne('SELECT name FROM gf_identity_users WHERE id = ?', [$actor]));
+
+            $deepValue = 'no permitir';
+            for ($depth = 0; $depth < 17; ++$depth) {
+                $deepValue = [$deepValue];
+            }
+            $deepJson = '{"name":'.json_encode($deepValue, JSON_THROW_ON_ERROR)
+                .',"name":"Perfil actualizado"}';
+            self::assertSame('Perfil actualizado', json_decode($deepJson, true, 512, JSON_THROW_ON_ERROR)['name']);
+            $client->request('POST', '/api/admin/profile/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+            ], $deepJson);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Cuenta original', $db->fetchOne('SELECT name FROM gf_identity_users WHERE id = ?', [$actor]));
+
+            $atLimit = $normalName.str_repeat(' ', 4096 - strlen($normalName));
+            self::assertSame(4096, strlen($atLimit));
+            $client->request('POST', '/api/admin/profile/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+            ], $atLimit);
             self::assertResponseIsSuccessful();
             $payload = json_decode((string) $client->getResponse()->getContent(), true);
             self::assertSame('Perfil actualizado', $payload['data']['user']['display_name']);
