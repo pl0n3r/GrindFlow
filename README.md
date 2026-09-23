@@ -20,8 +20,8 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.113** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.112~~ | `1619f1f67c2e5458cbe5acac2aa47f755862b84c` |
-| CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
-| Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
+| CI del PR | ✅ **VALIDATED IN CODE** | `validate` del HEAD final debe estar `success` antes del merge |
+| Sonar del PR | ✅ **Quality Gate** | `SonarCloud Code Analysis` del HEAD final debe estar `success` antes del merge |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
 | CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35845840089` success sobre `1619f1f67c2e5458cbe5acac2aa47f755862b84c` |
 | Deploy Observer | ✅ ~~Marcador humano observado~~ | `35845840055` success; no acredita SHA remoto |
