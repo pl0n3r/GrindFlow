@@ -617,7 +617,7 @@ test('S2 mobile vault navigates real paginated API metadata', async ({ page }) =
   });
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-pages-e2e=1', type: 'module' });
-  await expect(page.getByText('31 imágenes en esta organización')).toBeVisible();
+  await expect(page.getByText('31 archivos en esta organización')).toBeVisible();
   await expect(page.getByText('pagina-1.png')).toBeVisible();
   await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(page.getByText('pagina-2.png')).toBeVisible();
@@ -673,12 +673,12 @@ test('S2 móvil conserva éxitos parciales cuando la cuota rechaza otra imagen',
 
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-quota-e2e=1', type: 'module' });
-  await expect(page.getByText('99 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('99 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'uno.png', mimeType: 'image/png', buffer: png },
     { name: 'dos.png', mimeType: 'image/png', buffer: png },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
   await expect(page.getByText(/1 de 2 archivos guardados/)).toContainText('dos.png: La biblioteca alcanzó su cuota.');
   await expect(page.getByText('100 de 100 archivos, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('uno.png', { exact: true })).toBeVisible();
@@ -724,7 +724,7 @@ test('S2 mobile never retries ambiguous HTTP 201 or permanent 422 with malformed
     { name: 'recibida.png', mimeType: 'image/png', buffer: png },
     { name: 'rechazada.png', mimeType: 'image/png', buffer: png },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
   await expect(page.getByText(/0 de 2 archivos guardados/)).toBeVisible();
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
@@ -822,7 +822,7 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
     { name: 'guardada.png', mimeType: 'image/png', buffer: png },
     { name: 'texto.txt', mimeType: 'text/plain', buffer: Buffer.from('no es imagen') },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
   await expect(page.getByText(/0 de 2 archivos guardados/)).toBeVisible();
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
@@ -880,14 +880,14 @@ test('S2 mobile retries only failed files after a partial multi-upload', async (
     { name: 'uno.png', mimeType: 'image/png', buffer: png },
     { name: 'dos.png', mimeType: 'image/png', buffer: png },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
   await expect(page.getByText(/1 de 2 archivos guardados/)).toContainText('dos.png: Error temporal.');
-  await expect(page.getByText('Procesadas 2 de 2 imágenes.')).toBeVisible();
+  await expect(page.getByText('Procesados 2 de 2 archivos.')).toBeVisible();
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
   await expect(page.getByText('1 archivo pendiente.')).toBeVisible();
   await page.getByRole('button', { name: 'Reintentar 1 archivo' }).click();
   await expect(page.getByText('1 de 1 archivos guardados.')).toBeVisible();
-  await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('2 de 100 archivos, incluida la papelera.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reintentar 1 archivo' })).toHaveCount(0);
   expect(attempts).toEqual(['uno.png', 'dos.png', 'dos.png']);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
@@ -1232,9 +1232,9 @@ test('S2 mobile classifies private originals with CSRF, scoped filter and viewer
   await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
   await expect(page.getByText('1 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByRole('combobox', { name: 'Clasificación interna' }).selectOption('needs_review');
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   expect(writes).toBe(2);
   expect(seen).toContainEqual(['internal_only', 'active']);
   expect(seen).toContainEqual(['needs_review', 'trash']);
@@ -1343,14 +1343,14 @@ test('S2 mobile searches private filenames in library and trash without changing
   await page.addScriptTag({ url: script + '?vault-search-e2e=1', type: 'module' });
   await expect(page.getByText('festival.png')).toBeVisible();
   await expect(page.getByText('ensayo.png')).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Buscar imágenes por nombre' }).fill('festival');
+  await page.getByRole('searchbox', { name: 'Buscar archivos por nombre' }).fill('festival');
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
   await expect(page.getByText('festival.png')).toBeVisible();
   await expect(page.getByText('ensayo.png')).toHaveCount(0);
   await expect(page.getByText('Resultados para «festival» en biblioteca.')).toBeVisible();
-  await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('2 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await expect(page.getByText('Resultados para «festival» en papelera.')).toBeVisible();
   await page.getByRole('button', { name: 'Biblioteca', exact: true }).click();
   await page.getByRole('button', { name: 'Limpiar búsqueda' }).click();
@@ -1415,17 +1415,17 @@ test('S2 mobile combines MIME filters, backend ordering and search while keeping
   await page.getByLabel('Formato').selectOption('webp');
   await expect(page.getByText('mar.webp')).toBeVisible();
   await expect(page.getByText('lago.png')).toHaveCount(0);
-  await expect(page.getByText('3 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('3 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByLabel('Ordenar por').selectOption('size_desc');
   await expect(page.getByText('mar.webp')).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Buscar imágenes por nombre' }).fill('lago');
+  await page.getByRole('searchbox', { name: 'Buscar archivos por nombre' }).fill('lago');
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await page.getByLabel('Formato').selectOption('all');
   await expect(page.getByText('lago.png')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
-  await expect(page.getByText('3 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('3 de 100 archivos, incluida la papelera.')).toBeVisible();
   expect(requests.some((entry) =>
     entry.view === 'active' && entry.q === 'lago' && entry.format === 'webp' &&
     entry.sort === 'size_desc' && entry.page === '1')).toBe(true);
@@ -1607,7 +1607,7 @@ test('S2 mobile verifies only visible originals and clears results on view switc
   await expect(page.getByText('imagen-1.png')).toBeVisible();
   await page.getByRole('button', { name: 'Verificar originales visibles (2)' }).click();
   await expect(page.getByText('Comprobados 2 de 2 originales.')).toBeVisible();
-  await expect(page.getByText(/1 de 2 imágenes necesitan revisión/)).toBeVisible();
+  await expect(page.getByText(/1 de 2 archivos necesitan revisión/)).toBeVisible();
   await expect(page.getByText('Original íntegro: tamaño y SHA-256 coinciden.')).toBeVisible();
   await expect(page.getByText(/Alerta: el tamaño o la huella SHA-256 no coinciden/)).toBeVisible();
   expect(requests).toEqual([first, second]);
@@ -1669,25 +1669,25 @@ test('S2 editor classifies explicitly selected active images atomically at 360px
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-batch-e2e=1', type: 'module' });
   await expect(page.getByRole('checkbox', { name: 'Seleccionar imagen-1.png' })).toBeVisible();
-  await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
-  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByRole('button', { name: 'Seleccionar archivos visibles' }).click();
+  await expect(page.getByText('2 de 2 archivos visibles seleccionados.')).toBeVisible();
   await page.getByLabel('Clasificación para la selección').selectOption('needs_review');
   await page.getByRole('button', { name: 'Revisar clasificación de selección' }).click();
-  await expect(page.getByText(/¿Asignar «Requiere revisión» a las 2 imágenes/)).toBeVisible();
+  await expect(page.getByText(/¿Asignar «Requiere revisión» a los 2 archivos/)).toBeVisible();
   await page.getByRole('button', { name: 'Confirmar clasificación de selección' }).click();
   await expect(page.getByRole('alert').getByText('Algún archivo ya no está activo.')).toBeVisible();
-  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByText('2 de 2 archivos visibles seleccionados.')).toBeVisible();
   await page.getByRole('button', { name: 'Revisar clasificación de selección' }).click();
   await page.getByRole('button', { name: 'Confirmar clasificación de selección' }).click();
-  await expect(page.getByText(/2 imágenes revisadas; 2 clasificaciones actualizadas/)).toBeVisible();
-  await expect(page.getByText('0 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByText(/2 archivos revisados; 2 clasificaciones actualizadas/)).toBeVisible();
+  await expect(page.getByText('0 de 2 archivos visibles seleccionados.')).toBeVisible();
   await expect(page.getByText('Clasificación: Requiere revisión')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
-  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByRole('button', { name: 'Seleccionar archivos visibles' }).click();
+  await expect(page.getByText('2 de 2 archivos visibles seleccionados.')).toBeVisible();
   await page.getByLabel('Clasificación interna', { exact: true }).selectOption('unclassified');
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await page.getByLabel('Clasificación interna', { exact: true }).selectOption('all');
-  await expect(page.getByText('0 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByText('0 de 2 archivos visibles seleccionados.')).toBeVisible();
   expect(bulkCalls).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
@@ -1718,7 +1718,7 @@ test('S2 viewer has no batch controls in library or trash', async ({ page }) => 
   await page.addScriptTag({ url: script + '?vault-batch-viewer-e2e=1', type: 'module' });
   await expect(page.getByText('visible.png')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Seleccionar imágenes visibles' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Seleccionar archivos visibles' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
 });
