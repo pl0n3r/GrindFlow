@@ -67,11 +67,6 @@ flowchart LR
 - Chromium valida activación con Enter/Espacio, selección `aria-pressed` y nombre accesible de la región actualizada.
 - GF-UX-003 conserva navegación compartida y prueba responsive; sin cambios en datos, proveedores externos, Laravel ni producción.
 - AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
-- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
-- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
-- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
-- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
-- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de esta entrega candidata, no prueba publicación:
