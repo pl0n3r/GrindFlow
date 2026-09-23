@@ -103,6 +103,16 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit HTTP con dos organizaciones sintéticas comprueba el HTML autenticado y el fallback sin JavaScript; Chromium aislado simula contexto válido y error 401, y confirma retención de foco, único landmark y ausencia de overflow antes y después de hidratar React a 360/820 px. No modifica la base de producción ni hace cutover Symfony.
 
+### GF-SEC-009 — HSTS solo cuando Symfony conoce HTTPS real
+
+**Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
+
+**Enunciado:** el runtime Symfony debe emitir `Strict-Transport-Security` únicamente cuando la petición sea segura según el objeto `Request`, sin aceptar cabeceras de proxy del cliente como sustituto mientras no exista una configuración explícita y verificada de proxies confiables.
+
+**Aceptación:** respuestas HTTPS 200, redirecciones privadas 302, errores API 401 y 404 envían `Strict-Transport-Security: max-age=31536000`. Peticiones HTTP no envían HSTS. Un HTTP con `X-Forwarded-Proto: https` tampoco lo envía bajo la configuración actual sin proxies confiables. No se incluyen `includeSubDomains` ni `preload` sin inventario de subdominios y operación HTTPS comprobada.
+
+**Verificación:** PHPUnit HTTP del runtime Symfony aislado; no acredita TLS, proxy ni cabeceras efectivas del hosting productivo.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
