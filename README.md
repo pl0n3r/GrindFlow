@@ -27,7 +27,7 @@
 | Deploy Observer base | ✅ ~~Marcador observado~~ | #35903927866; no acredita SHA remoto |
 | Production Smoke | ⛔ Bloqueo externo #73 | #35903927898 failure |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Solo cambios de UI, test y documentación |
+| Datos productivos | ✅ ~~No tocados~~ | Solo cambios de UI, test, versión/configuración y documentación |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
@@ -66,7 +66,7 @@ flowchart LR
 - La vista previa React anuncia el panel actualizado mediante `aria-live="polite"` y `aria-atomic="true"`, sin interrumpir el foco de teclado.
 - Chromium valida activación con Enter/Espacio, selección `aria-pressed` y nombre accesible de la región actualizada.
 - GF-UX-003 conserva navegación compartida y prueba responsive; sin cambios en datos, proveedores externos, Laravel ni producción.
-- AGENTS.md registra la autorización del propietario para despliegues y reparaciones reversibles en producción con verificación y recuperación, conservando aprobación separada para operaciones protegidas.
+- [AGENTS.md](AGENTS.md) registra intervenciones productivas rutinarias y reversibles solo con acceso efectivo, procedimiento probado, recuperación viable y gates previos satisfactorios; las operaciones protegidas requieren aprobación específica.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de esta entrega candidata, no prueba publicación:
