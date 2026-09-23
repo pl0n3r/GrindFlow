@@ -24,6 +24,7 @@ interface DirectUploadStorage
     public function temporaryUpload(
         string $storageKey,
         string $mimeType,
+        int $byteSize,
         int $expiresAt,
     ): array;
 
