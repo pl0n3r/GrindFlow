@@ -20,9 +20,9 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.120** | `config/version.php`; candidata, no publicada |
 | Base exacta | ✅ ~~main v0.1.119~~ | `620012179f843338accea21c84742d306b6eb229` |
-| CI del PR | 🚧 Pendiente | `validate` sobre HEAD final |
-| Sonar del PR | 🚧 Pendiente | Quality Gate sobre HEAD final |
-| CodeRabbit del PR | 🚧 Pendiente | Revisión terminada del mismo SHA |
+| CI del PR | ✅ ~~success `adf5583`~~; 🚧 nuevo HEAD pendiente | #35910215166; revalidar tras cambios |
+| Sonar del PR | ✅ ~~success `adf5583`~~; 🚧 nuevo HEAD pendiente | Quality Gate del HEAD nuevo requerido |
+| CodeRabbit del PR | 🚧 Dos hallazgos nuevos del HEAD previo | Revisión completa requerida tras corregirlos |
 | CI del SHA exacto de main | ✅ ~~success~~ | #35906880198 sobre `62001217…` |
 | Deploy Observer base | ✅ ~~Marcador observado~~ | #35906880205; no acredita SHA remoto |
 | Production Smoke | ⛔ Bloqueo externo #73 | #35906880233 failure |
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+113** | **−26** | **+87** |
+| **4** | **+125** | **−29** | **+96** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -63,8 +63,8 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- PHPUnit con cuenta sintética exige conservar CSRF, identificador y marcador de sesión entre dos GET anónimos y tras contraseña errónea; confirma que el POST válido rota la cookie y mantiene la autenticación en una petición posterior.
-- El test de rate limiting existente exige CSRF e identificador estables ante el sexto intento bloqueado, sin modificar el límite.
+- PHPUnit con cuenta sintética comprueba CSRF, ID y marcador entre GET anónimos y tras rechazo; limpia atributos en memoria para exigir restauración real desde el backend con la misma cookie y verifica el login en otra solicitud.
+- El test de rate limiting exige CSRF e ID estables tras el sexto intento bloqueado con lectura de sesión persistida, sin alterar el límite.
 - GF-SEC-003 documenta la expectativa Laravel y distingue pruebas descartables de un smoke auténtico en Hostinger. No cambia controlador, credenciales ni datos reales.
 
 ## Archivos modificados en esta entrega candidata
