@@ -153,6 +153,14 @@ Each requirement should contain:
 
 **Verificación:** cada contribución Symfony debe superar `symfony-preview` y `validate` con la política de aceptación indicada. Una deprecation `self` o `direct` debe bloquear CI; los avisos indirectos/vendor permanecen sujetos al presupuesto total configurado.
 
+### GF-OPS-013 — Acciones oficiales de GitHub compatibles con Node 24
+
+**Enunciado:** los workflows de GrindFlow no deben depender de majors de acciones oficiales de GitHub que requieran el runtime JavaScript Node 20 retirado. La migración de runtime de las acciones no debe cambiar permisos, disparadores, secretos, comandos de aplicación ni semántica de los gates.
+
+**Aceptación:** `actions/checkout` usa v5 o posterior, `actions/cache` usa v5 o posterior, `actions/setup-node` usa v5 o posterior y `actions/upload-artifact` usa v6 o posterior. Los pins SHA existentes para acciones oficiales deben apuntar a releases Node 24 compatibles. `scripts/workflow-syntax-check.rb` bloquea las referencias Node 20 conocidas retiradas y continúa validando YAML y los contratos de seguridad del smoke/observer.
+
+**Verificación:** cada cambio de workflows debe superar `preflight` y `validate`; la matriz aplicable debe ejecutar correctamente cache, setup de Node, checkout y subida de artefactos con sus entradas existentes. La política no autoriza cambios productivos, despliegues ni uso de secretos adicionales.
+
 ### GF-OPS-010 — Readiness segura del runtime Symfony
 
 **Estado:** implementado en código; despliegue y producción se verifican por separado.
