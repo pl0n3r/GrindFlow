@@ -23,7 +23,7 @@ Tampoco se aceptan rutas relativas ni segmentos `.` o `..` ni una ubicación den
 del árbol del release. La carpeta debe permanecer fuera del webroot y no
 publicarse como alias del servidor HTTP.
 
-## Fundamento de carga directa para media grande (v0.1.117 candidato)
+## Fundamento de carga directa para media grande
 
 El quick upload local de fotos/videos hasta 8 MiB permanece como camino simple.
 Para preparar media grande, Symfony define un port de object storage, keys opacas
@@ -38,7 +38,11 @@ secret, credenciales temporales ni rutas físicas. La variable de secreto proteg
 únicamente el futuro token de completion y **no configura por sí sola** un proveedor.
 
 Esta versión no implementa S3/Flysystem, no crea endpoints de presign/completion,
-no mueve originales actuales y no hace I/O productivo. Antes de activar una carga
+no mueve originales actuales y no hace I/O productivo. Cuando se habilite un
+adaptador, la URL temporal deberá quedar ligada al tamaño aprobado y el bucket
+deberá aplicar lifecycle sobre `organizations/{tenant}/staging/` para borrar
+objetos con más de 24 horas. El token expira a los 15 minutos por defecto y su
+máximo permitido es 60 minutos; el objeto staged nunca extiende esa vigencia. Antes de activar una carga
 directa real se requiere un adaptador explícito, CORS acotado, credenciales de
 mínimo privilegio, pruebas descartables del proveedor y el flujo transaccional de
 deduplicación/promoción/registro de catálogo con reautorización tenant-safe.
