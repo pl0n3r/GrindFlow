@@ -145,6 +145,36 @@ final class DirectUploadCompletionVerifierTest extends TestCase
         }
     }
 
+    public function testLongerStreamStopsAfterApprovedSizePlusOneByte(): void
+    {
+        $organization = Uuid::v7()->toRfc4122();
+        $user = Uuid::v7()->toRfc4122();
+        $stagingKey = 'organizations/'.$organization.'/staging/'.Uuid::v7()->toRfc4122();
+        $storage = $this->storage($stagingKey, 'longer', 5);
+        $tokens = new DirectUploadTokenCipher(str_repeat('s', 32));
+        $token = $tokens->issue(
+            $organization,
+            $user,
+            'media',
+            $stagingKey,
+            'clip.mp4',
+            'video/mp4',
+            5,
+            900,
+            self::NOW,
+        );
+        $verifier = new DirectUploadCompletionVerifier($storage, $tokens, new DirectUploadObjectKeys());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Direct upload object stream size does not match the approved upload.');
+        try {
+            $verifier->verify($token, $organization, $user, self::NOW + 1);
+        } finally {
+            self::assertSame(1, $storage->existsCalls);
+            self::assertSame(1, $storage->readCalls);
+        }
+    }
+
     private function storage(string $key, string $bytes, ?int $reportedSize = null): DirectUploadStorage
     {
         return new class($key, $bytes, $reportedSize) implements DirectUploadStorage {
@@ -161,7 +191,7 @@ final class DirectUploadCompletionVerifierTest extends TestCase
             public function available(): bool { return true; }
             public function disk(): string { return 'media'; }
             public function driver(): string { return 's3'; }
-            public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
+            public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
             {
                 return ['url' => 'https://example.invalid', 'headers' => []];
             }
