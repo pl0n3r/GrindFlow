@@ -67,6 +67,7 @@ final class OrganizationSelectorAccessibilityTest extends WebTestCase
 
             $selector = $client->request('GET', '/organizations');
             self::assertResponseIsSuccessful();
+            self::assertSelectorExists('main#contenido[tabindex="-1"]');
             $cards = $selector->filter('.identity-orgs li');
             self::assertCount(2, $cards);
             self::assertCount(0, $selector->filter('.identity-orgs li[aria-current="true"]'));
