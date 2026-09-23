@@ -20,10 +20,10 @@
 | --- | --- | --- |
 | Version objetivo | 🚧 **v0.1.100** | `config/version.php`; no publicada |
 | Base exacta | ✅ ~~main v0.1.99~~ | `11ed123a3dbe163ae7c1a346aebba317fe25e654` |
-| CI del PR | 🚧 Pendiente | Revalidar HEAD final |
-| Sonar del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CodeRabbit del PR | 🚧 Pendiente | Revalidar HEAD final |
-| CI del SHA exacto de main | 🚧 v0.1.99 en ejecución | Production Smoke independiente, no validado |
+| CI del PR | ✅ **VALIDATED IN CODE** | `GrindFlow CI / validate` run `35799235688` success sobre `52c6cd23bd633a9dd0790aea5ea482ba115410eb` |
+| Sonar del PR | ✅ **VALIDATED IN CODE** | SonarCloud success, 0 issues nuevos / 0 hotspots sobre `52c6cd23bd633a9dd0790aea5ea482ba115410eb` |
+| CodeRabbit del PR | 🚧 Ajuste documental pendiente | Full review completada sobre `52c6cd23bd633a9dd0790aea5ea482ba115410eb`; este sync requiere nueva revisión final |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35792566588` success sobre `11ed123a3dbe163ae7c1a346aebba317fe25e654`; Production Smoke separado |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
 | Production Smoke | ⛔ Login E2E no validado | #73 sigue independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
