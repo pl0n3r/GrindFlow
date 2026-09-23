@@ -103,7 +103,7 @@ Each requirement should contain:
 **Verificación:** PHPUnit/MariaDB de CSRF, ACL, tenant, validación, retención en papelera y persistencia; Playwright/Chromium a 360 px; regresión del manifiesto de staging y restauración. Todo en entornos sintéticos, sin migraciones productivas.
 
 ### GF-SEC-005 — Cambio de contraseña personal en Symfony
-**Estado:** cambio de contraseña base integrado desde v0.1.61; límites de cuerpo/profundidad preparados en candidato v0.1.101. CI, merge y producción son verificaciones separadas.
+**Alcance funcional:** el cambio de contraseña personal exige controles de identidad, CSRF, intentos y límites del JSON de entrada; la aceptación se define a continuación.
 
 **Enunciado:** una persona con sesión Symfony activa cambia únicamente su propia contraseña desde React, independientemente del rol de su organización.
 
