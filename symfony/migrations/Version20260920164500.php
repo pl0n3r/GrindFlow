@@ -12,7 +12,7 @@ final class Version20260920164500 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Create private organization-scoped photo catalog for isolated Symfony S2';
+        return 'Create private organization-scoped media catalog for isolated Symfony S2';
     }
 
     public function up(Schema $schema): void
@@ -36,7 +36,7 @@ final class Version20260920164500 extends AbstractMigration
                 CONSTRAINT fk_gf_vault_assets_uploader FOREIGN KEY (uploaded_by)
                     REFERENCES gf_identity_users(id) ON DELETE RESTRICT,
                 CONSTRAINT ck_gf_vault_assets_size CHECK (size_bytes > 0 AND size_bytes <= 8388608),
-                CONSTRAINT ck_gf_vault_assets_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp'))
+                CONSTRAINT ck_gf_vault_assets_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'))
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             SQL);
     }
