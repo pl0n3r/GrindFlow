@@ -38,7 +38,17 @@ test('mobile navigation reveals active preview and private sections without page
     .toBeLessThanOrEqual(360);
 
   // DOM clicks do not automatically scroll off-screen items as Playwright
-  // locator.click would. The component must reveal the selected item itself.
+  // locator.click would. Give the document scroll room so a regression to
+  // scrollIntoView() cannot pass merely because the page starts at scrollY=0.
+  const beforeDocumentScroll = await page.evaluate(() => {
+    const spacer = document.createElement('div');
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.style.height = '1000px';
+    document.body.append(spacer);
+    window.scrollTo(0, 320);
+    return { x: window.scrollX, y: window.scrollY };
+  });
+  expect(beforeDocumentScroll.y).toBeGreaterThan(0);
   await preview.evaluate((el) => {
     el.scrollLeft = 0;
     el.querySelectorAll('button')[2].click();
@@ -46,6 +56,10 @@ test('mobile navigation reveals active preview and private sections without page
   await expect(page.getByRole('heading', { name: 'Tráfico' })).toBeVisible();
   await expect.poll(() => fullyVisible(preview)).toBe(true);
   expect(await preview.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => ({
+    x: window.scrollX,
+    y: window.scrollY,
+  }))).toEqual(beforeDocumentScroll);
 
   await preview.evaluate((el) => {
     el.scrollLeft = el.scrollWidth;
