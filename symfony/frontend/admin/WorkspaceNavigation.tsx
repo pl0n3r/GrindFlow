@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 export type WorkspaceNavItem = Readonly<{
   id: string;
@@ -23,7 +23,7 @@ export function WorkspaceNavigation({
 }: WorkspaceNavigationProps) {
   const navigationRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nav = navigationRef.current;
     if (!nav) return;
 
