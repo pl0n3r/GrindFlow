@@ -71,7 +71,7 @@ final class OrganizationSelectorAccessibilityTest extends WebTestCase
             self::assertCount(2, $cards);
             self::assertCount(0, $selector->filter('.identity-orgs li[aria-current="true"]'));
 
-            foreach (['Alpha pruebas', 'Beta pruebas'] as $index => $name) {
+            foreach ([['Alpha pruebas', 'editor'], ['Beta pruebas', 'studio']] as $index => [$name, $role]) {
                 $number = $index + 1;
                 $card = $cards->eq($index);
                 self::assertSame($name, $card->filter('strong')->text());
@@ -83,6 +83,8 @@ final class OrganizationSelectorAccessibilityTest extends WebTestCase
                     'organization-action-'.$number.' organization-name-'.$number,
                     $button->attr('aria-labelledby'),
                 );
+                self::assertCount(1, $card->filter('#organization-role-'.$number));
+                self::assertSame($role, $card->filter('#organization-role-'.$number)->text());
                 self::assertSame('organization-role-'.$number, $button->attr('aria-describedby'));
             }
 
