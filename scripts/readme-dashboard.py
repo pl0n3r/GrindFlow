@@ -216,13 +216,13 @@ def roadmap_error(readme: str) -> str | None:
 
     next_section = section(readme, "## Qué sigue")
     issue_destinations = re.findall(
-        r"https://github\\.com/pl0n3r/GrindFlow/issues/(\\d+)\\b",
+        r"https://github\.com/pl0n3r/GrindFlow/issues/(\d+)\b",
         next_section,
         flags=re.I,
     )
     if issue_destinations != ["2"]:
         return "Qué sigue must link only the canonical issue #2 exactly once"
-    if re.search(r"\\*\\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\\*\\*", next_section):
+    if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", next_section):
         return "Qué sigue must only link canonical issue #2; snapshot lanes belong in Panorama"
 
     panorama = section(readme, "## Panorama general pendiente")
