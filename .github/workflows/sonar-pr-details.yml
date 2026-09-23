@@ -20,6 +20,7 @@ jobs:
       - name: Checkout trusted default branch
         uses: actions/checkout@v5
         with:
+          persist-credentials: false
           ref: main
 
       - name: Mirror Sonar details into the pull request
