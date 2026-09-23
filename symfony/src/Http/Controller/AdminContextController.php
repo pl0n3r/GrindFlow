@@ -109,7 +109,7 @@ final class AdminContextController extends AbstractController
         }
 
         $body = BoundedJsonBody::decode($request);
-        if (!is_array($body) || array_key_exists('organization_id', $body) || !is_string($body['name'] ?? null)) {
+        if (!is_array($body) || array_keys($body) !== ['name'] || !is_string($body['name'])) {
             return $this->error(422, 'invalid_name', 'Indica un nombre válido, sin identificadores de organización.');
         }
 
