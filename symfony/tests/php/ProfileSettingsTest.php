@@ -113,6 +113,7 @@ final class ProfileSettingsTest extends WebTestCase
             $client->request('POST', '/api/admin/profile/name', [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_X_CSRF_TOKEN' => $token,
+                'CONTENT_LENGTH' => '1',
             ], $tooLarge);
             self::assertResponseStatusCodeSame(422);
             self::assertSame('Cuenta original', $db->fetchOne('SELECT name FROM gf_identity_users WHERE id = ?', [$actor]));
