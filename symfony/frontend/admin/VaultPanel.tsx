@@ -843,16 +843,16 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
                 onClick={() => setUsageDraft(detail.usage_scope ?? 'unclassified')}>Descartar clasificación</button>
             </form>}
             <figure className="vault-preview">
-              {previewFailed
-                ? <p role="status">La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.</p>
-                : isVideoMime(detail.mime_type)
-                  ? <video controls playsInline preload="metadata"
-                      src={'/api/admin/vault/' + detail.id + '/preview'}
-                      aria-label={'Vista previa privada de ' + detail.name}
-                      onError={() => setPreviewFailed(true)} />
-                  : <img src={'/api/admin/vault/' + detail.id + '/preview'}
-                      alt={'Vista previa privada de ' + detail.name} loading="lazy" decoding="async"
-                      referrerPolicy="no-referrer" onError={() => setPreviewFailed(true)} />}
+              {previewFailed &&
+                <p role="status">La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.</p>}
+              {isVideoMime(detail.mime_type)
+                ? <video controls playsInline preload="metadata" hidden={previewFailed}
+                    src={'/api/admin/vault/' + detail.id + '/preview'}
+                    aria-label={'Vista previa privada de ' + detail.name}
+                    onError={() => setPreviewFailed(true)} />
+                : <img src={'/api/admin/vault/' + detail.id + '/preview'} hidden={previewFailed}
+                    alt={'Vista previa privada de ' + detail.name} loading="lazy" decoding="async"
+                    referrerPolicy="no-referrer" onError={() => setPreviewFailed(true)} />}
               <figcaption>Vista previa privada, visible solo con acceso a esta organización.</figcaption>
             </figure>
           </>}
