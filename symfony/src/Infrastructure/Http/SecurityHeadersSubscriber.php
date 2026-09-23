@@ -20,6 +20,9 @@ final class SecurityHeadersSubscriber
         $headers = $event->getResponse()->headers;
         $headers->set('Content-Security-Policy', "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'");
         $headers->set('X-Content-Type-Options', 'nosniff');
+        // CSP frame-ancestors is authoritative in modern browsers; XFO also
+        // protects clients that do not implement the directive.
+        $headers->set('X-Frame-Options', 'DENY');
         // Respect stricter policies on private binary content while keeping
         // a conservative default for public pages and JSON responses.
         if (!$headers->has('Referrer-Policy')) {

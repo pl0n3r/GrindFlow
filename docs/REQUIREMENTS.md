@@ -63,6 +63,16 @@ Each requirement should contain:
 
 **Verificación:** prueba HTTP/Twig en Symfony con dos organizaciones sintéticas y MariaDB descartable: nombres y descripciones por fila no ambiguos, ausencia inicial de selección, cambio a segundo tenant, único marcador de actual y contexto del servidor correspondiente. Gate `symfony-preview`.
 
+### GF-SEC-008 — Defensa de clickjacking en el runtime Symfony
+
+**Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
+
+**Enunciado:** además de la política CSP moderna que prohíbe `frame-ancestors`, Symfony envía `X-Frame-Options: DENY` para navegadores que aún dependan de esa cabecera. La misma política debe cubrir página pública, identidad, redirecciones y respuestas de error, sin modificar Laravel ni cabeceras del hosting actual.
+
+**Aceptación:** respuestas de página pública/preview/login, redirección anónima a login, API privada no autenticada y 404 contienen `X-Frame-Options: DENY`, CSP con `frame-ancestors 'none'` y `X-Content-Type-Options: nosniff`. No se introducen excepciones para enmarcar el login o contenido privado.
+
+**Verificación:** PHPUnit HTTP del runtime Symfony aislado en `symfony-preview`; no acredita despliegue ni encabezados del servidor productivo.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
