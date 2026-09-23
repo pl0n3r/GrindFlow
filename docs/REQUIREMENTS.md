@@ -102,14 +102,6 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit/MariaDB de CSRF, ACL, tenant, validación, retención en papelera y persistencia; Playwright/Chromium a 360 px; regresión del manifiesto de staging y restauración. Todo en entornos sintéticos, sin migraciones productivas.
 
-### GF-SEC-006 — Cuerpo JSON acotado al renombrar perfil y organización
-
-**Enunciado:** las operaciones de renombre autenticadas de Symfony procesan únicamente solicitudes JSON pequeñas y no cambian recursos con cuerpos excesivos o malformados.
-
-**Aceptación:** tras las comprobaciones existentes de identidad, organización/rol cuando aplique y CSRF, los endpoints personales y de organización rechazan con HTTP 422 genérico un `Content-Length` decimal superior a 4.096 bytes antes de leer el cuerpo. Como la cabecera no es autoridad, la lectura del stream se limita a 4.097 bytes y se rechaza cualquier longitud real superior a 4.096. La decodificación JSON usa profundidad máxima 16 y mantiene la validación de claves, longitud y permisos ya establecidos. No se refleja el cuerpo, no se altera un recurso ajeno y no se modifica ningún registro con una solicitud rechazada. El límite de aplicación complementa, no sustituye, los límites de PHP y del servidor web.
-
-**Verificación:** PHPUnit HTTP con cuenta, membresía y MariaDB descartables en renombre personal y de organización; probar 4.097 bytes, `Content-Length` superior al límite, frontera válida de 4.096 bytes, preservación del nombre y autorización/CSRF anteriores. Sin tocar usuarios ni organizaciones productivas.
-
 ### GF-SEC-005 — Cambio de contraseña personal en Symfony
 **Estado:** implementado en candidato v0.1.61; CI, merge y producción son verificaciones separadas.
 
@@ -118,6 +110,14 @@ Each requirement should contain:
 **Aceptación:** POST JSON con exclusivamente contraseña actual, nueva y confirmación; CSRF exclusivo de esta acción y cuenta activa; mínimo 12/máximo 128 caracteres para la nueva clave. Verificar la contraseña anterior frente al hash vigente dentro de una transacción con bloqueo de la fila, denegar reutilización y cambios ajenos. Aplicar hash de Symfony, revocar la sesión actual tras éxito y exigir nuevo login. No incluir contraseñas ni hashes en respuestas, métricas o logs; no prometer revocación de otras sesiones sin infraestructura de sesiones verificable. Limitar a ocho solicitudes CSRF-válidas por identidad y ventana móvil de 15 minutos, incluso si el JSON es inválido; tras agotar el cupo rechazar antes de calcular hashes con HTTP 429, código estable y `Retry-After` positivo. Mantener el cupo al iniciar otra sesión; un CSRF inválido no consume cupo. No registrar contraseñas ni devolverlas. El panel a 360 px limpia los tres campos también tras error o bloqueo.
 
 **Verificación:** PHPUnit contra MariaDB Symfony descartable para anónimo, CSRF, campos extra/IDOR, contraseña errónea, reuso, confirmación, éxito, cierre de sesión y nuevo login; Chromium con respuestas sintéticas para errores, HTTP 429, limpieza de campos y recorrido móvil. Sin tocar usuarios ni sesiones Laravel.
+
+### GF-SEC-006 — Cuerpo JSON acotado al renombrar perfil y organización
+
+**Enunciado:** las operaciones de renombre autenticadas de Symfony procesan únicamente solicitudes JSON pequeñas y no cambian recursos con cuerpos excesivos o malformados.
+
+**Aceptación:** tras las comprobaciones existentes de identidad, organización/rol cuando aplique y CSRF, los endpoints personales y de organización rechazan con HTTP 422 genérico un `Content-Length` decimal superior a 4.096 bytes antes de leer el cuerpo. Como la cabecera no es autoridad, la lectura del stream se limita a 4.097 bytes y se rechaza cualquier longitud real superior a 4.096. La decodificación JSON usa profundidad máxima 16 y mantiene la validación de claves, longitud y permisos ya establecidos. No se refleja el cuerpo, no se altera un recurso ajeno y no se modifica ningún registro con una solicitud rechazada. El límite de aplicación complementa, no sustituye, los límites de PHP y del servidor web.
+
+**Verificación:** PHPUnit HTTP con cuenta, membresía y MariaDB descartables en renombre personal y de organización; probar 4.097 bytes, `Content-Length` superior al límite, frontera válida de 4.096 bytes, preservación del nombre y autorización/CSRF anteriores. Sin tocar usuarios ni organizaciones productivas.
 
 ### GF-FR-011 — Clasificación conservadora y filtro privado del Vault Symfony
 **Estado:** integrado en main v0.1.62; la disponibilidad en Hostinger Symfony no está confirmada.
