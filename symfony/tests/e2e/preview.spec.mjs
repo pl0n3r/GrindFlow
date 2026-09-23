@@ -11,10 +11,21 @@ test('home Twig is navigable and S0 content is honest', async ({ page }) => {
 
 test('React navigation changes visible section without claiming real data', async ({ page }) => {
   await page.goto('/preview');
-  await expect(page.getByRole('status')).toContainText('Todavía no gestiona archivos ni publica en redes');
-  await page.getByRole('button', { name: /Programación/ }).click();
+  await expect(page.locator('.preview-banner[role="status"]')).toContainText('Todavía no gestiona archivos ni publica en redes');
+  await expect(page.locator('.preview-board')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('.preview-board')).toHaveAttribute('aria-atomic', 'true');
+  const programacion = page.getByRole('button', { name: /Programación/ });
+  await programacion.focus();
+  await page.keyboard.press('Enter');
+  await expect(programacion).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.preview-board')).toHaveAttribute('aria-label', 'Concepto de Programación');
   await expect(page.getByRole('heading', { name: 'Programación' })).toBeVisible();
-  await page.getByRole('button', { name: /Tráfico/ }).click();
+  const trafico = page.getByRole('button', { name: /Tráfico/ });
+  await trafico.focus();
+  await page.keyboard.press('Space');
+  await expect(trafico).toHaveAttribute('aria-pressed', 'true');
+  await expect(programacion).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.preview-board')).toHaveAttribute('aria-label', 'Concepto de Tráfico');
   await expect(page.getByRole('heading', { name: 'Tráfico' })).toBeVisible();
 });
 
