@@ -17,12 +17,14 @@ test('React navigation changes visible section without claiming real data', asyn
   const programacion = page.getByRole('button', { name: /Programación/ });
   await programacion.focus();
   await page.keyboard.press('Enter');
+  await expect(programacion).toBeFocused();
   await expect(programacion).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.preview-board')).toHaveAttribute('aria-label', 'Concepto de Programación');
   await expect(page.getByRole('heading', { name: 'Programación' })).toBeVisible();
   const trafico = page.getByRole('button', { name: /Tráfico/ });
   await trafico.focus();
   await page.keyboard.press('Space');
+  await expect(trafico).toBeFocused();
   await expect(trafico).toHaveAttribute('aria-pressed', 'true');
   await expect(programacion).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.preview-board')).toHaveAttribute('aria-label', 'Concepto de Tráfico');
