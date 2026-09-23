@@ -25,7 +25,7 @@ Each requirement should contain:
 
 **Aceptación:** primer slice aislado S0 ofrece home Twig, assets React reales, versión y health seguros, sin reemplazar Laravel/Hostinger actual; Composer/Vite reproducibles; tests de rutas + asset + integración MariaDB + navegador; PHP de hosting observado antes de cutover.
 
-### GF-UX-001 — Navegación coherente entre espacios Symfony
+### GF-UX-003 — Navegación coherente entre espacios Symfony
 
 **Estado:** implementado.
 
