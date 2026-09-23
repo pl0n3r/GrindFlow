@@ -102,6 +102,14 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit/MariaDB de CSRF, ACL, tenant, validación, retención en papelera y persistencia; Playwright/Chromium a 360 px; regresión del manifiesto de staging y restauración. Todo en entornos sintéticos, sin migraciones productivas.
 
+### GF-SEC-006 — Cuerpo JSON acotado al renombrar perfil y organización
+
+**Enunciado:** las operaciones de renombre autenticadas de Symfony procesan únicamente solicitudes JSON pequeñas y no cambian recursos con cuerpos excesivos o malformados.
+
+**Aceptación:** tras las comprobaciones existentes de identidad, organización/rol cuando aplique y CSRF, los endpoints personales y de organización rechazan con HTTP 422 genérico un `Content-Length` decimal superior a 4.096 bytes antes de leer el cuerpo. Como la cabecera no es autoridad, la lectura del stream se limita a 4.097 bytes y se rechaza cualquier longitud real superior a 4.096. La decodificación JSON usa profundidad máxima 16 y mantiene la validación de claves, longitud y permisos ya establecidos. No se refleja el cuerpo, no se altera un recurso ajeno y no se modifica ningún registro con una solicitud rechazada. El límite de aplicación complementa, no sustituye, los límites de PHP y del servidor web.
+
+**Verificación:** PHPUnit HTTP con cuenta, membresía y MariaDB descartables en renombre personal y de organización; probar 4.097 bytes, `Content-Length` superior al límite, frontera válida de 4.096 bytes, preservación del nombre y autorización/CSRF anteriores. Sin tocar usuarios ni organizaciones productivas.
+
 ### GF-SEC-005 — Cambio de contraseña personal en Symfony
 **Estado:** implementado en candidato v0.1.61; CI, merge y producción son verificaciones separadas.
 
