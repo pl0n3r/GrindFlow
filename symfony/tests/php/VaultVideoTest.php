@@ -129,7 +129,7 @@ final class VaultVideoTest extends WebTestCase
             self::assertIsString($mp4Bytes);
             $mp4 = $this->tempFile(self::MP4_HEX, $tempFiles);
             $client->request('POST', '/api/admin/vault', [], [
-                'file' => new UploadedFile($mp4, 'clip-prueba.mp4', 'video/mp4', null, true),
+                'file' => new UploadedFile($mp4, 'clip-prueba.mp4', null, null, true),
             ], ['HTTP_X_CSRF_TOKEN' => $uploadToken]);
             self::assertResponseStatusCodeSame(201);
             $mp4Asset = json_decode((string) $client->getResponse()->getContent(), true)['data']['asset'];
@@ -142,7 +142,7 @@ final class VaultVideoTest extends WebTestCase
             self::assertIsString($webmBytes);
             $webm = $this->tempFile(self::WEBM_HEX, $tempFiles);
             $client->request('POST', '/api/admin/vault', [], [
-                'file' => new UploadedFile($webm, 'clip-prueba.webm', 'video/webm', null, true),
+                'file' => new UploadedFile($webm, 'clip-prueba.webm', 'video/mp4', null, true),
             ], ['HTTP_X_CSRF_TOKEN' => $uploadToken]);
             self::assertResponseStatusCodeSame(201);
             $webmAsset = json_decode((string) $client->getResponse()->getContent(), true)['data']['asset'];
