@@ -259,7 +259,7 @@ export function AdminApp() {
           <div><small>ESPACIO PRIVADO</small><strong>{context.organization.name}</strong></div>
           <div className="admin-user"><span>{context.user.display_name}</span><span className="role-chip">{role}</span></div>
         </header>
-        <main id="contenido" className="admin-content">
+        <div className="admin-content">
           <span className="admin-kicker"><span className="admin-pulse" /> CONTEXTO VERIFICADO</span>
           <h1>Tu espacio,<br/><em>con permisos claros.</em></h1>
           <p className="admin-lead">La sesión y la membresía se revalidan en el servidor. Esta entrega muestra únicamente acciones que tu rol puede realizar.</p>
@@ -374,7 +374,7 @@ export function AdminApp() {
                   <p>La biblioteca privada admite imágenes; los videos, la programación y las conexiones externas todavía no están habilitados en Symfony.</p>
                 </>}
           </section>
-        </main>
+        </div>
       </section>
     </div>
   );
