@@ -32,7 +32,7 @@ final class SecurityHeadersSubscriber
         // HSTS is meaningful only when the request itself is known to be HTTPS.
         // Never emit it on local/plain-HTTP previews where it could poison a test origin.
         if ($event->getRequest()->isSecure()) {
-            $headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+            $headers->set('Strict-Transport-Security', 'max-age=31536000');
         }
         // Apply to redirects and exceptions as well as successful private responses.
         // Login errors and authenticated routes must never be stored by a browser
