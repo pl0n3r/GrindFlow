@@ -22,7 +22,7 @@
 | Base exacta | ✅ ~~main v0.1.109~~ | `b597640440b579fae585d255ccbeda3e5bdf20fd` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
-| CodeRabbit del PR | 🚧 Pendiente | Exigir revisión disponible del HEAD final |
+| CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
 | CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35838201609` success sobre `b597640440b579fae585d255ccbeda3e5bdf20fd` |
 | Deploy Observer | ✅ ~~Marcador humano observado~~ | `35838201490` success; no acredita SHA remoto |
 | Production Smoke | ⛔ Login E2E no validado | `35838201643` failure, #73; independiente |
@@ -82,7 +82,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `symfony/tests/php/OrganizationSelectorAccessibilityTest.php`
 
 ## Validación
-- Exigir `validate`, Sonar y revisión disponible del HEAD final; después CI exact-main.
+- Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
 - `symfony-preview` valida PHPUnit HTTP/MariaDB descartable y Chromium de hidratación admin a 360/820 px.
 - La versión humana no acredita deploy Symfony ni resuelve Production Smoke #73.
 
