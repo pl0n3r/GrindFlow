@@ -55,8 +55,11 @@ class AuthenticationTest extends TestCase
         $anonymousSessionId = $this->app['session.store']->getId();
         self::assertNotSame('', $anonymousSessionId);
 
-        $this->from('/login')->post('/login', [
-            '_token' => $beforeToken[1],
+        // The HTTP test harness does not replay session cookies like a browser.
+        // Reuse the same synthetic cookie to test the server-side ID contract.
+        $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
+            ->from('/login')->post('/login', [
+                '_token' => $beforeToken[1],
             'email' => $user->email,
             'password' => 'incorrect-synthetic-password',
         ])->assertRedirect('/login')->assertSessionHasErrors('email');
@@ -179,7 +182,8 @@ class AuthenticationTest extends TestCase
         $anonymousSessionId = $this->app['session.store']->getId();
         self::assertNotSame('', $anonymousSessionId);
 
-        $this->withServerVariables(['REMOTE_ADDR' => $ip])
+        $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
+            ->withServerVariables(['REMOTE_ADDR' => $ip])
             ->from('/login')
             ->post('/login', [
                 '_token' => $beforeToken[1],
