@@ -49,9 +49,9 @@
 flowchart LR
  A["PR + snapshot exacto"] --> P["preflight"]
  P --> F["fast + contratos"]
- P --> S2["symfony-preview"]
+ P -.-> S2["symfony-preview (opcional; no aplica a esta candidata)"]
  F --> V["validate"]
- S2 --> V
+ S2 -.-> V
  A --> S["Sonar"]
  A --> C["CodeRabbit"]
  V --> M["Squash merge"]
@@ -63,8 +63,8 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- PHPUnit con cuenta sintética exige conservar token CSRF y marcador de sesión después de un POST de contraseña errónea; confirma que un POST válido posterior inicia sesión.
-- El test de rate limiting existente añade la misma comprobación de estabilidad de CSRF ante el sexto intento bloqueado, sin modificar el límite.
+- PHPUnit con cuenta sintética exige conservar CSRF, identificador y marcador de sesión tras contraseña errónea; confirma que un POST válido posterior inicia sesión y rota su ID.
+- El test de rate limiting existente exige CSRF e identificador estables ante el sexto intento bloqueado, sin modificar el límite.
 - GF-SEC-003 documenta la expectativa Laravel y distingue pruebas descartables de un smoke auténtico en Hostinger. No cambia controlador, credenciales ni datos reales.
 
 ## Archivos modificados en esta entrega candidata
