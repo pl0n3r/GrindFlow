@@ -206,7 +206,12 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   No bloquear estas tareas solo por estar en Hostinger o en el entorno productivo;
   avanzar sin solicitar aprobación repetida por cada operación segura.
 - Antes de escribir: verificar destino, versión/SHA realmente observado, impacto,
-  estado de CI/revisiones, respaldo aplicable y reversión. Después de escribir:
+  estado de CI/revisiones, respaldo aplicable y reversión. Para desplegar
+  código nuevo, exigir antes de escribir CI agregado y Sonar aprobados, revisión
+  CodeRabbit finalizada y sus hallazgos accionables resueltos para el HEAD del
+  PR, además de CI exact-main satisfactorio para el SHA ya fusionado. Si una
+  compuerta falta, falla o sigue en ejecución, NO desplegar. CI validado no es
+  despliegue, y despliegue no es validación funcional en producción. Después de escribir:
   comprobar salud y flujo afectado, registrar evidencia y separar DEPLOYED de
   VALIDATED IN PRODUCTION. Si falla la verificación, activar el procedimiento de
   recuperación seguro; no afirmar que producción está sana sin evidencia.
