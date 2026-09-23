@@ -115,6 +115,16 @@ final class PreviewTest extends WebTestCase
         $client->request('GET', '/', server: ['HTTPS' => 'off']);
         self::assertResponseIsSuccessful();
         self::assertFalse($client->getResponse()->headers->has('Strict-Transport-Security'));
+
+        // The runtime does not trust reverse-proxy headers by default. A client
+        // must not be able to turn plain HTTP into a secure request by spoofing
+        // X-Forwarded-Proto.
+        $client->request('GET', '/', server: [
+            'HTTPS' => 'off',
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+        ]);
+        self::assertResponseIsSuccessful();
+        self::assertFalse($client->getResponse()->headers->has('Strict-Transport-Security'));
     }
 
     public function testPrivateResponsesCannotBeCachedOnSuccessRedirectOrError(): void
