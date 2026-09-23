@@ -17,7 +17,7 @@ for (const width of [360, 820]) {
     }
 
     const email = page.getByLabel('Correo electrónico');
-    await email.focus();
+    await page.keyboard.press('Tab');
     await expect(email).toBeFocused();
     const focus = await email.evaluate((node) => ({
       outlineStyle: getComputedStyle(node).outlineStyle,
