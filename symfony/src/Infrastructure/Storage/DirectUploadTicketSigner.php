@@ -180,7 +180,8 @@ final class DirectUploadTicketSigner
             || !is_string($userId) || !Uuid::isValid($userId)
             || !is_string($storageKey) || $storagePrefix === ''
             || !Uuid::isValid($stagingId) || $storageKey !== $storagePrefix.$stagingId
-            || !is_string($filename) || trim($filename) === '' || mb_strlen($filename) > 180
+            || !is_string($filename) || trim($filename) === '' || strlen($filename) > 180
+            || preg_match('//u', $filename) !== 1
             || basename(str_replace('\\', '/', $filename)) !== $filename
             || preg_match('/[\\x00-\\x1F\\x7F]/u', $filename) === 1
             || !is_string($mimeType) || !in_array($mimeType, self::MIMES, true)

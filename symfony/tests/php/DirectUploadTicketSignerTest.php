@@ -87,6 +87,7 @@ final class DirectUploadTicketSignerTest extends TestCase
             [$staging, '   ', 'video/mp4', 1, 900],
             ['organizations/'.$organization.'/staging/not-a-uuid', 'clip.mp4', 'video/mp4', 1, 900],
             [$staging, "bad\nname.mp4", 'video/mp4', 1, 900],
+            [$staging, "invalid-\xC3\x28.mp4", 'video/mp4', 1, 900],
             [$staging, 'clip.mov', 'video/quicktime', 1, 900],
             [$staging, 'clip.mp4', 'video/mp4', 0, 900],
             [$staging, 'clip.mp4', 'video/mp4', DirectUploadTicketSigner::MAX_BYTES + 1, 900],
