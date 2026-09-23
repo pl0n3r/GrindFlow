@@ -70,14 +70,26 @@ final class VaultVideoTest extends WebTestCase
                 'created_at' => $at,
                 'updated_at' => $at,
             ]);
+            $db->insert('gf_identity_memberships', [
+                'id' => Uuid::v7()->toRfc4122(),
+                'user_id' => $user,
+                'organization_id' => $foreign,
+                'role' => 'editor',
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+
+            $foreignBytes = hex2bin(self::MP4_HEX);
+            self::assertIsString($foreignBytes);
+            self::assertSame(strlen($foreignBytes), file_put_contents($root.'/'.$foreignAsset.'.blob', $foreignBytes));
             $db->insert('gf_vault_assets', [
                 'id' => $foreignAsset,
                 'organization_id' => $foreign,
                 'uploaded_by' => $user,
                 'original_name' => 'ajeno.mp4',
                 'mime_type' => 'video/mp4',
-                'size_bytes' => 24,
-                'sha256' => str_repeat('a', 64),
+                'size_bytes' => strlen($foreignBytes),
+                'sha256' => hash('sha256', $foreignBytes),
                 'storage_key' => $foreignAsset,
                 'created_at' => $at,
             ]);
@@ -90,11 +102,17 @@ final class VaultVideoTest extends WebTestCase
             self::assertResponseRedirects('/organizations');
 
             $selector = $client->request('GET', '/organizations');
-            $client->submit($selector->filter('.identity-orgs form')->form());
+            $selectorToken = $selector->filter('.identity-orgs input[name="_csrf_token"]')->first()->attr('value');
+            self::assertNotNull($selectorToken);
+            $client->request('POST', '/organizations/select', [
+                'organization_id' => $mine,
+                '_csrf_token' => $selectorToken,
+            ]);
             self::assertResponseRedirects('/admin');
 
             $client->request('GET', '/api/admin/context');
             $context = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame($mine, $context['organization']['id']);
             $uploadToken = $context['vault_upload_csrf'];
             self::assertNotEmpty($uploadToken);
 
@@ -189,6 +207,7 @@ final class VaultVideoTest extends WebTestCase
             foreach ($storedIds as $id) {
                 @unlink($root.'/'.$id.'.blob');
             }
+            @unlink($root.'/'.$foreignAsset.'.blob');
             foreach ($tempFiles as $temp) {
                 @unlink($temp);
             }
