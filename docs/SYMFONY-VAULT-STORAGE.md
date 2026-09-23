@@ -192,4 +192,4 @@ El catálogo Symfony incorpora `private_note` nullable, con un máximo de 280 ca
 
 ## Clasificación interna y recuperación (v0.1.61 candidato)
 
-El catálogo de cada imagen mantiene `usage_scope=unclassified|internal_only|needs_review`; se inicia en `unclassified` y se conserva en papelera. Nunca constituye permiso de publicación o licencia. El manifiesto nuevo incluye `usage_scope` en cada entrada: una etapa anterior sin este campo no se puede usar como prueba de recuperación bajo el contrato nuevo; regenerar con originales y base íntegros en entorno controlado. No se ejecuta aquí ningún backup, migración ni restauración de datos de Hostinger.
+El catálogo de cada archivo multimedia mantiene `usage_scope=unclassified|internal_only|needs_review`; se inicia en `unclassified` y se conserva en papelera. Nunca constituye permiso de publicación o licencia. El manifiesto nuevo incluye `usage_scope` en cada entrada: una etapa anterior sin este campo no se puede usar como prueba de recuperación bajo el contrato nuevo; regenerar con originales y base íntegros en entorno controlado. No se ejecuta aquí ningún backup, migración ni restauración de datos de Hostinger.
