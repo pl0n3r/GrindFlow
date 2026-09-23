@@ -29,7 +29,8 @@ export function PreviewApp({ version }: PreviewAppProps) {
           <h1>Tu contenido.<br/><em>Tu ritmo.</em></h1>
           <p className="preview-lead">Explora el lenguaje visual de GrindFlow. El flujo de carga, las reglas y las integraciones se añadirán por entregables verificables.</p>
           <div className="preview-banner" role="status"><strong>Vista previa de interfaz</strong><p>Esta pantalla permite navegar entre conceptos. Todavía no gestiona archivos ni publica en redes y no solicita credenciales.</p></div>
-          <section className="preview-board" aria-label={'Concepto de ' + chosen.label}>
+          <section className="preview-board" aria-label={'Concepto de ' + chosen.label}
+            aria-live="polite" aria-atomic="true">
             <div className="board-heading"><span>0{sections.findIndex((s) => s.id === active) + 1} / MÓDULO</span><span>EN PREPARACIÓN</span></div>
             <h2>{chosen.label}</h2>
             <p>{chosen.description}</p>

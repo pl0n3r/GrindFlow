@@ -197,6 +197,33 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   el README después del merge; incluir release, decisiones y panorama en el PR
   lógico, y registrar estados operativos en #2 si procede.
 
+### Autorizacion explicita para intervenir produccion (23/09/2026)
+
+- El propietario autoriza al agente a **tocar produccion de GrindFlow**: inspeccionar
+  estado real, ejecutar diagnósticos autorizados, preparar y efectuar despliegues,
+  comprobar su resultado y aplicar correcciones operativas rutinarias y reversibles
+  cuando existan acceso efectivo, procedimiento probado y recuperación viable.
+  No bloquear estas tareas solo por estar en Hostinger o en el entorno productivo;
+  avanzar sin solicitar aprobación repetida por cada operación segura.
+- Antes de escribir: verificar destino, versión/SHA realmente observado, impacto,
+  estado de CI/revisiones, respaldo aplicable y reversión. Para desplegar
+  código nuevo, exigir antes de escribir CI agregado y Sonar aprobados, revisión
+  CodeRabbit finalizada y sus hallazgos accionables resueltos para el HEAD del
+  PR, además de CI exact-main satisfactorio para el SHA ya fusionado. Si una
+  compuerta falta, falla o sigue en ejecución, NO desplegar. CI validado no es
+  despliegue, y despliegue no es validación funcional en producción. Después de escribir:
+  comprobar salud y flujo afectado, registrar evidencia y separar DEPLOYED de
+  VALIDATED IN PRODUCTION. Si falla la verificación, activar el procedimiento de
+  recuperación seguro; no afirmar que producción está sana sin evidencia.
+- La autorización general **no sustituye la aprobación específica** para
+  migraciones de datos, borrados, restauraciones, rotación o divulgación de
+  secretos, cambios de permisos sensibles, publicaciones externas ni acciones
+  destructivas o difíciles de revertir. No exponer credenciales en GitHub, logs
+  o chat, no usar datos reales en tests y no saltar barreras de seguridad.
+- Esta regla aclara los límites operativos de autonomía previos: «producción»
+  por sí sola deja de ser motivo de bloqueo; el riesgo concreto, acceso ausente
+  o una operación protegida sí pueden seguir siéndolo.
+
 ### Regla de entregas sin ZIP
 
 - No generar, empaquetar ni entregar archivos ZIP del proyecto. Preferir cambios
