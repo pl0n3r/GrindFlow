@@ -86,6 +86,16 @@ final class DirectUploadHttpTest extends WebTestCase
                 'byte_size' => 9 * 1024 * 1024];
             $validComplete = ['upload_token' => 'not-a-valid-encrypted-token'];
 
+            // JSON fields cannot override the selected tenant, and a forged
+            // session selection must fail before the storage or CSRF checks.
+            foreach ([[$intent, $validIntent], [$complete, $validComplete]] as [$endpoint, $payload]) {
+                $client->getRequest()->getSession()->set('grindflow_organization_id', $foreign);
+                $this->postJson($client, $endpoint, $payload, $csrf);
+                self::assertResponseStatusCodeSame(403);
+                self::assertSame('organization_access_changed', $this->errorCode($client));
+            }
+            $client->getRequest()->getSession()->set('grindflow_organization_id', $mine);
+
             foreach ([[$intent, $validIntent], [$complete, $validComplete]] as [$endpoint, $payload]) {
                 $this->postJson($client, $endpoint, $payload, 'wrong-csrf');
                 self::assertResponseStatusCodeSame(403);
