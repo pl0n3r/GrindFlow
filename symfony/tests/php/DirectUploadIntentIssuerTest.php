@@ -84,7 +84,7 @@ final class DirectUploadIntentIssuerTest extends TestCase
             public function driver(): string { return 'unavailable'; }
             public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
             {
-                self::fail('Unavailable storage must not receive presign calls.');
+                throw new \LogicException('Unavailable storage must not receive presign calls.');
             }
             public function exists(string $storageKey): bool { return false; }
             public function size(string $storageKey): ?int { return null; }
