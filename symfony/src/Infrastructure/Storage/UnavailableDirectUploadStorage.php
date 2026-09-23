@@ -34,7 +34,7 @@ final class UnavailableDirectUploadStorage implements DirectUploadStorage
         return 'unavailable';
     }
 
-    public function temporaryUpload(string $storageKey, string $mimeType, int $expiresAt): array
+    public function temporaryUpload(string $storageKey, string $mimeType, int $byteSize, int $expiresAt): array
     {
         throw $this->unavailable();
     }
