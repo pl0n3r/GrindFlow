@@ -96,6 +96,10 @@ final class OrganizationSelectorAccessibilityTest extends WebTestCase
             self::assertSelectorExists('main#contenido[tabindex="-1"] > #grindflow-admin');
             self::assertCount(1, $client->getCrawler()->filter('main#contenido'));
             self::assertSelectorExists('main#contenido .admin-state[aria-live="polite"]');
+            self::assertSelectorTextContains(
+                'main#contenido > noscript .admin-state',
+                'Activa JavaScript para usar el panel administrativo.',
+            );
 
             $selected = $client->request('GET', '/organizations');
             self::assertResponseIsSuccessful();
