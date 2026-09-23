@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+423** | **−26** | **+397** |
+| **7** | **+425** | **−26** | **+399** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -65,6 +65,7 @@ flowchart LR
 ## Qué se hizo
 - `scripts/coderabbit-final-review.py` verifica evidencia GitHub capturada para un HEAD exacto y falla cerrado si CodeRabbit indica `Review skipped`, `pending`, SHA distinto o hilos sin resolver.
 - Diecinueve tests offline cubren revisión final real, SHA, hilos, registros malformados, límites de tamaño, FIFO, enlaces simbólicos y UTF-8 inválido; `fast` los ejecuta.
+- El workflow de CI también activa validación al pasar una PR de borrador a lista para revisión, sin disparos por ediciones cosméticas.
 - `docs/CODERABBIT-FINAL-REVIEW.md` y AGENTS explican que es ayuda local, no ruleset, fusión automática ni acreditación productiva.
 
 ## Archivos modificados en esta entrega candidata
