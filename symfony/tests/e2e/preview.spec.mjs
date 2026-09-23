@@ -34,6 +34,8 @@ test('mobile navigation reveals active preview and private sections without page
   await expect(page.getByText('Desliza para explorar más secciones ↔')).toBeVisible();
   await expect.poll(() => preview.evaluate((el) => el.scrollWidth - el.clientWidth))
     .toBeGreaterThan(8);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(360);
 
   // DOM clicks do not automatically scroll off-screen items as Playwright
   // locator.click would. The component must reveal the selected item itself.
@@ -54,10 +56,17 @@ test('mobile navigation reveals active preview and private sections without page
 
   // Active item must remain visible when a wide workspace becomes narrow.
   await page.setViewportSize({ width: 820, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(820);
   await preview.evaluate((el) => { el.querySelectorAll('button')[2].click(); });
   await expect(page.getByRole('heading', { name: 'Tráfico' })).toBeVisible();
+  await expect.poll(() => fullyVisible(preview)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(820);
   await page.setViewportSize({ width: 360, height: 740 });
   await expect.poll(() => fullyVisible(preview)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(360);
 
   const asset = await page.locator('script[type="module"]').getAttribute('src');
   expect(asset).toBeTruthy();
@@ -82,6 +91,10 @@ test('mobile navigation reveals active preview and private sections without page
   await expect.poll(() => fullyVisible(admin)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(360);
+  await page.setViewportSize({ width: 820, height: 740 });
+  await expect.poll(() => fullyVisible(admin)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(820);
 });
 
 test('mobile viewport keeps home and React preview usable', async ({ page }) => {
