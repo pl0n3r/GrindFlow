@@ -107,10 +107,20 @@ final class ProfileSettingsTest extends WebTestCase
             ], '{"name":"Nombre\\ninyectado"}');
             self::assertResponseStatusCodeSame(422);
 
+            $normalName = json_encode(['name' => 'Perfil actualizado'], JSON_THROW_ON_ERROR);
+            $tooLarge = $normalName.str_repeat(' ', 4097 - strlen($normalName));
+            self::assertSame(4097, strlen($tooLarge));
             $client->request('POST', '/api/admin/profile/name', [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_X_CSRF_TOKEN' => $token,
-            ], json_encode(['name' => 'Perfil actualizado'], JSON_THROW_ON_ERROR));
+            ], $tooLarge);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('Cuenta original', $db->fetchOne('SELECT name FROM gf_identity_users WHERE id = ?', [$actor]));
+
+            $client->request('POST', '/api/admin/profile/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+            ], $normalName.str_repeat(' ', 4096 - strlen($normalName)));
             self::assertResponseIsSuccessful();
             $payload = json_decode((string) $client->getResponse()->getContent(), true);
             self::assertSame('Perfil actualizado', $payload['data']['user']['display_name']);
