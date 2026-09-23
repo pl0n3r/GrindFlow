@@ -13,8 +13,15 @@ for (const width of [360, 820]) {
       }
       expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior))
         .toBe('auto');
-      expect(await page.evaluate(() => document.documentElement.scrollWidth))
-        .toBeLessThanOrEqual(width);
+      const layout = await page.evaluate(() => ({
+        path: location.pathname,
+        scrollWidth: document.documentElement.scrollWidth,
+        offenders: Array.from(document.querySelectorAll('body *'))
+          .filter((node) => node.getBoundingClientRect().right > innerWidth + 1)
+          .slice(0, 8)
+          .map((node) => node.tagName.toLowerCase() + '.' + String(node.className).slice(0, 45)),
+      }));
+      expect(layout.scrollWidth, JSON.stringify(layout)).toBeLessThanOrEqual(width);
     }
 
     const navigation = page.getByRole('navigation', { name: 'Explorador de secciones' });
