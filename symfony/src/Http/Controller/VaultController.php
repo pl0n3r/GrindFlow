@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Isolated S2 photo library. Files never live under public/; no external delivery.
+ * Isolated S2 media library. Files never live under public/; no external delivery.
  * Tenant is exclusively the verified session membership, not a client parameter.
  */
 final class VaultController extends AbstractController
