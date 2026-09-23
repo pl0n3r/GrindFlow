@@ -90,10 +90,10 @@ class AuthenticationTest extends TestCase
         $this->app['session.store']->flush();
         $successfulLogin = $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
             ->post('/login', [
-            '_token' => $afterToken[1],
-            'email' => $user->email,
-            'password' => 'correct-synthetic-password',
-        ])->assertRedirect(route('dashboard'));
+                '_token' => $afterToken[1],
+                'email' => $user->email,
+                'password' => 'correct-synthetic-password',
+            ])->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
         $authenticatedSessionId = $this->app['session.store']->getId();
         self::assertNotSame($anonymousSessionId, $authenticatedSessionId,
