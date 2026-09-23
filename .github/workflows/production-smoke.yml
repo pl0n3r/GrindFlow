@@ -190,7 +190,8 @@ jobs:
               echo "Human release label does not establish the deployed Git SHA."
               echo
             fi
-            expected_health="$(grep -E '^HEALTH_SHA=[0-9a-f]{40}
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
             echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
             echo "Retention: 3 days"
@@ -222,148 +223,7 @@ jobs:
             echo "Target: $BASE_URL"
             echo "Checked: exact /health, /, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
             echo "Observed release: $(grep -E '^HEALTH_VERSION=' production-smoke.log | tail -1 | cut -d= -f2)"
-            echo "Exact deployed Git SHA: $(grep -E '^HEALTH_SHA=[0-9a-f]{40}
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
-            gh issue close "$issue_number"
-          fi
-
-      - name: Fail workflow after publishing diagnostics
-        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
-        shell: bash
-        run: exit 1
-
-      - name: Fail unconfigured authenticated production smoke
-        if: steps.credentials.outputs.configured == 'false'
-        shell: bash
-        run: |
-          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
-          exit 1
- production-smoke.log | tail -1 | cut -d= -f2 || true)"
-            if [[ -n "$expected_health" ]]; then
-              echo "Health-observed checkout SHA: $expected_health"
-            else
-              echo "Health-observed checkout SHA: not verified"
-            fi
-            echo "Workflow source SHA: $GITHUB_SHA"
-            echo "Target: $BASE_URL"
-            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
-            echo "Retention: 3 days"
-            echo
-            echo "The diagnostic payload is kept out of the public issue body."
-            echo "Authorized agents can retrieve the short-lived artifact through GitHub."
-          } > /tmp/grindflow-production-failure.md
-
-          cat /tmp/grindflow-production-failure.md >> "$GITHUB_STEP_SUMMARY"
-
-          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue comment "$issue_number" --body-file /tmp/grindflow-production-failure.md
-          else
-            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-production-failure.md
-          fi
-
-      - name: Publish production recovery
-        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          {
-            echo "## Production smoke passed"
-            echo
-            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
-            echo "Target: $BASE_URL"
-            echo "Checked: /up, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
-            echo "Observed release: $(grep -E '^RELEASE_UI_OBSERVED=' production-smoke.log | tail -1 | cut -d= -f2)"
-            echo "Exact deployed Git SHA: not established by this smoke"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
-            gh issue close "$issue_number"
-          fi
-
-      - name: Fail workflow after publishing diagnostics
-        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
-        shell: bash
-        run: exit 1
-
-      - name: Fail unconfigured authenticated production smoke
-        if: steps.credentials.outputs.configured == 'false'
-        shell: bash
-        run: |
-          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
-          exit 1
- production-smoke.log | tail -1 | cut -d= -f2)"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
-            gh issue close "$issue_number"
-          fi
-
-      - name: Fail workflow after publishing diagnostics
-        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
-        shell: bash
-        run: exit 1
-
-      - name: Fail unconfigured authenticated production smoke
-        if: steps.credentials.outputs.configured == 'false'
-        shell: bash
-        run: |
-          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
-          exit 1
- production-smoke.log | tail -1 | cut -d= -f2 || true)"
-            if [[ -n "$expected_health" ]]; then
-              echo "Health-observed checkout SHA: $expected_health"
-            else
-              echo "Health-observed checkout SHA: not verified"
-            fi
-            echo "Workflow source SHA: $GITHUB_SHA"
-            echo "Target: $BASE_URL"
-            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
-            echo "Retention: 3 days"
-            echo
-            echo "The diagnostic payload is kept out of the public issue body."
-            echo "Authorized agents can retrieve the short-lived artifact through GitHub."
-          } > /tmp/grindflow-production-failure.md
-
-          cat /tmp/grindflow-production-failure.md >> "$GITHUB_STEP_SUMMARY"
-
-          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue comment "$issue_number" --body-file /tmp/grindflow-production-failure.md
-          else
-            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-production-failure.md
-          fi
-
-      - name: Publish production recovery
-        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          {
-            echo "## Production smoke passed"
-            echo
-            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
-            echo "Target: $BASE_URL"
-            echo "Checked: /up, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
-            echo "Observed release: $(grep -E '^RELEASE_UI_OBSERVED=' production-smoke.log | tail -1 | cut -d= -f2)"
-            echo "Exact deployed Git SHA: not established by this smoke"
+            echo "Exact deployed Git SHA: $(grep -E '^HEALTH_SHA=[0-9a-f]{40}$' production-smoke.log | tail -1 | cut -d= -f2)"
           } >> "$GITHUB_STEP_SUMMARY"
 
           issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"

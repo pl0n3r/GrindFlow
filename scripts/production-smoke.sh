@@ -371,17 +371,15 @@ run_smoke() {
   rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$health_body" "$health_headers" "$home_body" "$home_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
 
   local health_status health_version health_sha
+  local -a health_identity=()
   health_status="$(curl_common --output "$health_body" --dump-header "$health_headers" --write-out '%{http_code}' "$BASE_URL/health" || true)"
   if [[ "$health_status" != "200" ]]; then
     print_http_failure "exact health endpoint /health" "$health_status" "$health_headers"
     return 1
   fi
-  if ! mapfile -t health_identity < <(extract_health_identity); then
-    printf 'ERROR: exact health identity is invalid or incomplete.\n' >&2
-    return 1
-  fi
+  mapfile -t health_identity < <(extract_health_identity)
   if (( ${#health_identity[@]} != 2 )); then
-    printf 'ERROR: exact health identity is incomplete.\n' >&2
+    printf 'ERROR: exact health identity is invalid or incomplete.\n' >&2
     return 1
   fi
   health_version="${health_identity[0]}"

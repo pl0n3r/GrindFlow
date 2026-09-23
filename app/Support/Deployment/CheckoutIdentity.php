@@ -2,8 +2,6 @@
 
 namespace App\Support\Deployment;
 
-use RuntimeException;
-
 class CheckoutIdentity
 {
     public function commit(?string $basePath = null): ?string
