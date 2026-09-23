@@ -99,6 +99,7 @@ final class VaultVideoTest extends WebTestCase
             self::assertNotEmpty($uploadToken);
 
             $invalid = $this->tempFile(self::INVALID_MP4_HEX, $tempFiles);
+            self::assertSame('video/mp4', (new \finfo(FILEINFO_MIME_TYPE))->file($invalid));
             $client->request('POST', '/api/admin/vault', [], [
                 'file' => new UploadedFile($invalid, 'cabecera-invalida.mp4', 'video/mp4', null, true),
             ], ['HTTP_X_CSRF_TOKEN' => $uploadToken]);
