@@ -63,6 +63,16 @@ Each requirement should contain:
 
 **Verificación:** prueba HTTP/Twig en Symfony con dos organizaciones sintéticas y MariaDB descartable: nombres y descripciones por fila no ambiguos, ausencia inicial de selección, cambio a segundo tenant, único marcador de actual y contexto del servidor correspondiente. Gate `symfony-preview`.
 
+### GF-UX-006 — Preferencia del sistema para reducir movimiento
+
+**Estado:** preparado en rama independiente; CI, despliegue y producción se verifican por separado.
+
+**Enunciado:** el HTML público y la vista previa React respetan `prefers-reduced-motion: reduce` de navegador/SO: el desplazamiento de página deja de ser suave, sin eliminar navegación ni alterar el comportamiento de quienes no solicitan reducción de movimiento. El menú compartido mantiene su propia regla preexistente.
+
+**Aceptación:** tanto la home Twig como `/preview` mantienen `scroll-behavior: smooth` si la preferencia es `no-preference`; con `reduce` computan `scroll-behavior: auto`. El menú React conserva desplazamiento propio y no genera desbordamiento horizontal a 360 y 820 px. No se añaden animaciones, se modifica la sesión o se despliega Symfony.
+
+**Verificación:** Chromium aislado con `emulateMedia(reducedMotion)` sobre home, preview y navegación a 360/820 px; gate `symfony-preview`.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
