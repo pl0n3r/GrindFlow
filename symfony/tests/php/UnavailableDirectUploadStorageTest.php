@@ -21,7 +21,7 @@ final class UnavailableDirectUploadStorageTest extends TestCase
         self::assertNull($storage->readStream('organizations/example/staging/example'));
 
         foreach ([
-            fn () => $storage->temporaryUpload('key', 'video/mp4', 1_800_000_900),
+            fn () => $storage->temporaryUpload('key', 'video/mp4', 1, 1_800_000_900),
             fn () => $storage->delete('key'),
             fn () => $storage->promote('staging', 'final'),
         ] as $operation) {
