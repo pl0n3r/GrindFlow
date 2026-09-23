@@ -41,3 +41,35 @@ for (const width of [360, 820]) {
       .toBeLessThanOrEqual(width);
   });
 }
+
+
+for (const width of [360, 820]) {
+  test(`admin skip target remains focused when context fails at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto('/preview');
+    const asset = await page.locator('script[type="module"]').getAttribute('src');
+    expect(asset).toBeTruthy();
+    await page.route('**/api/admin/context', (route) => route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'authentication_required', message: 'Acceso expirado.' } }),
+    }));
+    await page.evaluate(() => {
+      document.body.innerHTML = `
+        <a class="skip-link" href="#contenido">Saltar al contenido</a>
+        <div class="admin-page"><main id="contenido" tabindex="-1">
+          <div id="grindflow-admin">Cargando espacio seguro…</div>
+        </main></div>`;
+    });
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    const target = page.locator('main#contenido[tabindex="-1"]');
+    await expect(target).toBeFocused();
+    await page.addScriptTag({ url: asset + '?admin-error-skip=1', type: 'module' });
+    await expect(page.getByRole('alert')).toContainText('Acceso expirado.');
+    await expect(target).toBeFocused();
+    await expect(page.locator('main')).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(width);
+  });
+}
