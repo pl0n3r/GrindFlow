@@ -7,6 +7,7 @@
 .identity-card form{display:grid;gap:12px}
 .identity-card label{font-size:13px;font-weight:750}
 .identity-card input:not([type=hidden]){width:100%;min-height:46px;padding:12px 14px;background:#11111c;color:var(--fg);border:1px solid #706282;border-radius:9px;font:inherit}
+.identity-card input[aria-invalid="true"]{border-color:#ffb8c9}
 .identity-card button{cursor:pointer}
 .identity-error{color:#ffd6dc!important;border:1px solid #a44c66;padding:12px;border-radius:9px}
 .identity-orgs{list-style:none;padding:0;display:grid;gap:12px}
