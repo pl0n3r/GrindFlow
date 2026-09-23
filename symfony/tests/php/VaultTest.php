@@ -82,8 +82,15 @@ final class VaultTest extends WebTestCase
 
             $client->request('GET', '/api/admin/vault');
             self::assertResponseIsSuccessful();
-            self::assertSame([], json_decode((string) $client->getResponse()->getContent(), true)['data']['assets']);
-            $emptyQuota = json_decode((string) $client->getResponse()->getContent(), true)['data']['quota'];
+            $emptyVault = json_decode((string) $client->getResponse()->getContent(), true)['data'];
+            self::assertSame([], $emptyVault['assets']);
+            $emptyQuota = $emptyVault['quota'];
+            self::assertSame([
+                'disk' => 'media',
+                'driver' => 'unavailable',
+                'max_bytes' => 2_147_483_648,
+                'configured' => false,
+            ], $emptyVault['direct_upload']);
             self::assertSame(0, $emptyQuota['used_assets']);
             self::assertSame(0, $emptyQuota['used_bytes']);
             self::assertSame(100, $emptyQuota['max_assets']);

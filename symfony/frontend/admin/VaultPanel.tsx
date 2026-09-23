@@ -19,6 +19,7 @@ const usageLabels: Record<UsageScope, string> = {
   needs_review: 'Requiere revisión',
 };
 type Quota = { used_bytes: number; max_bytes: number; used_assets: number; max_assets: number };
+type DirectUploadReadiness = { disk: string; driver: string; max_bytes: number; configured: boolean };
 
 type Props = { canUpload: boolean; csrf: string | null; manageCsrf?: string | null };
 type UploadResult = { name: string; success: boolean; message: string };
@@ -65,6 +66,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
   const [quota, setQuota] = useState<Quota | null>(null);
+  const [directUpload, setDirectUpload] = useState<DirectUploadReadiness | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -133,7 +135,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     }).then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo abrir la biblioteca.');
-      return body.data as { assets: Asset[]; total: number; pages: number; quota?: Quota };
+      return body.data as { assets: Asset[]; total: number; pages: number; quota?: Quota; direct_upload?: DirectUploadReadiness };
     }).then((data) => {
       if (controller.signal.aborted) return;
       setAssets(data.assets);
@@ -145,11 +147,13 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setIntegrity({});
       setTotal(data.total);
       setQuota(data.quota ?? null);
+      setDirectUpload(data.direct_upload ?? null);
       setPages(data.pages);
       setError('');
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) {
         setQuota(null);
+        setDirectUpload(null);
         setError(cause instanceof Error ? cause.message : 'No se pudo cargar la biblioteca.');
       }
     }).finally(() => {
@@ -625,6 +629,14 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       <meter aria-label="Uso del almacenamiento" min={0} max={quota.max_bytes}
         value={Math.min(quota.used_bytes, quota.max_bytes)} />
       <small>{quota.used_assets} de {quota.max_assets} archivos, incluida la papelera. Los originales retenidos siguen ocupando espacio.</small>
+    </div>}
+    {directUpload && <div className="vault-quota vault-direct-upload" aria-label="Carga de archivos grandes">
+      <strong>{directUpload.configured
+        ? 'Carga de archivos grandes preparada'
+        : 'Carga de archivos grandes no configurada'}</strong>
+      <small>{directUpload.configured
+        ? 'Transporte privado preparado hasta ' + (directUpload.max_bytes / (1024 * 1024 * 1024)).toFixed(0) + ' GiB por archivo. La carga rápida de hasta 8 MiB sigue disponible.'
+        : 'La carga rápida de hasta 8 MiB sigue disponible. Este entorno no enviará archivos grandes a un proveedor externo.'}</small>
     </div>}
     {view === 'active' && canUpload && csrf && <form onSubmit={upload} className="vault-upload">
       <label htmlFor="vault-files">Añadir fotos o videos desde tu dispositivo</label>

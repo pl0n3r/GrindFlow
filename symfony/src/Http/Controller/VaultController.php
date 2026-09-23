@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Infrastructure\Storage\DirectUploadReadiness;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,8 +33,8 @@ final class VaultController extends AbstractController
     public function __construct(
         private readonly PrivateVaultDirectory $storage,
         private readonly VaultBlobVerifier $verifier,
-    )
-    {
+        private readonly DirectUploadReadiness $directUploadReadiness,
+    ) {
     }
 
     #[Route('/api/admin/vault', name: 'grindflow_vault_list', methods: ['GET'])]
@@ -149,6 +150,7 @@ final class VaultController extends AbstractController
                 'used_assets' => (int) $usage['count_assets'],
                 'max_assets' => self::MAX_ORGANIZATION_ASSETS,
             ],
+            'direct_upload' => $this->directUploadReadiness->publicSummary(),
         ]]);
     }
 
