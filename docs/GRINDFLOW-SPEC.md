@@ -100,7 +100,7 @@ El destino es una **aplicación Symfony monolítica modular**, una MariaDB con m
 
 Se **conserva** la aplicación Laravel y su CI como referencia operativa durante la transición. Cada módulo se traslada con migraciones y pruebas de paridad de usuarios/organizaciones, IDs, permisos, estados, URLs, auditoría e históricos; por módulo existe un propietario único de escritura para evitar dos runtimes mutando el mismo estado sin coordinación. No modificar/borrar tablas Laravel automáticamente desde Doctrine.
 
-### S2 · Biblioteca multimedia privada (integrada v0.1.116)
+### S2 · Biblioteca multimedia privada
 
 El Vault Symfony trata fotos y videos pequeños como originales privados del tenant.
 El quick upload síncrono admite JPEG/PNG/WebP y MP4/WebM hasta 8 MiB, valida el
@@ -109,7 +109,7 @@ tras revalidar sesión, organización e integridad. La UI puede previsualizar vi
 con controles nativos sin autoplay. Esto no procesa, programa ni publica el
 archivo y no sustituye el pipeline asíncrono/direct upload para media grande.
 
-### S2 · Fundamento de direct upload para media grande (candidato v0.1.117)
+### S2 · Fundamento de direct upload para media grande
 
 Symfony incorpora un límite técnico separado para futuros archivos grandes, hasta
 2 GiB por original, sin sustituir el quick upload de 8 MiB. El transporte se modela
