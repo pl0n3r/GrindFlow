@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.110: destino estable de teclado en admin Symfony.** Base exacta `main` v0.1.109 `b597640440b579fae585d255ccbeda3e5bdf20fd`; el contenido principal existe desde Twig y conserva el foco durante la hidratación React.
+> **Candidato v0.1.111: HSTS solo con HTTPS confiable.** Base exacta `main` v0.1.110 `594d13bc886b466dbffa5e1a7c83e0f55928258c`; Symfony emite HSTS solo cuando la petición es realmente segura.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.110** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.109~~ | `b597640440b579fae585d255ccbeda3e5bdf20fd` |
+| Version objetivo | 🚧 **v0.1.111** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.110~~ | `594d13bc886b466dbffa5e1a7c83e0f55928258c` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35838201609` success sobre `b597640440b579fae585d255ccbeda3e5bdf20fd` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35838201490` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35838201643` failure, #73; independiente |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35842070400` success sobre `594d13bc886b466dbffa5e1a7c83e0f55928258c` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35842070467` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35842070404` failure, #73; independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Symfony/MariaDB/Chromium descartable; sin cuentas reales |
+| Datos productivos | ✅ ~~No tocados~~ | PHPUnit/MariaDB descartable; sin cuentas reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+162** | **−65** | **+97** |
+| **5** | **+69** | **−25** | **+44** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-UX-008: destino admin estable antes/durante/después de hidratar React a 360/820 px |
+| Alcance | GF-SEC-009: HSTS solo en HTTPS reconocido y sin confiar en proto del cliente |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,10 +63,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- El panel autenticado crea `main#contenido[tabindex="-1"]` en Twig antes de montar React; «Saltar al contenido» ya no depende de que termine la petición de contexto.
-- React deja de crear un segundo `main`, evitando landmarks anidados; el mismo nodo conserva el foco cuando el workspace carga o cuando el contexto devuelve 401.
-- El fallback `noscript` permanece dentro del contenido principal y el landmark conserva el margen de desplazamiento de navegación.
-- PHPUnit valida el HTML autenticado y Chromium sintético comprueba foco estable, único `main` y ausencia de overflow a 360/820 px. GF-UX-008 queda documentado sin alterar sesiones, permisos, CSRF, Laravel ni Hostinger.
+- Symfony añade `Strict-Transport-Security: max-age=31536000` solo cuando `Request::isSecure()` confirma HTTPS.
+- HTTP normal no recibe HSTS y un cliente tampoco puede activarlo enviando `X-Forwarded-Proto: https` mientras no exista una configuración explícita de proxies confiables.
+- PHPUnit cubre HTTPS 200/302/401/404, ausencia en HTTP y el caso de cabecera falsificada.
+- No se habilitan `includeSubDomains` ni `preload` sin inventario y operación HTTPS comprobados; GF-SEC-009 no cambia Laravel, Hostinger ni datos productivos.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
@@ -74,24 +74,20 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/frontend/admin/AdminApp.tsx`
-- `symfony/frontend/admin/workspace-navigation.css`
-- `symfony/templates/identity/admin.html.twig`
-- `symfony/tests/e2e/admin-stable-skip.spec.mjs`
-- `symfony/tests/e2e/preview.spec.mjs`
-- `symfony/tests/php/OrganizationSelectorAccessibilityTest.php`
+- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
+- `symfony/tests/php/PreviewTest.php`
 
 ## Validación
 - Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
-- `symfony-preview` valida PHPUnit HTTP/MariaDB descartable y Chromium de hidratación admin a 360/820 px.
-- La versión humana no acredita deploy Symfony ni resuelve Production Smoke #73.
+- `symfony-preview` valida PHPUnit HTTP y el stack descartable seleccionado por CI.
+- La versión humana no acredita TLS/proxy productivo ni resuelve Production Smoke #73.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Destino estable de teclado en admin | 🚧 v0.1.110 candidata |
+| **NOW** | 🚧 HSTS condicionado a HTTPS confiable | 🚧 v0.1.111 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -99,8 +95,8 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.109 fusionada~~ | ✅ ~~teclado y foco visible en superficies Symfony~~ |
-| **NOW** | 🚧 Landmark admin estable durante hidratación | 🚧 GF-UX-008, v0.1.110 |
+| **DONE** | ✅ ~~v0.1.110 fusionada~~ | ✅ ~~landmark admin estable durante hidratación~~ |
+| **NOW** | 🚧 HSTS solo con HTTPS verificado | 🚧 GF-SEC-009, v0.1.111 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |

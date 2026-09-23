@@ -29,6 +29,11 @@ final class SecurityHeadersSubscriber
             $headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         }
         $headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+        // HSTS is meaningful only when Symfony knows the request itself is HTTPS.
+        // Do not trust client-supplied forwarding headers unless proxies are configured explicitly.
+        if ($event->getRequest()->isSecure()) {
+            $headers->set('Strict-Transport-Security', 'max-age=31536000');
+        }
         // Apply to redirects and exceptions as well as successful private responses.
         // Login errors and authenticated routes must never be stored by a browser
         // or an intermediary, even if a controller omits its own cache policy.
