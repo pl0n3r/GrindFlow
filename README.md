@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+31** | **−39** | **−8** |
+| **5** | **+57** | **−56** | **+1** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -75,6 +75,7 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
+- `scripts/readme-dashboard.py`
 
 ## Validación
 - Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
