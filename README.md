@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.101: acotar las solicitudes de cambio de contraseña en Symfony.** Base exacta `main` v0.1.100 `61ae4dae188f685dacdf15d7caf2b5bb959ce53d`; rechaza JSON excesivo con salida genérica y sin cambiar contraseñas.
+> **Candidato v0.1.102: límites JSON reutilizables en renombres Symfony.** Base exacta `main` v0.1.101 `42774544eb1ff24f710eade753c7ba1dd95e66b4`; conserva permisos y CSRF y rechaza cargas excesivas sin mutar nombres.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,14 +18,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.101** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.100~~ | `61ae4dae188f685dacdf15d7caf2b5bb959ce53d` |
+| Version objetivo | 🚧 **v0.1.102** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.101~~ | `42774544eb1ff24f710eade753c7ba1dd95e66b4` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir full review del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35801200020` success sobre `61ae4dae188f685dacdf15d7caf2b5bb959ce53d` |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35806401819` success sobre `42774544eb1ff24f710eade753c7ba1dd95e66b4` |
 | Deploy Observer | 🚧 Pendiente | No inferir checkout remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35801200045` failure, #73; independiente de esta mejora |
+| Production Smoke | ⛔ Login E2E no validado | `35806401786` failure, #73; independiente de esta mejora |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
 | Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/MariaDB descartable; sin cambio de cuentas reales |
 
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+234** | **−48** | **+186** |
+| **8** | **+0** | **−0** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-SEC-005: validar tamaño/profundidad del JSON de cambio de contraseña |
+| Alcance | GF-SEC-007: límites JSON para renombres de perfil/organización |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,10 +63,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `AccountSecurityController` rechaza `Content-Length` válido superior a 4.096 bytes antes de cargar el JSON; lee como máximo 4.097 bytes del stream y coteja la longitud real aun si la cabecera miente o falta.
-- La profundidad de decodificación se limita a 16; cuerpos fuera de contrato reciben HTTP 422 genérico sin eco, tras consumir el cupo por identidad si su CSRF era válido.
-- Regresiones PHPUnit con usuario, organización y MariaDB descartables: longitud declarada y real, frontera exacta de 4 KiB, anidación excesiva y contraseña sin mutaciones inesperadas.
-- Actualizado el contrato GF-SEC-005 sin cambiar Laravel, secretos, usuarios productivos, Hostinger ni llamadas externas.
+- Nuevo lector `BoundedJsonBody`: rechaza `Content-Length` decimal superior a 4.096 bytes; lee máximo 4.097 bytes reales y limita la profundidad JSON a 16.
+- Los endpoints Symfony de renombre personal y organización lo reutilizan **después** de las comprobaciones de identidad, rol/tenant y CSRF ya existentes.
+- Regresiones PHPUnit con cuentas y organizaciones descartables: 4.097 bytes con cabecera falsa, longitud declarada excesiva, anidación >16 con clave duplicada, límite de 4.096 bytes y ausencia de modificaciones tras rechazos.
+- Requisito GF-SEC-007 independiente del login y de GF-SEC-005; sin cambios en Laravel, secretos, usuarios reales, Hostinger o migraciones productivas.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
@@ -74,20 +74,23 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Http/Controller/AccountSecurityController.php`
-- `symfony/tests/php/AccountSecurityTest.php`
+- `symfony/src/Http/BoundedJsonBody.php`
+- `symfony/src/Http/Controller/AdminContextController.php`
+- `symfony/src/Http/Controller/ProfileController.php`
+- `symfony/tests/php/OrganizationSettingsTest.php`
+- `symfony/tests/php/ProfileSettingsTest.php`
 
 ## Validación
-- Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final del PR; luego CI exact-main.
-- El gate `symfony-preview` ejecuta PHP/MariaDB y Chromium en un entorno aislado; las pruebas cubren 4.096 bytes y profundidad 16.
-- Este candidato no cambia el login productivo ni resuelve por sí solo el Production Smoke #73.
+- Exigir `validate`, Sonar y full review CodeRabbit del HEAD final; después, CI exact-main.
+- El gate `symfony-preview` incluye PHPUnit HTTP contra MariaDB descartable y Chromium aislado.
+- El release no demuestra deployment de Symfony ni resuelve el Production Smoke de Laravel #73.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Guardas del cambio de contraseña Symfony | 🚧 v0.1.101 candidata |
+| **NOW** | 🚧 Límites del renombre personal y organizacional | 🚧 v0.1.102 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #2 |
@@ -95,8 +98,8 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.100 fusionada~~ | ✅ ~~diagnóstico redacted del Production Smoke~~ |
-| **NOW** | 🚧 Límite JSON para cambio de contraseña | 🚧 v0.1.101 |
+| **DONE** | ✅ ~~v0.1.101 fusionada~~ | ✅ ~~guardas JSON de contraseña Symfony~~ |
+| **NOW** | 🚧 Límites JSON para renombres | 🚧 v0.1.102 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #2 |
