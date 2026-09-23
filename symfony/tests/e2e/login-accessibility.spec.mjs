@@ -26,6 +26,8 @@ for (const width of [360, 820]) {
       );
     }
     await expect(password).toHaveAttribute('type', 'password');
+    await expect(password).toHaveValue('');
+    await expect(email).toHaveValue('synthetic@example.test');
     expect(await page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(width);
   });
