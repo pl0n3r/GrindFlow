@@ -52,6 +52,13 @@ test('mobile navigation reveals active preview and private sections without page
   await expect(page.getByRole('heading', { name: 'Biblioteca' })).toBeVisible();
   await expect.poll(() => fullyVisible(preview)).toBe(true);
 
+  // Active item must remain visible when a wide workspace becomes narrow.
+  await page.setViewportSize({ width: 820, height: 740 });
+  await preview.evaluate((el) => { el.querySelectorAll('button')[2].click(); });
+  await expect(page.getByRole('heading', { name: 'Tráfico' })).toBeVisible();
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect.poll(() => fullyVisible(preview)).toBe(true);
+
   const asset = await page.locator('script[type="module"]').getAttribute('src');
   expect(asset).toBeTruthy();
   await page.route('**/api/admin/context', (route) => route.fulfill({
