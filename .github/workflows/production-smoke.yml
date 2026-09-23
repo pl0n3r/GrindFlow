@@ -27,7 +27,7 @@ jobs:
       CONFIG_ISSUE_TITLE: '[AUTO] Production Smoke Not Configured'
       MEDIA_STORAGE_ISSUE_TITLE: '[AUTO] Media Storage Not Configured'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - id: credentials
         name: Check synthetic credentials
@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload short-lived smoke diagnostics
         if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: production-smoke-diagnostics-${{ github.run_id }}
           path: production-smoke.log
