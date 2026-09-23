@@ -67,7 +67,7 @@ final class DirectUploadCompletionVerifier
 
         try {
             $hash = hash_init('sha256');
-            $read = hash_update_stream($hash, $stream);
+            $read = hash_update_stream($hash, $stream, $payload['byte_size'] + 1);
             if ($read === false) {
                 throw new \RuntimeException('Direct upload object could not be fully hashed.');
             }
