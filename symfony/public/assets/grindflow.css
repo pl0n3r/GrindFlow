@@ -30,3 +30,4 @@
   .identity-navbar nav .identity-current{padding:10px;font-size:11px}
   .identity-shell{padding:28px 16px}
 }
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
