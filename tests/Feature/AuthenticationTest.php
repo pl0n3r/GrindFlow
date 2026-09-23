@@ -41,6 +41,36 @@ class AuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    /** A rejected synthetic login must not invalidate the anonymous session. */
+    public function test_rejected_login_preserves_anonymous_csrf_and_allows_a_later_valid_login(): void
+    {
+        $user = User::factory()->create([
+            'password' => 'correct-synthetic-password',
+        ]);
+
+        $before = $this->get('/login')->assertOk();
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $before->getContent(), $beforeToken));
+
+        $this->from('/login')->post('/login', [
+            '_token' => $beforeToken[1],
+            'email' => $user->email,
+            'password' => 'incorrect-synthetic-password',
+        ])->assertRedirect('/login')->assertSessionHasErrors('email');
+        $this->assertGuest();
+
+        $after = $this->get('/login')->assertOk();
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $after->getContent(), $afterToken));
+        self::assertSame($beforeToken[1], $afterToken[1],
+            'A rejected login should not rotate the anonymous session CSRF token.');
+
+        $this->post('/login', [
+            '_token' => $afterToken[1],
+            'email' => $user->email,
+            'password' => 'correct-synthetic-password',
+        ])->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_user_can_authenticate_and_logout(): void
     {
         $user = User::factory()->create([
