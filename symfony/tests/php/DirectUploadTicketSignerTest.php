@@ -61,7 +61,8 @@ final class DirectUploadTicketSignerTest extends TestCase
         [$payload, $signature] = explode('.', $ticket, 2);
         $tamperedPayload = substr($payload, 0, -1).($payload[-1] === 'A' ? 'B' : 'A');
         self::assertNull($signer->verify($tamperedPayload.'.'.$signature, $organization, $user, self::NOW));
-        self::assertNull($signer->verify($payload.'.'.substr($signature, 0, -1).'A', $organization, $user, self::NOW));
+        $tamperedSignature = substr($signature, 0, -1).($signature[-1] === 'A' ? 'B' : 'A');
+        self::assertNull($signer->verify($payload.'.'.$tamperedSignature, $organization, $user, self::NOW));
         self::assertNull($signer->verify('not-a-ticket', $organization, $user, self::NOW));
         self::assertNull($signer->verify($payload.'.%%%%', $organization, $user, self::NOW));
 
@@ -82,6 +83,9 @@ final class DirectUploadTicketSignerTest extends TestCase
 
         foreach ([
             [$staging, '../clip.mp4', 'video/mp4', 1, 900],
+            [$staging, '..\\clip.mp4', 'video/mp4', 1, 900],
+            [$staging, '   ', 'video/mp4', 1, 900],
+            ['organizations/'.$organization.'/staging/not-a-uuid', 'clip.mp4', 'video/mp4', 1, 900],
             [$staging, "bad\nname.mp4", 'video/mp4', 1, 900],
             [$staging, 'clip.mov', 'video/quicktime', 1, 900],
             [$staging, 'clip.mp4', 'video/mp4', 0, 900],

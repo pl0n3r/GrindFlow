@@ -168,16 +168,20 @@ final class DirectUploadTicketSigner
         $issuedAt = $payload['issued_at'] ?? null;
         $expiresAt = $payload['expires_at'] ?? null;
 
+        $storagePrefix = is_string($organizationId)
+            ? 'organizations/'.$organizationId.'/staging/'
+            : '';
+        $stagingId = is_string($storageKey) && str_starts_with($storageKey, $storagePrefix)
+            ? substr($storageKey, strlen($storagePrefix))
+            : '';
+
         if (($payload['v'] ?? null) !== self::VERSION
             || !is_string($organizationId) || !Uuid::isValid($organizationId)
             || !is_string($userId) || !Uuid::isValid($userId)
-            || !is_string($storageKey)
-            || preg_match(
-                '#\\Aorganizations/'.preg_quote($organizationId, '#').'/staging/[0-9a-fA-F-]{36}\\z#D',
-                $storageKey,
-            ) !== 1
-            || !is_string($filename) || $filename === '' || mb_strlen($filename) > 180
-            || basename(str_replace('\\\\', '/', $filename)) !== $filename
+            || !is_string($storageKey) || $storagePrefix === ''
+            || !Uuid::isValid($stagingId) || $storageKey !== $storagePrefix.$stagingId
+            || !is_string($filename) || trim($filename) === '' || mb_strlen($filename) > 180
+            || basename(str_replace('\\', '/', $filename)) !== $filename
             || preg_match('/[\\x00-\\x1F\\x7F]/u', $filename) === 1
             || !is_string($mimeType) || !in_array($mimeType, self::MIMES, true)
             || !is_int($byteSize) || $byteSize < 1 || $byteSize > self::MAX_BYTES
