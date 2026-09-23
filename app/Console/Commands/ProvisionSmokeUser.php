@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -55,8 +54,9 @@ class ProvisionSmokeUser extends Command
         }
 
         try {
-            $changed = Cache::lock('grindflow:provision-smoke-user', 30)
-                ->block(5, fn (): bool => $this->reconcile($email, $password, $name));
+            $changed = $this->withFilesystemLock(
+                fn (): bool => $this->reconcile($email, $password, $name),
+            );
         } catch (Throwable) {
             $this->error('Synthetic smoke identity reconciliation failed safely.');
 
@@ -70,6 +70,45 @@ class ProvisionSmokeUser extends Command
         );
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  callable(): bool  $callback
+     */
+    private function withFilesystemLock(callable $callback): bool
+    {
+        $directory = storage_path('framework');
+
+        if (
+            ! is_dir($directory)
+            && ! mkdir($directory, 0775, true)
+            && ! is_dir($directory)
+        ) {
+            throw new RuntimeException('Unable to create deployment lock directory.');
+        }
+
+        $handle = fopen($directory.'/grindflow-smoke-user.lock', 'c+');
+
+        if ($handle === false) {
+            throw new RuntimeException('Unable to open smoke-user provisioning lock.');
+        }
+
+        $deadline = microtime(true) + 5.0;
+
+        try {
+            while (! flock($handle, LOCK_EX | LOCK_NB)) {
+                if (microtime(true) >= $deadline) {
+                    throw new RuntimeException('Timed out waiting for smoke-user provisioning lock.');
+                }
+
+                usleep(100_000);
+            }
+
+            return $callback();
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 
     private function reconcile(string $email, string $password, string $name): bool

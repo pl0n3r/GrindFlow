@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Membership;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -130,12 +131,12 @@ class ProvisionSmokeUserCommandTest extends TestCase
 
     public function test_command_output_never_contains_identity_or_secret(): void
     {
-        $result = $this->artisan('grindflow:provision-smoke-user');
-        $result->assertSuccessful();
+        self::assertSame(0, Artisan::call('grindflow:provision-smoke-user'));
 
-        $output = $result->run();
+        $output = Artisan::output();
 
         self::assertStringNotContainsString('e2e-admin@grindflow.test', $output);
         self::assertStringNotContainsString('synthetic-secret-with-safe-length', $output);
+        self::assertDoesNotMatchRegularExpression('/[$]2[ayb][$][0-9]{2}[$]/', $output);
     }
 }
