@@ -83,6 +83,16 @@ Each requirement should contain:
 
 **Verificación:** Chromium aislado con `emulateMedia(reducedMotion)` sobre home, preview y navegación a 360/820 px; gate `symfony-preview`.
 
+### GF-UX-008 — Destino de teclado estable en panel administrativo Symfony
+
+**Estado:** preparado en rama aislada; no validado ni desplegado.
+
+**Enunciado:** el enlace compartido «Saltar al contenido» en el panel autenticado debe tener un destino semántico presente desde el primer HTML, durante la carga de React y después de su hidratación; no puede apuntar a un nodo creado únicamente cuando termina la petición de contexto, ni dejar dos elementos `main` anidados.
+
+**Aceptación:** Twig renderiza exactamente un `main#contenido[tabindex="-1"]` envolviendo el mount React y el estado inicial; React renderiza el contenido del workspace sin crear otro `main`. Al activar el enlace antes de cargar el contexto se enfoca el landmark y ese mismo nodo retiene el foco al aparecer el workspace. El estado de error también conserva destino. Se mantienen las acciones de sesión, permisos, CSRF y contexto existentes.
+
+**Verificación:** PHPUnit HTTP con dos organizaciones sintéticas comprueba el HTML autenticado; Chromium aislado simula un contexto de organización y confirma retención de foco y único landmark antes y después de hidratar React a 360/820 px. No modifica la base de producción ni hace cutover Symfony.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
