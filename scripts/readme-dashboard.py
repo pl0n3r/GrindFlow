@@ -217,6 +217,8 @@ def next_roadmap_error(next_section: str) -> str | None:
     )
     if issue_destinations != ["2"]:
         return "Qué sigue must link only the canonical issue #2 exactly once"
+    if "~~" in next_section:
+        return "Qué sigue must not contain completed history; keep that in issue #2"
     if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", next_section):
         return "Qué sigue must only link canonical issue #2; snapshot lanes belong in Panorama"
     return None
@@ -243,7 +245,7 @@ def panorama_lane_error(row: str, lanes: tuple[str, ...]) -> str | None:
 def panorama_error(panorama: str) -> str | None:
     if not panorama:
         return "README must keep the current operational Panorama snapshot"
-    if "**DONE**" in panorama:
+    if "**DONE**" in panorama or "~~" in panorama:
         return "Panorama must not accumulate completed history; keep that in issue #2"
 
     lanes = ("**NOW**", "**NEXT**", "**BLOCKED / EXTERNAL**", "**LATER**")
@@ -421,6 +423,15 @@ ok
             "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
             "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\\n"
             "[Smoke #73](https://github.com/pl0n3r/GrindFlow/issues/73)",
+        ),
+        roadmap_sample.replace(
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\n"
+            "✅ ~~GF-OPS-010 terminado~~",
+        ),
+        roadmap_sample.replace(
+            "| --- | --- | --- |",
+            "| --- | --- | --- |\n| nota | ✅ ~~GF-OPS-010 terminado~~ | historial |",
         ),
         roadmap_sample.replace(
             "| **NOW** | 🚧 entrega actual | 🚧 validando |",
