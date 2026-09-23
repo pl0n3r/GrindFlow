@@ -145,6 +145,16 @@ Each requirement should contain:
 
 **Verificación:** una prueba de reflexión fija la firma de `checkPostAuth()`, su parámetro opcional/tipo y el atributo de `eraseCredentials()`. El gate `symfony-preview` debe dejar de reportar las deprecations propias correspondientes observadas en el `main` v0.1.111; deprecations de herramientas o dependencias externas se evalúan por separado.
 
+### GF-OPS-012 — Cero deprecations Symfony propias o directas en CI
+
+**Estado:** implementado en código; validación y despliegue se verifican por separado.
+
+**Enunciado:** una contribución Symfony no puede introducir deprecations originadas en código de GrindFlow (`self`) ni llamadas directas desde GrindFlow a APIs vendor deprecadas (`direct`). Los avisos indirectos de dependencias pueden conservar una tolerancia acotada para que una actualización transitoria de vendor no bloquee trabajo no relacionado.
+
+**Aceptación:** el gate `symfony-preview` usa `SYMFONY_DEPRECATIONS_HELPER=max[total]=30&max[self]=0&max[direct]=0`. Cualquier deprecation `self` o `direct` hace fallar la suite aunque el total siga bajo 30; el presupuesto total continúa limitando avisos indirectos/otros. La salida detallada permanece visible para diagnóstico y la política no modifica el runtime de aplicación.
+
+**Verificación:** la base v0.1.112 demuestra cero deprecations propias conocidas después de GF-OPS-011; la candidata debe superar `symfony-preview` y `validate` usando la nueva política. Cambios futuros que reintroduzcan código deprecado de primera parte o uso directo quedan bloqueados por CI.
+
 ### GF-OPS-010 — Readiness segura del runtime Symfony
 
 **Estado:** implementado en código; despliegue y producción se verifican por separado.
