@@ -229,6 +229,7 @@ jobs:
           python3 -m py_compile scripts/production-runtime-readiness.py
           python3 -m py_compile scripts/production-runtime-readiness-contract.py
           [[ -f scripts/sonar-pr-comment.py ]] && python3 -m py_compile scripts/sonar-pr-comment.py
+          python3 -m unittest tests/test_sonar_pr_comment_retry.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb

@@ -6,6 +6,9 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
+import email.utils
+from datetime import datetime, timezone
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +25,50 @@ class ApiError(RuntimeError):
         super().__init__(f"{source} API HTTP {status}: {message}")
         self.source = source
         self.status = status
+
+
+
+MAX_GITHUB_RETRIES = 2
+MAX_GITHUB_RETRY_SECONDS = 30
+
+
+def github_retry_delay(error: urllib.error.HTTPError, attempt: int) -> float | None:
+    """Honor GitHub rate-limit headers; fail closed on a long wait.
+
+    Only the caller can decide which HTTP methods are safe to repeat.
+    A bare HTTP 403 is not evidence of throttling and must not be retried.
+    """
+    if attempt >= MAX_GITHUB_RETRIES or error.code not in (403, 429):
+        return None
+
+    retry_after = error.headers.get("Retry-After")
+    delay: float | None = None
+    if retry_after:
+        try:
+            delay = max(0.0, float(retry_after))
+        except (TypeError, ValueError):
+            try:
+                date = email.utils.parsedate_to_datetime(retry_after)
+                if date.tzinfo is None:
+                    date = date.replace(tzinfo=timezone.utc)
+                delay = max(0.0, (date - datetime.now(timezone.utc)).total_seconds())
+            except (TypeError, ValueError, OverflowError):
+                pass
+
+    if delay is None and error.headers.get("X-RateLimit-Remaining") == "0":
+        reset = error.headers.get("X-RateLimit-Reset")
+        if reset:
+            try:
+                delay = max(0.0, float(reset) - time.time())
+            except (TypeError, ValueError, OverflowError):
+                pass
+
+    if delay is None and error.code == 429:
+        delay = float(2 ** (attempt + 1))
+
+    if delay is None or delay > MAX_GITHUB_RETRY_SECONDS:
+        return None
+    return delay
 
 
 def request_json(
@@ -56,18 +103,27 @@ def request_json(
         method=method,
     )
 
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")[:1200]
-        accepted = error.headers.get("X-Accepted-GitHub-Permissions", "")
-        if accepted:
-            detail = f"{detail} | X-Accepted-GitHub-Permissions: {accepted}"
-        raise ApiError(source, error.code, detail) from error
-    except urllib.error.URLError as error:
-        raise RuntimeError(f"{source} API network error: {error}") from error
+    for attempt in range(MAX_GITHUB_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read().decode("utf-8")
+                return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as error:
+            delay = None
+            if source == "GitHub" and method in ("GET", "PATCH"):
+                delay = github_retry_delay(error, attempt)
+            if delay is not None:
+                error.close()
+                time.sleep(delay)
+                continue
+            detail = error.read().decode("utf-8", errors="replace")[:1200]
+            accepted = error.headers.get("X-Accepted-GitHub-Permissions", "")
+            if accepted:
+                detail = f"{detail} | X-Accepted-GitHub-Permissions: {accepted}"
+            raise ApiError(source, error.code, detail) from error
+        except urllib.error.URLError as error:
+            raise RuntimeError(f"{source} API network error: {error}") from error
+    raise RuntimeError("GitHub API retry budget exhausted")
 
 
 def github_json(

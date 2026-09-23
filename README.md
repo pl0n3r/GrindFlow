@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.121: verificación de revisión terminal CodeRabbit sobre el SHA exacto.** Base `main` v0.1.120 `cd871630d427f97a09d9e6e8befdd4e85e1d7a05`; candidata no fusionada ni desplegada.
+> **Candidato apilado v0.1.122: reducir llamadas repetidas a GitHub y tormentas de eventos.** Base candidata PR #122 v0.1.121 `3a3d1c3862e57fd45d244cde3753e188fe3880de`; `main` sigue v0.1.120. No fusionado ni desplegado.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,12 +18,12 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.121** | `config/version.php`; candidata, no publicada |
-| Base exacta | ✅ ~~main v0.1.120~~ | `cd871630d427f97a09d9e6e8befdd4e85e1d7a05` |
+| Version objetivo | 🚧 **v0.1.122** | `config/version.php`; candidata apilada, no publicada |
+| Base exacta | 🚧 PR #122 v0.1.121 | `3a3d1c38…`; no reemplaza a main v0.1.120 |
 | CI del PR | 🚧 Pendiente | `validate` sobre HEAD final |
-| Sonar del PR | 🚧 Pendiente | Quality Gate sobre HEAD final, tras cambio de base |
+| Sonar del PR | 🚧 Pendiente | Quality Gate del futuro HEAD de v0.1.122 |
 | CodeRabbit del PR | 🚧 Pendiente | Revisión terminada del mismo SHA |
-| CI del SHA exacto de main | ✅ ~~success~~ | #35917304166 sobre `cd871630…` |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35917304166 sobre `cd871630…` (v0.1.120) |
 | Deploy Observer base | ✅ ~~Release observado~~ | #35917304167; no acredita SHA remoto |
 | Production Smoke | ⛔ Bloqueo externo #73 | #35917304261 failure |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+425** | **−26** | **+399** |
+| **6** | **+200** | **−33** | **+167** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | Gobierno: evidencia terminal CodeRabbit exact-head, no confundir `skipped` con `completed` |
+| Alcance | Issue #123: reintentos limitados de API GitHub y concurrencia Sonar relay |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,26 +63,24 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `scripts/coderabbit-final-review.py` verifica evidencia GitHub capturada para un HEAD exacto y falla cerrado si CodeRabbit indica `Review skipped`, `pending`, SHA distinto o hilos sin resolver.
-- Diecinueve tests offline cubren revisión final real, SHA, hilos, registros malformados, límites de tamaño, FIFO, enlaces simbólicos y UTF-8 inválido; `fast` los ejecuta.
-- El workflow de CI también activa validación al pasar una PR de borrador a lista para revisión, sin disparos por ediciones cosméticas.
-- `docs/CODERABBIT-FINAL-REVIEW.md` y AGENTS explican que es ayuda local, no ruleset, fusión automática ni acreditación productiva.
+- El relay de Sonar cancela ejecuciones obsoletas por PR y limita el job a cinco minutos; mantiene el filtro de checks de Sonar a nivel job.
+- Las consultas GitHub GET y actualizaciones idempotentes PATCH respetan `Retry-After` y `X-RateLimit-Reset` con máximo dos reintentos. POST no se repite; espera mayor de 30 segundos falla cerrado.
+- Diez pruebas offline fijan respuestas 403/429, cuotas, presupuesto de intentos e idempotencia. CI `fast` ejecuta las pruebas.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de esta entrega candidata, no prueba publicación:
 <!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
-- `AGENTS.md`
+- `.github/workflows/sonar-pr-details.yml`
 - `README.md`
 - `config/version.php`
-- `docs/CODERABBIT-FINAL-REVIEW.md`
-- `scripts/coderabbit-final-review.py`
-- `tests/test_coderabbit_final_review.py`
+- `scripts/sonar-pr-comment.py`
+- `tests/test_sonar_pr_comment_retry.py`
 
 ## Validación
-- La PR #120 está fusionada en `main` v0.1.120, con CI exact-main exitoso; scope CI core completo para esta candidata: `validate`, Sonar y CodeRabbit del HEAD final.
-- Production Smoke #73 sigue fallando de forma independiente; no cerrar el incidente por pasar CI.
-- El helper no consulta producción, no cambia tokens ni genera ZIP.
+- La PR #122 sigue independiente con CI/Sonar aprobados sobre v0.1.121 y revisión CodeRabbit pendiente. Esta entrega debe rebasarse sobre `main` cuando #122 se fusione.
+- Al tocar workflow CI core, ejecutar suites completas, Sonar y revisión terminal CodeRabbit sobre el HEAD final antes de fusionar.
+- No modifica producción, secretos, usuarios ni datos del smoke #73.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -90,7 +88,7 @@ Inventario de esta entrega candidata, no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Gate de revisión exact-head v0.1.121 contra main v0.1.120 | 🚧 PR #122 |
-| **NEXT** | 🚧 Diagnóstico read-only de autenticación #73/#121 | 🚧 pendiente |
+| **NOW** | 🚧 Revisar PR #122; v0.1.122 prepara defensa de carga GitHub | 🚧 candidata apilada |
+| **NEXT** | 🚧 Completar #123 y después investigar smoke #73/#121 | 🚧 pendiente |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
 | **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |
