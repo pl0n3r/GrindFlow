@@ -86,11 +86,14 @@ continúa siendo el archivo operativo canónico para todos los agentes.
   con `config/version.php`; `scripts/validate-governance.py` lo exige
   en preflight. Los tickets automáticos e historial anterior no se renombran
   a la fuerza.
-- Documentar progresos y bloqueos **únicamente** en roadmap Issue #2:
-  [`ROADMAP.md`](ROADMAP.md) solo enlaza. Conservar todo el historial
-  `✅ ~~completado~~`, `🚧 pendiente`, `⛔ bloqueado` hasta al menos la
-  primera versión 1.0.0 madura. Si el Issue se acerca al límite, abrir
-  volumen de continuación con enlaces bidireccionales, nunca borrar log.
+- Documentar el **historial acumulativo** de progresos y bloqueos únicamente
+  en roadmap Issue #2: [`ROADMAP.md`](ROADMAP.md) solo enlaza. README conserva
+  solamente el estado operativo actual del deploy, incluido el snapshot
+  NOW/NEXT/BLOCKED / EXTERNAL/LATER, y lo reemplaza en cada entrega. Conservar en
+  Issue #2 todo el historial `✅ ~~completado~~`, `🚧 pendiente`,
+  `⛔ bloqueado` hasta al menos la primera versión 1.0.0 madura. Si el Issue se
+  acerca al límite, abrir volumen de continuación con enlaces bidireccionales,
+  nunca borrar log.
 - **No introducir normas permanentes en roadmap**: protocolos en AGENTS.md,
   reglas de colaboración en docs/GOVERNANCE.md, requisitos funcionales
   en docs/REQUIREMENTS.md, términos para socios en [GLOSARIO.md](GLOSARIO.md).
@@ -157,8 +160,11 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - El issue [#2](https://github.com/pl0n3r/GrindFlow/issues/2)
   es la **hoja de ruta maestra ordenada** por riesgo y dependencias; cada issue
   funcional conserva sus criterios de aceptación. Si cambia la prioridad, actualizar
-  #2 y este archivo en la próxima PR correspondiente. No duplicar roadmap en
-  README ni guardar una segunda historia acumulativa.
+  #2 y este archivo en la próxima PR correspondiente. No copiar el historial
+  acumulativo del roadmap en README ni guardar una segunda historia. Issue #2
+  conserva ese historial acumulativo; README sí conserva únicamente el estado
+  operativo actual del deploy en un resumen efímero `Panorama general pendiente`,
+  reemplazado en cada entrega y limitado a NOW/NEXT/BLOCKED / EXTERNAL/LATER.
 - Progreso canónico en roadmap, issues, README y handoffs: `✅ ~~Completado~~`
   solo tras las compuertas aplicables; `🚧 Pendiente` (texto normal) para
   pendiente/en curso. Conservar entregas finalizadas tachadas en roadmap durable,
@@ -910,8 +916,10 @@ Reglas:
 - `Calidad y entrega` diferencia CI, Sonar, CodeRabbit, exact-main y produccion.
 - `Flujo de entrega` conserva un Mermaid que haga visible el fan-out desde
   preflight y la validacion exact-main tras squash merge.
-- `Qué sigue` y `Panorama general pendiente` deben hacer visibles
-  **NOW**, **NEXT**, **BLOCKED / EXTERNAL** y **LATER**.
+- `Qué sigue` enlaza al roadmap canónico #2. `Panorama general pendiente`
+  resume únicamente el snapshot operativo actual con **NOW**, **NEXT**,
+  **BLOCKED / EXTERNAL** y **LATER**; no copia historial, entregas anteriores ni
+  tareas acumulativas del Issue #2.
 - Cada deploy o cambio de estado operativo relevante reemplaza el snapshot
   anterior en vez de acumular historia.
 - CI verde solo permite **VALIDATED IN CODE**. Production Smoke o evidencia

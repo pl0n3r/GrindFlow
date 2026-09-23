@@ -209,31 +209,72 @@ def validate_changed_files(readme: str, files: list[str]) -> None:
         fail("changed-file list is stale. Run readme-dashboard.py --update.")
 
 
-def validate_roadmap(readme: str) -> None:
-    lanes = ("**NOW**", "**NEXT**", "**LATER**", "**BLOCKED / EXTERNAL**")
-    missing = [lane for lane in lanes if lane not in readme]
-    if missing:
-        fail("missing roadmap lane(s): " + ", ".join(missing))
+def next_roadmap_error(next_section: str) -> str | None:
+    issue_destinations = re.findall(
+        r"https://github\.com/pl0n3r/GrindFlow/issues/(\d+)\b",
+        next_section,
+        flags=re.I,
+    )
+    if issue_destinations != ["2"]:
+        return "Qué sigue must link only the canonical issue #2 exactly once"
+    if "~~" in next_section:
+        return "Qué sigue must not contain completed history; keep that in issue #2"
+    if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", next_section):
+        return "Qué sigue must only link canonical issue #2; snapshot lanes belong in Panorama"
+    return None
 
+
+def panorama_lane_error(row: str, lanes: tuple[str, ...]) -> str | None:
+    matching = [lane for lane in lanes if lane in row]
+    if not matching:
+        return None
+    if "🚧" not in row and "⛔" not in row:
+        return "Panorama pending/blocked row missing status symbol"
+    if "~~" in row:
+        return "Panorama must not contain completed/struck-through history"
+
+    payload = row
+    for lane in matching:
+        payload = payload.replace(lane, "")
+    payload = payload.replace("🚧", "").replace("⛔", "")
+    if not any(char.isalnum() for char in payload):
+        return "Panorama lane must include current work or status content"
+    return None
+
+
+def panorama_error(panorama: str) -> str | None:
+    if not panorama:
+        return "README must keep the current operational Panorama snapshot"
+    if "**DONE**" in panorama or "~~" in panorama:
+        return "Panorama must not accumulate completed history; keep that in issue #2"
+
+    lanes = ("**NOW**", "**NEXT**", "**BLOCKED / EXTERNAL**", "**LATER**")
+    for lane in lanes:
+        if panorama.count(lane) != 1:
+            return f"Panorama must contain exactly one {lane} lane"
+
+    for row in panorama.splitlines():
+        error = panorama_lane_error(row, lanes)
+        if error is not None:
+            return error
+    return None
+
+
+def roadmap_error(readme: str) -> str | None:
     convention = section(readme, "## Progress convention")
     if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
-        fail("canonical progress convention missing or not documented")
+        return "canonical progress convention missing or not documented"
 
-    roadmap = section(readme, "## Qué sigue") + section(readme, "## Panorama general pendiente")
-    if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
-        fail("roadmap must link to canonical issue #2")
-    if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", roadmap, flags=re.I):
-        fail("legacy issue #88 cannot be an active roadmap destination")
+    error = next_roadmap_error(section(readme, "## Qué sigue"))
+    if error is not None:
+        return error
+    return panorama_error(section(readme, "## Panorama general pendiente"))
 
-    for row in roadmap.splitlines():
-        if not re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", row):
-            continue
-        if "✅" not in row and "🚧" not in row and "⛔" not in row:
-            fail("roadmap row missing completed/pending/blocked symbol")
-        if "✅" in row and "~~" not in row:
-            fail("completed work must be struck through")
-        if ("🚧" in row or "⛔" in row) and "~~" in row:
-            fail("pending/blocked work must remain unstruck")
+
+def validate_roadmap(readme: str) -> None:
+    error = roadmap_error(readme)
+    if error is not None:
+        fail(error)
 
 
 def validate_version(readme: str) -> None:
@@ -352,6 +393,52 @@ ok
         pass
     else:
         raise AssertionError("duplicate changed-files marker must be rejected")
+
+    roadmap_sample = """## Progress convention
+✅ ~~Completado~~
+🚧 Pendiente
+
+## Qué sigue
+[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+
+## Panorama general pendiente
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | 🚧 entrega actual | 🚧 validando |
+| **NEXT** | 🚧 siguiente slice | 🚧 pendiente |
+| **BLOCKED / EXTERNAL** | ⛔ dependencia | ⛔ externa |
+| **LATER** | 🚧 trabajo posterior | 🚧 pendiente |
+"""
+    assert roadmap_error(roadmap_sample) is None
+
+    for invalid in (
+        roadmap_sample.replace("## Panorama general pendiente", "## Otro panorama"),
+        roadmap_sample.replace("| **NEXT** | 🚧 siguiente slice | 🚧 pendiente |\n", ""),
+        roadmap_sample.replace("| **NEXT** | 🚧 siguiente slice | 🚧 pendiente |", "| **DONE** | ✅ ~~historia~~ | ✅ ~~hecho~~ |"),
+        roadmap_sample.replace(
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\n| **NOW** | 🚧 duplicado | 🚧 pendiente |",
+        ),
+        roadmap_sample.replace(
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\\n"
+            "[Smoke #73](https://github.com/pl0n3r/GrindFlow/issues/73)",
+        ),
+        roadmap_sample.replace(
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\n"
+            "✅ ~~GF-OPS-010 terminado~~",
+        ),
+        roadmap_sample.replace(
+            "| --- | --- | --- |",
+            "| --- | --- | --- |\n| nota | ✅ ~~GF-OPS-010 terminado~~ | historial |",
+        ),
+        roadmap_sample.replace(
+            "| **NOW** | 🚧 entrega actual | 🚧 validando |",
+            "🚧 **NOW**",
+        ),
+    ):
+        assert roadmap_error(invalid) is not None
 
     print("README dashboard self-test: OK")
 
