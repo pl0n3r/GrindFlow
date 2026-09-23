@@ -33,13 +33,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+113** | **−26** | **+87** |
+| **7** | **+218** | **−16** | **+202** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
 | Alcance | Gobierno: evidencia terminal CodeRabbit exact-head, no confundir `skipped` con `completed` |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
@@ -70,10 +70,13 @@ flowchart LR
 ## Archivos modificados en esta entrega candidata
 Inventario de esta entrega candidata, no prueba publicación:
 <!-- grindflow:changed-files -->
+- `.github/workflows/grindflow-ci.yml`
+- `AGENTS.md`
 - `README.md`
 - `config/version.php`
-- `docs/REQUIREMENTS.md`
-- `tests/Feature/AuthenticationTest.php`
+- `docs/CODERABBIT-FINAL-REVIEW.md`
+- `scripts/coderabbit-final-review.py`
+- `tests/test_coderabbit_final_review.py`
 
 ## Validación
 - CI de la PR apilada: scope core completo, `validate`, Sonar y CodeRabbit una vez estabilizada su base.
