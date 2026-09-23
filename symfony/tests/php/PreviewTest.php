@@ -101,8 +101,7 @@ final class PreviewTest extends WebTestCase
             ['/api/admin/context', 401],
             ['/missing-route', 404],
         ] as [$path, $status]) {
-            $client->request('GET', $path, server: [
-                'HTTPS' => 'on',
+            $client->request('GET', 'https://localhost'.$path, server: [
                 'HTTP_ACCEPT' => 'application/json',
             ]);
             self::assertResponseStatusCodeSame($status);
@@ -113,14 +112,13 @@ final class PreviewTest extends WebTestCase
             );
         }
 
-        $client->request('GET', '/', server: ['HTTPS' => 'off']);
+        $client->request('GET', 'http://localhost/');
         self::assertResponseIsSuccessful();
         self::assertFalse($client->getResponse()->headers->has('Strict-Transport-Security'));
 
         // Reverse-proxy headers are untrusted by default; a client must not be
         // able to turn plain HTTP into a secure request by spoofing the proto.
-        $client->request('GET', '/', server: [
-            'HTTPS' => 'off',
+        $client->request('GET', 'http://localhost/', server: [
             'HTTP_X_FORWARDED_PROTO' => 'https',
         ]);
         self::assertResponseIsSuccessful();
