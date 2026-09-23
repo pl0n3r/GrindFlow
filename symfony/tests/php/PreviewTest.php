@@ -98,6 +98,7 @@ final class PreviewTest extends WebTestCase
         foreach ([
             ['/', 200],
             ['/admin', 302],
+            ['/api/admin/context', 401],
             ['/missing-route', 404],
         ] as [$path, $status]) {
             $client->request('GET', $path, server: [
