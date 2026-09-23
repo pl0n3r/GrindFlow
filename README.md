@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-UX-001: visibilidad de sección activa y menú horizontal a 360 px |
+| Alcance | GF-UX-003: visibilidad de sección activa y menú horizontal a 360 px |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -66,7 +66,7 @@ flowchart LR
 - `WorkspaceNavigation` compartido revela dentro del scroll horizontal la opción activa cuando cambia la sección o el viewport; nunca usa `scrollIntoView` sobre el documento.
 - Menú móvil a 360 px añade pista visible para desplazar horizontalmente y scrollbar fino, conservando la misma marca, jerarquía y estados `aria-pressed` / `aria-current` en preview y admin.
 - Chromium sintético ejercita selección fuera de pantalla sin scroll automático del tester, regreso a primera opción, reducción 820→360 px y menú privado tras cambio de hash; confirma ausencia de overflow de la página.
-- GF-UX-001 actualizado sin tocar sesiones, datos, permisos, Laravel, Hostinger ni cutover.
+- GF-UX-003 actualizado sin tocar sesiones, datos, permisos, Laravel, Hostinger ni cutover.
 
 ## Archivos modificados en esta entrega candidata
 Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
@@ -80,7 +80,7 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 
 ## Validación
 - Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final; después CI exact-main.
-- `symfony-preview` compila React/TypeScript y ejecuta Chromium a 360 y 820 px sobre build aislado.
+- `symfony-preview` valida PHP, MariaDB descartable, TypeScript/Vite y Chromium a 360 y 820 px sobre un build aislado.
 - El release no demuestra deployment Symfony ni resuelve Production Smoke #73 del Laravel operativo.
 
 ## Qué sigue
