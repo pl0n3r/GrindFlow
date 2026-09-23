@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.112: compatibilidad anticipada con Symfony Security.** Base exacta `main` v0.1.111 `9aec23b74ff46c5b99dce39d4c1813415fa5a42a`; elimina deprecations propias conocidas sin cambiar autenticación.
+> **Candidato v0.1.113: presupuesto estricto de deprecations Symfony.** Base exacta `main` v0.1.112 `1619f1f67c2e5458cbe5acac2aa47f755862b84c`; CI bloquea deprecations propias o llamadas directas a APIs deprecadas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.112** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.111~~ | `9aec23b74ff46c5b99dce39d4c1813415fa5a42a` |
+| Version objetivo | 🚧 **v0.1.113** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.112~~ | `1619f1f67c2e5458cbe5acac2aa47f755862b84c` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35843977573` success sobre `9aec23b74ff46c5b99dce39d4c1813415fa5a42a` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35843977579` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35843977571` failure, #73; independiente |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35845840089` success sobre `1619f1f67c2e5458cbe5acac2aa47f755862b84c` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35845840055` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35845840108` failure, #73; independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | PHPUnit/reflexión; sin cuentas reales |
+| Datos productivos | ✅ ~~No tocados~~ | Política CI; sin cuentas ni datos reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+61** | **−22** | **+39** |
+| **4** | **+35** | **−24** | **+11** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-OPS-011: compatibilidad anticipada de identidad con contratos Symfony Security |
+| Alcance | GF-OPS-012: cero deprecations Symfony propias o directas en CI |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,32 +63,30 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- `ActiveUserChecker::checkPostAuth()` acepta el segundo parámetro opcional `?TokenInterface $token = null` anunciado por Symfony para la siguiente versión mayor y conserva la misma validación de cuenta activa.
-- `IdentityUser::eraseCredentials()` se marca `#[\Deprecated]` porque el método está vacío y no almacena credenciales en texto plano.
-- Una prueba de reflexión fija la firma, opcionalidad/tipo del token y el atributo de deprecación para impedir regresiones silenciosas.
-- GF-OPS-011 documenta el alcance: no cambia roles, hashes, sesiones, membresías, autorización, Laravel, Hostinger ni datos persistidos.
+- `symfony-preview` cambia de un presupuesto global permisivo a `max[total]=30&max[self]=0&max[direct]=0`.
+- Una deprecation originada en GrindFlow o una llamada directa desde GrindFlow a una API vendor deprecada falla CI aunque el total siga por debajo del límite.
+- El límite total 30 se conserva para no convertir una actualización transitoria de dependencias indirectas en un bloqueo de trabajo no relacionado.
+- GF-OPS-012 documenta la política; no cambia el runtime, autenticación, datos, Laravel, Hostinger ni el cutover Symfony.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
 <!-- grindflow:changed-files -->
+- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Identity/Entity/IdentityUser.php`
-- `symfony/src/Identity/Security/ActiveUserChecker.php`
-- `symfony/tests/php/IdentityCompatibilityTest.php`
 
 ## Validación
 - Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
-- `symfony-preview` debe dejar de reportar las deprecations propias de `checkPostAuth()` y `eraseCredentials()` observadas en main v0.1.111.
-- Deprecations de Node/actions o dependencias externas se mantienen separadas; la versión humana no acredita deploy Symfony ni resuelve Production Smoke #73.
+- La base v0.1.112 ya pasó `symfony-preview` sin deprecations propias conocidas; la candidata debe pasar con `self=0` y `direct=0` activos.
+- Deprecations indirectas/vendor siguen visibles y acotadas por `max[total]=30`; Production Smoke #73 permanece separado.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Compatibilidad Symfony Security | 🚧 v0.1.112 candidata |
+| **NOW** | 🚧 Política estricta de deprecations Symfony | 🚧 v0.1.113 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -96,8 +94,8 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.111 fusionada~~ | ✅ ~~HSTS condicionado a HTTPS confiable~~ |
-| **NOW** | 🚧 Compatibilidad anticipada Symfony Security | 🚧 GF-OPS-011, v0.1.112 |
+| **DONE** | ✅ ~~v0.1.112 fusionada~~ | ✅ ~~compatibilidad anticipada Symfony Security~~ |
+| **NOW** | 🚧 Cero deprecations propias/directas | 🚧 GF-OPS-012, v0.1.113 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
