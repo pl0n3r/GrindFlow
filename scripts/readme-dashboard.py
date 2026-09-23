@@ -171,6 +171,7 @@ def require_markers(readme: str) -> None:
         CHANGED_FILES_MARKER,
         "## Validación",
         "## Qué sigue",
+        "## Panorama general pendiente",
         "actions/workflows/grindflow-ci.yml/badge.svg",
         "sonarcloud.io/api/project_badges/measure",
         "actions/workflows/production-smoke.yml/badge.svg",
@@ -213,15 +214,33 @@ def roadmap_error(readme: str) -> str | None:
     if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
         return "canonical progress convention missing or not documented"
 
-    roadmap = section(readme, "## Qué sigue")
-    if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
+    next_section = section(readme, "## Qué sigue")
+    if "https://github.com/pl0n3r/GrindFlow/issues/2" not in next_section:
         return "roadmap must link to canonical issue #2"
-    if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", roadmap, flags=re.I):
+    if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", next_section, flags=re.I):
         return "legacy issue #88 cannot be an active roadmap destination"
-    if "## Panorama general pendiente" in readme:
-        return "README must not duplicate the cumulative roadmap; use issue #2 only"
-    if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", roadmap):
-        return "README must not duplicate roadmap lanes; link canonical issue #2 only"
+    if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", next_section):
+        return "Qué sigue must only link canonical issue #2; snapshot lanes belong in Panorama"
+
+    panorama = section(readme, "## Panorama general pendiente")
+    if not panorama:
+        return "README must keep the current operational Panorama snapshot"
+    if "**DONE**" in panorama:
+        return "Panorama must not accumulate completed history; keep that in issue #2"
+
+    lanes = ("**NOW**", "**NEXT**", "**BLOCKED / EXTERNAL**", "**LATER**")
+    for lane in lanes:
+        if panorama.count(lane) != 1:
+            return f"Panorama must contain exactly one {lane} lane"
+
+    for row in panorama.splitlines():
+        if not any(lane in row for lane in lanes):
+            continue
+        if "🚧" not in row and "⛔" not in row:
+            return "Panorama pending/blocked row missing status symbol"
+        if "~~" in row:
+            return "Panorama must not contain completed/struck-through history"
+
     return None
 
 
@@ -354,12 +373,25 @@ ok
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+
+## Panorama general pendiente
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | 🚧 entrega actual | 🚧 validando |
+| **NEXT** | 🚧 siguiente slice | 🚧 pendiente |
+| **BLOCKED / EXTERNAL** | ⛔ dependencia | ⛔ externa |
+| **LATER** | 🚧 trabajo posterior | 🚧 pendiente |
 """
     assert roadmap_error(roadmap_sample) is None
 
     for invalid in (
-        roadmap_sample + "\n| **NOW** | 🚧 tarea | 🚧 pendiente |\n",
-        roadmap_sample + "\n## Panorama general pendiente\n",
+        roadmap_sample.replace("## Panorama general pendiente", "## Otro panorama"),
+        roadmap_sample.replace("| **NEXT** | 🚧 siguiente slice | 🚧 pendiente |\n", ""),
+        roadmap_sample.replace("| **NEXT** | 🚧 siguiente slice | 🚧 pendiente |", "| **DONE** | ✅ ~~historia~~ | ✅ ~~hecho~~ |"),
+        roadmap_sample.replace(
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)",
+            "[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)\n| **NOW** | 🚧 duplicado | 🚧 pendiente |",
+        ),
     ):
         assert roadmap_error(invalid) is not None
 
