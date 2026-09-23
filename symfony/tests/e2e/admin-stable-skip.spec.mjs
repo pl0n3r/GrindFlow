@@ -34,6 +34,11 @@ for (const width of [360, 820]) {
     await page.addScriptTag({ url: asset + '?admin-stable-skip=1', type: 'module' });
 
     await expect(page.getByRole('heading', { name: /Tu espacio/ })).toBeVisible();
+    const layout = page.locator('.admin-layout');
+    await expect(layout).toBeVisible();
+    const targetWidth = await target.evaluate((node) => node.getBoundingClientRect().width);
+    const layoutWidth = await layout.evaluate((node) => node.getBoundingClientRect().width);
+    expect(Math.abs(targetWidth - layoutWidth)).toBeLessThanOrEqual(1);
     await expect(target).toBeFocused();
     await expect(page.locator('main')).toHaveCount(1);
     await expect(page.getByRole('navigation', { name: 'Navegación administrativa' })).toBeVisible();
