@@ -12,6 +12,7 @@
 .identity-error{color:#ffd6dc!important;border:1px solid #a44c66;padding:12px;border-radius:9px}
 .identity-orgs{list-style:none;padding:0;display:grid;gap:12px}
 .identity-orgs li{border:1px solid #514462;border-radius:12px;padding:16px}
+.identity-orgs li[aria-current="true"]{border-color:#b896ff;background:#262139}
 .identity-orgs li form{gap:10px}
 .identity-orgs span{color:var(--muted);font-size:13px}
 

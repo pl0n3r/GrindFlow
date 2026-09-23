@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.105: errores de acceso accesibles en Symfony.** Base exacta `main` v0.1.104 `ad136a0018aa05ff99eaa5d1498577b750bdde02`; los campos explican un rechazo genérico a tecnología asistiva sin revelar datos de cuentas.
+> **Candidato v0.1.106: selector multiorganización accesible.** Base exacta `main` v0.1.105 `248ee1d0c20c39d2c2a31cc9cd14ef0639d6db31`; cada acción distingue su espacio y señala el seleccionado.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,14 +18,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.105** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.104~~ | `ad136a0018aa05ff99eaa5d1498577b750bdde02` |
+| Version objetivo | 🚧 **v0.1.106** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.105~~ | `248ee1d0c20c39d2c2a31cc9cd14ef0639d6db31` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir full review del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35829054550` success sobre `ad136a0018aa05ff99eaa5d1498577b750bdde02` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35829054510` success; SHA remoto no observado |
-| Production Smoke | ⛔ Login E2E no validado | `35829054568` failure, #73; independiente de esta mejora |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35829915605` success sobre `248ee1d0c20c39d2c2a31cc9cd14ef0639d6db31` |
+| Deploy Observer | 🚧 Pendiente | `35829915425` sin conclusión al preparar; no inferir SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35829915414` failure, #73; independiente de esta mejora |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
 | Datos productivos | ✅ ~~No tocados~~ | Pruebas en Symfony/MariaDB descartable; sin cambio de cuentas reales |
 
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+88** | **−26** | **+62** |
+| **6** | **+155** | **−25** | **+130** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-UX-004: error genérico de acceso perceptible a 360/820 px |
+| Alcance | GF-UX-005: selector multiorganización con acción distinguible |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,21 +63,20 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- El rechazo del login Symfony conserva mensaje genérico `role="alert"` con ID estable; correo y contraseña señalan el error con `aria-describedby` y `aria-invalid` solo mientras existe.
-- Estado inválido visible en ambos campos sin revelar causa, contraseñas ni estado interno de las cuentas.
-- PHPUnit HTTP cubre formulario limpio, error de cuenta inactiva sintética, correo conservado, contraseña no reflejada y recuperación de estado limpio; Chromium aislado valida accesibilidad computada y ausencia de overflow a 360/820 px.
-- GF-UX-004 documentado sin modificar Symfony Security, Laravel, datos productivos, Hostinger ni cutover.
+- Cada botón del selector Symfony identifica su organización mediante su nombre visible y describe el rol sin exponer IDs internos en el nombre accesible.
+- La fila seleccionada anuncia «Actual» y `aria-current`, además de estado visual diferenciado.
+- PHPUnit HTTP/Doctrine con MariaDB descartable crea dos membresías, verifica nombres accesibles únicos, selecciona la segunda con CSRF y confirma el contexto del tenant.
+- GF-UX-005 documentado sin alterar autorizaciones, sesiones, Laravel ni Hostinger.
 
 ## Archivos modificados en esta entrega candidata
-Inventario de solo esta entrega candidata: no constituye evidencia de publicación:
+Inventario exclusivo de esta entrega candidata; no prueba publicación:
 <!-- grindflow:changed-files -->
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
 - `symfony/public/assets/grindflow.css`
-- `symfony/templates/identity/login.html.twig`
-- `symfony/tests/e2e/login-accessibility.spec.mjs`
-- `symfony/tests/php/IdentityLoginTest.php`
+- `symfony/templates/identity/organizations.html.twig`
+- `symfony/tests/php/OrganizationSelectorAccessibilityTest.php`
 
 ## Validación
 - Exigir `validate`, Sonar y full review CodeRabbit sobre el HEAD final; después CI exact-main.
@@ -89,7 +88,7 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Accesibilidad del acceso Symfony | 🚧 v0.1.105 candidata |
+| **NOW** | 🚧 Selección accesible de organizaciones | 🚧 v0.1.106 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -97,8 +96,8 @@ Inventario de solo esta entrega candidata: no constituye evidencia de publicaci�
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.104 fusionada~~ | ✅ ~~navegación responsive Symfony~~ |
-| **NOW** | 🚧 Error de autenticación accesible | 🚧 GF-UX-004, v0.1.105 |
+| **DONE** | ✅ ~~v0.1.105 fusionada~~ | ✅ ~~accesibilidad del error de login Symfony~~ |
+| **NOW** | 🚧 Selector multiorganización accesible | 🚧 GF-UX-005, v0.1.106 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |

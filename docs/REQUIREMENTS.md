@@ -53,6 +53,16 @@ Each requirement should contain:
 
 **Verificación:** PHPUnit HTTP con usuario inactivo sintético en MariaDB descartable y Chromium sintético a 360 y 820 px; gate `symfony-preview`. Producción y cutover son evidencias independientes.
 
+### GF-UX-005 — Selector accesible de organizaciones Symfony
+
+**Estado:** implementado en código; CI, despliegue y producción se verifican por separado.
+
+**Enunciado:** cuando una cuenta pertenece a más de una organización, cada acción «Entrar a este espacio» debe identificar la organización a la que accede. El espacio seleccionado se distingue visualmente y para tecnología asistiva, sin inferir acceso desde el rol de plataforma ni presentar IDs internos al usuario.
+
+**Aceptación:** la lista Symfony usa nombres e IDs HTML de etiquetado únicos por fila, con cada botón referenciando su texto de acción y el nombre visible de la organización mediante `aria-labelledby`, y el rol mediante `aria-describedby`. Tras seleccionar una organización propia, exactamente una fila marca `aria-current="true"` y su acción describe además «Actual»; otras filas no anuncian estado actual. La selección usa el formulario CSRF existente y revalida membresía en servidor; nombres organizacionales arbitrarios se escapan en Twig. No expone IDs en nombres accesibles, modifica roles ni despliega Symfony/Hostinger.
+
+**Verificación:** prueba HTTP/Twig en Symfony con dos organizaciones sintéticas y MariaDB descartable: nombres y descripciones por fila no ambiguos, ausencia inicial de selección, cambio a segundo tenant, único marcador de actual y contexto del servidor correspondiente. Gate `symfony-preview`.
+
 ### GF-SEC-006 — Formulario de acceso Symfony no cacheable
 
 **Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
