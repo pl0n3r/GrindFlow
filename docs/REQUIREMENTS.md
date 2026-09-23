@@ -191,6 +191,23 @@ Each requirement should contain:
 
 **Aceptación:** cinco participantes con línea base definida; registrar tiempo operativo, entregas y errores, costos de infraestructura, funciones usadas y tráfico medible. Prueba comercial de 30 días/dos redes y precios quedan pendientes de resultado y aprobación.
 
+### GF-FR-020 — Fundamento fail-closed de direct upload Symfony
+
+**Estado:** fundamento implementado en código; transporte a proveedor y persistencia de media grande siguen pendientes.
+
+**Enunciado:** el Vault Symfony separa el quick upload de hasta 8 MiB de un futuro camino de carga directa para originales grandes. El nuevo camino solo puede considerarse disponible si coinciden un adaptador de almacenamiento compatible y protección criptográfica configurada; su ausencia no debe romper el Vault existente ni provocar I/O externo.
+
+**Aceptación:**
+- `DirectUploadStorage` aísla presign, existencia, tamaño, lectura por stream, borrado y promoción. El binding predeterminado es `UnavailableDirectUploadStorage`, que declara `configured=false` y no contacta proveedores.
+- El límite del contrato grande es 2 GiB. Keys de staging y blob son opacas, derivadas de UUID/SHA-256 y siempre quedan bajo `organizations/{tenant}/...`; el nombre suministrado por usuario nunca forma parte de la ruta.
+- El token de completion se cifra con AES-256-GCM cuando existe un secreto de al menos 32 bytes y queda ligado a organización, actor, disk, key, nombre, MIME declarado, tamaño y expiración de 5 a 60 minutos. Sin secreto suficiente, OpenSSL o soporte de AES-256-GCM, el servicio queda no configurado en vez de impedir arrancar el contenedor.
+- El emisor de intent no devuelve credenciales permanentes. El verificador de completion rechaza token/tenant/actor incorrectos antes de consultar storage, exige existencia y tamaño exacto, calcula SHA-256 leyendo por stream y deriva la key final tenant-safe. Esta verificación no registra todavía un asset ni habilita publicación.
+- `GET /api/admin/vault` añade únicamente readiness sanitizado: `disk`, `driver`, `max_bytes` y `configured`. No devuelve bucket, endpoint, access key, secret, token de proveedor ni rutas físicas. React muestra si la carga grande está preparada o no, conservando siempre el quick upload de 8 MiB.
+- Esta entrega no añade adaptador S3/Flysystem, rutas `intent/complete`, upload directo de browser, mutación de MariaDB por media grande, FFmpeg/ffprobe, Hostinger ni credenciales reales.
+- Antes de habilitar un adaptador real, el presign debe quedar ligado al `byte_size` aprobado y el proveedor debe purgar automáticamente objetos bajo `organizations/{tenant}/staging/` con más de 24 horas. Los tokens expiran a los 15 minutos por defecto y nunca pueden superar 60 minutos; conservar un objeto staged no prolonga ni revive el token.
+
+**Verificación:** PHPUnit puro cubre token cifrado/tamper/expiración/contexto, keys, fallback no configurado, intent con fake y completion por tamaño+SHA-256; PHPUnit/MariaDB comprueba que el Vault real arranca y devuelve readiness no configurado; Chromium 360 px muestra ese estado y mantiene funcional el quick upload. CI/Sonar/CodeRabbit se validan sobre el HEAD final y producción continúa separada.
+
 ### GF-FR-010 — Anotación privada del Vault Symfony
 **Estado:** implementado en candidato v0.1.60; código, despliegue y producción se validan por separado.
 

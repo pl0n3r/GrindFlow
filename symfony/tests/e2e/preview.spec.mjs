@@ -395,7 +395,8 @@ test('S2 multimedia library allows a mobile editor to upload and see a private a
         body: JSON.stringify({ data: { assets: stored, limit: 30, page: 1,
           pages: stored.length ? 1 : 0, total: stored.length,
           quota: { used_assets: stored.length, max_assets: 100,
-            used_bytes: stored.length * png.length, max_bytes: 128 * 1024 * 1024 } } }) });
+            used_bytes: stored.length * png.length, max_bytes: 128 * 1024 * 1024 },
+          direct_upload: { disk: 'media', driver: 'unavailable', max_bytes: 2_147_483_648, configured: false } } }) });
     }
     uploads++;
     expect(route.request().method()).toBe('POST');
@@ -420,6 +421,8 @@ test('S2 multimedia library allows a mobile editor to upload and see a private a
   await expect(page.getByText('Todavía no hay archivos en esta organización.')).toBeVisible();
   await expect(page.getByText('0 de 100 archivos, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('Espacio utilizado: 0.00 de 128 MiB')).toBeVisible();
+  await expect(page.getByText('Carga de archivos grandes no configurada')).toBeVisible();
+  await expect(page.getByText('Este entorno no enviará archivos grandes a un proveedor externo.')).toBeVisible();
   await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'foto-ejemplo.png', mimeType: 'image/png', buffer: png },
     { name: 'no-enviar.png', mimeType: 'image/png', buffer: png },

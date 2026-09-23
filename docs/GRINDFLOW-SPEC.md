@@ -100,7 +100,7 @@ El destino es una **aplicación Symfony monolítica modular**, una MariaDB con m
 
 Se **conserva** la aplicación Laravel y su CI como referencia operativa durante la transición. Cada módulo se traslada con migraciones y pruebas de paridad de usuarios/organizaciones, IDs, permisos, estados, URLs, auditoría e históricos; por módulo existe un propietario único de escritura para evitar dos runtimes mutando el mismo estado sin coordinación. No modificar/borrar tablas Laravel automáticamente desde Doctrine.
 
-### S2 · Biblioteca multimedia privada (candidato v0.1.116)
+### S2 · Biblioteca multimedia privada
 
 El Vault Symfony trata fotos y videos pequeños como originales privados del tenant.
 El quick upload síncrono admite JPEG/PNG/WebP y MP4/WebM hasta 8 MiB, valida el
@@ -108,6 +108,23 @@ tipo desde los bytes, conserva SHA-256/deduplicación y sirve previews únicamen
 tras revalidar sesión, organización e integridad. La UI puede previsualizar video
 con controles nativos sin autoplay. Esto no procesa, programa ni publica el
 archivo y no sustituye el pipeline asíncrono/direct upload para media grande.
+
+### S2 · Fundamento de direct upload para media grande
+
+Symfony incorpora un límite técnico separado para futuros archivos grandes, hasta
+2 GiB por original, sin sustituir el quick upload de 8 MiB. El transporte se modela
+detrás de un port privado: si no existe adaptador S3-compatible o secreto suficiente,
+la capacidad queda `configured=false` y falla cerrada sin impedir abrir el Vault.
+Los intents internos usan keys opacas por tenant y tokens cifrados, cortos y ligados
+a organización, actor, disk, key, nombre, MIME declarado, tamaño y expiración.
+La verificación de completion lee el objeto staged por stream, exige tamaño exacto,
+calcula SHA-256 real y deriva una key final tenant-safe.
+
+Esta entrega **no** añade adaptador de proveedor, endpoint `intent/complete`, carga
+directa desde navegador, registro de assets grandes ni cambios de producción.
+El listado existente del Vault solo expone un resumen sanitizado de readiness
+(`disk`, `driver`, `max_bytes`, `configured`) y React muestra el estado sin
+publicar bucket, endpoint, credenciales ni secretos.
 
 ### S2 · Clasificación conservadora de recursos (integrada v0.1.62)
 
