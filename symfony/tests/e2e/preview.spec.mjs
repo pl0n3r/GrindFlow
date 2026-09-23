@@ -428,8 +428,9 @@ test('S2 multimedia library allows a mobile editor to upload and see a private a
   await expect(page.getByAltText('Vista local de foto-ejemplo.png')).toBeVisible();
   await expect(page.getByAltText('Vista local de no-enviar.png')).toBeVisible();
   await expect(page.getByAltText('Vista local de formato-no-valido.svg')).toHaveCount(0);
-  await expect(page.getByText(/Archivo no admitido: JPEG, PNG, WebP, MP4 o WebM/)).toBeVisible();
-  expect(uploads).toBe(0); // Local review does not upload.
+  await expect(page.locator('.vault-selected-files .vault-selected-mark')).toHaveCount(1);
+  await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
+  expect(uploads).toBe(0); // Local review never sends bytes before explicit submit.
   await page.getByRole('button', { name: 'Descartar formato-no-valido.svg' }).click();
   await page.getByRole('button', { name: 'Descartar no-enviar.png' }).click();
   await expect(page.getByRole('button', { name: /Guardar 1 archivo/ })).toBeVisible();
@@ -555,8 +556,8 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
   await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
 
   const input = page.getByLabel('Añadir fotos o videos desde tu dispositivo');
-  await expect(input).toHaveAttribute('accept', /\\.mp4/);
-  await expect(input).toHaveAttribute('accept', /\\.webm/);
+  expect(await input.getAttribute('accept')).toContain('.mp4');
+  expect(await input.getAttribute('accept')).toContain('.webm');
 
   await input.setInputFiles({
     name: 'clip-sin-mime.mp4',
@@ -827,6 +828,11 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
   }));
   await page.route('**/api/admin/vault', (route) => {
     attempts++;
+    const bytes = route.request().postDataBuffer();
+    if (bytes?.includes(Buffer.from('no es imagen'))) {
+      return route.fulfill({ status: 422, contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'invalid_type', message: 'El formato real del archivo no está permitido.' } }) });
+    }
     return route.fulfill({ status: 409, contentType: 'application/json',
       body: JSON.stringify({ error: { code: 'vault_duplicate_active', message: 'Ya existe esta imagen.' } }) });
   });
@@ -842,7 +848,7 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
-  expect(attempts).toBe(1);
+  expect(attempts).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
