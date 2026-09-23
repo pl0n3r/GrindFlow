@@ -89,12 +89,16 @@ final class DirectUploadHttpTest extends WebTestCase
             // JSON fields cannot override the selected tenant, and a forged
             // session selection must fail before the storage or CSRF checks.
             foreach ([[$intent, $validIntent], [$complete, $validComplete]] as [$endpoint, $payload]) {
-                $client->getRequest()->getSession()->set('grindflow_organization_id', $foreign);
+                $session = $client->getRequest()->getSession();
+                $session->set('grindflow_organization_id', $foreign);
+                $session->save();
                 $this->postJson($client, $endpoint, $payload, $csrf);
                 self::assertResponseStatusCodeSame(403);
                 self::assertSame('organization_access_changed', $this->errorCode($client));
             }
-            $client->getRequest()->getSession()->set('grindflow_organization_id', $mine);
+            $session = $client->getRequest()->getSession();
+            $session->set('grindflow_organization_id', $mine);
+            $session->save();
 
             foreach ([[$intent, $validIntent], [$complete, $validComplete]] as [$endpoint, $payload]) {
                 $this->postJson($client, $endpoint, $payload, 'wrong-csrf');
