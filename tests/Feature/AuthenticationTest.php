@@ -166,14 +166,23 @@ class AuthenticationTest extends TestCase
         self::assertSame(0, RateLimiter::attempts($rawKey));
         Event::assertNotDispatched(Lockout::class);
 
+        $beforeLockout = $this->get('/login')->assertOk();
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $beforeLockout->getContent(), $beforeToken));
+
         $this->withServerVariables(['REMOTE_ADDR' => $ip])
             ->from('/login')
             ->post('/login', [
+                '_token' => $beforeToken[1],
                 'email' => $email,
                 'password' => 'wrong-password',
             ])
             ->assertRedirect('/login')
             ->assertSessionHasErrors('email');
+
+        $afterLockout = $this->get('/login')->assertOk();
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $afterLockout->getContent(), $afterToken));
+        self::assertSame($beforeToken[1], $afterToken[1],
+            'Rate limiting must not rotate the anonymous session CSRF token.');
 
         Event::assertDispatched(Lockout::class);
         $this->assertGuest();
