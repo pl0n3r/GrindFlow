@@ -465,6 +465,7 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
   const id = '00000000-0000-7000-8000-000000000039';
   const mp4 = Buffer.from('000000186674797069736f6d0000020069736f6d69736f32', 'hex');
   let stored = null;
+  let videoUploads = 0;
 
   await page.route('**/api/admin/context', (route) => route.fulfill({
     status: 200,
@@ -513,9 +514,10 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
     if (url.pathname === '/api/admin/vault' && request.method() === 'POST') {
       expect(request.headers()['x-csrf-token']).toBe('video-upload-test');
       expect(request.postDataBuffer().includes(mp4)).toBe(true);
+      videoUploads += 1;
       stored = {
         id,
-        name: 'clip-prueba.mp4',
+        name: videoUploads === 1 ? 'clip-sin-mime.mp4' : 'clip-prueba.mp4',
         mime_type: 'video/mp4',
         size_bytes: mp4.length,
         created_at: '2026-09-23 00:00:00',
@@ -559,15 +561,20 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
   expect(await input.getAttribute('accept')).toContain('.mp4');
   expect(await input.getAttribute('accept')).toContain('.webm');
 
-  await input.setInputFiles({
-    name: 'clip-sin-mime.mp4',
-    mimeType: '',
-    buffer: mp4,
-  });
+  await input.evaluate((element, bytes) => {
+    const file = new File([new Uint8Array(bytes)], 'clip-sin-mime.mp4', { type: '' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    element.files = transfer.files;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }, Array.from(mp4));
   await expect(page.locator('.vault-selected-files video')).toHaveCount(0);
   await expect(page.locator('.vault-selected-mark')).toHaveCount(1);
   await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Guardar 1 archivo' })).toBeEnabled();
+  await expect(page.getByText(/tipo desconocido/)).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar 1 archivo' }).click();
+  await expect(page.getByText('clip-sin-mime.mp4', { exact: true })).toBeVisible();
+  expect(videoUploads).toBe(1);
 
   await input.setInputFiles({
     name: 'clip-prueba.mp4',
@@ -577,9 +584,9 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
   await expect(page.locator('.vault-selected-files video')).toHaveCount(0);
   await expect(page.locator('.vault-selected-mark')).toHaveCount(1);
   await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
-
   await page.getByRole('button', { name: 'Guardar 1 archivo' }).click();
   await expect(page.getByText('clip-prueba.mp4', { exact: true })).toBeVisible();
+  expect(videoUploads).toBe(2);
 
   await page.getByRole('button', { name: 'Detalles' }).click();
   const preview = page.locator('.vault-preview video');
