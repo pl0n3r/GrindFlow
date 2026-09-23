@@ -171,7 +171,6 @@ def require_markers(readme: str) -> None:
         CHANGED_FILES_MARKER,
         "## Validación",
         "## Qué sigue",
-        "## Panorama general pendiente",
         "actions/workflows/grindflow-ci.yml/badge.svg",
         "sonarcloud.io/api/project_badges/measure",
         "actions/workflows/production-smoke.yml/badge.svg",
@@ -210,30 +209,19 @@ def validate_changed_files(readme: str, files: list[str]) -> None:
 
 
 def validate_roadmap(readme: str) -> None:
-    lanes = ("**NOW**", "**NEXT**", "**LATER**", "**BLOCKED / EXTERNAL**")
-    missing = [lane for lane in lanes if lane not in readme]
-    if missing:
-        fail("missing roadmap lane(s): " + ", ".join(missing))
-
     convention = section(readme, "## Progress convention")
     if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
         fail("canonical progress convention missing or not documented")
 
-    roadmap = section(readme, "## Qué sigue") + section(readme, "## Panorama general pendiente")
+    roadmap = section(readme, "## Qué sigue")
     if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
         fail("roadmap must link to canonical issue #2")
     if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", roadmap, flags=re.I):
         fail("legacy issue #88 cannot be an active roadmap destination")
-
-    for row in roadmap.splitlines():
-        if not re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", row):
-            continue
-        if "✅" not in row and "🚧" not in row and "⛔" not in row:
-            fail("roadmap row missing completed/pending/blocked symbol")
-        if "✅" in row and "~~" not in row:
-            fail("completed work must be struck through")
-        if ("🚧" in row or "⛔" in row) and "~~" in row:
-            fail("pending/blocked work must remain unstruck")
+    if "## Panorama general pendiente" in readme:
+        fail("README must not duplicate the cumulative roadmap; use issue #2 only")
+    if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", roadmap):
+        fail("README must not duplicate roadmap lanes; link canonical issue #2 only")
 
 
 def validate_version(readme: str) -> None:
@@ -352,6 +340,26 @@ ok
         pass
     else:
         raise AssertionError("duplicate changed-files marker must be rejected")
+
+    roadmap_sample = """## Progress convention
+✅ ~~Completado~~
+🚧 Pendiente
+
+## Qué sigue
+[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+"""
+    validate_roadmap(roadmap_sample)
+
+    for invalid in (
+        roadmap_sample + "\n| **NOW** | 🚧 tarea | 🚧 pendiente |\n",
+        roadmap_sample + "\n## Panorama general pendiente\n",
+    ):
+        try:
+            validate_roadmap(invalid)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("README roadmap duplication must be rejected")
 
     print("README dashboard self-test: OK")
 
