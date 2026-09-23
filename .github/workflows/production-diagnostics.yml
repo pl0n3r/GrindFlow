@@ -32,6 +32,8 @@ jobs:
       LIMIT: '20'
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Initialize safe diagnostics artifact
         shell: bash
