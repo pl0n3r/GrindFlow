@@ -65,6 +65,30 @@ final class PreviewTest extends WebTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
+    public function testFramingIsDeniedOnPublicPrivateAndErrorResponses(): void
+    {
+        $client = static::createClient();
+        foreach ([
+            ['/', 200],
+            ['/preview', 200],
+            ['/login', 200],
+            ['/admin', 302],
+            ['/api/admin/context', 401],
+            ['/missing-route', 404],
+        ] as [$path, $status]) {
+            $client->request('GET', $path, server: ['HTTP_ACCEPT' => 'application/json']);
+            self::assertResponseStatusCodeSame($status);
+            $headers = $client->getResponse()->headers;
+            self::assertSame('DENY', $headers->get('X-Frame-Options'), $path);
+            self::assertStringContainsString(
+                "frame-ancestors 'none'",
+                (string) $headers->get('Content-Security-Policy'),
+                $path,
+            );
+            self::assertSame('nosniff', $headers->get('X-Content-Type-Options'), $path);
+        }
+    }
+
     public function testPrivateResponsesCannotBeCachedOnSuccessRedirectOrError(): void
     {
         $client = static::createClient();
