@@ -45,3 +45,10 @@ Artisan::command('grindflow:prune-traffic-dedupes', function (): int {
 Schedule::command('grindflow:prune-traffic-dedupes')
     ->hourly()
     ->withoutOverlapping(5);
+
+Schedule::command('grindflow:provision-smoke-user')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->when(static fn (): bool => app()->environment('production')
+        && config('grindflow.phase') === 'construccion'
+        && trim((string) config('grindflow.smoke_user.password')) !== '');

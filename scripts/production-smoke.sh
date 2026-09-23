@@ -12,7 +12,10 @@ SMOKE_USER_AGENT="${SMOKE_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKi
 SMOKE_ACCEPT="${SMOKE_ACCEPT:-text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPECTED_RELEASE="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/p" "$script_dir/../config/version.php")"
+EXPECTED_SHA="${EXPECTED_SHA:-$(git -C "$script_dir/.." rev-parse HEAD 2>/dev/null || true)}"
 [[ "$EXPECTED_RELEASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'ERROR: expected release version is unavailable.\n' >&2; exit 1; }
+[[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { printf 'ERROR: expected Git SHA is unavailable or invalid.\n' >&2; exit 1; }
+export EXPECTED_SHA
 
 workdir="$(mktemp -d)"
 cleanup() { rm -rf "$workdir"; }
@@ -33,8 +36,10 @@ dashboard_html="$workdir/dashboard.html"
 system_html="$workdir/system.html"
 vault_html="$workdir/vault.html"
 diagnostics_json="$workdir/diagnostics.json"
-up_body="$workdir/up.body"
-up_headers="$workdir/up.headers"
+health_body="$workdir/health.json"
+health_headers="$workdir/health.headers"
+home_body="$workdir/home.html"
+home_headers="$workdir/home.headers"
 login_headers="$workdir/login.headers"
 login_post_headers="$workdir/login-post.headers"
 csrf_file="$workdir/login-csrf"
@@ -207,6 +212,35 @@ print(values[0])
 PY
 }
 
+extract_health_identity() {
+  python3 - "$health_body" <<'PY'
+import json
+import re
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        payload = json.load(handle)
+except (OSError, UnicodeError, json.JSONDecodeError):
+    raise SystemExit(2)
+
+if not isinstance(payload, dict):
+    raise SystemExit(2)
+if payload.get("status") != "ok" or payload.get("exact") is not True:
+    raise SystemExit(2)
+
+version = payload.get("version")
+commit = payload.get("commit")
+if not isinstance(version, str) or re.fullmatch(r"[0-9]+[.][0-9]+[.][0-9]+", version) is None:
+    raise SystemExit(2)
+if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+    raise SystemExit(2)
+
+print(version)
+print(commit)
+PY
+}
+
 assert_contains() {
   local file="$1" expected="$2"
   if ! grep -Fq "$expected" "$file"; then
@@ -334,10 +368,35 @@ check_failed_login_session() {
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$up_body" "$up_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
-  local up_status
-  up_status="$(curl_common --output "$up_body" --dump-header "$up_headers" --write-out '%{http_code}' "$BASE_URL/up" || true)"
-  if [[ "$up_status" != "200" ]]; then print_http_failure "health endpoint /up" "$up_status" "$up_headers"; return 1; fi
+  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$health_body" "$health_headers" "$home_body" "$home_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
+
+  local health_status health_version health_sha
+  local -a health_identity=()
+  health_status="$(curl_common --output "$health_body" --dump-header "$health_headers" --write-out '%{http_code}' "$BASE_URL/health" || true)"
+  if [[ "$health_status" != "200" ]]; then
+    print_http_failure "exact health endpoint /health" "$health_status" "$health_headers"
+    return 1
+  fi
+  mapfile -t health_identity < <(extract_health_identity)
+  if (( ${#health_identity[@]} != 2 )); then
+    printf 'ERROR: exact health identity is invalid or incomplete.\n' >&2
+    return 1
+  fi
+  health_version="${health_identity[0]}"
+  health_sha="${health_identity[1]}"
+  printf 'HEALTH_VERSION=v%s\n' "$health_version"
+  printf 'HEALTH_SHA=%s\n' "$health_sha"
+  if [[ "$health_version" != "$EXPECTED_RELEASE" || "$health_sha" != "$EXPECTED_SHA" ]]; then
+    printf 'ERROR: production health identity does not match the exact main candidate yet.\n' >&2
+    return 1
+  fi
+
+  local home_status
+  home_status="$(curl_common --output "$home_body" --dump-header "$home_headers" --write-out '%{http_code}' "$BASE_URL/" || true)"
+  if [[ "$home_status" != "200" ]]; then
+    print_http_failure "home GET /" "$home_status" "$home_headers"
+    return 1
+  fi
 
   local login_page_status
   login_page_status="$(curl_common --cookie-jar "$cookie_jar" --output "$login_html" --dump-header "$login_headers" --write-out '%{http_code}' "$BASE_URL/login" || true)"
@@ -461,7 +520,7 @@ run_smoke() {
   fi
 
   check_workspace_modules "$vault_path" || return $?
-  printf 'PASS production smoke: /up, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
+  printf 'PASS production smoke: /health exact-main, /, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
 }
 
 for attempt in $(seq 1 "$ATTEMPTS"); do

@@ -21,6 +21,7 @@ jobs:
       BASE_URL: https://www.grindflow.com.co
       E2E_USER_EMAIL: e2e-admin@grindflow.test
       E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
+      EXPECTED_SHA: ${{ github.sha }}
       ATTEMPTS: '15'
       WAIT_SECONDS: '20'
       FAILURE_ISSUE_TITLE: '[AUTO] Production Smoke Failure'
@@ -218,11 +219,11 @@ jobs:
           {
             echo "## Production smoke passed"
             echo
-            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Workflow source SHA: $GITHUB_SHA"
             echo "Target: $BASE_URL"
-            echo "Checked: /up, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
-            echo "Observed release: $(grep -E '^RELEASE_UI_OBSERVED=' production-smoke.log | tail -1 | cut -d= -f2)"
-            echo "Exact deployed Git SHA: not established by this smoke"
+            echo "Checked: exact /health, /, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
+            echo "Observed release: $(grep -E '^HEALTH_VERSION=' production-smoke.log | tail -1 | cut -d= -f2)"
+            echo "Exact deployed Git SHA: $(grep -E '^HEALTH_SHA=[0-9a-f]{40}$' production-smoke.log | tail -1 | cut -d= -f2)"
           } >> "$GITHUB_STEP_SUMMARY"
 
           issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"

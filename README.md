@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.120: regresión de autenticación Laravel con sesiones sintéticas descartables.** Base exacta main v0.1.119 `620012179f843338accea21c84742d306b6eb229`. No modifica el flujo de login ni corrige por sí solo el incidente productivo #73.
+> **Candidato v0.1.121: recuperación de Production Smoke y prueba exacta de despliegue.** Base exacta main v0.1.120 `cd871630d427f97a09d9e6e8befdd4e85e1d7a05`. #121 corrige el aprovisionamiento de la identidad sintética y #73 sigue abierto hasta que producción quede validada.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,67 +18,74 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.120** | `config/version.php`; candidata, no publicada |
-| Base exacta | ✅ ~~main v0.1.119~~ | `620012179f843338accea21c84742d306b6eb229` |
-| CI del PR | ✅ ~~success `adf5583`~~; 🚧 nuevo HEAD pendiente | #35910215166; revalidar tras cambios |
-| Sonar del PR | ✅ ~~success `adf5583`~~; 🚧 nuevo HEAD pendiente | Quality Gate del HEAD nuevo requerido |
-| CodeRabbit del PR | 🚧 Dos hallazgos nuevos del HEAD previo | Revisión completa requerida tras corregirlos |
-| CI del SHA exacto de main | ✅ ~~success~~ | #35906880198 sobre `62001217…` |
-| Deploy Observer base | ✅ ~~Marcador observado~~ | #35906880205; no acredita SHA remoto |
-| Production Smoke | ⛔ Bloqueo externo #73 | #35906880233 failure |
-| Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | Solo test, requisitos y versión de código |
+| Version objetivo | 🚧 **v0.1.121** | `config/version.php`; candidata |
+| Base exacta | ✅ ~~main v0.1.120~~ | `cd871630d427f97a09d9e6e8befdd4e85e1d7a05` |
+| CI del PR | 🚧 pendiente | validar HEAD final |
+| Sonar del PR | 🚧 pendiente | Quality Gate del HEAD final |
+| CodeRabbit del PR | 🚧 pendiente | máximo 3 rondas |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35917304166 sobre `cd871630…` |
+| Production Smoke base | ⛔ #73 | #35917304261 failure |
+| Producción objetivo | 🚧 pendiente | /health exacto + flujo autenticado |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+125** | **−29** | **+96** |
+| **16** | **+820** | **−68** | **+752** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-SEC-003: estabilidad de sesión anónima ante fallo de login y bloqueo |
-| Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
+| Alcance | #121/#73: identidad sintética, post-deploy, health exacto y Smoke |
+| Rol del PR | **SRE · Backend Laravel · Application Security** |
+| Revisiones | máximo 3 rondas automáticas; sin polling |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
- A["PR + snapshot exacto"] --> P["preflight"]
- P --> F["fast + contratos"]
- P -.-> S2["symfony-preview (opcional; no aplica a esta candidata)"]
- F --> V["validate"]
- S2 -.-> V
- A --> S["Sonar"]
- A --> C["CodeRabbit"]
- V --> M["Squash merge"]
- S --> M
- C --> M
+ A["PR + snapshot exacto"] --> C["CI + Sonar + CodeRabbit"]
+ C --> M["Squash merge"]
  M --> X["CI exact-main"]
- X --> O["Observer"]
- O --> T["Smoke separado"]
+ X --> H["/health version + SHA"]
+ H --> S["Production Smoke"]
+ S --> G["Cerrar #73 y declarar verde"]
 ```
 
 ## Qué se hizo
-- PHPUnit con cuenta sintética comprueba CSRF, ID y marcador entre GET anónimos y tras rechazo; limpia atributos en memoria para exigir restauración real desde el backend con la misma cookie y verifica el login en otra solicitud.
-- El test de rate limiting exige CSRF e ID estables tras el sexto intento bloqueado con lectura de sesión persistida, sin alterar el límite.
-- GF-SEC-003 documenta la expectativa Laravel y distingue pruebas descartables de un smoke auténtico en Hostinger. No cambia controlador, credenciales ni datos reales.
+- `grindflow:provision-smoke-user` reconcilia solo `@grindflow.test`, exige `APP_PHASE=construccion`, toma lock de filesystem y realiza backup cifrado privado antes de crear o mutar la fila sintética.
+- La cuenta no recibe memberships; usa `platform_role=admin` únicamente porque `/admin/system` exige ese rol. Contraseña/hash/email nunca se imprimen.
+- El comando corre en `deploy-hostinger.sh`, en el primer request que observa un release nuevo y como reconciliación del scheduler productivo.
+- `/health` responde 200 solo si puede demostrar versión y SHA Git exactos; Production Smoke compara ese SHA con `main` antes de gastar un intento de login y valida también home, login y dashboard.
+- Contrato de entorno: `SMOKE_USER_PASSWORD` en Hostinger debe coincidir con el secret GitHub `PRODUCTION_E2E_PASSWORD`.
 
 ## Archivos modificados en esta entrega candidata
-Inventario de esta entrega candidata, no prueba publicación:
+Inventario del diff exacto:
 <!-- grindflow:changed-files -->
+- `.env.example`
+- `.github/workflows/production-smoke.yml`
 - `README.md`
+- `app/Console/Commands/ProvisionSmokeUser.php`
+- `app/Support/Deployment/CheckoutIdentity.php`
+- `config/grindflow.php`
 - `config/version.php`
-- `docs/REQUIREMENTS.md`
-- `tests/Feature/AuthenticationTest.php`
+- `docs/DEPLOY-HOSTINGER.md`
+- `public/index.php`
+- `routes/console.php`
+- `routes/web.php`
+- `scripts/deploy-hostinger.sh`
+- `scripts/production-smoke-contract.sh`
+- `scripts/production-smoke.sh`
+- `tests/Feature/HealthIdentityTest.php`
+- `tests/Feature/ProvisionSmokeUserCommandTest.php`
 
 ## Validación
-- CI exact-main v0.1.119 primero, luego `preflight`, `fast`, `php-quality`, `PHPUnit`, `validate`, Sonar y CodeRabbit sobre HEAD final.
-- Smoke #73 sigue independiente; esta entrega no reintenta el login productivo ni atribuye una causa sin evidencia.
-- No ejecutar migraciones ni escrituras de datos productivos.
+- Tests del comando: ausencia de secreto, dominio sintético, creación, idempotencia, backup cifrado previo y redacción de salida.
+- Tests de health: refs loose/packed/detached, 200 exacto sin DB y 503 fail-closed sin SHA.
+- Contrato Smoke: health exacto, home y flujo autenticado; fallos de identidad no consumen login.
+- Producción solo se declara verde con evidencia de los cinco criterios del dueño.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -86,7 +93,7 @@ Inventario de esta entrega candidata, no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 GF-SEC-003: regresión de sesión y CSRF ante login fallido | 🚧 v0.1.120 candidata |
-| **NEXT** | 🚧 Diagnosticar causa de autenticación productiva #73 por vía operativa autorizada | 🚧 pendiente |
-| **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
-| **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |
+| **NOW** | 🚧 #121 + #73: recuperar Production Smoke | 🚧 v0.1.121 |
+| **NEXT** | 🚧 CI exact-main + validación productiva | 🚧 tras merge |
+| **BLOCKED / EXTERNAL** | ⛔ Ninguno asumido | ⛔ se determina por evidencia |
+| **LATER** | 🚧 Roadmap de producto | 🚧 solo después de producción verde |

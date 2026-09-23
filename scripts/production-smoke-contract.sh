@@ -36,7 +36,19 @@ status=200; body=""; csv_headers=""; redirect=""
 # Paths only, no cookies or headers. Keep this separate from the request log.
 [[ -z "${MOCK_COOKIE_LOG:-}" ]] || printf '%s\t%s\t%s\t%s\n' "$method" "$url" "$cookie_in" "$cookie_out" >> "$MOCK_COOKIE_LOG"
 case "$url" in
-  http://mock/up) body="ok";;
+  http://mock/health)
+    release="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" "$MOCK_REPOSITORY_ROOT/config/version.php")"
+    health_sha="${EXPECTED_SHA:-0000000000000000000000000000000000000000}"
+    [[ "${MOCK_HEALTH_MODE:-current}" == stale_sha ]] && health_sha="1111111111111111111111111111111111111111"
+    [[ "${MOCK_HEALTH_MODE:-current}" == stale_version ]] && release="0.0.0"
+    if [[ "${MOCK_HEALTH_MODE:-current}" == degraded ]]; then
+      status=503
+      body="{\"status\":\"degraded\",\"version\":\"$release\",\"commit\":null,\"exact\":false}"
+    else
+      body="{\"status\":\"ok\",\"version\":\"$release\",\"commit\":\"$health_sha\",\"exact\":true}"
+    fi
+    ;;
+  http://mock/) body="<html><body>GrindFlow</body></html>";;
   http://mock/login)
     if [[ "$method" == POST ]]; then
       status=302; redirect="/dashboard"
@@ -130,19 +142,32 @@ run_case() {
   local release_mode="${8:-current}"
   local auth_mode="${9:-ok}"
   local diagnostic_mode="${10:-valid}"
+  local health_mode="${11:-current}"
   local log="$workdir/$label.log"
   local requests="$workdir/$label.requests"
   local cookie_requests="$workdir/$label.cookie-paths"
   local result
-  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_REQUEST_LOG="$requests" MOCK_COOKIE_LOG="$cookie_requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
+  if MOCK_PENDING="$pending" MOCK_INVENTORY_MODE="$inventory_mode" MOCK_VAULT_MODE="$vault_mode" MOCK_MODULE_MODE="$module_mode" MOCK_CSV_MODE="$csv_mode" MOCK_RELEASE_MODE="$release_mode" MOCK_AUTH_MODE="$auth_mode" MOCK_DIAGNOSTIC_MODE="$diagnostic_mode" MOCK_HEALTH_MODE="$health_mode" MOCK_REQUEST_LOG="$requests" MOCK_COOKIE_LOG="$cookie_requests" MOCK_REPOSITORY_ROOT="$script_dir/.." BASE_URL=http://mock E2E_USER_PASSWORD=synthetic-only CURL_BIN="$workdir/mock-curl" ATTEMPTS=3 WAIT_SECONDS=0 bash "$script_dir/production-smoke.sh" > "$log" 2>&1; then result=0; else result=$?; fi
   if [[ "$result" -ne "$expected_status" ]]; then printf 'FAIL %s: exit=%s expected=%s\n' "$label" "$result" "$expected_status" >&2; cat "$log" >&2; exit 1; fi
   assert_absent_fixed 'never-print-header-private' "$log"
   local expected_login_gets=2
-  if [[ "$auth_mode" == post_login || "$auth_mode" == post_login_changed || "$auth_mode" == post_login_unavailable ]]; then
+  if [[ "$label" == health_* ]]; then
+    expected_login_gets=0
+  elif [[ "$auth_mode" == post_login || "$auth_mode" == post_login_changed || "$auth_mode" == post_login_unavailable ]]; then
     expected_login_gets=3
   fi
   [[ "$(grep -c '^GET http://mock/login$' "$requests")" -eq "$expected_login_gets" ]] || { printf 'FAIL %s: expected %s read-only login GETs.\n' "$label" "$expected_login_gets" >&2; exit 1; }
   case "$label" in
+    health_*)
+      [[ "$(grep -c '^GET http://mock/health$' "$requests")" -eq 3 ]]
+      if grep -Fxq 'GET http://mock/' "$requests"; then
+        printf 'FAIL %s: home must not run before exact health matches.\n' "$label" >&2
+        exit 1
+      fi
+      assert_absent_regex "$LOGIN_POST_PATTERN" "$requests"
+      assert_absent_fixed 'GET http://mock/dashboard' "$requests"
+      grep -Fq 'ERROR:' "$log"
+      ;;
     pending*)
       grep -Fxq 'MIGRATIONS_PENDING=3' "$log"
       if [[ "$vault_mode" == failed || "$vault_mode" == missing_link ]]; then grep -Fxq 'VAULT_READ_ONLY=failed' "$log"; grep -Fq 'ERROR: read-only Vault check failed while migrations remain pending' "$log"; else grep -Fxq 'VAULT_READ_ONLY=ok' "$log"; grep -Fxq 'MEDIA_STORAGE_READY=0' "$log"; fi
@@ -159,6 +184,10 @@ run_case() {
       assert_absent_fixed 'GET http://mock/dashboard' "$requests"
       ;;
     current|auth_post_303|auth_post_absolute_ok)
+      grep -Eq '^HEALTH_VERSION=v[0-9]+[.][0-9]+[.][0-9]+$' "$log"
+      grep -Eq '^HEALTH_SHA=[0-9a-f]{40}$' "$log"
+      [[ "$(grep -c '^GET http://mock/health$' "$requests")" -eq 1 ]]
+      [[ "$(grep -c '^GET http://mock/$' "$requests")" -eq 1 ]]
       grep -Fxq 'VAULT_READ_ONLY=ok' "$log"
       grep -Eq '^RELEASE_UI_OBSERVED=v[0-9]+\.[0-9]+\.[0-9]+$' "$log"
       grep -Eq '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' "$log"
@@ -269,6 +298,9 @@ run_case pending_no_fingerprint 3 2 no_fingerprint
 run_case pending_vault_failure 3 3 valid failed
 run_case pending_vault_link_missing 3 3 valid missing_link
 run_case current 0 0
+run_case health_stale_sha 0 1 valid ok ok ok current ok valid stale_sha
+run_case health_stale_version 0 1 valid ok ok ok current ok valid stale_version
+run_case health_degraded 0 1 valid ok ok ok current ok valid degraded
 run_case current_module_failure 0 5 valid ok failed
 run_case current_module_failure_invalid_id 0 5 valid ok failed ok current ok invalid
 run_case current_csv_failure 0 5 valid ok ok failed

@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'phase' => env('APP_PHASE', 'construccion'),
+
+    'smoke_user' => [
+        'email' => env('SMOKE_USER_EMAIL', 'e2e-admin@grindflow.test'),
+        'password' => env('SMOKE_USER_PASSWORD', env('PRODUCTION_E2E_PASSWORD')),
+        'name' => env('SMOKE_USER_NAME', 'GrindFlow Production Smoke'),
+    ],
+
     'security' => [
         'encryption_master_key' => env('ENCRYPTION_MASTER_KEY'),
     ],
