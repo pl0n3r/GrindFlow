@@ -135,6 +135,16 @@ Each requirement should contain:
 
 **Aceptación:** mantener gate agregado `GrindFlow CI / validate` y jobs Laravel/legado mientras existan; añadir Composer/Symfony, Doctrine/MariaDB, TypeScript/Vite y Playwright; CI del PR, Sonar y CI exact-main independientes; release identity y smoke de solo lectura sin credenciales ni contenido sensible en logs; deploy no se infiere por version.php.
 
+### GF-OPS-011 — Compatibilidad anticipada de identidad con Symfony Security
+
+**Estado:** implementado en código; validación, despliegue y producción se verifican por separado.
+
+**Enunciado:** las implementaciones propias de contratos de Symfony Security deben adelantarse a las firmas y marcas de deprecación anunciadas por Symfony 7.4 cuando hacerlo sea retrocompatible, para evitar acumular deuda de actualización dentro del código de GrindFlow sin cambiar el comportamiento de autenticación.
+
+**Aceptación:** `ActiveUserChecker::checkPostAuth()` acepta el segundo parámetro opcional `?TokenInterface $token = null` y conserva la misma validación de cuenta activa. `IdentityUser::eraseCredentials()`, que no persiste credenciales en texto plano ni realiza limpieza, se marca con `#[\Deprecated]` según el contrato de Symfony. No cambia roles, hashes, sesiones, membresías, autorización ni datos persistidos.
+
+**Verificación:** una prueba de reflexión fija la firma de `checkPostAuth()`, su parámetro opcional/tipo y el atributo de `eraseCredentials()`. El gate `symfony-preview` debe dejar de reportar las deprecations propias correspondientes observadas en el `main` v0.1.111; deprecations de herramientas o dependencias externas se evalúan por separado.
+
 ### GF-OPS-010 — Readiness segura del runtime Symfony
 
 **Estado:** implementado en código; despliegue y producción se verifican por separado.

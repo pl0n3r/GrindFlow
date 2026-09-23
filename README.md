@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.111: HSTS solo con HTTPS confiable.** Base exacta `main` v0.1.110 `594d13bc886b466dbffa5e1a7c83e0f55928258c`; Symfony emite HSTS solo cuando la petición es realmente segura.
+> **Candidato v0.1.112: compatibilidad anticipada con Symfony Security.** Base exacta `main` v0.1.111 `9aec23b74ff46c5b99dce39d4c1813415fa5a42a`; elimina deprecations propias conocidas sin cambiar autenticación.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,22 +18,22 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.111** | `config/version.php`; no publicada |
-| Base exacta | ✅ ~~main v0.1.110~~ | `594d13bc886b466dbffa5e1a7c83e0f55928258c` |
+| Version objetivo | 🚧 **v0.1.112** | `config/version.php`; no publicada |
+| Base exacta | ✅ ~~main v0.1.111~~ | `9aec23b74ff46c5b99dce39d4c1813415fa5a42a` |
 | CI del PR | 🚧 Pendiente | Exigir `validate` del HEAD final |
 | Sonar del PR | 🚧 Pendiente | Exigir Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 Pendiente | Exigir revisión CodeRabbit completada del HEAD final |
-| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35842070400` success sobre `594d13bc886b466dbffa5e1a7c83e0f55928258c` |
-| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35842070467` success; no acredita SHA remoto |
-| Production Smoke | ⛔ Login E2E no validado | `35842070404` failure, #73; independiente |
+| CI del SHA exacto de main | ✅ **VALIDATED IN CODE** | `35843977573` success sobre `9aec23b74ff46c5b99dce39d4c1813415fa5a42a` |
+| Deploy Observer | ✅ ~~Marcador humano observado~~ | `35843977579` success; no acredita SHA remoto |
+| Production Smoke | ⛔ Login E2E no validado | `35843977571` failure, #73; independiente |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
-| Datos productivos | ✅ ~~No tocados~~ | PHPUnit/MariaDB descartable; sin cuentas reales |
+| Datos productivos | ✅ ~~No tocados~~ | PHPUnit/reflexión; sin cuentas reales |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+69** | **−25** | **+44** |
+| **6** | **+61** | **−22** | **+39** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -41,7 +41,7 @@
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | GF-SEC-009: HSTS solo en HTTPS reconocido y sin confiar en proto del cliente |
+| Alcance | GF-OPS-011: compatibilidad anticipada de identidad con contratos Symfony Security |
 | Revisiones | CI/Sonar/CodeRabbit HEAD; exact-main, Observer y Smoke separados |
 
 ## Flujo de entrega
@@ -63,10 +63,10 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Symfony añade `Strict-Transport-Security: max-age=31536000` solo cuando `Request::isSecure()` confirma HTTPS.
-- HTTP normal no recibe HSTS y un cliente tampoco puede activarlo enviando `X-Forwarded-Proto: https` mientras no exista una configuración explícita de proxies confiables.
-- PHPUnit cubre HTTPS 200/302/401/404, ausencia en HTTP y el caso de cabecera falsificada.
-- No se habilitan `includeSubDomains` ni `preload` sin inventario y operación HTTPS comprobados; GF-SEC-009 no cambia Laravel, Hostinger ni datos productivos.
+- `ActiveUserChecker::checkPostAuth()` acepta el segundo parámetro opcional `?TokenInterface $token = null` anunciado por Symfony para la siguiente versión mayor y conserva la misma validación de cuenta activa.
+- `IdentityUser::eraseCredentials()` se marca `#[\Deprecated]` porque el método está vacío y no almacena credenciales en texto plano.
+- Una prueba de reflexión fija la firma, opcionalidad/tipo del token y el atributo de deprecación para impedir regresiones silenciosas.
+- GF-OPS-011 documenta el alcance: no cambia roles, hashes, sesiones, membresías, autorización, Laravel, Hostinger ni datos persistidos.
 
 ## Archivos modificados en esta entrega candidata
 Inventario exclusivo de esta entrega candidata; no prueba publicación:
@@ -74,20 +74,21 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 - `README.md`
 - `config/version.php`
 - `docs/REQUIREMENTS.md`
-- `symfony/src/Infrastructure/Http/SecurityHeadersSubscriber.php`
-- `symfony/tests/php/PreviewTest.php`
+- `symfony/src/Identity/Entity/IdentityUser.php`
+- `symfony/src/Identity/Security/ActiveUserChecker.php`
+- `symfony/tests/php/IdentityCompatibilityTest.php`
 
 ## Validación
 - Exigir `validate`, Sonar y revisión CodeRabbit completada del HEAD final; después CI exact-main.
-- `symfony-preview` valida PHPUnit HTTP y el stack descartable seleccionado por CI.
-- La versión humana no acredita TLS/proxy productivo ni resuelve Production Smoke #73.
+- `symfony-preview` debe dejar de reportar las deprecations propias de `checkPostAuth()` y `eraseCredentials()` observadas en main v0.1.111.
+- Deprecations de Node/actions o dependencias externas se mantienen separadas; la versión humana no acredita deploy Symfony ni resuelve Production Smoke #73.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 | Lane | Trabajo | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 HSTS condicionado a HTTPS confiable | 🚧 v0.1.111 candidata |
+| **NOW** | 🚧 Compatibilidad Symfony Security | 🚧 v0.1.112 candidata |
 | **NEXT** | 🚧 Verificación autorizada de cuenta E2E | 🚧 #2 |
 | **LATER** | 🚧 Conmutación Symfony por módulo | 🚧 Sin deploy |
 | **BLOCKED / EXTERNAL** | ⛔ Resolver login E2E productivo | ⛔ #73 |
@@ -95,8 +96,8 @@ Inventario exclusivo de esta entrega candidata; no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **DONE** | ✅ ~~v0.1.110 fusionada~~ | ✅ ~~landmark admin estable durante hidratación~~ |
-| **NOW** | 🚧 HSTS solo con HTTPS verificado | 🚧 GF-SEC-009, v0.1.111 |
+| **DONE** | ✅ ~~v0.1.111 fusionada~~ | ✅ ~~HSTS condicionado a HTTPS confiable~~ |
+| **NOW** | 🚧 Compatibilidad anticipada Symfony Security | 🚧 GF-OPS-011, v0.1.112 |
 | **NEXT** | 🚧 Evidencia revisada fuera de banda + autorización separada | 🚧 GF-ARCH-002 sin cutover |
 | **LATER** | 🚧 Symfony en Hostinger | 🚧 No desplegado |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
