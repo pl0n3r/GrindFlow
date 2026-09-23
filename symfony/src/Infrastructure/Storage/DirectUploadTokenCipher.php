@@ -39,6 +39,8 @@ final class DirectUploadTokenCipher
         $this->key = strlen($secret) >= 32
             && function_exists('openssl_encrypt')
             && function_exists('openssl_decrypt')
+            && function_exists('openssl_get_cipher_methods')
+            && in_array(self::CIPHER, openssl_get_cipher_methods(), true)
             ? hash('sha256', $secret, true)
             : null;
     }
