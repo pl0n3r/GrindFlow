@@ -208,20 +208,27 @@ def validate_changed_files(readme: str, files: list[str]) -> None:
         fail("changed-file list is stale. Run readme-dashboard.py --update.")
 
 
-def validate_roadmap(readme: str) -> None:
+def roadmap_error(readme: str) -> str | None:
     convention = section(readme, "## Progress convention")
     if "✅ ~~Completado~~" not in convention or "🚧 Pendiente" not in convention:
-        fail("canonical progress convention missing or not documented")
+        return "canonical progress convention missing or not documented"
 
     roadmap = section(readme, "## Qué sigue")
     if "https://github.com/pl0n3r/GrindFlow/issues/2" not in roadmap:
-        fail("roadmap must link to canonical issue #2")
+        return "roadmap must link to canonical issue #2"
     if re.search(r"(?:/issues/88\b|\[(?:roadmap|issue)[^\]]*#88\])", roadmap, flags=re.I):
-        fail("legacy issue #88 cannot be an active roadmap destination")
+        return "legacy issue #88 cannot be an active roadmap destination"
     if "## Panorama general pendiente" in readme:
-        fail("README must not duplicate the cumulative roadmap; use issue #2 only")
+        return "README must not duplicate the cumulative roadmap; use issue #2 only"
     if re.search(r"\*\*(?:DONE|NOW|NEXT|LATER|BLOCKED / EXTERNAL)\*\*", roadmap):
-        fail("README must not duplicate roadmap lanes; link canonical issue #2 only")
+        return "README must not duplicate roadmap lanes; link canonical issue #2 only"
+    return None
+
+
+def validate_roadmap(readme: str) -> None:
+    error = roadmap_error(readme)
+    if error is not None:
+        fail(error)
 
 
 def validate_version(readme: str) -> None:
@@ -348,18 +355,13 @@ ok
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 """
-    validate_roadmap(roadmap_sample)
+    assert roadmap_error(roadmap_sample) is None
 
     for invalid in (
         roadmap_sample + "\n| **NOW** | 🚧 tarea | 🚧 pendiente |\n",
         roadmap_sample + "\n## Panorama general pendiente\n",
     ):
-        try:
-            validate_roadmap(invalid)
-        except SystemExit:
-            pass
-        else:
-            raise AssertionError("README roadmap duplication must be rejected")
+        assert roadmap_error(invalid) is not None
 
     print("README dashboard self-test: OK")
 
