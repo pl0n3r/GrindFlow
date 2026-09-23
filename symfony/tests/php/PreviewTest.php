@@ -106,7 +106,7 @@ final class PreviewTest extends WebTestCase
             ]);
             self::assertResponseStatusCodeSame($status);
             self::assertSame(
-                'max-age=31536000; includeSubDomains',
+                'max-age=31536000',
                 $client->getResponse()->headers->get('Strict-Transport-Security'),
                 $path,
             );
