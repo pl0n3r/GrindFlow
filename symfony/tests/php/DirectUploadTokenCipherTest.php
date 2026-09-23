@@ -88,6 +88,8 @@ final class DirectUploadTokenCipherTest extends TestCase
             ['media', $staging, '../clip.mp4', 'video/mp4', 1, 900],
             ['media', $staging, '..\\clip.mp4', 'video/mp4', 1, 900],
             ['media', $staging, '   ', 'video/mp4', 1, 900],
+            ['media', $staging, '.', 'video/mp4', 1, 900],
+            ['media', $staging, '..', 'video/mp4', 1, 900],
             ['media', $staging, "bad\nname.mp4", 'video/mp4', 1, 900],
             ['media', $staging, "invalid-\xC3\x28.mp4", 'video/mp4', 1, 900],
             ['media', 'organizations/'.$organization.'/staging/not-a-uuid', 'clip.mp4', 'video/mp4', 1, 900],
