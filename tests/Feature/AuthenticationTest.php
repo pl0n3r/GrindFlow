@@ -55,6 +55,14 @@ class AuthenticationTest extends TestCase
         $anonymousSessionId = $this->app['session.store']->getId();
         self::assertNotSame('', $anonymousSessionId);
 
+        // Mirror the two anonymous browser GETs before attempting authentication.
+        $second = $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
+            ->get('/login')->assertOk()
+            ->assertSessionHas('synthetic_login_probe', 'session-persistent');
+        self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $second->getContent(), $secondToken));
+        self::assertSame($beforeToken[1], $secondToken[1]);
+        self::assertSame($anonymousSessionId, $this->app['session.store']->getId());
+
         // The HTTP test harness does not replay session cookies like a browser.
         // Reuse the same synthetic cookie to test the server-side ID contract.
         $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
@@ -75,14 +83,25 @@ class AuthenticationTest extends TestCase
         self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
             'The anonymous session identifier should survive the rejection recheck.');
 
-        $this->post('/login', [
+        $successfulLogin = $this->post('/login', [
             '_token' => $afterToken[1],
             'email' => $user->email,
             'password' => 'correct-synthetic-password',
         ])->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
-        self::assertNotSame($anonymousSessionId, $this->app['session.store']->getId(),
+        $authenticatedSessionId = $this->app['session.store']->getId();
+        self::assertNotSame($anonymousSessionId, $authenticatedSessionId,
             'Successful login must rotate the authenticated session identifier.');
+
+        // TestResponse::getCookie decrypts the response cookie. Replay it as a
+        // browser would, then force the guard to resolve the user from session.
+        $sessionCookie = $successfulLogin->getCookie($this->app['session.store']->getName());
+        self::assertNotNull($sessionCookie, 'A successful login must emit a session cookie.');
+        self::assertSame($authenticatedSessionId, $sessionCookie->getValue());
+        $this->app['auth']->guard('web')->forgetUser();
+        $this->withCookie($sessionCookie->getName(), $sessionCookie->getValue())
+            ->get('/login')->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_user_can_authenticate_and_logout(): void
