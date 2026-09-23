@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato apilado v0.1.121: evidencia terminal CodeRabbit del SHA exacto, sin falsos verdes.** La rama se creó sobre un HEAD histórico de PR #120; está pendiente de sincronizar tras el squash. `main` continúa v0.1.119. No desplegado ni fusionado.
+> **Candidato v0.1.121: verificación de revisión terminal CodeRabbit sobre el SHA exacto.** Base `main` v0.1.120 `cd871630d427f97a09d9e6e8befdd4e85e1d7a05`; candidata no fusionada ni desplegada.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,14 +18,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.121** | `config/version.php`; apilada, no publicada |
-| Base de la PR apilada | 🚧 #120 cambió de HEAD | Apilada originalmente en `adf5583`; debe sincronizarse tras squash |
+| Version objetivo | 🚧 **v0.1.121** | `config/version.php`; candidata, no publicada |
+| Base exacta | ✅ ~~main v0.1.120~~ | `cd871630d427f97a09d9e6e8befdd4e85e1d7a05` |
 | CI del PR | 🚧 Pendiente | `validate` sobre HEAD final |
-| Sonar del PR | ⛔ Quality Gate anterior falló | Revalidar seguridad del HEAD nuevo |
+| Sonar del PR | 🚧 Pendiente | Quality Gate sobre HEAD final, tras cambio de base |
 | CodeRabbit del PR | 🚧 Pendiente | Revisión terminada del mismo SHA |
-| CI del SHA exacto de main | ✅ ~~success~~ | #35906880198 sobre `62001217…` |
-| Deploy Observer base | ✅ ~~Marcador observado~~ | #35906880205; no acredita SHA remoto |
-| Production Smoke | ⛔ Bloqueo externo #73 | #35906880233 failure |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35917304166 sobre `cd871630…` |
+| Deploy Observer base | ✅ ~~Release observado~~ | #35917304167; no acredita SHA remoto |
+| Production Smoke | ⛔ Bloqueo externo #73 | #35917304261 failure |
 | Symfony en Hostinger | ⛔ NO desplegado | Sin cutover |
 | Datos productivos | ✅ ~~No tocados~~ | Solo CI, script local, tests, docs y versión |
 
@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+418** | **−21** | **+397** |
+| **7** | **+423** | **−26** | **+397** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -79,9 +79,9 @@ Inventario de esta entrega candidata, no prueba publicación:
 - `tests/test_coderabbit_final_review.py`
 
 ## Validación
-- CI de la PR apilada: scope core completo, `validate`, Sonar y CodeRabbit una vez estabilizada su base.
-- PR #120 mantiene su gate CodeRabbit independiente; no fusionar esta candidata antes de integrar y validar v0.1.120 en `main`.
-- El helper no consulta producción, no cambia tokens y nunca genera ZIP.
+- La PR #120 está fusionada en `main` v0.1.120, con CI exact-main exitoso; scope CI core completo para esta candidata: `validate`, Sonar y CodeRabbit del HEAD final.
+- Production Smoke #73 sigue fallando de forma independiente; no cerrar el incidente por pasar CI.
+- El helper no consulta producción, no cambia tokens ni genera ZIP.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -89,7 +89,7 @@ Inventario de esta entrega candidata, no prueba publicación:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 Revisión final #120; prueba exact-head v0.1.121 apilada | 🚧 sin merge |
-| **NEXT** | 🚧 PR v0.1.121 y después diagnóstico read-only de #73/#121 | 🚧 pendiente |
+| **NOW** | 🚧 Gate de revisión exact-head v0.1.121 contra main v0.1.120 | 🚧 PR #122 |
+| **NEXT** | 🚧 Diagnóstico read-only de autenticación #73/#121 | 🚧 pendiente |
 | **BLOCKED / EXTERNAL** | ⛔ Smoke autenticado Laravel | ⛔ #73 |
 | **LATER** | 🚧 Cutover Symfony por módulo | 🚧 sin deploy |

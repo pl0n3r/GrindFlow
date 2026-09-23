@@ -55,6 +55,8 @@ class AuthenticationTest extends TestCase
         $anonymousSessionId = $this->app['session.store']->getId();
         self::assertNotSame('', $anonymousSessionId);
 
+        // Verify the next request reads persisted state, not stale in-memory attributes.
+        $this->app['session.store']->flush();
         // Mirror the two anonymous browser GETs before attempting authentication.
         $second = $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
             ->get('/login')->assertOk()
@@ -75,7 +77,9 @@ class AuthenticationTest extends TestCase
         self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
             'Rejected login must not rotate the anonymous session identifier.');
 
-        $after = $this->get('/login')->assertOk()
+        $this->app['session.store']->flush();
+        $after = $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
+            ->get('/login')->assertOk()
             ->assertSessionHas('synthetic_login_probe', 'session-persistent');
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $after->getContent(), $afterToken));
         self::assertSame($beforeToken[1], $afterToken[1],
@@ -83,11 +87,13 @@ class AuthenticationTest extends TestCase
         self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
             'The anonymous session identifier should survive the rejection recheck.');
 
-        $successfulLogin = $this->post('/login', [
-            '_token' => $afterToken[1],
-            'email' => $user->email,
-            'password' => 'correct-synthetic-password',
-        ])->assertRedirect(route('dashboard'));
+        $this->app['session.store']->flush();
+        $successfulLogin = $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
+            ->post('/login', [
+                '_token' => $afterToken[1],
+                'email' => $user->email,
+                'password' => 'correct-synthetic-password',
+            ])->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
         $authenticatedSessionId = $this->app['session.store']->getId();
         self::assertNotSame($anonymousSessionId, $authenticatedSessionId,
@@ -99,6 +105,7 @@ class AuthenticationTest extends TestCase
         self::assertNotNull($sessionCookie, 'A successful login must emit a session cookie.');
         self::assertSame($authenticatedSessionId, $sessionCookie->getValue());
         $this->app['auth']->guard('web')->forgetUser();
+        $this->app['session.store']->flush();
         $this->withCookie($sessionCookie->getName(), $sessionCookie->getValue())
             ->get('/login')->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
@@ -215,7 +222,9 @@ class AuthenticationTest extends TestCase
         self::assertSame($anonymousSessionId, $this->app['session.store']->getId(),
             'Rate limiting must not rotate the anonymous session identifier.');
 
-        $afterLockout = $this->get('/login')->assertOk();
+        $this->app['session.store']->flush();
+        $afterLockout = $this->withCookie($this->app['session.store']->getName(), $anonymousSessionId)
+            ->get('/login')->assertOk();
         self::assertSame(1, preg_match('/name="_token" value="([^"]+)"/', $afterLockout->getContent(), $afterToken));
         self::assertSame($beforeToken[1], $afterToken[1],
             'Rate limiting must not rotate the anonymous session CSRF token.');
