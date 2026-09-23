@@ -33,7 +33,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+94** | **−26** | **+68** |
+| **4** | **+113** | **−26** | **+87** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -63,7 +63,7 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- PHPUnit con cuenta sintética exige conservar CSRF, identificador y marcador de sesión tras contraseña errónea; confirma que un POST válido posterior inicia sesión y rota su ID.
+- PHPUnit con cuenta sintética exige conservar CSRF, identificador y marcador de sesión entre dos GET anónimos y tras contraseña errónea; confirma que el POST válido rota la cookie y mantiene la autenticación en una petición posterior.
 - El test de rate limiting existente exige CSRF e identificador estables ante el sexto intento bloqueado, sin modificar el límite.
 - GF-SEC-003 documenta la expectativa Laravel y distingue pruebas descartables de un smoke auténtico en Hostinger. No cambia controlador, credenciales ni datos reales.
 
