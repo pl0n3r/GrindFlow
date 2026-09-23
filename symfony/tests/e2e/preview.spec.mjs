@@ -181,7 +181,7 @@ test('React admin renders role capabilities from its tenant context contract', a
   await expect(page.getByText('Estudio seguro').first()).toBeVisible();
   await expect(page.getByText('Edición').first()).toBeVisible();
   await expect(page.getByText('Sin permiso')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
   await expect(page.getByText(/los videos, la programación y las conexiones externas/)).toBeVisible();
 });
 
@@ -367,7 +367,7 @@ test('profile API never redirects anonymous writes to a private HTML page', asyn
 });
 
 
-test('S2 photo library allows a mobile editor to upload and see a private asset', async ({ page }) => {
+test('S2 multimedia library allows a mobile editor to upload and see a private asset', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/preview');
   const asset = await page.locator('script[type="module"]').getAttribute('src');
@@ -416,11 +416,11 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
 
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-e2e=1', type: 'module' });
-  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
-  await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
-  await expect(page.getByText('0 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
+  await expect(page.getByText('Todavía no hay archivos en esta organización.')).toBeVisible();
+  await expect(page.getByText('0 de 100 archivos, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('Espacio utilizado: 0.00 de 128 MiB')).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'foto-ejemplo.png', mimeType: 'image/png', buffer: png },
     { name: 'no-enviar.png', mimeType: 'image/png', buffer: png },
     { name: 'formato-no-valido.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg></svg>') },
@@ -428,17 +428,18 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
   await expect(page.getByAltText('Vista local de foto-ejemplo.png')).toBeVisible();
   await expect(page.getByAltText('Vista local de no-enviar.png')).toBeVisible();
   await expect(page.getByAltText('Vista local de formato-no-valido.svg')).toHaveCount(0);
-  await expect(page.getByText(/Archivo no admitido: JPEG, PNG o WebP/)).toBeVisible();
-  expect(uploads).toBe(0); // Local review does not upload.
+  await expect(page.locator('.vault-selected-files .vault-selected-mark')).toHaveCount(1);
+  await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
+  expect(uploads).toBe(0); // Local review never sends bytes before explicit submit.
   await page.getByRole('button', { name: 'Descartar formato-no-valido.svg' }).click();
   await page.getByRole('button', { name: 'Descartar no-enviar.png' }).click();
-  await expect(page.getByRole('button', { name: /Guardar 1 imagen/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Guardar 1 archivo/ })).toBeVisible();
   await expect(page.getByAltText('Vista local de no-enviar.png')).toHaveCount(0);
-  await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
+  await page.getByRole('button', { name: /Guardar 1 archivo/ }).click();
   expect(uploads).toBe(1);
   await expect(page.getByAltText('Vista local de foto-ejemplo.png')).toHaveCount(0);
-  await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
-  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('1 de 1 archivos guardados.')).toBeVisible();
+  await expect(page.getByText('1 de 100 archivos, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('foto-ejemplo.png', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Descargar' })).toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
   await page.route('**/api/admin/vault/' + id, (route) => route.fulfill({
@@ -452,6 +453,150 @@ test('S2 photo library allows a mobile editor to upload and see a private asset'
   await expect(page.locator('.vault-metadata').getByText('Guardada', { exact: true })).toBeVisible();
   await expect(page.getByText(png.length + ' bytes')).toBeVisible();
 
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test('S2 mobile Vault renders private MP4 controls and fails safely on undecodable media', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/preview');
+  const script = await page.locator('script[type="module"]').getAttribute('src');
+  expect(script).toBeTruthy();
+
+  const id = '00000000-0000-7000-8000-000000000039';
+  const mp4 = Buffer.from('000000186674797069736f6d0000020069736f6d69736f32', 'hex');
+  let stored = null;
+  let videoUploads = 0;
+
+  await page.route('**/api/admin/context', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      data: {
+        user: { display_name: 'Editor video' },
+        organization: { id, name: 'Biblioteca multimedia', role: 'editor' },
+        permissions: { workspace_view: true, organization_manage: false, content_prepare: true, content_review: true },
+        organization_name_csrf: null,
+        profile_name_csrf: 'profile-test',
+        vault_upload_csrf: 'video-upload-test',
+        vault_manage_csrf: 'video-manage-test',
+      },
+    }),
+  }));
+
+  await page.route('**/api/admin/vault**', (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.pathname === '/api/admin/vault' && request.method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {
+          assets: stored ? [stored] : [],
+          limit: 30,
+          page: 1,
+          pages: stored ? 1 : 0,
+          total: stored ? 1 : 0,
+          view: 'active',
+          format: 'all',
+          usage: 'all',
+          sort: 'recent',
+          quota: {
+            used_assets: stored ? 1 : 0,
+            max_assets: 100,
+            used_bytes: stored ? mp4.length : 0,
+            max_bytes: 128 * 1024 * 1024,
+          },
+        } }),
+      });
+    }
+
+    if (url.pathname === '/api/admin/vault' && request.method() === 'POST') {
+      expect(request.headers()['x-csrf-token']).toBe('video-upload-test');
+      expect(request.postDataBuffer().includes(mp4)).toBe(true);
+      videoUploads += 1;
+      stored = {
+        id,
+        name: videoUploads === 1 ? 'clip-sin-mime.mp4' : 'clip-prueba.mp4',
+        mime_type: 'video/mp4',
+        size_bytes: mp4.length,
+        created_at: '2026-09-23 00:00:00',
+        download_url: '/api/admin/vault/' + id + '/download',
+        usage_scope: 'unclassified',
+      };
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { asset: stored } }),
+      });
+    }
+
+    if (url.pathname === '/api/admin/vault/' + id && request.method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { asset: { ...stored, note: null } } }),
+      });
+    }
+
+    if (url.pathname === '/api/admin/vault/' + id + '/preview' && request.method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'video/mp4',
+        headers: { 'Cache-Control': 'no-store, private' },
+        body: mp4,
+      });
+    }
+
+    return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  });
+
+  await page.evaluate(() => {
+    document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>';
+  });
+  await page.addScriptTag({ url: script + '?vault-video-e2e=1', type: 'module' });
+  await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
+
+  const input = page.getByLabel('Añadir fotos o videos desde tu dispositivo');
+  expect(await input.getAttribute('accept')).toContain('.mp4');
+  expect(await input.getAttribute('accept')).toContain('.webm');
+
+  await input.evaluate((element, bytes) => {
+    const file = new File([new Uint8Array(bytes)], 'clip-sin-mime.mp4', { type: '' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    element.files = transfer.files;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }, Array.from(mp4));
+  await expect(page.locator('.vault-selected-files video')).toHaveCount(0);
+  await expect(page.locator('.vault-selected-mark')).toHaveCount(1);
+  await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
+  await expect(page.getByText(/tipo desconocido/)).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar 1 archivo' }).click();
+  await expect(page.getByText('clip-sin-mime.mp4', { exact: true })).toBeVisible();
+  expect(videoUploads).toBe(1);
+
+  await input.setInputFiles({
+    name: 'clip-prueba.mp4',
+    mimeType: 'application/octet-stream',
+    buffer: mp4,
+  });
+  await expect(page.locator('.vault-selected-files video')).toHaveCount(0);
+  await expect(page.locator('.vault-selected-mark')).toHaveCount(1);
+  await expect(page.locator('.vault-selected-files [role="alert"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Guardar 1 archivo' }).click();
+  await expect(page.getByText('clip-prueba.mp4', { exact: true })).toBeVisible();
+  expect(videoUploads).toBe(2);
+
+  await page.getByRole('button', { name: 'Detalles' }).click();
+  const preview = page.locator('.vault-preview video');
+  await expect(preview).toHaveCount(1);
+  await expect(preview).toHaveAttribute('controls', '');
+  await expect(preview).toHaveAttribute('preload', 'metadata');
+  await expect(preview).toHaveAttribute('src', '/api/admin/vault/' + id + '/preview');
+  expect(await preview.getAttribute('autoplay')).toBeNull();
+  await expect(page.getByText('La vista previa no está disponible. Comprueba la integridad del original antes de descargarlo.')).toBeVisible();
+  await expect(preview).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
@@ -495,7 +640,7 @@ test('S2 mobile vault navigates real paginated API metadata', async ({ page }) =
   });
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-pages-e2e=1', type: 'module' });
-  await expect(page.getByText('31 imágenes en esta organización')).toBeVisible();
+  await expect(page.getByText('31 archivos en esta organización')).toBeVisible();
   await expect(page.getByText('pagina-1.png')).toBeVisible();
   await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(page.getByText('pagina-2.png')).toBeVisible();
@@ -551,14 +696,14 @@ test('S2 móvil conserva éxitos parciales cuando la cuota rechaza otra imagen',
 
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: asset + '?vault-quota-e2e=1', type: 'module' });
-  await expect(page.getByText('99 de 100 imágenes, incluida la papelera.')).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+  await expect(page.getByText('99 de 100 archivos, incluida la papelera.')).toBeVisible();
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'uno.png', mimeType: 'image/png', buffer: png },
     { name: 'dos.png', mimeType: 'image/png', buffer: png },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
-  await expect(page.getByText(/1 de 2 imágenes guardadas/)).toContainText('dos.png: La biblioteca alcanzó su cuota.');
-  await expect(page.getByText('100 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
+  await expect(page.getByText(/1 de 2 archivos guardados/)).toContainText('dos.png: La biblioteca alcanzó su cuota.');
+  await expect(page.getByText('100 de 100 archivos, incluida la papelera.')).toBeVisible();
   await expect(page.getByText('uno.png', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   expect(uploads).toBe(2);
@@ -597,13 +742,13 @@ test('S2 mobile never retries ambiguous HTTP 201 or permanent 422 with malformed
   });
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-ambiguous-e2e=1', type: 'module' });
-  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+  await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'recibida.png', mimeType: 'image/png', buffer: png },
     { name: 'rechazada.png', mimeType: 'image/png', buffer: png },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
-  await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
+  await expect(page.getByText(/0 de 2 archivos guardados/)).toBeVisible();
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   expect(attempts).toBe(2);
@@ -690,22 +835,27 @@ test('S2 mobile does not offer retry for a duplicate or invalid format', async (
   }));
   await page.route('**/api/admin/vault', (route) => {
     attempts++;
+    const bytes = route.request().postDataBuffer();
+    if (bytes?.includes(Buffer.from('no es imagen'))) {
+      return route.fulfill({ status: 422, contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'invalid_type', message: 'El formato real del archivo no está permitido.' } }) });
+    }
     return route.fulfill({ status: 409, contentType: 'application/json',
       body: JSON.stringify({ error: { code: 'vault_duplicate_active', message: 'Ya existe esta imagen.' } }) });
   });
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-reject-e2e=1', type: 'module' });
-  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+  await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'guardada.png', mimeType: 'image/png', buffer: png },
     { name: 'texto.txt', mimeType: 'text/plain', buffer: Buffer.from('no es imagen') },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
-  await expect(page.getByText(/0 de 2 imágenes guardadas/)).toBeVisible();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
+  await expect(page.getByText(/0 de 2 archivos guardados/)).toBeVisible();
   await expect(page.getByText(/2 archivos requieren revisión/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reintentar/ })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
-  expect(attempts).toBe(1);
+  expect(attempts).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
@@ -753,20 +903,20 @@ test('S2 mobile retries only failed files after a partial multi-upload', async (
   });
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: assetScript + '?vault-retry-e2e=1', type: 'module' });
-  await expect(page.getByRole('heading', { name: 'Biblioteca de imágenes' })).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles([
+  await expect(page.getByRole('heading', { name: 'Biblioteca de archivos' })).toBeVisible();
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles([
     { name: 'uno.png', mimeType: 'image/png', buffer: png },
     { name: 'dos.png', mimeType: 'image/png', buffer: png },
   ]);
-  await page.getByRole('button', { name: /Guardar 2 imágenes/ }).click();
-  await expect(page.getByText(/1 de 2 imágenes guardadas/)).toContainText('dos.png: Error temporal.');
-  await expect(page.getByText('Procesadas 2 de 2 imágenes.')).toBeVisible();
+  await page.getByRole('button', { name: /Guardar 2 archivos/ }).click();
+  await expect(page.getByText(/1 de 2 archivos guardados/)).toContainText('dos.png: Error temporal.');
+  await expect(page.getByText('Procesados 2 de 2 archivos.')).toBeVisible();
   await expect(page.getByRole('list', { name: 'Resultado por archivo' }).getByRole('listitem')).toHaveCount(2);
   await expect(page.getByText('1 archivo pendiente.')).toBeVisible();
-  await page.getByRole('button', { name: 'Reintentar 1 imagen' }).click();
-  await expect(page.getByText('1 de 1 imágenes guardadas.')).toBeVisible();
-  await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reintentar 1 imagen' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reintentar 1 archivo' }).click();
+  await expect(page.getByText('1 de 1 archivos guardados.')).toBeVisible();
+  await expect(page.getByText('2 de 100 archivos, incluida la papelera.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reintentar 1 archivo' })).toHaveCount(0);
   expect(attempts).toEqual(['uno.png', 'dos.png', 'dos.png']);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
@@ -830,15 +980,15 @@ test('S2 mobile trash requires confirmation, keeps quota and restores without ex
   expect(changes).toBe(0);
   await page.getByRole('button', { name: 'Mover a papelera' }).click();
   await page.getByRole('button', { name: 'Confirmar movimiento' }).click();
-  await expect(page.getByText('Imagen movida a la papelera. Puedes restaurarla.')).toBeVisible();
-  await expect(page.getByText('Todavía no hay imágenes en esta organización.')).toBeVisible();
-  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('Archivo movido a la papelera. Puedes restaurarlo.')).toBeVisible();
+  await expect(page.getByText('Todavía no hay archivos en esta organización.')).toBeVisible();
+  await expect(page.getByText('1 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera' }).click();
   await expect(page.getByText('foto-recuperable.png')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Descargar' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Detalles' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Restaurar' }).click();
-  await expect(page.getByText('Imagen restaurada en la biblioteca.')).toBeVisible();
+  await expect(page.getByText('Archivo restaurado en la biblioteca.')).toBeVisible();
   await expect(page.getByText('La papelera está vacía.')).toBeVisible();
   await page.getByRole('button', { name: 'Biblioteca' }).click();
   await expect(page.getByText('foto-recuperable.png')).toBeVisible();
@@ -886,8 +1036,8 @@ test('S2 mobile upload distinguishes an active duplicate from a recoverable tras
     return route.fulfill({ status: 409, contentType: 'application/json',
       body: JSON.stringify({ error: {
         code: trashed ? 'vault_duplicate_trash' : 'vault_duplicate_active',
-        message: trashed ? 'Esta imagen ya está en tu papelera; puedes restaurarla.'
-          : 'Esta imagen ya está en tu biblioteca; no se guardó otra copia.',
+        message: trashed ? 'Este archivo ya está en tu papelera; puedes restaurarlo.'
+          : 'Este archivo ya está en tu biblioteca; no se guardó otra copia.',
       } }) });
   });
   await page.route('**/api/admin/vault/' + id + '/restore', (route) => {
@@ -900,22 +1050,22 @@ test('S2 mobile upload distinguishes an active duplicate from a recoverable tras
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: assetScript + '?vault-dedup-e2e=1', type: 'module' });
   await expect(page.getByText('guardada.png')).toBeVisible();
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles({
     name: 'otra-copia.png', mimeType: 'image/png', buffer: png,
   });
-  await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
-  await expect(page.getByText(/0 de 1 imágenes guardadas/)).toContainText('ya está en tu biblioteca');
+  await page.getByRole('button', { name: /Guardar 1 archivo/ }).click();
+  await expect(page.getByText(/0 de 1 archivos guardados/)).toContainText('ya está en tu biblioteca');
   await expect(page.getByRole('button', { name: 'Ver papelera para restaurar' })).toHaveCount(0);
   trashed = true;
-  await page.getByLabel('Añadir imágenes desde tu dispositivo').setInputFiles({
+  await page.getByLabel('Añadir fotos o videos desde tu dispositivo').setInputFiles({
     name: 'imagen-retirada.png', mimeType: 'image/png', buffer: png,
   });
-  await page.getByRole('button', { name: /Guardar 1 imagen/ }).click();
-  await expect(page.getByText(/0 de 1 imágenes guardadas/)).toContainText('ya está en tu papelera');
+  await page.getByRole('button', { name: /Guardar 1 archivo/ }).click();
+  await expect(page.getByText(/0 de 1 archivos guardados/)).toContainText('ya está en tu papelera');
   await page.getByRole('button', { name: 'Ver papelera para restaurar' }).click();
   await expect(page.getByText('guardada.png')).toBeVisible();
   await page.getByRole('button', { name: 'Restaurar' }).click();
-  await expect(page.getByText('Imagen restaurada en la biblioteca.')).toBeVisible();
+  await expect(page.getByText('Archivo restaurado en la biblioteca.')).toBeVisible();
   await page.getByRole('button', { name: 'Biblioteca', exact: true }).click();
   await expect(page.getByText('guardada.png')).toBeVisible();
   expect(uploads).toBe(2);
@@ -1015,7 +1165,7 @@ test('S2 mobile edits a tenant-private note, handles CSRF, clears and reads it a
   await expect(page.getByText('archivo-interno.png', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Detalles' }).click();
   await expect(page.getByText('Sin nota privada.')).toBeVisible();
-  const input = page.getByRole('textbox', { name: /Nota privada de la imagen/ });
+  const input = page.getByRole('textbox', { name: /Nota privada del archivo/ });
   await input.fill('  Revisar iluminación  ');
   await page.getByRole('button', { name: 'Guardar nota' }).click();
   await expect(page.getByText('Token inválido.')).toBeVisible();
@@ -1039,7 +1189,7 @@ test('S2 mobile edits a tenant-private note, handles CSRF, clears and reads it a
   await page.getByRole('button', { name: 'Detalles' }).click();
   await expect(page.getByText('Referencia de lectura')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Guardar nota' })).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: /Nota privada de la imagen/ })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /Nota privada del archivo/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
@@ -1100,7 +1250,7 @@ test('S2 mobile classifies private originals with CSRF, scoped filter and viewer
   await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
   await expect(page.getByText('Clasificación: Sin clasificar')).toBeVisible();
   await page.getByRole('button', { name: 'Detalles' }).click();
-  await page.getByRole('combobox', { name: 'Clasificar imagen para uso interno' }).selectOption('internal_only');
+  await page.getByRole('combobox', { name: 'Clasificar archivo para uso interno' }).selectOption('internal_only');
   await page.getByRole('button', { name: 'Guardar clasificación' }).click();
   await expect(page.getByText('Token inválido.')).toBeVisible();
   await page.getByRole('button', { name: 'Guardar clasificación' }).click();
@@ -1108,11 +1258,11 @@ test('S2 mobile classifies private originals with CSRF, scoped filter and viewer
   await expect(page.getByText('Clasificación: Solo uso interno')).toBeVisible();
   await page.getByRole('combobox', { name: 'Clasificación interna' }).selectOption('internal_only');
   await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
-  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('1 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByRole('combobox', { name: 'Clasificación interna' }).selectOption('needs_review');
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   expect(writes).toBe(2);
   expect(seen).toContainEqual(['internal_only', 'active']);
   expect(seen).toContainEqual(['needs_review', 'trash']);
@@ -1121,7 +1271,7 @@ test('S2 mobile classifies private originals with CSRF, scoped filter and viewer
   await page.addScriptTag({ url: script + '?vault-classification-viewer-e2e=1', type: 'module' });
   await expect(page.getByText('interno.png', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Detalles' }).click();
-  await expect(page.getByRole('combobox', { name: 'Clasificar imagen para uso interno' })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Clasificar archivo para uso interno' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Guardar clasificación' })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
@@ -1169,12 +1319,12 @@ test('S2 mobile renames a private image without changing its download identity',
   await page.addScriptTag({ url: asset + '?vault-rename-e2e=1', type: 'module' });
   await expect(page.getByText('original.png')).toBeVisible();
   await page.getByRole('button', { name: 'Renombrar' }).click();
-  await page.getByLabel('Nombre de la imagen').fill('nueva.png');
+  await page.getByLabel('Nombre del archivo').fill('nueva.png');
   await page.getByRole('button', { name: 'Guardar nombre' }).click();
   await expect(page.getByText('La solicitud ha caducado.')).toBeVisible();
   await expect(page.getByText('original.png')).toBeVisible();
   await page.getByRole('button', { name: 'Guardar nombre' }).click();
-  await expect(page.getByText('Nombre de imagen actualizado.')).toBeVisible();
+  await expect(page.getByText('Nombre de archivo actualizado.')).toBeVisible();
   await expect(page.getByText('nueva.png')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Descargar' }))
     .toHaveAttribute('href', '/api/admin/vault/' + id + '/download');
@@ -1221,14 +1371,14 @@ test('S2 mobile searches private filenames in library and trash without changing
   await page.addScriptTag({ url: script + '?vault-search-e2e=1', type: 'module' });
   await expect(page.getByText('festival.png')).toBeVisible();
   await expect(page.getByText('ensayo.png')).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Buscar imágenes por nombre' }).fill('festival');
+  await page.getByRole('searchbox', { name: 'Buscar archivos por nombre' }).fill('festival');
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
   await expect(page.getByText('festival.png')).toBeVisible();
   await expect(page.getByText('ensayo.png')).toHaveCount(0);
   await expect(page.getByText('Resultados para «festival» en biblioteca.')).toBeVisible();
-  await expect(page.getByText('2 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('2 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await expect(page.getByText('Resultados para «festival» en papelera.')).toBeVisible();
   await page.getByRole('button', { name: 'Biblioteca', exact: true }).click();
   await page.getByRole('button', { name: 'Limpiar búsqueda' }).click();
@@ -1293,17 +1443,17 @@ test('S2 mobile combines MIME filters, backend ordering and search while keeping
   await page.getByLabel('Formato').selectOption('webp');
   await expect(page.getByText('mar.webp')).toBeVisible();
   await expect(page.getByText('lago.png')).toHaveCount(0);
-  await expect(page.getByText('3 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('3 de 100 archivos, incluida la papelera.')).toBeVisible();
   await page.getByLabel('Ordenar por').selectOption('size_desc');
   await expect(page.getByText('mar.webp')).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Buscar imágenes por nombre' }).fill('lago');
+  await page.getByRole('searchbox', { name: 'Buscar archivos por nombre' }).fill('lago');
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await page.getByLabel('Formato').selectOption('all');
   await expect(page.getByText('lago.png')).toBeVisible();
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
-  await expect(page.getByText('3 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('3 de 100 archivos, incluida la papelera.')).toBeVisible();
   expect(requests.some((entry) =>
     entry.view === 'active' && entry.q === 'lago' && entry.format === 'webp' &&
     entry.sort === 'size_desc' && entry.page === '1')).toBe(true);
@@ -1365,7 +1515,7 @@ test('S2 mobile checks retained private original without leaking a fingerprint o
   await expect(page.getByRole('alert').getByText('El original privado no está disponible: archivo ausente.')).toBeVisible();
   await button.click();
   await expect(page.getByRole('alert').getByText('No se puede verificar el almacenamiento privado en este momento.')).toBeVisible();
-  await expect(page.getByText('1 de 100 imágenes, incluida la papelera.')).toBeVisible();
+  await expect(page.getByText('1 de 100 archivos, incluida la papelera.')).toBeVisible();
   expect(requests).toHaveLength(4);
   expect(requests.every((request) => request.method === 'GET' &&
     request.url.endsWith('/api/admin/vault/' + id + '/integrity'))).toBe(true);
@@ -1485,7 +1635,7 @@ test('S2 mobile verifies only visible originals and clears results on view switc
   await expect(page.getByText('imagen-1.png')).toBeVisible();
   await page.getByRole('button', { name: 'Verificar originales visibles (2)' }).click();
   await expect(page.getByText('Comprobados 2 de 2 originales.')).toBeVisible();
-  await expect(page.getByText(/1 de 2 imágenes necesitan revisión/)).toBeVisible();
+  await expect(page.getByText(/1 de 2 archivos necesitan revisión/)).toBeVisible();
   await expect(page.getByText('Original íntegro: tamaño y SHA-256 coinciden.')).toBeVisible();
   await expect(page.getByText(/Alerta: el tamaño o la huella SHA-256 no coinciden/)).toBeVisible();
   expect(requests).toEqual([first, second]);
@@ -1537,7 +1687,7 @@ test('S2 editor classifies explicitly selected active images atomically at 360px
     });
     if (bulkCalls === 1) return route.fulfill({
       status: 404, contentType: 'application/json',
-      body: JSON.stringify({ error: { code: 'file_not_found', message: 'Alguna imagen ya no está activa.' } }),
+      body: JSON.stringify({ error: { code: 'file_not_found', message: 'Algún archivo ya no está activo.' } }),
     });
     state = 'needs_review';
     return route.fulfill({ status: 200, contentType: 'application/json',
@@ -1547,25 +1697,25 @@ test('S2 editor classifies explicitly selected active images atomically at 360px
   await page.evaluate(() => { document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1"><div id="grindflow-admin"></div></main></div>'; });
   await page.addScriptTag({ url: script + '?vault-batch-e2e=1', type: 'module' });
   await expect(page.getByRole('checkbox', { name: 'Seleccionar imagen-1.png' })).toBeVisible();
-  await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
-  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByRole('button', { name: 'Seleccionar archivos visibles' }).click();
+  await expect(page.getByText('2 de 2 archivos visibles seleccionados.')).toBeVisible();
   await page.getByLabel('Clasificación para la selección').selectOption('needs_review');
   await page.getByRole('button', { name: 'Revisar clasificación de selección' }).click();
-  await expect(page.getByText(/¿Asignar «Requiere revisión» a las 2 imágenes/)).toBeVisible();
+  await expect(page.getByText(/¿Asignar «Requiere revisión» a los 2 archivos/)).toBeVisible();
   await page.getByRole('button', { name: 'Confirmar clasificación de selección' }).click();
-  await expect(page.getByRole('alert').getByText('Alguna imagen ya no está activa.')).toBeVisible();
-  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByRole('alert').getByText('Algún archivo ya no está activo.')).toBeVisible();
+  await expect(page.getByText('2 de 2 archivos visibles seleccionados.')).toBeVisible();
   await page.getByRole('button', { name: 'Revisar clasificación de selección' }).click();
   await page.getByRole('button', { name: 'Confirmar clasificación de selección' }).click();
-  await expect(page.getByText(/2 imágenes revisadas; 2 clasificaciones actualizadas/)).toBeVisible();
-  await expect(page.getByText('0 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByText(/2 archivos revisados; 2 clasificaciones actualizadas/)).toBeVisible();
+  await expect(page.getByText('0 de 2 archivos visibles seleccionados.')).toBeVisible();
   await expect(page.getByText('Clasificación: Requiere revisión')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Seleccionar imágenes visibles' }).click();
-  await expect(page.getByText('2 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await page.getByRole('button', { name: 'Seleccionar archivos visibles' }).click();
+  await expect(page.getByText('2 de 2 archivos visibles seleccionados.')).toBeVisible();
   await page.getByLabel('Clasificación interna', { exact: true }).selectOption('unclassified');
-  await expect(page.getByText('No hay imágenes que coincidan con los filtros.')).toBeVisible();
+  await expect(page.getByText('No hay archivos que coincidan con los filtros.')).toBeVisible();
   await page.getByLabel('Clasificación interna', { exact: true }).selectOption('all');
-  await expect(page.getByText('0 de 2 imágenes visibles seleccionadas.')).toBeVisible();
+  await expect(page.getByText('0 de 2 archivos visibles seleccionados.')).toBeVisible();
   expect(bulkCalls).toBe(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
@@ -1596,7 +1746,7 @@ test('S2 viewer has no batch controls in library or trash', async ({ page }) => 
   await page.addScriptTag({ url: script + '?vault-batch-viewer-e2e=1', type: 'module' });
   await expect(page.getByText('visible.png')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Seleccionar imágenes visibles' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Seleccionar archivos visibles' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Papelera', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Seleccionar visible.png' })).toHaveCount(0);
 });

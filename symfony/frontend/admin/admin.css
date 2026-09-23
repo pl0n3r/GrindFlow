@@ -100,9 +100,10 @@
 .vault-filters :focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
 @media(max-width:520px){.vault-filters{grid-template-columns:minmax(0,1fr)}}
 
-/* S2 in-browser preview: protected, responsive image inside details. */
+/* S2 in-browser preview: protected, responsive media inside details. */
 .vault-preview{flex:1 0 100%;min-width:0;margin:0;padding:12px;border:1px solid #39384d;border-radius:10px;background:#0d0e17;display:grid;gap:10px}
-.vault-preview img{display:block;max-width:100%;width:auto;height:auto;max-height:440px;object-fit:contain;border-radius:7px;justify-self:center}
+.vault-preview img,.vault-preview video{display:block;max-width:100%;width:auto;height:auto;max-height:440px;object-fit:contain;border-radius:7px;justify-self:center;background:#0d0e17}
+.vault-preview [hidden]{display:none!important}
 .vault-preview figcaption{color:#bfb8cd;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .vault-preview p{margin:0}
 
@@ -123,7 +124,7 @@
 .vault-selection p{margin:0;overflow-wrap:anywhere}
 .vault-selected-files{list-style:none;margin:0;padding:0;display:grid;gap:9px;min-width:0}
 .vault-selected-files li{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:0;padding:9px;border:1px solid #39384d;border-radius:9px}
-.vault-selected-files img,.vault-selected-mark{width:66px;height:66px;flex:0 0 66px;object-fit:contain;border-radius:7px;background:#0d0e17}
+.vault-selected-files img,.vault-selected-files video,.vault-selected-mark{width:66px;height:66px;flex:0 0 66px;object-fit:contain;border-radius:7px;background:#0d0e17}
 .vault-selected-mark{display:grid;place-items:center;font-size:28px;color:#b896ff}
 .vault-selected-details{min-width:0;flex:1 1 110px;display:grid;gap:5px}
 .vault-selected-details strong,.vault-selected-details small{overflow-wrap:anywhere}

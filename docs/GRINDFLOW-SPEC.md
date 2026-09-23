@@ -100,6 +100,15 @@ El destino es una **aplicación Symfony monolítica modular**, una MariaDB con m
 
 Se **conserva** la aplicación Laravel y su CI como referencia operativa durante la transición. Cada módulo se traslada con migraciones y pruebas de paridad de usuarios/organizaciones, IDs, permisos, estados, URLs, auditoría e históricos; por módulo existe un propietario único de escritura para evitar dos runtimes mutando el mismo estado sin coordinación. No modificar/borrar tablas Laravel automáticamente desde Doctrine.
 
+### S2 · Biblioteca multimedia privada (candidato v0.1.116)
+
+El Vault Symfony trata fotos y videos pequeños como originales privados del tenant.
+El quick upload síncrono admite JPEG/PNG/WebP y MP4/WebM hasta 8 MiB, valida el
+tipo desde los bytes, conserva SHA-256/deduplicación y sirve previews únicamente
+tras revalidar sesión, organización e integridad. La UI puede previsualizar video
+con controles nativos sin autoplay. Esto no procesa, programa ni publica el
+archivo y no sustituye el pipeline asíncrono/direct upload para media grande.
+
 ### S2 · Clasificación conservadora de recursos (integrada v0.1.62)
 
 El Vault asigna a cada original una clasificación interna: `unclassified` por defecto,

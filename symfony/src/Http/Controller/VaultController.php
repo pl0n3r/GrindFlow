@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Isolated S2 photo library. Files never live under public/; no external delivery.
+ * Isolated S2 media library. Files never live under public/; no external delivery.
  * Tenant is exclusively the verified session membership, not a client parameter.
  */
 final class VaultController extends AbstractController
@@ -27,7 +27,7 @@ final class VaultController extends AbstractController
     private const MAX_BYTES = 8 * 1024 * 1024;
     private const MAX_ORGANIZATION_ASSETS = 100;
     private const MAX_ORGANIZATION_BYTES = 128 * 1024 * 1024;
-    private const MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+    private const MIMES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'];
 
     public function __construct(
         private readonly PrivateVaultDirectory $storage,
@@ -66,7 +66,14 @@ final class VaultController extends AbstractController
             return $this->error(422, 'invalid_search', 'Indica una búsqueda de hasta 80 caracteres visibles.');
         }
         $format = $request->query->all()['format'] ?? 'all';
-        $formats = ['all' => null, 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+        $formats = [
+            'all' => null,
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+        ];
         if (!is_string($format) || !array_key_exists($format, $formats)) {
             return $this->error(422, 'invalid_format', 'Selecciona todos los formatos, JPEG, PNG o WebP.');
         }
@@ -168,18 +175,19 @@ final class VaultController extends AbstractController
 
         $size = $file->getSize();
         if (!is_int($size) || $size < 1 || $size > self::MAX_BYTES) {
-            return $this->error(422, 'invalid_size', 'La imagen debe pesar entre 1 byte y 8 MiB.');
+            return $this->error(422, 'invalid_size', 'El archivo debe pesar entre 1 byte y 8 MiB.');
         }
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($file->getPathname());
-        if (!is_string($mime) || !in_array($mime, self::MIMES, true) || @getimagesize($file->getPathname()) === false) {
-            return $this->error(422, 'invalid_type', 'Solo se aceptan imágenes JPEG, PNG o WebP válidas.');
+        if (!is_string($mime) || !in_array($mime, self::MIMES, true)
+            || !$this->hasSupportedMediaSignature($file->getPathname(), $mime)) {
+            return $this->error(422, 'invalid_type', 'Solo se aceptan JPEG, PNG, WebP, MP4 o WebM válidos.');
         }
 
         $filename = basename(str_replace('\\', '/', $file->getClientOriginalName()));
-        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $filename) ?: 'imagen';
+        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $filename) ?: 'archivo';
         $filename = mb_substr(trim($filename), 0, 180);
         if ($filename === '') {
-            $filename = 'imagen';
+            $filename = 'archivo';
         }
 
         $id = Uuid::v7()->toRfc4122();
@@ -191,7 +199,7 @@ final class VaultController extends AbstractController
             $actualSize = filesize($path);
             $sha256 = hash_file('sha256', $path);
             if ($actualSize === false || $sha256 === false || $actualSize !== $size) {
-                return $this->error(422, 'invalid_upload', 'La imagen no pudo verificarse.');
+                return $this->error(422, 'invalid_upload', 'El archivo no pudo verificarse.');
             }
             // Every cooperating upload locks the same organization row before counting.
             // File IO and hashing have finished before the transaction starts.
@@ -269,13 +277,13 @@ final class VaultController extends AbstractController
             });
 
             if ($uploadStatus === 'quota') {
-                return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 imágenes o 128 MiB por organización.');
+                return $this->error(409, 'vault_quota_exceeded', 'La biblioteca alcanzó su cuota: máximo 100 archivos o 128 MiB por organización.');
             }
             if ($uploadStatus === 'duplicate_active') {
-                return $this->error(409, 'vault_duplicate_active', 'Esta imagen ya está en tu biblioteca; no se guardó otra copia.');
+                return $this->error(409, 'vault_duplicate_active', 'Este archivo ya está en tu biblioteca; no se guardó otra copia.');
             }
             if ($uploadStatus === 'duplicate_trash') {
-                return $this->error(409, 'vault_duplicate_trash', 'Esta imagen ya está en tu papelera; puedes restaurarla.');
+                return $this->error(409, 'vault_duplicate_trash', 'Este archivo ya está en tu papelera; puedes restaurarlo.');
             }
             if ($uploadStatus !== 'stored') {
                 return $this->error(403, 'organization_access_changed', 'Tu permiso para guardar cambió.');
@@ -365,7 +373,7 @@ final class VaultController extends AbstractController
 
 
     /**
-     * Browser-only inline image preview. The original stays outside public/,
+     * Browser-only inline media preview. The original stays outside public/,
      * and every request rechecks the user, tenant and active file state.
      */
     #[Route('/api/admin/vault/{id}/preview', name: 'grindflow_vault_preview', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
@@ -407,7 +415,13 @@ final class VaultController extends AbstractController
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         // Never use a user-controlled filename for inline content.
-        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime];
+        $extension = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'video/mp4' => 'mp4',
+            'video/webm' => 'webm',
+        ][$mime];
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, 'preview.'.$extension);
 
         return $response;
@@ -465,7 +479,7 @@ final class VaultController extends AbstractController
         $body = json_decode($request->getContent(), true);
         if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
             || array_keys($body) !== ['name'] || !is_string($body['name'])) {
-            return $this->error(422, 'invalid_name', 'Indica únicamente un nombre de imagen válido.');
+            return $this->error(422, 'invalid_name', 'Indica únicamente un nombre de archivo válido.');
         }
         $name = trim($body['name']);
         if (preg_match('/\\A.{2,180}\\z/usD', $name) !== 1
@@ -523,7 +537,7 @@ final class VaultController extends AbstractController
             return $written === 1 ? 'updated' : 'revoked';
         });
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
         }
         if ($result !== 'updated') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para renombrar cambió.');
@@ -612,7 +626,7 @@ final class VaultController extends AbstractController
             return $written === 1 ? 'updated' : 'revoked';
         });
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
         }
         if ($result !== 'updated') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para editar la nota cambió.');
@@ -633,7 +647,7 @@ final class VaultController extends AbstractController
             return $context;
         }
         if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
-            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar imágenes.');
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
@@ -694,7 +708,7 @@ final class VaultController extends AbstractController
             return $written === 1 ? 'updated' : 'revoked';
         });
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'No se encontró la imagen activa en tu organización.');
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
         }
         if ($result !== 'updated') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
@@ -715,14 +729,14 @@ final class VaultController extends AbstractController
             return $context;
         }
         if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
-            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar imágenes.');
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
             return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
         }
         $body = json_decode($request->getContent(), true);
         if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)) {
-            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 imágenes activas.');
+            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 archivos activos.');
         }
         $keys = array_keys($body);
         sort($keys);
@@ -731,7 +745,7 @@ final class VaultController extends AbstractController
         if ($keys !== ['ids', 'usage_scope'] || !is_array($ids) || !array_is_list($ids)
             || count($ids) < 1 || count($ids) > 30 || !is_string($usage)
             || !in_array($usage, ['unclassified', 'internal_only', 'needs_review'], true)) {
-            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 imágenes y una clasificación válida.');
+            return $this->error(422, 'invalid_bulk_usage', 'Selecciona entre 1 y 30 archivos y una clasificación válida.');
         }
         foreach ($ids as $id) {
             if (!is_string($id)
@@ -740,7 +754,7 @@ final class VaultController extends AbstractController
             }
         }
         if (count(array_unique($ids)) !== count($ids)) {
-            return $this->error(422, 'invalid_bulk_usage', 'Cada imagen debe seleccionarse una sola vez.');
+            return $this->error(422, 'invalid_bulk_usage', 'Cada archivo debe seleccionarse una sola vez.');
         }
 
         $organization = $context['organization']['id'];
@@ -813,10 +827,10 @@ final class VaultController extends AbstractController
                 return ['selected_count' => count($ids), 'updated_count' => $written];
             });
         } catch (\LogicException) {
-            return $this->error(403, 'organization_access_changed', 'Tu acceso cambió; no se clasificó ninguna imagen.');
+            return $this->error(403, 'organization_access_changed', 'Tu acceso cambió; no se clasificó ningún archivo.');
         }
         if ($result === 'not_found') {
-            return $this->error(404, 'file_not_found', 'Alguna imagen ya no está activa en esta organización.');
+            return $this->error(404, 'file_not_found', 'Algún archivo ya no está activo en esta organización.');
         }
         if ($result === 'revoked') {
             return $this->error(403, 'organization_access_changed', 'Tu permiso para clasificar cambió.');
@@ -943,6 +957,53 @@ final class VaultController extends AbstractController
         }
 
         return ['user' => $user, 'organization' => $organization];
+    }
+
+    /**
+     * Validate a bounded media signature without invoking external tools.
+     * Quick upload stays capped at 8 MiB; deeper inspection/transcoding belongs
+     * to the asynchronous media-processing pipeline.
+     */
+    private function hasSupportedMediaSignature(string $path, string $mime): bool
+    {
+        if (str_starts_with($mime, 'image/')) {
+            return @getimagesize($path) !== false;
+        }
+
+        $handle = @fopen($path, 'rb');
+        if ($handle === false) {
+            return false;
+        }
+        try {
+            $head = fread($handle, 4096);
+        } finally {
+            fclose($handle);
+        }
+        if (!is_string($head)) {
+            return false;
+        }
+        if ($mime === 'video/webm') {
+            return strlen($head) >= 4 && substr($head, 0, 4) === "\x1A\x45\xDF\xA3";
+        }
+        if ($mime !== 'video/mp4') {
+            return false;
+        }
+
+        $offset = 0;
+        $length = strlen($head);
+        while ($offset + 8 <= $length) {
+            $size = unpack('N', substr($head, $offset, 4));
+            $boxSize = is_array($size) ? (int) ($size[1] ?? 0) : 0;
+            $type = substr($head, $offset + 4, 4);
+            if ($type === 'ftyp') {
+                return $boxSize >= 16 && $offset + $boxSize <= $length;
+            }
+            if ($boxSize < 8 || $offset + $boxSize > $length) {
+                return false;
+            }
+            $offset += $boxSize;
+        }
+        return false;
     }
 
     /** @param array<string, mixed> $asset

@@ -356,6 +356,19 @@ límites de semana y ventana UTC; Chromium móvil con datos sintéticos, navegac
 y estado explícito de Traffic no integrado. La integración real de Traffic y
 la línea base comercial siguen como slices posteriores del roadmap #2.
 
+### GF-FR-019 — Quick upload privado de video en Vault Symfony
+**Enunciado:** el Vault S2 acepta también videos MP4/WebM pequeños por el mismo quick upload privado y tenant-safe que las fotos, sin convertir la carga en procesamiento, distribución ni publicación.
+
+**Aceptación:**
+- El endpoint síncrono conserva el límite fijo de 8 MiB por archivo y admite únicamente JPEG, PNG, WebP, MP4 y WebM detectados por bytes reales; extensión o MIME declarado por el cliente no bastan. Imágenes conservan validación de imagen y videos exigen firma de contenedor MP4/WebM acotada.
+- El catálogo `gf_vault_assets` restringe `mime_type` a los mismos cinco MIME aceptados por el endpoint; catálogo y validación HTTP deben evolucionar juntos para no aceptar un formato que la persistencia rechace.
+- Lista, búsqueda, cuota, clasificación, nota, papelera, integridad, descarga y deduplicación siguen siendo comunes a todos los originales. Los filtros exactos añaden `mp4` y `webm` sin alterar la cuota global ni mostrar recursos de otro tenant.
+- Preview autenticado entrega el MIME real únicamente después de verificar organización, membresía, estado activo, tamaño y SHA-256. Usa `no-store`, `nosniff`, `Cross-Origin-Resource-Policy: same-origin` y nombre de preview fijo; nunca expone storage key ni filename del usuario en inline.
+- React permite selección múltiple de fotos/videos, preview local limitado, progreso por archivo y reintento solo de fallos. El detalle de video usa controles nativos, `playsInline`, `preload=metadata` y nunca autoplay.
+- El quick upload no ejecuta FFmpeg/FFprobe, no genera derivados, no llama proveedores y no habilita distribución. Los videos mayores quedan fuera de este flujo y usan un contrato separado de direct upload/processing.
+
+**Verificación:** PHPUnit/MariaDB sintética con MP4/WebM mínimos válidos, contenedor MP4 inválido, filtros, cross-tenant, preview/descarga y headers privados; build TypeScript/Vite y Chromium del panel Symfony dentro de `symfony-preview`. Datos descartables únicamente.
+
 ### GF-UX-001 — Shell de navegación consistente y responsive
 **Estado:** integrado en main v0.1.70; despliegue y producción se verifican por separado.
 
