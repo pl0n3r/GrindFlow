@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
+use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Entity\IdentityUser;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Target;
@@ -48,21 +49,9 @@ final class AccountSecurityController extends AbstractController
             return $response;
         }
 
-        // Reject a declared oversized request before buffering its body; always check
-        // the actual byte length too, since Content-Length is not an authority.
-        // The web server must also enforce its own request-size limit.
-        $declaredLength = $request->headers->get('Content-Length');
-        if (is_string($declaredLength) && ctype_digit($declaredLength)
-            && (int) $declaredLength > 4096) {
-            return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
-        }
-        // Read one byte beyond the accepted size, never buffer an unbounded body.
-        $stream = $request->getContent(true);
-        $raw = is_resource($stream) ? stream_get_contents($stream, 4097) : false;
-        if (!is_string($raw) || strlen($raw) > 4096) {
-            return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
-        }
-        $body = json_decode($raw, true, 16);
+        // Authenticate, validate CSRF and consume the per-identity attempt before parsing.
+        // The shared reader enforces the same byte and depth contract as profile rename.
+        $body = BoundedJsonBody::decode($request);
         if (!is_array($body) || $request->request->all() !== [] || $request->files->all() !== []) {
             return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
         }
