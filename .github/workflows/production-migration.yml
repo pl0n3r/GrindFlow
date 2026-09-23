@@ -31,6 +31,8 @@ jobs:
       EXPECTED_PENDING: ${{ github.event.comment.body == '/production-migrate 7 backup-verified' && '7' || '1' }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Initialize migration result
         shell: bash

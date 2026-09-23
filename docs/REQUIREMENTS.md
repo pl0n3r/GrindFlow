@@ -161,6 +161,14 @@ Each requirement should contain:
 
 **Verificación:** cada cambio de workflows debe superar `preflight` y `validate`; la matriz aplicable debe ejecutar correctamente cache, setup de Node, checkout y subida de artefactos con sus entradas existentes. La política no autoriza cambios productivos, despliegues ni uso de secretos adicionales.
 
+### GF-OPS-014 — Checkout de CI sin credenciales Git persistidas
+
+**Enunciado:** los jobs de GitHub Actions que obtienen el código de GrindFlow no deben dejar el token inyectado por `actions/checkout` persistido en la configuración Git del runner cuando no existe una operación Git autenticada posterior. Las acciones que escriben Issues, comentarios o metadatos deben usar de forma explícita `github.token` o el secreto requerido por su API, sin reutilizar credenciales implícitas del checkout.
+
+**Aceptación:** toda referencia a `actions/checkout` en `.github/workflows/` declara `persist-credentials: false`. `scripts/workflow-syntax-check.rb` inspecciona todos los jobs y falla si un checkout nuevo omite el opt-out o intenta volver a persistir credenciales. El cambio no modifica triggers, permisos declarados, secretos, comandos de aplicación, acceso a producción ni semántica de los gates.
+
+**Verificación:** `fast` ejecuta el validador sobre todos los workflows y la matriz completa debe completar checkout, pruebas y automatizaciones con el token Git no persistido. Los workflows con escritura de Issues/PR continúan usando sus permisos mínimos y variables de token explícitas; no se autoriza ningún push Git desde CI.
+
 ### GF-OPS-010 — Readiness segura del runtime Symfony
 
 **Estado:** implementado en código; despliegue y producción se verifican por separado.

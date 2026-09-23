@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Check out exact main source
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Read expected human release
         shell: bash
         run: |

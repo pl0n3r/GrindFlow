@@ -39,6 +39,29 @@ paths.each do |path|
 end
 puts "PASS official GitHub Actions use Node 24-capable majors"
 
+# Checkout is only used to read repository content in GrindFlow workflows.
+# Do not leave the injected GitHub token in .git/config for later processes.
+paths.each do |path|
+  workflow = YAML.safe_load_file(path, aliases: true)
+  jobs = workflow.fetch("jobs", {})
+  next unless jobs.is_a?(Hash)
+
+  jobs.each_value do |job|
+    next unless job.is_a?(Hash)
+
+    Array(job["steps"]).each do |step|
+      next unless step.is_a?(Hash)
+      next unless step["uses"].is_a?(String) && step["uses"].downcase.start_with?("actions/checkout@")
+
+      options = step.fetch("with", {})
+      unless options.is_a?(Hash) && options["persist-credentials"] == false
+        abort "#{File.basename(path)} checkout must set persist-credentials: false"
+      end
+    end
+  end
+end
+puts "PASS checkout credentials are not persisted"
+
 smoke_path = File.join(root, ".github/workflows/production-smoke.yml")
 smoke = YAML.safe_load_file(smoke_path, aliases: true)
 steps = smoke.fetch("jobs").fetch("production-smoke").fetch("steps")
