@@ -129,14 +129,17 @@ final class AccountSecurityTest extends WebTestCase
             $client->request('GET', '/api/admin/context');
             $freshCsrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
             $freshHeaders = $jsonHeaders + ['HTTP_X_CSRF_TOKEN' => $freshCsrf];
-            // A syntactically valid request padded beyond the 4 KiB input ceiling
-            // must fail before JSON decoding or any password change. It still counts
-            // against the per-identity limiter, even across renewed sessions.
-            $oversized = str_repeat(' ', 4097).json_encode([
+            // A valid JSON request whose trailing whitespace crosses the 4 KiB
+            // ceiling must not change the password. The test detects code that
+            // reads only 4096 bytes, since the truncated body is valid JSON.
+            $oversizedJson = json_encode([
                 'current_password' => $next, 'new_password' => $old,
                 'confirm_password' => $old,
             ], JSON_THROW_ON_ERROR);
-            $client->request('POST', $endpoint, [], [], $freshHeaders, $oversized);
+            $oversized = $oversizedJson.str_repeat(' ', 4097 - strlen($oversizedJson));
+            self::assertSame(4097, strlen($oversized));
+            $client->request('POST', $endpoint, [], [],
+                $freshHeaders + ['CONTENT_LENGTH' => '1'], $oversized);
             self::assertResponseStatusCodeSame(422);
             self::assertSame('invalid_password', json_decode(
                 (string) $client->getResponse()->getContent(), true,
@@ -300,18 +303,20 @@ final class AccountSecurityTest extends WebTestCase
             self::assertResponseIsSuccessful();
             $csrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['profile_password_csrf'];
 
-            // 17 nested arrays exceed the controller's json_decode depth of 16
-            // while remaining far below the independent 4 KiB byte ceiling.
+            // The first duplicate key exceeds depth 16. An unbounded decoder
+            // accepts the final scalar instead, so removing the guard would
+            // actually change the account rather than fail at the type check.
             $nestedValue = 'blocked';
             for ($depth = 0; $depth < 17; ++$depth) {
                 $nestedValue = [$nestedValue];
             }
-            $nested = json_encode([
-                'current_password' => $password,
-                'new_password' => $nestedValue,
-                'confirm_password' => $password,
-            ], JSON_THROW_ON_ERROR);
+            $replacement = 'synthetic-next-depth-password-456';
+            $nested = '{"current_password":'.json_encode($password, JSON_THROW_ON_ERROR)
+                .',"new_password":'.json_encode($nestedValue, JSON_THROW_ON_ERROR)
+                .',"new_password":'.json_encode($replacement, JSON_THROW_ON_ERROR)
+                .',"confirm_password":'.json_encode($replacement, JSON_THROW_ON_ERROR).'}';
             self::assertLessThan(4096, strlen($nested));
+            self::assertSame($replacement, json_decode($nested, true, 512, JSON_THROW_ON_ERROR)['new_password']);
 
             $client->request('POST', '/api/admin/profile/password', [], [], [
                 'CONTENT_TYPE' => 'application/json',
