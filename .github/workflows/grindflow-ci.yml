@@ -4,6 +4,7 @@ run-name: GrindFlow CI #${{ github.run_number }} · ${{ github.event_name }} · 
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -222,6 +223,8 @@ jobs:
           python3 -m py_compile scripts/production-migration-inventory.py
           python3 -m py_compile scripts/production-smoke-auth-triage.py
           python3 -m unittest tests/test_production_smoke_auth_triage.py
+          python3 -m py_compile scripts/coderabbit-final-review.py
+          python3 -m unittest tests/test_coderabbit_final_review.py
           python3 -m py_compile scripts/production-migration-contract.py
           python3 -m py_compile scripts/production-runtime-readiness.py
           python3 -m py_compile scripts/production-runtime-readiness-contract.py

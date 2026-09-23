@@ -992,6 +992,18 @@ CodeRabbit todavía mostraba «Currently processing», sin revisión final visib
 Esa conducta no se repite. Esta es una regla de actuación del agente; por sí
 sola no implica que GitHub tenga un ruleset/required check configurado.
 
+- Para contrastar evidencia del HEAD exacto sin confundir un `success` de revisión
+  omitida con una revisión terminada, se puede usar el verificador de solo lectura
+  `scripts/coderabbit-final-review.py` documentado en
+  `docs/CODERABBIT-FINAL-REVIEW.md`. Sus tests se ejecutan en el gate `fast`.
+  Es ayuda de verificación, **no** fusión automática ni ruleset GitHub.
+- **Concurrencia de agentes (issue #123):** inspeccionar repo, PRs, issues,
+  CI y revisiones antes de escribir, y actualizar la evidencia al cerrar un
+  hito; evitar polling frecuente de bots y checks, commits y comentarios
+  fragmentados. Agrupar escrituras por bloque lógico y coordinar como máximo
+  2–3 agentes simultáneos por repositorio, sin duplicar ramas o tareas.
+
+
 
 ### Observacion de deploy y real-stack
 
