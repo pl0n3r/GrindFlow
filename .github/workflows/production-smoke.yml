@@ -28,6 +28,8 @@ jobs:
       MEDIA_STORAGE_ISSUE_TITLE: '[AUTO] Media Storage Not Configured'
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - id: credentials
         name: Check synthetic credentials
