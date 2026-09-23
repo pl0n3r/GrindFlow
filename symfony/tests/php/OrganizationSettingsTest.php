@@ -115,6 +115,26 @@ final class OrganizationSettingsTest extends WebTestCase
             ], json_encode(['name' => 'IDOR blocked', 'organization_id' => $foreign], JSON_THROW_ON_ERROR));
             self::assertResponseStatusCodeSame(422);
 
+            // Unlike a permissive partial update, rename accepts exactly one
+            // field: additional tenant/role flags must never be silently ignored.
+            $client->request('POST', '/api/admin/organization/name', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token,
+            ], json_encode([
+                'name' => 'Unexpectedly renamed',
+                'unexpected_flag' => true,
+            ], JSON_THROW_ON_ERROR));
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_name', json_decode(
+                (string) $client->getResponse()->getContent(), true,
+            )['error']['code']);
+            self::assertSame('Own studio', $db->fetchOne(
+                'SELECT name FROM gf_identity_organizations WHERE id = ?', [$mine],
+            ));
+            self::assertSame('Foreign studio', $db->fetchOne(
+                'SELECT name FROM gf_identity_organizations WHERE id = ?', [$foreign],
+            ));
+
             $updatedJson = '{"name":"Updated own studio"}';
             $oversized = $updatedJson.str_repeat(' ', 4097 - strlen($updatedJson));
             self::assertSame(4097, strlen($oversized));
