@@ -56,8 +56,10 @@ final class AccountSecurityController extends AbstractController
             && (int) $declaredLength > 4096) {
             return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
         }
-        $raw = $request->getContent();
-        if (strlen($raw) > 4096) {
+        // Read one byte beyond the accepted size, never buffer an unbounded body.
+        $stream = $request->getContent(true);
+        $raw = is_resource($stream) ? stream_get_contents($stream, 4097) : false;
+        if (!is_string($raw) || strlen($raw) > 4096) {
             return $this->error(422, 'invalid_password', 'Completa los tres campos de contraseña.');
         }
         $body = json_decode($raw, true, 16);
