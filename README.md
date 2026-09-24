@@ -30,7 +30,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **13** | **+938** | **−34** | **+904** |
+| **13** | **+941** | **−32** | **+909** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -90,4 +90,9 @@ Inventario del diff exacto:
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 ## Panorama general pendiente
-- **NOW:** 🚧 #149 · privacidad como código. Las prioridades posteriores viven únicamente en el [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | 🚧 #149 · privacidad como código | 🚧 validación final |
+| **NEXT** | 🚧 Roadmap canónico #2 | 🚧 prioridades gestionadas allí |
+| **BLOCKED / EXTERNAL** | ⛔ revisión jurídica humana | ⛔ separada del merge técnico |
+| **LATER** | 🚧 Roadmap canónico #2 | 🚧 trabajo posterior gestionado allí |
