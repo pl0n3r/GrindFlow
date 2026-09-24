@@ -873,6 +873,18 @@ jobs:
           node-version: '22'
           cache: npm
       - run: python3 scripts/ci_retry.py --label "Legacy Node dependencies" -- npm ci --prefer-offline --no-audit --no-fund
+      - name: Install worker Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/grindflow-worker-venv
+          python3 scripts/ci_retry.py --label "Worker Python dependencies" -- \
+            /tmp/grindflow-worker-venv/bin/pip install --disable-pip-version-check -r workers/requirements.txt
+      - name: Worker Python image pipeline
+        shell: bash
+        env:
+          PYTHONPATH: workers
+        run: /tmp/grindflow-worker-venv/bin/python -m unittest workers/test_image_pipeline.py
       - name: Legacy validation during migration
         shell: bash
         run: |
