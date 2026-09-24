@@ -37,6 +37,7 @@ APP_ENV="production"
 APP_DEBUG="false"
 APP_URL="https://www.grindflow.com.co"
 APP_PHASE="construccion"
+CACHE_STORE="file"
 SMOKE_USER_EMAIL="e2e-admin@grindflow.test"
 SMOKE_USER_PASSWORD="<secret>"
 SMOKE_USER_NAME="GrindFlow Production Smoke"
@@ -46,8 +47,11 @@ SMOKE_USER_NAME="GrindFlow Production Smoke"
 de GitHub Actions `PRODUCTION_E2E_PASSWORD`. Production Smoke sincroniza ese
 valor automáticamente después de que `/health` demuestra el SHA exacto de
 `main`: obtiene un token OIDC efímero de GitHub, el servidor valida
-repositorio/IDs/ref/workflow/SHA/audiencia, guarda un backup cifrado privado de
-`.env`, persiste únicamente `SMOKE_USER_PASSWORD` y ejecuta
+repositorio/IDs/ref/workflow/SHA/audiencia y consume su `jti` en cache
+persistente. Si una instalación antigua todavía arranca con cache `array`, el
+bootstrap solo continúa cuando el store `file` está disponible y escribible;
+después del OIDC válido guarda un backup cifrado privado de `.env`, persiste
+`SMOKE_USER_PASSWORD` y `CACHE_STORE=file`, y ejecuta
 `grindflow:provision-smoke-user`. Si la reconciliación falla, restaura el
 `.env` anterior y no envía ningún login. Nunca copies el valor a Issues, PRs,
 logs o comandos de chat. El correo queda limitado por código al dominio
