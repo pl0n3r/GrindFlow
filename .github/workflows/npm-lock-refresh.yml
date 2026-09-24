@@ -42,12 +42,19 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           const names = ['vitest', 'vite', 'postcss', 'esbuild', 'next-intl', '@vitest/mocker'];
           const versions = {};
           for (const name of names) {
-            const path = `node_modules/${name}/package.json`;
-            const parsed = JSON.parse(fs.readFileSync(path, 'utf8'));
-            versions[name] = parsed.version;
+            const suffix = `node_modules/${name}`;
+            versions[name] = [...new Set(
+              Object.entries(lock.packages)
+                .filter(([path, meta]) => meta?.version && (path === suffix || path.endsWith(`/${suffix}`)))
+                .map(([, meta]) => meta.version)
+            )].sort();
+            if (versions[name].length === 0) {
+              throw new Error(`No resolved versions found for ${name}`);
+            }
           }
           fs.writeFileSync('npm-security-versions.json', JSON.stringify(versions, null, 2) + '\n');
           NODE
