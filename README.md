@@ -21,7 +21,7 @@
 | Version objetivo | 🚧 **v0.1.124** | `config/version.php`; candidata |
 | Base exacta | ✅ ~~main v0.1.123~~ | `88bc1ba66658ff9208540db4f7c04545bbfbbe3d` |
 | CI/Sonar/CodeRabbit del PR | 🚧 pendiente | exigen HEAD final |
-| CI exact-main base | ✅ ~~success~~ | #35974051468 |
+| CI del SHA exacto de main (base) | ✅ ~~success~~ | #35974051468 |
 | Health productivo base | ✅ ~~SHA exacto~~ | Smoke #35974051526 |
 | Deploy Observer base | ✅ ~~success~~ | #35974051489 |
 | Production Smoke base | ⛔ #73 · HTTP 503 bootstrap | #35974051526; no hubo login |
@@ -46,9 +46,10 @@
 ## Flujo de entrega
 ```mermaid
 flowchart LR
- A["HTTP 503 tras OIDC"] --> B["Diagnóstico de fase/código fijo"]
- B --> C["CI + Sonar + CodeRabbit"]
- C --> M["Squash merge"]
+ A["PR + snapshot exacto"] --> B["HTTP 503 tras OIDC"]
+ B --> C["Diagnóstico de fase/código fijo"]
+ C --> D["CI + Sonar + CodeRabbit"]
+ D --> M["Squash merge"]
  M --> X["CI exact-main + /health"]
  X --> S["Smoke sin reintentos 503"]
  S --> G["Reparación de causa raíz"]

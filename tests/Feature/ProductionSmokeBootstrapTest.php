@@ -9,6 +9,7 @@ use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
@@ -139,7 +140,6 @@ class ProductionSmokeBootstrapTest extends TestCase
         $this->assertDatabaseCount('users', 0);
     }
 
-
     #[DataProvider('safeReconciliationCodes')]
     public function test_verified_bootstrap_reports_only_allowlisted_failure_codes(
         string $errorMessage,
@@ -197,12 +197,12 @@ class ProductionSmokeBootstrapTest extends TestCase
             });
         $this->app->instance(ProductionEnvironmentWriter::class, $writer);
 
-        \Illuminate\Support\Facades\Artisan::shouldReceive('call')
+        Artisan::shouldReceive('call')
             ->once()->with('config:clear')
             ->andReturn($failedCommand === 'config:clear' ? 1 : 0);
 
         if ($failedCommand === 'grindflow:provision-smoke-user') {
-            \Illuminate\Support\Facades\Artisan::shouldReceive('call')->once()
+            Artisan::shouldReceive('call')->once()
                 ->with('grindflow:provision-smoke-user')->andReturn(1);
         }
 
