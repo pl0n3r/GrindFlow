@@ -9,6 +9,7 @@ use App\Http\Controllers\Connections\GoogleDriveConnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Distribution\DistributionController;
 use App\Http\Controllers\Finance\FinanceController;
+use App\Http\Controllers\Operations\ProductionSmokeBootstrapController;
 use App\Http\Controllers\Scheduling\SchedulerController;
 use App\Http\Controllers\Traffic\TrackedLinkRedirectController;
 use App\Http\Controllers\Traffic\TrafficController;
@@ -41,6 +42,11 @@ Route::get('/health', static function (CheckoutIdentity $identity): JsonResponse
         ->header('X-Content-Type-Options', 'nosniff');
 })->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
     ->name('health.exact');
+
+Route::post('/internal/production-smoke/bootstrap', ProductionSmokeBootstrapController::class)
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
+    ->middleware('throttle:6,1')
+    ->name('production-smoke.bootstrap');
 
 Route::get('/_deployment', static function (): JsonResponse {
     // Version humana observable, sin inferir el SHA del checkout remoto.
