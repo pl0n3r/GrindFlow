@@ -13,7 +13,7 @@ $release = require __DIR__.'/version.php';
 
 return [
     'dsn' => env('APP_ENV') === 'production'
-        ? env('SENTRY_LARAVEL_DSN', 'https://4e981c4c3adfc32afc86670945a7e4a4@o4512139951865856.ingest.us.sentry.io/4512139977621504')
+        ? env('SENTRY_LARAVEL_DSN', 'https://321c2bf9d5acca22a97990859413d02b@o4512139951865856.ingest.us.sentry.io/4512140006195200')
         : null,
 
     'release' => 'grindflow@'.($release['number'] ?? '0.0.0-dev'),
