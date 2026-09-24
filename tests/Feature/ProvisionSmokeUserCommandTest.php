@@ -230,6 +230,33 @@ class ProvisionSmokeUserCommandTest extends TestCase
         self::assertCount(1, Storage::disk('local')->allFiles('operations/smoke-user-backups'));
     }
 
+    public function test_it_rejects_a_membership_conflict_on_the_new_dedicated_identity_without_mutation(): void
+    {
+        config(['grindflow.smoke_user.email' => ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL]);
+        $dedicated = User::factory()->create([
+            'email' => ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL,
+            'name' => 'Occupied dedicated identity',
+            'password' => 'existing-secret',
+            'platform_role' => UserRole::Model,
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::query()->create([
+            'user_id' => $dedicated->getKey(),
+            'organization_id' => $organization->getKey(),
+            'role' => UserRole::Model,
+        ]);
+        $existingHash = $dedicated->getAuthPassword();
+
+        $this->artisan('grindflow:provision-smoke-user')->assertFailed();
+
+        self::assertSame('provision-membership-conflict', config('grindflow.smoke_provision_failure_code'));
+        $dedicated->refresh();
+        self::assertSame(UserRole::Model, $dedicated->platform_role);
+        self::assertSame($existingHash, $dedicated->getAuthPassword());
+        self::assertSame(1, $dedicated->memberships()->count());
+        self::assertSame([], Storage::disk('local')->allFiles('operations/smoke-user-backups'));
+    }
+
     public function test_it_refuses_to_reconcile_a_synthetic_email_with_an_organization_membership(): void
     {
         $user = User::factory()->create([
