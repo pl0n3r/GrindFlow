@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "project": "pl0n3r/GrindFlow",
+  "phase": "construccion",
+  "controller": {
+    "name": "[COMPLETAR POR EL DUEÑO]",
+    "identifier": "[COMPLETAR POR EL DUEÑO]",
+    "address": "[COMPLETAR POR EL DUEÑO]",
+    "rights_email": "[COMPLETAR POR EL DUEÑO]"
+  },
+  "treatments": [
+    {
+      "id": "account_credentials",
+      "category": "authentication",
+      "fields": [
+        "password",
+        "remember_token"
+      ],
+      "purpose": "account_security",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "account_identity",
+      "category": "contact",
+      "fields": [
+        "name",
+        "display_name",
+        "handle",
+        "email",
+        "email_verified_at",
+        "platform_role",
+        "role"
+      ],
+      "purpose": "account_access",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "cloud_connections",
+      "category": "authentication",
+      "fields": [
+        "authorized_by_user_id",
+        "created_by",
+        "provider",
+        "label",
+        "account_identifier",
+        "account_email",
+        "access_ciphertext",
+        "refresh_ciphertext",
+        "token_expires_at",
+        "scopes",
+        "cursor",
+        "delta_cursor",
+        "root_path",
+        "root_folder_id",
+        "root_folder_path",
+        "default_profile_id",
+        "metadata"
+      ],
+      "purpose": "cloud_media_connection",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "dropbox",
+        "google_drive",
+        "supabase"
+      ]
+    },
+    {
+      "id": "legacy_supabase_link_clicks",
+      "category": "usage",
+      "fields": [
+        "tracking_link_id",
+        "occurred_at",
+        "country",
+        "referrer",
+        "ua_family",
+        "network"
+      ],
+      "purpose": "traffic_click_analytics",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "legacy_supabase_platform_credentials",
+      "category": "authentication",
+      "fields": [
+        "profile_id",
+        "platform",
+        "credential_type",
+        "label",
+        "account_identifier",
+        "secret_ciphertext",
+        "refresh_ciphertext",
+        "token_expires_at",
+        "scopes",
+        "settings",
+        "active",
+        "last_used_at"
+      ],
+      "purpose": "publishing_account_connection",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "legacy_supabase_upload_audit",
+      "category": "location",
+      "fields": [
+        "upload_link_id",
+        "r2_key",
+        "bytes",
+        "mime_type",
+        "ip",
+        "occurred_at"
+      ],
+      "purpose": "upload_security_audit",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "media_vault",
+      "category": "usage",
+      "fields": [
+        "ingested_by_user_id",
+        "profile_id",
+        "original_filename",
+        "source_type",
+        "source_ref",
+        "storage_disk",
+        "storage_key",
+        "r2_key",
+        "sha256",
+        "checksum_sha256",
+        "byte_size",
+        "file_type",
+        "mime_type",
+        "outfit_tag",
+        "session_date",
+        "metadata",
+        "derivatives"
+      ],
+      "purpose": "media_management",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "cloudflare_r2",
+        "supabase"
+      ]
+    },
+    {
+      "id": "organization_membership",
+      "category": "identification",
+      "fields": [
+        "user_id",
+        "organization_id",
+        "role"
+      ],
+      "purpose": "tenant_authorization",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "traffic_dedupe",
+      "category": "usage",
+      "fields": [
+        "visitor_hash",
+        "last_counted_at"
+      ],
+      "purpose": "traffic_deduplication",
+      "basis": "review_required",
+      "retention": "dedupe_24h",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "traffic_links",
+      "category": "usage",
+      "fields": [
+        "created_by_user_id",
+        "profile_id",
+        "slug",
+        "label",
+        "destination_url",
+        "channel",
+        "campaign",
+        "network",
+        "status",
+        "clicks_count",
+        "expires_at"
+      ],
+      "purpose": "traffic_attribution",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "traffic_metrics",
+      "category": "usage",
+      "fields": [
+        "metric_date",
+        "clicks"
+      ],
+      "purpose": "traffic_measurement",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    }
+  ]
+}

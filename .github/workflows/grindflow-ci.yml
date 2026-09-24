@@ -892,10 +892,41 @@ jobs:
           npm run typecheck
           npm run test
 
+  privacy:
+    name: privacy
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout Factory privacy kit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5
+        with:
+          repository: pl0n3r/factory
+          ref: a33b04cafeabfe0004f01fdf79291a0645a60f0a
+          path: .factory
+          persist-credentials: false
+
+      - name: Validate privacy-as-code for this event
+        shell: bash
+        env:
+          PRIVACY_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$PRIVACY_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::privacy base SHA invalid"; exit 1; }
+          PYTHONPATH=.factory python3 .factory/scripts/privacidad_gate.py --base-sha "$PRIVACY_BASE_SHA"
+
   validate:
     name: validate
     if: always()
-    needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy, symfony-preview]
+    needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy, symfony-preview, privacy]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -911,6 +942,7 @@ jobs:
           REALSTACK_RESULT: ${{ needs.realstack.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
           SYMFONY_RESULT: ${{ needs.symfony-preview.result }}
+          PRIVACY_RESULT: ${{ needs.privacy.result }}
           RUN_PHP_QUALITY: ${{ needs.preflight.outputs.run_php_quality }}
           RUN_TESTS: ${{ needs.preflight.outputs.run_tests }}
           RUN_DATABASE: ${{ needs.preflight.outputs.run_database }}
@@ -962,6 +994,7 @@ jobs:
           require_optional real-stack "$RUN_REALSTACK" "$REALSTACK_RESULT"
           require_optional legacy "$RUN_LEGACY" "$LEGACY_RESULT"
           require_optional symfony-preview "$RUN_SYMFONY" "$SYMFONY_RESULT"
+          require_success privacy "$PRIVACY_RESULT"
 
           if [[ "$failures" -ne 0 ]]; then
             exit 1
@@ -980,6 +1013,7 @@ jobs:
           REALSTACK_RESULT: ${{ needs.realstack.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
           SYMFONY_RESULT: ${{ needs.symfony-preview.result }}
+          PRIVACY_RESULT: ${{ needs.privacy.result }}
         run: |
           {
             echo "## GrindFlow CI / validate"
@@ -995,4 +1029,5 @@ jobs:
             echo "| real-stack MariaDB | **$REALSTACK_RESULT** |"
             echo "| legacy | **$LEGACY_RESULT** |"
             echo "| Symfony S0 preview | **$SYMFONY_RESULT** |"
+            echo "| privacy-as-code | **$PRIVACY_RESULT** |"
           } >> "$GITHUB_STEP_SUMMARY"
