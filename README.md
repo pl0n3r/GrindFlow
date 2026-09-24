@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.121: recuperación de Production Smoke y prueba exacta de despliegue.** Base exacta main v0.1.120 `cd871630d427f97a09d9e6e8befdd4e85e1d7a05`. #121 corrige el aprovisionamiento de la identidad sintética y #73 sigue abierto hasta que producción quede validada.
+> **Candidato v0.1.122: fail-closed para cuentas sintéticas vinculadas a organizaciones.** Base exacta main v0.1.121 `30ffd5b9cb9c04f88c76f4dc32179eaf3570741c`. Entrega de seguridad independiente del bootstrap OIDC bloqueado en PR #131; no supone Production Smoke verde.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,29 +18,29 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.121** | `config/version.php`; candidata |
-| Base exacta | ✅ ~~main v0.1.120~~ | `cd871630d427f97a09d9e6e8befdd4e85e1d7a05` |
+| Version objetivo | 🚧 **v0.1.122** | `config/version.php`; candidata |
+| Base exacta | ✅ ~~main v0.1.121~~ | `30ffd5b9cb9c04f88c76f4dc32179eaf3570741c` |
 | CI del PR | 🚧 pendiente | validar HEAD final |
 | Sonar del PR | 🚧 pendiente | Quality Gate del HEAD final |
 | CodeRabbit del PR | 🚧 pendiente | máximo 3 rondas |
-| CI del SHA exacto de main | ✅ ~~success~~ | #35917304166 sobre `cd871630…` |
-| Production Smoke base | ⛔ #73 | #35917304261 failure |
-| Producción objetivo | 🚧 pendiente | /health exacto + flujo autenticado |
+| CI del SHA exacto de main | ✅ ~~success~~ | #35927165744 sobre `30ffd5b…` |
+| Production Smoke base | ⛔ #73 | #35927165714 failure; login sintético |
+| Producción objetivo | 🚧 pendiente | PR #131 bloqueada; no declarar verde |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **16** | **+820** | **−68** | **+752** |
+| **4** | **+87** | **−38** | **+49** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · real-stack** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | #121/#73: identidad sintética, post-deploy, health exacto y Smoke |
-| Rol del PR | **SRE · Backend Laravel · Application Security** |
+| Alcance | #121: negar colisión con memberships antes de cambiar rol/clave |
+| Rol del PR | **Application Security · Backend Laravel · QA** |
 | Revisiones | máximo 3 rondas automáticas; sin polling |
 
 ## Flujo de entrega
@@ -49,43 +49,27 @@ flowchart LR
  A["PR + snapshot exacto"] --> C["CI + Sonar + CodeRabbit"]
  C --> M["Squash merge"]
  M --> X["CI exact-main"]
- X --> H["/health version + SHA"]
- H --> S["Production Smoke"]
- S --> G["Cerrar #73 y declarar verde"]
+ X --> S["Reconciliar PR #131"]
+ S --> G["Smoke productivo para #73"]
 ```
 
 ## Qué se hizo
-- `grindflow:provision-smoke-user` reconcilia solo `@grindflow.test`, exige `APP_PHASE=construccion`, toma lock de filesystem y realiza backup cifrado privado antes de crear o mutar la fila sintética.
-- La cuenta no recibe memberships; usa `platform_role=admin` únicamente porque `/admin/system` exige ese rol. Contraseña/hash/email nunca se imprimen.
-- El comando corre en `deploy-hostinger.sh`, en el primer request que observa un release nuevo y como reconciliación del scheduler productivo.
-- `/health` responde 200 solo si puede demostrar versión y SHA Git exactos; Production Smoke compara ese SHA con `main` antes de gastar un intento de login y valida también home, login y dashboard.
-- Contrato de entorno: `SMOKE_USER_PASSWORD` en Hostinger debe coincidir con el secret GitHub `PRODUCTION_E2E_PASSWORD`.
+- El comando de aprovisionamiento rechaza una cuenta sintética preexistente con memberships antes de tocar contraseña, rol, nombre o estado de verificación.
+- Conserva el lock transaccional, el error sanitizado y el caso positivo de identidad aislada. Sin borrados ni cambios a tenants.
+- Las pruebas cubren colisión con rol Model, rechazo aun cuando el usuario Admin ya esté reconciliado, cero nuevos backups y preservación de hash/asociaciones.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
 <!-- grindflow:changed-files -->
-- `.env.example`
-- `.github/workflows/production-smoke.yml`
 - `README.md`
 - `app/Console/Commands/ProvisionSmokeUser.php`
-- `app/Support/Deployment/CheckoutIdentity.php`
-- `config/grindflow.php`
 - `config/version.php`
-- `docs/DEPLOY-HOSTINGER.md`
-- `public/index.php`
-- `routes/console.php`
-- `routes/web.php`
-- `scripts/deploy-hostinger.sh`
-- `scripts/production-smoke-contract.sh`
-- `scripts/production-smoke.sh`
-- `tests/Feature/HealthIdentityTest.php`
 - `tests/Feature/ProvisionSmokeUserCommandTest.php`
 
 ## Validación
-- Tests del comando: ausencia de secreto, dominio sintético, creación, idempotencia, backup cifrado previo y redacción de salida.
-- Tests de health: refs loose/packed/detached, 200 exacto sin DB y 503 fail-closed sin SHA.
-- Contrato Smoke: health exacto, home y flujo autenticado; fallos de identidad no consumen login.
-- Producción solo se declara verde con evidencia de los cinco criterios del dueño.
+- PHPUnit protege la colisión con memberships sin tocar filas, roles, contraseña ni backup previo.
+- Los gates del HEAD del PR y la revisión terminal CodeRabbit siguen pendientes; no confundir propuesta con producción.
+
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -93,7 +77,7 @@ Inventario del diff exacto:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #121 + #73: recuperar Production Smoke | 🚧 v0.1.121 |
-| **NEXT** | 🚧 CI exact-main + validación productiva | 🚧 tras merge |
-| **BLOCKED / EXTERNAL** | ⛔ Ninguno asumido | ⛔ se determina por evidencia |
+| **NOW** | 🚧 #121: proteger aprovisionamiento sintético | 🚧 v0.1.122 |
+| **NEXT** | 🚧 revisar PR #131 y ejecutar Smoke #73 | 🚧 tras merge seguro |
+| **BLOCKED / EXTERNAL** | ⛔ PR #131 sin CodeRabbit terminal | ⛔ no desplegar |
 | **LATER** | 🚧 Roadmap de producto | 🚧 solo después de producción verde |

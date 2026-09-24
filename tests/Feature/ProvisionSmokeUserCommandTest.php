@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Membership;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -127,6 +128,64 @@ class ProvisionSmokeUserCommandTest extends TestCase
         self::assertTrue($snapshot['exists']);
         self::assertSame('model', $snapshot['user']['platform_role']);
         self::assertTrue(Hash::check('old-secret', $snapshot['user']['password']));
+    }
+
+    public function test_it_refuses_to_reconcile_a_synthetic_email_with_an_organization_membership(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Previously associated identity',
+            'email' => 'e2e-admin@grindflow.test',
+            'password' => 'original-secret',
+            'email_verified_at' => null,
+            'platform_role' => UserRole::Model,
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::query()->create([
+            'user_id' => $user->getKey(),
+            'organization_id' => $organization->getKey(),
+            'role' => UserRole::Model,
+        ]);
+        $hashBefore = $user->getAuthPassword();
+        $updatedAtBefore = $user->updated_at?->format('Y-m-d H:i:s.u');
+
+        $this->artisan('grindflow:provision-smoke-user')
+            ->expectsOutputToContain('Synthetic smoke identity reconciliation failed safely.')
+            ->assertFailed();
+
+        $user->refresh();
+        self::assertSame(UserRole::Model, $user->platform_role);
+        self::assertNull($user->email_verified_at);
+        self::assertSame('Previously associated identity', $user->name);
+        self::assertSame($hashBefore, $user->getAuthPassword());
+        self::assertSame($updatedAtBefore, $user->updated_at?->format('Y-m-d H:i:s.u'));
+        self::assertTrue(Hash::check('original-secret', $user->getAuthPassword()));
+        self::assertSame(1, Membership::query()->where('user_id', $user->getKey())->count());
+        self::assertSame([], Storage::disk('local')->allFiles('operations/smoke-user-backups'));
+    }
+
+    public function test_it_rejects_a_membership_even_when_the_synthetic_account_is_already_reconciled(): void
+    {
+        $this->artisan('grindflow:provision-smoke-user')->assertSuccessful();
+
+        $user = User::query()->sole();
+        $organization = Organization::factory()->create();
+        Membership::query()->create([
+            'user_id' => $user->getKey(),
+            'organization_id' => $organization->getKey(),
+            'role' => UserRole::Model,
+        ]);
+        $hashBefore = $user->getAuthPassword();
+        $backupFilesBefore = Storage::disk('local')->allFiles('operations/smoke-user-backups');
+
+        $this->artisan('grindflow:provision-smoke-user')
+            ->expectsOutputToContain('Synthetic smoke identity reconciliation failed safely.')
+            ->assertFailed();
+
+        $user->refresh();
+        self::assertSame(UserRole::Admin, $user->platform_role);
+        self::assertSame($hashBefore, $user->getAuthPassword());
+        self::assertSame(1, Membership::query()->where('user_id', $user->getKey())->count());
+        self::assertSame($backupFilesBefore, Storage::disk('local')->allFiles('operations/smoke-user-backups'));
     }
 
     public function test_command_output_never_contains_identity_or_secret(): void
