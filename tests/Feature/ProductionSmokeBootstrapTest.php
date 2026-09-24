@@ -9,6 +9,7 @@ use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
 use Tests\TestCase;
@@ -74,7 +75,66 @@ class ProductionSmokeBootstrapTest extends TestCase
         $user = User::query()->sole();
         self::assertSame(UserRole::Admin, $user->platform_role);
         self::assertSame('e2e-admin@grindflow.test', $user->email);
+        self::assertTrue(Hash::check($password, $user->password));
         self::assertStringNotContainsString($password, (string) $response->getContent());
+    }
+
+    public function test_bootstrap_is_not_found_outside_construction_phase(): void
+    {
+        config(['grindflow.phase' => 'operacion']);
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldNotReceive('verify');
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', str_repeat('a', 40))
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => 'unused'])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_bootstrap_is_not_found_outside_production(): void
+    {
+        $this->app->detectEnvironment(static fn (): string => 'staging');
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldNotReceive('verify');
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', str_repeat('a', 40))
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => 'unused'])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_bootstrap_returns_503_without_database_write_when_reconciliation_fails(): void
+    {
+        $sha = str_repeat('a', 40);
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')
+            ->once()
+            ->with('signed-oidc-token', $sha)
+            ->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')
+            ->once()
+            ->andThrow(new \RuntimeException('synthetic persistence failure'));
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => 'unused']);
+
+        $response->assertStatus(503);
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertDatabaseCount('users', 0);
     }
 
     public function test_bootstrap_rejects_missing_oidc_before_any_database_write(): void
