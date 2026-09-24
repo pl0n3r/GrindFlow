@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.128: privacidad como código.** Base productiva exacta `main` v0.1.127 `9a166705781835a9caa4bfb00573b4290cb29f23`, con CI exact-main, CodeQL, Sonar, Deploy Observer y Production Smoke en `success`. #149 incorpora un mapa técnico auditable sin declarar aprobación jurídica.
+> **Candidato v0.1.128: privacidad como código.** Base productiva exacta `main` v0.1.127 `9a166705781835a9caa4bfb00573b4290cb29f23`, con CI exact-main, Deploy Observer y Production Smoke en `success`. #149 incorpora un mapa técnico auditable sin declarar aprobación jurídica.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -90,9 +90,4 @@ Inventario del diff exacto:
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 ## Panorama general pendiente
-| Lane | Frente | Estado |
-| --- | --- | --- |
-| **NOW** | 🚧 #149 · privacidad como código | 🚧 candidata v0.1.128 |
-| **NEXT** | 🚧 Factory#54 → BRVTAL#654 | 🚧 adopción serial |
-| **BLOCKED / EXTERNAL** | ⛔ revisión jurídica material | ⛔ separada del merge técnico |
-| **LATER** | 🚧 #139 · remediación npm preservada | 🚧 v0.1.129 después de privacidad |
+- **NOW:** 🚧 #149 · privacidad como código. Las prioridades posteriores viven únicamente en el [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2).
