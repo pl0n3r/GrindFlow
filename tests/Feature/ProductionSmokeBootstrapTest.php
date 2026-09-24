@@ -31,6 +31,7 @@ class ProductionSmokeBootstrapTest extends TestCase
 
         config([
             'grindflow.phase' => 'construccion',
+            'cache.limiter' => 'array',
             'grindflow.smoke_user.email' => 'e2e-admin@grindflow.test',
             'grindflow.smoke_user.password' => '',
             'grindflow.smoke_user.name' => 'GrindFlow Production Smoke',
@@ -137,7 +138,6 @@ class ProductionSmokeBootstrapTest extends TestCase
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertDatabaseCount('users', 0);
     }
-
 
     #[DataProvider('invalidPayloads')]
     public function test_bootstrap_rejects_invalid_payload_before_oidc(array $payload, string $sha): void

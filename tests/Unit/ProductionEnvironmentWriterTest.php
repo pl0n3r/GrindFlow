@@ -144,7 +144,6 @@ class ProductionEnvironmentWriterTest extends TestCase
         @unlink($path);
     }
 
-
     #[DataProvider('invalidPasswords')]
     public function test_it_rejects_invalid_password_formats_without_side_effects(string $password): void
     {
