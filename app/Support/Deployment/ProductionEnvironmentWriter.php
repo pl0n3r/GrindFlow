@@ -3,6 +3,7 @@
 namespace App\Support\Deployment;
 
 use Closure;
+use Dotenv\Dotenv;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -56,11 +57,16 @@ class ProductionEnvironmentWriter
                 'SMOKE_USER_PASSWORD',
                 $this->quoted($password),
             );
-            $updated = $this->upsert(
-                $updated,
-                'CACHE_STORE',
-                $this->quoted('file'),
-            );
+            // Preserve production cache backends that already persist OIDC replay IDs.
+            $currentStore = Dotenv::parse($original)['CACHE_STORE'] ?? null;
+
+            if ($currentStore === null || $currentStore === '' || $currentStore === 'array') {
+                $updated = $this->upsert(
+                    $updated,
+                    'CACHE_STORE',
+                    $this->quoted('file'),
+                );
+            }
             $changed = ! hash_equals($original, $updated);
 
             if ($changed) {
