@@ -51,7 +51,9 @@ repositorio/IDs/ref/workflow/SHA/audiencia y consume su `jti` en cache
 persistente. Si una instalación antigua todavía arranca con cache `array`, el
 bootstrap solo continúa cuando el store `file` está disponible y escribible;
 después del OIDC válido guarda un backup cifrado privado de `.env`, persiste
-`SMOKE_USER_PASSWORD` y `CACHE_STORE=file`, y ejecuta
+`SMOKE_USER_PASSWORD` y solo configura `CACHE_STORE=file` cuando el valor
+actual falta, está vacío o es `array`. Conserva `database` o `redis` cuando
+ya están configurados como caché persistente y ejecuta
 `grindflow:provision-smoke-user`. Si la reconciliación falla, restaura el
 `.env` anterior y no envía ningún login. Nunca copies el valor a Issues, PRs,
 logs o comandos de chat. El correo queda limitado por código al dominio
