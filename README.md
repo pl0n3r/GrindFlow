@@ -37,7 +37,7 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast · php-quality · PHPUnit · browser · real-stack** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · browser · real-stack** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
 | Alcance | #121/#73: aislar el fallo de la identidad sintética en Hostinger |
 | Rol del PR | **SRE · Backend Laravel · DBA · Application Security** |
@@ -46,7 +46,7 @@
 ## Flujo de entrega
 ```mermaid
 flowchart LR
- A["main v0.1.124 + 503"] --> B["provision-user/provision-failed"]
+ A["PR + snapshot exacto: main v0.1.124 + 503"] --> B["provision-user/provision-failed"]
  B --> C["Clasificar causa acotada de Artisan"]
  C --> D["CI + Sonar + CodeRabbit"]
  D --> M["Squash merge"]

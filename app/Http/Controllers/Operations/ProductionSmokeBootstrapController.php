@@ -72,7 +72,7 @@ class ProductionSmokeBootstrapController extends Controller
                     config(['grindflow.smoke_user.password' => $password]);
 
                     $failureStage = 'provision-user';
-                    config()->forget('grindflow.smoke_provision_failure_code');
+                    config(['grindflow.smoke_provision_failure_code' => null]);
 
                     if (Artisan::call('grindflow:provision-smoke-user') !== 0) {
                         throw new RuntimeException('Synthetic smoke identity reconciliation failed.');

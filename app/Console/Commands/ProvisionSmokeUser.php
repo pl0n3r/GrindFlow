@@ -23,7 +23,7 @@ class ProvisionSmokeUser extends Command
     public function handle(): int
     {
         // This is request-local diagnostic state, never persisted in .env or DB.
-        config()->forget('grindflow.smoke_provision_failure_code');
+        config(['grindflow.smoke_provision_failure_code' => null]);
 
         $email = Str::lower(trim((string) config('grindflow.smoke_user.email')));
         $password = (string) config('grindflow.smoke_user.password');
