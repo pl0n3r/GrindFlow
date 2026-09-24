@@ -105,13 +105,13 @@ class ProvisionSmokeUser extends Command
 
         if (
             ! is_dir($directory)
-            && ! mkdir($directory, 0775, true)
+            && ! @mkdir($directory, 0775, true)
             && ! is_dir($directory)
         ) {
             throw new RuntimeException('Unable to create deployment lock directory.');
         }
 
-        $handle = fopen($directory.'/grindflow-smoke-user.lock', 'c+');
+        $handle = @fopen($directory.'/grindflow-smoke-user.lock', 'c+');
 
         if ($handle === false) {
             throw new RuntimeException('Unable to open smoke-user provisioning lock.');
