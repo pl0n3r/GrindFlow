@@ -29,6 +29,8 @@ class GitHubActionsOidcVerifier
      */
     public function verify(string $jwt, string $expectedSha): array
     {
+        $this->ensurePersistentReplayCache();
+
         if (preg_match('/^[0-9a-f]{40}$/', $expectedSha) !== 1) {
             throw new RuntimeException('Invalid expected deployment SHA.');
         }
@@ -65,6 +67,35 @@ class GitHubActionsOidcVerifier
         $this->consumeJti($claims);
 
         return $claims;
+    }
+
+    private function ensurePersistentReplayCache(): void
+    {
+        if (! app()->environment('production')) {
+            return;
+        }
+
+        $defaultStore = (string) config('cache.default');
+        $defaultDriver = config("cache.stores.{$defaultStore}.driver");
+
+        if ($defaultDriver !== 'array') {
+            return;
+        }
+
+        $fileDriver = config('cache.stores.file.driver');
+        $filePath = config('cache.stores.file.path');
+
+        if (
+            $fileDriver !== 'file'
+            || ! is_string($filePath)
+            || $filePath === ''
+            || ! is_dir($filePath)
+            || ! is_writable($filePath)
+        ) {
+            throw new RuntimeException('A persistent cache store is required for production OIDC replay protection.');
+        }
+
+        config(['cache.default' => 'file']);
     }
 
     /**
