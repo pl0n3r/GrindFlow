@@ -15,6 +15,37 @@ assert_absent_regex() {
   if grep -Eq -- "$1" "$2"; then printf 'FAIL: unexpected diagnostic or request.\n' >&2; exit 1; fi
 }
 
+
+# A failed exact-SHA wait or OIDC bootstrap must still report the production incident.
+# This contract is run by GrindFlow CI / fast without production credentials.
+python3 - "$script_dir/../.github/workflows/production-smoke.yml" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+workflow = Path(sys.argv[1]).read_text(encoding="utf-8")
+for step_id in ("deployed_checkout", "synthetic_bootstrap"):
+    assert re.search(rf"(?m)^      - id: {step_id}$", workflow), step_id
+start = "      - name: Publish pre-login production failure\n"
+end = "      - name: Validate smoke script\n"
+assert workflow.count(start) == 1, "pre-login incident reporter must be unique"
+report = workflow.split(start, 1)[1].split(end, 1)[0]
+for marker in (
+    "if: failure()",
+    "steps.credentials.outputs.configured == 'true'",
+    "steps.deployed_checkout.outcome == 'failure'",
+    "steps.synthetic_bootstrap.outcome == 'failure'",
+    "gh issue comment",
+    "gh issue create",
+    "--body-file /tmp/grindflow-prelogin-failure.md",
+    "GH_TOKEN:",
+):
+    assert marker in report, marker
+for forbidden in ('"$oidc_token"', '"$payload"', "production-smoke.log", "getMessage"):
+    assert forbidden not in report, forbidden
+print("PASS production smoke contract: pre-login failure is reported without secrets")
+PY
+
 cat > "$workdir/mock-curl" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail

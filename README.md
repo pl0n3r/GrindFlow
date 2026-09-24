@@ -32,7 +32,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **14** | **+1441** | **−29** | **+1412** |
+| **15** | **+1508** | **−29** | **+1479** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -57,6 +57,7 @@ flowchart LR
 ```
 
 ## Qué se hizo
+- Los fallos previos al login (SHA exacto u OIDC) publican un incidente automático con etapa fija, sin credenciales ni payloads.
 - Production Smoke obtiene un token OIDC efímero solo con `id-token: write` y espera antes a que `/health` exponga el SHA exacto de `main`.
 - El servidor valida firma GitHub, audiencia, repositorio/IDs, `refs/heads/main`, workflow exacto, runner GitHub-hosted y SHA; además exige que ese SHA sea el checkout realmente desplegado.
 - OIDC registra solo etapa y clase del fallo, sin mensajes externos; PHPUnit aísla `CACHE_LIMITER` y prueba el replay cache productivo, headers y tiempos inválidos.
@@ -71,6 +72,7 @@ Inventario del diff exacto:
 - `.env.example`
 - `.github/workflows/production-smoke.yml`
 - `README.md`
+- `scripts/production-smoke-contract.sh`
 - `app/Http/Controllers/Operations/ProductionSmokeBootstrapController.php`
 - `app/Support/Deployment/GitHubActionsOidcVerifier.php`
 - `app/Support/Deployment/ProductionEnvironmentWriter.php`

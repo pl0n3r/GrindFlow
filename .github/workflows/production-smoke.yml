@@ -86,7 +86,8 @@ jobs:
             gh issue close "$issue_number"
           fi
 
-      - name: Wait for exact deployed checkout before production write
+      - id: deployed_checkout
+        name: Wait for exact deployed checkout before production write
         if: steps.credentials.outputs.configured == 'true'
         shell: bash
         run: |
@@ -109,7 +110,8 @@ jobs:
           echo "::error::Production never exposed the exact main SHA through /health."
           exit 1
 
-      - name: Reconcile synthetic smoke identity through GitHub OIDC
+      - id: synthetic_bootstrap
+        name: Reconcile synthetic smoke identity through GitHub OIDC
         if: steps.credentials.outputs.configured == 'true'
         shell: bash
         run: |
@@ -157,6 +159,38 @@ jobs:
           if [[ "$bootstrap_status" != "204" ]]; then
             echo "::error::Synthetic production identity bootstrap failed with HTTP $bootstrap_status; no login attempt will be sent."
             exit 1
+          fi
+
+      - name: Publish pre-login production failure
+        if: failure() && steps.credentials.outputs.configured == 'true' && (steps.deployed_checkout.outcome == 'failure' || steps.synthetic_bootstrap.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_CHECK_OUTCOME: ${{ steps.deployed_checkout.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="oidc-bootstrap"
+          if [[ "$DEPLOY_CHECK_OUTCOME" == "failure" ]]; then
+            stage="exact-health"
+          fi
+
+          {
+            echo "## Production smoke blocked before login"
+            echo
+            echo "Stage: $stage"
+            echo "No login was attempted. Inspect the failed workflow step for details."
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "No request bodies, credentials, OIDC tokens or remote responses are included."
+          } > /tmp/grindflow-prelogin-failure.md
+
+          cat /tmp/grindflow-prelogin-failure.md >> "$GITHUB_STEP_SUMMARY"
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body-file /tmp/grindflow-prelogin-failure.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-prelogin-failure.md --label 'tipo: incidente' --label 'prioridad: crítica' --label 'estado: disponible'
           fi
 
       - name: Validate smoke script
