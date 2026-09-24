@@ -167,6 +167,19 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringNotContainsString('issues: write', $privacy);
         self::assertStringNotContainsString('secrets:', $privacy);
 
+        $ci = file_get_contents($this->root().'/.github/workflows/grindflow-ci.yml');
+        self::assertStringContainsString(
+            'uses: pl0n3r/factory/.github/workflows/privacidad.yml@'.self::FACTORY_SHA,
+            $ci,
+        );
+        self::assertStringContainsString('kit_ref: '.self::FACTORY_SHA, $ci);
+        self::assertStringContainsString(
+            'needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy, symfony-preview, privacy]',
+            $ci,
+        );
+        self::assertStringContainsString('PRIVACY_RESULT: ${{ needs.privacy.result }}', $ci);
+        self::assertStringContainsString('require_success privacy "$PRIVACY_RESULT"', $ci);
+
         self::assertStringContainsString(
             'uses: pl0n3r/factory/.github/workflows/auditoria-privacidad.yml@'.self::FACTORY_SHA,
             $audit,
