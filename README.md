@@ -30,7 +30,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **13** | **+902** | **−32** | **+870** |
+| **13** | **+940** | **−32** | **+908** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -61,6 +61,7 @@ flowchart LR
 - Añade callers mínimos, sin secretos, fijados a Factory `a33b04cafeabfe0004f01fdf79291a0645a60f0a`.
 - Adopta el contrato vigente de Factory de **seis documentos canónicos**, incluyendo aviso de privacidad, términos y canal de derechos.
 - Integra privacy-as-code dentro de `GrindFlow CI / validate`, por lo que el squash exacto de `main` también debe pasar el gate de privacidad.
+- Corrige la base del privacy gate para `workflow_dispatch`, ramas no-default y el primer push de la rama principal, evitando diffs vacíos o SHAs de ceros.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
