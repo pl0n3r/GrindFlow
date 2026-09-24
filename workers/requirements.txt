@@ -3,4 +3,4 @@ psycopg[binary]==3.2.3
 # Almacenamiento R2 por su API compatible con S3.
 boto3==1.35.76
 # Sanitizacion y marca de agua de imagenes.
-Pillow==11.0.0
+Pillow==12.3.0
