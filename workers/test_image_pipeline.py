@@ -57,7 +57,7 @@ class WorkerImagePipelineTest(unittest.TestCase):
             to_webp(clean, webp, max_width=100)
             with Image.open(webp) as image:
                 self.assertEqual("WEBP", image.format)
-                self.assertLessEqual(image.width, 100)
+                self.assertEqual((100, 200), image.size)
 
             watermark_image(clean, marked, "grindflow-ci")
             with Image.open(marked) as image:
