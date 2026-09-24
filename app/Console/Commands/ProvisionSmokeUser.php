@@ -120,6 +120,12 @@ class ProvisionSmokeUser extends Command
                 ->lockForUpdate()
                 ->first();
 
+            // Never turn an organization-associated account into a platform admin
+            // controlled by the smoke secret. The user row is transaction-locked.
+            if ($user !== null && $user->memberships()->exists()) {
+                throw new RuntimeException('Synthetic smoke identity is linked to an organization.');
+            }
+
             $passwordMatches = $user !== null
                 && Hash::check($password, (string) $user->getAuthPassword())
                 && Hash::needsRehash((string) $user->getAuthPassword()) === false;
