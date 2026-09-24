@@ -9,6 +9,7 @@ use App\Support\Deployment\ProductionEnvironmentWriter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -65,7 +66,12 @@ class ProductionSmokeBootstrapController extends Controller
                     }
                 },
             );
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::error('Production smoke bootstrap reconciliation failed.', [
+                'stage' => 'synthetic_reconciliation',
+                'exception_class' => get_class($exception),
+            ]);
+
             return response('', 503)
                 ->header('Cache-Control', 'no-store, max-age=0')
                 ->header('X-Content-Type-Options', 'nosniff');

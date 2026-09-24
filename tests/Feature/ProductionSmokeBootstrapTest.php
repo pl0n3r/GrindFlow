@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ProductionSmokeBootstrapTest extends TestCase
@@ -135,6 +136,40 @@ class ProductionSmokeBootstrapTest extends TestCase
         $response->assertStatus(503);
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertDatabaseCount('users', 0);
+    }
+
+
+    #[DataProvider('invalidPayloads')]
+    public function test_bootstrap_rejects_invalid_payload_before_oidc(array $payload, string $sha): void
+    {
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldNotReceive('verify');
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldNotReceive('withSmokePassword');
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', $payload)
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public static function invalidPayloads(): array
+    {
+        $sha = str_repeat('a', 40);
+
+        return [
+            'missing password' => [[], $sha],
+            'empty password' => [['password' => ''], $sha],
+            'array password' => [['password' => ['not-a-string']], $sha],
+            'numeric password' => [['password' => 1234], $sha],
+            'uppercase sha' => [['password' => 'unused'], str_repeat('A', 40)],
+            'short sha' => [['password' => 'unused'], 'abc'],
+        ];
     }
 
     public function test_bootstrap_rejects_missing_oidc_before_any_database_write(): void

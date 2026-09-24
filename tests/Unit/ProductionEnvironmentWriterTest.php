@@ -6,6 +6,7 @@ use App\Support\Deployment\ProductionEnvironmentWriter;
 use Dotenv\Dotenv;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -141,6 +142,45 @@ class ProductionEnvironmentWriterTest extends TestCase
         self::assertSame([], Storage::disk('local')->allFiles('operations/environment-backups'));
 
         @unlink($path);
+    }
+
+
+    #[DataProvider('invalidPasswords')]
+    public function test_it_rejects_invalid_password_formats_without_side_effects(string $password): void
+    {
+        $original = "APP_ENV=production\nCACHE_STORE=\"file\"\n";
+        $path = $this->temporaryEnvironment($original);
+        $called = false;
+
+        try {
+            (new ProductionEnvironmentWriter)->withSmokePassword(
+                $password,
+                static function () use (&$called): void {
+                    $called = true;
+                },
+                $path,
+            );
+            self::fail('Expected invalid password rejection.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('Synthetic smoke password format is invalid.', $exception->getMessage());
+        }
+
+        self::assertFalse($called);
+        self::assertSame($original, file_get_contents($path));
+        self::assertSame([], Storage::disk('local')->allFiles('operations/environment-backups'));
+
+        @unlink($path);
+    }
+
+    public static function invalidPasswords(): array
+    {
+        return [
+            'empty' => [''],
+            'newline' => ["ok\nAPP_DEBUG=true"],
+            'carriage return' => ["ok\rX=1"],
+            'null byte' => ["ok\0"],
+            'too long' => [str_repeat('a', 4097)],
+        ];
     }
 
     private function temporaryEnvironment(string $contents): string
