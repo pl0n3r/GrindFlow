@@ -7,7 +7,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.127: actualización de seguridad de Pillow en workers.** Base exacta `main` v0.1.126 `8c59ea017b5cb8f90985cf9aae8e32d59f93c65c`, con CI #35989657390, Deploy Observer #35989657416 y Production Smoke #35989657379 en `success`; producción quedó verde antes de esta candidata. #139 prioriza Pillow porque procesa archivos en workers y concentra 13 alertas altas.
+> **Candidato v0.1.128: privacidad como código.** Base productiva exacta `main` v0.1.127 `9a166705781835a9caa4bfb00573b4290cb29f23`, con CI exact-main, Deploy Observer y Production Smoke en `success`. #149 incorpora un mapa técnico auditable sin declarar aprobación jurídica.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -18,59 +18,73 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Version objetivo | 🚧 **v0.1.127** | `config/version.php`; candidata |
-| Base exacta | ✅ ~~main v0.1.126~~ | `8c59ea017b5cb8f90985cf9aae8e32d59f93c65c` |
+| Version objetivo | 🚧 **v0.1.128** | `config/version.php`; candidata |
+| Base exacta | ✅ ~~main v0.1.127~~ | `9a166705781835a9caa4bfb00573b4290cb29f23` |
+| CI del SHA exacto de main (base) | ✅ ~~success~~ | GrindFlow CI `36027875895` |
+| Deploy Observer base | ✅ ~~success~~ | run `36027875891` |
+| Production Smoke base | ✅ ~~success~~ | run `36027875912`; versión/SHA exactos |
 | CI/Sonar/CodeRabbit del PR | 🚧 pendiente | exigen HEAD final |
-| CI del SHA exacto de main (base) | ✅ ~~success~~ | #35989657390 |
-| Deploy Observer base | ✅ ~~success~~ | #35989657416 |
-| Production Smoke base | ✅ ~~success~~ | #35989657379 |
-| Producción objetivo | 🚧 pendiente | actualizar worker y validar gates/release |
+| Producción objetivo | 🚧 pendiente | merge, exact-main, observer y smoke |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+128** | **−46** | **+82** |
+| **13** | **+941** | **−32** | **+909** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
-| Alcance | #139: Pillow 11.0.0 → 12.3.0 en workers |
-| Rol del PR | **Application Security · Python/Workers · Release Engineering** |
-| Revisiones | CodeRabbit terminal del HEAD; CI/Sonar obligatorios antes de merge |
+| Gate agregador obligatorio | **validate**: todos los seleccionados, incluido privacy-as-code; Sonar y CodeRabbit aparte |
+| Alcance | #149: `datos.yml`, seis documentos generados, callers de Factory y pruebas de tratamientos observados |
+| Rol del PR | **Legal-Privacidad · Ingeniería de Software · Infraestructura · QA** |
+| Revisiones | Factory privacy gate + CI/Sonar/CodeRabbit terminal del HEAD; revisión jurídica humana permanece separada |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
- A["PR + snapshot exacto"] --> B["Pillow 12.3.0"]
- B --> C["CI legacy + Sonar + CodeRabbit"]
- C --> M["Squash merge"]
- M --> X["CI exact-main"]
- X --> S["Observer + Smoke"]
+ A["PR + snapshot exacto: v0.1.127 verde"] --> B["datos.yml observado"]
+ B --> C["documentos generados por Factory"]
+ C --> D["tests + privacy gate + auditoría"]
+ D --> M["CI + Sonar + CodeRabbit"]
+ M --> X["squash merge + CI exact-main"]
+ X --> S["Observer + Production Smoke"]
 ```
 
 ## Qué se hizo
-- Actualiza el pin de Pillow de 11.0.0 a 12.3.0 en `workers/requirements.txt`.
-- Mantiene sin cambios psycopg y boto3; no toca código de negocio, datos ni secretos.
-- Recupera la PR de Dependabot sobre el `main` real y la adapta al contrato actual de releases.
-- El gate `legacy` instala `workers/requirements.txt` en un venv descartable y prueba sanitización EXIF, WEBP y watermark con Pillow real.
+- Documenta identidad/membresías, credenciales, conexiones Google Drive/Dropbox, Media Vault, credenciales de publicación y tráfico sin PII real.
+- Declara Supabase solo donde el código demuestra procesamiento y **Cloudflare R2** únicamente en `media_vault`, donde el worker de ingesta transmite los bytes mediante `uploadStream`.
+- Separa el dedupe Laravel (`visitor_hash`, retención técnica `dedupe_24h`) de los flujos legacy: `link_clicks` guarda referrer/UA sin IP, mientras `upload_link_events` sí registra IP cruda.
+- Mantiene responsable, bases, consentimientos y retenciones no demostradas como `review_required` / `[COMPLETAR POR EL DUEÑO]`.
+- Añade callers mínimos, sin secretos, fijados a Factory `a33b04cafeabfe0004f01fdf79291a0645a60f0a`.
+- Adopta el contrato vigente de Factory de **seis documentos canónicos**, incluyendo aviso de privacidad, términos y canal de derechos.
+- Integra privacy-as-code dentro de `GrindFlow CI / validate`, por lo que el squash exacto de `main` también debe pasar el gate de privacidad.
+- Corrige la base del privacy gate para `workflow_dispatch`, ramas no-default y el primer push de la rama principal, evitando diffs vacíos o SHAs de ceros.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
 <!-- grindflow:changed-files -->
+- `.github/workflows/auditoria-privacidad.yml`
 - `.github/workflows/grindflow-ci.yml`
+- `.github/workflows/privacidad.yml`
 - `README.md`
 - `config/version.php`
-- `workers/requirements.txt`
-- `workers/test_image_pipeline.py`
+- `datos.yml`
+- `docs/privacidad/aviso-privacidad.md`
+- `docs/privacidad/canal-derechos.md`
+- `docs/privacidad/politica-tratamiento.md`
+- `docs/privacidad/registro-tratamientos.md`
+- `docs/privacidad/retencion.md`
+- `docs/privacidad/terminos-condiciones.md`
+- `tests/Feature/PrivacyAsCodeTest.php`
 
 ## Validación
-- El gate `legacy` instala dependencias Python del worker y ejecuta `workers/test_image_pipeline.py`: EXIF/orientación, conversión WEBP y watermark sin servicios externos.
-- Sonar y CodeRabbit deben revisar el HEAD final; la actualización no se considera desplegada por existir en rama.
-- Tras merge se exige CI exact-main y las señales operativas normales antes de declarar v0.1.127 validada en producción.
+- `PrivacyAsCodeTest` valida los IDs del mapa y evidencia de proveedores, incluido R2 (`@/lib/r2`, `uploadStream`, `r2_key`); además distingue `visitor_hash`, `link_clicks` e IP cruda de uploads.
+- Los seis documentos canónicos quedan congelados contra la salida determinista del kit y los gates vuelven a verificar `datos.yml` contra Factory.
+- `validate` depende explícitamente de `privacy`; la misma compuerta corre en PR y en `push main` a través de `GrindFlow CI`.
+- Ningún documento se presenta como cumplimiento o revisión jurídica aprobada.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -78,7 +92,7 @@ Inventario del diff exacto:
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #139 · Pillow 12.3.0 | 🚧 candidata v0.1.127 |
-| **NEXT** | 🚧 #139 · vitest/vite/postcss y alertas npm | 🚧 después de Pillow |
-| **BLOCKED / EXTERNAL** | ⛔ ninguno conocido | ⛔ sin bloqueo externo |
-| **LATER** | 🚧 roadmap de producto y arquitectura | 🚧 después de seguridad crítica |
+| **NOW** | 🚧 #149 · privacidad como código | 🚧 validación final |
+| **NEXT** | 🚧 Roadmap canónico #2 | 🚧 prioridades gestionadas allí |
+| **BLOCKED / EXTERNAL** | ⛔ revisión jurídica humana | ⛔ separada del merge técnico |
+| **LATER** | 🚧 Roadmap canónico #2 | 🚧 trabajo posterior gestionado allí |
