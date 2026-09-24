@@ -30,7 +30,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **5** | **+96** | **−46** | **+50** |
+| **5** | **+128** | **−46** | **+82** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -55,7 +55,8 @@ flowchart LR
 ## Qué se hizo
 - Actualiza el pin de Pillow de 11.0.0 a 12.3.0 en `workers/requirements.txt`.
 - Mantiene sin cambios psycopg y boto3; no toca código de negocio, datos ni secretos.
-- Recupera la PR de Dependabot sobre el `main` real y la adapta al contrato actual de releases.\n- El gate `legacy` instala `workers/requirements.txt` en un venv descartable y prueba sanitización EXIF, WEBP y watermark con Pillow real.
+- Recupera la PR de Dependabot sobre el `main` real y la adapta al contrato actual de releases.
+- El gate `legacy` instala `workers/requirements.txt` en un venv descartable y prueba sanitización EXIF, WEBP y watermark con Pillow real.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
