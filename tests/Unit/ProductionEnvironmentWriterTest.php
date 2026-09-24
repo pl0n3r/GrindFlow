@@ -29,6 +29,7 @@ class ProductionEnvironmentWriterTest extends TestCase
 
         $contents = (string) file_get_contents($path);
         self::assertStringContainsString('SMOKE_USER_PASSWORD="secret-\\$-with-\\"quotes\\""', $contents);
+        self::assertStringContainsString('CACHE_STORE="file"', $contents);
 
         $backups = Storage::disk('local')->allFiles('operations/environment-backups');
         self::assertCount(1, $backups);
@@ -59,7 +60,7 @@ class ProductionEnvironmentWriterTest extends TestCase
 
     public function test_it_rolls_environment_back_when_reconciliation_fails(): void
     {
-        $original = "APP_ENV=production\nSMOKE_USER_PASSWORD=\"old\"\n";
+        $original = "APP_ENV=production\nCACHE_STORE=\"array\"\nSMOKE_USER_PASSWORD=\"old\"\n";
         $path = $this->temporaryEnvironment($original);
 
         try {
@@ -82,7 +83,7 @@ class ProductionEnvironmentWriterTest extends TestCase
 
     public function test_it_does_not_create_environment_backup_when_value_is_already_current(): void
     {
-        $path = $this->temporaryEnvironment("SMOKE_USER_PASSWORD=\"same\"\n");
+        $path = $this->temporaryEnvironment("CACHE_STORE=\"file\"\nSMOKE_USER_PASSWORD=\"same\"\n");
         $called = false;
 
         (new ProductionEnvironmentWriter)->withSmokePassword(
