@@ -10,9 +10,10 @@ use PHPUnit\Framework\TestCase;
 final class PrivacyAsCodeTest extends TestCase
 {
     private const PLACEHOLDER = '[COMPLETAR POR EL DUEÑO]';
+
     private const FACTORY_SHA = 'a14f38d5b4b1bb0db21101021375c76f1e36699c';
 
-    public function testDataMapMatchesObservedGrindFlowTreatments(): void
+    public function test_data_map_matches_observed_grind_flow_treatments(): void
     {
         $data = $this->data();
 
@@ -53,7 +54,7 @@ final class PrivacyAsCodeTest extends TestCase
         }
     }
 
-    public function testObservedProvidersAreScopedToRealTreatments(): void
+    public function test_observed_providers_are_scoped_to_real_treatments(): void
     {
         $data = $this->data();
 
@@ -93,7 +94,7 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringContainsString('ip               inet', $supabaseMigration);
     }
 
-    public function testGeneratedPrivacyDocumentsAreCurrent(): void
+    public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
             'politica-tratamiento.md' => '073dc490829e2655c76f5e70eb21726e441cc900b86684e17718ffdaedb63549',
@@ -110,7 +111,7 @@ final class PrivacyAsCodeTest extends TestCase
         }
     }
 
-    public function testPrivacyWorkflowsUsePinnedFactoryWithMinimumPermissions(): void
+    public function test_privacy_workflows_use_pinned_factory_with_minimum_permissions(): void
     {
         $privacy = file_get_contents($this->root().'/.github/workflows/privacidad.yml');
         $audit = file_get_contents($this->root().'/.github/workflows/auditoria-privacidad.yml');
@@ -134,7 +135,7 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringNotContainsString('secrets:', $audit);
     }
 
-    public function testPendingLegalStatesAreNotInvented(): void
+    public function test_pending_legal_states_are_not_invented(): void
     {
         $data = $this->data();
 
@@ -155,7 +156,7 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringNotContainsString('jurídicamente aprobada', $policy);
     }
 
-    public function testTrafficFingerprintDocumentsHashAndObservedRetention(): void
+    public function test_traffic_fingerprint_documents_hash_and_observed_retention(): void
     {
         $data = $this->data();
         $dedupe = $this->treatment($data, 'traffic_dedupe');
@@ -206,7 +207,7 @@ final class PrivacyAsCodeTest extends TestCase
     }
 
     /** @param array<string, mixed> $data
-     *  @return list<string>
+     * @return list<string>
      */
     private function treatmentIds(array $data): array
     {
@@ -220,7 +221,7 @@ final class PrivacyAsCodeTest extends TestCase
     }
 
     /** @param array<string, mixed> $data
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function treatment(array $data, string $id): array
     {
