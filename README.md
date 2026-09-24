@@ -72,7 +72,6 @@ Inventario del diff exacto:
 - `.env.example`
 - `.github/workflows/production-smoke.yml`
 - `README.md`
-- `scripts/production-smoke-contract.sh`
 - `app/Http/Controllers/Operations/ProductionSmokeBootstrapController.php`
 - `app/Support/Deployment/GitHubActionsOidcVerifier.php`
 - `app/Support/Deployment/ProductionEnvironmentWriter.php`
@@ -81,6 +80,7 @@ Inventario del diff exacto:
 - `docs/DEPLOY-HOSTINGER.md`
 - `phpunit.xml`
 - `routes/web.php`
+- `scripts/production-smoke-contract.sh`
 - `tests/Feature/ProductionSmokeBootstrapTest.php`
 - `tests/Unit/GitHubActionsOidcVerifierTest.php`
 - `tests/Unit/ProductionEnvironmentWriterTest.php`
