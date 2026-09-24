@@ -30,7 +30,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+612** | **−33** | **+579** |
+| **9** | **+758** | **−33** | **+725** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -54,8 +54,9 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Documenta identidad/membresías, credenciales, conexiones Google Drive/Dropbox, Media Vault y tráfico sin PII real.
-- Separa el dedupe de tráfico (`visitor_hash`, retención técnica `dedupe_24h`) del legado Supabase que sí registra IP cruda en la bitácora de subidas.
+- Documenta identidad/membresías, credenciales, conexiones Google Drive/Dropbox, Media Vault, credenciales de publicación y tráfico sin PII real.
+- Declara Supabase solo donde el código demuestra procesamiento: identidad/membresías, conexiones cloud, media, credenciales de publicación, tracking/clicks y bitácora de subidas.
+- Separa el dedupe Laravel (`visitor_hash`, retención técnica `dedupe_24h`) de los flujos legacy: `link_clicks` guarda referrer/UA sin IP, mientras `upload_link_events` sí registra IP cruda.
 - Mantiene responsable, bases, consentimientos y retenciones no demostradas como `review_required` / `[COMPLETAR POR EL DUEÑO]`.
 - Añade callers mínimos, sin secretos, fijados a Factory `a14f38d5b4b1bb0db21101021375c76f1e36699c`.
 
@@ -73,7 +74,7 @@ Inventario del diff exacto:
 - `tests/Feature/PrivacyAsCodeTest.php`
 
 ## Validación
-- `PrivacyAsCodeTest` enlaza cada tratamiento/proveedor con código real y distingue `visitor_hash` de la IP cruda del flujo legado.
+- `PrivacyAsCodeTest` enlaza cada tratamiento/proveedor con código real, incluyendo `createServiceClient`, tablas Supabase y los flujos de ingesta/publicación/tracking; distingue `visitor_hash`, `link_clicks` e IP cruda de uploads.
 - Los tres documentos quedan congelados contra la salida determinista del kit y el workflow reutilizable vuelve a verificar `datos.yml` contra Factory.
 - Ningún documento se presenta como cumplimiento o revisión jurídica aprobada.
 
