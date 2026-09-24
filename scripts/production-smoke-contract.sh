@@ -16,6 +16,61 @@ assert_absent_regex() {
 }
 
 
+# The synthetic login identity is a cross-file contract. Drift here would
+# provision one account and then try to authenticate another in production.
+writer_file="$script_dir/../app/Support/Deployment/ProductionEnvironmentWriter.php"
+workflow_file="$script_dir/../.github/workflows/production-smoke.yml"
+config_file="$script_dir/../config/grindflow.php"
+smoke_file="$script_dir/production-smoke.sh"
+env_example_file="$script_dir/../.env.example"
+deploy_file="$script_dir/deploy-hostinger.sh"
+
+php_email="$(sed -nE "s/^[[:space:]]*public const DEDICATED_SMOKE_EMAIL = '([^']+)';/\1/p" "$writer_file")"
+workflow_email="$(sed -nE 's/^[[:space:]]*E2E_USER_EMAIL:[[:space:]]*([a-z0-9._+-]+@grindflow[.]test)[[:space:]]*$/\1/p' "$workflow_file")"
+script_email="$(sed -nE 's/^E2E_USER_EMAIL="\$\{E2E_USER_EMAIL:-([^}]+)\}"$/\1/p' "$smoke_file")"
+config_email="$(sed -nE "s/.*env\('SMOKE_USER_EMAIL', '([a-z0-9._+-]+@grindflow[.]test)'\).*/\1/p" "$config_file")"
+example_email="$(sed -nE 's/^SMOKE_USER_EMAIL="([a-z0-9._+-]+@grindflow[.]test)"$/\1/p' "$env_example_file")"
+deploy_email="$(sed -nE 's/^export SMOKE_USER_EMAIL="([a-z0-9._+-]+@grindflow[.]test)"$/\1/p' "$deploy_file")"
+
+if [[ -z "$php_email" || "$php_email" == *$'\n'* ||
+      "$workflow_email" != "$php_email" ||
+      "$script_email" != "$php_email" ||
+      "$config_email" != "$php_email" ||
+      "$example_email" != "$php_email" ||
+      "$deploy_email" != "$php_email" ]]; then
+  printf 'FAIL production smoke contract: dedicated OIDC identity drifted across runtime files.\n' >&2
+  exit 1
+fi
+for runtime_file in "$workflow_file" "$config_file" "$smoke_file" "$env_example_file" "$deploy_file"; do
+  if grep -Fq 'e2e-admin@grindflow.test' "$runtime_file"; then
+    printf 'FAIL production smoke contract: legacy member-bound identity returned to runtime configuration.\n' >&2
+    exit 1
+  fi
+done
+printf 'PASS production smoke contract: dedicated OIDC identity stays synchronized\n'
+deploy_email_line="$(grep -n '^export SMOKE_USER_EMAIL=' "$deploy_file" | cut -d: -f1)"
+config_cache_line="$(grep -n 'artisan config:cache' "$deploy_file" | cut -d: -f1)"
+provision_line="$(grep -n 'artisan grindflow:provision-smoke-user' "$deploy_file" | cut -d: -f1)"
+if [[ -z "$deploy_email_line" || -z "$config_cache_line" || -z "$provision_line" ||
+      "$deploy_email_line" -ge "$config_cache_line" ||
+      "$config_cache_line" -ge "$provision_line" ]]; then
+  printf 'FAIL production smoke contract: deploy must select dedicated identity before config cache and provisioning.\n' >&2
+  exit 1
+fi
+printf 'PASS production smoke contract: deploy selects dedicated identity before provisioning\n'
+if grep -Fq 'assert_contains "$dashboard_html" "Overview"' "$smoke_file" ||
+   grep -Fq 'assert_contains "$dashboard_html" "Tenant isolation active"' "$smoke_file"; then
+  printf 'FAIL production smoke contract: dashboard smoke still depends on obsolete copy markers.\n' >&2
+  exit 1
+fi
+for dashboard_marker in 'data-dashboard-metric="organizations"' 'data-dashboard-metric="ready-media"'; do
+  if ! grep -Fq "$dashboard_marker" "$smoke_file"; then
+    printf 'FAIL production smoke contract: stable dashboard marker is missing from smoke assertions.\n' >&2
+    exit 1
+  fi
+done
+printf 'PASS production smoke contract: dashboard assertions use stable HTML markers\n'
+
 # A failed exact-SHA wait or OIDC bootstrap must still report the production incident.
 # This contract is run by GrindFlow CI / fast without production credentials.
 python3 - "$script_dir/../.github/workflows/production-smoke.yml" <<'PY'
@@ -133,7 +188,7 @@ case "$url" in
     if [[ "${MOCK_AUTH_MODE:-ok}" == dashboard_303 ]]; then status=303; redirect="/login?private-query-do-not-print"; fi
      if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^dashboard_(301|307|308)$ ]]; then status="${BASH_REMATCH[1]}"; redirect="/login?private-query-do-not-print"; fi
     if [[ "${MOCK_AUTH_MODE:-ok}" =~ ^dashboard_(401|403|419|422|429)$ ]]; then status="${BASH_REMATCH[1]}"; fi
-    if [[ "${MOCK_VAULT_MODE:-ok}" == missing_link ]]; then body='<h1>Overview</h1>Tenant isolation active'; else body='<h1>Overview</h1>Tenant isolation active <a href="/organizations/example/vault">Vault</a>'; fi;;
+    if [[ "${MOCK_VAULT_MODE:-ok}" == missing_link ]]; then body='<article data-dashboard-metric="organizations"></article><article data-dashboard-metric="ready-media"></article>'; else body='<article data-dashboard-metric="organizations"></article><article data-dashboard-metric="ready-media"></article><a href="/organizations/example/vault">Vault</a>'; fi;;
   http://mock/admin/system)
     release="$(sed -nE "s/^[[:space:]]*'number'[[:space:]]*=>[[:space:]]*'([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" "$MOCK_REPOSITORY_ROOT/config/version.php")"
     [[ "${MOCK_RELEASE_MODE:-current}" == stale ]] && release=0.0.0

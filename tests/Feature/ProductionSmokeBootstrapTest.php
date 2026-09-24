@@ -77,7 +77,7 @@ class ProductionSmokeBootstrapTest extends TestCase
 
         $user = User::query()->sole();
         self::assertSame(UserRole::Admin, $user->platform_role);
-        self::assertSame('e2e-admin@grindflow.test', $user->email);
+        self::assertSame(ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL, $user->email);
         self::assertTrue(Hash::check($password, $user->password));
         self::assertStringNotContainsString($password, (string) $response->getContent());
     }

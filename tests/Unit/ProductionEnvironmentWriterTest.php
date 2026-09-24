@@ -31,6 +31,7 @@ class ProductionEnvironmentWriterTest extends TestCase
         $contents = (string) file_get_contents($path);
         self::assertStringContainsString('SMOKE_USER_PASSWORD="secret-\\$-with-\\"quotes\\""', $contents);
         self::assertStringContainsString('CACHE_STORE="file"', $contents);
+        self::assertStringContainsString('SMOKE_USER_EMAIL="e2e-oidc-smoke@grindflow.test"', $contents);
 
         $backups = Storage::disk('local')->allFiles('operations/environment-backups');
         self::assertCount(1, $backups);
@@ -102,9 +103,29 @@ class ProductionEnvironmentWriterTest extends TestCase
         @unlink($path);
     }
 
+    public function test_it_migrates_only_the_legacy_smoke_email_with_private_backup_and_idempotency(): void
+    {
+        $original = "CACHE_STORE=\"file\"\nSMOKE_USER_PASSWORD=\"same\"\nSMOKE_USER_EMAIL=\"e2e-admin@grindflow.test\"\n";
+        $path = $this->temporaryEnvironment($original);
+        $writer = new ProductionEnvironmentWriter;
+
+        $writer->withSmokePassword('same', static fn (): null => null, $path);
+        $parsed = Dotenv::parse((string) file_get_contents($path));
+        self::assertSame(ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL, $parsed['SMOKE_USER_EMAIL']);
+        self::assertSame('same', $parsed['SMOKE_USER_PASSWORD']);
+        $backups = Storage::disk('local')->allFiles('operations/environment-backups');
+        self::assertCount(1, $backups);
+        self::assertSame($original, Crypt::decryptString((string) Storage::disk('local')->get($backups[0])));
+
+        $writer->withSmokePassword('same', static fn (): null => null, $path);
+        self::assertSame($backups, Storage::disk('local')->allFiles('operations/environment-backups'));
+
+        @unlink($path);
+    }
+
     public function test_it_rolls_environment_back_when_reconciliation_fails(): void
     {
-        $original = "APP_ENV=production\nCACHE_STORE=\"array\"\nSMOKE_USER_PASSWORD=\"old\"\n";
+        $original = "APP_ENV=production\nCACHE_STORE=\"array\"\nSMOKE_USER_PASSWORD=\"old\"\nSMOKE_USER_EMAIL=\"e2e-admin@grindflow.test\"\n";
         $path = $this->temporaryEnvironment($original);
 
         try {
@@ -127,7 +148,7 @@ class ProductionEnvironmentWriterTest extends TestCase
 
     public function test_it_does_not_create_environment_backup_when_value_is_already_current(): void
     {
-        $path = $this->temporaryEnvironment("CACHE_STORE=\"file\"\nSMOKE_USER_PASSWORD=\"same\"\n");
+        $path = $this->temporaryEnvironment("CACHE_STORE=\"file\"\nSMOKE_USER_PASSWORD=\"same\"\nSMOKE_USER_EMAIL=\"e2e-oidc-smoke@grindflow.test\"\n");
         $called = false;
 
         (new ProductionEnvironmentWriter)->withSmokePassword(

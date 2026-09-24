@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Deployment\ProductionEnvironmentWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
@@ -193,6 +194,67 @@ class ProvisionSmokeUserCommandTest extends TestCase
         self::assertTrue($snapshot['exists']);
         self::assertSame('model', $snapshot['user']['platform_role']);
         self::assertTrue(Hash::check('old-secret', $snapshot['user']['password']));
+    }
+
+    public function test_it_provisions_a_dedicated_identity_without_mutating_the_member_bound_legacy_account(): void
+    {
+        $legacy = User::factory()->create([
+            'email' => 'e2e-admin@grindflow.test',
+            'name' => 'Legacy synthetic member',
+            'password' => 'legacy-secret',
+            'platform_role' => UserRole::Model,
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::query()->create([
+            'user_id' => $legacy->getKey(),
+            'organization_id' => $organization->getKey(),
+            'role' => UserRole::Model,
+        ]);
+        $legacyHash = $legacy->getAuthPassword();
+        $legacyUpdatedAt = $legacy->updated_at?->format('Y-m-d H:i:s.u');
+        config(['grindflow.smoke_user.email' => ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL]);
+
+        $this->artisan('grindflow:provision-smoke-user')->assertSuccessful();
+        $this->artisan('grindflow:provision-smoke-user')->assertSuccessful();
+
+        $legacy->refresh();
+        self::assertSame(UserRole::Model, $legacy->platform_role);
+        self::assertSame('Legacy synthetic member', $legacy->name);
+        self::assertSame($legacyHash, $legacy->getAuthPassword());
+        self::assertSame($legacyUpdatedAt, $legacy->updated_at?->format('Y-m-d H:i:s.u'));
+        self::assertSame(1, $legacy->memberships()->count());
+        $dedicated = User::query()->where('email', ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL)->sole();
+        self::assertSame(UserRole::Admin, $dedicated->platform_role);
+        self::assertSame(0, $dedicated->memberships()->count());
+        $this->assertDatabaseCount('users', 2);
+        self::assertCount(1, Storage::disk('local')->allFiles('operations/smoke-user-backups'));
+    }
+
+    public function test_it_rejects_a_membership_conflict_on_the_new_dedicated_identity_without_mutation(): void
+    {
+        config(['grindflow.smoke_user.email' => ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL]);
+        $dedicated = User::factory()->create([
+            'email' => ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL,
+            'name' => 'Occupied dedicated identity',
+            'password' => 'existing-secret',
+            'platform_role' => UserRole::Model,
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::query()->create([
+            'user_id' => $dedicated->getKey(),
+            'organization_id' => $organization->getKey(),
+            'role' => UserRole::Model,
+        ]);
+        $existingHash = $dedicated->getAuthPassword();
+
+        $this->artisan('grindflow:provision-smoke-user')->assertFailed();
+
+        self::assertSame('provision-membership-conflict', config('grindflow.smoke_provision_failure_code'));
+        $dedicated->refresh();
+        self::assertSame(UserRole::Model, $dedicated->platform_role);
+        self::assertSame($existingHash, $dedicated->getAuthPassword());
+        self::assertSame(1, $dedicated->memberships()->count());
+        self::assertSame([], Storage::disk('local')->allFiles('operations/smoke-user-backups'));
     }
 
     public function test_it_refuses_to_reconcile_a_synthetic_email_with_an_organization_membership(): void

@@ -29,6 +29,11 @@ printf 'Using PHP: %s\n' "$("$PHP_BIN" -r 'echo PHP_VERSION;')"
 printf 'Installing production Composer dependencies...\n'
 "$COMPOSER_BIN" install   --no-dev   --prefer-dist   --no-interaction   --optimize-autoloader
 
+# Production may still carry the legacy member-bound smoke address in .env.
+# Override this deploy process before config:cache/provisioning; the OIDC bootstrap
+# persists the same dedicated address through the encrypted .env backup path.
+export SMOKE_USER_EMAIL="e2e-oidc-smoke@grindflow.test"
+
 printf 'Refreshing Laravel caches...\n'
 "$PHP_BIN" artisan config:clear
 "$PHP_BIN" artisan view:clear

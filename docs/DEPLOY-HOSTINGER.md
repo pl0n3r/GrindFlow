@@ -38,7 +38,7 @@ APP_DEBUG="false"
 APP_URL="https://www.grindflow.com.co"
 APP_PHASE="construccion"
 CACHE_STORE="file"
-SMOKE_USER_EMAIL="e2e-admin@grindflow.test"
+SMOKE_USER_EMAIL="e2e-oidc-smoke@grindflow.test"
 SMOKE_USER_PASSWORD="<secret>"
 SMOKE_USER_NAME="GrindFlow Production Smoke"
 ```
@@ -69,6 +69,14 @@ el formato aceptado por el writer; no revela su valor ni autoriza rotarlo a cieg
 Los códigos `provision-email-invalid` y `provision-name-invalid` requieren
 corregir `SMOKE_USER_EMAIL` y `SMOKE_USER_NAME`, respectivamente, por canal
 privado y sin revelar sus valores.
+En la recuperación de #73, el correo reservado `e2e-oidc-smoke@grindflow.test`
+sustituye exclusivamente la identidad técnica del Smoke. El bootstrap OIDC
+lo persiste junto con `SMOKE_USER_PASSWORD` en una sola actualización de `.env`
+con copia cifrada y reversión ante fallo; el workflow usa ese mismo correo.
+**No renombrar, eliminar, desasociar ni elevar** la cuenta anterior
+`e2e-admin@grindflow.test`, que puede pertenecer a una organización.
+Si el nuevo correo también tiene membresías, se mantiene el bloqueo seguro
+`provision-membership-conflict` y se investiga por canal privado.
 Para la etapa `provision-user`, los códigos fijos distinguen un conflicto de
 membresías (`provision-membership-conflict`: NO elevar la identidad existente),
 un backup cifrado que no puede escribirse o protegerse
