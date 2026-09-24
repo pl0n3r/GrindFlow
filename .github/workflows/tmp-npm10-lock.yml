@@ -1,0 +1,36 @@
+name: TEMP npm10 lock refresh
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: github.event.pull_request.number == 147
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Regenerate package lock with CI npm
+        run: |
+          set -euo pipefail
+          npm_version="$(npm --version)"
+          echo "npm major: ${npm_version%%.*}"
+          test "${npm_version%%.*}" = "10"
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Upload regenerated lock
+        uses: actions/upload-artifact@v6
+        with:
+          name: npm10-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
