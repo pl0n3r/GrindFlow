@@ -31,7 +31,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+145** | **−40** | **+105** |
+| **14** | **+211** | **−42** | **+169** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -72,6 +72,8 @@ Inventario del diff exacto:
 - `config/grindflow.php`
 - `config/version.php`
 - `docs/DEPLOY-HOSTINGER.md`
+- `scripts/deploy-hostinger.sh`
+- `scripts/production-smoke-contract.sh`
 - `scripts/production-smoke.sh`
 - `tests/Feature/ProductionSmokeBootstrapTest.php`
 - `tests/Feature/ProvisionSmokeUserCommandTest.php`
@@ -79,6 +81,8 @@ Inventario del diff exacto:
 
 ## Validación
 - PHPUnit cubre cambio atómico del correo, backup/rollback e identidad antigua asociada intacta; el comando conserva el rechazo por membresías.
+- El contrato offline obliga a PHP, deploy, workflow, script y `.env.example` a compartir exactamente la identidad OIDC reservada; además exige seleccionarla antes de `config:cache` y del aprovisionamiento obligatorio.
+- El Smoke autenticado valida el dashboard mediante atributos `data-dashboard-metric` presentes en la vista real, no mediante copy histórico; el mock contractual usa los mismos marcadores.
 - CI/Sonar/CodeRabbit del HEAD deben aprobar antes del merge. Smoke exact-SHA verificará el login; CI verde no equivale a producción verde.
 
 ## Qué sigue

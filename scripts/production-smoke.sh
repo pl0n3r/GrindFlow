@@ -466,8 +466,8 @@ run_smoke() {
     401|403|419|422|429) printf 'ERROR: authenticated dashboard returned HTTP %s; stop authentication retries.\n' "$dashboard_status" >&2; return 7 ;;
   esac
   if [[ "$dashboard_status" != "200" ]]; then printf 'ERROR: authenticated dashboard returned HTTP %s\n' "$dashboard_status" >&2; print_diagnostics; return 1; fi
-  if ! assert_contains "$dashboard_html" "Overview"; then print_diagnostics; return 1; fi
-  if ! assert_contains "$dashboard_html" "Tenant isolation active"; then print_diagnostics; return 1; fi
+  if ! assert_contains "$dashboard_html" 'data-dashboard-metric="organizations"'; then print_diagnostics; return 1; fi
+  if ! assert_contains "$dashboard_html" 'data-dashboard-metric="ready-media"'; then print_diagnostics; return 1; fi
 
   local system_status
   system_status="$(curl_common --cookie "$cookie_jar" --output "$system_html" --write-out '%{http_code}' "$BASE_URL/admin/system")"
