@@ -187,7 +187,7 @@ class ProductionSmokeBootstrapTest extends TestCase
         $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
 
         // Keep the real writer: its input guard executes before opening .env.
-        $password = "invalid\\nsynthetic-secret";
+        $password = "invalid\nsynthetic-secret";
         $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
             ->withHeader('X-GrindFlow-Expected-Sha', $sha)
             ->postJson('/internal/production-smoke/bootstrap', ['password' => $password]);
