@@ -58,6 +58,49 @@ class ProductionEnvironmentWriterTest extends TestCase
         @unlink($path);
     }
 
+    public function test_it_preserves_an_existing_database_cache_store(): void
+    {
+        $original = "APP_ENV=production\nCACHE_STORE=\"database\"\nSMOKE_USER_PASSWORD=\"old\"\n";
+        $path = $this->temporaryEnvironment($original);
+
+        (new ProductionEnvironmentWriter)->withSmokePassword(
+            'replacement',
+            static fn (): null => null,
+            $path,
+        );
+
+        $contents = (string) file_get_contents($path);
+        $parsed = Dotenv::parse($contents);
+        self::assertSame('database', $parsed['CACHE_STORE']);
+        self::assertSame('replacement', $parsed['SMOKE_USER_PASSWORD']);
+        self::assertSame(1, substr_count($contents, 'CACHE_STORE='));
+        self::assertSame(
+            $original,
+            Crypt::decryptString((string) Storage::disk('local')->get(
+                Storage::disk('local')->allFiles('operations/environment-backups')[0],
+            )),
+        );
+
+        @unlink($path);
+    }
+
+    public function test_it_upgrades_array_cache_store_to_persistent_file_cache(): void
+    {
+        $path = $this->temporaryEnvironment("CACHE_STORE=\"array\"\nSMOKE_USER_PASSWORD=\"old\"\n");
+
+        (new ProductionEnvironmentWriter)->withSmokePassword(
+            'replacement',
+            static fn (): null => null,
+            $path,
+        );
+
+        $parsed = Dotenv::parse((string) file_get_contents($path));
+        self::assertSame('file', $parsed['CACHE_STORE']);
+        self::assertSame('replacement', $parsed['SMOKE_USER_PASSWORD']);
+
+        @unlink($path);
+    }
+
     public function test_it_rolls_environment_back_when_reconciliation_fails(): void
     {
         $original = "APP_ENV=production\nCACHE_STORE=\"array\"\nSMOKE_USER_PASSWORD=\"old\"\n";
