@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -15,11 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
-      - name: Regenerate package lock with CI npm
+      - name: Regenerate and verify package lock with CI npm
         run: |
           set -euo pipefail
           npm_version="$(npm --version)"
@@ -27,10 +29,17 @@ jobs:
           test "${npm_version%%.*}" = "10"
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci --ignore-scripts --no-audit --no-fund
-      - name: Upload regenerated lock
-        uses: actions/upload-artifact@v6
-        with:
-          name: npm10-package-lock
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit generated lock to temporary branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock already compatible"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(ci): refresh npm10 package lock"
+          git push origin HEAD:"$HEAD_REF"
