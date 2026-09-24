@@ -117,8 +117,11 @@ jobs:
         run: |
           set -euo pipefail
           payload="$(mktemp)"
-          trap 'rm -f "$payload"' EXIT
+          response_headers="$(mktemp)"
+          trap 'rm -f "$payload" "$response_headers"' EXIT
           chmod 600 "$payload"
+          failure_stage="unknown"
+          failure_code="unknown"
 
           GRINDFLOW_SMOKE_PASSWORD="$E2E_USER_PASSWORD" python3 - "$payload" <<'PY'
           import json
@@ -145,7 +148,8 @@ jobs:
             fi
             printf '::add-mask::%s\n' "$oidc_token"
 
-            bootstrap_status="$(curl --silent --show-error --max-time 20               --output /dev/null               --write-out '%{http_code}'               --request POST               --header "Authorization: Bearer $oidc_token"               --header "Content-Type: application/json"               --header "X-GrindFlow-Expected-Sha: $GITHUB_SHA"               --data-binary "@$payload"               "$BASE_URL/internal/production-smoke/bootstrap" || true)"
+            : > "$response_headers"
+            bootstrap_status="$(curl --silent --show-error --max-time 20               --dump-header "$response_headers"               --output /dev/null               --write-out '%{http_code}'               --request POST               --header "Authorization: Bearer $oidc_token"               --header "Content-Type: application/json"               --header "X-GrindFlow-Expected-Sha: $GITHUB_SHA"               --data-binary "@$payload"               "$BASE_URL/internal/production-smoke/bootstrap" || true)"
             unset oidc_token oidc_response
 
             if [[ "$bootstrap_status" == "204" ]]; then
@@ -153,11 +157,26 @@ jobs:
               break
             fi
 
+            # A reconciliation 503 is deterministic for this checkout. Do not
+            # repeat potentially mutating operations; only report allowlisted codes.
+            if [[ "$bootstrap_status" == "503" ]]; then
+              failure_stage="$(awk -F ': *' 'tolower($1) == "x-grindflow-smoke-failure-stage" {gsub(/\r/, "", $2); print $2; exit}' "$response_headers")"
+              failure_code="$(awk -F ': *' 'tolower($1) == "x-grindflow-smoke-failure-code" {gsub(/\r/, "", $2); print $2; exit}' "$response_headers")"
+              case "$failure_stage" in environment|config-clear|provision-user) ;; *) failure_stage="unknown";; esac
+              case "$failure_code" in
+                env-unavailable|lock-unavailable|lock-failed|env-read-failed|backup-write-failed|backup-permission-failed|stage-unavailable|stage-write-failed|stage-permission-failed|env-publish-failed|config-clear-failed|provision-failed)
+                  ;;
+                *) failure_code="unexpected";;
+              esac
+              break
+            fi
             if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
           done
 
           if [[ "$bootstrap_status" != "204" ]]; then
-            echo "::error::Synthetic production identity bootstrap failed with HTTP $bootstrap_status; no login attempt will be sent."
+            echo "BOOTSTRAP_FAILURE_STAGE=$failure_stage" >> "$GITHUB_ENV"
+            echo "BOOTSTRAP_FAILURE_CODE=$failure_code" >> "$GITHUB_ENV"
+            echo "::error::Synthetic production identity bootstrap failed with HTTP $bootstrap_status; stage=$failure_stage code=$failure_code; no login attempt will be sent."
             exit 1
           fi
 
@@ -178,6 +197,10 @@ jobs:
             echo "## Production smoke blocked before login"
             echo
             echo "Stage: $stage"
+            if [[ "$stage" == "oidc-bootstrap" ]]; then
+              echo "Reconciliation stage: ${BOOTSTRAP_FAILURE_STAGE:-unknown}"
+              echo "Reconciliation code: ${BOOTSTRAP_FAILURE_CODE:-unknown}"
+            fi
             echo "No login was attempted. Inspect the failed workflow step for details."
             echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
             echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -37,12 +37,16 @@ for marker in (
     "steps.synthetic_bootstrap.outcome == 'failure'",
     "gh issue comment",
     "gh issue create",
+    "Reconciliation stage:",
+    "Reconciliation code:",
     "--body-file /tmp/grindflow-prelogin-failure.md",
     "GH_TOKEN:",
 ):
     assert marker in report, marker
 for forbidden in ('"$oidc_token"', '"$payload"', "production-smoke.log", "getMessage"):
     assert forbidden not in report, forbidden
+for marker in ("--dump-header", "failure_stage=", "failure_code=", "break", "BOOTSTRAP_FAILURE_STAGE", "BOOTSTRAP_FAILURE_CODE"):
+    assert marker in workflow, marker
 print("PASS production smoke contract: pre-login failure is reported without secrets")
 PY
 
