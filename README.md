@@ -30,13 +30,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **3** | **+30** | **−46** | **-16** |
+| **5** | **+96** | **−46** | **+50** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · legacy** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
 | Alcance | #139: Pillow 11.0.0 → 12.3.0 en workers |
 | Rol del PR | **Application Security · Python/Workers · Release Engineering** |
@@ -55,17 +55,19 @@ flowchart LR
 ## Qué se hizo
 - Actualiza el pin de Pillow de 11.0.0 a 12.3.0 en `workers/requirements.txt`.
 - Mantiene sin cambios psycopg y boto3; no toca código de negocio, datos ni secretos.
-- Recupera la PR de Dependabot sobre el `main` real y la adapta al contrato actual de releases.
+- Recupera la PR de Dependabot sobre el `main` real y la adapta al contrato actual de releases.\n- El gate `legacy` instala `workers/requirements.txt` en un venv descartable y prueba sanitización EXIF, WEBP y watermark con Pillow real.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
 <!-- grindflow:changed-files -->
+- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
 - `workers/requirements.txt`
+- `workers/test_image_pipeline.py`
 
 ## Validación
-- El gate `legacy` debe instalar y validar el stack de workers/Node aplicable al diff.
+- El gate `legacy` instala dependencias Python del worker y ejecuta `workers/test_image_pipeline.py`: EXIF/orientación, conversión WEBP y watermark sin servicios externos.
 - Sonar y CodeRabbit deben revisar el HEAD final; la actualización no se considera desplegada por existir en rama.
 - Tras merge se exige CI exact-main y las señales operativas normales antes de declarar v0.1.127 validada en producción.
 
