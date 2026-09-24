@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://www.grindflow.com.co}"
-E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-admin@grindflow.test}"
+E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-oidc-smoke@grindflow.test}"
 : "${E2E_USER_PASSWORD:?E2E_USER_PASSWORD is required}"
 
 ATTEMPTS="${ATTEMPTS:-12}"

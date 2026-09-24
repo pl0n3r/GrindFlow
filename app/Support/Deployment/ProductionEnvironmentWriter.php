@@ -12,6 +12,8 @@ use Throwable;
 
 class ProductionEnvironmentWriter
 {
+    public const DEDICATED_SMOKE_EMAIL = 'e2e-oidc-smoke@grindflow.test';
+
     /**
      * @param  Closure(): void  $afterPersist
      */
@@ -56,6 +58,13 @@ class ProductionEnvironmentWriter
                 $original,
                 'SMOKE_USER_PASSWORD',
                 $this->quoted($password),
+            );
+            // Change the login identity and secret in the same backed-up .env write.
+            // Never repurpose the legacy organization-associated synthetic user.
+            $updated = $this->upsert(
+                $updated,
+                'SMOKE_USER_EMAIL',
+                $this->quoted(self::DEDICATED_SMOKE_EMAIL),
             );
             // Preserve production cache backends that already persist OIDC replay IDs.
             $currentStore = Dotenv::parse($original)['CACHE_STORE'] ?? null;

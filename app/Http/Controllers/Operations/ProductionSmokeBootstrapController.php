@@ -69,7 +69,10 @@ class ProductionSmokeBootstrapController extends Controller
                         throw new RuntimeException('Configuration cache could not be invalidated.');
                     }
 
-                    config(['grindflow.smoke_user.password' => $password]);
+                    config([
+                        'grindflow.smoke_user.password' => $password,
+                        'grindflow.smoke_user.email' => ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL,
+                    ]);
 
                     $failureStage = 'provision-user';
                     config(['grindflow.smoke_provision_failure_code' => null]);

@@ -4,7 +4,7 @@ return [
     'phase' => env('APP_PHASE', 'construccion'),
 
     'smoke_user' => [
-        'email' => env('SMOKE_USER_EMAIL', 'e2e-admin@grindflow.test'),
+        'email' => env('SMOKE_USER_EMAIL', 'e2e-oidc-smoke@grindflow.test'),
         'password' => env('SMOKE_USER_PASSWORD', env('PRODUCTION_E2E_PASSWORD')),
         'name' => env('SMOKE_USER_NAME', 'GrindFlow Production Smoke'),
     ],
