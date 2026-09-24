@@ -11,7 +11,7 @@ final class PrivacyAsCodeTest extends TestCase
 {
     private const PLACEHOLDER = '[COMPLETAR POR EL DUEÑO]';
 
-    private const FACTORY_SHA = 'a14f38d5b4b1bb0db21101021375c76f1e36699c';
+    private const FACTORY_SHA = 'a33b04cafeabfe0004f01fdf79291a0645a60f0a';
 
     public function test_data_map_matches_observed_grind_flow_treatments(): void
     {
@@ -140,7 +140,10 @@ final class PrivacyAsCodeTest extends TestCase
     {
         $expected = [
             'politica-tratamiento.md' => '9406b4890130bb338c4dbff0ec3f4803da4c3560d1ae834c3a9e7ed264e3ce3a',
+            'aviso-privacidad.md' => 'c91a6a4a7d6fed08357654f00b06cf1b21aa288b2efda74a26c4915ab524a6f7',
+            'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
             'registro-tratamientos.md' => 'ff99c96491876ddf7a6c6dc962802b0ee67c4e1a88eb7b5115c8723fb39eeaae',
+            'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
             'retencion.md' => '27afabf1ea5af1da5ef3c0eea9fc093d950e455e266c5a83da8a535377abeec5',
         ];
 
@@ -168,11 +171,17 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringNotContainsString('secrets:', $privacy);
 
         $ci = file_get_contents($this->root().'/.github/workflows/grindflow-ci.yml');
+        self::assertStringContainsString('repository: pl0n3r/factory', $ci);
+        self::assertStringContainsString('ref: '.self::FACTORY_SHA, $ci);
+        self::assertStringContainsString('path: .factory', $ci);
         self::assertStringContainsString(
-            'uses: pl0n3r/factory/.github/workflows/privacidad.yml@'.self::FACTORY_SHA,
+            "PRIVACY_BASE_SHA: \${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}",
             $ci,
         );
-        self::assertStringContainsString('kit_ref: '.self::FACTORY_SHA, $ci);
+        self::assertStringContainsString(
+            'PYTHONPATH=.factory python3 .factory/scripts/privacidad_gate.py --base-sha "$PRIVACY_BASE_SHA"',
+            $ci,
+        );
         self::assertStringContainsString(
             'needs: [preflight, fast, php-quality, tests, database, browser, realstack, legacy, symfony-preview, privacy]',
             $ci,

@@ -2,7 +2,7 @@
 
 <p align="center">
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
-<a href="https://sonarcloud.io/dashboard?id=pl0n3r/GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
+<a href="https://sonarcloud.io/dashboard?id=pl0n3r_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-deploy-observer.yml"><img alt="Deploy Observer" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-deploy-observer.yml/badge.svg?branch=main"></a>
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
@@ -30,15 +30,15 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+786** | **−34** | **+752** |
+| **13** | **+898** | **−32** | **+866** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · privacy-as-code** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados, incluido privacy-as-code; Sonar y CodeRabbit aparte |
-| Alcance | #149: `datos.yml`, documentos generados, callers de Factory y pruebas de tratamientos observados |
+| Alcance | #149: `datos.yml`, seis documentos generados, callers de Factory y pruebas de tratamientos observados |
 | Rol del PR | **Legal-Privacidad · Ingeniería de Software · Infraestructura · QA** |
 | Revisiones | Factory privacy gate + CI/Sonar/CodeRabbit terminal del HEAD; revisión jurídica humana permanece separada |
 
@@ -58,7 +58,8 @@ flowchart LR
 - Declara Supabase solo donde el código demuestra procesamiento: identidad/membresías, conexiones cloud, media, credenciales de publicación, tracking/clicks y bitácora de subidas.
 - Separa el dedupe Laravel (`visitor_hash`, retención técnica `dedupe_24h`) de los flujos legacy: `link_clicks` guarda referrer/UA sin IP, mientras `upload_link_events` sí registra IP cruda.
 - Mantiene responsable, bases, consentimientos y retenciones no demostradas como `review_required` / `[COMPLETAR POR EL DUEÑO]`.
-- Añade callers mínimos, sin secretos, fijados a Factory `a14f38d5b4b1bb0db21101021375c76f1e36699c`.
+- Añade callers mínimos, sin secretos, fijados a Factory `a33b04cafeabfe0004f01fdf79291a0645a60f0a`.
+- Adopta el contrato vigente de Factory de **seis documentos canónicos**, incluyendo aviso de privacidad, términos y canal de derechos.
 - Integra privacy-as-code dentro de `GrindFlow CI / validate`, por lo que el squash exacto de `main` también debe pasar el gate de privacidad.
 
 ## Archivos modificados en esta entrega candidata
@@ -70,14 +71,17 @@ Inventario del diff exacto:
 - `README.md`
 - `config/version.php`
 - `datos.yml`
+- `docs/privacidad/aviso-privacidad.md`
+- `docs/privacidad/canal-derechos.md`
 - `docs/privacidad/politica-tratamiento.md`
 - `docs/privacidad/registro-tratamientos.md`
 - `docs/privacidad/retencion.md`
+- `docs/privacidad/terminos-condiciones.md`
 - `tests/Feature/PrivacyAsCodeTest.php`
 
 ## Validación
-- `PrivacyAsCodeTest` enlaza cada tratamiento/proveedor con código real, incluyendo `createServiceClient`, tablas Supabase y los flujos de ingesta/publicación/tracking; distingue `visitor_hash`, `link_clicks` e IP cruda de uploads.
-- Los tres documentos quedan congelados contra la salida determinista del kit y el workflow reutilizable vuelve a verificar `datos.yml` contra Factory.
+- `PrivacyAsCodeTest` valida los IDs del mapa y evidencias seleccionadas de implementación/proveedores; además distingue `visitor_hash`, `link_clicks` e IP cruda de uploads.
+- Los seis documentos canónicos quedan congelados contra la salida determinista del kit y los gates vuelven a verificar `datos.yml` contra Factory.
 - `validate` depende explícitamente de `privacy`; la misma compuerta corre en PR y en `push main` a través de `GrindFlow CI`.
 - Ningún documento se presenta como cumplimiento o revisión jurídica aprobada.
 
