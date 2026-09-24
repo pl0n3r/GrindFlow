@@ -72,6 +72,7 @@ class ProductionSmokeBootstrapController extends Controller
                     config(['grindflow.smoke_user.password' => $password]);
 
                     $failureStage = 'provision-user';
+                    config()->forget('grindflow.smoke_provision_failure_code');
 
                     if (Artisan::call('grindflow:provision-smoke-user') !== 0) {
                         throw new RuntimeException('Synthetic smoke identity reconciliation failed.');
@@ -96,6 +97,24 @@ class ProductionSmokeBootstrapController extends Controller
                 'Synthetic smoke identity reconciliation failed.' => 'provision-failed',
                 default => 'unexpected',
             };
+
+            if ($failureStage === 'provision-user' && $failureCode === 'provision-failed') {
+                // Treat the command's in-process diagnostic as untrusted until allowlisted.
+                $provisionCode = (string) config('grindflow.smoke_provision_failure_code', '');
+                $failureCode = in_array($provisionCode, [
+                    'provision-phase-disabled',
+                    'provision-password-missing',
+                    'provision-email-invalid',
+                    'provision-name-invalid',
+                    'provision-lock-directory-failed',
+                    'provision-lock-open-failed',
+                    'provision-lock-timeout',
+                    'provision-membership-conflict',
+                    'provision-backup-write-failed',
+                    'provision-backup-permission-failed',
+                    'provision-database-failed',
+                ], true) ? $provisionCode : 'provision-failed';
+            }
 
             Log::error('Production smoke bootstrap reconciliation failed.', [
                 'stage' => $failureStage,

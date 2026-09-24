@@ -66,6 +66,17 @@ reconciliación 503 no se reintenta tres veces: revisar el código fijo del Issu
 #73, corregir la precondición correspondiente y ejecutar un nuevo Smoke con
 el SHA exacto. El código fijo `password-invalid` señala que el secreto sintético provisto no cumple
 el formato aceptado por el writer; no revela su valor ni autoriza rotarlo a ciegas.
+Para la etapa `provision-user`, los códigos fijos distinguen un conflicto de
+membresías (`provision-membership-conflict`: NO elevar la identidad existente),
+un backup cifrado que no puede escribirse o protegerse
+(`provision-backup-write-failed` / `provision-backup-permission-failed`),
+un lock de provisioning (`provision-lock-*`) o error en MariaDB
+(`provision-database-failed`: revisar esquema y conexión por canal privado;
+no ejecutar migraciones automáticamente). `provision-failed` sigue indicando
+cualquier error no clasificado. Los códigos se transportan solo en memoria
+desde Artisan al controlador, se cotejan con allowlists y nunca contienen
+consultas SQL, rutas privadas, secretos ni mensajes de excepción. Corregir
+solo la precondición demostrada y ejecutar un Smoke posterior al SHA exacto.
 El código `unexpected` exige inspección privada del servidor,
 no cambios ciegos de contraseñas o cuentas. Nunca copies el valor a Issues, PRs,
 logs o comandos de chat. El correo queda limitado por código al dominio
