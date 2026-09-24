@@ -15,6 +15,50 @@ PR_TITLE = re.compile(r"^.+ \(V ([0-9]+\.[0-9]+\.[0-9]+)\)$")
 VERSION = re.compile(r"'number'\s*=>\s*'([0-9]+\.[0-9]+\.[0-9]+)'")
 LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 TEMPLATE_TITLE = re.compile(r'^title:\s*"[^"]+\(V X\.Y\.Z\)"\s*$', re.M)
+LABEL_TYPE_IMPROVEMENT = "tipo: mejora"
+LABEL_PRIORITY_MEDIUM = "prioridad: media"
+LABEL_REVIEW_STATE = "estado: en revisión"
+DEPENDABOT_REQUIRED_LABELS = {
+    LABEL_TYPE_IMPROVEMENT,
+    LABEL_PRIORITY_MEDIUM,
+    LABEL_REVIEW_STATE,
+}
+
+
+def dependabot_errors(content: str, label_names: set[str]) -> list[str]:
+    """Valida el contrato mínimo de actualizaciones automáticas."""
+    failures: list[str] = []
+    missing_labels = sorted(DEPENDABOT_REQUIRED_LABELS - label_names)
+    if missing_labels:
+        failures.append(
+            "Dependabot referencia labels no declarados en labels.json: "
+            + ", ".join(missing_labels)
+        )
+
+    composer = re.search(
+        r'- package-ecosystem:\s*["\']composer["\']',
+        content,
+    )
+    if composer is None:
+        failures.append("dependabot.yml debe configurar Composer.")
+        return failures
+
+    body_start = composer.end()
+    next_ecosystem = re.search(r"\n\s*- package-ecosystem:", content[body_start:])
+    body_end = (
+        body_start + next_ecosystem.start()
+        if next_ecosystem is not None
+        else len(content)
+    )
+    body = content[body_start:body_end]
+    if "directories:" not in body:
+        failures.append("Dependabot Composer debe usar directories para múltiples manifests.")
+    for required in ('"/"', '"/symfony"'):
+        if not re.search(rf"^\s*-\s*{re.escape(required)}\s*$", body, flags=re.M):
+            failures.append(f"Dependabot Composer debe incluir {required}.")
+    return failures
+
+
 REQUIRED = (
     "AGENTS.md",
     "README.md",
@@ -86,6 +130,14 @@ def governance_errors(root: Path) -> list[str]:
         for label in labels:
             if not re.fullmatch(r"[0-9a-fA-F]{6}", label["color"]):
                 errors.append(f"Color inválido en label: {label['name']}")
+        dependabot = root / ".github/dependabot.yml"
+        if dependabot.is_file():
+            errors.extend(
+                dependabot_errors(
+                    dependabot.read_text(encoding="utf-8"),
+                    set(names),
+                )
+            )
     except (ValueError, KeyError, TypeError) as error:
         errors.append(f"labels.json inválido: {error}")
 
@@ -120,7 +172,20 @@ def self_test() -> None:
             continue
         raise AssertionError(f"Título incorrecto aceptado: {invalid!r}")
     assert product_version("<?php return ['number' => '0.1.16'];") == version
-    print("Contrato de gobierno: títulos válidos e inválidos comprobados.")
+    valid_dependabot = """updates:
+  - package-ecosystem: "composer"
+    directories:
+      - "/"
+      - "/symfony"
+"""
+    declared = set(DEPENDABOT_REQUIRED_LABELS)
+    assert dependabot_errors(valid_dependabot, declared) == []
+    assert dependabot_errors(valid_dependabot, {LABEL_TYPE_IMPROVEMENT})
+    assert dependabot_errors(
+        'updates:\n  - package-ecosystem: "composer"\n    directory: "/"\n',
+        declared,
+    )
+    print("Contrato de gobierno: títulos, labels y Dependabot comprobados.")
 
 
 def main() -> int:

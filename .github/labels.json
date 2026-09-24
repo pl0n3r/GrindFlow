@@ -53,5 +53,15 @@
     "name": "estado: bloqueado",
     "color": "000000",
     "description": "Dependencia externa real."
+  },
+  {
+    "name": "prioridad: media",
+    "color": "ededed",
+    "description": ""
+  },
+  {
+    "name": "estado: en revisión",
+    "color": "1D76DB",
+    "description": "Trabajo con Pull Request listo para revisión."
   }
 ]
