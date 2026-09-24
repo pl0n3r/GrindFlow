@@ -31,7 +31,7 @@ class ProductionEnvironmentWriterTest extends TestCase
         $contents = (string) file_get_contents($path);
         self::assertStringContainsString('SMOKE_USER_PASSWORD="secret-\\$-with-\\"quotes\\""', $contents);
         self::assertStringContainsString('CACHE_STORE="file"', $contents);
-        self::assertStringContainsString('SMOKE_USER_EMAIL="'+email+'"', $contents);
+        self::assertStringContainsString('SMOKE_USER_EMAIL="'.ProductionEnvironmentWriter::DEDICATED_SMOKE_EMAIL.'"', $contents);
 
         $backups = Storage::disk('local')->allFiles('operations/environment-backups');
         self::assertCount(1, $backups);
