@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "project": "pl0n3r/GrindFlow",
+  "phase": "construccion",
+  "controller": {
+    "name": "[COMPLETAR POR EL DUEÑO]",
+    "identifier": "[COMPLETAR POR EL DUEÑO]",
+    "address": "[COMPLETAR POR EL DUEÑO]",
+    "rights_email": "[COMPLETAR POR EL DUEÑO]"
+  },
+  "treatments": [
+    {
+      "id": "account_credentials",
+      "category": "authentication",
+      "fields": [
+        "password",
+        "remember_token"
+      ],
+      "purpose": "account_security",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "account_identity",
+      "category": "contact",
+      "fields": [
+        "name",
+        "email",
+        "email_verified_at",
+        "platform_role"
+      ],
+      "purpose": "account_access",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "cloud_connections",
+      "category": "authentication",
+      "fields": [
+        "authorized_by_user_id",
+        "provider",
+        "label",
+        "account_identifier",
+        "access_ciphertext",
+        "refresh_ciphertext",
+        "token_expires_at",
+        "scopes",
+        "cursor",
+        "root_path",
+        "metadata"
+      ],
+      "purpose": "cloud_media_connection",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "dropbox",
+        "google_drive"
+      ]
+    },
+    {
+      "id": "legacy_supabase_upload_audit",
+      "category": "location",
+      "fields": [
+        "upload_link_id",
+        "r2_key",
+        "bytes",
+        "mime_type",
+        "ip",
+        "occurred_at"
+      ],
+      "purpose": "upload_security_audit",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "supabase"
+      ]
+    },
+    {
+      "id": "media_vault",
+      "category": "usage",
+      "fields": [
+        "ingested_by_user_id",
+        "original_filename",
+        "source_type",
+        "source_ref",
+        "storage_disk",
+        "storage_key",
+        "sha256",
+        "byte_size",
+        "mime_type",
+        "metadata"
+      ],
+      "purpose": "media_management",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "organization_membership",
+      "category": "identification",
+      "fields": [
+        "user_id",
+        "organization_id",
+        "role"
+      ],
+      "purpose": "tenant_authorization",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "traffic_dedupe",
+      "category": "usage",
+      "fields": [
+        "visitor_hash",
+        "last_counted_at"
+      ],
+      "purpose": "traffic_deduplication",
+      "basis": "review_required",
+      "retention": "dedupe_24h",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "traffic_links",
+      "category": "usage",
+      "fields": [
+        "created_by_user_id",
+        "label",
+        "destination_url",
+        "channel",
+        "campaign",
+        "status"
+      ],
+      "purpose": "traffic_attribution",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "traffic_metrics",
+      "category": "usage",
+      "fields": [
+        "metric_date",
+        "clicks"
+      ],
+      "purpose": "traffic_measurement",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    }
+  ]
+}
