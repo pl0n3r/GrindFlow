@@ -37,14 +37,29 @@ APP_ENV="production"
 APP_DEBUG="false"
 APP_URL="https://www.grindflow.com.co"
 APP_PHASE="construccion"
+CACHE_STORE="file"
 SMOKE_USER_EMAIL="e2e-admin@grindflow.test"
 SMOKE_USER_PASSWORD="<secret>"
 SMOKE_USER_NAME="GrindFlow Production Smoke"
 ```
 
 `SMOKE_USER_PASSWORD` debe contener exactamente el mismo valor que el secret
-de GitHub Actions `PRODUCTION_E2E_PASSWORD`. Nunca copies ese valor a Issues,
-PRs, logs o comandos de chat. El correo queda limitado por código al dominio
+de GitHub Actions `PRODUCTION_E2E_PASSWORD`. Production Smoke sincroniza ese
+valor automáticamente después de que `/health` demuestra el SHA exacto de
+`main`: obtiene un token OIDC efímero de GitHub, el servidor valida
+repositorio/IDs/ref/workflow/SHA/audiencia y consume su `jti` en cache
+persistente. Si una instalación antigua todavía arranca con cache `array`, el
+bootstrap solo continúa cuando el store `file` está disponible y escribible;
+después del OIDC válido guarda un backup cifrado privado de `.env`, persiste
+`SMOKE_USER_PASSWORD` y solo configura `CACHE_STORE=file` cuando el valor
+actual falta, está vacío o es `array`. `config/cache.php` solo define los
+stores `array` y `file`: `CACHE_STORE=database`, `redis` u otro valor requiere
+que ese store esté definido explícitamente en `cache.stores` antes del deploy.
+Con la configuración actual, usa `CACHE_STORE=file`; un store inexistente
+impide completar el bootstrap y no se envía ningún login. Después ejecuta
+`grindflow:provision-smoke-user`. Si la reconciliación falla, restaura el
+`.env` anterior y no envía ningún login. Nunca copies el valor a Issues, PRs,
+logs o comandos de chat. El correo queda limitado por código al dominio
 sintético reservado `@grindflow.test`.
 
 No copies al chat ni al repositorio `APP_KEY`, contrasenas de DB, tokens ni
