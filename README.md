@@ -32,7 +32,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **12** | **+1247** | **−28** | **+1219** |
+| **13** | **+1331** | **−28** | **+1303** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -73,6 +73,7 @@ Inventario del diff exacto:
 - `app/Http/Controllers/Operations/ProductionSmokeBootstrapController.php`
 - `app/Support/Deployment/GitHubActionsOidcVerifier.php`
 - `app/Support/Deployment/ProductionEnvironmentWriter.php`
+- `config/cache.php`
 - `config/version.php`
 - `docs/DEPLOY-HOSTINGER.md`
 - `routes/web.php`
