@@ -234,7 +234,6 @@ class ProductionSmokeBootstrapTest extends TestCase
             ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', 'provision-user')
             ->assertHeader('X-GrindFlow-Smoke-Failure-Code', $expectedCode);
         self::assertSame('', $response->getContent());
-        self::assertStringNotContainsString($reportedCode, (string) $response->getContent());
         $this->assertDatabaseCount('users', 0);
     }
 
