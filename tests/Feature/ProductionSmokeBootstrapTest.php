@@ -200,6 +200,56 @@ class ProductionSmokeBootstrapTest extends TestCase
         $this->assertDatabaseCount('users', 0);
     }
 
+    #[DataProvider('safeProvisioningCodes')]
+    public function test_verified_bootstrap_reports_only_fixed_provisioning_codes(
+        string $reportedCode,
+        string $expectedCode,
+    ): void {
+        $sha = str_repeat('a', 40);
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')->once()
+            ->andReturnUsing(static function (string $secret, Closure $afterPersist): void {
+                $afterPersist();
+            });
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        Artisan::shouldReceive('call')->once()->with('config:clear')->andReturn(0);
+        Artisan::shouldReceive('call')->once()->with('grindflow:provision-smoke-user')
+            ->andReturnUsing(static function () use ($reportedCode): int {
+                config(['grindflow.smoke_provision_failure_code' => $reportedCode]);
+
+                return 1;
+            });
+
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => 'synthetic-secret']);
+
+        $response->assertStatus(503)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', 'provision-user')
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Code', $expectedCode);
+        self::assertSame('', $response->getContent());
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public static function safeProvisioningCodes(): array
+    {
+        return [
+            'membership conflict' => ['provision-membership-conflict', 'provision-membership-conflict'],
+            'backup not writable' => ['provision-backup-write-failed', 'provision-backup-write-failed'],
+            'backup permissions' => ['provision-backup-permission-failed', 'provision-backup-permission-failed'],
+            'database failure' => ['provision-database-failed', 'provision-database-failed'],
+            'lock timeout' => ['provision-lock-timeout', 'provision-lock-timeout'],
+            'arbitrary error rejected' => ['private-secret-or-exception-text', 'provision-failed'],
+            'empty code rejected' => ['', 'provision-failed'],
+        ];
+    }
+
     #[DataProvider('failedReconciliationStages')]
     public function test_verified_bootstrap_identifies_failed_command_without_reflecting_errors(
         string $failedCommand,

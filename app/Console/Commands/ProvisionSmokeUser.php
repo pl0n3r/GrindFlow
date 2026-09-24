@@ -5,11 +5,13 @@ namespace App\Console\Commands;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -21,6 +23,9 @@ class ProvisionSmokeUser extends Command
 
     public function handle(): int
     {
+        // This is request-local diagnostic state, never persisted in .env or DB.
+        config(['grindflow.smoke_provision_failure_code' => null]);
+
         $email = Str::lower(trim((string) config('grindflow.smoke_user.email')));
         $password = (string) config('grindflow.smoke_user.password');
         $name = trim((string) config('grindflow.smoke_user.name'));
@@ -28,12 +33,14 @@ class ProvisionSmokeUser extends Command
 
         if ($phase !== 'construccion') {
             $this->error('Smoke identity provisioning is disabled outside construction phase.');
+            config(['grindflow.smoke_provision_failure_code' => 'provision-phase-disabled']);
 
             return self::FAILURE;
         }
 
         if ($password === '') {
             $this->error('SMOKE_USER_PASSWORD is required; no production data was changed.');
+            config(['grindflow.smoke_provision_failure_code' => 'provision-password-missing']);
 
             return self::FAILURE;
         }
@@ -43,12 +50,14 @@ class ProvisionSmokeUser extends Command
             || preg_match('/^[^@\\s]+@grindflow[.]test$/i', $email) !== 1
         ) {
             $this->error('SMOKE_USER_EMAIL must use the reserved grindflow.test synthetic domain.');
+            config(['grindflow.smoke_provision_failure_code' => 'provision-email-invalid']);
 
             return self::FAILURE;
         }
 
         if ($name === '') {
             $this->error('SMOKE_USER_NAME must not be empty.');
+            config(['grindflow.smoke_provision_failure_code' => 'provision-name-invalid']);
 
             return self::FAILURE;
         }
@@ -57,7 +66,22 @@ class ProvisionSmokeUser extends Command
             $changed = $this->withFilesystemLock(
                 fn (): bool => $this->reconcile($email, $password, $name),
             );
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            // Query exceptions take precedence over any framework-supplied message.
+            if ($exception instanceof QueryException || $exception instanceof PDOException) {
+                $code = 'provision-database-failed';
+            } else {
+                $code = match ($exception->getMessage()) {
+                    'Unable to create deployment lock directory.' => 'provision-lock-directory-failed',
+                    'Unable to open smoke-user provisioning lock.' => 'provision-lock-open-failed',
+                    'Timed out waiting for smoke-user provisioning lock.' => 'provision-lock-timeout',
+                    'Synthetic smoke identity is linked to an organization.' => 'provision-membership-conflict',
+                    'Unable to write private smoke-user rollback backup.' => 'provision-backup-write-failed',
+                    'Unable to secure private smoke-user rollback backup.' => 'provision-backup-permission-failed',
+                    default => 'provision-failed',
+                };
+            }
+            config(['grindflow.smoke_provision_failure_code' => $code]);
             $this->error('Synthetic smoke identity reconciliation failed safely.');
 
             return self::FAILURE;
@@ -81,13 +105,13 @@ class ProvisionSmokeUser extends Command
 
         if (
             ! is_dir($directory)
-            && ! mkdir($directory, 0775, true)
+            && ! @mkdir($directory, 0775, true)
             && ! is_dir($directory)
         ) {
             throw new RuntimeException('Unable to create deployment lock directory.');
         }
 
-        $handle = fopen($directory.'/grindflow-smoke-user.lock', 'c+');
+        $handle = @fopen($directory.'/grindflow-smoke-user.lock', 'c+');
 
         if ($handle === false) {
             throw new RuntimeException('Unable to open smoke-user provisioning lock.');
