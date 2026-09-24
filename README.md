@@ -35,8 +35,8 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast · legacy + cualquier gate adicional que seleccione ci-scope** |
-| Gate agregador obligatorio | **validate**; Sonar, CodeQL y CodeRabbit separados |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · legacy** |
+| Gate agregador obligatorio | **validate** (incluye siempre el gate privacy-as-code); Sonar, CodeQL y CodeRabbit separados |
 | Alcance | #139: Vitest/Vite/PostCSS/esbuild/next-intl/@vitest-mocker corregidos |
 | Rol del PR | **Application Security · Node.js · Release Engineering · QA** |
 | Revisiones | repetir CI/Sonar/CodeRabbit sobre el HEAD rebased a main |
