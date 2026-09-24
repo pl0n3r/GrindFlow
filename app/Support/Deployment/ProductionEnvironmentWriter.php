@@ -56,6 +56,11 @@ class ProductionEnvironmentWriter
                 'SMOKE_USER_PASSWORD',
                 $this->quoted($password),
             );
+            $updated = $this->upsert(
+                $updated,
+                'CACHE_STORE',
+                $this->quoted('file'),
+            );
             $changed = ! hash_equals($original, $updated);
 
             if ($changed) {
