@@ -6,7 +6,7 @@ on:
       - security/npm-lock-refresh-v0.1.129
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: npm-lock-refresh-${{ github.ref }}
@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          persist-credentials: false
+          persist-credentials: true
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -67,3 +67,16 @@ jobs:
             npm-security-versions.json
           if-no-files-found: error
           retention-days: 3
+      - name: Persist generated lockfile on ephemeral branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "package-lock.json already current"
+            exit 0
+          fi
+          git commit -m "chore(security): persist generated npm lockfile"
+          git push origin HEAD:${GITHUB_REF_NAME}
