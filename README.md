@@ -45,7 +45,7 @@
 ## Flujo de entrega
 ```mermaid
 flowchart LR
- A["main v0.1.126 verde"] --> B["Pillow 12.3.0"]
+ A["PR + snapshot exacto"] --> B["Pillow 12.3.0"]
  B --> C["CI legacy + Sonar + CodeRabbit"]
  C --> M["Squash merge"]
  M --> X["CI exact-main"]
