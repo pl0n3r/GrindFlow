@@ -9,6 +9,7 @@ use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
@@ -137,6 +138,113 @@ class ProductionSmokeBootstrapTest extends TestCase
         $response->assertStatus(503);
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertDatabaseCount('users', 0);
+    }
+
+    #[DataProvider('safeReconciliationCodes')]
+    public function test_verified_bootstrap_reports_only_allowlisted_failure_codes(
+        string $errorMessage,
+        string $expectedCode,
+    ): void {
+        $sha = str_repeat('a', 40);
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')->once()
+            ->andThrow(new \RuntimeException($errorMessage));
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => 'test-workflow-secret']);
+
+        $response->assertStatus(503)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', 'environment')
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Code', $expectedCode);
+        self::assertSame('', $response->getContent());
+        self::assertStringNotContainsString($errorMessage, (string) $response->headers);
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public static function safeReconciliationCodes(): array
+    {
+        return [
+            'environment not writable' => ['Production environment file is unavailable.', 'env-unavailable'],
+            'backup not writable' => ['Unable to write production environment backup.', 'backup-write-failed'],
+            'lock inaccessible' => ['Unable to open production environment lock.', 'lock-unavailable'],
+            'no raw exception or secret reflection' => ['SECRET=private-failure-detail', 'unexpected'],
+        ];
+    }
+
+    public function test_verified_bootstrap_classifies_invalid_writer_password_without_mutating_environment(): void
+    {
+        $sha = str_repeat('a', 40);
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        // Keep the real writer: its input guard executes before opening .env.
+        $password = "invalid\nsynthetic-secret";
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => $password]);
+
+        $response->assertStatus(503)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', 'environment')
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Code', 'password-invalid');
+        self::assertSame('', $response->getContent());
+        self::assertStringNotContainsString($password, (string) $response->headers);
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    #[DataProvider('failedReconciliationStages')]
+    public function test_verified_bootstrap_identifies_failed_command_without_reflecting_errors(
+        string $failedCommand,
+        string $expectedStage,
+        string $expectedCode,
+    ): void {
+        $sha = str_repeat('a', 40);
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')->once()
+            ->andReturnUsing(static function (string $secret, Closure $afterPersist): void {
+                $afterPersist();
+            });
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        Artisan::shouldReceive('call')
+            ->once()->with('config:clear')
+            ->andReturn($failedCommand === 'config:clear' ? 1 : 0);
+
+        if ($failedCommand === 'grindflow:provision-smoke-user') {
+            Artisan::shouldReceive('call')->once()
+                ->with('grindflow:provision-smoke-user')->andReturn(1);
+        }
+
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => 'synthetic-secret']);
+
+        $response->assertStatus(503)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', $expectedStage)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Code', $expectedCode);
+        self::assertSame('', $response->getContent());
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public static function failedReconciliationStages(): array
+    {
+        return [
+            'config invalidation' => ['config:clear', 'config-clear', 'config-clear-failed'],
+            'synthetic command' => ['grindflow:provision-smoke-user', 'provision-user', 'provision-failed'],
+        ];
     }
 
     #[DataProvider('invalidPayloads')]

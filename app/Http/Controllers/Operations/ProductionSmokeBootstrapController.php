@@ -57,15 +57,21 @@ class ProductionSmokeBootstrapController extends Controller
             abort(403);
         }
 
+        $failureStage = 'environment';
+
         try {
             $environment->withSmokePassword(
                 $password,
-                static function () use ($password): void {
+                static function () use ($password, &$failureStage): void {
+                    $failureStage = 'config-clear';
+
                     if (Artisan::call('config:clear') !== 0) {
                         throw new RuntimeException('Configuration cache could not be invalidated.');
                     }
 
                     config(['grindflow.smoke_user.password' => $password]);
+
+                    $failureStage = 'provision-user';
 
                     if (Artisan::call('grindflow:provision-smoke-user') !== 0) {
                         throw new RuntimeException('Synthetic smoke identity reconciliation failed.');
@@ -73,14 +79,35 @@ class ProductionSmokeBootstrapController extends Controller
                 },
             );
         } catch (Throwable $exception) {
+            // Only allowlisted fixed codes reach the signed workflow; never return exception text.
+            $failureCode = match ($exception->getMessage()) {
+                'Synthetic smoke password format is invalid.' => 'password-invalid',
+                'Production environment file is unavailable.' => 'env-unavailable',
+                'Unable to open production environment lock.' => 'lock-unavailable',
+                'Unable to lock production environment.' => 'lock-failed',
+                'Unable to read production environment.' => 'env-read-failed',
+                'Unable to write production environment backup.' => 'backup-write-failed',
+                'Unable to secure production environment backup.' => 'backup-permission-failed',
+                'Unable to stage production environment update.' => 'stage-unavailable',
+                'Unable to write staged production environment.' => 'stage-write-failed',
+                'Unable to secure staged production environment.' => 'stage-permission-failed',
+                'Unable to publish production environment update.' => 'env-publish-failed',
+                'Configuration cache could not be invalidated.' => 'config-clear-failed',
+                'Synthetic smoke identity reconciliation failed.' => 'provision-failed',
+                default => 'unexpected',
+            };
+
             Log::error('Production smoke bootstrap reconciliation failed.', [
-                'stage' => 'synthetic_reconciliation',
+                'stage' => $failureStage,
+                'code' => $failureCode,
                 'exception_class' => get_class($exception),
             ]);
 
             return response('', 503)
                 ->header('Cache-Control', 'no-store, max-age=0')
-                ->header('X-Content-Type-Options', 'nosniff');
+                ->header('X-Content-Type-Options', 'nosniff')
+                ->header('X-GrindFlow-Smoke-Failure-Stage', $failureStage)
+                ->header('X-GrindFlow-Smoke-Failure-Code', $failureCode);
         }
 
         return response('', 204)

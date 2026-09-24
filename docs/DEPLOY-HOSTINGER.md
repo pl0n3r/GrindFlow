@@ -58,7 +58,16 @@ que ese store esté definido explícitamente en `cache.stores` antes del deploy.
 Con la configuración actual, usa `CACHE_STORE=file`; un store inexistente
 impide completar el bootstrap y no se envía ningún login. Después ejecuta
 `grindflow:provision-smoke-user`. Si la reconciliación falla, restaura el
-`.env` anterior y no envía ningún login. Nunca copies el valor a Issues, PRs,
+`.env` anterior y no envía ningún login. Cuando el endpoint devuelve HTTP 503
+tras validar OIDC, el workflow solo recoge dos campos de vocabulario cerrado
+(etapa `environment`, `config-clear` o `provision-user`, y código operacional
+allowlisted), nunca cuerpo HTTP, mensajes de excepción ni secretos. Una
+reconciliación 503 no se reintenta tres veces: revisar el código fijo del Issue
+#73, corregir la precondición correspondiente y ejecutar un nuevo Smoke con
+el SHA exacto. El código fijo `password-invalid` señala que el secreto sintético provisto no cumple
+el formato aceptado por el writer; no revela su valor ni autoriza rotarlo a ciegas.
+El código `unexpected` exige inspección privada del servidor,
+no cambios ciegos de contraseñas o cuentas. Nunca copies el valor a Issues, PRs,
 logs o comandos de chat. El correo queda limitado por código al dominio
 sintético reservado `@grindflow.test`.
 
