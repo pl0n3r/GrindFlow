@@ -24,6 +24,8 @@ final class PrivacyAsCodeTest extends TestCase
                 'account_credentials',
                 'account_identity',
                 'cloud_connections',
+                'legacy_supabase_link_clicks',
+                'legacy_supabase_platform_credentials',
                 'legacy_supabase_upload_audit',
                 'media_vault',
                 'organization_membership',
@@ -52,26 +54,42 @@ final class PrivacyAsCodeTest extends TestCase
         foreach (['original_filename', 'source_ref', 'metadata'] as $field) {
             self::assertStringContainsString($field, $vault);
         }
+
+        $legacyIdentity = file_get_contents(
+            $this->root().'/supabase/migrations/20260101000100_core_tenancy.sql',
+        );
+        foreach (['create table public.users', 'create table public.memberships', 'create table public.profiles'] as $table) {
+            self::assertStringContainsString($table, $legacyIdentity);
+        }
     }
 
     public function test_observed_providers_are_scoped_to_real_treatments(): void
     {
         $data = $this->data();
 
+        self::assertSame(['supabase'], $this->treatment($data, 'account_identity')['providers']);
         self::assertSame(
-            ['dropbox', 'google_drive'],
+            ['dropbox', 'google_drive', 'supabase'],
             $this->treatment($data, 'cloud_connections')['providers'],
+        );
+        self::assertSame(
+            ['supabase'],
+            $this->treatment($data, 'legacy_supabase_link_clicks')['providers'],
+        );
+        self::assertSame(
+            ['supabase'],
+            $this->treatment($data, 'legacy_supabase_platform_credentials')['providers'],
         );
         self::assertSame(
             ['supabase'],
             $this->treatment($data, 'legacy_supabase_upload_audit')['providers'],
         );
+        self::assertSame(['supabase'], $this->treatment($data, 'media_vault')['providers']);
+        self::assertSame(['supabase'], $this->treatment($data, 'organization_membership')['providers']);
+        self::assertSame(['supabase'], $this->treatment($data, 'traffic_links')['providers']);
 
-        foreach ($data['treatments'] as $treatment) {
-            if (in_array($treatment['id'], ['cloud_connections', 'legacy_supabase_upload_audit'], true)) {
-                continue;
-            }
-            self::assertSame([], $treatment['providers']);
+        foreach (['account_credentials', 'traffic_dedupe', 'traffic_metrics'] as $id) {
+            self::assertSame([], $this->treatment($data, $id)['providers']);
         }
 
         self::assertStringContainsString(
@@ -83,23 +101,47 @@ final class PrivacyAsCodeTest extends TestCase
             file_get_contents($this->root().'/app/Services/Media/Connections/DropboxOAuthClient.php'),
         );
 
+        $legacyConnection = file_get_contents($this->root().'/src/lib/connectors/connection.ts');
+        self::assertStringContainsString("from '@/lib/supabase/service'", $legacyConnection);
+        self::assertStringContainsString("from('cloud_connections')", $legacyConnection);
+
+        $legacyIngest = file_get_contents($this->root().'/src/workers/ingest/ingest.ts');
+        self::assertStringContainsString("from('media_assets')", $legacyIngest);
+        self::assertStringContainsString("from('cloud_ingest_items')", $legacyIngest);
+
+        $legacyPublish = file_get_contents($this->root().'/src/workers/publish/publish.ts');
+        self::assertStringContainsString("from('platform_credentials')", $legacyPublish);
+        self::assertStringContainsString("from('tracking_links')", $legacyPublish);
+
         $legacyUpload = file_get_contents($this->root().'/src/app/api/uploads/presign/route.ts');
         self::assertStringContainsString("from '@/lib/supabase/service'", $legacyUpload);
         self::assertStringContainsString("from('upload_link_events')", $legacyUpload);
 
-        $supabaseMigration = file_get_contents(
+        $supabaseUpload = file_get_contents(
             $this->root().'/supabase/migrations/20260101000300_media_and_uploads.sql',
         );
-        self::assertStringContainsString('create table public.upload_link_events', $supabaseMigration);
-        self::assertStringContainsString('ip               inet', $supabaseMigration);
+        self::assertStringContainsString('create table public.upload_link_events', $supabaseUpload);
+        self::assertStringContainsString('ip               inet', $supabaseUpload);
+
+        $supabaseCredentials = file_get_contents(
+            $this->root().'/supabase/migrations/20260101000500_distribution_and_jobs.sql',
+        );
+        self::assertStringContainsString('create table public.platform_credentials', $supabaseCredentials);
+        self::assertStringContainsString('secret_ciphertext', $supabaseCredentials);
+
+        $supabaseTracking = file_get_contents(
+            $this->root().'/supabase/migrations/20260101000600_tracking_links.sql',
+        );
+        self::assertStringContainsString('create table public.link_clicks', $supabaseTracking);
+        self::assertStringContainsString('ua_family', $supabaseTracking);
     }
 
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '073dc490829e2655c76f5e70eb21726e441cc900b86684e17718ffdaedb63549',
-            'registro-tratamientos.md' => 'be256f04ae631aa466d29810ecca95d77c6949247dae82cc2f17aca29e2a4d54',
-            'retencion.md' => 'd2244ac11054ea1d4ec2a3c378395a08bfc365406adace803bc85657be4338bd',
+            'politica-tratamiento.md' => '9406b4890130bb338c4dbff0ec3f4803da4c3560d1ae834c3a9e7ed264e3ce3a',
+            'registro-tratamientos.md' => 'ff99c96491876ddf7a6c6dc962802b0ee67c4e1a88eb7b5115c8723fb39eeaae',
+            'retencion.md' => '27afabf1ea5af1da5ef3c0eea9fc093d950e455e266c5a83da8a535377abeec5',
         ];
 
         foreach ($expected as $name => $sha256) {
@@ -185,6 +227,11 @@ final class PrivacyAsCodeTest extends TestCase
         $legacyAudit = $this->treatment($data, 'legacy_supabase_upload_audit');
         self::assertContains('ip', $legacyAudit['fields']);
         self::assertSame(['supabase'], $legacyAudit['providers']);
+
+        $legacyClicks = $this->treatment($data, 'legacy_supabase_link_clicks');
+        self::assertNotContains('ip', $legacyClicks['fields']);
+        self::assertContains('referrer', $legacyClicks['fields']);
+        self::assertContains('ua_family', $legacyClicks['fields']);
     }
 
     /** @return array<string, mixed> */

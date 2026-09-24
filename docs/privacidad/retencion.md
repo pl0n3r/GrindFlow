@@ -9,6 +9,8 @@ Producto: `pl0n3r/GrindFlow`
 | account_credentials | authentication | review_required | review_required |
 | account_identity | contact | review_required | review_required |
 | cloud_connections | authentication | review_required | review_required |
+| legacy_supabase_link_clicks | usage | review_required | review_required |
+| legacy_supabase_platform_credentials | authentication | review_required | review_required |
 | legacy_supabase_upload_audit | location | review_required | review_required |
 | media_vault | usage | review_required | review_required |
 | organization_membership | identification | review_required | review_required |
