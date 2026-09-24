@@ -9,8 +9,10 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use PDOException;
 use Tests\TestCase;
 
 class ProvisionSmokeUserCommandTest extends TestCase
@@ -39,6 +41,7 @@ class ProvisionSmokeUserCommandTest extends TestCase
             ->assertFailed();
 
         $this->assertDatabaseCount('users', 0);
+        self::assertSame('provision-password-missing', config('grindflow.smoke_provision_failure_code'));
         self::assertSame([], Storage::disk('local')->allFiles('operations/smoke-user-backups'));
     }
 
@@ -51,6 +54,21 @@ class ProvisionSmokeUserCommandTest extends TestCase
             ->assertFailed();
 
         $this->assertDatabaseCount('users', 0);
+        self::assertSame('provision-email-invalid', config('grindflow.smoke_provision_failure_code'));
+    }
+
+    public function test_it_classifies_a_pdo_failure_before_the_transaction_callback(): void
+    {
+        DB::shouldReceive('transaction')
+            ->once()
+            ->andThrow(new PDOException('Synthetic transaction startup failure.'));
+
+        $this->artisan('grindflow:provision-smoke-user')
+            ->expectsOutputToContain('Synthetic smoke identity reconciliation failed safely.')
+            ->assertFailed();
+
+        self::assertSame('provision-database-failed', config('grindflow.smoke_provision_failure_code'));
+        self::assertSame([], Storage::disk('local')->allFiles('operations/smoke-user-backups'));
     }
 
     public function test_it_creates_only_the_required_synthetic_platform_admin_with_private_backup(): void
@@ -87,11 +105,13 @@ class ProvisionSmokeUserCommandTest extends TestCase
         $originalUpdatedAt = $user->updated_at?->format('Y-m-d H:i:s.u');
         $backupsBefore = Storage::disk('local')->allFiles('operations/smoke-user-backups');
 
+        config(['grindflow.smoke_provision_failure_code' => 'provision-membership-conflict']);
         $this->artisan('grindflow:provision-smoke-user')
             ->expectsOutputToContain('already reconciled')
             ->assertSuccessful();
 
         $user->refresh();
+        self::assertNull(config('grindflow.smoke_provision_failure_code'));
         self::assertSame($originalHash, $user->getAuthPassword());
         self::assertSame($originalUpdatedAt, $user->updated_at?->format('Y-m-d H:i:s.u'));
         self::assertSame(
@@ -151,6 +171,7 @@ class ProvisionSmokeUserCommandTest extends TestCase
         $this->artisan('grindflow:provision-smoke-user')
             ->expectsOutputToContain('Synthetic smoke identity reconciliation failed safely.')
             ->assertFailed();
+        self::assertSame('provision-membership-conflict', config('grindflow.smoke_provision_failure_code'));
 
         $user->refresh();
         self::assertSame(UserRole::Model, $user->platform_role);
@@ -180,6 +201,7 @@ class ProvisionSmokeUserCommandTest extends TestCase
         $this->artisan('grindflow:provision-smoke-user')
             ->expectsOutputToContain('Synthetic smoke identity reconciliation failed safely.')
             ->assertFailed();
+        self::assertSame('provision-membership-conflict', config('grindflow.smoke_provision_failure_code'));
 
         $user->refresh();
         self::assertSame(UserRole::Admin, $user->platform_role);
