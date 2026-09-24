@@ -920,6 +920,20 @@ jobs:
           PRIVACY_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}
         run: |
           set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            default_branch="${{ github.event.repository.default_branch }}"
+            if [[ "$GITHUB_REF_NAME" == "$default_branch" ]]; then
+              if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+                PRIVACY_BASE_SHA="$(git rev-parse HEAD^)"
+              else
+                PRIVACY_BASE_SHA="$(git rev-parse HEAD)"
+              fi
+            else
+              PRIVACY_BASE_SHA="$(git merge-base "origin/$default_branch" HEAD)"
+            fi
+          elif [[ "$PRIVACY_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            PRIVACY_BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -1)"
+          fi
           [[ "$PRIVACY_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::privacy base SHA invalid"; exit 1; }
           PYTHONPATH=.factory python3 .factory/scripts/privacidad_gate.py --base-sha "$PRIVACY_BASE_SHA"
 
