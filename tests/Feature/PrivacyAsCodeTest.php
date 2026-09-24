@@ -182,6 +182,30 @@ final class PrivacyAsCodeTest extends TestCase
             $ci,
         );
         self::assertStringContainsString(
+            'if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then',
+            $ci,
+        );
+        self::assertStringContainsString(
+            'if [[ "$GITHUB_REF_NAME" == "$default_branch" ]]; then',
+            $ci,
+        );
+        self::assertStringContainsString(
+            'PRIVACY_BASE_SHA="$(git rev-parse HEAD^)"',
+            $ci,
+        );
+        self::assertStringContainsString(
+            'PRIVACY_BASE_SHA="$(git merge-base "origin/$default_branch" HEAD)"',
+            $ci,
+        );
+        self::assertStringContainsString(
+            'elif [[ "$PRIVACY_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then',
+            $ci,
+        );
+        self::assertStringContainsString(
+            'PRIVACY_BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -1)"',
+            $ci,
+        );
+        self::assertStringContainsString(
             'PYTHONPATH=.factory python3 .factory/scripts/privacidad_gate.py --base-sha "$PRIVACY_BASE_SHA"',
             $ci,
         );
