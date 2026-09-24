@@ -68,12 +68,18 @@ class ProvisionSmokeUser extends Command
         } catch (Throwable $exception) {
             $code = match (true) {
                 $exception instanceof QueryException => 'provision-database-failed',
-                $exception->getMessage() === 'Unable to create deployment lock directory.' => 'provision-lock-directory-failed',
-                $exception->getMessage() === 'Unable to open smoke-user provisioning lock.' => 'provision-lock-open-failed',
-                $exception->getMessage() === 'Timed out waiting for smoke-user provisioning lock.' => 'provision-lock-timeout',
-                $exception->getMessage() === 'Synthetic smoke identity is linked to an organization.' => 'provision-membership-conflict',
-                $exception->getMessage() === 'Unable to write private smoke-user rollback backup.' => 'provision-backup-write-failed',
-                $exception->getMessage() === 'Unable to secure private smoke-user rollback backup.' => 'provision-backup-permission-failed',
+                $exception->getMessage() === 'Unable to create deployment lock directory.'
+                    => 'provision-lock-directory-failed',
+                $exception->getMessage() === 'Unable to open smoke-user provisioning lock.'
+                    => 'provision-lock-open-failed',
+                $exception->getMessage() === 'Timed out waiting for smoke-user provisioning lock.'
+                    => 'provision-lock-timeout',
+                $exception->getMessage() === 'Synthetic smoke identity is linked to an organization.'
+                    => 'provision-membership-conflict',
+                $exception->getMessage() === 'Unable to write private smoke-user rollback backup.'
+                    => 'provision-backup-write-failed',
+                $exception->getMessage() === 'Unable to secure private smoke-user rollback backup.'
+                    => 'provision-backup-permission-failed',
                 default => 'provision-failed',
             };
             config(['grindflow.smoke_provision_failure_code' => $code]);
