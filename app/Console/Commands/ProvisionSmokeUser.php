@@ -66,22 +66,20 @@ class ProvisionSmokeUser extends Command
                 fn (): bool => $this->reconcile($email, $password, $name),
             );
         } catch (Throwable $exception) {
-            $code = match (true) {
-                $exception instanceof QueryException => 'provision-database-failed',
-                $exception->getMessage() === 'Unable to create deployment lock directory.'
-                    => 'provision-lock-directory-failed',
-                $exception->getMessage() === 'Unable to open smoke-user provisioning lock.'
-                    => 'provision-lock-open-failed',
-                $exception->getMessage() === 'Timed out waiting for smoke-user provisioning lock.'
-                    => 'provision-lock-timeout',
-                $exception->getMessage() === 'Synthetic smoke identity is linked to an organization.'
-                    => 'provision-membership-conflict',
-                $exception->getMessage() === 'Unable to write private smoke-user rollback backup.'
-                    => 'provision-backup-write-failed',
-                $exception->getMessage() === 'Unable to secure private smoke-user rollback backup.'
-                    => 'provision-backup-permission-failed',
-                default => 'provision-failed',
-            };
+            // Query exceptions take precedence over any framework-supplied message.
+            if ($exception instanceof QueryException) {
+                $code = 'provision-database-failed';
+            } else {
+                $code = match ($exception->getMessage()) {
+                    'Unable to create deployment lock directory.' => 'provision-lock-directory-failed',
+                    'Unable to open smoke-user provisioning lock.' => 'provision-lock-open-failed',
+                    'Timed out waiting for smoke-user provisioning lock.' => 'provision-lock-timeout',
+                    'Synthetic smoke identity is linked to an organization.' => 'provision-membership-conflict',
+                    'Unable to write private smoke-user rollback backup.' => 'provision-backup-write-failed',
+                    'Unable to secure private smoke-user rollback backup.' => 'provision-backup-permission-failed',
+                    default => 'provision-failed',
+                };
+            }
             config(['grindflow.smoke_provision_failure_code' => $code]);
             $this->error('Synthetic smoke identity reconciliation failed safely.');
 
