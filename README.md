@@ -58,9 +58,10 @@ flowchart LR
 ## Qué se hizo
 - Smoke #35974051526 confirmó SHA exacto de Hostinger, pero OIDC bootstrap alcanzó la reconciliación y obtuvo HTTP 503; el login no se intentó.
 - El controller solo tras OIDC válido devuelve fase fija (`environment`, `config-clear`, `provision-user`) y código operacional de lista cerrada.
+- El writer reporta contraseñas sintéticas de formato inválido como `password-invalid` (tras OIDC válido); el workflow solo publica ese código fijo.
 - Los errores inesperados se clasifican `unexpected`; nunca se devuelve texto de excepción, contraseña, token ni cuerpo remoto.
 - El workflow extrae exclusivamente dos cabeceras autorizadas de un 503, valida sus valores antes de escribir el reporte seguro al Issue #73 y evita repetir la reconciliación determinista.
-- Pruebas parametrizadas verifican fallo de filesystem/backup, excepción sensible inesperada y comandos config/provision; contrato de Smoke exige reporte seguro sin secretos.
+- Pruebas de writer real cubren contraseña inválida, y pruebas parametrizadas verifican fallo de filesystem/backup, excepción sensible inesperada y comandos config/provision; contrato de Smoke exige reporte seguro sin secretos.
 - No se cambian cuentas de clientes, roles, SQL ni variables reales: telemetría para reparar el prerrequisito correcto en la siguiente iteración.
 
 ## Archivos modificados en esta entrega candidata

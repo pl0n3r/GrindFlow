@@ -178,6 +178,28 @@ class ProductionSmokeBootstrapTest extends TestCase
         ];
     }
 
+    public function test_verified_bootstrap_classifies_invalid_writer_password_without_mutating_environment(): void
+    {
+        $sha = str_repeat('a', 40);
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        // Keep the real writer: its input guard executes before opening .env.
+        $password = "invalid\\nsynthetic-secret";
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => $password]);
+
+        $response->assertStatus(503)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', 'environment')
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Code', 'password-invalid');
+        self::assertSame('', $response->getContent());
+        self::assertStringNotContainsString($password, (string) $response->headers);
+        $this->assertDatabaseCount('users', 0);
+    }
+
     #[DataProvider('failedReconciliationStages')]
     public function test_verified_bootstrap_identifies_failed_command_without_reflecting_errors(
         string $failedCommand,

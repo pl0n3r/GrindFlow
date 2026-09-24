@@ -64,7 +64,9 @@ tras validar OIDC, el workflow solo recoge dos campos de vocabulario cerrado
 allowlisted), nunca cuerpo HTTP, mensajes de excepción ni secretos. Una
 reconciliación 503 no se reintenta tres veces: revisar el código fijo del Issue
 #73, corregir la precondición correspondiente y ejecutar un nuevo Smoke con
-el SHA exacto. El código `unexpected` exige inspección privada del servidor,
+el SHA exacto. El código fijo `password-invalid` señala que el secreto sintético provisto no cumple
+el formato aceptado por el writer; no revela su valor ni autoriza rotarlo a ciegas.
+El código `unexpected` exige inspección privada del servidor,
 no cambios ciegos de contraseñas o cuentas. Nunca copies el valor a Issues, PRs,
 logs o comandos de chat. El correo queda limitado por código al dominio
 sintético reservado `@grindflow.test`.

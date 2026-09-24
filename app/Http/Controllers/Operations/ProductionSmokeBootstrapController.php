@@ -81,6 +81,7 @@ class ProductionSmokeBootstrapController extends Controller
         } catch (Throwable $exception) {
             // Only allowlisted fixed codes reach the signed workflow; never return exception text.
             $failureCode = match ($exception->getMessage()) {
+                'Synthetic smoke password format is invalid.' => 'password-invalid',
                 'Production environment file is unavailable.' => 'env-unavailable',
                 'Unable to open production environment lock.' => 'lock-unavailable',
                 'Unable to lock production environment.' => 'lock-failed',
