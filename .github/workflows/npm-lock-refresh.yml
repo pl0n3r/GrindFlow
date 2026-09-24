@@ -1,0 +1,58 @@
+name: Temporary npm security lock refresh
+
+on:
+  push:
+    branches:
+      - security/npm-lock-refresh-v0.1.129
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-lock-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Generate lockfile
+        run: npm install --package-lock-only --no-audit --no-fund
+      - name: Install resolved dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Validate legacy app
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test
+      - name: Record resolved security versions
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const names = ['vitest', 'vite', 'postcss', 'esbuild', 'next-intl', '@vitest/mocker'];
+          const versions = {};
+          for (const name of names) {
+            const path = `node_modules/${name}/package.json`;
+            const parsed = JSON.parse(fs.readFileSync(path, 'utf8'));
+            versions[name] = parsed.version;
+          }
+          fs.writeFileSync('npm-security-versions.json', JSON.stringify(versions, null, 2) + '\n');
+          NODE
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v6
+        with:
+          name: npm-security-lock
+          path: |
+            package-lock.json
+            npm-security-versions.json
+          if-no-files-found: error
+          retention-days: 3
