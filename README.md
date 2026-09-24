@@ -30,14 +30,14 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+758** | **−33** | **+725** |
+| **10** | **+786** | **−34** | **+752** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
-| Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · privacy-as-code** |
+| Gate agregador obligatorio | **validate**: todos los seleccionados, incluido privacy-as-code; Sonar y CodeRabbit aparte |
 | Alcance | #149: `datos.yml`, documentos generados, callers de Factory y pruebas de tratamientos observados |
 | Rol del PR | **Legal-Privacidad · Ingeniería de Software · Infraestructura · QA** |
 | Revisiones | Factory privacy gate + CI/Sonar/CodeRabbit terminal del HEAD; revisión jurídica humana permanece separada |
@@ -59,11 +59,13 @@ flowchart LR
 - Separa el dedupe Laravel (`visitor_hash`, retención técnica `dedupe_24h`) de los flujos legacy: `link_clicks` guarda referrer/UA sin IP, mientras `upload_link_events` sí registra IP cruda.
 - Mantiene responsable, bases, consentimientos y retenciones no demostradas como `review_required` / `[COMPLETAR POR EL DUEÑO]`.
 - Añade callers mínimos, sin secretos, fijados a Factory `a14f38d5b4b1bb0db21101021375c76f1e36699c`.
+- Integra privacy-as-code dentro de `GrindFlow CI / validate`, por lo que el squash exacto de `main` también debe pasar el gate de privacidad.
 
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
 <!-- grindflow:changed-files -->
 - `.github/workflows/auditoria-privacidad.yml`
+- `.github/workflows/grindflow-ci.yml`
 - `.github/workflows/privacidad.yml`
 - `README.md`
 - `config/version.php`
@@ -76,6 +78,7 @@ Inventario del diff exacto:
 ## Validación
 - `PrivacyAsCodeTest` enlaza cada tratamiento/proveedor con código real, incluyendo `createServiceClient`, tablas Supabase y los flujos de ingesta/publicación/tracking; distingue `visitor_hash`, `link_clicks` e IP cruda de uploads.
 - Los tres documentos quedan congelados contra la salida determinista del kit y el workflow reutilizable vuelve a verificar `datos.yml` contra Factory.
+- `validate` depende explícitamente de `privacy`; la misma compuerta corre en PR y en `push main` a través de `GrindFlow CI`.
 - Ningún documento se presenta como cumplimiento o revisión jurídica aprobada.
 
 ## Qué sigue
