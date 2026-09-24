@@ -32,13 +32,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+1079** | **−39** | **+1040** |
+| **12** | **+1190** | **−38** | **+1152** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · browser · real-stack** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
 | Gate agregador obligatorio | **validate**: todos los seleccionados; Sonar y CodeRabbit aparte |
 | Alcance | #121/#73: sincronizar el secreto sintético sin acceso SSH y recuperar Smoke |
 | Rol del PR | **SRE · Backend Laravel · Application Security** |
@@ -67,6 +67,7 @@ flowchart LR
 ## Archivos modificados en esta entrega candidata
 Inventario del diff exacto:
 <!-- grindflow:changed-files -->
+- `.env.example`
 - `.github/workflows/production-smoke.yml`
 - `README.md`
 - `app/Http/Controllers/Operations/ProductionSmokeBootstrapController.php`
