@@ -2,6 +2,8 @@
 
 return [
     'default' => env('CACHE_STORE', 'array'),
+    // OIDC bootstrap rate limiting must persist across requests.
+    'limiter' => env('CACHE_LIMITER', 'file'),
 
     'stores' => [
         'array' => [

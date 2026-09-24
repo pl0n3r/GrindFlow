@@ -12,6 +12,7 @@ concurrency:
 permissions:
   contents: read
   issues: write
+  id-token: write
 
 jobs:
   production-smoke:
@@ -83,6 +84,113 @@ jobs:
           if [[ -n "$issue_number" ]]; then
             gh issue comment "$issue_number" --body "Production E2E credentials are now configured. Closing this automatic notice."
             gh issue close "$issue_number"
+          fi
+
+      - id: deployed_checkout
+        name: Wait for exact deployed checkout before production write
+        if: steps.credentials.outputs.configured == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_body="$(mktemp)"
+          trap 'rm -f "$health_body"' EXIT
+
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            status="$(curl --silent --show-error --max-time 20               --output "$health_body"               --write-out '%{http_code}'               "$BASE_URL/health?probe=$GITHUB_RUN_ID-$attempt" || true)"
+
+            if [[ "$status" == "200" ]] && jq -e --arg sha "$GITHUB_SHA"               'type == "object" and .status == "ok" and .exact == true and .commit == $sha'               "$health_body" >/dev/null; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -lt "$ATTEMPTS" ]]; then
+              sleep "$WAIT_SECONDS"
+            fi
+          done
+
+          echo "::error::Production never exposed the exact main SHA through /health."
+          exit 1
+
+      - id: synthetic_bootstrap
+        name: Reconcile synthetic smoke identity through GitHub OIDC
+        if: steps.credentials.outputs.configured == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(mktemp)"
+          trap 'rm -f "$payload"' EXIT
+          chmod 600 "$payload"
+
+          GRINDFLOW_SMOKE_PASSWORD="$E2E_USER_PASSWORD" python3 - "$payload" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump({"password": os.environ["GRINDFLOW_SMOKE_PASSWORD"]}, handle)
+          PY
+
+          bootstrap_status=0
+          for attempt in 1 2 3; do
+            if ! oidc_response="$(curl --silent --show-error --fail --max-time 20               --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"               "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=grindflow-production-smoke-bootstrap")"; then
+              bootstrap_status="oidc-request-failed"
+              if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
+              continue
+            fi
+
+            if ! oidc_token="$(jq -er '.value | select(type == "string" and length > 0)' <<<"$oidc_response")"; then
+              bootstrap_status="oidc-token-invalid"
+              unset oidc_response
+              if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
+              continue
+            fi
+            printf '::add-mask::%s\n' "$oidc_token"
+
+            bootstrap_status="$(curl --silent --show-error --max-time 20               --output /dev/null               --write-out '%{http_code}'               --request POST               --header "Authorization: Bearer $oidc_token"               --header "Content-Type: application/json"               --header "X-GrindFlow-Expected-Sha: $GITHUB_SHA"               --data-binary "@$payload"               "$BASE_URL/internal/production-smoke/bootstrap" || true)"
+            unset oidc_token oidc_response
+
+            if [[ "$bootstrap_status" == "204" ]]; then
+              echo "Synthetic production smoke identity reconciled through verified GitHub OIDC." >> "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+
+            if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
+          done
+
+          if [[ "$bootstrap_status" != "204" ]]; then
+            echo "::error::Synthetic production identity bootstrap failed with HTTP $bootstrap_status; no login attempt will be sent."
+            exit 1
+          fi
+
+      - name: Publish pre-login production failure
+        if: failure() && steps.credentials.outputs.configured == 'true' && (steps.deployed_checkout.outcome == 'failure' || steps.synthetic_bootstrap.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_CHECK_OUTCOME: ${{ steps.deployed_checkout.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="oidc-bootstrap"
+          if [[ "$DEPLOY_CHECK_OUTCOME" == "failure" ]]; then
+            stage="exact-health"
+          fi
+
+          {
+            echo "## Production smoke blocked before login"
+            echo
+            echo "Stage: $stage"
+            echo "No login was attempted. Inspect the failed workflow step for details."
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "No request bodies, credentials, OIDC tokens or remote responses are included."
+          } > /tmp/grindflow-prelogin-failure.md
+
+          cat /tmp/grindflow-prelogin-failure.md >> "$GITHUB_STEP_SUMMARY"
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body-file /tmp/grindflow-prelogin-failure.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-prelogin-failure.md --label 'tipo: incidente' --label 'prioridad: crítica' --label 'estado: disponible'
           fi
 
       - name: Validate smoke script
