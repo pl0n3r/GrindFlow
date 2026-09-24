@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Upgrade npm resolver
+        run: |
+          npm install --global npm@11
+          npm --version
       - name: Generate lockfile
         run: npm install --package-lock-only --no-audit --no-fund
       - name: Install resolved dependencies
