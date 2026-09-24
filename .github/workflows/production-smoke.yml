@@ -129,8 +129,18 @@ jobs:
 
           bootstrap_status=0
           for attempt in 1 2 3; do
-            oidc_response="$(curl --silent --show-error --fail               --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"               "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=grindflow-production-smoke-bootstrap")"
-            oidc_token="$(jq -er '.value' <<<"$oidc_response")"
+            if ! oidc_response="$(curl --silent --show-error --fail --max-time 20               --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"               "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=grindflow-production-smoke-bootstrap")"; then
+              bootstrap_status="oidc-request-failed"
+              if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
+              continue
+            fi
+
+            if ! oidc_token="$(jq -er '.value | select(type == "string" and length > 0)' <<<"$oidc_response")"; then
+              bootstrap_status="oidc-token-invalid"
+              unset oidc_response
+              if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
+              continue
+            fi
             printf '::add-mask::%s\n' "$oidc_token"
 
             bootstrap_status="$(curl --silent --show-error --max-time 20               --output /dev/null               --write-out '%{http_code}'               --request POST               --header "Authorization: Bearer $oidc_token"               --header "Content-Type: application/json"               --header "X-GrindFlow-Expected-Sha: $GITHUB_SHA"               --data-binary "@$payload"               "$BASE_URL/internal/production-smoke/bootstrap" || true)"
@@ -141,7 +151,7 @@ jobs:
               break
             fi
 
-            sleep 2
+            if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
           done
 
           if [[ "$bootstrap_status" != "204" ]]; then
