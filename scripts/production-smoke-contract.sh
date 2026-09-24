@@ -47,7 +47,15 @@ for forbidden in ('"$oidc_token"', '"$payload"', "production-smoke.log", "getMes
     assert forbidden not in report, forbidden
 for marker in ("--dump-header", "failure_stage=", "failure_code=", "break", "BOOTSTRAP_FAILURE_STAGE", "BOOTSTRAP_FAILURE_CODE"):
     assert marker in workflow, marker
-assert workflow.count('password-invalid|env-unavailable') == 1, 'invalid writer password requires an explicit safe code'
+assert workflow.count('password-invalid|provision-phase-disabled|provision-password-missing') == 1, 'invalid writer password requires an explicit safe code'
+for code in (
+    'provision-lock-timeout',
+    'provision-membership-conflict',
+    'provision-backup-write-failed',
+    'provision-backup-permission-failed',
+    'provision-database-failed',
+):
+    assert code in workflow, f'provisioning failure missing from workflow allowlist: {code}'
 print("PASS production smoke contract: pre-login failure is reported without secrets")
 PY
 
