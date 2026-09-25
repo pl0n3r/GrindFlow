@@ -22,7 +22,7 @@ STATES = frozenset({
     "estado: bloqueado", "estado: requiere recuperación",
     "estado: completado", "estado: cancelado",
 })
-DIMENSION = re.compile(r"^(?:tipo|prioridad|estado)\s*[:：]", re.IGNORECASE)
+DIMENSION = re.compile(r"^(tipo|prioridad|estado)\s*[:：]", re.IGNORECASE)
 CLOSES = re.compile(r"(?im)(?:^|\s)closes\s+#([1-9]\d{0,9})(?=\s|$|[.,;:)])")
 MAX_BODY_CHARS = 65_536
 MAX_LABELS = 200
@@ -59,18 +59,24 @@ def linked_issue_number(body: object) -> int | None:
         return None
     if not isinstance(body, str) or len(body) > MAX_BODY_CHARS:
         raise InheritanceError("body inválido o excesivo")
-    numbers = {int(match) for match in CLOSES.findall(body)}
-    if not numbers:
+    matches = CLOSES.findall(body)
+    if not matches:
         return None
-    if len(numbers) != 1:
+    if len(matches) != 1:
         raise InheritanceError("Closes debe enlazar un único Issue")
-    return next(iter(numbers))
+    return int(matches[0])
 
 
-def _dimension(names: set[str], allowed: frozenset[str], prefix: str) -> set[str]:
-    unknown = {name for name in names if name.lower().startswith(prefix) and name not in allowed}
+def _dimension(names: set[str], allowed: frozenset[str], dimension: str) -> set[str]:
+    scoped = {
+        name
+        for name in names
+        if (match := DIMENSION.match(name)) is not None
+        and match.group(1).lower() == dimension
+    }
+    unknown = scoped - allowed
     if unknown:
-        raise InheritanceError(f"{prefix[:-1]} contiene etiqueta no canónica")
+        raise InheritanceError(f"{dimension} contiene etiqueta no canónica")
     return names & allowed
 
 
@@ -78,11 +84,11 @@ def plan_inheritance(pr_labels: object, issue_labels: object) -> list[str]:
     pr = label_names(pr_labels)
     issue = label_names(issue_labels)
 
-    pr_types = _dimension(pr, TYPES, "tipo:")
-    pr_priorities = _dimension(pr, PRIORITIES, "prioridad:")
-    pr_states = _dimension(pr, STATES, "estado:")
-    issue_types = _dimension(issue, TYPES, "tipo:")
-    issue_priorities = _dimension(issue, PRIORITIES, "prioridad:")
+    pr_types = _dimension(pr, TYPES, "tipo")
+    pr_priorities = _dimension(pr, PRIORITIES, "prioridad")
+    pr_states = _dimension(pr, STATES, "estado")
+    issue_types = _dimension(issue, TYPES, "tipo")
+    issue_priorities = _dimension(issue, PRIORITIES, "prioridad")
 
     if len(pr_types) > 2 or len(pr_priorities) > 1 or len(pr_states) > 1:
         raise InheritanceError("PR ya contiene dimensiones conflictivas")

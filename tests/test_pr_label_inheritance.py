@@ -20,6 +20,8 @@ class PrLabelInheritanceTests(unittest.TestCase):
         self.assertIsNone(module.linked_issue_number("Refs #125"))
         with self.assertRaises(module.InheritanceError):
             module.linked_issue_number("Closes #125\nCloses #140")
+        with self.assertRaises(module.InheritanceError):
+            module.linked_issue_number("Closes #125\nCloses #125")
 
     def test_inherits_only_missing_canonical_dimensions(self):
         issue = [
@@ -54,6 +56,13 @@ class PrLabelInheritanceTests(unittest.TestCase):
             ),
             ["prioridad: alta"],
         )
+        self.assertEqual(
+            module.plan_inheritance(
+                ["tipo: infraestructura", "prioridad: alta"],
+                [],
+            ),
+            ["estado: en revisión"],
+        )
 
     def test_never_inherits_issue_state_or_arbitrary_labels(self):
         issue = [
@@ -86,6 +95,13 @@ class PrLabelInheritanceTests(unittest.TestCase):
                 ["prioridad: alta", "prioridad: baja"],
                 ["tipo: infraestructura", "prioridad: alta"],
             )
+        for labels in (
+            ["tipo：seguridad", "prioridad: alta"],
+            ["tipo : seguridad", "prioridad: alta"],
+        ):
+            with self.subTest(noncanonical=labels[0]):
+                with self.assertRaises(module.InheritanceError):
+                    module.plan_inheritance(labels, [])
 
     def test_cli_output_is_bounded_and_sanitized(self):
         extract = subprocess.run(
@@ -116,6 +132,8 @@ class PrLabelInheritanceTests(unittest.TestCase):
         self.assertNotIn("issue_comment", workflow)
         self.assertIn('has("pull_request")', workflow)
         self.assertIn("Closes debe enlazar un Issue", workflow)
+        self.assertIn('if [[ -n "$ISSUE_NUMBER" ]]; then', workflow)
+        self.assertNotIn("steps.linked.outputs.issue != ''", workflow)
 
 
 if __name__ == "__main__":

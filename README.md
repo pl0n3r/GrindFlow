@@ -22,14 +22,14 @@
 | Deploy Observer base | ✅ **success** | SHA 1769f918… |
 | Production Smoke base | ✅ **success** | SHA 1769f918… |
 | Version objetivo | 🚧 **v0.1.139** | PHP, npm y lock en paridad |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final · Issue #125 |
+| CI/Sonar/CodeRabbit del PR | 🚧 nueva ronda requerida | HEAD corregido · Issue #125 |
 | Producción objetivo | 🚧 pendiente | Observer exacto + Smoke tras merge |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **11** | **+742** | **−40** | **+702** |
+| **11** | **+770** | **−40** | **+730** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -55,7 +55,7 @@ flowchart LR
 
 ## Qué se hizo
 - Hereda únicamente tipo(s) y prioridad canónicos desde un único `Closes #N` cuando faltan en la PR.
-- Nunca copia estado del Issue ni etiquetas arbitrarias; una PR sin estado recibe `estado: en revisión`.
+- Nunca copia estado del Issue ni etiquetas arbitrarias; una PR sin estado recibe `estado: en revisión` incluso sin `Closes #N`.
 - El workflow usa código de la base confiable y metadata GitHub; no ejecuta el HEAD del PR.
 - Añade barrido diario/dispatch que mantiene un único `[AUTO] Ítems sin etiquetas`, deduplica reportes y lo cierra cuando llega a cero.
 - El reporte automático publica solo número, clase y dimensión controlada; no títulos ni cuerpos de usuario.
@@ -76,7 +76,7 @@ flowchart LR
 - `tests/test_pr_label_inheritance.py`
 
 ## Validación
-- Tests offline cubren parser `Closes`, herencia, conflictos, sanitización, deduplicación y cero pendientes.
+- Tests offline cubren parser `Closes` (incluidos duplicados), herencia, separadores no canónicos, conflictos, sanitización, deduplicación y cero pendientes.
 - Workflow de PR usa `pull_request`, checkout del SHA base y permisos acotados.
 - Workflow de sweep usa `schedule`/dispatch, concurrencia serial e idempotencia.
 - No cambia runtime, Hostinger, base de datos, secretos ni datos productivos.

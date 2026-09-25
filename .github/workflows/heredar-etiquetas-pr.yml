@@ -54,7 +54,7 @@ jobs:
           echo "issue=$issue" >> "$GITHUB_OUTPUT"
 
       - name: Planear y aplicar solo dimensiones canónicas faltantes
-        if: steps.planner.outputs.available == 'true' && steps.linked.outputs.issue != ''
+        if: steps.planner.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -63,11 +63,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Issue inválido"; exit 1; }
-          gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" > /tmp/issue.json
-          if jq -e 'has("pull_request")' /tmp/issue.json >/dev/null; then
-            echo "::error::Closes debe enlazar un Issue, no otro Pull Request"
-            exit 1
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Issue inválido"; exit 1; }
+            gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" > /tmp/issue.json
+            if jq -e 'has("pull_request")' /tmp/issue.json >/dev/null; then
+              echo "::error::Closes debe enlazar un Issue, no otro Pull Request"
+              exit 1
+            fi
+          else
+            printf '{"labels":[]}\n' > /tmp/issue.json
           fi
           jq -n             --slurpfile pr /tmp/pr.json             --slurpfile issue /tmp/issue.json             '{pr_labels:$pr[0].labels,issue_labels:$issue[0].labels}'             | python3 scripts/pr-label-inheritance.py plan > /tmp/plan.json
           jq '{labels:.add}' /tmp/plan.json > /tmp/add.json
