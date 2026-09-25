@@ -92,8 +92,8 @@ abort "Unconfigured smoke must exit nonzero" unless guard["run"].match?(/(?:^|\n
 abort "No smoke shell steps checked" if checked.zero?
 puts "PASS production-smoke embedded Bash syntax (#{checked} steps)"
 
-# El observador de release es otro workflow: GET público sin secretos ni
-# mutaciones, con salida no exitosa cuando la versión no se observa.
+# El observador de deploy usa /health como señal canónica read-only y exige
+# versión + SHA exactos. Production Smoke conserva la validación funcional.
 observer_path = File.join(root, ".github/workflows/production-deploy-observer.yml")
 observer = YAML.safe_load_file(observer_path, aliases: true)
 abort "Observer must retain dynamic run identity" unless observer.fetch("run-name").include?("${{ github.run_number }}")
@@ -106,12 +106,11 @@ observer_steps.each do |step|
   _out, err, code = Open3.capture3("bash", "-n", stdin_data: step["run"])
   abort "Invalid observer shell: #{err}" unless code.success?
 end
-probe = observer_steps.find { |step| step["name"] == "Observe release marker without production writes" }
+probe = observer_steps.find { |step| step["name"] == "Observe exact deployed checkout without production writes" }
 abort "Observer GET probe missing" if probe.nil?
 script = probe.fetch("run")
-abort "Observer must probe only the public version marker" unless script.include?("/_deployment?probe=")
-abort "Observer must never claim the remote SHA" unless script.include?("Hostinger checkout SHA: **NOT OBSERVED**")
-abort "Observer must fail on missing release" unless script.include?('[[ "$observed" == true ]] || exit 1')
+abort "Observer must probe /health" unless script.include?("/health?probe=")
+abort "Observer must fail on missing exact checkout" unless script.include?('[[ "$observed" == true ]] || exit 1')
 abort "Observer must use exactly one curl request" unless script.scan(/\bcurl\b/).length == 1
 # Bloquear opciones de escritura cortas con valor separado o pegado (-XPOST, -dJSON, etc.).
 curl_write_option = /--(?:data(?:-[a-z-]+)?|request|upload-file|form(?:-string)?|json)\b|(?:^|\s)-(?:X|d|F|T)(?:\S*)/m
@@ -119,5 +118,6 @@ curl_write_option = /--(?:data(?:-[a-z-]+)?|request|upload-file|form(?:-string)?
   abort "Observer write-option guard missing #{option}" unless curl_write_option.match?("curl #{option}")
 end
 abort "Observer must be read-only" if script.match?(curl_write_option)
-abort "Observer must validate all marker fields and types" unless script.include?('.exact == false and .commit == null and .source == "release-only"')
-puts "PASS release-only deploy observer shell and safety contract"
+abort "Observer must never use the legacy deployment marker" if script.include?("/_deployment")
+abort "Observer must require exact SHA health identity" unless script.include?('.exact == true and .commit == $sha')
+puts "PASS exact-health deploy observer shell and safety contract"
