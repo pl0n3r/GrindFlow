@@ -55,7 +55,8 @@ class IssueLabelNoticeTests(unittest.TestCase):
                 return {}
             if target.endswith("/comments?per_page=100"):
                 return [comments]
-            if "/comments/" in target and args[:2] == ("--method", "PATCH"):
+            if args[:2] == ("--method", "PATCH"):
+                self.assertEqual(target, "repos/pl0n3r/GrindFlow/issues/comments/7")
                 comments[0]["body"] = args[-1][5:]
                 return {}
             if target.endswith("/comments") and args[:2] == ("--method", "POST"):
@@ -77,6 +78,41 @@ class IssueLabelNoticeTests(unittest.TestCase):
             self.assertEqual(module.main(), 0)
             self.assertEqual(len(comments), 1)
             self.assertIn("Clasificación completa", comments[0]["body"])
+
+    def test_noncanonical_state_is_preserved_between_events(self):
+        issue = {"labels": [
+            {"name": "tipo: producto"},
+            {"name": "prioridad: media"},
+            {"name": "estado: personalizado"},
+        ]}
+        comments = []
+        calls = []
+
+        def fake_gh(*args):
+            calls.append(args)
+            if args[0] == "--paginate":
+                self.assertEqual(args[-1], "repos/pl0n3r/GrindFlow/issues/125/comments?per_page=100")
+                return [comments]
+            if args[:2] == ("--method", "POST"):
+                self.assertEqual(args[2], "repos/pl0n3r/GrindFlow/issues/125/comments")
+                comments.append({
+                    "id": 8,
+                    "body": args[-1][5:],
+                    "user": {"login": "github-actions[bot]"},
+                })
+                return {}
+            return issue
+
+        with patch.dict(module.os.environ, {
+            "GITHUB_REPOSITORY": "pl0n3r/GrindFlow", "ISSUE_NUMBER": "125",
+        }), patch.object(module, "gh", fake_gh):
+            self.assertEqual(module.main(), 0)
+            self.assertEqual(module.main(), 0)
+
+        self.assertEqual(len(comments), 1)
+        self.assertIn("etiquetas de dimensión no canónicas", comments[0]["body"])
+        self.assertEqual(sum("/labels" in " ".join(args) for args in calls), 0)
+        self.assertEqual(issue["labels"][-1]["name"], "estado: personalizado")
 
     def test_workflow_triggers_only_issue_metadata_and_limited_permissions(self):
         workflow = (ROOT / ".github/workflows/aviso-etiquetas-issues.yml").read_text()

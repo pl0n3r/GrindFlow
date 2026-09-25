@@ -94,7 +94,8 @@ def sync_notice(endpoint: str, problems: tuple[str, ...]) -> None:
     if matches:
         current = matches[0]
         if current.get("body") != body:
-            gh("--method", "PATCH", endpoint + "/comments/" + str(current["id"]), "-f", "body=" + body)
+            comment_endpoint = endpoint.rsplit("/", 2)[0] + "/issues/comments/" + str(current["id"])
+            gh("--method", "PATCH", comment_endpoint, "-f", "body=" + body)
     else:
         gh("--method", "POST", endpoint + "/comments", "-f", "body=" + body)
 

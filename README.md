@@ -23,7 +23,7 @@
 | Deploy Observer base | ✅ **success** | job 107984688624 |
 | Production Smoke base | ✅ **success** | job 107984689135 |
 | Version objetivo | 🚧 **v0.1.137** | PHP, npm y lock en paridad |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de #125 |
+| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #168 · Issue #125 |
 | Producción objetivo | 🚧 pendiente | verificación independiente tras merge |
 
 ## Huella del cambio
@@ -37,7 +37,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **Issue #125 · v0.1.137**; diff y README deben coincidir con HEAD final |
+| PR + snapshot exacto | **PR #168 · Issue #125 · v0.1.137**; diff y README deben coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** conserva gates seleccionados + privacidad; Sonar, CodeQL y CodeRabbit separados |
 | Release Factory v1 | Solo push main; tag anotado y GitHub Release sin deploy productivo |
 | CI local canónico | `GrindFlow CI / validate` sigue obligatorio, Factory CI corre en paralelo |
