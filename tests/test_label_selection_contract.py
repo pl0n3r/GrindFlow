@@ -36,6 +36,9 @@ class LabelSelectionTests(unittest.TestCase):
             BASE + ["tipo: desconocido"],
             BASE + ["prioridad: normal"],
             BASE + ["estado: desconocido"],
+            BASE + ["tipo : seguridad"], BASE + ["prioridad : alta"],
+            BASE + ["estado : disponible"], BASE + ["TIPO: seguridad"],
+            BASE + ["tipo： seguridad"],
             BASE + [BASE[0]],
         ]
         for labels in invalid:
@@ -62,6 +65,16 @@ class LabelSelectionTests(unittest.TestCase):
         no = subprocess.run([sys.executable, str(SCRIPT)], input=b"x" * 65537, capture_output=True, check=False)
         self.assertEqual(no.returncode, 2)
         self.assertNotIn(b"x" * 100, no.stderr)
+
+    def test_cli_fails_closed_on_extreme_json_depth(self):
+        deep = b"[" * 2000 + b"]" * 2000
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)],
+            input=deep, capture_output=True, check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b"ERROR:", result.stderr)
+        self.assertNotIn(b"Traceback", result.stderr)
 
     def test_fast_ci_executes_contract(self):
         ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")

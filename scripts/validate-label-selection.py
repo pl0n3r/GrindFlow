@@ -7,6 +7,7 @@ cuando ambos aplican. Este módulo valida la selección sin modificar metadatos.
 from __future__ import annotations
 
 import json
+import re
 import sys
 
 TYPES = frozenset({
@@ -24,6 +25,7 @@ STATES = frozenset({
     "estado: completado", "estado: cancelado",
 })
 MAX_INPUT_BYTES = 65536
+DIMENSION_PATTERN = re.compile(r"^(?:tipo|prioridad|estado)\s*[:：]", re.IGNORECASE)
 
 
 class LabelSelectionError(ValueError):
@@ -51,7 +53,7 @@ def validate_selection(labels: object) -> dict[str, list[str]]:
     if len(names) != len(set(names)):
         raise LabelSelectionError("Etiquetas duplicadas")
     unknown = [
-        n for n in names if n.startswith(("tipo:", "prioridad:", "estado:"))
+        n for n in names if DIMENSION_PATTERN.match(n)
         and n not in TYPES | PRIORITIES | STATES
     ]
     if unknown:
@@ -78,7 +80,7 @@ def main() -> int:
         return 2
     try:
         result = validate_selection(json.loads(raw))
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
