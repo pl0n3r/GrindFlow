@@ -6,7 +6,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidata v0.1.137 · Issue #125.** Aviso único editable y estado seguro por defecto para Issues, sin ejecutar código de PR.
+> **Candidata v0.1.138 · Issue #170.** Recupera el Deploy Observer usando la identidad exacta ya expuesta por `/health`, sin escrituras productivas.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -17,65 +17,64 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| SHA exacto de main (base) | ✅ **b920d87abf71d7d7aa9a55155adf85e1d71915af** | v0.1.136 fusionada (#167) |
-| Tag y GitHub Release (base) | ✅ **v0.1.136** | tag anotado apunta a main |
-| CI del SHA exacto de main (base) | ✅ **success** | validate job 107984926500 |
-| Deploy Observer base | ✅ **success** | job 107984688624 |
-| Production Smoke base | ✅ **success** | job 107984689135 |
-| Version objetivo | 🚧 **v0.1.137** | PHP, npm y lock en paridad |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #168 · Issue #125 |
+| SHA exacto de main (base) | ✅ **af31ff256c26b529730b6f8145773f0175116bea** | v0.1.137 fusionada (#168) |
+| Tag y GitHub Release (base) | ✅ **v0.1.137** | Release Factory success |
+| CI del SHA exacto de main (base) | ✅ **success** | run 36118866455 |
+| Deploy Observer base | ⛔ **failure** | `/_deployment` devolvió 403 en run 36118866592 |
+| Production Smoke base | ✅ **success** | run 36118866607; `/health` exacto + auth |
+| Version objetivo | 🚧 **v0.1.138** | PHP, npm y lock en paridad |
+| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | Issue #170 · observer exacto/read-only |
 | Producción objetivo | 🚧 pendiente | verificación independiente tras merge |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+318** | **−28** | **+290** |
+| **7** | **+000** | **−000** | **+000** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **PR #168 · Issue #125 · v0.1.137**; diff y README deben coincidir con HEAD final |
+| PR + snapshot exacto | **Issue #170 · v0.1.138**; diff y README deben coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** conserva gates seleccionados + privacidad; Sonar, CodeQL y CodeRabbit separados |
 | Release Factory v1 | Solo push main; tag anotado y GitHub Release sin deploy productivo |
 | CI local canónico | `GrindFlow CI / validate` sigue obligatorio, Factory CI corre en paralelo |
-| Rol del PR | **Infraestructura · Seguridad · QA** |
+| Rol del PR | **SRE · Infraestructura · QA** |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
-  A["main v0.1.136 · CI/Smoke aprobados"] --> P["#125 · aviso único para Issues"]
+  A["main v0.1.137 · CI/Smoke aprobados; observer 403"] --> P["#170 · observer por /health exacto"]
   P --> Q["CI / validate + Factory CI · Sonar + CodeQL + CodeRabbit"]
   Q --> M["squash merge serial"]
-  M --> F["Issue notice · estado seguro"]
-  F --> R["Factory Release v0.1.137"]
+  M --> F["Observer /health · versión + SHA exactos"]
+  F --> R["Factory Release v0.1.138"]
   M --> X["CI exact-main + Observer + Smoke"]
 ```
 
 ## Qué se hizo
-- El catálogo Factory v1 completo llegó en v0.1.136; ahora automatiza el estado inicial de Issues sin sobrescribir otros estados.
-- Un aviso con marcador se crea solo si falta clasificación y se edita si cambia la situación; Issues correctos no reciben comentarios.
-- Añade pruebas offline de dimensiones, estados existentes, aviso idempotente y contrato del workflow.
-- El workflow escucha solo eventos de Issues y ejecuta código confiable de main con permiso `issues: write` acotado al job.
-- No automatiza aún herencia PR/barrido diario ni garantiza branch protection; #125 permanece abierto.
+- Sustituye el endpoint legacy `/_deployment`, hoy bloqueado con 403, por `/health` read-only.
+- El observer exige `status=ok`, versión esperada, `exact=true` y SHA exacto de `github.sha`.
+- Reduce la espera máxima del observer y mantiene `concurrency` + permisos `contents: read`.
+- Fija `actions/checkout` del observer a SHA.
+- Añade regresión offline para impedir volver al marcador release-only o perder la identidad exacta.
 
 ## Archivos modificados en esta entrega candidata
 <!-- grindflow:changed-files -->
-- `.github/workflows/aviso-etiquetas-issues.yml`
 - `.github/workflows/grindflow-ci.yml`
+- `.github/workflows/production-deploy-observer.yml`
 - `README.md`
 - `config/version.php`
 - `package-lock.json`
 - `package.json`
-- `scripts/issue-label-notice.py`
-- `tests/test_issue_label_notice.py`
+- `tests/test_production_deploy_observer.py`
 
 ## Validación
-- Regresión offline verifica notificación estable, dimensiones canónicas y preservación del estado existente.
-- El aviso nuevo no corre sobre PR ni sobre comentarios; no crea comentario para Issues completamente etiquetados.
-- Registro independiente de CI exact-main, Observer y Smoke tras merge; #[146] media storage queda externamente bloqueado.
+- Contrato offline comprueba endpoint, campos exactos, read-only, timeout y pin de checkout.
+- `fast` ejecuta la regresión en cada cambio relevante.
+- Tras merge deben pasar por separado CI exact-main, Deploy Observer y Production Smoke.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -83,7 +82,7 @@ flowchart LR
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #125 · aviso único de Issues | 🚧 candidata v0.1.137 |
-| **NEXT** | 🚧 #125/#129 · herencia, barrido y deploy/rollback | 🚧 próximo slice |
+| **NOW** | 🚧 #170 · recuperar Deploy Observer | 🚧 candidata v0.1.138 |
+| **NEXT** | 🚧 #125/#129 · herencia, barrido y deploy/rollback | 🚧 tras recuperar GREEN |
 | **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + #146 media storage | ⛔ evidencia/configuración externa |
 | **LATER** | 🚧 #122 helper CodeRabbit + #138 Sentry | 🚧 preservados tras TANDA 2 |
