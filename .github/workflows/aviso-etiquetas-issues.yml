@@ -1,0 +1,32 @@
+name: Aviso único de etiquetas de Issue
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-issue-label-notice-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  issue-label-notice:
+    if: github.event.issue.pull_request == null
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Leer código confiable de main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Clasificar Issue y mantener un aviso editable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: python3 scripts/issue-label-notice.py

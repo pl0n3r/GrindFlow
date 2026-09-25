@@ -237,6 +237,7 @@ jobs:
           python3 -m unittest tests/test_sonar_event_load.py
           python3 -m unittest tests/test_label_selection_contract.py
           python3 -m unittest tests/test_label_workflow_contract.py
+          python3 -m unittest tests/test_issue_label_notice.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
