@@ -30,16 +30,24 @@ class LabelSelectionError(ValueError):
     pass
 
 
+def label_name(item: object) -> str:
+    """Extrae una etiqueta desde la API de GitHub o el formato simplificado."""
+    if isinstance(item, str):
+        name = item
+    elif isinstance(item, dict):
+        name = item.get("name")
+    else:
+        name = None
+    if not isinstance(name, str) or not 1 <= len(name) <= 80 or name.strip() != name:
+        raise LabelSelectionError("Nombre de etiqueta inválido")
+    return name
+
+
 def validate_selection(labels: object) -> dict[str, list[str]]:
     """Valida nombres canónicos; dos tipos necesitan justificación humana."""
     if not isinstance(labels, list) or len(labels) > 200:
         raise LabelSelectionError("La selección debe ser una lista acotada")
-    names: list[str] = []
-    for item in labels:
-        name = item if isinstance(item, str) else item.get("name") if isinstance(item, dict) else None
-        if not isinstance(name, str) or not 1 <= len(name) <= 80 or name.strip() != name:
-            raise LabelSelectionError("Nombre de etiqueta inválido")
-        names.append(name)
+    names = [label_name(item) for item in labels]
     if len(names) != len(set(names)):
         raise LabelSelectionError("Etiquetas duplicadas")
     unknown = [
@@ -70,7 +78,7 @@ def main() -> int:
         return 2
     try:
         result = validate_selection(json.loads(raw))
-    except (ValueError, UnicodeDecodeError) as exc:
+    except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
