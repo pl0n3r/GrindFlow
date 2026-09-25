@@ -6,7 +6,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.132 · TANDA 2.** GitHub Releases por el kit Factory v1, sin alterar runtime, despliegue ni migraciones.
+> **Candidata v0.1.133 · PR #164.** Reduce procesamientos redundantes del relay Sonar; v0.1.132 ya tiene tag anotado y GitHub Release del SHA de main. Sin modificaciones de datos ni producción en esta PR.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -17,15 +17,14 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| SHA exacto de main (base) | ✅ **f5f2a00e5bfed2669b01a204cc2be475f9db5387** | v0.1.131 fusionada |
-| Versión observada en producción (base) | ✅ **v0.1.131** | Production Smoke `36086540476` (SHA exacto) |
-| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI `36086540475`, intento 2 |
-| Deploy Observer base | ✅ **success** | run `36086540472` |
-| Production Smoke base | ✅ **success** | autenticado, checkout exacto |
-| Version objetivo | 🚧 **v0.1.132** | PHP, npm y lock en paridad |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #162 |
-| Tag y GitHub Release objetivo | 🚧 pendiente | únicamente después del merge |
-| Producción objetivo | 🚧 pendiente | CI exact-main + observer + smoke independientes |
+| SHA exacto de main (base) | ✅ **aeac12c0a13d0d26e6599e8f7b05a899b080155a** | v0.1.132 fusionada (#162) |
+| Tag y GitHub Release (base) | ✅ **v0.1.132** | tag anotado del SHA exacto y Release Factory publicados |
+| CI del SHA exacto de main (base) | 🚧 ejecución en progreso | no inferir verde de PR anterior |
+| Deploy Observer base | ✅ **success** | observación release; no representa por sí sola paridad funcional |
+| Production Smoke base | ✅ **success** | check del commit base; revisar evidencia exacta por ejecución |
+| Version objetivo | 🚧 **v0.1.133** | PHP, npm y lock en paridad |
+| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #164 |
+| Producción objetivo | 🚧 pendiente | tras merge y comprobaciones independientes |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
@@ -38,46 +37,44 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **PR #162 / Issue #124 · v0.1.132**; diff y README deben coincidir con el HEAD final |
+| PR + snapshot exacto | **PR #164 / Issue #123 · v0.1.133**; diff y README deben coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** conserva gates seleccionados + privacidad; Sonar, CodeQL y CodeRabbit separados |
 | Release Factory v1 | Solo push main; tag anotado y GitHub Release sin deploy productivo |
 | CI local canónico | `GrindFlow CI / validate` sigue obligatorio, Factory CI corre en paralelo |
-| Rol del PR | **Infraestructura · Seguridad · QA** |
+| Rol del PR | **Infraestructura · SRE · QA** |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
-  A["main v0.1.131 verde"] --> P["#124 · GitHub Release @v1"]
-  P --> F["GrindFlow CI + Factory CI"]
+  A["main v0.1.132"] --> P["#164 · relay Sonar deduplicado"]
+  P --> F["GrindFlow CI / validate + Factory CI"]
   F --> Q["Sonar + CodeQL + CodeRabbit"]
-  Q --> M["squash merge"]
-  M --> R["Factory Release: tag + notas"]
-  M --> X["CI exact-main"]
-  X --> S["Observer + Production Smoke"]
+  Q --> M["squash merge serial"]
+  M --> R["Factory Release v0.1.133"]
+  M --> X["CI exact-main + Observer + Smoke"]
 ```
 
 ## Qué se hizo
-- Añade `.github/workflows/tag-release.yml` para invocar `pl0n3r/factory/.github/workflows/release.yml@v1` exclusivamente en push main, con escritura solo en el job.
-- Lee `config/version.php` como `php-array` clave `number`, sin ejecutar PHP.
-- Sincroniza 0.1.132 en versión PHP, `package.json` y dos versiones raíz de `package-lock.json`, sin cambiar dependencias.
-- Añade regresiones negativas de eventos, herencia de secretos, permisos, refs e inputs en `fast`.
-- Ni el tag ni el GitHub Release prueban por sí solos el checkout de Hostinger. No hubo escrituras productivas en esta PR.
+- Conserva caller Factory Release v1 y test de adopción de v0.1.132 ya integrados; no reintroduce el caller anterior.
+- Añade timeout de cinco minutos y `concurrency` por `check_run.id` al relay Sonar; mantiene filtro de aplicación y nombre del check antes del runner.
+- Ejecuta test negativo del relay en `fast`; preserva el gate `validate` y toda la matriz aplicable.
+- Sincroniza v0.1.133 en PHP, npm y raíz del lock sin modificar resoluciones.
+- Limita el beneficio declarado a deduplicar relays del mismo check; no se ha demostrado reducción de la cantidad total de workflow runs.
 
 ## Archivos modificados en esta entrega candidata
 <!-- grindflow:changed-files -->
 - `.github/workflows/grindflow-ci.yml`
-- `.github/workflows/tag-release.yml`
-- `AGENTS.md`
+- `.github/workflows/sonar-pr-details.yml`
 - `README.md`
 - `config/version.php`
-- `docs/GOVERNANCE.md`
 - `package-lock.json`
 - `package.json`
-- `tests/test_release_adoption.py`
+- `tests/test_sonar_event_load.py`
 
 ## Validación
-- El CI anterior conserva todos sus gates; Factory es dueño de idempotencia, carreras y tag anotado.
-- CodeRabbit debe finalizar sobre el HEAD final, con cero hilos accionables; merge y deploy son señales distintas.
+- Regresiones de filtro de eventos, timeout, concurrencia por check y mutaciones negativas integradas en fast.
+- No confundir CI de PR con producción ni tag/Release con SHA de Hostinger.
+- Se requieren CI, Factory, Sonar, CodeQL, CodeRabbit y evidencia de main/deploy independientes.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -85,7 +82,7 @@ flowchart LR
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #124 · release Factory v1 | 🚧 candidata v0.1.132 |
-| **NEXT** | 🚧 #129 · siguiente slice Factory | 🚧 coordinación/etiquetas y deploy/rollback |
+| **NOW** | 🚧 #123 · relay Sonar deduplicado | 🚧 candidata v0.1.133 |
+| **NEXT** | 🚧 #125/#129 · etiquetas y despliegue con rollback | 🚧 después de integración serial |
 | **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + #146 media storage | ⛔ evidencia/configuración externa |
 | **LATER** | 🚧 #122 helper CodeRabbit + #138 Sentry | 🚧 preservados tras TANDA 2 |
