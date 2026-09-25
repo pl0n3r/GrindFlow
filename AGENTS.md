@@ -1000,6 +1000,14 @@ Esa conducta no se repite. Esta es una regla de actuación del agente; por sí
 sola no implica que GitHub tenga un ruleset/required check configurado.
 
 
+### Factory deploy paralelo y reversible
+
+- Mientras `.github/workflows/deploy-factory.yml` exista con `FACTORY_DEPLOY_ENABLED != true`, Git/hPanel sigue siendo la autoridad productiva. No presentar el layout Factory como cutover.
+- El caller Factory usa `migration_mode: none`. `ops/factory/migrate` falla cerrado hasta que exista un backup de base verificable y una decisión posterior habilite migración aditiva; nunca convertir esa falla en no-op exitoso.
+- `ops/factory/backup` captura el release `current` antes de preparar otro artefacto. El deploy exige `shared/.env` y `shared/storage`, ejecuta el `scripts/deploy-hostinger.sh` existente dentro del release y activa `current` solo al final.
+- Rollback Factory cambia únicamente el symlink al release anterior validado por `.release-sha`; no restaura ni modifica datos.
+- Todo cambio a estos adapters debe mantener SSH estricto, paths/SHA allowlisted y los contratos de `tests/test_factory_deploy_adapters.py`.
+
 ### Observacion de deploy y real-stack
 
 - GET `/health` es la señal canónica de deploy: debe responder 200 con
