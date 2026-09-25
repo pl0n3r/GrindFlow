@@ -6,7 +6,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidata v0.1.135 · Issue #125.** Comp puerta de etiquetas en cada PR: solo metadatos y validador leído del SHA base. No autocorrige Issues ni modifica producción.
+> **Candidata v0.1.135 · Issue #125.** Compuerta de etiquetas en cada PR: solo metadatos y validador leído del SHA base. No autocorrige Issues ni modifica producción.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -30,7 +30,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+0** | **−0** | **+0** |
+| **8** | **+116** | **−30** | **+86** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
