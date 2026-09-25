@@ -108,6 +108,23 @@ Los cambios de formato sin cambio semántico no requieren una nueva decisión.
 Una modificación del archivo base inválido, un SHA no resoluble, comentarios
 malformados o una aprobación para otro HEAD fallan cerrado.
 
+## CI reusable Factory v1 en paralelo
+
+El caller `.github/workflows/factory-ci.yml` consume
+`pl0n3r/factory/.github/workflows/ci.yml@v1` únicamente en `pull_request`
+hacia `main`, con `contents: read` y sin secretos heredados. Declara el
+estado real de GrindFlow para este slice: Laravel en raíz, PHP 8.5, Node 24,
+dominio HTTPS, fase `construccion`, versión en `config/version.php` y
+`kit_ref: v1`.
+
+Durante esta adopción el reusable es **un check paralelo**, no sustituto del
+workflow local `GrindFlow CI / validate`. El CI local conserva sus gates de
+MariaDB, navegador, Symfony preview, legado, contratos operativos, privacidad y
+README exacto hasta que exista evidencia explícita de equivalencia y un slice
+posterior retire duplicación de forma segura. Las regresiones locales fallan si
+el caller amplía eventos o permisos, hereda secretos, usa una referencia
+Factory no aprobada o deriva de los inputs declarados.
+
 ## Seguridad y estados
 
 Respetar la secuencia: IMPLEMENTADO → VALIDADO EN CÓDIGO → DESPLEGADO → VALIDADO EN PRODUCCIÓN. No saltar etapas. Nunca ejecutar migraciones productivas, reseteos, uploads externos, cambios irreversibles o pruebas E2E con datos reales por copiar prácticas de otro proyecto. Gobierno GitHub usa permisos mínimos solo para labels; cualquier protección/ruleset de `main` que exija acceso administrativo queda documentada como dependencia externa, no se simula.

@@ -6,7 +6,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidato v0.1.130: primer slice de TANDA 2.** Adopta decisiones como código y el caller de política Factory v1 sin retirar los gates actuales ni tocar runtime, datos o producción.
+> **Candidato v0.1.131: segundo slice de TANDA 2.** Añade el CI reusable Factory v1 en paralelo al CI actual, sin retirar gates ni tocar runtime, datos o producción.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -17,39 +17,39 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| SHA exacto de main (base) | ✅ **d0bf0693ec16efff4baa1654fc38104732103654** | v0.1.129 fusionada |
-| Versión observada en producción (base) | ✅ **v0.1.129** | Production Smoke `36077101214` |
-| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI `36077101190` |
-| Deploy Observer base | ✅ **success** | run `36077101295` |
+| SHA exacto de main (base) | ✅ **5c816cc87a0ba4c2d99e992415789090acdb226d** | v0.1.130 fusionada |
+| Versión observada en producción (base) | ✅ **v0.1.130** | Production Smoke `36081267633` |
+| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI `36081267660` |
+| Deploy Observer base | ✅ **success** | run `36081267653` |
 | Production Smoke base | ✅ **success** | autenticado, checkout exacto |
-| Version objetivo | 🚧 **v0.1.130** | `config/version.php` |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #158 |
+| Version objetivo | 🚧 **v0.1.131** | `config/version.php` |
+| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #161 |
 | Producción objetivo | 🚧 pendiente | solo tras merge + exact-main + observer + smoke |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **10** | **+660** | **−39** | **+621** |
+| **7** | **+197** | **−33** | **+164** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **PR #158 / Issue #157 · v0.1.130**; diff y README deben coincidir con el HEAD final |
+| PR + snapshot exacto | **PR #161 / Issue #159 · v0.1.131**; diff y README deben coincidir con el HEAD final |
 | Gate agregador obligatorio | **validate** mantiene todos los gates seleccionados + privacy-as-code; Sonar, CodeQL y CodeRabbit separados |
-| Política Factory | `politica.yml@v1` valida esquema y máximo 3 rondas; no sustituye el gate local de ownership |
-| Ownership protegido | `pull_request_target` ejecuta gate/script desde base protegida; el HEAD aporta solo `decisiones.yml` como dato |
+| Política Factory | `politica.yml@v1` sigue validando decisiones; **CI Factory v1** corre además como check paralelo |
+| CI local canónico | `GrindFlow CI / validate` permanece obligatorio; Factory CI todavía no lo sustituye |
 | Rol del PR | **Infraestructura · Seguridad · QA** |
 
 ## Flujo de entrega
 ```mermaid
 flowchart LR
-  A["main v0.1.129 verde"] --> P["#157 · decisiones.yml + Factory policy"]
-  P --> F["fast + validate"]
-  P --> K["Factory policy @v1"]
-  P --> O["Owner decisions · base protegida"]
+  A["main v0.1.130 verde"] --> P["#159 · CI Factory reusable en paralelo"]
+  P --> F["GrindFlow CI / validate"]
+  P --> K["Factory CI reusable @v1"]
+  P --> O["Policy + Owner decisions"]
   F --> Q["checks requeridos"]
   K --> Q
   O --> Q
@@ -60,29 +60,26 @@ flowchart LR
 ```
 
 ## Qué se hizo
-- Añade `decisiones.yml` compatible con Factory v1 y `review_round_limit=3`, limitado a decisiones realmente aplicables a GrindFlow.
-- Añade caller PR-only `.github/workflows/politica.yml` con `contents: read` y `pull-requests: read`, fijo a `@v1`.
-- Añade `decision-owner-gate.py` y `decision-owner.yml`: después del bootstrap, cambios semánticos exigen aprobación OWNER ligada al HEAD exacto.
-- La compuerta privilegiada corre con `pull_request_target` desde base protegida; el PR no puede sustituir su script y su HEAD se lee solo como datos.
-- Tests negativos cubren borrado, supersesión, cambio de texto, límite >3, actor no OWNER, SHA equivocado y caller inseguro.
-- No se retira el CI actual, no se mueve Factory `v1` y no se escribe producción.
+- Añade `.github/workflows/factory-ci.yml` como caller PR-only del reusable `pl0n3r/factory/.github/workflows/ci.yml@v1`.
+- Declara inputs reales de GrindFlow: Laravel en raíz, PHP 8.5, Node 24, dominio HTTPS, fase `construccion`, `config/version.php` y `kit_ref: v1`.
+- Mantiene permisos de solo lectura y no hereda secretos.
+- Añade regresiones que rechazan push/pull_request_target, permisos de escritura, refs flotantes y drift de inputs.
+- El CI local exige el nuevo workflow y ejecuta sus tests; `GrindFlow CI / validate` sigue siendo el gate canónico.
+- No se retira ningún gate actual, no se mueve Factory `v1` y no se escribe producción.
 
 ## Archivos modificados en esta entrega candidata
 <!-- grindflow:changed-files -->
-- `.github/workflows/decision-owner.yml`
+- `.github/workflows/factory-ci.yml`
 - `.github/workflows/grindflow-ci.yml`
-- `.github/workflows/politica.yml`
 - `README.md`
 - `config/version.php`
-- `decisiones.yml`
 - `docs/GOVERNANCE.md`
-- `scripts/decision-owner-gate.py`
-- `tests/test_decision_owner_gate.py`
-- `tests/test_factory_policy_adoption.py`
+- `phpunit.xml`
+- `tests/test_factory_ci_adoption.py`
 
 ## Validación
-- AC-01/02/03 tienen regresiones offline en `fast`; Factory policy y Owner decisions son checks paralelos e independientes.
-- `GrindFlow CI / validate`, privacidad, Sonar, CodeQL y CodeRabbit siguen siendo obligatorios para el HEAD final.
+- AC-01/02/03 tienen regresiones offline en `fast`; Factory CI y GrindFlow CI corren como checks paralelos.
+- `GrindFlow CI / validate`, política, ownership, privacidad, Sonar, CodeQL y CodeRabbit siguen siendo obligatorios para el HEAD final.
 - Merge, deploy y validación productiva permanecen estados separados.
 
 ## Qué sigue
@@ -91,7 +88,7 @@ flowchart LR
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #157 · decisiones + política Factory v1 | 🚧 candidata v0.1.130 |
-| **NEXT** | 🚧 #129 · siguiente slice Factory | 🚧 CI reusable en paralelo |
+| **NOW** | 🚧 #159 · CI reusable Factory v1 en paralelo | 🚧 candidata v0.1.131 |
+| **NEXT** | 🚧 #129 · siguiente slice Factory | 🚧 coordinación/etiquetas y release/observer |
 | **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + #146 media storage | ⛔ evidencia/configuración externa |
 | **LATER** | 🚧 #122 helper CodeRabbit + #138 Sentry | 🚧 preservados tras TANDA 2 |
