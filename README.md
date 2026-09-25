@@ -47,10 +47,10 @@
 ```mermaid
 flowchart LR
   A["main v0.1.135 · CI/Smoke aprobados"] --> P["#125 · catálogo Factory es"]
-  P --> F["Sync aditivo · CI / validate + Factory CI"]
-  F --> Q["Sonar + CodeQL + CodeRabbit"]
+  P --> Q["CI / validate + Factory CI · Sonar + CodeQL + CodeRabbit"]
   Q --> M["squash merge serial"]
-  M --> R["Factory Release v0.1.136"]
+  M --> F["Sync aditivo · etiquetas"]
+  F --> R["Factory Release v0.1.136"]
   M --> X["CI exact-main + Observer + Smoke"]
 ```
 
@@ -72,7 +72,7 @@ flowchart LR
 
 ## Validación
 - Regresión de catálogo coteja el conjunto completo con `TYPES | PRIORITIES | STATES` y preserva etiquetas legadas.
-- Sync en push main solo al cambiar labels JSON; verificar job real tras merge, no confundir existencia del catálogo con etiquetas remotas ya sincronizadas.
+- Sync en push a main al cambiar `.github/labels.json` **o** `.github/workflows/sincronizar-gobierno.yml`; verificar job real tras merge, no confundir catálogo con etiquetas remotas sincronizadas.
 - Registro independiente de CI exact-main, Observer y Smoke tras merge; #[146] media storage queda externamente bloqueado.
 
 ## Qué sigue
