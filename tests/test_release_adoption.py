@@ -6,6 +6,7 @@ el proyecto no copia ni relaja sus comprobaciones.
 
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -62,6 +63,51 @@ def validate_caller(source: str) -> None:
     if source != CANONICAL_CALLER:
         raise ValueError("caller de release diferente del aprobado")
 
+
+def observer_filter(source: str) -> str:
+    pattern = re.compile(r"^\s*'(?P<filter>type == \"object\".+\.commit == \$sha)'\s*\\\s*$")
+    for line in source.splitlines():
+        match = pattern.match(line)
+        if match is not None:
+            return match.group("filter")
+    raise ValueError("observer sin filtro jq exacto")
+
+
+def run_observer_filter(payload: object, expected_version: str, expected_sha: str, source: str) -> bool:
+    result = subprocess.run(
+        [
+            "jq",
+            "-e",
+            "--arg",
+            "expected",
+            expected_version,
+            "--arg",
+            "sha",
+            expected_sha,
+            observer_filter(source),
+        ],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def validate_observer(source: str) -> None:
+    required = (
+        '"${PRODUCTION_URL}/health?probe=${GITHUB_RUN_ID}-${attempt}"',
+        '--arg expected "$EXPECTED_VERSION"',
+        '--arg sha "$EXPECTED_SOURCE_SHA"',
+        '.status == "ok"',
+        '.version == $expected',
+        '.exact == true',
+        '.commit == $sha',
+    )
+    if any(token not in source for token in required):
+        raise ValueError("observer no exige health exacto de main")
+    if '/_deployment' in source or 'source == "release-only"' in source or '.exact == false' in source:
+        raise ValueError("observer no puede depender del marker release-only")
 
 class ReleaseAdoptionTests(unittest.TestCase):
     @classmethod
@@ -144,6 +190,56 @@ class ReleaseAdoptionTests(unittest.TestCase):
         self.assertIn("python3 -m unittest tests/test_release_adoption.py", ci)
         self.assertIn("name: validate", ci)
 
+
+    def test_observer_requires_exact_health_sha(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        validate_observer(observer)
+
+    def test_observer_rejects_release_only_marker(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        release_only = observer.replace('.exact == true and .commit == $sha', '.exact == false and .commit == null and .source == "release-only"')
+        self.assertNotEqual(release_only, observer)
+        with self.assertRaises(ValueError):
+            validate_observer(release_only)
+
+    def test_observer_does_not_use_deployment_marker(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        self.assertNotIn("/_deployment", observer)
+        self.assertIn("/health?probe=", observer)
+
+    def test_observer_filter_accepts_only_exact_health_identity(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        expected_version = "0.1.138"
+        expected_sha = "a" * 40
+        valid = {
+            "status": "ok",
+            "version": expected_version,
+            "exact": True,
+            "commit": expected_sha,
+        }
+        self.assertTrue(run_observer_filter(valid, expected_version, expected_sha, observer))
+
+        invalid = (
+            {**valid, "status": "degraded"},
+            {**valid, "version": "0.1.137"},
+            {**valid, "exact": False},
+            {**valid, "commit": "b" * 40},
+            [],
+            None,
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                self.assertFalse(run_observer_filter(payload, expected_version, expected_sha, observer))
+
+    def test_observer_summary_escapes_markdown_backticks(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        self.assertIn("printf '%s\\n' '- Expected release: `v%s`' \"$EXPECTED_VERSION\"", observer)
+        self.assertIn("printf '%s\\n' '- Expected main SHA: `%s`' \"$EXPECTED_SOURCE_SHA\"", observer)
+        self.assertNotIn('"- Expected release: `v${EXPECTED_VERSION}`"', observer)
+    def test_observer_exhaustion_fails_closed(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        self.assertIn("for attempt in $(seq 1 50); do", observer)
+        self.assertIn('[[ "$observed" == true ]] || exit 1', observer)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1002,12 +1002,14 @@ sola no implica que GitHub tenga un ruleset/required check configurado.
 
 ### Observacion de deploy y real-stack
 
-- GET `/_deployment` devuelve solo version humana y no usa base de datos:
-  `exact=false`, `commit=null`, `source=release-only`. Sin secretos,
-  detalle interno de hosting ni datos de usuarios.
-- `GrindFlow Deploy Observer` observa la version en Hostinger despues de cada
-  push a main, por separado del CI y Production Smoke. Solo permite afirmar
-  **DEPLOYED release**; nunca inferir el SHA remoto por version coincidente.
+- GET `/health` es la señal canónica de deploy: debe responder 200 con
+  `status=ok`, versión humana esperada, `exact=true` y el SHA Git exacto
+  desplegado. Un mismatch de versión/SHA o health degradado falla cerrado.
+- `GrindFlow Deploy Observer` espera esa evidencia exacta después de cada
+  push a main, por separado del CI y Production Smoke. Solo entonces permite
+  afirmar **EXACT DEPLOY OBSERVED** para ese SHA.
+- `/_deployment` puede conservarse como diagnóstico release-only mientras
+  exista, pero no es una dependencia operativa del observer ni prueba el SHA.
 - Los gates `browser` (SQLite) y `real-stack` (MariaDB 11.4) ejecutan el
   mismo recorrido autenticado sobre bases descartables; no usar Hostinger
   ni datos o credenciales reales para E2E con escrituras.
