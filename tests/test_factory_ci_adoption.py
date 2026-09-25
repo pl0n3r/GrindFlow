@@ -1,55 +1,24 @@
-"""Contratos del caller CI reusable Factory v1."""
+"""Contrato fail-closed del caller CI reusable Factory v1.
 
-import re
+El caller tiene un manifiesto pequeño y deliberadamente inmutable. Comparar
+su texto completo con la plantilla aprobada impide que claves YAML extra,
+comentarios con refs falsos o variaciones de espacios eludan los controles.
+"""
+
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_WORKFLOW = "name: CI Factory v1\n\non:\n  pull_request:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  factory:\n    name: Factory CI reusable\n    uses: pl0n3r/factory/.github/workflows/ci.yml@v1\n    with:\n      stack: laravel\n      domain: https://www.grindflow.com.co\n      version_source: config/version.php\n      label_language: es\n      phase: construccion\n      php_version: '8.5'\n      node_enabled: true\n      node_version: '24'\n      working_directory: .\n      kit_ref: v1\n"
 
 
 def validate_factory_ci_caller(text: str) -> None:
-    """Rechaza drift de eventos, permisos, referencia o inputs del caller."""
-    expected_prefix = """name: CI Factory v1
-
-on:
-  pull_request:
-    branches: [main]
-
-permissions:
-  contents: read
-
-jobs:
-"""
-    if not text.startswith(expected_prefix):
-        raise ValueError("eventos o permisos del caller CI Factory divergentes")
-    if "pull_request_target:" in text or re.search(r"^\s+push:", text, re.MULTILINE):
-        raise ValueError("caller CI Factory debe ser exclusivamente pull_request")
-    if re.search(r"(?m)^\s{2,}(issues|pull-requests|actions|checks|deployments):", text):
-        raise ValueError("caller CI Factory excede permisos mínimos")
-    if "contents: write" in text or "secrets: inherit" in text:
-        raise ValueError("caller CI Factory no puede escribir ni heredar secretos")
-    if text.count("pl0n3r/factory/.github/workflows/ci.yml@v1") != 1:
-        raise ValueError("caller CI Factory debe fijarse exactamente a @v1")
-    if re.search(r"ci\.yml@(main|master|HEAD|v\d+\.\d+\.\d+)", text):
-        raise ValueError("ref Factory no corresponde al canal mayor aprobado")
-
-    expected_inputs = {
-        "stack": "laravel",
-        "domain": "https://www.grindflow.com.co",
-        "version_source": "config/version.php",
-        "label_language": "es",
-        "phase": "construccion",
-        "php_version": "'8.5'",
-        "node_enabled": "true",
-        "node_version": "'24'",
-        "working_directory": ".",
-        "kit_ref": "v1",
-    }
-    for key, value in expected_inputs.items():
-        if not re.search(
-            rf"(?m)^\s{{6}}{re.escape(key)}:\s*{re.escape(value)}\s*$", text
-        ):
-            raise ValueError(f"input Factory inválido o ausente: {key}")
+    """Exige exactamente el caller aprobado; no busca subcadenas en comentarios."""
+    if text != CANONICAL_WORKFLOW:
+        raise ValueError(
+            "caller CI Factory diverge del manifiesto aprobado "
+            "(eventos, permisos, secretos, job, ref o inputs)"
+        )
 
 
 class FactoryCiAdoptionTests(unittest.TestCase):
@@ -66,20 +35,57 @@ class FactoryCiAdoptionTests(unittest.TestCase):
         validate_factory_ci_caller(self.workflow)
 
     def test_caller_rejects_event_permission_ref_and_input_drift(self):
-        variants = (
-            self.workflow.replace(
-                "  pull_request:\n    branches: [main]\n",
-                "  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n",
+        variants = {
+            "push": self.workflow.replace(
+                "    branches: [main]\n\npermissions:",
+                "    branches: [main]\n  push:\n    branches: [main]\n\npermissions:",
             ),
-            self.workflow.replace("  contents: read\n", "  contents: write\n"),
-            self.workflow.replace("ci.yml@v1", "ci.yml@main"),
-            self.workflow.replace("      stack: laravel\n", "      stack: php\n"),
-            self.workflow.replace("      phase: construccion\n", "      phase: live\n"),
-            self.workflow.replace("      node_enabled: true\n", "      node_enabled: false\n"),
-            self.workflow.replace("      kit_ref: v1\n", "      kit_ref: main\n"),
-        )
-        for candidate in variants:
-            with self.subTest(candidate=candidate):
+            "pull_request_target": self.workflow.replace(
+                "  pull_request:\n",
+                "  pull_request:\n  pull_request_target:\n",
+            ),
+            "write_permission": self.workflow.replace(
+                "  contents: read\n", "  contents: write\n"
+            ),
+            "inherit_secrets": self.workflow.replace(
+                "    with:\n", "    secrets: inherit\n    with:\n"
+            ),
+            "inherit_secrets_with_spaces": self.workflow.replace(
+                "    with:\n", "    secrets:  inherit\n    with:\n"
+            ),
+            "masked_ref_v2": self.workflow.replace(
+                "    uses: pl0n3r/factory/.github/workflows/ci.yml@v1\n",
+                "    # pl0n3r/factory/.github/workflows/ci.yml@v1\n"
+                "    uses: pl0n3r/factory/.github/workflows/ci.yml@v2\n",
+            ),
+            "floating_ref": self.workflow.replace(
+                "ci.yml@v1", "ci.yml@main"
+            ),
+            "wrong_stack": self.workflow.replace(
+                "      stack: laravel\n", "      stack: php\n"
+            ),
+            "live_phase": self.workflow.replace(
+                "      phase: construccion\n", "      phase: live\n"
+            ),
+            "disable_node": self.workflow.replace(
+                "      node_enabled: true\n", "      node_enabled: false\n"
+            ),
+            "floating_kit_ref": self.workflow.replace(
+                "      kit_ref: v1\n", "      kit_ref: main\n"
+            ),
+            "unexpected_secret_input": self.workflow.replace(
+                "      kit_ref: v1\n",
+                "      kit_ref: v1\n      extra: unsafe\n",
+            ),
+            "unexpected_job": self.workflow + (
+                "  unexpected:\n    runs-on: ubuntu-latest\n"
+                "    steps: []\n"
+            ),
+            "comment_only": self.workflow + "# allowed @v1, effective @v2\n",
+        }
+        for name, candidate in variants.items():
+            with self.subTest(name=name):
+                self.assertNotEqual(candidate, self.workflow)
                 with self.assertRaises(ValueError):
                     validate_factory_ci_caller(candidate)
 
