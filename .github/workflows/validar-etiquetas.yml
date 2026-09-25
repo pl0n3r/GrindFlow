@@ -1,0 +1,32 @@
+name: Etiquetas
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-etiquetas-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  etiquetas:
+    name: Etiquetas
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Leer validador de main, nunca código del PR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Validar clasificación de la PR
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$LABELS_JSON" | python3 scripts/validate-label-selection.py
