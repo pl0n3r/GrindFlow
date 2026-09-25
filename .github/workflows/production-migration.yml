@@ -1,8 +1,20 @@
 name: GrindFlow Production Migration
 
 on:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      expected_pending:
+        description: 'Exact pending migration count expected in production'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '7'
+      backup_verified:
+        description: 'Confirm a current verified production backup exists'
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: grindflow-production-migration
@@ -10,17 +22,13 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   migrate:
     name: production-migration
     if: >-
-      github.event.issue.number == 34 &&
-      github.event.issue.title == '[AUTO] Production Migration Bridge' &&
-      (github.event.comment.body == '/production-migrate 1' ||
-       github.event.comment.body == '/production-migrate 7 backup-verified') &&
-      github.event.comment.author_association == 'OWNER'
+      github.actor == github.repository_owner &&
+      inputs.backup_verified == true
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -28,7 +36,7 @@ jobs:
       E2E_USER_EMAIL: e2e-admin@grindflow.test
       E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
       OUTPUT_PATH: production-migration-result.json
-      EXPECTED_PENDING: ${{ github.event.comment.body == '/production-migrate 7 backup-verified' && '7' || '1' }}
+      EXPECTED_PENDING: ${{ inputs.expected_pending }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -86,11 +94,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Publish migration status
+      - name: Publish safe status to workflow summary
         if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
         shell: bash
         run: |
           if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
@@ -102,20 +107,17 @@ jobs:
           fi
 
           {
-            echo "Production migration request: **$state**"
+            echo "## Production migration"
             echo
+            echo "Status: **$state**"
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
             printf 'Artifact: `production-migration-%s`\n' "$GITHUB_RUN_ID"
             printf 'Approved pending count: **%s**\n' "$EXPECTED_PENDING"
+            echo "Verified backup confirmation: **required**"
             echo "Retention: **7 days**"
-            echo
-            printf '%s\n' 'This bridge runs only for the repository OWNER exact approved command: `/production-migrate 1` or `/production-migrate 7 backup-verified`.'
-            echo "It refuses to migrate if production reports a different pending count."
-          } > /tmp/grindflow-production-migration-status.md
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/grindflow-production-migration-status.md
-
-      - name: Fail after publishing migration status
+      - name: Fail after publishing safe status
         if: >-
           always() &&
           (
