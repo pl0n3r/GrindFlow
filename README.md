@@ -6,7 +6,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidata v0.1.136 · Issue #125.** Catálogo canónico Factory en español, con sincronización aditiva y sin borrar etiquetas legadas.
+> **Candidata v0.1.137 · Issue #125.** Aviso único editable y estado seguro por defecto para Issues, sin ejecutar código de PR.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -17,12 +17,12 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| SHA exacto de main (base) | ✅ **e0b5fd0d5a9f0b8128d1cf4cd99eb5ab03019019** | v0.1.135 fusionada (#166) |
-| Tag y GitHub Release (base) | ✅ **v0.1.135** | tag anotado apunta a main |
-| CI del SHA exacto de main (base) | ✅ **success** | validate job 107970916546 |
-| Deploy Observer base | ✅ **success** | job 107970273045 |
-| Production Smoke base | ✅ **success** | job 107970272778 |
-| Version objetivo | 🚧 **v0.1.136** | PHP, npm y lock en paridad |
+| SHA exacto de main (base) | ✅ **b920d87abf71d7d7aa9a55155adf85e1d71915af** | v0.1.136 fusionada (#167) |
+| Tag y GitHub Release (base) | ✅ **v0.1.136** | tag anotado apunta a main |
+| CI del SHA exacto de main (base) | ✅ **success** | validate job 107984926500 |
+| Deploy Observer base | ✅ **success** | job 107984688624 |
+| Production Smoke base | ✅ **success** | job 107984689135 |
+| Version objetivo | 🚧 **v0.1.137** | PHP, npm y lock en paridad |
 | CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de #125 |
 | Producción objetivo | 🚧 pendiente | verificación independiente tras merge |
 
@@ -37,7 +37,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · legacy** |
-| PR + snapshot exacto | **Issue #125 · v0.1.136**; diff y README deben coincidir con HEAD final |
+| PR + snapshot exacto | **Issue #125 · v0.1.137**; diff y README deben coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** conserva gates seleccionados + privacidad; Sonar, CodeQL y CodeRabbit separados |
 | Release Factory v1 | Solo push main; tag anotado y GitHub Release sin deploy productivo |
 | CI local canónico | `GrindFlow CI / validate` sigue obligatorio, Factory CI corre en paralelo |
@@ -50,16 +50,16 @@ flowchart LR
   P --> Q["CI / validate + Factory CI · Sonar + CodeQL + CodeRabbit"]
   Q --> M["squash merge serial"]
   M --> F["Sync aditivo · etiquetas"]
-  F --> R["Factory Release v0.1.136"]
+  F --> R["Factory Release v0.1.137"]
   M --> X["CI exact-main + Observer + Smoke"]
 ```
 
 ## Qué se hizo
-- Completa 22 etiquetas canónicas Factory v1 en `.github/labels.json`: 11 tipos, 4 prioridades (incluye `prioridad: baja`) y 7 estados.
-- Conserva los tres labels legados `calidad`, `seguridad` y `deuda técnica`, con sus descripciones/colores; no renombra Issues históricos.
-- Añade regresión de catálogo vs contrato local de validación, unicidad, colores y preservación de legacy.
-- El sincronizador existente solo **crea/actualiza**, nunca elimina etiquetas remotas.
-- No cambia automatización de herencia/comentarios/barrido ni garantiza branch protection; #125 permanece abierto.
+- El catálogo Factory v1 completo llegó en v0.1.136; ahora automatiza el estado inicial de Issues sin sobrescribir otros estados.
+- Un aviso con marcador se crea solo si falta clasificación y se edita si cambia la situación; Issues correctos no reciben comentarios.
+- Añade pruebas offline de dimensiones, estados existentes, aviso idempotente y contrato del workflow.
+- El workflow escucha solo eventos de Issues y ejecuta código confiable de main con permiso `issues: write` acotado al job.
+- No automatiza aún herencia PR/barrido diario ni garantiza branch protection; #125 permanece abierto.
 
 ## Archivos modificados en esta entrega candidata
 <!-- grindflow:changed-files -->
@@ -71,8 +71,8 @@ flowchart LR
 - `tests/test_label_selection_contract.py`
 
 ## Validación
-- Regresión de catálogo coteja el conjunto completo con `TYPES | PRIORITIES | STATES` y preserva etiquetas legadas.
-- Sync en push a main al cambiar `.github/labels.json` **o** `.github/workflows/sincronizar-gobierno.yml`; verificar job real tras merge, no confundir catálogo con etiquetas remotas sincronizadas.
+- Regresión offline verifica notificación estable, dimensiones canónicas y preservación del estado existente.
+- El aviso nuevo no corre sobre PR ni sobre comentarios; no crea comentario para Issues completamente etiquetados.
 - Registro independiente de CI exact-main, Observer y Smoke tras merge; #[146] media storage queda externamente bloqueado.
 
 ## Qué sigue
@@ -81,7 +81,7 @@ flowchart LR
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #125 · catálogo canónico | 🚧 candidata v0.1.136 |
+| **NOW** | 🚧 #125 · aviso único de Issues | 🚧 candidata v0.1.137 |
 | **NEXT** | 🚧 #125/#129 · herencia, barrido y deploy/rollback | 🚧 próximo slice |
 | **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + #146 media storage | ⛔ evidencia/configuración externa |
 | **LATER** | 🚧 #122 helper CodeRabbit + #138 Sentry | 🚧 preservados tras TANDA 2 |
