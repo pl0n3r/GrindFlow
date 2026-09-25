@@ -30,7 +30,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **8** | **+112** | **−70** | **+42** |
+| **9** | **+182** | **−78** | **+104** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -71,6 +71,7 @@ flowchart LR
 - `docs/DEPLOY-HOSTINGER.md`
 - `package-lock.json`
 - `package.json`
+- `scripts/workflow-syntax-check.rb`
 - `tests/test_release_adoption.py`
 
 ## Validación
