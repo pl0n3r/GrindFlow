@@ -76,6 +76,20 @@ class LabelSelectionTests(unittest.TestCase):
         self.assertIn(b"ERROR:", result.stderr)
         self.assertNotIn(b"Traceback", result.stderr)
 
+    def test_versioned_catalog_covers_validator_without_removing_legacy_labels(self):
+        catalog = json.loads((ROOT / ".github/labels.json").read_text(encoding="utf-8"))
+        names = [item["name"] for item in catalog]
+        expected = module.TYPES | module.PRIORITIES | module.STATES
+        self.assertEqual(len(names), len(set(names)))
+        self.assertTrue(expected <= set(names))
+        self.assertIn("prioridad: baja", names)
+        self.assertTrue({"calidad", "seguridad", "deuda técnica"} <= set(names))
+        for item in catalog:
+            with self.subTest(label=item["name"]):
+                self.assertEqual(set(item), {"name", "color", "description"})
+                self.assertRegex(item["color"], r"^[0-9A-Fa-f]{6}$")
+                self.assertTrue(item["description"].strip())
+
     def test_fast_ci_executes_contract(self):
         ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")
         self.assertIn("python3 -m unittest tests/test_label_selection_contract.py", ci)
