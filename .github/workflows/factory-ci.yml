@@ -1,0 +1,24 @@
+name: CI Factory v1
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  factory:
+    name: Factory CI reusable
+    uses: pl0n3r/factory/.github/workflows/ci.yml@v1
+    with:
+      stack: laravel
+      domain: https://www.grindflow.com.co
+      version_source: config/version.php
+      label_language: es
+      phase: construccion
+      php_version: '8.5'
+      node_enabled: true
+      node_version: '24'
+      working_directory: .
+      kit_ref: v1

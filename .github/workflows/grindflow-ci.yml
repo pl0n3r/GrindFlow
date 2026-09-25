@@ -162,6 +162,7 @@ jobs:
           test -f scripts/decision-owner-gate.py
           test -f .github/workflows/politica.yml
           test -f .github/workflows/decision-owner.yml
+          test -f .github/workflows/factory-ci.yml
           if [[ -f composer.json ]]; then
             test -f composer.lock
           fi
@@ -222,7 +223,7 @@ jobs:
           python3 scripts/validate-governance.py --self-test
           python3 scripts/validate-governance.py
           python3 -m py_compile scripts/decision-owner-gate.py
-          python3 -m unittest tests/test_decision_owner_gate.py tests/test_factory_policy_adoption.py
+          python3 -m unittest tests/test_decision_owner_gate.py tests/test_factory_policy_adoption.py tests/test_factory_ci_adoption.py
           python3 -m py_compile scripts/release-version.py
           python3 scripts/release-version.py --self-test
           python3 -m py_compile scripts/production-migration-inventory.py
