@@ -98,8 +98,10 @@ class ReleaseAdoptionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_caller(candidate)
         with self.assertRaises(ValueError):
-            validate_caller(self.caller +    def test_product_version_and_npm_lock_match(self):
-        php_version = re.search(r"""['"]number['"]\\s*=>\\s*['"]([^'"]+)['"]""", self.php)
+            validate_caller(self.caller + "  unexpected:\n    runs-on: ubuntu-latest\n")
+
+    def test_product_version_and_npm_lock_match(self):
+        php_version = re.search(r"""['"]number['"]\s*=>\s*['"]([^'"]+)['"]""", self.php)
         self.assertIsNotNone(php_version)
         expected = php_version.group(1)
         self.assertIsNotNone(SEMVER.fullmatch(expected))
@@ -136,8 +138,6 @@ class ReleaseAdoptionTests(unittest.TestCase):
             with self.subTest(package=package[:70], lock=lock[:70]):
                 with self.assertRaises(ValueError):
                     release_version(self.php, package, lock)
-
-       release_version(self.php, package, lock)
 
     def test_grindflow_ci_runs_release_contract_without_removing_validate(self):
         ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")
