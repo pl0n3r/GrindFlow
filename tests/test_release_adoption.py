@@ -6,6 +6,7 @@ el proyecto no copia ni relaja sus comprobaciones.
 
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -61,6 +62,36 @@ def validate_caller(source: str) -> None:
     """Comprueba manifiesto efectivo íntegro; ignora coincidencias en comentarios."""
     if source != CANONICAL_CALLER:
         raise ValueError("caller de release diferente del aprobado")
+
+
+def observer_filter(source: str) -> str:
+    pattern = re.compile(r"^\s*'(?P<filter>type == \"object\".+\.commit == \$sha)'\s*\\\s*$")
+    for line in source.splitlines():
+        match = pattern.match(line)
+        if match is not None:
+            return match.group("filter")
+    raise ValueError("observer sin filtro jq exacto")
+
+
+def run_observer_filter(payload: object, expected_version: str, expected_sha: str, source: str) -> bool:
+    result = subprocess.run(
+        [
+            "jq",
+            "-e",
+            "--arg",
+            "expected",
+            expected_version,
+            "--arg",
+            "sha",
+            expected_sha,
+            observer_filter(source),
+        ],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def validate_observer(source: str) -> None:
@@ -175,6 +206,35 @@ class ReleaseAdoptionTests(unittest.TestCase):
         observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
         self.assertNotIn("/_deployment", observer)
         self.assertIn("/health?probe=", observer)
+
+    def test_observer_filter_accepts_only_exact_health_identity(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        expected_version = "0.1.138"
+        expected_sha = "a" * 40
+        valid = {
+            "status": "ok",
+            "version": expected_version,
+            "exact": True,
+            "commit": expected_sha,
+        }
+        self.assertTrue(run_observer_filter(valid, expected_version, expected_sha, observer))
+
+        invalid = (
+            {**valid, "status": "degraded"},
+            {**valid, "version": "0.1.137"},
+            {**valid, "exact": False},
+            {**valid, "commit": "b" * 40},
+            [],
+            None,
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                self.assertFalse(run_observer_filter(payload, expected_version, expected_sha, observer))
+
+    def test_observer_exhaustion_fails_closed(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        self.assertIn("for attempt in $(seq 1 50); do", observer)
+        self.assertIn('[[ "$observed" == true ]] || exit 1', observer)
 
 if __name__ == "__main__":
     unittest.main()
