@@ -51,6 +51,8 @@ flowchart LR
   Q --> M["squash merge serial"]
   M --> R["Factory Release v0.1.138"]
   M --> X["Observer exacto SHA + Production Smoke"]
+  R -. "metadata release" .-> Z["GitHub tag/release"]
+  X -. "validación producción" .-> Y["GREEN"]
 ```
 
 ## Qué se hizo
