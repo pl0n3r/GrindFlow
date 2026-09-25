@@ -91,9 +91,10 @@ class ReleaseAdoptionTests(unittest.TestCase):
         )
         for old, new in mutations:
             with self.subTest(old=old, new=new):
-                self.assertIn(old, self.caller)
+                candidate = self.caller.replace(old, new, 1)
+                self.assertNotEqual(candidate, self.caller)
                 with self.assertRaises(ValueError):
-                    validate_caller(self.caller.replace(old, new, 1))
+                    validate_caller(candidate)
         with self.assertRaises(ValueError):
             validate_caller(self.caller + "  unexpected:\n    runs-on: ubuntu-latest\n")
 
