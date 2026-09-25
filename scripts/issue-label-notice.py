@@ -84,7 +84,7 @@ def main() -> int:
     if not isinstance(issue, dict) or "pull_request" in issue:
         raise ValueError("Expected an Issue, not a pull request")
     names = names_of(issue)
-    if not names & STATES and not any(re.match(r"^estado\\s*[:：]", n, re.IGNORECASE) and n not in STATES for n in names):
+    if not names & STATES and not any(re.match(r"^estado\s*[:：]", n, re.IGNORECASE) and n not in STATES for n in names):
         gh("--method", "POST", endpoint + "/labels", "-f", "labels[]=" + DEFAULT_STATE)
         issue = gh(endpoint)
         names = names_of(issue)
