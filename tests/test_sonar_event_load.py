@@ -11,6 +11,7 @@ def validate_relay(source: str) -> None:
     required = (
         "  check_run:\n    types: [completed]\n",
         "github.event.check_run.app.slug == 'sonarqubecloud'",
+        " == 'sonarqubecloud' &&",
         "github.event.check_run.name == 'SonarCloud Code Analysis'",
         "    timeout-minutes: 5\n",
         "    concurrency:\n      group: grindflow-sonar-relay-${{ github.event.check_run.id }}\n"
@@ -41,6 +42,7 @@ class SonarRelayLoadTests(unittest.TestCase):
             ("    types: [completed]", "    types: [created, completed]"),
             ("github.event.check_run.app.slug == 'sonarqubecloud'", "true"),
             ("github.event.check_run.name == 'SonarCloud Code Analysis'", "true"),
+            (" == 'sonarqubecloud' &&", " == 'sonarqubecloud' ||"),
             ("grindflow-sonar-relay-${{ github.event.check_run.id }}",
              "grindflow-sonar-relay"),
             ("      cancel-in-progress: true", "      cancel-in-progress: false"),
