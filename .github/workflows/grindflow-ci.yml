@@ -224,6 +224,7 @@ jobs:
           python3 scripts/validate-governance.py
           python3 -m py_compile scripts/decision-owner-gate.py
           python3 -m unittest tests/test_decision_owner_gate.py tests/test_factory_policy_adoption.py tests/test_factory_ci_adoption.py
+          python3 -m unittest tests/test_factory_deploy_adapters.py
           python3 -m unittest tests/test_release_adoption.py
           python3 -m py_compile scripts/release-version.py
           python3 scripts/release-version.py --self-test
