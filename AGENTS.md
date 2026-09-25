@@ -240,6 +240,12 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Cuando un cambio concurrente llegue a main, reexaminar la base antes de
   integrar para evitar sobrescribir fixes o duplicar versiones.
 
+### Versionado GitHub Release (Factory v1)
+
+- Cada PR deploy-bound incrementa una sola vez `config/version.php` y sincroniza `package.json` y ambas versiones de raíz de `package-lock.json`, sin tocar las resoluciones de dependencias.
+- Nunca crear tags ni GitHub Releases de GrindFlow a mano. El caller `.github/workflows/tag-release.yml` en `push` a `main` invoca `release.yml@v1` de Factory. No despliega, migra ni sustituye CI/Smoke/Observer.
+- Si un tag apunta a otro SHA, detenerse y corregir versión mediante otro PR. **Nunca mover tags**; un reintento de release conserva el evento `push` y el SHA original.
+
 ### Regla de releases pequeñas, visibles y comprobables
 
 - Entregar cambios acotados que el propietario pueda comprobar en cada
