@@ -231,6 +231,11 @@ class ReleaseAdoptionTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 self.assertFalse(run_observer_filter(payload, expected_version, expected_sha, observer))
 
+    def test_observer_summary_escapes_markdown_backticks(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        self.assertIn("printf '%s\\n' '- Expected release: `v%s`' \"$EXPECTED_VERSION\"", observer)
+        self.assertIn("printf '%s\\n' '- Expected main SHA: `%s`' \"$EXPECTED_SOURCE_SHA\"", observer)
+        self.assertNotIn('"- Expected release: `v${EXPECTED_VERSION}`"', observer)
     def test_observer_exhaustion_fails_closed(self):
         observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
         self.assertIn("for attempt in $(seq 1 50); do", observer)

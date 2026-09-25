@@ -60,10 +60,10 @@ jobs:
           {
             echo '## GrindFlow exact production observation'
             echo
-            printf '%s\n' "- Expected release: `v${EXPECTED_VERSION}`"
-            printf '%s\n' "- Expected main SHA: `${EXPECTED_SOURCE_SHA}`"
+            printf '%s\n' '- Expected release: `v%s`' "$EXPECTED_VERSION"
+            printf '%s\n' '- Expected main SHA: `%s`' "$EXPECTED_SOURCE_SHA"
             if [[ "$observed" == true ]]; then
-              printf '%s\n' "- Exact Hostinger checkout: `${EXPECTED_SOURCE_SHA}`"
+              printf '%s\n' '- Exact Hostinger checkout: `%s`' "$EXPECTED_SOURCE_SHA"
               echo '- State: **EXACT DEPLOY OBSERVED**'
             else
               echo '- Exact Hostinger checkout: **NOT OBSERVED**'
