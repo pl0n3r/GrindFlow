@@ -30,13 +30,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **6** | **+124** | **−39** | **+85** |
+| **8** | **+227** | **−21** | **+206** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · legacy** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | PR + snapshot exacto | **Issue #125 · v0.1.137**; diff y README deben coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** conserva gates seleccionados + privacidad; Sonar, CodeQL y CodeRabbit separados |
 | Release Factory v1 | Solo push main; tag anotado y GitHub Release sin deploy productivo |
@@ -46,10 +46,10 @@
 ## Flujo de entrega
 ```mermaid
 flowchart LR
-  A["main v0.1.135 · CI/Smoke aprobados"] --> P["#125 · catálogo Factory es"]
+  A["main v0.1.136 · CI/Smoke aprobados"] --> P["#125 · aviso único para Issues"]
   P --> Q["CI / validate + Factory CI · Sonar + CodeQL + CodeRabbit"]
   Q --> M["squash merge serial"]
-  M --> F["Sync aditivo · etiquetas"]
+  M --> F["Issue notice · estado seguro"]
   F --> R["Factory Release v0.1.137"]
   M --> X["CI exact-main + Observer + Smoke"]
 ```
@@ -63,12 +63,14 @@ flowchart LR
 
 ## Archivos modificados en esta entrega candidata
 <!-- grindflow:changed-files -->
-- `.github/labels.json`
+- `.github/workflows/aviso-etiquetas-issues.yml`
+- `.github/workflows/grindflow-ci.yml`
 - `README.md`
 - `config/version.php`
 - `package-lock.json`
 - `package.json`
-- `tests/test_label_selection_contract.py`
+- `scripts/issue-label-notice.py`
+- `tests/test_issue_label_notice.py`
 
 ## Validación
 - Regresión offline verifica notificación estable, dimensiones canónicas y preservación del estado existente.
