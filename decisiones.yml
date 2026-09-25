@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "review_round_limit": 3,
+  "decisions": [
+    {
+      "id": "D-055",
+      "status": "active",
+      "text": "Durante fase construccion GrindFlow permite escrituras autonomas rutinarias y reversibles en produccion con trazabilidad, backup previo y recuperacion viable; SQL destructivo o borrado irreversible requiere autorizacion explicita del propietario."
+    },
+    {
+      "id": "D-056",
+      "status": "active",
+      "text": "GrindFlow adopta el kit Factory por releases versionados y evidencia de version/SHA exactos; un merge o una version visible no demuestra por si sola despliegue ni validacion productiva."
+    },
+    {
+      "id": "D-057",
+      "status": "active",
+      "text": "Todo Issue y Pull Request debe tener exactamente una etiqueta de tipo, una de prioridad y una de estado conforme al catalogo vigente del proyecto."
+    },
+    {
+      "id": "D-058",
+      "status": "active",
+      "text": "Cada tarea declara y aplica los roles profesionales que exige; la automatizacion no debe generar trabajo manual evitable para el propietario."
+    },
+    {
+      "id": "D-059",
+      "status": "active",
+      "text": "Todo cambio que agregue, modifique o elimine datos personales, formularios que los recojan o proveedores que los reciban actualiza datos.yml y documentos derivados en el mismo PR; nuevas finalidades, datos sensibles o nuevos proveedores receptores requieren la puerta legal correspondiente."
+    },
+    {
+      "id": "D-060",
+      "status": "active",
+      "text": "El stack objetivo aprobado de GrindFlow es Symfony 7.4 con Doctrine/MariaDB, React/TypeScript/Vite para administracion y Twig/SSR para publico; Laravel y el legado coexisten solo hasta paridad y cutover comprobados."
+    }
+  ]
+}
