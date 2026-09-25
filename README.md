@@ -22,7 +22,7 @@
 | CI del SHA exacto de main (base) | ✅ **success** | validate job 107965159419 |
 | Deploy Observer base | ✅ **success** | job 107964502805 |
 | Production Smoke base | ✅ **success** | job 107964502236 |
-| Versión objetivo | 🚧 **v0.1.135** | PHP, npm y lock en paridad |
+| Version objetivo | 🚧 **v0.1.135** | PHP, npm y lock en paridad |
 | CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de #125 |
 | Producción objetivo | 🚧 pendiente | verificación independiente tras merge |
 
