@@ -63,6 +63,21 @@ def validate_caller(source: str) -> None:
         raise ValueError("caller de release diferente del aprobado")
 
 
+def validate_observer(source: str) -> None:
+    required = (
+        '"${PRODUCTION_URL}/health?probe=${GITHUB_RUN_ID}-${attempt}"',
+        '--arg expected "$EXPECTED_VERSION"',
+        '--arg sha "$EXPECTED_SOURCE_SHA"',
+        '.status == "ok"',
+        '.version == $expected',
+        '.exact == true',
+        '.commit == $sha',
+    )
+    if any(token not in source for token in required):
+        raise ValueError("observer no exige health exacto de main")
+    if '/_deployment' in source or 'source == "release-only"' in source or '.exact == false' in source:
+        raise ValueError("observer no puede depender del marker release-only")
+
 class ReleaseAdoptionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -144,6 +159,22 @@ class ReleaseAdoptionTests(unittest.TestCase):
         self.assertIn("python3 -m unittest tests/test_release_adoption.py", ci)
         self.assertIn("name: validate", ci)
 
+
+    def test_observer_requires_exact_health_sha(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        validate_observer(observer)
+
+    def test_observer_rejects_release_only_marker(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        release_only = observer.replace('.exact == true and .commit == $sha', '.exact == false and .commit == null and .source == "release-only"')
+        self.assertNotEqual(release_only, observer)
+        with self.assertRaises(ValueError):
+            validate_observer(release_only)
+
+    def test_observer_does_not_use_deployment_marker(self):
+        observer = (ROOT / ".github/workflows/production-deploy-observer.yml").read_text(encoding="utf-8")
+        self.assertNotIn("/_deployment", observer)
+        self.assertIn("/health?probe=", observer)
 
 if __name__ == "__main__":
     unittest.main()

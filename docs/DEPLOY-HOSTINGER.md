@@ -202,14 +202,17 @@ curl -f https://www.grindflow.com.co/up
 El endpoint `/up` prueba que Laravel puede arrancar. No prueba por si solo
 autenticacion, MariaDB ni comportamiento multi-tenant.
 
-## Observación de release pública (sin SHA remoto)
+## Observación exacta del deploy
 
-GET `/_deployment` devuelve versión humana desde `config/version.php`, con
-`Cache-Control: no-store`, `exact=false`, `commit=null` y
-`source=release-only`, sin consultar base de datos ni revelar configuración.
+GET `/health` es la señal canónica del checkout desplegado. El observer exige
+HTTP 200, `status=ok`, la versión de `config/version.php`, `exact=true` y
+`commit` igual al SHA exacto de `main` que disparó el workflow.
 
-`GrindFlow Deploy Observer` consulta esta URL después de cada push a main.
-Cuando ve la versión esperada puede informar **DEPLOYED release observed**,
-pero el SHA mostrado por GitHub sigue siendo **fuente**, no checkout remoto
-confirmado. Una futura señal de SHA exacto requiere evidencia verificada del
-servidor, no inferencia a partir de la versión.
+`GrindFlow Deploy Observer` consulta `/health` después de cada push a main
+hasta observar ese SHA o agotar el timeout. No escribe en producción ni usa
+credenciales. Si Hostinger aún sirve otro checkout, el workflow falla cerrado.
+
+`/_deployment` puede seguir devolviendo información release-only sin SHA para
+diagnóstico mientras exista, pero ya no participa en la decisión de deploy.
+Production Smoke permanece como señal autenticada separada de validación
+funcional después de confirmar el checkout exacto.

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   observe:
-    name: release-deploy-marker
+    name: exact-health-deploy
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -24,7 +24,7 @@ jobs:
       EXPECTED_SOURCE_SHA: ${{ github.sha }}
     steps:
       - name: Check out exact main source
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Read expected human release
@@ -34,34 +34,41 @@ jobs:
           version="$(php -r '$v = require "config/version.php"; echo $v["number"];')"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           echo "EXPECTED_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Observe release marker without production writes
+      - name: Observe exact deployed checkout without production writes
         shell: bash
         run: |
           set -euo pipefail
           observed=false
+          health_body="$(mktemp)"
+          trap 'rm -f "$health_body"' EXIT
           for attempt in $(seq 1 50); do
-            payload="$(curl -fsS --connect-timeout 3 --max-time 5 \
+            status="$(curl --silent --show-error --connect-timeout 3 --max-time 5 \
+              --output "$health_body" \
+              --write-out '%{http_code}' \
               -H 'Cache-Control: no-cache' \
-              "${PRODUCTION_URL}/_deployment?probe=${GITHUB_RUN_ID}-${attempt}" || true)"
-            if jq -e --arg expected "$EXPECTED_VERSION" \
-              'type == "object" and .version == $expected and .exact == false and .commit == null and .source == "release-only"' \
-              <<< "$payload" >/dev/null 2>&1; then
+              "${PRODUCTION_URL}/health?probe=${GITHUB_RUN_ID}-${attempt}" || true)"
+            if [[ "$status" == "200" ]] && jq -e \
+              --arg expected "$EXPECTED_VERSION" \
+              --arg sha "$EXPECTED_SOURCE_SHA" \
+              'type == "object" and .status == "ok" and .version == $expected and .exact == true and .commit == $sha' \
+              "$health_body" >/dev/null 2>&1; then
               observed=true
               break
             fi
             if [[ "$attempt" -lt 50 ]]; then sleep 8; fi
           done
           {
-            echo '## GrindFlow production release observation'
+            echo '## GrindFlow exact production observation'
             echo
-            echo "- Expected release: \`v$EXPECTED_VERSION\`"
-            echo "- Expected source SHA from GitHub: \`$EXPECTED_SOURCE_SHA\`"
-            echo '- Hostinger checkout SHA: **NOT OBSERVED**'
+            echo "- Expected release: `v$EXPECTED_VERSION`"
+            echo "- Expected main SHA: `$EXPECTED_SOURCE_SHA`"
             if [[ "$observed" == true ]]; then
-              echo '- State: **DEPLOYED RELEASE OBSERVED** (not functional validation)'
+              echo "- Exact Hostinger checkout: `$EXPECTED_SOURCE_SHA`"
+              echo '- State: **EXACT DEPLOY OBSERVED**'
             else
-              echo '- State: **RELEASE NOT OBSERVED** (check hPanel Git connection, branch and propagation)'
+              echo '- Exact Hostinger checkout: **NOT OBSERVED**'
+              echo '- State: **EXACT DEPLOY NOT OBSERVED** (check hPanel Git propagation and /health)'
             fi
-            echo '- Production Smoke is a separate authenticated/read-only signal.'
+            echo '- Production Smoke remains the separate authenticated functional signal.'
           } >> "$GITHUB_STEP_SUMMARY"
           [[ "$observed" == true ]] || exit 1
