@@ -1,0 +1,70 @@
+name: Barrido diario de etiquetas
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '29 6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-label-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Leer planner de main confiable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Construir reporte sanitizado de metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$REPOSITORY/issues?state=open&per_page=100" --slurp \
+            | jq --arg marker '<!-- grindflow:label-sweep:v1 -->' '[(add // [])[] | {
+                number,
+                title,
+                user: {login: .user.login},
+                labels: [.labels[]? | {name}],
+                body: (if ((.body // "") | startswith($marker)) then $marker else "" end)
+              } + (if .pull_request then {pull_request: true} else {} end)]' > /tmp/items.json
+          python3 scripts/label-sweep.py < /tmp/items.json > /tmp/report.json
+
+      - name: Reconciliar un único Issue automático
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          count="$(jq -r '.count' /tmp/report.json)"
+          existing="$(jq -r '.existing_number // empty' /tmp/report.json)"
+          jq -r '.duplicate_numbers[]' /tmp/report.json | while IFS= read -r duplicate; do
+            [[ "$duplicate" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Issue duplicado inválido"; exit 1; }
+            gh issue close "$duplicate" --repo "$REPOSITORY"               --comment 'Cerrado por barrido idempotente: existe otro reporte canónico activo.' >/dev/null
+          done
+          jq -r '.body' /tmp/report.json > /tmp/body.md
+
+          if [[ "$count" -gt 0 ]]; then
+            if [[ -n "$existing" ]]; then
+              gh issue edit "$existing" --repo "$REPOSITORY" --body-file /tmp/body.md >/dev/null
+            else
+              gh issue create --repo "$REPOSITORY"                 --title '[AUTO] Ítems sin etiquetas'                 --body-file /tmp/body.md                 --label 'tipo: documentación'                 --label 'prioridad: media'                 --label 'estado: disponible' >/dev/null
+            fi
+          elif [[ -n "$existing" ]]; then
+            gh issue close "$existing" --repo "$REPOSITORY"               --comment '🟢 Barrido de etiquetas: cero ítems abiertos con clasificación incompleta.' >/dev/null
+          fi
