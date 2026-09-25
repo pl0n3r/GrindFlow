@@ -9,7 +9,31 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_WORKFLOW = "name: CI Factory v1\n\non:\n  pull_request:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  factory:\n    name: Factory CI reusable\n    uses: pl0n3r/factory/.github/workflows/ci.yml@v1\n    with:\n      stack: laravel\n      domain: https://www.grindflow.com.co\n      version_source: config/version.php\n      label_language: es\n      phase: construccion\n      php_version: '8.5'\n      node_enabled: true\n      node_version: '24'\n      working_directory: .\n      kit_ref: v1\n"
+CANONICAL_WORKFLOW = """name: CI Factory v1
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  factory:
+    name: Factory CI reusable
+    uses: pl0n3r/factory/.github/workflows/ci.yml@v1
+    with:
+      stack: laravel
+      domain: https://www.grindflow.com.co
+      version_source: config/version.php
+      label_language: es
+      phase: construccion
+      php_version: '8.5'
+      node_enabled: true
+      node_version: '24'
+      working_directory: .
+      kit_ref: v1
+"""
 
 
 def validate_factory_ci_caller(text: str) -> None:
