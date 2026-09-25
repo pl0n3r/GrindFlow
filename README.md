@@ -30,13 +30,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **9** | **+182** | **−78** | **+104** |
+| **9** | **+183** | **−78** | **+105** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · legacy** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy** |
 | PR + snapshot exacto | **Issue #169 · v0.1.138**; diff y README deben coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** conserva gates seleccionados + privacidad; Sonar, CodeQL y CodeRabbit separados |
 | Release Factory v1 | Solo push main; tag anotado y GitHub Release sin sustituir validación productiva |
