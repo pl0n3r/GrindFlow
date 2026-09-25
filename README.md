@@ -23,21 +23,21 @@
 | Deploy Observer base | ✅ **success** | run `36081267653` |
 | Production Smoke base | ✅ **success** | autenticado, checkout exacto |
 | Version objetivo | 🚧 **v0.1.131** | `config/version.php` |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #160 |
+| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final de PR #161 |
 | Producción objetivo | 🚧 pendiente | solo tras merge + exact-main + observer + smoke |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **7** | **+167** | **−33** | **+134** |
+| **7** | **+197** | **−33** | **+164** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **PR #160 / Issue #159 · v0.1.131**; diff y README deben coincidir con el HEAD final |
+| PR + snapshot exacto | **PR #161 / Issue #159 · v0.1.131**; diff y README deben coincidir con el HEAD final |
 | Gate agregador obligatorio | **validate** mantiene todos los gates seleccionados + privacy-as-code; Sonar, CodeQL y CodeRabbit separados |
 | Política Factory | `politica.yml@v1` sigue validando decisiones; **CI Factory v1** corre además como check paralelo |
 | CI local canónico | `GrindFlow CI / validate` permanece obligatorio; Factory CI todavía no lo sustituye |
