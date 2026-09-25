@@ -16,6 +16,10 @@ jobs:
       github.event.check_run.app.slug == 'sonarqubecloud' &&
       github.event.check_run.name == 'SonarCloud Code Analysis'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: grindflow-sonar-relay-${{ github.event.check_run.id }}
+      cancel-in-progress: true
     steps:
       - name: Checkout trusted default branch
         uses: actions/checkout@v5
