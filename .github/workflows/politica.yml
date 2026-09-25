@@ -1,0 +1,16 @@
+name: Política Factory v1
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  factory-policy:
+    name: Factory policy
+    uses: pl0n3r/factory/.github/workflows/politica.yml@v1
+    with:
+      pr_number: ${{ github.event.pull_request.number }}

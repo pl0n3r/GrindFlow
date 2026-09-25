@@ -1,0 +1,61 @@
+name: Decisiones del propietario
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: grindflow-owner-decisions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  owner-decisions:
+    name: Owner decisions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted gate from base
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .trusted
+          sparse-checkout: |
+            decisiones.yml
+            scripts/decision-owner-gate.py
+          persist-credentials: false
+
+      - name: Checkout candidate policy as data only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .candidate
+          sparse-checkout: decisiones.yml
+          persist-credentials: false
+
+      - name: Enforce owner decisions from trusted code
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GF_REPOSITORY: ${{ github.repository }}
+          GF_PR: ${{ github.event.pull_request.number }}
+          GF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .trusted/scripts/decision-owner-gate.py
+          test -f .candidate/decisiones.yml
+          rm -rf .policy-input
+          mkdir -p .policy-input/.decision-base
+          cp .candidate/decisiones.yml .policy-input/decisiones.yml
+          if [[ -f .trusted/decisiones.yml ]]; then
+            cp .trusted/decisiones.yml .policy-input/.decision-base/decisiones.yml
+          fi
+          cd .policy-input
+          gh api --paginate "repos/$GF_REPOSITORY/issues/$GF_PR/comments?per_page=100" --jq '.[] | @json' \
+            | python3 ../.trusted/scripts/decision-owner-gate.py \
+                --head-sha "$GF_HEAD_SHA" \
+                --owner pl0n3r

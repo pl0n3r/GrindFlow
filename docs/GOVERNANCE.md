@@ -71,6 +71,43 @@ puede tratarse como excepción documentada.
 Caso que motivó el cambio: PR #72 se fusionó mientras CodeRabbit continuaba
 procesando. Véase el procedimiento operativo en [AGENTS.md](../AGENTS.md).
 
+
+## Decisiones del propietario como código
+
+`decisiones.yml` es la capa machine-readable de decisiones durables aplicables a
+GrindFlow. Su esquema es compatible con Factory v1 y fija
+`review_round_limit=3`.
+
+El reusable `pl0n3r/factory/.github/workflows/politica.yml@v1` valida la forma
+del archivo y el límite de rondas automáticas, pero **no prueba por sí solo quién
+autorizó un cambio semántico**. GrindFlow añade por eso
+`.github/workflows/decision-owner.yml`, ejecutado con `pull_request_target`:
+el workflow y `scripts/decision-owner-gate.py` se cargan exclusivamente desde
+el **base SHA protegido**, mientras el `decisiones.yml` del HEAD se trata solo
+como datos no confiables. El CI controlado por el PR conserva únicamente las
+regresiones offline y no posee la compuerta privilegiada.
+
+Este PR constituye el bootstrap: como el workflow protegido y la política
+machine-readable todavía no existen en su base, la protección comienza para
+los cambios semánticos **posteriores a su merge**. Desde entonces borrar,
+agregar, sustituir, superseder o editar una decisión requiere un comentario del
+propietario asociado al SHA exacto:
+
+```html
+<!-- grindflow-decision-approval {"sha":"<HEAD exacto>"} -->
+```
+
+El gate acepta ese marker únicamente en un comentario cuyo autor sea
+`pl0n3r` con `author_association=OWNER`. Los agentes **no crean ese marker
+sin una aprobación explícita del propietario**. Es evidencia de protocolo
+auditable ligada al HEAD, no una separación criptográfica de identidad; la
+protección real del merge depende además de que **Owner decisions** y los demás
+checks obligatorios sigan requeridos por la configuración de GitHub.
+
+Los cambios de formato sin cambio semántico no requieren una nueva decisión.
+Una modificación del archivo base inválido, un SHA no resoluble, comentarios
+malformados o una aprobación para otro HEAD fallan cerrado.
+
 ## Seguridad y estados
 
 Respetar la secuencia: IMPLEMENTADO → VALIDADO EN CÓDIGO → DESPLEGADO → VALIDADO EN PRODUCCIÓN. No saltar etapas. Nunca ejecutar migraciones productivas, reseteos, uploads externos, cambios irreversibles o pruebas E2E con datos reales por copiar prácticas de otro proyecto. Gobierno GitHub usa permisos mínimos solo para labels; cualquier protección/ruleset de `main` que exija acceso administrativo queda documentada como dependencia externa, no se simula.
