@@ -21,6 +21,7 @@ permissions:
 
 concurrency:
   group: grindflow-tag-release-${{ github.ref }}
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -88,6 +89,7 @@ class ReleaseAdoptionTests(unittest.TestCase):
             ("      version_format: php-array\n", "      version_format: php-const\n"),
             ("      version_source: config/version.php\n", "      version_source: config/version.json\n"),
             ("      contents: write\n", "      contents: write\n      issues: write\n"),
+            ("  queue: max\n", ""),
         )
         for old, new in mutations:
             with self.subTest(old=old, new=new):
@@ -96,28 +98,46 @@ class ReleaseAdoptionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_caller(candidate)
         with self.assertRaises(ValueError):
-            validate_caller(self.caller + "  unexpected:\n    runs-on: ubuntu-latest\n")
-
-    def test_product_version_and_npm_lock_match(self):
-        self.assertEqual(release_version(self.php, self.package, self.lock), "0.1.132")
+            validate_caller(self.caller +    def test_product_version_and_npm_lock_match(self):
+        php_version = re.search(r"""['"]number['"]\\s*=>\\s*['"]([^'"]+)['"]""", self.php)
+        self.assertIsNotNone(php_version)
+        expected = php_version.group(1)
+        self.assertIsNotNone(SEMVER.fullmatch(expected))
+        self.assertEqual(release_version(self.php, self.package, self.lock), expected)
 
     def test_invalid_semver_missing_key_and_npm_drift_fail(self):
-        for invalid_php in (
-            self.php.replace("'0.1.132'", "'01.1.132'"),
-            self.php.replace("'number'", "'version'"),
-            self.php.replace("'0.1.132'", "'invalid'"),
-        ):
-            with self.subTest(php=invalid_php):
+        version = release_version(self.php, self.package, self.lock)
+        major, minor, patch = version.split(".")
+        canonical_number = f"'number' => '{version}'"
+        invalid_php = (
+            self.php.replace(canonical_number, f"'number' => '0{major}.{minor}.{patch}'", 1),
+            self.php.replace("'number'", "'version'", 1),
+            self.php.replace(canonical_number, "'number' => 'invalid'", 1),
+        )
+        for candidate in invalid_php:
+            with self.subTest(php=candidate):
+                self.assertNotEqual(candidate, self.php)
                 with self.assertRaises(ValueError):
-                    release_version(invalid_php, self.package, self.lock)
-        for package, lock in (
-            (self.package.replace('"version": "0.1.132"', '"version": "0.1.0"', 1), self.lock),
-            (self.package, self.lock.replace('"version": "0.1.132"', '"version": "0.1.0"', 1)),
-            (self.package, self.lock.replace('"version": "0.1.132"', '"version": "0.1.0"', 2)),
-        ):
+                    release_version(candidate, self.package, self.lock)
+
+        drift = version + "-drift"
+        changed_npm = json.loads(self.package)
+        changed_npm["version"] = drift
+        changed_lock_top = json.loads(self.lock)
+        changed_lock_top["version"] = drift
+        changed_lock_root = json.loads(self.lock)
+        changed_lock_root["packages"][""]["version"] = drift
+        candidates = (
+            (json.dumps(changed_npm), self.lock),
+            (self.package, json.dumps(changed_lock_top)),
+            (self.package, json.dumps(changed_lock_root)),
+        )
+        for package, lock in candidates:
             with self.subTest(package=package[:70], lock=lock[:70]):
                 with self.assertRaises(ValueError):
                     release_version(self.php, package, lock)
+
+       release_version(self.php, package, lock)
 
     def test_grindflow_ci_runs_release_contract_without_removing_validate(self):
         ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")
