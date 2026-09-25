@@ -7,6 +7,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Sentry\Laravel\Integration;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Sentry reporta los errores reales de producción; en otros entornos
+        // su DSN es null y no envía nada (config/sentry.php).
+        if (class_exists(Integration::class)) {
+            Integration::handles($exceptions);
+        }
+
         $exceptions->report(function (Throwable $exception): void {
             $status = $exception instanceof HttpExceptionInterface
                 ? $exception->getStatusCode()
