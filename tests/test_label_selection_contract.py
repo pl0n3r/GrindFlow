@@ -81,9 +81,9 @@ class LabelSelectionTests(unittest.TestCase):
         names = [item["name"] for item in catalog]
         expected = module.TYPES | module.PRIORITIES | module.STATES
         self.assertEqual(len(names), len(set(names)))
-        self.assertTrue(expected <= set(names))
+        self.assertLessEqual(expected, set(names))
         self.assertIn("prioridad: baja", names)
-        self.assertTrue({"calidad", "seguridad", "deuda técnica"} <= set(names))
+        self.assertLessEqual({"calidad", "seguridad", "deuda técnica"}, set(names))
         for item in catalog:
             with self.subTest(label=item["name"]):
                 self.assertEqual(set(item), {"name", "color", "description"})
