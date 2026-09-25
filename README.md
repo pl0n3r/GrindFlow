@@ -22,7 +22,7 @@
 | CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI `36086540475`, intento 2 |
 | Deploy Observer base | ✅ **success** | run `36086540472`; sin SHA remoto verificado |
 | Production Smoke base | ✅ **success** | run `36086540476` |
-| Versión candidata | 🚧 **v0.1.132** | PR #163, no fusionada |
+| Version candidata | 🚧 **v0.1.132** | PR #163, no fusionada |
 | CI/Sonar/CodeRabbit del PR | 🚧 pendiente | HEAD final PR #163 |
 | Producción candidata | 🚧 pendiente | bloqueada hasta secuenciar #162/#163 y verificar merge/deploy |
 
