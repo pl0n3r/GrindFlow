@@ -148,6 +148,10 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Si el conector GitHub tampoco puede escribir, informar el bloqueo técnico preciso sin prometer un deploy ni modificar datos productivos.
 
 ### Optimización continua del CI sin debilitar compuertas
+- **Carga GitHub / coordinación:** No hacer polling de checks, PRs ni comentarios; revisar señales una sola vez al cierre de un bloque o en otra sesión.
+- Agrupar cambios locales y hacer un solo push por bloque lógico; no empujar cada microajuste por separado.
+- Publicar un solo comentario por hito; evitar comentarios de progreso intermedio que disparen automatización sin aportar evidencia durable.
+- No exceder dos agentes simultáneos en GrindFlow; el PLAN-AGENTES global puede imponer un límite menor y, cuando lo haga, prevalece.
 
 - El selector `scripts/ci-scope.sh` adapta gates según rutas modificadas. Documentación Symfony no dispara el stack pesado por sí sola; una mezcla de docs y código conserva **unión** de gates. Cambios al core del CI y ejecución manual disparan matriz completa.
 - `GrindFlow CI / validate` sigue exigiendo éxito real en todos los gates seleccionados; saltarse un gate que correspondía, reinterpretar un fallo como verde o alterar cobertura por tendencias históricas está prohibido.

@@ -1,8 +1,7 @@
 name: GrindFlow Production Diagnostics
 
 on:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
 
 concurrency:
   group: grindflow-production-diagnostics
@@ -10,20 +9,13 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   diagnostics:
     name: production-diagnostics
-    if: >-
-      github.event.issue.title == '[AUTO] Production Diagnostics Bridge' &&
-      github.event.comment.body == '/production-diagnostics' &&
-      (
-        github.event.comment.author_association == 'OWNER' ||
-        github.event.comment.author_association == 'MEMBER' ||
-        github.event.comment.author_association == 'COLLABORATOR'
-      )
+    if: github.actor == github.repository_owner
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     env:
       BASE_URL: https://www.grindflow.com.co
       E2E_USER_EMAIL: e2e-admin@grindflow.test
@@ -86,11 +78,8 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Publish bridge status
+      - name: Publish safe status to workflow summary
         if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
         shell: bash
         run: |
           if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
@@ -102,18 +91,17 @@ jobs:
           fi
 
           {
-            echo "Production diagnostics request: **$state**"
+            echo "## Production diagnostics"
             echo
+            echo "Status: **$state**"
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
             printf 'Artifact: `production-diagnostics-%s`\n' "$GITHUB_RUN_ID"
             echo "Retention: **3 days**"
             echo
-            echo "The issue does not contain the diagnostic payload. Authorized agents can read the artifact through GitHub."
-          } > /tmp/grindflow-diagnostics-status.md
+            echo "The workflow summary never contains the diagnostic payload."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/grindflow-diagnostics-status.md
-
-      - name: Fail after publishing bridge status
+      - name: Fail after publishing safe status
         if: >-
           always() &&
           (
