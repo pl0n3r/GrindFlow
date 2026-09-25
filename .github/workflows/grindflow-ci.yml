@@ -238,6 +238,8 @@ jobs:
           python3 -m unittest tests/test_label_selection_contract.py
           python3 -m unittest tests/test_label_workflow_contract.py
           python3 -m unittest tests/test_issue_label_notice.py
+          python3 -m unittest tests/test_pr_label_inheritance.py
+          python3 -m unittest tests/test_label_sweep.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb

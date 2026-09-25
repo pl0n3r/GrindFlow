@@ -1,0 +1,76 @@
+name: Heredar etiquetas de PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, edited, unlabeled, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-inherit-pr-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  inherit:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Leer planner de la base confiable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Detectar planner disponible en la base
+        id: planner
+        shell: bash
+        run: |
+          if [[ -f scripts/pr-label-inheritance.py ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolver Issue enlazado sin ejecutar código del PR
+        if: steps.planner.outputs.available == 'true'
+        id: linked
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" > /tmp/pr.json
+          jq '{body:(.body // "")}' /tmp/pr.json             | python3 scripts/pr-label-inheritance.py extract > /tmp/linked.json
+          issue="$(jq -r '.issue_number // empty' /tmp/linked.json)"
+          echo "issue=$issue" >> "$GITHUB_OUTPUT"
+
+      - name: Planear y aplicar solo dimensiones canónicas faltantes
+        if: steps.planner.outputs.available == 'true' && steps.linked.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ steps.linked.outputs.issue }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Issue inválido"; exit 1; }
+          gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" > /tmp/issue.json
+          if jq -e 'has("pull_request")' /tmp/issue.json >/dev/null; then
+            echo "::error::Closes debe enlazar un Issue, no otro Pull Request"
+            exit 1
+          fi
+          jq -n             --slurpfile pr /tmp/pr.json             --slurpfile issue /tmp/issue.json             '{pr_labels:$pr[0].labels,issue_labels:$issue[0].labels}'             | python3 scripts/pr-label-inheritance.py plan > /tmp/plan.json
+          jq '{labels:.add}' /tmp/plan.json > /tmp/add.json
+          if [[ "$(jq '.labels | length' /tmp/add.json)" -gt 0 ]]; then
+            gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/labels"               --input /tmp/add.json >/dev/null
+          fi
