@@ -72,12 +72,39 @@ def gh(*args: str) -> object:
     return json.loads(result.stdout)
 
 
+def existing_bot_notices(comments: object) -> list[dict]:
+    """Select editable notices authored by our workflow, not by Issue reporters."""
+    if not isinstance(comments, list):
+        raise ValueError("Invalid comments response")
+    return [
+        comment for page in comments if isinstance(page, list)
+        for comment in page if isinstance(comment, dict)
+        and MARKER in str(comment.get("body") or "")
+        and isinstance(comment.get("user"), dict)
+        and comment["user"].get("login") == "github-actions[bot]"
+    ]
+
+
+def sync_notice(endpoint: str, problems: tuple[str, ...]) -> None:
+    """Reuse the first owned notice; do not emit new comments on healthy Issues."""
+    matches = existing_bot_notices(gh("--paginate", "--slurp", endpoint + "/comments?per_page=100"))
+    if not problems and not matches:
+        return
+    body = notice(problems)
+    if matches:
+        current = matches[0]
+        if current.get("body") != body:
+            gh("--method", "PATCH", endpoint + "/comments/" + str(current["id"]), "-f", "body=" + body)
+    else:
+        gh("--method", "POST", endpoint + "/comments", "-f", "body=" + body)
+
+
 def main() -> int:
     repository = os.environ["GITHUB_REPOSITORY"]
     number = os.environ["ISSUE_NUMBER"]
     if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) is None:
         raise ValueError("Invalid repository")
-    if re.fullmatch(r"[1-9][0-9]{0,9}", number) is None:
+    if re.fullmatch(r"[1-9]\d{0,9}", number) is None:
         raise ValueError("Invalid Issue number")
     endpoint = f"repos/{repository}/issues/{number}"
     issue = gh(endpoint)
@@ -89,26 +116,7 @@ def main() -> int:
         issue = gh(endpoint)
         names = names_of(issue)
 
-    problems = missing(names)
-    comments = gh("--paginate", "--slurp", endpoint + "/comments?per_page=100")
-    if not isinstance(comments, list):
-        raise ValueError("Invalid comments response")
-    matches = [
-        comment for page in comments if isinstance(page, list)
-        for comment in page if isinstance(comment, dict)
-        and MARKER in str(comment.get("body") or "")
-        and isinstance(comment.get("user"), dict)
-        and comment["user"].get("login") == "github-actions[bot]"
-    ]
-    if not problems and not matches:
-        return 0  # Never create noise for correctly labeled Issues.
-    body = notice(problems)
-    if matches:
-        current = matches[0]
-        if current.get("body") != body:
-            gh("--method", "PATCH", endpoint + "/comments/" + str(current["id"]), "-f", "body=" + body)
-    else:
-        gh("--method", "POST", endpoint + "/comments", "-f", "body=" + body)
+    sync_notice(endpoint, missing(names))
     return 0
 
 

@@ -49,7 +49,7 @@ class IssueLabelNoticeTests(unittest.TestCase):
 
         def fake_gh(*args):
             calls.append(args)
-            target = args[2] if args[:2] == ("--method", "POST") else args[0]
+            target = args[2] if args[:2] in (("--method", "POST"), ("--method", "PATCH")) else args[-1] if args[0] == "--paginate" else args[0]
             if target.endswith("/labels"):
                 issue["labels"].append({"name": module.DEFAULT_STATE})
                 return {}
