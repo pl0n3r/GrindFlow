@@ -1,0 +1,25 @@
+name: GrindFlow Tag Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-tag-release-${{ github.ref }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    uses: pl0n3r/factory/.github/workflows/release.yml@v1
+    with:
+      version_source: config/version.php
+      version_format: php-array
+      version_key: number

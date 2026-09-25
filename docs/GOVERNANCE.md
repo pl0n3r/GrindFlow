@@ -136,3 +136,9 @@ pero los Issues del propietario anterior no están presentes en este repositorio
 El roadmap actual comienza en Issue #2; el anterior #88 queda citado solo
 como referencia histórica, nunca como destino operativo. Los enlaces y las
 credenciales de GitHub Actions requieren comprobación independiente tras un traslado.
+
+## GitHub Releases automáticos sin despliegue
+
+Desde v0.1.132, `.github/workflows/tag-release.yml` invoca únicamente en `push` a `main` el reusable `pl0n3r/factory/.github/workflows/release.yml@v1`. Lee `config/version.php` como `php-array` y clave `number` sin ejecutar PHP. Asegura tag **anotado** `vX.Y.Z` y publica GitHub Release con notas generadas. Solo el job reusable recibe `contents: write`; no hereda secretos ni despliega, migra o ejecuta SQL. Tag de otro SHA falla cerrado; tag del mismo SHA permite completar Release ausente. Reintentar el evento `push` original, no disparar este caller como workflow_dispatch.
+
+`package.json` y ambas versiones raíz de `package-lock.json` guardan la misma versión humana que `config/version.php`, sin alterar resoluciones de dependencias. `tests/test_release_adoption.py` comprueba paridad y manifiesto con regresiones negativas. Un tag y un GitHub Release **no demuestran el checkout de Hostinger**: CI exact-main, Observer y Smoke siguen siendo señales independientes.
