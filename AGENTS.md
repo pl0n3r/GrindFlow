@@ -1,5 +1,12 @@
 # GrindFlow — contexto canonico para AI / Work / Codex
 
+> **Protocolo compartido de fábrica.** Antes de trabajar, lee y aplica
+> [PLAN-AGENTES.md](https://github.com/pl0n3r/factory/blob/main/PLAN-AGENTES.md)
+> para despacho, reservas, roles, límites de revisión y gates comunes.
+> `AGENTS.md`, `docs/GOVERNANCE.md` y las especificaciones de GrindFlow
+> siguen siendo autoridad para arquitectura, seguridad, datos y producción;
+> el protocolo común no sustituye una regla local salvo decisión explícita
+> del dueño registrada de forma auditable.
 **Leer el inicio rápido y las reglas vigentes del área antes de modificar código.**
 Un agente nuevo puede reconstruir el estado desde GitHub sin memoria ni chats:
 la evidencia de `main`, las decisiones en este archivo y las especificaciones
