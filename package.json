@@ -1,6 +1,6 @@
 {
   "name": "grindflow",
-  "version": "0.1.0",
+  "version": "0.1.132",
   "private": true,
   "description": "GrindFlow & Traffic Engine — plataforma SaaS multi-tenant de gestion de contenido, distribucion automatizada y embudos de trafico.",
   "type": "module",
