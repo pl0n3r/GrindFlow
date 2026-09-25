@@ -236,6 +236,7 @@ jobs:
           [[ -f scripts/sonar-pr-comment.py ]] && python3 -m py_compile scripts/sonar-pr-comment.py
           python3 -m unittest tests/test_sonar_event_load.py
           python3 -m unittest tests/test_label_selection_contract.py
+          python3 -m unittest tests/test_label_workflow_contract.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb

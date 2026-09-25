@@ -108,6 +108,7 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Plantillas GitHub y etiquetas nuevas en español son aditivas; workflow
   `sincronizar-gobierno` solo crea/actualiza labels declarados, **nunca**
   borra etiquetas, Issues o milestones. No modificar permisos productivos.
+- Toda PR nueva debe llevar en el mismo acto **1–2 tipos justificados, exactamente una prioridad y un estado**, además de los roles; no retirar `tipo: seguridad` de un Issue por satisfacer una compuerta. `.github/workflows/validar-etiquetas.yml` valida solo metadatos en PR, con código de la base y token de solo lectura; no autocorrige Issues ni sustituye todavía el barrido de #125.
 - Registrar incidentes de Smoke en roadmap y no usar un CI verde como
   sustituto de producción. Código/E2E local testing sí puede escribir
   fixtures aisladas, producción Smoke jamás.
