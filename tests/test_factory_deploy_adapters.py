@@ -90,6 +90,22 @@ class FactoryDeployAdaptersTests(unittest.TestCase):
         self.assertNotIn("migrate:fresh", source)
         self.assertNotIn("artisan migrate --force", source)
 
+    def test_deploy_retry_accepts_only_exact_storage_symlink(self):
+        source = (ROOT / "ops/factory/adapter.py").read_text(encoding="utf-8")
+        self.assertIn(
+            '[ -L "$rel/storage" ] && [ "$(readlink "$rel/storage")" = "$shared/storage" ]',
+            source,
+        )
+        self.assertIn(
+            '[ ! -e "$rel/storage" ] || exit 56; ln -s "$shared/storage" "$rel/storage"',
+            source,
+        )
+        self.assertNotIn(
+            '[ ! -e "$rel/storage" ] || exit 56; ln -s "$shared/storage" "$rel/storage"; '
+            'cd "$rel"',
+            source,
+        )
+
     def test_rollback_is_artifact_only(self):
         source = (ROOT / "ops/factory/adapter.py").read_text(encoding="utf-8")
         start = source.index("def rollback()")
