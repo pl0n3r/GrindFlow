@@ -30,6 +30,86 @@
     "description": "Contrato, integración o E2E."
   },
   {
+    "name": "tipo: incidente",
+    "color": "B60205",
+    "description": "Fallo activo de producción u operación."
+  },
+  {
+    "name": "tipo: seguridad",
+    "color": "B60205",
+    "description": "Seguridad, autenticación, autorización o vulnerabilidades."
+  },
+  {
+    "name": "tipo: calidad",
+    "color": "5319E7",
+    "description": "Calidad estática, mantenibilidad o deuda de calidad."
+  },
+  {
+    "name": "tipo: deuda técnica",
+    "color": "FBCA04",
+    "description": "Deuda técnica explícita que requiere seguimiento."
+  },
+  {
+    "name": "tipo: accesibilidad",
+    "color": "0E8A16",
+    "description": "Accesibilidad, WCAG o experiencia asistiva."
+  },
+  {
+    "name": "prioridad: crítica",
+    "color": "B60205",
+    "description": "Bloquea la operación o la fábrica."
+  },
+  {
+    "name": "prioridad: alta",
+    "color": "D93F0B",
+    "description": "Atención prioritaria."
+  },
+  {
+    "name": "prioridad: media",
+    "color": "FBCA04",
+    "description": "Prioridad estándar para trabajo planificado."
+  },
+  {
+    "name": "prioridad: baja",
+    "color": "C5DEF5",
+    "description": "Trabajo de baja urgencia o conveniencia."
+  },
+  {
+    "name": "estado: disponible",
+    "color": "2DA44E",
+    "description": "Trabajo disponible para ser reservado."
+  },
+  {
+    "name": "estado: reservado",
+    "color": "FBCA04",
+    "description": "Trabajo reservado por una sesión o agente."
+  },
+  {
+    "name": "estado: en revisión",
+    "color": "1D76DB",
+    "description": "Trabajo con Pull Request listo para revisión."
+  },
+  {
+    "name": "estado: bloqueado",
+    "color": "000000",
+    "description": "Dependencia externa real."
+  },
+  {
+    "name": "estado: requiere recuperación",
+    "color": "D876E3",
+    "description": "Reserva inactiva que debe recuperarse antes de trabajo nuevo."
+  },
+  {
+    "name": "estado: completado",
+    "color": "0E8A16",
+    "description": "Trabajo completado."
+  },
+  {
+    "name": "estado: cancelado",
+    "color": "6E7781",
+    "description": "Trabajo cerrado sin completarse."
+  },
+  {
     "name": "calidad",
     "color": "0E8A16",
     "description": "Mantenibilidad y calidad verificable."
@@ -43,15 +123,5 @@
     "name": "deuda técnica",
     "color": "FBCA04",
     "description": "Mantenimiento o deuda priorizada."
-  },
-  {
-    "name": "prioridad: alta",
-    "color": "D93F0B",
-    "description": "Atención prioritaria."
-  },
-  {
-    "name": "estado: bloqueado",
-    "color": "000000",
-    "description": "Dependencia externa real."
   }
 ]
