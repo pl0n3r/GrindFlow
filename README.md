@@ -2,7 +2,7 @@
 
 <p align="center">
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
-<a href="https://sonarcloud.io/dashboard?id=pl0n3r/GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
+<a href="https://sonarcloud.io/dashboard?id=pl0n3r_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-deploy-observer.yml"><img alt="Deploy Observer" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-deploy-observer.yml/badge.svg?branch=main"></a>
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
@@ -18,8 +18,11 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| Producción base | ✅ **v0.1.128 / GREEN** | `a106204b2e6df9c468a01920c7e2fbf6fe6b7aec`; exact-main, Observer y Production Smoke en success |
-| CI del SHA exacto de main (base) | ✅ **success** | v0.1.128 validada antes de abrir este candidato |
+| SHA exacto de main (base) | ✅ **a106204b2e6df9c468a01920c7e2fbf6fe6b7aec** | release base del candidato |
+| Versión observada en producción (base) | ✅ **v0.1.128** | Production Smoke `36056168033` |
+| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI `36056168058` |
+| Deploy Observer base | ✅ **success** | run `36056168069` |
+| Production Smoke base | ✅ **success** | run `36056168033`; versión/SHA exactos observados |
 | Version objetivo | 🚧 **v0.1.129** | `config/version.php` |
 | Pillow / workers | ✅ ~~completado~~ | v0.1.127; Pillow 12.3.0 ya integrado |
 | Lockfile npm | ✅ **REUTILIZADO SIN EDICIÓN MANUAL** | generado en workflow #35994547753; base npm de main sin cambios |
@@ -37,7 +40,7 @@
 | Control | Estado / contrato |
 | --- | --- |
 | Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · legacy** |
-| PR + snapshot exacto | **#147 · v0.1.129** | diff y README deben coincidir con el HEAD final |
+| PR + snapshot exacto | **#147 · v0.1.129**; diff y README deben coincidir con el HEAD final |
 | Gate agregador obligatorio | **validate** (incluye siempre el gate privacy-as-code); Sonar, CodeQL y CodeRabbit separados |
 | Alcance | #139: Vitest/Vite/PostCSS/esbuild/next-intl/@vitest-mocker corregidos |
 | Rol del PR | **Application Security · Node.js · Release Engineering · QA** |
