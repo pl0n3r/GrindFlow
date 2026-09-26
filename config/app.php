@@ -3,6 +3,7 @@
 return [
     'name' => env('APP_NAME', 'GrindFlow'),
     'env' => env('APP_ENV', 'production'),
+    'phase' => env('APP_PHASE', 'live'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),
     'timezone' => env('APP_TIMEZONE', 'UTC'),
