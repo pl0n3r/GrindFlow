@@ -21,6 +21,7 @@
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
             <button class="button primary" type="submit">Entrar</button>
         </form>
+        <a href="{{ path('grindflow_password_forgot') }}">¿Olvidaste tu contraseña?</a>
         <a href="{{ path('grindflow_home') }}">Volver al inicio</a>
     </section>
 </main>

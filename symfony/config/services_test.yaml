@@ -1,0 +1,7 @@
+services:
+  GrindFlow\Infrastructure\Mail\InMemoryPasswordRecoveryNotifier:
+    public: true
+
+  GrindFlow\Identity\Security\PasswordRecoveryNotifier:
+    alias: GrindFlow\Infrastructure\Mail\InMemoryPasswordRecoveryNotifier
+    public: true

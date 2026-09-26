@@ -7,6 +7,9 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Identity\Security\PasswordPolicy;
+use GrindFlow\Identity\Security\PasswordRecoveryNotifier;
+use Symfony\Component\Uid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,6 +31,8 @@ final class AccountSecurityController extends AbstractController
         Connection $db,
         UserPasswordHasherInterface $hasher,
         TokenStorageInterface $tokens,
+        PasswordPolicy $passwordPolicy,
+        PasswordRecoveryNotifier $notifier,
         #[Target('profile_password')] RateLimiterFactoryInterface $attemptLimiter,
     ): JsonResponse {
         $user = $this->getUser();
@@ -65,9 +70,8 @@ final class AccountSecurityController extends AbstractController
 
         $old = $body['current_password'];
         $new = $body['new_password'];
-        if ($old === '' || strlen($old) > 1024 || strlen($new) > 256
-            || preg_match('/\A.{12,128}\z/usD', $new) !== 1) {
-            return $this->error(422, 'invalid_password', 'La nueva contraseña debe tener entre 12 y 128 caracteres.');
+        if ($old === '' || strlen($old) > 1024 || !$passwordPolicy->isAcceptable($new)) {
+            return $this->error(422, 'invalid_password', 'Elige una contraseña segura de 12 a 128 caracteres.');
         }
         if (!hash_equals($new, $body['confirm_password'])) {
             return $this->error(422, 'password_confirmation_mismatch', 'Las nuevas contraseñas no coinciden.');
@@ -102,7 +106,17 @@ final class AccountSecurityController extends AbstractController
                 ],
             );
 
-            return $written === 1 ? 'changed' : 'revoked';
+            if ($written !== 1) {
+                return 'revoked';
+            }
+            $db->insert('gf_identity_security_audit', [
+                'id' => Uuid::v7()->toRfc4122(),
+                'user_id' => $user->id(),
+                'event' => 'password_changed',
+                'occurred_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+
+            return 'changed';
         });
 
         if ($result === 'incorrect') {
@@ -114,6 +128,9 @@ final class AccountSecurityController extends AbstractController
         if ($result !== 'changed') {
             return $this->error(403, 'account_access_changed', 'Tu cuenta ya no está disponible.');
         }
+
+        // Notification failure must never roll the credential back.
+        $notifier->sendPasswordChanged($user->email(), $user->displayName());
 
         // The current authenticated session must not continue after the change.
         $tokens->setToken(null);
