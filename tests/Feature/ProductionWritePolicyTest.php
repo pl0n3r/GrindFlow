@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Support\Operations\ProductionWritePolicy;
+use App\Support\Operations\VerifiedBackupEvidence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -66,7 +67,15 @@ class ProductionWritePolicyTest extends TestCase
     public function test_bulk_or_migration_requires_recent_verified_backup_and_lock(): void
     {
         config(['app.phase' => 'construccion']);
+        Storage::fake('local');
         $policy = app(ProductionWritePolicy::class);
+        $evidence = app(VerifiedBackupEvidence::class);
+        $fingerprint = str_repeat('a', 64);
+        $archive = 'operations/database-backups/policy-test.sql.gz';
+        Storage::disk('local')->put($archive, 'verified-database-backup');
+        $receipt = $evidence->record($archive, $fingerprint);
+
+        $evidence->assertValid($receipt, $fingerprint);
 
         foreach ([[false, true], [true, false]] as [$backup, $lock]) {
             try {
@@ -92,6 +101,19 @@ class ProductionWritePolicyTest extends TestCase
             backupVerified: true,
             lockHeld: true,
         );
+
+        try {
+            $evidence->assertValid($receipt, str_repeat('b', 64));
+            $this->fail('Receipt must be bound to one migration batch.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('another migration batch', $exception->getMessage());
+        }
+
+        Storage::disk('local')->put($archive, 'tampered-backup');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('checksum does not match');
+        $evidence->assertValid($receipt, $fingerprint);
     }
 
     public function test_documentation_and_migration_flow_require_verifiable_backup_evidence(): void
