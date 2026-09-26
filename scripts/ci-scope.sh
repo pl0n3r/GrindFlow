@@ -109,7 +109,7 @@ grindflow_ci_classify_files() {
             ;;
         esac
         ;;
-      composer.json|composer.lock|phpstan.neon|phpstan.neon.dist|phpunit.xml|phpunit.xml.dist)
+      composer.json|composer.lock|phpstan.neon|phpstan.neon.dist|rector.php|tools/rector/composer.json|tools/rector/composer.lock|phpunit.xml|phpunit.xml.dist)
         grindflow_ci_scope_add_area "PHP tooling"
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
         GRINDFLOW_SCOPE_RUN_TESTS=true

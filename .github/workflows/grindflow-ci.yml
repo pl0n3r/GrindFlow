@@ -192,6 +192,7 @@ jobs:
           done
 
           bash scripts/database-test-runner-contract.sh
+          bash scripts/static-analysis-contract.sh
           python3 -m py_compile scripts/ci-performance-report.py
           python3 scripts/ci-performance-report.py --self-test
           python3 -m py_compile scripts/ci_retry.py
@@ -296,13 +297,17 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock', 'tools/rector/composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
       - name: Install Composer dependencies
         run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
+      - name: Install Rector toolchain
+        run: python3 scripts/ci_retry.py --label "Rector toolchain" -- composer install --working-dir=tools/rector --prefer-dist --no-progress --no-interaction --no-scripts --no-plugins
       - name: Composer validation
-        run: composer validate --strict
+        run: |
+          composer validate --strict
+          composer validate --working-dir=tools/rector --strict
       - name: Laravel/PHP syntax
         shell: bash
         run: |
@@ -319,8 +324,10 @@ jobs:
             git --no-pager diff -- '*.php'
             exit 1
           fi
-      - name: Static analysis
+      - name: Static analysis (PHPStan)
         run: vendor/bin/phpstan analyse --no-progress
+      - name: Rector dry-run
+        run: tools/rector/vendor/bin/rector process --dry-run --no-progress-bar --config=rector.php
 
   tests:
     name: tests

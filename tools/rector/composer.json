@@ -1,0 +1,22 @@
+{
+  "$schema": "https://getcomposer.org/schema.json",
+  "name": "grindflow/rector-tools",
+  "type": "project",
+  "description": "Pinned static-refactoring toolchain for GrindFlow CI.",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.5"
+  },
+  "require-dev": {
+    "driftingly/rector-laravel": "2.6.2",
+    "rector/rector": "2.6.7"
+  },
+  "config": {
+    "platform": {
+      "php": "8.5.0"
+    },
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
