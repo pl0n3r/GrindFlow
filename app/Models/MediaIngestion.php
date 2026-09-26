@@ -17,6 +17,7 @@ class MediaIngestion extends TenantModel
 
     public const STATUS_FAILED = 'failed';
 
+    #[\Override]
     protected $fillable = [
         'requested_by_user_id',
         'media_asset_id',

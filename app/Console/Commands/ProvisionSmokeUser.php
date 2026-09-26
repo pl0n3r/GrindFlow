@@ -17,8 +17,10 @@ use Throwable;
 
 class ProvisionSmokeUser extends Command
 {
+    #[\Override]
     protected $signature = 'grindflow:provision-smoke-user';
 
+    #[\Override]
     protected $description = 'Reconcile the synthetic production smoke identity safely and idempotently.';
 
     public function handle(): int
@@ -125,7 +127,7 @@ class ProvisionSmokeUser extends Command
                     throw new RuntimeException('Timed out waiting for smoke-user provisioning lock.');
                 }
 
-                usleep(100_000);
+                \Illuminate\Support\Sleep::usleep(100_000);
             }
 
             return $callback();

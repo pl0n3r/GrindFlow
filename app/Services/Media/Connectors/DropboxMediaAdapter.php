@@ -10,9 +10,9 @@ use JsonException;
 
 class DropboxMediaAdapter
 {
-    private const API_BASE = 'https://api.dropboxapi.com/2';
+    private const string API_BASE = 'https://api.dropboxapi.com/2';
 
-    private const CONTENT_BASE = 'https://content.dropboxapi.com/2';
+    private const string CONTENT_BASE = 'https://content.dropboxapi.com/2';
 
     public function __construct(
         private readonly ConnectorMediaStager $stager,

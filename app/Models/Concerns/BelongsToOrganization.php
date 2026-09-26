@@ -17,7 +17,7 @@ trait BelongsToOrganization
         static::addGlobalScope(new TenantScope);
 
         static::creating(function (Model $model): void {
-            $organizationId = app(TenantContext::class)->organizationId();
+            $organizationId = resolve(TenantContext::class)->organizationId();
 
             if ($organizationId === null) {
                 throw new AuthorizationException('Tenant context is required to create this record.');

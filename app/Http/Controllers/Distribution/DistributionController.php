@@ -83,8 +83,7 @@ class DistributionController extends Controller
             $pageFilters = $filters;
             unset($pageFilters['page']);
 
-            $deliveries = $query
-                ->orderByDesc('created_at')
+            $deliveries = $query->latest()
                 ->orderByDesc('id')
                 ->paginate(25, ['*'], 'page', (int) ($filters['page'] ?? 1))
                 ->appends($pageFilters);
@@ -184,7 +183,7 @@ class DistributionController extends Controller
 
     private function back(Request $request, string $status): RedirectResponse
     {
-        return redirect()->route('organizations.distribution.index', [
+        return to_route('organizations.distribution.index', [
             'organizationId' => $this->organization($request)->getKey(),
         ])->with('status', $status);
     }

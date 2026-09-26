@@ -6,9 +6,9 @@ use App\Services\Media\Connectors\MediaConnectorException;
 
 class DropboxOAuthClient
 {
-    private const AUTHORIZE_URL = 'https://www.dropbox.com/oauth2/authorize';
+    private const string AUTHORIZE_URL = 'https://www.dropbox.com/oauth2/authorize';
 
-    private const TOKEN_URL = 'https://api.dropbox.com/oauth2/token';
+    private const string TOKEN_URL = 'https://api.dropbox.com/oauth2/token';
 
     public function __construct(
         private readonly OAuthTokenEndpointClient $tokens,

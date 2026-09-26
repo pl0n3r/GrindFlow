@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
 
 class GoogleDriveMediaAdapter
 {
-    private const API_BASE = 'https://www.googleapis.com/drive/v3';
+    private const string API_BASE = 'https://www.googleapis.com/drive/v3';
 
     public function __construct(
         private readonly ConnectorMediaStager $stager,

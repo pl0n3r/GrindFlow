@@ -165,7 +165,6 @@ class FilesystemMediaIngestor
                         return $detected;
                     }
                 } finally {
-                    finfo_close($finfo);
                 }
             }
         }

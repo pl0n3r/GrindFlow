@@ -7,11 +7,11 @@ use JsonException;
 
 final readonly class GoogleDriveScanCursor
 {
-    private const VERSION = 1;
+    private const int VERSION = 1;
 
-    private const MODE_BOOTSTRAP = 'bootstrap';
+    private const string MODE_BOOTSTRAP = 'bootstrap';
 
-    private const MODE_CHANGES = 'changes';
+    private const string MODE_CHANGES = 'changes';
 
     private function __construct(
         public string $mode,

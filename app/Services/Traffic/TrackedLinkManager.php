@@ -13,9 +13,9 @@ use RuntimeException;
 
 class TrackedLinkManager
 {
-    private const TOKEN_LENGTH = 22;
+    private const int TOKEN_LENGTH = 22;
 
-    private const TOKEN_ATTEMPTS = 8;
+    private const int TOKEN_ATTEMPTS = 8;
 
     public function __construct(
         private readonly TenantContext $tenantContext,

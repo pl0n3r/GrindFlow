@@ -9,6 +9,7 @@ class ScheduledPublicationLink extends TenantModel
 {
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'scheduled_publication_id',
         'tracked_link_id',

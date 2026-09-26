@@ -6,11 +6,11 @@ use App\Services\Media\Connectors\MediaConnectorException;
 
 class GoogleOAuthClient
 {
-    private const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+    private const string AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
-    private const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+    private const string TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-    private const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+    private const string DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
     public function __construct(
         private readonly OAuthTokenEndpointClient $tokens,

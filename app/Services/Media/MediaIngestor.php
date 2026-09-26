@@ -19,7 +19,7 @@ class MediaIngestor
 
     public function ingest(UploadedFile $file, User $actor): MediaAsset
     {
-        $organizationId = app(TenantContext::class)->organizationId();
+        $organizationId = resolve(TenantContext::class)->organizationId();
 
         if ($organizationId === null) {
             throw new AuthorizationException('Tenant context is required to ingest media.');

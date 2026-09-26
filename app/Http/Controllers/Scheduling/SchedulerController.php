@@ -86,8 +86,7 @@ class SchedulerController extends Controller
 
             $assetMatches = (clone $assetQuery)->count();
             $eligibleAssets = $assetQuery
-                ->with('blob')
-                ->orderByDesc('created_at')
+                ->with('blob')->latest()
                 ->orderByDesc('id')
                 ->limit(100)
                 ->get();
@@ -251,10 +250,9 @@ class SchedulerController extends Controller
             (string) $validated['request_key'],
         );
 
-        return redirect()
-            ->route('organizations.scheduler.index', [
-                'organizationId' => $this->organization($request)->getKey(),
-            ])
+        return to_route('organizations.scheduler.index', [
+            'organizationId' => $this->organization($request)->getKey(),
+        ])
             ->with('status', $created->count().' publicación(es) programada(s).');
     }
 

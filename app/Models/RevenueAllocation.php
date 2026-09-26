@@ -16,6 +16,7 @@ class RevenueAllocation extends TenantModel
 {
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'created_by_user_id',
         'beneficiary_user_id',

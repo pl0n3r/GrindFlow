@@ -13,6 +13,7 @@ class TrackedLink extends TenantModel
 
     public const STATUS_DISABLED = 'disabled';
 
+    #[\Override]
     protected $fillable = [
         'created_by_user_id',
         'token',

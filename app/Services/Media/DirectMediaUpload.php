@@ -15,7 +15,7 @@ use RuntimeException;
 
 class DirectMediaUpload
 {
-    private const HARD_MAX_BYTES = 2_147_483_648;
+    private const int HARD_MAX_BYTES = 2_147_483_648;
 
     public function __construct(
         private readonly MediaProcessingCoordinator $processing,

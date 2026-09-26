@@ -14,6 +14,7 @@ class TrackedLinkDailyMetric extends TenantModel
 {
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'tracked_link_id',
         'metric_date',

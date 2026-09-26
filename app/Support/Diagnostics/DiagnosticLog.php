@@ -10,9 +10,9 @@ use Throwable;
 
 class DiagnosticLog
 {
-    private const MAX_FILE_BYTES = 2_000_000;
+    private const int MAX_FILE_BYTES = 2_000_000;
 
-    private const MESSAGE_LIMIT = 1500;
+    private const int MESSAGE_LIMIT = 1500;
 
     /**
      * Record a sanitized server-side failure and return its incident ID.
@@ -134,7 +134,7 @@ class DiagnosticLog
 
         $user = $request->user();
         $userId = $user?->getAuthIdentifier();
-        $tenantContext = app(TenantContext::class);
+        $tenantContext = resolve(TenantContext::class);
 
         return [
             'source' => 'http',

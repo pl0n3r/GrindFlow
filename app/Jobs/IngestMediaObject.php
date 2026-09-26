@@ -31,24 +31,8 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
 
     public int $uniqueFor = 3600;
 
-    public readonly string $ingestionId;
-
-    private readonly string $organization;
-
-    private readonly string $actor;
-
-    private readonly string $idempotency;
-
-    public function __construct(
-        string $ingestionId,
-        string $organization,
-        string $actor,
-        string $idempotency,
-    ) {
-        $this->ingestionId = $ingestionId;
-        $this->organization = $organization;
-        $this->actor = $actor;
-        $this->idempotency = $idempotency;
+    public function __construct(public readonly string $ingestionId, private readonly string $organization, private readonly string $actor, private readonly string $idempotency)
+    {
     }
 
     /**
@@ -64,7 +48,7 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
      */
     public function middleware(): array
     {
-        return [app(UseOrganizationContext::class)];
+        return [resolve(UseOrganizationContext::class)];
     }
 
     public function uniqueId(): string

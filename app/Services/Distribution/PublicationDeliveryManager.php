@@ -23,12 +23,12 @@ class PublicationDeliveryManager
 {
     public const MAX_ATTEMPTS = 4;
 
-    private const CLAIM_SECONDS = 300;
+    private const int CLAIM_SECONDS = 300;
 
     /**
      * @var array<int, int>
      */
-    private const TRANSIENT_BACKOFF_SECONDS = [
+    private const array TRANSIENT_BACKOFF_SECONDS = [
         1 => 60,
         2 => 300,
         3 => 900,
@@ -149,7 +149,7 @@ class PublicationDeliveryManager
         }
 
         try {
-            app(BusDispatcher::class)->dispatch(
+            resolve(BusDispatcher::class)->dispatch(
                 new DispatchScheduledPublication(
                     (string) $delivery->getKey(),
                     $organizationId,

@@ -51,7 +51,7 @@ class ProductionSmokeBootstrapController extends Controller
             // Only fixed context and class: exception messages can contain secrets.
             Log::warning('Production smoke bootstrap OIDC verification failed.', [
                 'stage' => 'oidc_verification',
-                'exception_class' => get_class($exception),
+                'exception_class' => $exception::class,
             ]);
 
             abort(403);
@@ -122,7 +122,7 @@ class ProductionSmokeBootstrapController extends Controller
             Log::error('Production smoke bootstrap reconciliation failed.', [
                 'stage' => $failureStage,
                 'code' => $failureCode,
-                'exception_class' => get_class($exception),
+                'exception_class' => $exception::class,
             ]);
 
             return response('', 503)
