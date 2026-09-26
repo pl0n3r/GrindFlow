@@ -28,7 +28,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **56** | **+211** | **−207** | **+4** |
+| **57** | **+208** | **−205** | **+3** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -114,6 +114,7 @@ flowchart LR
 - `package.json`
 - `routes/console.php`
 - `routes/web.php`
+- `tests/Feature/PrivacyAsCodeTest.php`
 
 ## Validación
 - Cada bloque de Rector coincidió de forma única con el archivo exacto de main; no se improvisaron transformaciones adicionales.
