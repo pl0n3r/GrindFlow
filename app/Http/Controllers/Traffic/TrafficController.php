@@ -12,7 +12,7 @@ use App\Services\Traffic\TrackedLinkManager;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -42,7 +42,7 @@ class TrafficController extends Controller
         $to = $filters['to'] ?? now('UTC')->toDateString();
         // Exclusive next-day bound includes the full final UTC day on both DATE
         // and datetime-backed test databases without wrapping indexed columns.
-        $toExclusive = \Illuminate\Support\Facades\Date::parse($to, 'UTC')->addDay()->toDateString();
+        $toExclusive = Date::parse($to, 'UTC')->addDay()->toDateString();
         $totalClicks = 0;
         $linkCount = 0;
         $channels = collect();
@@ -114,10 +114,10 @@ class TrafficController extends Controller
         $to = $filters['to'] ?? now('UTC')->toDateString();
         // Exclusive next-day bound includes the full final UTC day on both DATE
         // and datetime-backed test databases without wrapping indexed columns.
-        $toExclusive = \Illuminate\Support\Facades\Date::parse($to, 'UTC')->addDay()->toDateString();
+        $toExclusive = Date::parse($to, 'UTC')->addDay()->toDateString();
 
-        if (\Illuminate\Support\Facades\Date::parse($from, 'UTC')->diffInDays(
-            \Illuminate\Support\Facades\Date::parse($to, 'UTC'),
+        if (Date::parse($from, 'UTC')->diffInDays(
+            Date::parse($to, 'UTC'),
         ) >= 366) {
             throw ValidationException::withMessages([
                 'to' => 'The CSV export supports up to 366 days.',

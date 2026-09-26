@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use PDOException;
 use RuntimeException;
@@ -127,7 +128,7 @@ class ProvisionSmokeUser extends Command
                     throw new RuntimeException('Timed out waiting for smoke-user provisioning lock.');
                 }
 
-                \Illuminate\Support\Sleep::usleep(100_000);
+                Sleep::usleep(100_000);
             }
 
             return $callback();

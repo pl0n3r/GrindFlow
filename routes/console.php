@@ -6,7 +6,7 @@ use App\Services\Traffic\TrafficAttributionRecorder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('grindflow:status', fn(): int => 0)->purpose('Verify the GrindFlow Laravel application can boot.');
+Artisan::command('grindflow:status', fn (): int => 0)->purpose('Verify the GrindFlow Laravel application can boot.');
 
 Artisan::command('grindflow:dispatch-media-scans', function (): int {
     $dispatched = resolve(MediaConnectionScheduler::class)->dispatchDue();

@@ -66,7 +66,7 @@ class MediaConnectionScheduler
                 continue;
             }
 
-            dispatch(new \App\Jobs\ScanMediaConnection((string) $connection->getKey(), (string) $connection->organization_id, (string) $actor->getKey()));
+            dispatch(new ScanMediaConnection((string) $connection->getKey(), (string) $connection->organization_id, (string) $actor->getKey()));
 
             $dispatched++;
         }

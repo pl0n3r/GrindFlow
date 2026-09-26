@@ -69,7 +69,7 @@ class MediaIngestionCoordinator
         );
 
         if ($ingestion->wasRecentlyCreated) {
-            dispatch(new \App\Jobs\IngestMediaObject((string) $ingestion->getKey(), (string) $organizationId, (string) $actor->getKey(), $idempotencyKey));
+            dispatch(new IngestMediaObject((string) $ingestion->getKey(), (string) $organizationId, (string) $actor->getKey(), $idempotencyKey));
         }
 
         return $ingestion;
@@ -122,7 +122,7 @@ class MediaIngestionCoordinator
             'last_error' => null,
         ])->save();
 
-        dispatch(new \App\Jobs\IngestMediaObject((string) $ingestion->getKey(), $ingestionOrganizationId, (string) $actor->getKey(), $ingestion->idempotency_key));
+        dispatch(new IngestMediaObject((string) $ingestion->getKey(), $ingestionOrganizationId, (string) $actor->getKey(), $ingestion->idempotency_key));
 
         return $ingestion->refresh();
     }

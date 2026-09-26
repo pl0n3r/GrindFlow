@@ -265,7 +265,7 @@ final class PrivacyAsCodeTest extends TestCase
         $recorder = file_get_contents(
             $this->root().'/app/Services/Traffic/TrafficAttributionRecorder.php',
         );
-        self::assertStringContainsString('private const DEDUPE_RETENTION_HOURS = 24;', $recorder);
+        self::assertStringContainsString('private const int DEDUPE_RETENTION_HOURS = 24;', $recorder);
         self::assertStringContainsString("'visitor_hash' => \$visitorHash", $recorder);
 
         $trafficMigration = file_get_contents(

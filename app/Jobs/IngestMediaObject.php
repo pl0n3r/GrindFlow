@@ -31,9 +31,7 @@ class IngestMediaObject implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
 
     public int $uniqueFor = 3600;
 
-    public function __construct(public readonly string $ingestionId, private readonly string $organization, private readonly string $actor, private readonly string $idempotency)
-    {
-    }
+    public function __construct(public readonly string $ingestionId, private readonly string $organization, private readonly string $actor, private readonly string $idempotency) {}
 
     /**
      * @return array<int, int>
