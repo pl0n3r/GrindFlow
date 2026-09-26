@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\ORM\EntityManagerInterface;
 use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Identity\Security\PasswordPolicy;
 use GrindFlow\Identity\Security\PasswordRecoveryNotifier;
 use GrindFlow\Shared\Version\ProductVersion;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +30,7 @@ final class PasswordRecoveryController extends AbstractController
         Request $request,
         Connection $db,
         ProductVersion $version,
+        LoggerInterface $logger,
         #[Target('password_recovery_ip')] RateLimiterFactoryInterface $ipLimiter,
         #[Target('password_recovery_account')] RateLimiterFactoryInterface $accountLimiter,
     ): Response {
@@ -73,29 +76,42 @@ final class PasswordRecoveryController extends AbstractController
         if ($account !== false) {
             $userId = (string) $account['id'];
             $now = gmdate('Y-m-d H:i:s');
-            $db->transactional(function (Connection $db) use ($userId, $now): void {
-                // Reissue invalidates any previously delivered reset link immediately.
-                $db->delete('gf_password_reset_tokens', ['user_id' => $userId]);
-                // Coalesce pending delivery for the same identity. The outbox stores
-                // no token, email or message body: only the identity and delivery state.
-                $db->delete('gf_password_recovery_outbox', [
-                    'user_id' => $userId,
-                    'kind' => 'reset',
-                ]);
-                $db->insert('gf_password_recovery_outbox', [
-                    'id' => Uuid::v7()->toRfc4122(),
-                    'user_id' => $userId,
-                    'kind' => 'reset',
-                    'available_at' => $now,
-                    'claimed_at' => null,
-                    'delivered_at' => null,
-                    'attempts' => 0,
-                    'last_error_code' => null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
-                $this->audit($db, $userId, 'password_recovery_requested');
-            });
+            try {
+                $db->transactional(function (Connection $db) use ($userId, $now): void {
+                    // Reissue invalidates any previously delivered reset link immediately.
+                    $db->delete('gf_password_reset_tokens', ['user_id' => $userId]);
+                    // Coalesce pending delivery atomically. Store no token, email or body.
+                    $db->executeStatement(
+                        <<<'SQL'
+                            INSERT INTO gf_password_recovery_outbox (
+                                id, user_id, kind, available_at, claimed_at, delivered_at,
+                                attempts, last_error_code, created_at, updated_at
+                            ) VALUES (
+                                :id, :user_id, :kind, :available_at, NULL, NULL,
+                                0, NULL, :created_at, :updated_at
+                            )
+                            ON DUPLICATE KEY UPDATE
+                                available_at = VALUES(available_at),
+                                claimed_at = NULL,
+                                delivered_at = NULL,
+                                attempts = 0,
+                                last_error_code = NULL,
+                                updated_at = VALUES(updated_at)
+                            SQL,
+                        [
+                            'id' => Uuid::v7()->toRfc4122(),
+                            'user_id' => $userId,
+                            'kind' => 'reset',
+                            'available_at' => $now,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ],
+                    );
+                    $this->audit($db, $userId, 'password_recovery_requested');
+                });
+            } catch (DbalException) {
+                $logger->warning('password_recovery_queue_failed');
+            }
         }
 
         $this->padRecoveryResponse($started);

@@ -62,7 +62,7 @@ final class PasswordRecoveryDeliverCommand extends Command
         return $counts['failed'] === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 
-    /** @return array{id:string,user_id:string}|null */
+    /** @return array{id:string,user_id:string,kind:string}|null */
     private function claim(): ?array
     {
         $now = gmdate('Y-m-d H:i:s');
@@ -71,7 +71,7 @@ final class PasswordRecoveryDeliverCommand extends Command
         for ($attempt = 0; $attempt < 4; ++$attempt) {
             $row = $this->db->fetchAssociative(
                 <<<'SQL'
-                    SELECT id, user_id
+                    SELECT id, user_id, kind
                     FROM gf_password_recovery_outbox
                     WHERE kind = :kind
                       AND delivered_at IS NULL
@@ -97,14 +97,14 @@ final class PasswordRecoveryDeliverCommand extends Command
                 ['now' => $now, 'id' => (string) $row['id'], 'stale' => $stale],
             );
             if ($claimed === 1) {
-                return ['id' => (string) $row['id'], 'user_id' => (string) $row['user_id']];
+                return ['id' => (string) $row['id'], 'user_id' => (string) $row['user_id'], 'kind' => (string) $row['kind']];
             }
         }
 
         return null;
     }
 
-    /** @param array{id:string,user_id:string} $job */
+    /** @param array{id:string,user_id:string,kind:string} $job */
     private function deliver(array $job): string
     {
         $account = $this->db->fetchAssociative(
@@ -117,36 +117,53 @@ final class PasswordRecoveryDeliverCommand extends Command
             return 'skipped';
         }
 
-        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-        $tokenHash = hash('sha256', $token);
-        $now = gmdate('Y-m-d H:i:s');
-        $expires = gmdate('Y-m-d H:i:s', time() + 3600);
+        $tokenHash = null;
+        if ($job['kind'] === 'reset') {
+            $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+            $tokenHash = hash('sha256', $token);
+            $now = gmdate('Y-m-d H:i:s');
+            $expires = gmdate('Y-m-d H:i:s', time() + 3600);
 
-        $this->db->transactional(function (Connection $db) use ($job, $tokenHash, $now, $expires): void {
-            // The job may have been superseded after it was claimed.
-            if ($db->fetchOne(
-                'SELECT id FROM gf_password_recovery_outbox WHERE id = :id AND delivered_at IS NULL',
-                ['id' => $job['id']],
-            ) === false) {
-                throw new \RuntimeException('delivery_superseded');
+            $issued = $this->db->transactional(function (Connection $db) use ($job, $tokenHash, $now, $expires): bool {
+                // The job may have been superseded after it was claimed.
+                if ($db->fetchOne(
+                    'SELECT id FROM gf_password_recovery_outbox WHERE id = :id AND delivered_at IS NULL FOR UPDATE',
+                    ['id' => $job['id']],
+                ) === false) {
+                    return false;
+                }
+                $db->delete('gf_password_reset_tokens', ['user_id' => $job['user_id']]);
+                $db->insert('gf_password_reset_tokens', [
+                    'user_id' => $job['user_id'],
+                    'token_hash' => $tokenHash,
+                    'expires_at' => $expires,
+                    'created_at' => $now,
+                ]);
+
+                return true;
+            });
+            if (!$issued) {
+                return 'skipped';
             }
-            $db->delete('gf_password_reset_tokens', ['user_id' => $job['user_id']]);
-            $db->insert('gf_password_reset_tokens', [
-                'user_id' => $job['user_id'],
-                'token_hash' => $tokenHash,
-                'expires_at' => $expires,
-                'created_at' => $now,
-            ]);
-        });
 
-        try {
-            $delivered = $this->notifier->sendReset(
-                (string) $account['email'],
-                (string) $account['name'],
-                $token,
-            );
-        } catch (\Throwable) {
-            $delivered = false;
+            try {
+                $delivered = $this->notifier->sendReset(
+                    (string) $account['email'],
+                    (string) $account['name'],
+                    $token,
+                );
+            } catch (\Throwable) {
+                $delivered = false;
+            }
+        } else {
+            try {
+                $delivered = $this->notifier->sendPasswordChanged(
+                    (string) $account['email'],
+                    (string) $account['name'],
+                );
+            } catch (\Throwable) {
+                $delivered = false;
+            }
         }
 
         if ($delivered) {
@@ -161,12 +178,14 @@ final class PasswordRecoveryDeliverCommand extends Command
         }
 
         $this->db->transactional(function (Connection $db) use ($job, $tokenHash): void {
-            // Compare-and-delete: a newer request/worker may already have
-            // replaced the user's token. Never delete that newer hash.
-            $db->delete('gf_password_reset_tokens', [
-                'user_id' => $job['user_id'],
-                'token_hash' => $tokenHash,
-            ]);
+            // Compare-and-delete only applies to reset jobs. A newer request may
+            // already have replaced the user's token; never delete that newer hash.
+            if ($job['kind'] === 'reset' && is_string($tokenHash)) {
+                $db->delete('gf_password_reset_tokens', [
+                    'user_id' => $job['user_id'],
+                    'token_hash' => $tokenHash,
+                ]);
+            }
             $db->update('gf_password_recovery_outbox', [
                 'claimed_at' => null,
                 'available_at' => gmdate('Y-m-d H:i:s', time() + self::RETRY_SECONDS),

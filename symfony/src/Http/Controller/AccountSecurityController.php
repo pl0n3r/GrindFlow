@@ -9,6 +9,7 @@ use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Identity\Security\PasswordPolicy;
 use GrindFlow\Identity\Security\PasswordRecoveryNotifier;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Target;
@@ -33,6 +34,7 @@ final class AccountSecurityController extends AbstractController
         TokenStorageInterface $tokens,
         PasswordPolicy $passwordPolicy,
         PasswordRecoveryNotifier $notifier,
+        LoggerInterface $logger,
         #[Target('profile_password')] RateLimiterFactoryInterface $attemptLimiter,
     ): JsonResponse {
         $user = $this->getUser();
@@ -129,14 +131,58 @@ final class AccountSecurityController extends AbstractController
             return $this->error(403, 'account_access_changed', 'Tu cuenta ya no está disponible.');
         }
 
-        // Notification failure must never roll the credential back.
-        $notifier->sendPasswordChanged($user->email(), $user->displayName());
+        // Notification failure must never roll the credential back. Persist a
+        // secret-free retry job so transport outages do not silently drop the alert.
+        try {
+            $notified = $notifier->sendPasswordChanged($user->email(), $user->displayName());
+        } catch (\Throwable) {
+            $notified = false;
+        }
+        if (!$notified) {
+            $logger->warning('password_changed_notification_deferred');
+            $this->enqueuePasswordChanged($db, $user->id());
+        }
 
         // The current authenticated session must not continue after the change.
         $tokens->setToken(null);
         $request->getSession()->invalidate();
 
         return $this->privateJson(['data' => ['reauthentication_required' => true]]);
+    }
+
+    private function enqueuePasswordChanged(Connection $db, string $userId): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        try {
+            $db->executeStatement(
+                <<<'SQL'
+                    INSERT INTO gf_password_recovery_outbox (
+                        id, user_id, kind, available_at, claimed_at, delivered_at,
+                        attempts, last_error_code, created_at, updated_at
+                    ) VALUES (
+                        :id, :user_id, :kind, :available_at, NULL, NULL,
+                        0, NULL, :created_at, :updated_at
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        available_at = VALUES(available_at),
+                        claimed_at = NULL,
+                        delivered_at = NULL,
+                        attempts = 0,
+                        last_error_code = NULL,
+                        updated_at = VALUES(updated_at)
+                    SQL,
+                [
+                    'id' => Uuid::v7()->toRfc4122(),
+                    'user_id' => $userId,
+                    'kind' => 'password_changed',
+                    'available_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            );
+        } catch (\Throwable) {
+            // Credential change is already committed; retry persistence is best-effort.
+        }
     }
 
     private function error(int $status, string $code, string $message): JsonResponse

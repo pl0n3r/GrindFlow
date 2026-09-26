@@ -55,8 +55,9 @@ final class NativePasswordRecoveryNotifier implements PasswordRecoveryNotifier
             return false;
         }
 
-        return @mail($email, $subject, $body, [
+        return @mail($email, mb_encode_mimeheader($subject, 'UTF-8', 'B'), $body, [
             'From' => $from,
+            'MIME-Version' => '1.0',
             'Content-Type' => 'text/plain; charset=UTF-8',
         ]);
     }

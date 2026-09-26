@@ -8,10 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 class PasswordRecoveryAcceptanceTests(unittest.TestCase):
     def test_reset_security_contract(self) -> None:
         controller = (ROOT / "symfony/src/Http/Controller/PasswordRecoveryController.php").read_text()
+        command = (ROOT / "symfony/src/Infrastructure/Mail/PasswordRecoveryDeliverCommand.php").read_text()
         migration = (ROOT / "symfony/migrations/Version20260926030500.php").read_text()
         self.assertIn("hash('sha256', $token)", controller)
-        self.assertIn("random_bytes(32)", controller)
-        self.assertIn("time() + 3600", controller)
+        self.assertIn("random_bytes(32)", command)
+        self.assertIn("time() + 3600", command)
         self.assertIn("FOR UPDATE", controller)
         self.assertIn("gf_password_reset_tokens", migration)
         self.assertIn("gf_password_recovery_outbox", migration)

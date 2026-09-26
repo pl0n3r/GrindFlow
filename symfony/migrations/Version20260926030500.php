@@ -50,7 +50,7 @@ final class Version20260926030500 extends AbstractMigration
                     FOREIGN KEY (user_id) REFERENCES gf_identity_users(id)
                     ON DELETE CASCADE,
                 CONSTRAINT ck_gf_password_recovery_outbox_kind
-                    CHECK (kind IN ('reset'))
+                    CHECK (kind IN ('reset','password_changed'))
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             SQL);
         $this->addSql(<<<'SQL'
