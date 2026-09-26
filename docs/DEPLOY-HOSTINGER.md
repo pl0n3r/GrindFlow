@@ -225,3 +225,13 @@ funcional después de confirmar el checkout exacto.
 Las migraciones de base de datos son un caso reforzado: el POST de Admin System y `.github/workflows/production-migration.yml` ya no aceptan `backup_confirmed=1` ni un booleano `backup_verified`. Exigen un `backup_receipt` de 64 hex generado por `VerifiedBackupEvidence` sobre un archivo `operations/database-backups/*.sql.gz` real. El recibo liga checksum, fingerprint de migraciones y timestamp; vence a los 15 minutos y se vuelve inválido si cambia el archivo o el lote.
 
 El adaptador Factory `ops/factory/backup` conserva rollback de **release**, no hace dump de MariaDB. No confundirlo con backup DB. Hasta que un paso de backup de base produzca el archivo y su recibo verificable, el flujo de migración debe permanecer bloqueado. Nunca recrear el bypass mediante checkbox, comentario o input booleano.
+
+Después de crear un dump real en el almacenamiento local privado, registrar la evidencia sin imprimir credenciales:
+
+```bash
+php artisan operations:record-db-backup \
+  operations/database-backups/<archivo>.sql.gz \
+  <fingerprint-de-migraciones>
+```
+
+El comando imprime únicamente el ID SHA-256 del recibo. Ese valor se entrega como `backup_receipt` al workflow/controlador; el servidor vuelve a comprobar archivo, checksum, fingerprint y TTL antes de ejecutar la migración.

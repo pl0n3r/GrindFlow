@@ -116,6 +116,22 @@ class ProductionWritePolicyTest extends TestCase
         $evidence->assertValid($receipt, $fingerprint);
     }
 
+    public function test_backup_receipt_expires_after_fifteen_minutes(): void
+    {
+        Storage::fake('local');
+        $fingerprint = str_repeat('a', 64);
+        $archive = 'operations/database-backups/expiry-test.sql.gz';
+        Storage::disk('local')->put($archive, 'database-backup');
+        $evidence = app(VerifiedBackupEvidence::class);
+        $receipt = $evidence->record($archive, $fingerprint);
+
+        $this->travel(16)->minutes();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not recent enough');
+        $evidence->assertValid($receipt, $fingerprint);
+    }
+
     public function test_documentation_and_migration_flow_require_verifiable_backup_evidence(): void
     {
         config(['app.phase' => 'construccion']);
