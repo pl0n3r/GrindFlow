@@ -28,7 +28,7 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **24** | **+901** | **−48** | **+853** |
+| **29** | **+1290** | **−50** | **+1240** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
@@ -66,6 +66,7 @@ flowchart LR
 - `README.md`
 - `config/version.php`
 - `datos.yml`
+- `docs/DEPLOY-HOSTINGER.md`
 - `docs/privacidad/aviso-privacidad.md`
 - `docs/privacidad/politica-tratamiento.md`
 - `docs/privacidad/registro-tratamientos.md`
@@ -75,6 +76,7 @@ flowchart LR
 - `symfony/config/services.yaml`
 - `symfony/config/services_test.yaml`
 - `symfony/migrations/Version20260926030500.php`
+- `symfony/public/assets/password-recovery.js`
 - `symfony/src/Http/Controller/AccountSecurityController.php`
 - `symfony/src/Http/Controller/PasswordRecoveryController.php`
 - `symfony/src/Identity/Entity/IdentityUser.php`
@@ -82,10 +84,13 @@ flowchart LR
 - `symfony/src/Identity/Security/PasswordRecoveryNotifier.php`
 - `symfony/src/Infrastructure/Mail/InMemoryPasswordRecoveryNotifier.php`
 - `symfony/src/Infrastructure/Mail/NativePasswordRecoveryNotifier.php`
+- `symfony/src/Infrastructure/Mail/PasswordRecoveryDeliverCommand.php`
 - `symfony/templates/identity/forgot-password.html.twig`
 - `symfony/templates/identity/login.html.twig`
 - `symfony/templates/identity/recover-password.html.twig`
+- `symfony/tests/e2e/password-recovery-fragment.spec.mjs`
 - `symfony/tests/php/PasswordRecoveryTest.php`
+- `tests/Feature/PrivacyAsCodeTest.php`
 - `tests/test_password_recovery_acceptance.py`
 
 ## Validación
