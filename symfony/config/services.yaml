@@ -1,6 +1,6 @@
 parameters:
   grindflow_vault_root_default: ''
-  grindflow_direct_upload_secret_default: ''
+  grindflow_direct_upload_secret_default: ''\n  grindflow_ops_key_id_default: ''\n  grindflow_ops_secret_default: ''\n  grindflow_ops_allowlist_default: ''\n  grindflow_ops_rate_limit_default: 60
 
 services:
   _defaults:
@@ -39,3 +39,11 @@ services:
   GrindFlow\Infrastructure\Storage\VaultVerifyStageCommand:
     arguments:
       $projectDir: '%kernel.project_dir%'
+
+
+  GrindFlow\Ops\Security\StaffOpsRequestAuthenticator:
+    arguments:
+      $keyId: '%env(default:grindflow_ops_key_id_default:GRINDFLOW_OPS_KEY_ID)%'
+      $secret: '%env(default:grindflow_ops_secret_default:GRINDFLOW_OPS_SECRET)%'
+      $allowlist: '%env(default:grindflow_ops_allowlist_default:GRINDFLOW_OPS_ALLOWLIST)%'
+      $rateLimit: '%env(int:default:grindflow_ops_rate_limit_default:GRINDFLOW_OPS_RATE_LIMIT)%'
