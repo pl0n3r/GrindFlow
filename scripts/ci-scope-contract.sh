@@ -86,6 +86,13 @@ expect_flag "$migration_plan" $RUN_SYMFONY_ENABLED "migration reversal planner s
 post_restore_guard="$(run_scope pull_request scripts/symfony-post-restore-tenant-guard.sh)"
 expect_flag "$post_restore_guard" $RUN_SYMFONY_ENABLED "post-restore tenant guard selects Symfony gate"
 
+rector_tooling="$(run_scope pull_request rector.php tools/rector/composer.json tools/rector/composer.lock)"
+expect_flag "$rector_tooling" "run_php_quality=true" "Rector tooling selects php-quality"
+expect_flag "$rector_tooling" "run_tests=true" "Rector tooling keeps Laravel tests"
+expect_flag "$rector_tooling" "run_database=true" "Rector tooling keeps MariaDB validation"
+expect_flag "$rector_tooling" "run_browser=true" "Rector tooling keeps browser validation"
+expect_flag "$rector_tooling" "$RUN_REALSTACK_ENABLED" "Rector tooling keeps real-stack validation"
+
 legacy="$(run_scope pull_request src/lib/example.ts)"
 expect_flag "$legacy" "run_legacy=true" "legacy source selects legacy gate"
 
