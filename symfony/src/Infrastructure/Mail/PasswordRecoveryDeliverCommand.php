@@ -73,14 +73,14 @@ final class PasswordRecoveryDeliverCommand extends Command
                 <<<'SQL'
                     SELECT id, user_id, kind
                     FROM gf_password_recovery_outbox
-                    WHERE kind = :kind
+                    WHERE kind IN ('reset', 'password_changed')
                       AND delivered_at IS NULL
                       AND available_at <= :now
                       AND (claimed_at IS NULL OR claimed_at < :stale)
                     ORDER BY created_at, id
                     LIMIT 1
                     SQL,
-                ['kind' => 'reset', 'now' => $now, 'stale' => $stale],
+                ['now' => $now, 'stale' => $stale],
             );
             if ($row === false) {
                 return null;

@@ -164,6 +164,7 @@ final class AccountSecurityController extends AbstractController
                         0, NULL, :created_at, :updated_at
                     )
                     ON DUPLICATE KEY UPDATE
+                        id = VALUES(id),
                         available_at = VALUES(available_at),
                         claimed_at = NULL,
                         delivered_at = NULL,

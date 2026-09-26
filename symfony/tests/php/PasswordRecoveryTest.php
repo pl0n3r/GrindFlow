@@ -24,6 +24,10 @@ final class PasswordRecoveryTest extends WebTestCase
     {
         $client = static::createClient();
         $client->disableReboot();
+        $limiterCache = static::getContainer()->get('cache.rate_limiter');
+        if ($limiterCache instanceof \Psr\Cache\CacheItemPoolInterface) {
+            $limiterCache->clear();
+        }
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         /** @var InMemoryPasswordRecoveryNotifier $mailer */
@@ -129,6 +133,9 @@ final class PasswordRecoveryTest extends WebTestCase
             $client->submit($login->filter('form.identity-form')->form(['email' => $email, 'password' => $next]));
             self::assertResponseRedirects('/organizations');
         } finally {
+            if ($limiterCache instanceof \Psr\Cache\CacheItemPoolInterface) {
+                $limiterCache->clear();
+            }
             $db->delete('gf_identity_security_audit', ['user_id' => $userId]);
             $db->delete('gf_password_recovery_outbox', ['user_id' => $userId]);
             $db->delete('gf_password_reset_tokens', ['user_id' => $userId]);

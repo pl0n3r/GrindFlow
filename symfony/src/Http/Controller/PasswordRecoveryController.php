@@ -91,6 +91,7 @@ final class PasswordRecoveryController extends AbstractController
                                 0, NULL, :created_at, :updated_at
                             )
                             ON DUPLICATE KEY UPDATE
+                                id = VALUES(id),
                                 available_at = VALUES(available_at),
                                 claimed_at = NULL,
                                 delivered_at = NULL,
@@ -130,6 +131,7 @@ final class PasswordRecoveryController extends AbstractController
         PasswordPolicy $passwordPolicy,
         PasswordRecoveryNotifier $notifier,
         ProductVersion $version,
+        LoggerInterface $logger,
         #[Target('password_reset_ip')] RateLimiterFactoryInterface $ipLimiter,
         #[Target('password_reset_account')] RateLimiterFactoryInterface $accountLimiter,
     ): Response {
@@ -205,9 +207,51 @@ final class PasswordRecoveryController extends AbstractController
             return $this->privateRecoveryPage($version, false, 'El enlace de recuperación no es válido o ya fue usado.', 422);
         }
 
-        $notifier->sendPasswordChanged($user->email(), $user->displayName());
+        try {
+            $notified = $notifier->sendPasswordChanged($user->email(), $user->displayName());
+        } catch (\Throwable) {
+            $notified = false;
+        }
+        if (!$notified) {
+            $logger->warning('password_changed_notification_deferred');
+            $this->enqueuePasswordChanged($db, $userId, $logger);
+        }
 
         return $this->privateRecoveryPage($version, true, null);
+    }
+
+    private function enqueuePasswordChanged(Connection $db, string $userId, LoggerInterface $logger): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        try {
+            $db->executeStatement(
+                <<<'SQL'
+                    INSERT INTO gf_password_recovery_outbox (
+                        id, user_id, kind, available_at, claimed_at, delivered_at,
+                        attempts, last_error_code, created_at, updated_at
+                    ) VALUES (
+                        :id, :user_id, 'password_changed', :now, NULL, NULL,
+                        0, NULL, :now, :now
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        id = VALUES(id),
+                        available_at = VALUES(available_at),
+                        claimed_at = NULL,
+                        delivered_at = NULL,
+                        attempts = 0,
+                        last_error_code = NULL,
+                        created_at = VALUES(created_at),
+                        updated_at = VALUES(updated_at)
+                    SQL,
+                [
+                    'id' => Uuid::v7()->toRfc4122(),
+                    'user_id' => $userId,
+                    'now' => $now,
+                ],
+            );
+        } catch (DbalException) {
+            $logger->warning('password_changed_notification_queue_failed');
+        }
     }
 
     private function audit(Connection $db, string $userId, string $event): void
