@@ -73,4 +73,9 @@ class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
     {
         return $this->name;
     }
+
+    public function email(): string
+    {
+        return $this->email;
+    }
 }

@@ -1,6 +1,8 @@
 parameters:
   grindflow_vault_root_default: ''
   grindflow_direct_upload_secret_default: ''
+  grindflow_mail_from_default: ''
+  grindflow_public_base_url_default: 'https://www.grindflow.com.co'
 
 services:
   _defaults:
@@ -39,3 +41,11 @@ services:
   GrindFlow\Infrastructure\Storage\VaultVerifyStageCommand:
     arguments:
       $projectDir: '%kernel.project_dir%'
+
+  GrindFlow\Infrastructure\Mail\NativePasswordRecoveryNotifier:
+    arguments:
+      $from: '%env(default:grindflow_mail_from_default:GRINDFLOW_MAIL_FROM)%'
+      $publicBaseUrl: '%env(default:grindflow_public_base_url_default:GRINDFLOW_PUBLIC_BASE_URL)%'
+
+  GrindFlow\Identity\Security\PasswordRecoveryNotifier:
+    alias: GrindFlow\Infrastructure\Mail\NativePasswordRecoveryNotifier

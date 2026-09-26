@@ -7,6 +7,10 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Identity\Security\PasswordPolicy;
+use GrindFlow\Identity\Security\PasswordRecoveryNotifier;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Uid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,6 +32,9 @@ final class AccountSecurityController extends AbstractController
         Connection $db,
         UserPasswordHasherInterface $hasher,
         TokenStorageInterface $tokens,
+        PasswordPolicy $passwordPolicy,
+        PasswordRecoveryNotifier $notifier,
+        LoggerInterface $logger,
         #[Target('profile_password')] RateLimiterFactoryInterface $attemptLimiter,
     ): JsonResponse {
         $user = $this->getUser();
@@ -65,9 +72,8 @@ final class AccountSecurityController extends AbstractController
 
         $old = $body['current_password'];
         $new = $body['new_password'];
-        if ($old === '' || strlen($old) > 1024 || strlen($new) > 256
-            || preg_match('/\A.{12,128}\z/usD', $new) !== 1) {
-            return $this->error(422, 'invalid_password', 'La nueva contraseña debe tener entre 12 y 128 caracteres.');
+        if ($old === '' || strlen($old) > 1024 || !$passwordPolicy->isAcceptable($new)) {
+            return $this->error(422, 'invalid_password', 'Elige una contraseña segura de 12 a 128 caracteres.');
         }
         if (!hash_equals($new, $body['confirm_password'])) {
             return $this->error(422, 'password_confirmation_mismatch', 'Las nuevas contraseñas no coinciden.');
@@ -102,7 +108,17 @@ final class AccountSecurityController extends AbstractController
                 ],
             );
 
-            return $written === 1 ? 'changed' : 'revoked';
+            if ($written !== 1) {
+                return 'revoked';
+            }
+            $db->insert('gf_identity_security_audit', [
+                'id' => Uuid::v7()->toRfc4122(),
+                'user_id' => $user->id(),
+                'event' => 'password_changed',
+                'occurred_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+
+            return 'changed';
         });
 
         if ($result === 'incorrect') {
@@ -115,11 +131,59 @@ final class AccountSecurityController extends AbstractController
             return $this->error(403, 'account_access_changed', 'Tu cuenta ya no está disponible.');
         }
 
+        // Notification failure must never roll the credential back. Persist a
+        // secret-free retry job so transport outages do not silently drop the alert.
+        try {
+            $notified = $notifier->sendPasswordChanged($user->email(), $user->displayName());
+        } catch (\Throwable) {
+            $notified = false;
+        }
+        if (!$notified) {
+            $logger->warning('password_changed_notification_deferred');
+            $this->enqueuePasswordChanged($db, $user->id());
+        }
+
         // The current authenticated session must not continue after the change.
         $tokens->setToken(null);
         $request->getSession()->invalidate();
 
         return $this->privateJson(['data' => ['reauthentication_required' => true]]);
+    }
+
+    private function enqueuePasswordChanged(Connection $db, string $userId): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        try {
+            $db->executeStatement(
+                <<<'SQL'
+                    INSERT INTO gf_password_recovery_outbox (
+                        id, user_id, kind, available_at, claimed_at, delivered_at,
+                        attempts, last_error_code, created_at, updated_at
+                    ) VALUES (
+                        :id, :user_id, :kind, :available_at, NULL, NULL,
+                        0, NULL, :created_at, :updated_at
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        id = VALUES(id),
+                        available_at = VALUES(available_at),
+                        claimed_at = NULL,
+                        delivered_at = NULL,
+                        attempts = 0,
+                        last_error_code = NULL,
+                        updated_at = VALUES(updated_at)
+                    SQL,
+                [
+                    'id' => Uuid::v7()->toRfc4122(),
+                    'user_id' => $userId,
+                    'kind' => 'password_changed',
+                    'available_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            );
+        } catch (\Throwable) {
+            // Credential change is already committed; retry persistence is best-effort.
+        }
     }
 
     private function error(int $status, string $code, string $message): JsonResponse
