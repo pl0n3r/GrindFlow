@@ -39,7 +39,7 @@
 | Gate agregador obligatorio | **validate** exige php-quality seleccionado; Sonar y CodeRabbit separados |
 | Static analysis | PHPStan/Larastan nivel 6; baseline solo para deuda reproducible y sin ignores obsoletos · Rector PHP 8.5 + dead-code/code-quality nivel 0 + Laravel code quality |
 | CI local canónico | **GrindFlow CI / validate** |
-| Rol del PR | **Ingeniería de software · Infraestructura · QA** |
+| Rol del PR | **Ingeniería de software · Infraestructura · QA · Seguridad** |
 
 ## Flujo de entrega
 ```mermaid
