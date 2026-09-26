@@ -26,7 +26,7 @@ class MediaConnectionScheduler
             ->where('status', MediaConnection::STATUS_ACTIVE)
             ->whereNotNull('next_scan_at')
             ->where('next_scan_at', '<=', now())
-            ->orderBy('next_scan_at')
+            ->oldest('next_scan_at')
             ->limit($batchSize)
             ->get();
 
@@ -66,11 +66,7 @@ class MediaConnectionScheduler
                 continue;
             }
 
-            ScanMediaConnection::dispatch(
-                (string) $connection->getKey(),
-                (string) $connection->organization_id,
-                (string) $actor->getKey(),
-            );
+            dispatch(new ScanMediaConnection((string) $connection->getKey(), (string) $connection->organization_id, (string) $actor->getKey()));
 
             $dispatched++;
         }

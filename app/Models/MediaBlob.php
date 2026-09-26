@@ -9,6 +9,7 @@ class MediaBlob extends TenantModel
 {
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'storage_disk',
         'storage_key',

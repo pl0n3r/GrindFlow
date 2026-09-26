@@ -114,10 +114,9 @@ class OAuthConnectionCoordinator
             );
         }
 
-        return redirect()
-            ->route('organizations.vault.index', [
-                'organizationId' => $organizationId,
-            ])
+        return to_route('organizations.vault.index', [
+            'organizationId' => $organizationId,
+        ])
             ->with('status', $providerName.' conectado correctamente.');
     }
 
@@ -126,10 +125,9 @@ class OAuthConnectionCoordinator
         string $message,
         string $provider,
     ): RedirectResponse {
-        return redirect()
-            ->route('organizations.vault.index', [
-                'organizationId' => $organizationId,
-            ])
+        return to_route('organizations.vault.index', [
+            'organizationId' => $organizationId,
+        ])
             ->withErrors([$provider => $message]);
     }
 }

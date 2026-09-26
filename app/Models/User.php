@@ -24,12 +24,14 @@ class User extends Authenticatable
     use HasUuids;
     use Notifiable;
 
+    #[\Override]
     protected $fillable = [
         'name',
         'email',
         'password',
     ];
 
+    #[\Override]
     protected $hidden = [
         'password',
         'remember_token',

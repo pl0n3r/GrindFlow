@@ -12,6 +12,7 @@ class Membership extends Model
 {
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'organization_id',
         'user_id',

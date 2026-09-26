@@ -8,21 +8,21 @@ use RuntimeException;
 
 class GitHubActionsOidcVerifier
 {
-    private const ISSUER = 'https://token.actions.githubusercontent.com';
+    private const string ISSUER = 'https://token.actions.githubusercontent.com';
 
-    private const JWKS_URL = self::ISSUER.'/.well-known/jwks';
+    private const string JWKS_URL = self::ISSUER.'/.well-known/jwks';
 
-    private const AUDIENCE = 'grindflow-production-smoke-bootstrap';
+    private const string AUDIENCE = 'grindflow-production-smoke-bootstrap';
 
-    private const REPOSITORY = 'pl0n3r/GrindFlow';
+    private const string REPOSITORY = 'pl0n3r/GrindFlow';
 
-    private const REPOSITORY_ID = '1377610265';
+    private const string REPOSITORY_ID = '1377610265';
 
-    private const OWNER_ID = '64439547';
+    private const string OWNER_ID = '64439547';
 
-    private const REF = 'refs/heads/main';
+    private const string REF = 'refs/heads/main';
 
-    private const WORKFLOW_REF = 'pl0n3r/GrindFlow/.github/workflows/production-smoke.yml@refs/heads/main';
+    private const string WORKFLOW_REF = 'pl0n3r/GrindFlow/.github/workflows/production-smoke.yml@refs/heads/main';
 
     /**
      * @return array<string, mixed>

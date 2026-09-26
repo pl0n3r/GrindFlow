@@ -48,8 +48,7 @@ class RunMigrationsController extends Controller
         if (flock($lock, LOCK_EX | LOCK_NB) === false) {
             fclose($lock);
 
-            return redirect()
-                ->route('admin.system')
+            return to_route('admin.system')
                 ->withErrors([
                     'migration' => 'Otra migracion ya esta en ejecucion.',
                 ]);
@@ -59,8 +58,7 @@ class RunMigrationsController extends Controller
             $snapshot = $readiness->snapshot();
 
             if ($snapshot['names'] === []) {
-                return redirect()
-                    ->route('admin.system')
+                return to_route('admin.system')
                     ->withErrors([
                         'migration' => 'No hay migraciones pendientes.',
                     ]);
@@ -70,8 +68,7 @@ class RunMigrationsController extends Controller
                 $snapshot['fingerprint'],
                 (string) $validated['migration_batch'],
             ) === false) {
-                return redirect()
-                    ->route('admin.system')
+                return to_route('admin.system')
                     ->withErrors([
                         'migration' => 'El lote de migraciones cambió. Recarga System y revísalo de nuevo.',
                     ]);
@@ -87,8 +84,7 @@ class RunMigrationsController extends Controller
             fclose($lock);
         }
 
-        return redirect()
-            ->route('admin.system')
+        return to_route('admin.system')
             ->with('status', 'Migraciones de base de datos completadas.');
     }
 }

@@ -17,6 +17,7 @@ class ScheduledPublication extends TenantModel
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    #[\Override]
     protected $fillable = [
         'media_asset_id',
         'publishing_destination_id',

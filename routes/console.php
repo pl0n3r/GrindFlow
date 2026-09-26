@@ -6,12 +6,10 @@ use App\Services\Traffic\TrafficAttributionRecorder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('grindflow:status', function (): int {
-    return 0;
-})->purpose('Verify the GrindFlow Laravel application can boot.');
+Artisan::command('grindflow:status', fn (): int => 0)->purpose('Verify the GrindFlow Laravel application can boot.');
 
 Artisan::command('grindflow:dispatch-media-scans', function (): int {
-    $dispatched = app(MediaConnectionScheduler::class)->dispatchDue();
+    $dispatched = resolve(MediaConnectionScheduler::class)->dispatchDue();
 
     $this->info("Dispatched {$dispatched} media connection scan(s).");
 
@@ -19,7 +17,7 @@ Artisan::command('grindflow:dispatch-media-scans', function (): int {
 })->purpose('Dispatch due tenant-scoped media connection scans.');
 
 Artisan::command('grindflow:dispatch-publications', function (): int {
-    $dispatched = app(DistributionScheduler::class)->dispatchDue();
+    $dispatched = resolve(DistributionScheduler::class)->dispatchDue();
 
     $this->info("Dispatched {$dispatched} publication delivery job(s).");
 
@@ -35,7 +33,7 @@ Schedule::command('grindflow:dispatch-publications')
     ->withoutOverlapping(5);
 
 Artisan::command('grindflow:prune-traffic-dedupes', function (): int {
-    $deleted = app(TrafficAttributionRecorder::class)->pruneExpired();
+    $deleted = resolve(TrafficAttributionRecorder::class)->pruneExpired();
 
     $this->info("Pruned {$deleted} expired traffic dedupe row(s).");
 

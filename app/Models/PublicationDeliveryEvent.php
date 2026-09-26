@@ -15,6 +15,7 @@ class PublicationDeliveryEvent extends TenantModel
 {
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'publication_delivery_id',
         'event_type',

@@ -50,7 +50,7 @@ class ProcessMediaAsset implements OrganizationAwareJob, ShouldBeUnique, ShouldQ
      */
     public function middleware(): array
     {
-        return [app(UseOrganizationContext::class)];
+        return [resolve(UseOrganizationContext::class)];
     }
 
     public function uniqueId(): string

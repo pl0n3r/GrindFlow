@@ -48,16 +48,15 @@ Route::post('/internal/production-smoke/bootstrap', ProductionSmokeBootstrapCont
     ->middleware('throttle:6,1')
     ->name('production-smoke.bootstrap');
 
-Route::get('/_deployment', static function (): JsonResponse {
+Route::get('/_deployment',
     // Version humana observable, sin inferir el SHA del checkout remoto.
-    return response()->json([
+    static fn (): JsonResponse => response()->json([
         'version' => (string) config('version.number'),
         'exact' => false,
         'commit' => null,
         'source' => 'release-only',
     ])->header('Cache-Control', 'no-store, max-age=0')
-        ->header('X-Content-Type-Options', 'nosniff');
-})->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
+        ->header('X-Content-Type-Options', 'nosniff'))->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
     ->name('deployment.marker');
 
 Route::get('/l/{token}', TrackedLinkRedirectController::class)

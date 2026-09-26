@@ -70,12 +70,7 @@ class MediaProcessingCoordinator
         $asset->forceFill(['metadata' => $metadata])->save();
 
         try {
-            ProcessMediaAsset::dispatch(
-                (string) $asset->getKey(),
-                $organizationId,
-                (string) $actor->getKey(),
-                $processorVersion,
-            );
+            dispatch(new ProcessMediaAsset((string) $asset->getKey(), $organizationId, (string) $actor->getKey(), $processorVersion));
         } catch (Throwable $exception) {
             $metadata = $this->metadata($asset);
             $metadata['processing'] = [

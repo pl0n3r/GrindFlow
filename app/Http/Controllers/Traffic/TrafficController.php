@@ -12,7 +12,7 @@ use App\Services\Traffic\TrackedLinkManager;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -42,7 +42,7 @@ class TrafficController extends Controller
         $to = $filters['to'] ?? now('UTC')->toDateString();
         // Exclusive next-day bound includes the full final UTC day on both DATE
         // and datetime-backed test databases without wrapping indexed columns.
-        $toExclusive = Carbon::parse($to, 'UTC')->addDay()->toDateString();
+        $toExclusive = Date::parse($to, 'UTC')->addDay()->toDateString();
         $totalClicks = 0;
         $linkCount = 0;
         $channels = collect();
@@ -58,8 +58,7 @@ class TrafficController extends Controller
                 ->with(['scheduledPublicationLinks.scheduledPublication.destination'])
                 ->withSum(['dailyMetrics as total_clicks' => fn ($query) => $query
                     ->where('metric_date', '>=', $from)
-                    ->where('metric_date', '<', $toExclusive)], 'clicks')
-                ->orderByDesc('created_at')
+                    ->where('metric_date', '<', $toExclusive)], 'clicks')->latest()
                 ->orderByDesc('id')
                 ->paginate(25)
                 ->appends(collect($filters)->except('page')->all());
@@ -70,7 +69,7 @@ class TrafficController extends Controller
                 ->where('metric_date', '<', $toExclusive)
                 ->selectRaw('metric_date, SUM(clicks) as clicks')
                 ->groupBy('metric_date')
-                ->orderBy('metric_date')
+                ->oldest('metric_date')
                 ->get();
             $totalClicks = (int) $series->sum('clicks');
             $channels = TrackedLink::query()->whereNotNull('channel')->distinct()->orderBy('channel')->pluck('channel');
@@ -115,10 +114,10 @@ class TrafficController extends Controller
         $to = $filters['to'] ?? now('UTC')->toDateString();
         // Exclusive next-day bound includes the full final UTC day on both DATE
         // and datetime-backed test databases without wrapping indexed columns.
-        $toExclusive = Carbon::parse($to, 'UTC')->addDay()->toDateString();
+        $toExclusive = Date::parse($to, 'UTC')->addDay()->toDateString();
 
-        if (Carbon::parse($from, 'UTC')->diffInDays(
-            Carbon::parse($to, 'UTC'),
+        if (Date::parse($from, 'UTC')->diffInDays(
+            Date::parse($to, 'UTC'),
         ) >= 366) {
             throw ValidationException::withMessages([
                 'to' => 'The CSV export supports up to 366 days.',
@@ -152,7 +151,7 @@ class TrafficController extends Controller
                 $filters['tracked_link_id'] ?? null,
                 fn ($query, $id) => $query->where('links.id', $id),
             )
-            ->orderBy('metrics.metric_date')
+            ->oldest('metrics.metric_date')
             ->orderBy('links.id')
             ->select([
                 'metrics.metric_date',
@@ -253,10 +252,9 @@ class TrafficController extends Controller
                 : null,
         );
 
-        return redirect()
-            ->route('organizations.traffic.index', [
-                'organizationId' => $this->organization($request)->getKey(),
-            ])
+        return to_route('organizations.traffic.index', [
+            'organizationId' => $this->organization($request)->getKey(),
+        ])
             ->with('status', 'Tracked link created.');
     }
 
@@ -314,10 +312,9 @@ class TrafficController extends Controller
             (string) $validated['status'],
         );
 
-        return redirect()
-            ->route('organizations.traffic.index', [
-                'organizationId' => $organization->getKey(),
-            ])
+        return to_route('organizations.traffic.index', [
+            'organizationId' => $organization->getKey(),
+        ])
             ->with(
                 'status',
                 $validated['status'] === TrackedLink::STATUS_DISABLED

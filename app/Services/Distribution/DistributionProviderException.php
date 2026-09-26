@@ -6,11 +6,11 @@ use RuntimeException;
 
 final class DistributionProviderException extends RuntimeException
 {
-    public const KIND_AUTHENTICATION = 'authentication';
+    public const string KIND_AUTHENTICATION = 'authentication';
 
-    public const KIND_RATE_LIMIT = 'rate_limit';
+    public const string KIND_RATE_LIMIT = 'rate_limit';
 
-    public const KIND_TRANSIENT = 'transient';
+    public const string KIND_TRANSIENT = 'transient';
 
     private function __construct(
         public readonly string $kind,

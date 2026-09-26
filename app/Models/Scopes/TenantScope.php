@@ -14,7 +14,7 @@ class TenantScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
-        $organizationId = app(TenantContext::class)->organizationId();
+        $organizationId = resolve(TenantContext::class)->organizationId();
 
         if ($organizationId === null) {
             $builder->whereRaw('1 = 0');

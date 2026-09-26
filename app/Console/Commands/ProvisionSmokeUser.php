@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use PDOException;
 use RuntimeException;
@@ -17,8 +18,10 @@ use Throwable;
 
 class ProvisionSmokeUser extends Command
 {
+    #[\Override]
     protected $signature = 'grindflow:provision-smoke-user';
 
+    #[\Override]
     protected $description = 'Reconcile the synthetic production smoke identity safely and idempotently.';
 
     public function handle(): int
@@ -125,7 +128,7 @@ class ProvisionSmokeUser extends Command
                     throw new RuntimeException('Timed out waiting for smoke-user provisioning lock.');
                 }
 
-                usleep(100_000);
+                Sleep::usleep(100_000);
             }
 
             return $callback();

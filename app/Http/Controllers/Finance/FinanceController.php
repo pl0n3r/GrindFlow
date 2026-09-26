@@ -51,8 +51,7 @@ class FinanceController extends Controller
 
             $allocations = $report->filtered($filters)
                 ->with(['beneficiary', 'createdBy', 'reversalOf', 'reversal'])
-                ->orderByDesc('occurred_on')
-                ->orderByDesc('created_at')
+                ->latest('occurred_on')->latest()
                 ->orderByDesc('id')
                 ->paginate(25)
                 ->appends($filters);
@@ -208,10 +207,9 @@ class FinanceController extends Controller
                 : null,
         );
 
-        return redirect()
-            ->route('organizations.finance.index', [
-                'organizationId' => $this->organization($request)->getKey(),
-            ])
+        return to_route('organizations.finance.index', [
+            'organizationId' => $this->organization($request)->getKey(),
+        ])
             ->with('status', 'Revenue allocation recorded.');
     }
 
@@ -231,10 +229,9 @@ class FinanceController extends Controller
             (string) $request->validated('reason'),
         );
 
-        return redirect()
-            ->route('organizations.finance.index', [
-                'organizationId' => $this->organization($request)->getKey(),
-            ])
+        return to_route('organizations.finance.index', [
+            'organizationId' => $this->organization($request)->getKey(),
+        ])
             ->with('status', 'Revenue allocation reversed.');
     }
 

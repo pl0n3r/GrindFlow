@@ -38,7 +38,7 @@ class DispatchScheduledPublication implements OrganizationAwareJob, ShouldBeUniq
      */
     public function middleware(): array
     {
-        return [app(UseOrganizationContext::class)];
+        return [resolve(UseOrganizationContext::class)];
     }
 
     public function uniqueId(): string

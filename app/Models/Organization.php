@@ -18,6 +18,7 @@ class Organization extends Model
 
     use HasUuids;
 
+    #[\Override]
     protected $fillable = [
         'name',
         'slug',
@@ -53,7 +54,7 @@ class Organization extends Model
      * @param  Builder<Organization>  $query
      * @return Builder<Organization>
      */
-    public function scopeVisibleTo(Builder $query, User $user): Builder
+    protected function scopeVisibleTo(Builder $query, User $user): Builder
     {
         if ($user->isPlatformAdmin()) {
             return $query;

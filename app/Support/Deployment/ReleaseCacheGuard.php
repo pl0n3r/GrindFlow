@@ -12,7 +12,7 @@ class ReleaseCacheGuard
      *
      * @var list<string>
      */
-    private const FINGERPRINT_PATHS = [
+    private const array FINGERPRINT_PATHS = [
         'bootstrap/app.php',
         'composer.lock',
         'routes/console.php',

@@ -104,10 +104,9 @@ class VaultController extends Controller
             ? 'Archivo registrado como duplicado sin guardar una segunda copia.'
             : 'Archivo agregado al Vault.';
 
-        return redirect()
-            ->route('organizations.vault.index', [
-                'organizationId' => $this->organization($request)->getKey(),
-            ])
+        return to_route('organizations.vault.index', [
+            'organizationId' => $this->organization($request)->getKey(),
+        ])
             ->with('status', $message);
     }
 

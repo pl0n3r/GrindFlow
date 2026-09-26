@@ -9,9 +9,9 @@ use Illuminate\Support\Str;
 
 class TrafficAttributionRecorder
 {
-    private const DEDUPE_MINUTES = 10;
+    private const int DEDUPE_MINUTES = 10;
 
-    private const DEDUPE_RETENTION_HOURS = 24;
+    private const int DEDUPE_RETENTION_HOURS = 24;
 
     public function record(
         string $organizationId,

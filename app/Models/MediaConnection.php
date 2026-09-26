@@ -19,6 +19,7 @@ class MediaConnection extends TenantModel
 
     public const STATUS_NEEDS_RECONNECT = 'needs_reconnect';
 
+    #[\Override]
     protected $fillable = [
         'authorized_by_user_id',
         'provider',
@@ -36,6 +37,7 @@ class MediaConnection extends TenantModel
         'metadata',
     ];
 
+    #[\Override]
     protected $hidden = [
         'access_ciphertext',
         'refresh_ciphertext',

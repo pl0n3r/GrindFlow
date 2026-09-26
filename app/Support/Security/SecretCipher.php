@@ -4,15 +4,15 @@ namespace App\Support\Security;
 
 class SecretCipher
 {
-    private const VERSION = 'v1';
+    private const string VERSION = 'v1';
 
-    private const ALGORITHM = 'aes-256-gcm';
+    private const string ALGORITHM = 'aes-256-gcm';
 
-    private const IV_BYTES = 12;
+    private const int IV_BYTES = 12;
 
-    private const TAG_BYTES = 16;
+    private const int TAG_BYTES = 16;
 
-    private const KEY_BYTES = 32;
+    private const int KEY_BYTES = 32;
 
     public function encrypt(string $plaintext, ?string $context = null): string
     {

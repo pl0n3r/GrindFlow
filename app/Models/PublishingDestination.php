@@ -13,6 +13,7 @@ class PublishingDestination extends TenantModel
 
     public const STATUS_DISABLED = 'disabled';
 
+    #[\Override]
     protected $fillable = [
         'name',
         'provider',

@@ -14,6 +14,7 @@ class MediaAsset extends TenantModel
 
     public const STATUS_DUPLICATE = 'duplicate';
 
+    #[\Override]
     protected $fillable = [
         'media_blob_id',
         'duplicate_of',

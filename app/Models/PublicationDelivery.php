@@ -29,6 +29,7 @@ class PublicationDelivery extends TenantModel
 
     public const STATUS_FAILED = 'failed';
 
+    #[\Override]
     protected $fillable = [
         'scheduled_publication_id',
         'idempotency_key',
