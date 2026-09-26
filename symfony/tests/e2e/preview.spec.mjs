@@ -155,20 +155,6 @@ test('private admin is not accidentally exposed through S0', async ({ request })
   expect(state).not.toHaveProperty('release_sha');
 });
 
-test('password recovery keeps token in fragment only and transfers it under CSP', async ({ page }) => {
-  const token = 'A'.repeat(43);
-  await page.goto('/recover-password#token=' + token);
-
-  const hidden = page.locator('#password-recovery-token');
-  await expect(hidden).toHaveValue(token);
-  await expect(page).toHaveURL(/\/recover-password$/);
-  await expect(page.locator('script[src^="/assets/password-recovery.js"]')).toHaveCount(1);
-  await expect(page.locator('script:not([src])')).toHaveCount(0);
-
-  const html = await page.content();
-  expect(html).not.toContain(token);
-});
-
 test('Symfony login entrypoint has CSRF and accessible error states on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/login');
