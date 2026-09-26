@@ -34,7 +34,7 @@
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **matriz completa** por cambio al core CI; php-quality exige PHPStan + Rector dry-run |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
 | PR + snapshot exacto | **PR #178 · Issue #140 · v0.1.143**; README debe coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** exige php-quality seleccionado; Sonar y CodeRabbit separados |
 | Static analysis | PHPStan/Larastan nivel 6; baseline solo para deuda reproducible y sin ignores obsoletos · Rector PHP 8.5 + dead-code/code-quality nivel 0 + Laravel code quality |
