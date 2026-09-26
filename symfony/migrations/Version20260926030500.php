@@ -32,6 +32,28 @@ final class Version20260926030500 extends AbstractMigration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             SQL);
         $this->addSql(<<<'SQL'
+            CREATE TABLE gf_password_recovery_outbox (
+                id CHAR(36) NOT NULL,
+                user_id CHAR(36) NOT NULL,
+                kind VARCHAR(16) NOT NULL,
+                available_at DATETIME NOT NULL,
+                claimed_at DATETIME NULL,
+                delivered_at DATETIME NULL,
+                attempts INT UNSIGNED NOT NULL DEFAULT 0,
+                last_error_code VARCHAR(48) NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_gf_password_recovery_outbox_user_kind (user_id, kind),
+                INDEX ix_gf_password_recovery_outbox_delivery (kind, delivered_at, available_at),
+                CONSTRAINT fk_gf_password_recovery_outbox_user
+                    FOREIGN KEY (user_id) REFERENCES gf_identity_users(id)
+                    ON DELETE CASCADE,
+                CONSTRAINT ck_gf_password_recovery_outbox_kind
+                    CHECK (kind IN ('reset'))
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SQL);
+        $this->addSql(<<<'SQL'
             CREATE TABLE gf_identity_security_audit (
                 id CHAR(36) NOT NULL,
                 user_id CHAR(36) NULL,
@@ -51,6 +73,7 @@ final class Version20260926030500 extends AbstractMigration
     public function down(Schema $schema): void
     {
         $this->addSql('DROP TABLE gf_identity_security_audit');
+        $this->addSql('DROP TABLE gf_password_recovery_outbox');
         $this->addSql('DROP TABLE gf_password_reset_tokens');
     }
 }

@@ -14,7 +14,9 @@ class PasswordRecoveryAcceptanceTests(unittest.TestCase):
         self.assertIn("time() + 3600", controller)
         self.assertIn("FOR UPDATE", controller)
         self.assertIn("gf_password_reset_tokens", migration)
+        self.assertIn("gf_password_recovery_outbox", migration)
         self.assertNotIn("token VARCHAR", migration)
+        self.assertNotIn("email VARCHAR", migration)
 
     def test_authenticated_change_and_session_invalidation(self) -> None:
         controller = (ROOT / "symfony/src/Http/Controller/AccountSecurityController.php").read_text()
@@ -26,8 +28,19 @@ class PasswordRecoveryAcceptanceTests(unittest.TestCase):
         notifier = (ROOT / "symfony/src/Infrastructure/Mail/NativePasswordRecoveryNotifier.php").read_text()
         template = (ROOT / "symfony/templates/identity/recover-password.html.twig").read_text()
         self.assertIn("GRINDFLOW_MAIL_FROM", (ROOT / "symfony/config/services.yaml").read_text())
+        asset = (ROOT / "symfony/public/assets/password-recovery.js").read_text()
+        command = (ROOT / "symfony/src/Infrastructure/Mail/PasswordRecoveryDeliverCommand.php").read_text()
+        controller = (ROOT / "symfony/src/Http/Controller/PasswordRecoveryController.php").read_text()
         self.assertIn("/recover-password#token=", notifier)
         self.assertIn("no-referrer", template)
+        self.assertIn("/assets/password-recovery.js", template)
+        self.assertNotIn("window.location.hash", template)
+        self.assertIn("window.location.hash", asset)
+        self.assertIn("history.replaceState", asset)
+        self.assertIn("gf_password_recovery_outbox", controller)
+        self.assertNotIn("sendReset(", controller.split("public function recover", 1)[0])
+        self.assertIn("sendReset(", command)
+        self.assertIn("'token_hash' => $tokenHash", command)
         self.assertNotRegex(template, re.compile(r"\?token="))
 
     def test_privacy_inventory_covers_password_reset_and_mail_provider(self) -> None:

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace GrindFlow\Tests;
 
 use Doctrine\DBAL\Connection;
+use GrindFlow\Identity\Security\PasswordRecoveryNotifier;
 use GrindFlow\Infrastructure\Mail\InMemoryPasswordRecoveryNotifier;
+use GrindFlow\Infrastructure\Mail\PasswordRecoveryDeliverCommand;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Uid\Uuid;
 
 final class PasswordRecoveryTest extends WebTestCase
@@ -60,6 +63,14 @@ final class PasswordRecoveryTest extends WebTestCase
                 preg_match('/Si existe una cuenta activa/', $knownBody),
             );
 
+            self::assertSame([], $mailer->messages());
+            self::assertSame(1, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_password_recovery_outbox WHERE user_id = ?', [$userId],
+            ));
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_password_reset_tokens WHERE user_id = ?', [$userId],
+            ));
+            self::deliverPending($db, $mailer);
             $messages = $mailer->messages();
             self::assertCount(1, $messages);
             self::assertSame('reset', $messages[0]['type']);
@@ -77,7 +88,8 @@ final class PasswordRecoveryTest extends WebTestCase
             self::assertResponseIsSuccessful();
             self::assertSame('no-referrer', $client->getResponse()->headers->get('Referrer-Policy'));
             self::assertSame('', $reset->filter('#password-recovery-token')->attr('value'));
-            self::assertStringContainsString('window.location.hash', (string) $client->getResponse()->getContent());
+            self::assertStringContainsString('/assets/password-recovery.js', (string) $client->getResponse()->getContent());
+            self::assertStringNotContainsString('<script>', (string) $client->getResponse()->getContent());
             self::assertStringNotContainsString($token, (string) $client->getResponse()->getContent());
 
             $client->submit($reset->filter('form')->form([
@@ -118,6 +130,7 @@ final class PasswordRecoveryTest extends WebTestCase
             self::assertResponseRedirects('/organizations');
         } finally {
             $db->delete('gf_identity_security_audit', ['user_id' => $userId]);
+            $db->delete('gf_password_recovery_outbox', ['user_id' => $userId]);
             $db->delete('gf_password_reset_tokens', ['user_id' => $userId]);
             $db->delete('gf_identity_users', ['id' => $userId]);
         }
@@ -179,6 +192,8 @@ final class PasswordRecoveryTest extends WebTestCase
             $forgot = $client->request('GET', '/forgot-password');
             $client->submit($forgot->filter('form')->form(['email' => $email]));
             self::assertResponseIsSuccessful();
+            self::assertSame([], $mailer->messages());
+            self::deliverPending($db, $mailer);
             $messages = $mailer->messages();
             self::assertCount(1, $messages);
             $token = (string) $messages[0]['token'];
@@ -202,6 +217,7 @@ final class PasswordRecoveryTest extends WebTestCase
             self::assertResponseRedirects('/login');
         } finally {
             $db->delete('gf_identity_security_audit', ['user_id' => $userId]);
+            $db->delete('gf_password_recovery_outbox', ['user_id' => $userId]);
             $db->delete('gf_password_reset_tokens', ['user_id' => $userId]);
             $db->delete('gf_identity_memberships', ['id' => $membershipId]);
             $db->delete('gf_identity_organizations', ['id' => $organizationId]);
@@ -234,6 +250,7 @@ public function testReissueInvalidatesPreviousTokenAndCommonPasswordIsRejected()
                 $page = $client->request('GET', '/forgot-password');
                 $client->submit($page->filter('form')->form(['email' => $email]));
                 self::assertResponseIsSuccessful();
+                self::deliverPending($db, $mailer);
             }
             $messages = $mailer->messages();
             self::assertCount(2, $messages);
@@ -254,8 +271,80 @@ public function testReissueInvalidatesPreviousTokenAndCommonPasswordIsRejected()
             )));
         } finally {
             $db->delete('gf_identity_security_audit', ['user_id' => $id]);
+            $db->delete('gf_password_recovery_outbox', ['user_id' => $id]);
             $db->delete('gf_password_reset_tokens', ['user_id' => $id]);
             $db->delete('gf_identity_users', ['id' => $id]);
         }
     }
+    public function testDeliveryFailureCannotDeleteANewerResetToken(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+
+        $userId = Uuid::v7()->toRfc4122();
+        $email = $userId.'@example.test';
+        $now = gmdate('Y-m-d H:i:s');
+        $db->insert('gf_identity_users', [
+            'id' => $userId, 'name' => 'Compare delete', 'email' => $email,
+            'password_hash' => password_hash('synthetic-source-password-123', PASSWORD_BCRYPT),
+            'platform_role' => 'model', 'is_active' => 1,
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+
+        try {
+            $page = $client->request('GET', '/forgot-password');
+            $client->submit($page->filter('form')->form(['email' => $email]));
+            self::assertResponseIsSuccessful();
+
+            $newerHash = str_repeat('a', 64);
+            $failing = new class($db, $userId, $newerHash) implements PasswordRecoveryNotifier {
+                public function __construct(
+                    private readonly Connection $db,
+                    private readonly string $userId,
+                    private readonly string $newerHash,
+                ) {
+                }
+
+                public function sendReset(string $email, string $displayName, string $token): bool
+                {
+                    $this->db->update('gf_password_reset_tokens', [
+                        'token_hash' => $this->newerHash,
+                        'expires_at' => gmdate('Y-m-d H:i:s', time() + 3600),
+                    ], ['user_id' => $this->userId]);
+
+                    return false;
+                }
+
+                public function sendPasswordChanged(string $email, string $displayName): bool
+                {
+                    return false;
+                }
+            };
+
+            $tester = new CommandTester(new PasswordRecoveryDeliverCommand($db, $failing));
+            self::assertSame(1, $tester->execute(['--limit' => '1']));
+            self::assertSame($newerHash, $db->fetchOne(
+                'SELECT token_hash FROM gf_password_reset_tokens WHERE user_id = ?', [$userId],
+            ));
+            self::assertSame('delivery_failed', $db->fetchOne(
+                'SELECT last_error_code FROM gf_password_recovery_outbox WHERE user_id = ?', [$userId],
+            ));
+        } finally {
+            $db->delete('gf_password_recovery_outbox', ['user_id' => $userId]);
+            $db->delete('gf_password_reset_tokens', ['user_id' => $userId]);
+            $db->delete('gf_identity_security_audit', ['user_id' => $userId]);
+            $db->delete('gf_identity_users', ['id' => $userId]);
+        }
+    }
+
+    private static function deliverPending(
+        Connection $db,
+        InMemoryPasswordRecoveryNotifier $mailer,
+    ): void {
+        $tester = new CommandTester(new PasswordRecoveryDeliverCommand($db, $mailer));
+        self::assertSame(0, $tester->execute(['--limit' => '10']));
+    }
+
 }
