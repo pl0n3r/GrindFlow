@@ -145,7 +145,7 @@ final class PrivacyAsCodeTest extends TestCase
             'politica-tratamiento.md' => 'fb974d045d702f7466eaf1daa30dd31f958976f1adfce127b9f94e37b9aee636',
             'aviso-privacidad.md' => '35738e922a487f6b784e9bc0f1b2ed93d868b7fdaf35967f79d5c06a592b486b',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
-            'registro-tratamientos.md' => '23c48eb228530decc39b843323fa4676d7f480c46f9b7aa6db89a7ae9ddccd65',
+            'registro-tratamientos.md' => 'a90f69c924f11975dfc80639455ecf5040f7bebb7726a6dbfa164eea7bcabdf9',
             'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
             'retencion.md' => '27afabf1ea5af1da5ef3c0eea9fc093d950e455e266c5a83da8a535377abeec5',
         ];
