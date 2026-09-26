@@ -20,7 +20,7 @@ fi
 
 grep -Fq '"driftingly/rector-laravel": "2.6.2"' "$RECTOR_MANIFEST"
 grep -Fq '"rector/rector": "2.6.7"' "$RECTOR_MANIFEST"
-test -s "$RECTOR_LOCK"
+[[ -s "$RECTOR_LOCK" ]]
 grep -Fq '"name": "driftingly/rector-laravel"' "$RECTOR_LOCK"
 grep -Fq '"version": "2.6.2"' "$RECTOR_LOCK"
 grep -Fq '"name": "rector/rector"' "$RECTOR_LOCK"
