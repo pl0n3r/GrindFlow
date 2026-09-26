@@ -103,6 +103,7 @@ def run_case(
             "E2E_USER_PASSWORD": "synthetic-only-not-a-secret",
             "EXPECTED_PENDING": "7",
             "OUTPUT_PATH": str(output),
+            "BACKUP_RECEIPT": "d" * 64,
         })
         result = subprocess.run(
             ["bash", "scripts/run-production-migrations.sh"],
