@@ -1104,3 +1104,17 @@ PostgreSQL, exigir VPS/Docker ni copiar una API legada a Symfony. Portar
 invariantes de aislamiento, permisos, uso autorizado, trazabilidad y
 procesamiento responsable con pruebas negativas equivalentes. Para el plan
 de conmutación usar [STACK-TRANSITION-SYMFONY.md](docs/STACK-TRANSITION-SYMFONY.md).
+
+
+### Política de escrituras productivas durante construcción · D-059/#126
+
+Mientras `APP_PHASE=construccion`, GrindFlow permite operaciones productivas **autónomas, versionadas, no destructivas y reversibles** sin aprobación humana caso por caso. Esto cubre aprovisionamiento sintético, configuración y backfills acotados que tengan contrato/test y rollback conocido.
+
+Las salvaguardas no se relajan:
+- `APP_PHASE=live` desactiva toda escritura autónoma y falla cerrado.
+- `DROP`, `TRUNCATE`, borrado masivo, contracciones de esquema y cualquier operación irreversible siguen requiriendo autorización explícita del dueño.
+- Migraciones y escrituras masivas requieren simultáneamente lock exclusivo y un **recibo verificable de backup DB** generado a partir de un archivo `.sql.gz` real, ligado al fingerprint del lote y con antigüedad máxima de 15 minutos.
+- Una casilla, texto `backup-verified`, comentario, variable booleana o afirmación del operador **no es evidencia de backup**.
+- Si falta el archivo, cambia el checksum, cambia el lote, el recibo expira o la fase es inválida, la operación aborta antes de escribir.
+
+El runtime centraliza esta decisión en `ProductionWritePolicy` y `VerifiedBackupEvidence`. No dupliques la política en workflows, controladores o scripts; esos consumidores deben invocar/transportar la evidencia y dejar que el servidor valide.

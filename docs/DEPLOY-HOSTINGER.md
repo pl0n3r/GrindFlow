@@ -216,3 +216,12 @@ credenciales. Si Hostinger aún sirve otro checkout, el workflow falla cerrado.
 diagnóstico mientras exista, pero ya no participa en la decisión de deploy.
 Production Smoke permanece como señal autenticada separada de validación
 funcional después de confirmar el checkout exacto.
+
+
+## Escrituras productivas por fase y backup DB verificable
+
+`APP_PHASE` admite únicamente `construccion` o `live`. En construcción, operaciones no destructivas/versionadas pueden automatizarse. En live, la automatización de escrituras falla cerrado.
+
+Las migraciones de base de datos son un caso reforzado: el POST de Admin System y `.github/workflows/production-migration.yml` ya no aceptan `backup_confirmed=1` ni un booleano `backup_verified`. Exigen un `backup_receipt` de 64 hex generado por `VerifiedBackupEvidence` sobre un archivo `operations/database-backups/*.sql.gz` real. El recibo liga checksum, fingerprint de migraciones y timestamp; vence a los 15 minutos y se vuelve inválido si cambia el archivo o el lote.
+
+El adaptador Factory `ops/factory/backup` conserva rollback de **release**, no hace dump de MariaDB. No confundirlo con backup DB. Hasta que un paso de backup de base produzca el archivo y su recibo verificable, el flujo de migración debe permanecer bloqueado. Nunca recrear el bypass mediante checkbox, comentario o input booleano.
