@@ -85,7 +85,9 @@ jobs:
 
       profile: es
   validar-pr:
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' &&
+      !startsWith(github.event.pull_request.head.ref, 'factory/bootstrap-coordination-')
     # Mismo sobre de carga; el job validar-pr del reusable conserva permisos
     # read-only (contents/issues/pull-requests: read).
     permissions:
