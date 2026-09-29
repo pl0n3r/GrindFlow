@@ -10,5 +10,8 @@ class FactoryCoordinationAdoptionTests(unittest.TestCase):
         self.assertIn("profile: es", text)
         self.assertNotIn("@main", text)
         self.assertNotIn("coordinar_trabajo.py", text)
+        self.assertIn("!startsWith(github.event.pull_request.head.ref, 'factory/bootstrap-coordination-')", text)
+        self.assertIn("require_reservation: true", text)
+        self.assertIn("operation: pr", text)
         for event in ("issue_comment:", "issues:", "pull_request:", "workflow_dispatch:", "schedule:"):
             self.assertIn(event, text)
