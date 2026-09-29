@@ -18,3 +18,19 @@ framework:
       policy: sliding_window
       limit: 8
       interval: '15 minutes'
+    password_recovery_ip:
+      policy: fixed_window
+      limit: 20
+      interval: '1 hour'
+    password_recovery_account:
+      policy: fixed_window
+      limit: 5
+      interval: '1 hour'
+    password_reset_ip:
+      policy: sliding_window
+      limit: 12
+      interval: '15 minutes'
+    password_reset_account:
+      policy: sliding_window
+      limit: 8
+      interval: '15 minutes'

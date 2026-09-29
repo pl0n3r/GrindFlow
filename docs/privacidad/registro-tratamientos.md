@@ -7,7 +7,7 @@ Producto: `pl0n3r/GrindFlow`
 ## account_credentials
 
 - Categoría: `authentication`
-- Campos de software: `password`, `remember_token`
+- Campos de software: `password`, `password_hash`, `remember_token`, `password_reset_token_hash`, `password_reset_expires_at`, `security_event`
 - Finalidad: `account_security`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`

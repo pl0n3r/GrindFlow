@@ -216,3 +216,40 @@ credenciales. Si Hostinger aún sirve otro checkout, el workflow falla cerrado.
 diagnóstico mientras exista, pero ya no participa en la decisión de deploy.
 Production Smoke permanece como señal autenticada separada de validación
 funcional después de confirmar el checkout exacto.
+
+## Entrega diferida de correos de recuperación Symfony
+
+La solicitud pública de recuperación no ejecuta SMTP ni `mail()` dentro del
+request HTTP. Guarda únicamente un handoff local en
+`gf_password_recovery_outbox`; el token real se genera después, en memoria,
+cuando un worker procesa la cola. La tabla de outbox no almacena token, correo
+ni cuerpo del mensaje.
+
+Después de desplegar la migración que crea
+`gf_password_recovery_outbox`, configurar en hPanel un Cron Job
+**personalizado** que ejecute periódicamente el comando Symfony desde el
+release activo, por ejemplo cada 5 minutos:
+
+```bash
+cd /ruta/real/al/release/symfony && php bin/console grindflow:password-recovery:deliver --limit=20
+```
+
+La ruta es específica del hosting y no se versiona. Los horarios de Cron en
+hPanel se interpretan en UTC. Probar el comando manualmente en el checkout
+correcto antes de habilitar la tarea periódica y verificar que no imprime
+correos, tokens, nombres, IDs ni excepciones de transporte.
+
+Reglas operativas:
+
+- no habilitar el Cron antes de que la migración aditiva esté aplicada;
+- no ejecutar dos Crons con el mismo propósito; el claim DB tolera concurrencia,
+  pero duplicar schedulers solo consume recursos;
+- una entrega fallida conserva el job para reintento y elimina únicamente el
+  `token_hash` generado por ese intento;
+- una nueva solicitud invalida inmediatamente el token anterior y reemplaza el
+  handoff pendiente;
+- el worker genera el token solo en memoria, persiste únicamente SHA-256 y no
+  lo escribe en logs;
+- `GRINDFLOW_MAIL_FROM` y cualquier configuración real del transporte siguen
+  siendo secretos/configuración del entorno, nunca del repositorio;
+- Production Smoke no debe solicitar recuperaciones reales ni consumir tokens.
