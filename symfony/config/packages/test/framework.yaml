@@ -1,9 +1,5 @@
 framework:
   test: true
-  cache:
-    pools:
-      cache.rate_limiter:
-        adapter: cache.adapter.array
   session:
     # Use test-only storage; native PHP sessions fail after PHPUnit writes output.
     storage_factory_id: session.storage.factory.mock_file

@@ -140,7 +140,7 @@ final class AccountSecurityController extends AbstractController
         }
         if (!$notified) {
             $logger->warning('password_changed_notification_deferred');
-            $this->enqueuePasswordChanged($db, $user->id());
+            $this->enqueuePasswordChanged($db, $user->id(), $logger);
         }
 
         // The current authenticated session must not continue after the change.
@@ -150,7 +150,7 @@ final class AccountSecurityController extends AbstractController
         return $this->privateJson(['data' => ['reauthentication_required' => true]]);
     }
 
-    private function enqueuePasswordChanged(Connection $db, string $userId): void
+    private function enqueuePasswordChanged(Connection $db, string $userId, LoggerInterface $logger): void
     {
         $now = gmdate('Y-m-d H:i:s');
         try {
@@ -164,6 +164,7 @@ final class AccountSecurityController extends AbstractController
                         0, NULL, :created_at, :updated_at
                     )
                     ON DUPLICATE KEY UPDATE
+                        id = VALUES(id),
                         available_at = VALUES(available_at),
                         claimed_at = NULL,
                         delivered_at = NULL,
@@ -181,7 +182,7 @@ final class AccountSecurityController extends AbstractController
                 ],
             );
         } catch (\Throwable) {
-            // Credential change is already committed; retry persistence is best-effort.
+            $logger->warning('password_changed_notification_queue_failed');
         }
     }
 
