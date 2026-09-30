@@ -2,8 +2,9 @@
 
 > Extensión normativa de [AGENTS.md](../AGENTS.md). Este documento conserva las
 > reglas operativas trasladadas para reducir el contexto de arranque sin cambiar
-> su semántica. La precedencia general sigue definida por AGENTS.md y
-> PLAN-AGENTES.md.
+> su semántica. La precedencia general sigue definida por AGENTS.md. El
+> PLAN-AGENTES.md global solo puede imponer un límite menor de agentes cuando
+> así lo establezca AGENTS.md.
 
 ### Regla de eficiencia CI
 
