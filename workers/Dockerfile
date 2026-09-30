@@ -20,8 +20,8 @@ RUN apt-get update \
 WORKDIR /app
 
 # Las dependencias antes que el codigo: cambiar un worker no reinstala todo.
-COPY workers/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir --only-binary=:all: -r requirements.txt
+COPY workers/requirements.lock ./requirements.lock
+RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements.lock
 
 COPY workers/ ./
 

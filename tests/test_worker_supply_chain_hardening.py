@@ -10,11 +10,54 @@ class WorkerSupplyChainHardeningTests(unittest.TestCase):
         docker = (ROOT / "workers" / "Dockerfile").read_text()
         requirements = (ROOT / "workers" / "requirements.txt").read_text().splitlines()
         node_docker = (ROOT / "workers" / "node.Dockerfile").read_text()
-        self.assertIn("--only-binary=:all:", docker)
+        self.assertIn("--require-hashes --only-binary=:all:", docker)
+        self.assertIn("-r requirements.lock", docker)
         packages = [line for line in requirements if line and not line.startswith("#")]
         self.assertTrue(packages)
         self.assertTrue(all("==" in line for line in packages))
         self.assertIn("npm ci --ignore-scripts", node_docker)
+
+    def test_python_worker_installs_hashed_transitive_lock(self) -> None:
+        docker = (ROOT / "workers" / "Dockerfile").read_text()
+        self.assertIn("COPY workers/requirements.lock ./requirements.lock", docker)
+        self.assertIn(
+            "pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements.lock",
+            docker,
+        )
+        self.assertNotIn("-r requirements.txt", docker)
+
+    def test_python_worker_lock_is_fully_pinned_and_hashed(self) -> None:
+        lock = (ROOT / "workers" / "requirements.lock").read_text()
+        logical = []
+        current = ""
+        for raw in lock.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            current += (" " if current else "") + line.rstrip("\\").strip()
+            if not line.endswith("\\"):
+                logical.append(current)
+                current = ""
+        self.assertFalse(current)
+        self.assertGreaterEqual(len(logical), 10)
+        for requirement in logical:
+            self.assertRegex(requirement, r"^[A-Za-z0-9_.-]+(?:\[binary\])?==[^ ]+ ")
+            self.assertRegex(requirement, r"--hash=sha256:[0-9a-f]{64}(?: |$)")
+        names = {re.split(r"\[|==", requirement, maxsplit=1)[0].lower() for requirement in logical}
+        self.assertTrue(
+            {"boto3", "botocore", "s3transfer", "jmespath", "python-dateutil",
+             "urllib3", "six", "psycopg", "psycopg-binary", "typing-extensions",
+             "pillow"}.issubset(names)
+        )
+
+    def test_python_worker_install_contract_fails_closed(self) -> None:
+        docker = (ROOT / "workers" / "Dockerfile").read_text()
+        lock = (ROOT / "workers" / "requirements.lock").read_text()
+        self.assertNotIn("requirements.txt ./requirements.txt", docker)
+        self.assertNotIn("pip install -r", docker)
+        self.assertNotRegex(lock, r"(?m)^[A-Za-z0-9_.-]+(?:\[binary\])?(?:>=|~=|>|<)")
+        self.assertNotIn("--index-url", lock)
+        self.assertNotIn("--extra-index-url", lock)
 
     def test_node_worker_does_not_use_npx_at_runtime(self) -> None:
         node_docker = (ROOT / "workers" / "node.Dockerfile").read_text()
