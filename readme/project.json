@@ -1,0 +1,8 @@
+{
+  "name": "GrindFlow",
+  "tagline": "SaaS multi-tenant para gestionar contenido, distribución programada, atribución de tráfico y operaciones de ingresos.",
+  "role": "product",
+  "phase": "construction",
+  "roadmap": "GitHub Issue #2",
+  "stack": "Symfony 7.4 + Doctrine/MariaDB + React/TypeScript/Vite + Twig; transición gobernada desde Laravel/Next.js legacy"
+}
