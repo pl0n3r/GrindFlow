@@ -3,6 +3,9 @@ parameters:
   grindflow_direct_upload_secret_default: ''
   grindflow_mail_from_default: ''
   grindflow_public_base_url_default: 'https://www.grindflow.com.co'
+  grindflow_ops_keys_json_default: '{}'
+  grindflow_ops_allowlist_default: ''
+  grindflow_ops_rate_limit_default: 60
 
 services:
   _defaults:
@@ -49,3 +52,18 @@ services:
 
   GrindFlow\Identity\Security\PasswordRecoveryNotifier:
     alias: GrindFlow\Infrastructure\Mail\NativePasswordRecoveryNotifier
+
+  GrindFlow\Ops\Http\StaffOpsController:
+    tags: ['controller.service_arguments']
+
+  GrindFlow\Ops\Security\StaffOpsConfiguration:
+    arguments:
+      $keysJson: '%env(default:grindflow_ops_keys_json_default:GRINDFLOW_OPS_KEYS_JSON)%'
+      $allowlist: '%env(default:grindflow_ops_allowlist_default:GRINDFLOW_OPS_ALLOWLIST)%'
+
+  GrindFlow\Ops\Security\StaffOpsRequestAuthenticator:
+    arguments:
+      $rateLimit: '%env(int:default:grindflow_ops_rate_limit_default:GRINDFLOW_OPS_RATE_LIMIT)%'
+
+  GrindFlow\Ops\Routing\StaffOpsRouteLoader:
+    tags: ['routing.loader']

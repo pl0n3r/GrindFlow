@@ -14,6 +14,9 @@ Producto: `pl0n3r/GrindFlow`
 | legacy_supabase_upload_audit | location | review_required | review_required |
 | media_vault | usage | review_required | review_required |
 | organization_membership | identification | review_required | review_required |
+| staff_access_metadata | usage | review_required | review_required |
+| staff_contact | contact | review_required | review_required |
+| staff_identity | identification | review_required | review_required |
 | traffic_dedupe | usage | dedupe_24h | review_required |
 | traffic_links | usage | review_required | review_required |
 | traffic_metrics | usage | review_required | review_required |

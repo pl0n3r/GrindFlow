@@ -3,3 +3,7 @@ controllers:
     path: ../src/Http/Controller/
     namespace: GrindFlow\Http\Controller
   type: attribute
+
+staff_ops:
+  resource: .
+  type: grindflow_ops

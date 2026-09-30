@@ -44,7 +44,7 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#186 · adoptar README Contract v1](https://github.com/pl0n3r/GrindFlow/issues/186).
+- **NOW:** [#174 · API de staff para ControlBot (D-060)](https://github.com/pl0n3r/GrindFlow/issues/174).
 - **NEXT:** seleccionar el siguiente trabajo `ready` desde el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) después de cerrar el trabajo activo.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
