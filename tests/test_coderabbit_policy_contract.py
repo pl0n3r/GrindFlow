@@ -46,10 +46,8 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
     def test_exact_head_substantive_review_is_required(self) -> None:
         review={"user":{"type":"Bot","login":REVIEWER},"state":"COMMENTED","body":"review completa","commit_id":"2"*40}
         self.assertTrue(substantive_review_satisfies(review, required_bot=REVIEWER, head_sha="2"*40))
-
-    def test_changes_requested_never_satisfies(self) -> None:
-        review={"user":{"type":"Bot","login":REVIEWER},"state":"CHANGES_REQUESTED","body":"hay cambios","commit_id":"2"*40}
-        self.assertFalse(substantive_review_satisfies(review, required_bot=REVIEWER, head_sha="2"*40))
+        requested={**review,"state":"CHANGES_REQUESTED","body":"hay cambios"}
+        self.assertFalse(substantive_review_satisfies(requested, required_bot=REVIEWER, head_sha="2"*40))
 
     def test_rate_limit_or_status_without_review_does_not_satisfy(self) -> None:
         empty={"user":{"type":"Bot","login":REVIEWER},"state":"COMMENTED","body":"","commit_id":"2"*40}
