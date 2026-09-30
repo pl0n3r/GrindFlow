@@ -5,8 +5,14 @@ BASE_URL="${BASE_URL:-https://www.grindflow.com.co}"
 E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-admin@grindflow.test}"
 OUTPUT_PATH="${OUTPUT_PATH:-production-migration-result.json}"
 EXPECTED_PENDING="${EXPECTED_PENDING:-1}"
+BACKUP_RECEIPT="${BACKUP_RECEIPT:-}"
 
 : "${E2E_USER_PASSWORD:?E2E_USER_PASSWORD is required}"
+
+if [[ ! "$BACKUP_RECEIPT" =~ ^[0-9a-f]{64}$ ]]; then
+  printf 'ERROR: BACKUP_RECEIPT must be a verified 64-hex receipt id.\n' >&2
+  exit 2
+fi
 
 if [[ ! "$EXPECTED_PENDING" =~ ^[0-9]+$ ]] || (( EXPECTED_PENDING < 1 )); then
   printf 'ERROR: EXPECTED_PENDING must be a positive integer.\n' >&2
@@ -263,7 +269,7 @@ migration_token="${migration_form_fields[0]}"
 migration_batch="${migration_form_fields[1]}"
 
 set +e
-migration_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 120   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$migration_token"   --data-urlencode "backup_confirmed=1"   --data-urlencode "confirmation=MIGRAR"   --data-urlencode "migration_batch=$migration_batch"   "$BASE_URL/admin/system/migrations")"
+migration_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 120   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$migration_token"   --data-urlencode "backup_receipt=$BACKUP_RECEIPT"   --data-urlencode "confirmation=MIGRAR"   --data-urlencode "migration_batch=$migration_batch"   "$BASE_URL/admin/system/migrations")"
 migration_exit=$?
 set -e
 

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Operations\MigrationReadiness;
+use App\Support\Operations\ProductionWritePolicy;
+use App\Support\Operations\VerifiedBackupEvidence;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -15,6 +17,8 @@ class RunMigrationsController extends Controller
     public function __invoke(
         Request $request,
         MigrationReadiness $readiness,
+        ProductionWritePolicy $writePolicy,
+        VerifiedBackupEvidence $backupEvidence,
     ): RedirectResponse {
         $user = $request->user();
 
@@ -24,7 +28,7 @@ class RunMigrationsController extends Controller
         );
 
         $validated = $request->validate([
-            'backup_confirmed' => ['required', 'accepted'],
+            'backup_receipt' => ['required', 'regex:/\\A[a-f0-9]{64}\\z/'],
             'confirmation' => ['required', 'in:MIGRAR'],
             'migration_batch' => [
                 'required',
@@ -72,6 +76,24 @@ class RunMigrationsController extends Controller
                     ->withErrors([
                         'migration' => 'El lote de migraciones cambió. Recarga System y revísalo de nuevo.',
                     ]);
+            }
+
+            try {
+                $backupEvidence->assertValid(
+                    (string) $validated['backup_receipt'],
+                    $snapshot['fingerprint'],
+                );
+                $writePolicy->assertAutonomousWriteAllowed(
+                    operation: 'migration',
+                    destructive: false,
+                    bulk: true,
+                    versioned: true,
+                    backupVerified: true,
+                    lockHeld: true,
+                );
+            } catch (RuntimeException $exception) {
+                return to_route('admin.system')
+                    ->withErrors(['migration' => $exception->getMessage()]);
             }
 
             $exitCode = Artisan::call('migrate', ['--force' => true]);

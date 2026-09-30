@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Support\Operations\MigrationReadiness;
+use App\Support\Operations\VerifiedBackupEvidence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 use Mockery;
 use Tests\TestCase;
 
@@ -31,7 +33,12 @@ class AdminMigrationTest extends TestCase
             'platform_role' => UserRole::Admin,
         ]);
 
+        config(['app.phase' => 'construccion']);
+        Storage::fake('local');
         $fingerprint = str_repeat('a', 64);
+        $archive = 'operations/database-backups/admin-test.sql.gz';
+        Storage::disk('local')->put($archive, 'database-backup');
+        $receipt = app(VerifiedBackupEvidence::class)->record($archive, $fingerprint);
         $readiness = Mockery::mock(MigrationReadiness::class);
         $readiness->shouldReceive('snapshot')
             ->once()
@@ -48,7 +55,7 @@ class AdminMigrationTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.system.migrate'), [
-                'backup_confirmed' => '1',
+                'backup_receipt' => $receipt,
                 'confirmation' => 'MIGRAR',
                 'migration_batch' => $fingerprint,
             ])

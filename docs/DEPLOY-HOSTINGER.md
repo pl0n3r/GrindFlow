@@ -162,23 +162,24 @@ preferido no requiere SSH:
 
 1. iniciar sesion como administrador de plataforma;
 2. abrir `Admin > System`;
-3. revisar el contador **Pending migrations**;
-4. confirmar que el cambio fue validado por CI y que existe recovery/backup
-   aplicable;
-5. pulsar **Run pending migrations** una sola vez;
-6. confirmar que el contador vuelve a cero y dejar que Production Smoke valide
+3. revisar el contador **Pending migrations** y su fingerprint;
+4. crear un backup DB real `.sql.gz` en almacenamiento privado y registrar
+   su evidencia con `operations:record-db-backup` para ese fingerprint;
+5. introducir el `backup_receipt` vigente y la confirmacion `MIGRAR`;
+6. pulsar **Run pending migrations** una sola vez;
+7. confirmar que el contador vuelve a cero y dejar que Production Smoke valide
    las rutas autenticadas.
 
-La accion usa CSRF, requiere `platform_role=admin` y toma un lock local para
-evitar dos ejecuciones simultaneas. GitHub Actions y Production Smoke nunca
-ejecutan migraciones de produccion.
+La accion usa CSRF, requiere `platform_role=admin`, vuelve a validar el recibo
+contra archivo/checksum/fingerprint/TTL y toma un lock local exclusivo antes de
+ejecutar. GitHub Actions y Production Smoke nunca ejecutan migraciones de
+produccion por si mismos.
 
-SSH queda como ruta de recuperacion si la interfaz administrativa no puede
-arrancar. En ese caso, el comando explicito sigue siendo:
-
-```bash
-/opt/alt/php85/usr/bin/php artisan migrate --force
-```
+SSH queda como ruta de diagnostico/recuperacion si la interfaz administrativa
+no puede arrancar. No ejecutar `artisan migrate --force` directamente: ese
+comando saltaria `VerifiedBackupEvidence` y `ProductionWritePolicy`. Primero
+restaurar el control plane o usar un procedimiento de recuperacion expresamente
+autorizado que mantenga backup verificable y lock equivalente.
 
 GF-MIG-002 no se considera VALIDATED IN PRODUCTION hasta comprobar el flujo real
 contra la MariaDB de Hostinger.
@@ -253,3 +254,21 @@ Reglas operativas:
 - `GRINDFLOW_MAIL_FROM` y cualquier configuración real del transporte siguen
   siendo secretos/configuración del entorno, nunca del repositorio;
 - Production Smoke no debe solicitar recuperaciones reales ni consumir tokens.
+
+## Escrituras productivas por fase y backup DB verificable
+
+`APP_PHASE` admite únicamente `construccion` o `live`. En construcción, operaciones no destructivas/versionadas pueden automatizarse. En live, la automatización de escrituras falla cerrado.
+
+Las migraciones de base de datos son un caso reforzado: el POST de Admin System y `.github/workflows/production-migration.yml` ya no aceptan `backup_confirmed=1` ni un booleano `backup_verified`. Exigen un `backup_receipt` de 64 hex generado por `VerifiedBackupEvidence` sobre un archivo `operations/database-backups/*.sql.gz` real. El recibo liga checksum, fingerprint de migraciones y timestamp; vence a los 15 minutos y se vuelve inválido si cambia el archivo o el lote.
+
+El adaptador Factory `ops/factory/backup` conserva rollback de **release**, no hace dump de MariaDB. No confundirlo con backup DB. Hasta que un paso de backup de base produzca el archivo y su recibo verificable, el flujo de migración debe permanecer bloqueado. Nunca recrear el bypass mediante checkbox, comentario o input booleano.
+
+Después de crear un dump real en el almacenamiento local privado, registrar la evidencia sin imprimir credenciales:
+
+```bash
+php artisan operations:record-db-backup \
+  operations/database-backups/<archivo>.sql.gz \
+  <fingerprint-de-migraciones>
+```
+
+El comando imprime únicamente el ID SHA-256 del recibo. Ese valor se entrega como `backup_receipt` al workflow/controlador; el servidor vuelve a comprobar archivo, checksum, fingerprint y TTL antes de ejecutar la migración.

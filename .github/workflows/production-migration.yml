@@ -10,11 +10,10 @@ on:
         options:
           - '1'
           - '7'
-      backup_verified:
-        description: 'Confirm a current verified production backup exists'
+      backup_receipt:
+        description: '64-hex receipt generated from a verified recent DB backup'
         required: true
-        type: boolean
-        default: false
+        type: string
 
 concurrency:
   group: grindflow-production-migration
@@ -27,8 +26,7 @@ jobs:
   migrate:
     name: production-migration
     if: >-
-      github.actor == github.repository_owner &&
-      inputs.backup_verified == true
+      github.actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -37,6 +35,7 @@ jobs:
       E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
       OUTPUT_PATH: production-migration-result.json
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
+      BACKUP_RECEIPT: ${{ inputs.backup_receipt }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -73,6 +72,15 @@ jobs:
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Validate verified backup receipt input
+        if: steps.credentials.outputs.configured == 'true'
+        shell: bash
+        run: |
+          [[ "$BACKUP_RECEIPT" =~ ^[0-9a-f]{64}$ ]] || {
+            echo "::error::backup_receipt must be a 64-hex verified receipt id"
+            exit 1
+          }
 
       - name: Validate migration script
         if: steps.credentials.outputs.configured == 'true'
@@ -113,7 +121,7 @@ jobs:
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
             printf 'Artifact: `production-migration-%s`\n' "$GITHUB_RUN_ID"
             printf 'Approved pending count: **%s**\n' "$EXPECTED_PENDING"
-            echo "Verified backup confirmation: **required**"
+            echo "Verified backup receipt: **required and server-validated**"
             echo "Retention: **7 days**"
           } >> "$GITHUB_STEP_SUMMARY"
 

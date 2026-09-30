@@ -44,7 +44,7 @@
                 </div>
             @endif
 
-            @if ($errors->has('migration') || $errors->has('backup_confirmed') || $errors->has('confirmation') || $errors->has('migration_batch'))
+            @if ($errors->has('migration') || $errors->has('backup_receipt') || $errors->has('confirmation') || $errors->has('migration_batch'))
                 <div class="gf-alert" role="alert">
                     {{ $errors->first() }}
                 </div>
@@ -276,17 +276,25 @@
                                 >
 
                                 <div class="gf-field">
-                                    <label for="backup_confirmed">
-                                        <input
-                                            id="backup_confirmed"
-                                            type="checkbox"
-                                            name="backup_confirmed"
-                                            value="1"
-                                            required
-                                        >
-                                        Verifique personalmente un backup externo restaurable
-                                        de esta base de datos.
+                                    <label for="backup_receipt">
+                                        Recibo SHA-256 del backup DB verificable
                                     </label>
+                                    <input
+                                        class="gf-input"
+                                        id="backup_receipt"
+                                        name="backup_receipt"
+                                        type="text"
+                                        inputmode="latin"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        pattern="[a-f0-9]{64}"
+                                        maxlength="64"
+                                        required
+                                    >
+                                    <p class="gf-system-copy">
+                                        Debe corresponder al lote actual y a un archivo .sql.gz
+                                        comprobado hace menos de 15 minutos.
+                                    </p>
                                 </div>
 
                                 <div class="gf-field">

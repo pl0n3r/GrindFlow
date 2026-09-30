@@ -228,3 +228,10 @@ read the rendered HTML, submit its real CSRF/session forms, and verify
 results; they do not represent physical pointer actions. Do not run
 the write-capable browser suite against Hostinger. Production Smoke
 must remain authenticated/read-only with no /l/* click increments.
+
+
+## Contrato operativo de fase para producción
+
+La fase de desarrollo usa `APP_PHASE=construccion`: los agentes pueden ejecutar escrituras productivas rutinarias no destructivas cuando son versionadas, acotadas y reversibles. La transición a `APP_PHASE=live` restablece el modo estricto y deshabilita automatización de escrituras.
+
+Migraciones y operaciones masivas siempre añaden dos condiciones aunque la fase sea construcción: backup DB verificable inmediatamente anterior y lock exclusivo. La evidencia de backup es técnica (archivo + checksum + fingerprint + TTL), nunca una confirmación humana libre. Operaciones destructivas o irreversibles permanecen fuera de la autonomía del agente.

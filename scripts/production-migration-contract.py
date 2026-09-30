@@ -66,7 +66,7 @@ class ProductionFixture(http.server.BaseHTTPRequestHandler):
             type(self).submitted.append(data)
             fields_ok = (
                 data.get("_token") == ["c" * 40]
-                and data.get("backup_confirmed") == ["1"]
+                and data.get("backup_receipt") == ["d" * 64]
                 and data.get("confirmation") == ["MIGRAR"]
                 and data.get("migration_batch") == ["b" * 64]
             )
@@ -103,6 +103,7 @@ def run_case(
             "E2E_USER_PASSWORD": "synthetic-only-not-a-secret",
             "EXPECTED_PENDING": "7",
             "OUTPUT_PATH": str(output),
+            "BACKUP_RECEIPT": "d" * 64,
         })
         result = subprocess.run(
             ["bash", "scripts/run-production-migrations.sh"],
