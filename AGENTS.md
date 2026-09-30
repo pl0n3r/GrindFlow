@@ -884,14 +884,17 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
 - Una prueba E2E eficiente puede comprobar en una sola pasada salud, login,
   Dashboard, System, pending migrations, Diagnostics y Vault cuando esas rutas
   ya forman parte del alcance del cambio.
-- Optimizar E2E significa maximizar evidencia por sesion, **no** reducir cobe### Reglas operativas detalladas
+- Optimizar E2E significa maximizar evidencia por sesion, **no** reducir cobertura
+  ni esconder fallos mediante retries excesivos.
+
+### Reglas operativas detalladas
 
 Las reglas durables de eficiencia/selección de CI, dashboard README, CodeRabbit,
 Factory deploy, observación/real-stack, SonarQube Cloud y diagnósticos viven en
 [docs/AGENT-OPERATIONS.md](docs/AGENT-OPERATIONS.md). Son normativas y deben
-leerse además de este bootstrap cuando el slice toque esas superficies.
-
-el.log` crudo mediante una ruta publica o autenticada.
+leerse además de este bootstrap cuando el slice toque esas superficies. Las
+acciones operativas owner-only que usan `workflow_dispatch` siguen regidas allí;
+CI y Production Smoke no sustituyen esas guardas.
 
 ## Referencia archivada y políticas de migración
 
