@@ -22,6 +22,14 @@ class AgentsTrafficCompactionTests(unittest.TestCase):
             self.assertIn(heading, traffic)
             self.assertNotIn(heading, agents)
 
+        for phrase in (
+            "El limite CSV de 366 dias es INCLUSIVO",
+            "`insertOrIgnore + lockForUpdate`",
+            "Pausar/reanudar link no elimina metricas",
+            "Reusar StoreTrackedLinkRequest",
+        ):
+            self.assertNotIn(phrase, agents)
+
     def test_agents_links_traffic_rules_from_startup_map(self) -> None:
         agents = (ROOT / "AGENTS.md").read_text()
         startup = agents.split("## Decisión vigente y obligatoria", 1)[0]
