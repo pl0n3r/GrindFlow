@@ -37,6 +37,9 @@ class AgentsDocumentationCompactionTests(unittest.TestCase):
 
         self.assertIn("docs/AGENT-OPERATIONS.md", startup)
         self.assertIn("### Reglas operativas detalladas", agents)
+        self.assertIn("workflow_dispatch", agents)
+        self.assertIn("### Regla de pruebas E2E eficientes", agents)
+        self.assertIn("Optimizar E2E significa maximizar evidencia por sesion", agents)
         self.assertIn(
             "[docs/AGENT-OPERATIONS.md](docs/AGENT-OPERATIONS.md)",
             agents,
