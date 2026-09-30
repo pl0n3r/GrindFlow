@@ -1,88 +1,134 @@
-# GrindFlow — Último deploy
+# GrindFlow
 
-<p align="center">
-<a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
-<a href="https://sonarcloud.io/dashboard?id=pl0n3r_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
-<a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
-</p>
+> SaaS multi-tenant para gestionar contenido, distribución programada, atribución de tráfico y operaciones de ingresos.
 
-> **Candidata v0.1.145 · Issue #187.** Restaura el caller gobernado de coordinación Factory para reservas, validación de PRs y recuperación segura de trabajo.
+**Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-## Progress convention
-- ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
+GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
 
-## Fuentes de verdad
-[AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+## Operational Cockpit
 
-## Estado del deploy
-| Señal | Estado | Evidencia |
-| --- | --- | --- |
-| SHA exacto de main (base) | ✅ **4e28fbb277c3642e48535a005540d159c2c5c21e** | v0.1.144 |
-| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI 36587515565 |
-| Deploy Observer / Production Smoke base | ✅ **success / success** | 36587515637 / 36587515612 |
-| Version objetivo | 🚧 **v0.1.145** | coordinación Factory #187 |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | PR #188 · Issue #187 · v0.1.145 |
-| Producción objetivo | 🚧 sin desplegar | cambio de coordinación GitHub; runtime productivo no mutado |
-
-## Huella del cambio
-<!-- grindflow:git-delta -->
-| Archivos | Inserciones | Eliminaciones | Neto |
-| ---: | ---: | ---: | ---: |
-| **6** | **+248** | **−65** | **+183** |
-
-## Calidad y entrega
-<!-- grindflow:gate-plan -->
-| Control | Estado / contrato |
+<!-- factory:status:start -->
+| Señal | Estado |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · legacy** |
-| PR + snapshot exacto | **PR #188 · Issue #187 · v0.1.145**; README debe coincidir con HEAD final |
-| Gate agregador obligatorio | **validate** exige todos los gates seleccionados; Sonar y CodeRabbit separados |
-| Seguridad | bootstrap limitado al PR exacto same-repo; reserva/validación delegadas a Factory v1 |
-| CI local canónico | **GrindFlow CI / validate** |
-| Rol del PR | **Infraestructura · Ingeniería de software · Seguridad · QA** |
+| main SHA | UNKNOWN |
+| versión | UNKNOWN |
+| CI | UNKNOWN |
+| release | UNKNOWN |
+| health | UNKNOWN |
+| smoke/observer | UNKNOWN |
+| quality/security | UNKNOWN |
+| Issue activo | UNKNOWN |
+| PR activo | UNKNOWN |
+| último release | UNKNOWN |
+<!-- factory:status:end -->
 
-## Flujo de entrega
-~~~mermaid
-flowchart LR
-  A["main v0.1.144"] --> P["#187 · caller de coordinación"]
-  P --> Q["Factory v1 + tests deterministas"]
-  Q --> V["CI / validate · Sonar · CodeRabbit"]
-  V --> M["merge serial"]
-  M --> X["exact-main + coordinación operativa"]
-~~~
+### Progress + Readiness
 
-## Qué se hizo
-- Añade el caller .github/workflows/work-coordination.yml consumiendo exclusivamente pl0n3r/factory/.github/workflows/coordinacion.yml@v1.
-- Revalida PRs en opened, synchronize, edited, cambios draft/ready y cierre.
-- Conserva la cola de coordinación con cancel-in-progress: false y queue: max.
-- Delega /tomar al parser canónico para aceptar whitespace final sin fabricar reservas localmente.
-- Limita la excepción de bootstrap a factory/bootstrap-coordination-187 del mismo repositorio y valida el resto de PRs.
-- Añade regresiones deterministas para los seis jobs, sus condiciones y operaciones.
+<!-- factory:progress-readiness:start -->
+| Señal | Estado |
+| --- | --- |
+| Target | UNKNOWN |
+| Progress | UNKNOWN |
+| Readiness | UNKNOWN |
+| Evidence freshness | UNKNOWN |
+| Critical blockers | UNKNOWN |
+| Trend | UNKNOWN |
 
-## Archivos modificados en esta entrega candidata
-Inventario de solo el deploy actual:
-<!-- grindflow:changed-files -->
-- `.github/workflows/work-coordination.yml`
-- `README.md`
-- `config/version.php`
-- `package-lock.json`
-- `package.json`
-- `tests/test_factory_coordination_adoption.py`
-
-## Validación
-- workflow-syntax-check.rb valida el caller y las Actions oficiales.
-- test_factory_coordination_adoption.py fija eventos, condiciones y operaciones del caller.
-- Factory CI valida el reusable publicado sin copiar scripts a GrindFlow.
-- El bootstrap no cambia DB, runtime de producto ni producción.
-- Estado final exige GrindFlow CI, Factory CI, Sonar y CodeRabbit del mismo HEAD antes del merge.
-
-## Qué sigue
-[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
-
-## Panorama general pendiente
-| Lane | Frente | Estado |
+| Dimensión | Progress | Readiness |
 | --- | --- | --- |
-| **NOW** | 🚧 #187 · coordinación Factory | 🚧 validando v0.1.145 |
-| **NEXT** | 🚧 #127 · reserva canónica | 🚧 desbloquear tras merge |
-| **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + dependencias externas | ⛔ pendiente |
-| **LATER** | 🚧 roadmap de producto | 🚧 preservado |
+| UNKNOWN | UNKNOWN | UNKNOWN |
+<!-- factory:progress-readiness:end -->
+
+> Los bloques anteriores son derivados. `UNKNOWN` o `PENDING` significa que falta evidencia canónica; nunca se promueve a `GREEN` o `DEGRADED` sin evidencia.
+
+## Work Queue
+
+- **NOW:** [#186 · adoptar README Contract v1](https://github.com/pl0n3r/GrindFlow/issues/186).
+- **NEXT:** seleccionar el siguiente trabajo `ready` desde el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) después de cerrar el trabajo activo.
+- **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+- **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
+
+Esta vista resume el trabajo; no sustituye el roadmap, los Issues ni las Releases.
+
+## Qué hace el producto
+
+GrindFlow gestiona el ciclo de vida de contenido multimedia para equipos y creadores: biblioteca y organización de recursos, programación, distribución a destinos configurados, enlaces rastreables, atribución de tráfico y soporte a operaciones de ingresos. La especificación durable está en [`docs/GRINDFLOW-SPEC.md`](docs/GRINDFLOW-SPEC.md) y los requisitos verificables en [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+
+## Arquitectura en 60 segundos
+
+```mermaid
+flowchart LR
+    U[Creadores y equipos] --> G[GrindFlow]
+    G --> C[Biblioteca y reglas]
+    C --> S[Scheduling]
+    S --> D[Distribution]
+    D --> T[Traffic attribution]
+    G --> A[Administración]
+    G --> P[Superficie pública]
+    F[Factory governance] --> G
+```
+
+La arquitectura objetivo es un monolito modular API-first. La transición tecnológica conserva el runtime existente hasta demostrar paridad y cutover; el README no convierte un objetivo arquitectónico en estado desplegado.
+
+## Stack e infraestructura
+
+- **Objetivo backend:** PHP 8.5 + Symfony 7.4 LTS + Doctrine ORM/DBAL/Migrations.
+- **Datos:** MariaDB.
+- **Administración objetivo:** React + TypeScript + Vite.
+- **Público objetivo:** Twig/SSR.
+- **Transición:** Laravel y el legado Next.js continúan operativos hasta paridad y cutover verificados.
+- **Hosting inicial:** Hostinger, con portabilidad prevista por la arquitectura.
+- **CI/gobernanza:** GitHub Actions consumiendo contratos reutilizables de Factory.
+
+La fuente técnica de la transición es [`docs/STACK-TRANSITION-SYMFONY.md`](docs/STACK-TRANSITION-SYMFONY.md); no se infiere estado de producción desde esta sección.
+
+## Ciclo de entrega
+
+Issue → reserva canónica → rama enfocada → PR → gates de GrindFlow/Factory → revisión → squash merge serial → verificación exact-main → release/deploy cuando aplique → smoke/observer → estado operativo basado en evidencia.
+
+Las reglas ejecutables del ciclo están en [`AGENTS.md`](AGENTS.md) y la gobernanza durable en [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md).
+
+## Calidad y seguridad
+
+- `GrindFlow CI / validate` agrega los gates seleccionados por alcance; Sonar y CodeRabbit aportan revisión adicional.
+- Los secretos y credenciales viven fuera del repositorio y no se publican en README, Issues ni logs.
+- Cambios de datos, despliegue y producción respetan migraciones, backup/restore, rollback y smoke definidos por la documentación operativa.
+- Estado desconocido falla cerrado: un badge, una versión o un merge no demuestran por sí solos salud ni despliegue.
+
+Consulta [`AGENTS.md`](AGENTS.md), [`decisiones.yml`](decisiones.yml) y [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md) para las reglas vigentes.
+
+## Roadmap y fuentes de verdad
+
+- **Roadmap canónico:** [Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+- **Especificación:** [`docs/GRINDFLOW-SPEC.md`](docs/GRINDFLOW-SPEC.md).
+- **Requisitos:** [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+- **Modelo de desarrollo:** [`docs/DEVELOPMENT-MODEL.md`](docs/DEVELOPMENT-MODEL.md).
+- **Decisiones vigentes:** [`decisiones.yml`](decisiones.yml).
+- **Contrato operativo para agentes:** [`AGENTS.md`](AGENTS.md).
+- **Documentación profunda:** [`docs/`](docs/).
+
+El README enlaza estas fuentes; no las duplica ni funciona como changelog.
+
+## Desarrollo local
+
+Para el frontend/legado Node declarado actualmente en `package.json`:
+
+```bash
+npm ci
+npm run validate
+```
+
+Los comandos y gates PHP/Symfony vigentes se mantienen en [`AGENTS.md`](AGENTS.md) y en la documentación de transición. Ejecuta solo los gates correspondientes al área modificada; no uses una ejecución local como evidencia de producción.
+
+## Mapa de la fábrica
+
+- **Factory:** governance/kit y contratos reutilizables.
+- **ControlBot:** control plane privado de proyectos, trabajo, decisiones e incidentes.
+- **FactoryRunner:** execution plane.
+- **Condor:** producto.
+- **GrindFlow:** **producto actual**, enfocado en contenido, distribución y tráfico.
+- **BRVTAL:** producto.
+- **AutoFactory:** herramienta local/manual.
+
+Cada repositorio conserva su responsabilidad; GrindFlow consume gobernanza de Factory sin convertirse en un segundo control plane.

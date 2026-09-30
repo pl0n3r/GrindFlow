@@ -242,6 +242,7 @@ jobs:
           python3 -m unittest tests/test_issue_label_notice.py
           python3 -m unittest tests/test_pr_label_inheritance.py
           python3 -m unittest tests/test_label_sweep.py
+          [[ -f tests/test_readme_contract_adoption.py ]] && python3 -m unittest tests/test_readme_contract_adoption.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
@@ -259,11 +260,18 @@ jobs:
           --base "${{ needs.preflight.outputs.base_sha }}"
           --head "${{ needs.preflight.outputs.head_sha }}"
 
-      - name: Verify README dashboard matches the exact delta
+      - name: Verify README delivery contract
         if: github.event_name != 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -f readme/project.json ]]; then
+            test -f .github/workflows/readme-contract.yml
+            grep -Fq 'uses: pl0n3r/factory/.github/workflows/readme.yml@v1' .github/workflows/readme-contract.yml
+            echo "README Contract v1 validation is delegated to the dedicated reusable workflow."
+            exit 0
+          fi
+
           python3 scripts/readme-dashboard.py --update \
             --base "${{ needs.preflight.outputs.base_sha }}" \
             --head "${{ needs.preflight.outputs.head_sha }}"
