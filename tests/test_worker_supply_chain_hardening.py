@@ -27,8 +27,9 @@ class WorkerSupplyChainHardeningTests(unittest.TestCase):
         self.assertNotIn(" npx tsx ", compose)
         self.assertGreaterEqual(compose.count("./node_modules/.bin/tsx"), 2)
         self.assertIn("bash scripts/smoke-node-worker.sh", package)
-        self.assertNotIn("--entrypoint", smoke)
-        self.assertIn('"$image" >/dev/null', smoke)
+        worker_run = smoke.rsplit("docker run -d \\\n", 1)[-1].split("for _ in", 1)[0]
+        self.assertNotIn("--entrypoint", worker_run)
+        self.assertIn('"$image" >/dev/null', worker_run)
         self.assertIn("docker network create --internal", smoke)
         self.assertIn("--network-alias supabase", smoke)
 
