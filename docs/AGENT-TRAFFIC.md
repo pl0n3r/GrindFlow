@@ -2,8 +2,8 @@
 
 > Extensión normativa de [AGENTS.md](../AGENTS.md). Este documento conserva las
 > reglas Traffic trasladadas para reducir el contexto de arranque sin cambiar su
-> semántica. La precedencia general sigue definida por AGENTS.md y por los
-> requisitos funcionales canónicos de Traffic en `docs/REQUIREMENTS.md`.
+> semántica. La precedencia general sigue definida por AGENTS.md; los
+> requisitos funcionales canónicos de Traffic viven en `docs/REQUIREMENTS.md`.
 
 ### Regla de reportes CSV de Traffic
 
