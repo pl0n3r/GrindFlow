@@ -14,7 +14,11 @@
       "category": "authentication",
       "fields": [
         "password",
-        "remember_token"
+        "password_hash",
+        "remember_token",
+        "password_reset_token_hash",
+        "password_reset_expires_at",
+        "security_event"
       ],
       "purpose": "account_security",
       "basis": "review_required",

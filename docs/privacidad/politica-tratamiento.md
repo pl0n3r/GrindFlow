@@ -17,7 +17,7 @@
 
 | Tratamiento | Categoría | Campos | Finalidad | Base documentada | Consentimiento | Proveedores | Retención |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| account_credentials | authentication | password, remember_token | account_security | review_required | review_required | ninguno_declarado | review_required |
+| account_credentials | authentication | password, password_hash, remember_token, password_reset_token_hash, password_reset_expires_at, security_event | account_security | review_required | review_required | ninguno_declarado | review_required |
 | account_identity | contact | name, display_name, handle, email, email_verified_at, platform_role, role | account_access | review_required | review_required | supabase | review_required |
 | cloud_connections | authentication | authorized_by_user_id, created_by, provider, label, account_identifier, account_email, access_ciphertext, refresh_ciphertext, token_expires_at, scopes, cursor, delta_cursor, root_path, root_folder_id, root_folder_path, default_profile_id, metadata | cloud_media_connection | review_required | review_required | dropbox, google_drive, supabase | review_required |
 | legacy_supabase_link_clicks | usage | tracking_link_id, occurred_at, country, referrer, ua_family, network | traffic_click_analytics | review_required | review_required | supabase | review_required |
