@@ -123,6 +123,8 @@ CodeRabbit todavía mostraba «Currently processing», sin revisión final visib
 Esa conducta no se repite. Esta es una regla de actuación del agente; por sí
 sola no implica que GitHub tenga un ruleset/required check configurado.
 
+**Enforcement machine-readable:** `.github/factory-policy.json` es la policy canónica del consumidor y exige `required_review_bot=coderabbitai[bot]`. El caller `.github/workflows/politica.yml` pasa explícitamente el mismo reviewer para que el bootstrap no dependa de que el archivo ya exista en BASE. Factory resuelve la policy desde la BASE exacta y valida la review sustantiva contra el HEAD exacto; una review de otro SHA, `CHANGES_REQUESTED`, rate-limit o un check sin review formal no satisface la compuerta.
+
 
 ### Factory deploy paralelo y reversible
 

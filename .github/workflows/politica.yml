@@ -14,3 +14,4 @@ jobs:
     uses: pl0n3r/factory/.github/workflows/politica.yml@v1
     with:
       pr_number: ${{ github.event.pull_request.number }}
+      required_review_bot: coderabbitai[bot]
