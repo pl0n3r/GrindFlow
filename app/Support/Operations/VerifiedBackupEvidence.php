@@ -70,7 +70,7 @@ final class VerifiedBackupEvidence
 
         if (
             ! is_array($payload)
-            || $payload['version'] !== 1
+            || ($payload['version'] ?? null) !== 1
             || ! is_string($payload['created_at'] ?? null)
             || ! is_string($payload['migration_fingerprint'] ?? null)
             || ! is_string($payload['archive'] ?? null)
