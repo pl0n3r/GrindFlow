@@ -10,10 +10,6 @@ class WorkerSupplyChainHardeningTests(unittest.TestCase):
         docker = (ROOT / "workers" / "Dockerfile").read_text()
         requirements = (ROOT / "workers" / "requirements.txt").read_text().splitlines()
         node_docker = (ROOT / "workers" / "node.Dockerfile").read_text()
-        compose = (ROOT / "docker-compose.yml").read_text()
-        package = (ROOT / "package.json").read_text()
-        smoke = (ROOT / "scripts" / "smoke-node-worker.sh").read_text()
-
         self.assertIn("--only-binary=:all:", docker)
         packages = [line for line in requirements if line and not line.startswith("#")]
         self.assertTrue(packages)
@@ -22,6 +18,9 @@ class WorkerSupplyChainHardeningTests(unittest.TestCase):
 
     def test_node_worker_does_not_use_npx_at_runtime(self) -> None:
         node_docker = (ROOT / "workers" / "node.Dockerfile").read_text()
+        compose = (ROOT / "docker-compose.yml").read_text()
+        package = (ROOT / "package.json").read_text()
+        smoke = (ROOT / "scripts" / "smoke-node-worker.sh").read_text()
 
         self.assertNotRegex(node_docker, r'CMD \["npx"')
         self.assertIn('"./node_modules/.bin/tsx"', node_docker)
