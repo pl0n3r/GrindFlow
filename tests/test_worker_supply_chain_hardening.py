@@ -29,7 +29,8 @@ class WorkerSupplyChainHardeningTests(unittest.TestCase):
         self.assertIn("bash scripts/smoke-node-worker.sh", package)
         self.assertNotIn("--entrypoint", smoke)
         self.assertIn('"$image" >/dev/null', smoke)
-        self.assertIn("--network none", smoke)
+        self.assertIn("docker network create --internal", smoke)
+        self.assertIn("--network-alias supabase", smoke)
 
     def test_security_findings_do_not_regress_to_path_or_literal_bidi(self) -> None:
         rls = (ROOT / "scripts" / "run-rls-tests.mjs").read_text()
