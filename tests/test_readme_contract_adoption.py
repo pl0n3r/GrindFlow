@@ -2,7 +2,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 METADATA = ROOT / "readme" / "project.json"
@@ -11,7 +10,6 @@ CI_WORKFLOW = ROOT / ".github" / "workflows" / "grindflow-ci.yml"
 VERSION_PHP = ROOT / "config" / "version.php"
 PACKAGE_JSON = ROOT / "package.json"
 PACKAGE_LOCK = ROOT / "package-lock.json"
-
 
 class ReadmeContractAdoptionTests(unittest.TestCase):
     def test_project_metadata_is_stable_and_complete(self):
@@ -137,7 +135,6 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
             self.assertIn(role, factory_map)
         self.assertIn("**Condor:** producto", factory_map)
         self.assertIn("**BRVTAL:** producto", factory_map)
-
 
 if __name__ == "__main__":
     unittest.main()
