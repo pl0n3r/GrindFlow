@@ -117,7 +117,7 @@ services:
       INGEST_WORKER_BATCH_SIZE: ${INGEST_WORKER_BATCH_SIZE:-2}
       INGEST_WORKER_POLL_SECONDS: ${INGEST_WORKER_POLL_SECONDS:-10}
       INGEST_MAX_BYTES_PER_FILE: ${INGEST_MAX_BYTES_PER_FILE:-5368709120}
-    command: ['sh', '-c', 'WORKER_NAME=ingest-$$(hostname) npx tsx --tsconfig tsconfig.workers.json src/workers/ingest/index.ts']
+    command: ['sh', '-c', 'WORKER_NAME=ingest-$(hostname) ./node_modules/.bin/tsx --tsconfig tsconfig.workers.json src/workers/ingest/index.ts']
     deploy:
       resources:
         limits:
@@ -153,7 +153,7 @@ services:
       PUBLISH_WORKER_BATCH_SIZE: ${PUBLISH_WORKER_BATCH_SIZE:-3}
       PUBLISH_WORKER_POLL_SECONDS: ${PUBLISH_WORKER_POLL_SECONDS:-15}
       PUBLISH_DISPATCH_SECONDS: ${PUBLISH_DISPATCH_SECONDS:-60}
-    command: ['sh', '-c', 'WORKER_NAME=publish-$$(hostname) npx tsx --tsconfig tsconfig.workers.json src/workers/publish/index.ts']
+    command: ['sh', '-c', 'WORKER_NAME=publish-$(hostname) ./node_modules/.bin/tsx --tsconfig tsconfig.workers.json src/workers/publish/index.ts']
     deploy:
       resources:
         limits:

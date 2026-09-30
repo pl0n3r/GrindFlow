@@ -20,7 +20,7 @@ COPY package.json package-lock.json ./
 # directamente. Compilar a JavaScript aparte anadiria un paso de build y un
 # directorio de salida para ahorrar unos megas en una imagen que no se
 # distribuye.
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY tsconfig.json tsconfig.workers.json ./
 COPY src ./src
@@ -35,4 +35,4 @@ USER node
 # Component. El tsconfig principal no lo toca, asi que la proteccion del bundle
 # del navegador sigue intacta.
 # Por defecto, ingesta. El servicio `publish` de docker-compose lo sustituye.
-CMD ["npx", "tsx", "--tsconfig", "tsconfig.workers.json", "src/workers/ingest/index.ts"]
+CMD ["./node_modules/.bin/tsx", "--tsconfig", "tsconfig.workers.json", "src/workers/ingest/index.ts"]

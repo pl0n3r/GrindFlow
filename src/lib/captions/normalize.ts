@@ -37,7 +37,7 @@ const LEET: Record<string, string> = {
  * filtro no la vea y el lector si. Su presencia en un caption generado es en si
  * misma una senal de manipulacion, asi que ademas de limpiarlos se reportan.
  */
-const INVISIBLE = /[­​-‏‪-‮⁠-⁤﻿]/g;
+const INVISIBLE = /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g;
 
 export function hasInvisibleCharacters(text: string): boolean {
   INVISIBLE.lastIndex = 0;
