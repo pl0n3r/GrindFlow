@@ -8,7 +8,7 @@ use RuntimeException;
 
 final class VerifiedBackupEvidence
 {
-    public const MAX_AGE_SECONDS = 900;
+    public const int MAX_AGE_SECONDS = 900;
 
     public function record(string $archiveRelativePath, string $migrationFingerprint): string
     {

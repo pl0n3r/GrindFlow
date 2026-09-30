@@ -8,10 +8,12 @@ use RuntimeException;
 
 class RecordVerifiedDatabaseBackup extends Command
 {
+    #[\Override]
     protected $signature = 'operations:record-db-backup
         {archive : Relative local-disk path operations/database-backups/*.sql.gz}
         {migration_fingerprint : 64-hex fingerprint for the pending migration batch}';
 
+    #[\Override]
     protected $description = 'Record a short-lived receipt for an already-created verified database backup';
 
     public function handle(VerifiedBackupEvidence $evidence): int

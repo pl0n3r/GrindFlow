@@ -66,7 +66,7 @@ class ProductionFixture(http.server.BaseHTTPRequestHandler):
             type(self).submitted.append(data)
             fields_ok = (
                 data.get("_token") == ["c" * 40]
-                and data.get("backup_confirmed") == ["1"]
+                and data.get("backup_receipt") == ["d" * 64]
                 and data.get("confirmation") == ["MIGRAR"]
                 and data.get("migration_batch") == ["b" * 64]
             )
