@@ -121,7 +121,6 @@ final class StaffOpsRequestAuthenticatorTest extends TestCase
             1,
         );
         $method = new \ReflectionMethod($authenticator, 'consumeReplayAndRateLimit');
-        $method->setAccessible(true);
 
         try {
             $method->invoke(
