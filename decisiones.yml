@@ -31,6 +31,11 @@
       "id": "D-060",
       "status": "active",
       "text": "El stack objetivo aprobado de GrindFlow es Symfony 7.4 con Doctrine/MariaDB, React/TypeScript/Vite para administracion y Twig/SSR para publico; Laravel y el legado coexisten solo hasta paridad y cutover comprobados."
+    },
+    {
+      "id": "D-061",
+      "status": "active",
+      "text": "GrindFlow mantiene ownership personal y adopta required checks del ruleset main-required-checks con Etiquetas, auto-merge y coordinacion Factory como modelo final de serializacion; Merge Queue nativa no es requisito obligatorio mientras el repositorio sea User-owned y reintroducirla como requisito exige una nueva decision explicita del propietario."
     }
   ]
 }
