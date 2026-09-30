@@ -28,13 +28,13 @@
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **4** | **+245** | **−64** | **+181** |
+| **6** | **+248** | **−65** | **+183** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit** |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · legacy** |
 | PR + snapshot exacto | **PR #188 · Issue #187 · v0.1.145**; README debe coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** exige todos los gates seleccionados; Sonar y CodeRabbit separados |
 | Seguridad | bootstrap limitado al PR exacto same-repo; reserva/validación delegadas a Factory v1 |
@@ -65,6 +65,8 @@ Inventario de solo el deploy actual:
 - `.github/workflows/work-coordination.yml`
 - `README.md`
 - `config/version.php`
+- `package-lock.json`
+- `package.json`
 - `tests/test_factory_coordination_adoption.py`
 
 ## Validación
