@@ -1062,20 +1062,19 @@ sola no implica que GitHub tenga un ruleset/required check configurado.
   `production-diagnostics-<run_id>` con retencion de 3 dias.
 - Para una peticion "revisa el log de produccion", el agente debe usar primero
   ese bridge, recuperar el artifact por GitHub y correlacionar incident IDs.
-- Las migraciones de produccion siguen siendo una accion explicita de operador.
-  El issue durable `[AUTO] Production Migration Bridge` acepta exactamente
-  `/production-migrate 1` solo de OWNER. El workflow autentica la cuenta E2E y
-  usa el mismo endpoint protegido de `Admin > System`; nunca recibe credenciales
-  directas de base de datos.
-- El bridge de migracion debe abortar sin cambios si produccion no reporta
-  exactamente una migracion pendiente. Un pending count distinto exige revision
-  humana antes de ampliar la aprobacion.
-- El bridge puede reintentar GETs de preflight/verificacion ante fallos transitorios
+- Las migraciones de produccion siguen siendo una accion explicita y serializada.
+  El workflow `GrindFlow Production Migration` se ejecuta solo mediante
+  `workflow_dispatch` del OWNER, recibe el pending count exacto aprobado y un
+  `backup_receipt` de 64 hex; autentica la cuenta E2E y usa el mismo endpoint
+  protegido de `Admin > System`, sin recibir credenciales directas de base de datos.
+- La migracion aborta sin cambios si el pending count no coincide exactamente con
+  el valor aprobado. Ampliar ese conteo requiere una nueva ejecucion explicita.
+- El flujo puede reintentar GETs de preflight/verificacion ante fallos transitorios
   de red, pero **nunca reintenta automaticamente el POST de migracion**. Si la
   respuesta del POST se pierde, debe verificar el pending count antes de decidir
   si la migracion termino.
-- CI, Production Smoke y el bridge de Diagnostics nunca ejecutan migraciones.
-  El bridge de migracion es una accion operacional separada y serializada.
+- CI, Production Smoke y Diagnostics nunca ejecutan migraciones. El workflow de
+  migracion es una accion operacional separada, owner-only y serializada.
 - Si falta el secret `PRODUCTION_E2E_PASSWORD`, el workflow debe mantener visible
   el issue `[AUTO] Production Smoke Not Configured` hasta que la configuracion
   exista; no debe aparentar que produccion fue validada.
@@ -1087,11 +1086,13 @@ sola no implica que GitHub tenga un ruleset/required check configurado.
   del contrato operativo y no se elimina sin reemplazo equivalente validado.
 - Las migraciones de produccion nunca las ejecuta CI ni el smoke. El camino
   preferido para el operador es `Admin > System > Run pending migrations`;
-  exige platform admin, CSRF, inventario visible, reconocimiento humano de un
-  backup externo restaurable, confirmacion MIGRAR y fingerprint del lote pendiente
-  (nombres + SHA-256 de archivos) revalidado dentro del lock justo antes de
-  ejecutar. La confirmacion NO verifica tecnicamente el backup ni sustituye su
-  comprobacion externa. SSH es solo fallback de recuperacion.
+  exige platform admin, CSRF, inventario visible, `backup_receipt` verificable
+  de un backup DB reciente ligado al fingerprint, confirmacion `MIGRAR` y el
+  fingerprint del lote pendiente (nombres + SHA-256 de archivos) revalidado
+  dentro del lock justo antes de ejecutar. El servidor vuelve a validar recibo,
+  archivo, checksum, fingerprint y TTL; una confirmacion booleana nunca sustituye
+  esa evidencia. SSH es solo fallback de diagnostico/recuperacion del control
+  plane y no autoriza ejecutar `artisan migrate --force` saltandose estas guardas.
 - Nunca se expone `laravel.log` crudo mediante una ruta publica o autenticada.
 
 ## Referencia archivada y políticas de migración
