@@ -27,7 +27,8 @@ class WorkerSupplyChainHardeningTests(unittest.TestCase):
         self.assertNotIn(" npx tsx ", compose)
         self.assertGreaterEqual(compose.count("./node_modules/.bin/tsx"), 2)
         self.assertIn("bash scripts/smoke-node-worker.sh", package)
-        self.assertIn("src/workers/ingest/index.ts", smoke)
+        self.assertNotIn("--entrypoint", smoke)
+        self.assertIn('"$image" >/dev/null', smoke)
         self.assertIn("--network none", smoke)
 
     def test_security_findings_do_not_regress_to_path_or_literal_bidi(self) -> None:
