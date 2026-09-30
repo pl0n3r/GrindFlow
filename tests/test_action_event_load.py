@@ -25,8 +25,9 @@ class ActionEventLoadTests(unittest.TestCase):
             self.assertIn("GITHUB_STEP_SUMMARY", source)
 
         self.assertIn("expected_pending:", migration)
-        self.assertIn("backup_verified:", migration)
-        self.assertIn("inputs.backup_verified == true", migration)
+        self.assertIn("backup_receipt:", migration)
+        self.assertIn("BACKUP_RECEIPT: ${{ inputs.backup_receipt }}", migration)
+        self.assertNotIn("backup_verified:", migration)
         self.assertIn("EXPECTED_PENDING: ${{ inputs.expected_pending }}", migration)
 
     def test_global_check_run_sonar_relay_is_removed(self):

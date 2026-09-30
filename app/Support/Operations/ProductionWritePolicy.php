@@ -7,6 +7,7 @@ use RuntimeException;
 final class ProductionWritePolicy
 {
     public const PHASE_CONSTRUCTION = 'construccion';
+
     public const PHASE_LIVE = 'live';
 
     public function assertAutonomousWriteAllowed(
