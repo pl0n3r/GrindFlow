@@ -60,8 +60,12 @@ class FactoryPolicyAdoptionTests(unittest.TestCase):
                 "  pull-requests: read\n", "  pull-requests: read\n  issues: write\n"
             ),
             self.workflow.replace(
-                "  pull_request:\n    branches: [main]\n",
-                "  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n",
+                "  pull_request_review:\n    types: [submitted, edited, dismissed]\n",
+                "  pull_request_review:\n    types: [submitted, edited, dismissed]\n  push:\n    branches: [main]\n",
+            ),
+            self.workflow.replace(
+                "  pull_request_review:\n",
+                "  pull_request_target:\n    branches: [main]\n  pull_request_review:\n",
             ),
             self.workflow.replace("politica.yml@v1", "politica.yml@main"),
         )
