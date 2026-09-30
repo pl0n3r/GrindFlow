@@ -84,6 +84,36 @@ Producto: `pl0n3r/GrindFlow`
 - Proveedores: `supabase`
 - Retención: `review_required`
 
+## staff_access_metadata
+
+- Categoría: `usage`
+- Campos de software: `last_access_at`, `failed_login_count`
+- Finalidad: `staff_security_monitoring`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
+## staff_contact
+
+- Categoría: `contact`
+- Campos de software: `email`
+- Finalidad: `staff_invitation_and_recovery`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
+## staff_identity
+
+- Categoría: `identification`
+- Campos de software: `staff_id`, `name`, `role`, `status`
+- Finalidad: `staff_administration`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
 ## traffic_dedupe
 
 - Categoría: `usage`
