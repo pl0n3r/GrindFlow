@@ -98,7 +98,26 @@ class FactoryPolicyAdoptionTests(unittest.TestCase):
         self.assertEqual(self.policy["review_round_limit"], 3)
         ids = [item["id"] for item in self.policy["decisions"]]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual(ids, ["D-055", "D-056", "D-057", "D-058", "D-059", "D-060"])
+        self.assertEqual(ids, ["D-055", "D-056", "D-057", "D-058", "D-059", "D-060", "D-061"])
+
+    def test_merge_queue_owner_decision_is_encoded_and_durable(self):
+        decisions = {item["id"]: item for item in self.policy["decisions"]}
+        decision = decisions["D-061"]
+        self.assertEqual(decision["status"], "active")
+        text = decision["text"].lower()
+        for required in (
+            "ownership personal",
+            "required checks",
+            "main-required-checks",
+            "etiquetas",
+            "auto-merge",
+            "coordinacion factory",
+            "merge queue",
+            "no es requisito obligatorio",
+            "nueva decision explicita",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
 
 
 if __name__ == "__main__":
