@@ -6,7 +6,7 @@
 <a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
 </p>
 
-> **Candidata v0.1.144 · Issue #127.** Recuperación de contraseña y cambio seguro del admin sobre Symfony/Doctrine, con tokens de un solo uso, rate limiting y pruebas de sesión.
+> **Candidata v0.1.145 · Issue #187.** Restaura el caller gobernado de coordinación Factory para reservas, validación de PRs y recuperación segura de trabajo.
 
 ## Progress convention
 - ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
@@ -17,88 +17,62 @@
 ## Estado del deploy
 | Señal | Estado | Evidencia |
 | --- | --- | --- |
-| SHA exacto de main (base) | ✅ **f5b74ddff10569023dd1b2a73de5dd8937bc3192** | v0.1.143 |
-| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI 36213912464 |
-| Deploy Observer / Production Smoke base | ✅ **success / success** | 36213912470 / 36213912462 |
-| Version objetivo | 🚧 **v0.1.144** | recuperación de cuenta Symfony |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | PR #181 · Issue #127 · v0.1.144 |
-| Producción objetivo | 🚧 sin desplegar | migración y runtime aún no aplicados |
+| SHA exacto de main (base) | ✅ **4e28fbb277c3642e48535a005540d159c2c5c21e** | v0.1.144 |
+| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI 36587515565 |
+| Deploy Observer / Production Smoke base | ✅ **success / success** | 36587515637 / 36587515612 |
+| Version objetivo | 🚧 **v0.1.145** | coordinación Factory #187 |
+| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | PR #188 · Issue #187 · v0.1.145 |
+| Producción objetivo | 🚧 sin desplegar | cambio de coordinación GitHub; runtime productivo no mutado |
 
 ## Huella del cambio
 <!-- grindflow:git-delta -->
 | Archivos | Inserciones | Eliminaciones | Neto |
 | ---: | ---: | ---: | ---: |
-| **29** | **+1426** | **−51** | **+1375** |
+| **4** | **+1** | **−1** | **+0** |
 
 ## Calidad y entrega
 <!-- grindflow:gate-plan -->
 | Control | Estado / contrato |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **PR #181 · Issue #127 · v0.1.144**; README debe coincidir con HEAD final |
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit** |
+| PR + snapshot exacto | **PR #188 · Issue #187 · v0.1.145**; README debe coincidir con HEAD final |
 | Gate agregador obligatorio | **validate** exige todos los gates seleccionados; Sonar y CodeRabbit separados |
-| Seguridad | token aleatorio, hash persistido, TTL ≤60 min, CSRF, rate limiting, no-referrer/no-store, auditoría sin secretos |
+| Seguridad | bootstrap limitado al PR exacto same-repo; reserva/validación delegadas a Factory v1 |
 | CI local canónico | **GrindFlow CI / validate** |
-| Rol del PR | **Ingeniería de software · Seguridad · QA** |
+| Rol del PR | **Infraestructura · Ingeniería de software · Seguridad · QA** |
 
 ## Flujo de entrega
-```mermaid
+~~~mermaid
 flowchart LR
-  A["main v0.1.143"] --> P["#127 · recuperación segura"]
-  P --> Q["Symfony + MariaDB + tests de sesión"]
+  A["main v0.1.144"] --> P["#187 · caller de coordinación"]
+  P --> Q["Factory v1 + tests deterministas"]
   Q --> V["CI / validate · Sonar · CodeRabbit"]
-  V --> M["squash merge serial"]
-  M --> X["exact-main + Observer + Smoke"]
-```
+  V --> M["merge serial"]
+  M --> X["exact-main + coordinación operativa"]
+~~~
 
 ## Qué se hizo
-- Añade solicitud de recuperación no enumerante con token criptográfico persistido solo como SHA-256 y expiración máxima de 60 minutos.
-- Reemitir el reset invalida el token anterior; usarlo lo elimina y registra auditoría sin secretos.
-- Añade rate limiting por IP/cuenta, CSRF, respuestas privadas/no-cache y `Referrer-Policy: no-referrer`.
-- El enlace entrega el token en fragmento URL y lo retira del navegador antes del POST.
-- Centraliza política de contraseña, rechaza comunes/reutilización y notifica cambios por transporte server-side configurable.
-- Extiende cambio autenticado con auditoría, notificación e invalidación de la sesión actual.
-- Añade regresión que restaura una sesión autenticada previa tras un reset y exige que Symfony la rechace al refrescar el hash.
-- El firewall actual no configura `remember_me` y el repositorio no implementa 2FA/TOTP; este slice no crea ni desactiva mecanismos inexistentes.
+- Añade el caller .github/workflows/work-coordination.yml consumiendo exclusivamente pl0n3r/factory/.github/workflows/coordinacion.yml@v1.
+- Revalida PRs en opened, synchronize, edited, cambios draft/ready y cierre.
+- Conserva la cola de coordinación con cancel-in-progress: false y queue: max.
+- Delega /tomar al parser canónico para aceptar whitespace final sin fabricar reservas localmente.
+- Limita la excepción de bootstrap a factory/bootstrap-coordination-187 del mismo repositorio y valida el resto de PRs.
+- Añade regresiones deterministas para los seis jobs, sus condiciones y operaciones.
 
 ## Archivos modificados en esta entrega candidata
+Inventario de solo el deploy actual:
 <!-- grindflow:changed-files -->
+- `.github/workflows/work-coordination.yml`
 - `README.md`
 - `config/version.php`
-- `datos.yml`
-- `docs/DEPLOY-HOSTINGER.md`
-- `docs/privacidad/aviso-privacidad.md`
-- `docs/privacidad/politica-tratamiento.md`
-- `docs/privacidad/registro-tratamientos.md`
-- `package-lock.json`
-- `package.json`
-- `symfony/config/packages/framework.yaml`
-- `symfony/config/services.yaml`
-- `symfony/config/services_test.yaml`
-- `symfony/migrations/Version20260926030500.php`
-- `symfony/public/assets/password-recovery.js`
-- `symfony/src/Http/Controller/AccountSecurityController.php`
-- `symfony/src/Http/Controller/PasswordRecoveryController.php`
-- `symfony/src/Identity/Entity/IdentityUser.php`
-- `symfony/src/Identity/Security/PasswordPolicy.php`
-- `symfony/src/Identity/Security/PasswordRecoveryNotifier.php`
-- `symfony/src/Infrastructure/Mail/InMemoryPasswordRecoveryNotifier.php`
-- `symfony/src/Infrastructure/Mail/NativePasswordRecoveryNotifier.php`
-- `symfony/src/Infrastructure/Mail/PasswordRecoveryDeliverCommand.php`
-- `symfony/templates/identity/forgot-password.html.twig`
-- `symfony/templates/identity/login.html.twig`
-- `symfony/templates/identity/recover-password.html.twig`
-- `symfony/tests/e2e/password-recovery-fragment.spec.mjs`
-- `symfony/tests/php/PasswordRecoveryTest.php`
-- `tests/Feature/PrivacyAsCodeTest.php`
-- `tests/test_password_recovery_acceptance.py`
+- `tests/test_factory_coordination_adoption.py`
 
 ## Validación
-- `PasswordRecoveryTest` cubre no enumeración, hash/TTL, uso único, reemisión, contraseña común, cambio efectivo, notificación y rechazo de sesión previa.
-- `AccountSecurityTest` conserva CSRF, password actual, rate limit y límites de payload del cambio autenticado.
-- La migración es reversible y solo añade tokens/auditoría del stack Symfony; esta PR no la ejecuta en producción.
-- `datos.yml` declara hash/expiración de reset y evento de seguridad sin persistir token plano.
-- Estado final exige CI/Sonar/CodeRabbit del mismo HEAD y exact-main + Observer + Smoke tras merge.
+- workflow-syntax-check.rb valida el caller y las Actions oficiales.
+- test_factory_coordination_adoption.py fija eventos, condiciones y operaciones del caller.
+- Factory CI valida el reusable publicado sin copiar scripts a GrindFlow.
+- El bootstrap no cambia DB, runtime de producto ni producción.
+- Estado final exige GrindFlow CI, Factory CI, Sonar y CodeRabbit del mismo HEAD antes del merge.
 
 ## Qué sigue
 [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
@@ -106,8 +80,7 @@ flowchart LR
 ## Panorama general pendiente
 | Lane | Frente | Estado |
 | --- | --- | --- |
-| **NOW** | 🚧 #127 · recuperación/cambio de contraseña | 🚧 candidata v0.1.144 |
-| **NEXT** | 🚧 #174 · API staff ControlBot | 🚧 depende de #127 |
-| **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + #146 media storage | ⛔ dependencias externas |
+| **NOW** | 🚧 #187 · coordinación Factory | 🚧 validando v0.1.145 |
+| **NEXT** | 🚧 #127 · reserva canónica | 🚧 desbloquear tras merge |
+| **BLOCKED / EXTERNAL** | ⛔ #139 Dependabot + dependencias externas | ⛔ pendiente |
 | **LATER** | 🚧 roadmap de producto | 🚧 preservado |
-
