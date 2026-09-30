@@ -52,10 +52,10 @@ class AgentsDocumentationCompactionTests(unittest.TestCase):
 
         match = re.search(r"'number'\s*=>\s*'([^']+)'", config)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.155", match.group(1))
-        self.assertEqual("0.1.155", package["version"])
-        self.assertEqual("0.1.155", package_lock["version"])
-        self.assertEqual("0.1.155", package_lock["packages"][""]["version"])
+        expected = match.group(1)
+        self.assertEqual(expected, package["version"])
+        self.assertEqual(expected, package_lock["version"])
+        self.assertEqual(expected, package_lock["packages"][""]["version"])
 
 
 if __name__ == "__main__":
