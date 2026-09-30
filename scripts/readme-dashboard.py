@@ -14,12 +14,6 @@ README_PATH = ROOT / "README.md"
 SCOPE_PATH = ROOT / "scripts" / "ci-scope.sh"
 SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 CHANGED_FILES_MARKER = "<!-- grindflow:changed-files -->"
-FACTORY_CONTRACT_MARKERS = (
-    "<!-- factory:status:start -->",
-    "<!-- factory:status:end -->",
-    "<!-- factory:progress-readiness:start -->",
-    "<!-- factory:progress-readiness:end -->",
-)
 DELTA_ROW_PATTERN = re.compile(
     r"^\| \*\*\d+\*\* \| \*\*\+\d+\*\* \| \*\*−\d+\*\* \| \*\*[+-]\d+\*\* \|$",
     flags=re.M,
@@ -31,11 +25,6 @@ FILE_ROW_PATTERN = re.compile(r"^- `([^`]+)`(?:\s+—.*)?$", flags=re.M)
 def fail(message: str) -> None:
     print(f"README DASHBOARD CHECK FAILED: {message}", file=sys.stderr)
     raise SystemExit(1)
-
-
-def factory_contract_v1(readme: str) -> bool:
-    """Detect the canonical Factory v1 layout without validating its semantics locally."""
-    return all(readme.count(marker) == 1 for marker in FACTORY_CONTRACT_MARKERS)
 
 
 def validated_sha(value: str, label: str) -> str:
@@ -300,9 +289,6 @@ def validate(base: str, head: str) -> None:
     additions, deletions = diff_metrics(base, head)
     scope = ci_scope(files)
     readme = README_PATH.read_text(encoding="utf-8")
-    if factory_contract_v1(readme):
-        print("Factory README Contract v1 detected; legacy dashboard validation is not applicable")
-        return
     require_markers(readme)
     validate_delta(readme, files, additions, deletions)
     validate_gate_plan(readme, scope)
@@ -352,11 +338,6 @@ def regenerate_once(base: str, head: str | None) -> bool:
 
 def update(base: str, head: str) -> None:
     """Regenerate exact dashboard facts locally or from GitHub's synthetic PR merge."""
-    readme = README_PATH.read_text(encoding="utf-8")
-    if factory_contract_v1(readme):
-        print("Factory README Contract v1 detected; legacy dashboard regeneration is not applicable")
-        return
-
     current = current_head()
     if current != head:
         if not head_is_ancestor(head, current):
@@ -404,10 +385,6 @@ ok
     assert "| **2** | **+12** | **−3** | **+9** |" in generated
     assert "**preflight · fast[operational contracts + automation syntax + README dashboard] · PHPUnit · MariaDB**" in generated
     assert "- `README.md`\n- `app.php`" in generated
-
-    factory_sample = "\n".join(FACTORY_CONTRACT_MARKERS)
-    assert factory_contract_v1(factory_sample)
-    assert not factory_contract_v1(factory_sample.replace(FACTORY_CONTRACT_MARKERS[-1], "", 1))
 
     duplicate = sample + "\n" + CHANGED_FILES_MARKER + "\n"
     try:
