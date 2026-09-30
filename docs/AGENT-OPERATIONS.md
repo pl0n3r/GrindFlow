@@ -99,10 +99,11 @@ verdes NO sustituyen la revisión final del mismo head.
 1. Estabilizar el SHA final del PR; comprobar CI `GrindFlow CI / validate` y
    Sonar satisfactorios para ese SHA y solicitar/confirmar CodeRabbit full review.
 2. Antes de ejecutar squash/merge, verificar en GitHub que **CodeRabbit terminó
-   explícitamente su revisión** de ese SHA: revisión final registrada o resumen
-   inequívoco de finalización. Un comentario de «Currently processing», una
-   revisión parcial, silencio, un check ausente o la ausencia de comentarios/hilos
-   NO son aprobación ni finalización.
+   explícitamente una review formal** de ese SHA. Un resumen o comentario puede
+   servir como evidencia auxiliar, pero NO sustituye una review formal registrada
+   sobre el HEAD exacto. Un comentario de «Currently processing», una revisión
+   parcial, silencio, un check ausente o la ausencia de comentarios/hilos NO son
+   aprobación ni finalización.
 3. Inspeccionar revisión, comentarios inline e hilos; corregir TODOS los
    hallazgos accionables o justificar y resolver los falsos positivos con
    evidencia. No fusionar con hilos accionables abiertos o cambios solicitados.

@@ -33,6 +33,8 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
         self.assertEqual(self.workflow.count("required_review_bot: coderabbitai[bot]"), 1)
         self.assertIn("pr_number: ${{ github.event.pull_request.number }}", self.workflow)
         self.assertIn("pl0n3r/factory/.github/workflows/politica.yml@v1", self.workflow)
+        self.assertIn("pull_request_review:", self.workflow)
+        self.assertIn("types: [submitted, edited, dismissed]", self.workflow)
         self.assertIn("pull-requests: read", self.workflow)
         self.assertNotIn("pull-requests: write", self.workflow)
         self.assertNotIn("secrets:", self.workflow)
@@ -56,7 +58,7 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
         self.assertFalse(substantive_review_satisfies(status, required_bot=REVIEWER, head_sha="2"*40))
 
     def test_documented_rule_and_machine_policy_stay_aligned(self) -> None:
-        for expected in (".github/factory-policy.json","coderabbitai[bot]","HEAD exacto","CHANGES_REQUESTED","rate-limit","check sin review formal"):
+        for expected in (".github/factory-policy.json","coderabbitai[bot]","HEAD exacto","review formal","CHANGES_REQUESTED","rate-limit","check sin review formal"):
             with self.subTest(expected=expected):
                 self.assertIn(expected, self.docs)
 
