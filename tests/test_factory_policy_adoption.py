@@ -15,6 +15,9 @@ def validate_factory_caller(text: str) -> None:
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, edited]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 
 permissions:
   contents: read
@@ -25,7 +28,7 @@ jobs:
     if not text.startswith(expected_prefix):
         raise ValueError("eventos o permisos del caller Factory divergentes")
     if "pull_request_target:" in text or re.search(r"^\s+push:", text, re.MULTILINE):
-        raise ValueError("caller Factory debe ser exclusivamente pull_request")
+        raise ValueError("caller Factory debe limitarse a pull_request y pull_request_review")
     if "secrets: inherit" in text or "issues:" in text or "contents: write" in text:
         raise ValueError("caller Factory excede permisos mínimos")
     if text.count("pl0n3r/factory/.github/workflows/politica.yml@v1") != 1:
@@ -48,7 +51,7 @@ class FactoryPolicyAdoptionTests(unittest.TestCase):
         cls.ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")
         cls.policy = json.loads((ROOT / "decisiones.yml").read_text(encoding="utf-8"))
 
-    def test_caller_is_pr_only_fixed_v1_and_minimal_permissions(self):
+    def test_caller_is_pr_and_review_only_fixed_v1_and_minimal_permissions(self):
         validate_factory_caller(self.workflow)
 
     def test_caller_rejects_extra_permission_push_and_floating_ref(self):
