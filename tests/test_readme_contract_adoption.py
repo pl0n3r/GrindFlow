@@ -7,6 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 METADATA = ROOT / "readme" / "project.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "readme-contract.yml"
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "grindflow-ci.yml"
+VERSION_PHP = ROOT / "config" / "version.php"
+PACKAGE_JSON = ROOT / "package.json"
+PACKAGE_LOCK = ROOT / "package-lock.json"
 
 
 class ReadmeContractAdoptionTests(unittest.TestCase):
@@ -83,6 +87,32 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
         self.assertNotIn("contents: write", workflow)
         self.assertNotIn("@main", workflow)
         self.assertNotIn("secrets:", workflow)
+
+    def test_release_version_artifacts_stay_aligned(self):
+        version_php = VERSION_PHP.read_text(encoding="utf-8")
+        package = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
+        package_lock = json.loads(PACKAGE_LOCK.read_text(encoding="utf-8"))
+        marker = "'number' => '"
+        self.assertIn(marker, version_php)
+        version = version_php.split(marker, 1)[1].split("'", 1)[0]
+        self.assertEqual(package["version"], version)
+        self.assertEqual(package_lock["version"], version)
+        self.assertEqual(package_lock["packages"][""]["version"], version)
+
+    def test_grindflow_ci_delegates_contract_v1_without_legacy_dashboard(self):
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("if [[ -f readme/project.json ]]; then", workflow)
+        self.assertIn(
+            "README Contract v1 validation is delegated to the dedicated reusable workflow.",
+            workflow,
+        )
+        delegated = workflow.split("if [[ -f readme/project.json ]]; then", 1)[1].split("fi", 1)[0]
+        self.assertNotIn("scripts/readme-dashboard.py", delegated)
+        self.assertIn("python3 scripts/readme-dashboard.py --update", workflow)
+        self.assertIn(
+            "python3 -m unittest tests/test_readme_contract_adoption.py",
+            workflow,
+        )
 
     def test_work_queue_links_canonical_roadmap(self):
         readme = README.read_text(encoding="utf-8")
