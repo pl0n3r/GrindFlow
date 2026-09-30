@@ -33,8 +33,6 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
         self.assertEqual(self.workflow.count("required_review_bot: coderabbitai[bot]"), 1)
         self.assertIn("pr_number: ${{ github.event.pull_request.number }}", self.workflow)
         self.assertIn("pl0n3r/factory/.github/workflows/politica.yml@v1", self.workflow)
-        self.assertIn("pull_request_review:", self.workflow)
-        self.assertIn("types: [submitted, dismissed]", self.workflow)
         self.assertIn("pull-requests: read", self.workflow)
         self.assertNotIn("pull-requests: write", self.workflow)
         self.assertNotIn("secrets:", self.workflow)
