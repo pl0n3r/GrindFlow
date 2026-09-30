@@ -893,8 +893,8 @@ Las reglas durables de eficiencia/selección de CI, dashboard README, CodeRabbit
 Factory deploy, observación/real-stack, SonarQube Cloud y diagnósticos viven en
 [docs/AGENT-OPERATIONS.md](docs/AGENT-OPERATIONS.md). Son normativas y deben
 leerse además de este bootstrap cuando el slice toque esas superficies. Las
-acciones operativas owner-only que usan `workflow_dispatch` siguen regidas allí;
-CI y Production Smoke no sustituyen esas guardas.
+acciones operativas owner-only que usan `workflow_dispatch` y evidencia `backup_receipt`
+siguen regidas allí; CI y Production Smoke no sustituyen esas guardas.
 
 ## Referencia archivada y políticas de migración
 
