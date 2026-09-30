@@ -5,7 +5,7 @@ on:
     - cron: '17 * * * *'
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, edited, ready_for_review, converted_to_draft, closed]
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
   issues:
     types: [labeled, closed, reopened]
   issue_comment:
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: coordinacion-${{ github.event.issue.number || github.event.pull_request.head.ref || github.run_id }}
+  group: coordinacion-${{ github.repository }}
   cancel-in-progress: false
   queue: max
 
@@ -26,13 +26,20 @@ jobs:
       github.event.issue.pull_request == null &&
       github.event.sender.login == github.event.comment.user.login &&
       (
-        startsWith(github.event.comment.body, '/tomar') ||
+        github.event.comment.body == '/tomar' ||
         github.event.comment.body == '/liberar-forzado' ||
         github.event.comment.body == '/adoptar-contrato-huerfana' ||
         startsWith(github.event.comment.body, '/liberar ') ||
         startsWith(github.event.comment.body, '/transferir ') ||
         startsWith(github.event.comment.body, '/migrar-contrato ') ||
-        startsWith(github.event.comment.body, '/renovar-contrato ')
+        startsWith(github.event.comment.body, '/renovar-contrato ') ||
+        contains(github.event.comment.body, '/tomar') ||
+        contains(github.event.comment.body, '/liberar-forzado') ||
+        contains(github.event.comment.body, '/adoptar-contrato-huerfana') ||
+        contains(github.event.comment.body, '/liberar ') ||
+        contains(github.event.comment.body, '/transferir ') ||
+        contains(github.event.comment.body, '/migrar-contrato ') ||
+        contains(github.event.comment.body, '/renovar-contrato ')
       )
     # GitHub valida el máximo permission envelope del reusable antes de
     # seleccionar el job interno. El reusable conserva mínimo privilegio por job.
@@ -89,8 +96,9 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       !(
+        startsWith(github.event.pull_request.head.ref, 'factory/bootstrap-coordination-') &&
         github.event.pull_request.head.repo.full_name == github.repository &&
-        github.event.pull_request.head.ref == 'factory/bootstrap-coordination-187'
+        github.event.pull_request.author_association == 'OWNER'
       )
     # Mismo sobre de carga; el job validar-pr del reusable conserva permisos
     # read-only (contents/issues/pull-requests: read).
@@ -130,5 +138,4 @@ jobs:
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: sweep
-
       profile: es
