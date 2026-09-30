@@ -29,6 +29,9 @@ final class PrivacyAsCodeTest extends TestCase
                 'legacy_supabase_upload_audit',
                 'media_vault',
                 'organization_membership',
+                'staff_access_metadata',
+                'staff_contact',
+                'staff_identity',
                 'traffic_dedupe',
                 'traffic_links',
                 'traffic_metrics',
@@ -142,12 +145,12 @@ final class PrivacyAsCodeTest extends TestCase
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '79ecf63aef1d814348434ddbf9f1b088b80985f7a716f4412fb7ca9213fc6a57',
-            'aviso-privacidad.md' => '4bd1cb1057fa4038940e8e285392df12743d77892ea51eae34ff448ce592dcd7',
+            'politica-tratamiento.md' => '97966f83fcbf184518f7c6aaec64c2ae2768f8599eb29726516351880c89ae23',
+            'aviso-privacidad.md' => 'a374a4f6335c3941f5f9ecacf3bc2ba2020ae7859bf68f9a035f53d7edf61434',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
-            'registro-tratamientos.md' => '23c48eb228530decc39b843323fa4676d7f480c46f9b7aa6db89a7ae9ddccd65',
+            'registro-tratamientos.md' => 'afd34e0eaa59f697aa88d5dc47e005c6d4bea8ca80146c650c1758ffcdda1e7e',
             'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
-            'retencion.md' => '27afabf1ea5af1da5ef3c0eea9fc093d950e455e266c5a83da8a535377abeec5',
+            'retencion.md' => '83f2248f31c9be19494303c146a1942ff65ec686be81de907fea3fe4a7d8ba23',
         ];
 
         foreach ($expected as $name => $sha256) {

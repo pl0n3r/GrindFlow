@@ -1,95 +1,134 @@
-# GrindFlow — Último deploy
+# GrindFlow
 
-<p align="center">
-<a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml"><img alt="GrindFlow CI" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main"></a>
-<a href="https://sonarcloud.io/dashboard?id=pl0n3r_GrindFlow"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status"></a>
-<a href="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml"><img alt="Production Smoke" src="https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg?branch=main"></a>
-</p>
+> SaaS multi-tenant para gestionar contenido, distribución programada, atribución de tráfico y operaciones de ingresos.
 
-> **Candidata v0.1.143 · Issue #140.** PHPStan/Larastan nivel 6 se conserva como gate y Rector entra en dry-run conservador para PHP 8.5/Laravel sin baseline artificial.
+**Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-## Progress convention
-- ✅ ~~Completado~~ = verificado; 🚧 Pendiente = en curso; ⛔ bloqueado = dependencia externa.
+GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
 
-## Fuentes de verdad
-[AGENTS.md](AGENTS.md) · [Spec](docs/GRINDFLOW-SPEC.md) · [Requisitos](docs/REQUIREMENTS.md) · [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+## Operational Cockpit
 
-## Estado del deploy
-| Señal | Estado | Evidencia |
-| --- | --- | --- |
-| SHA exacto de main (base) | ✅ **104b91657daaa4681cad31316f4f3b99a9271e71** | v0.1.142 |
-| CI del SHA exacto de main (base) | ✅ **success** | GrindFlow CI 36211838271 |
-| Deploy Observer / Production Smoke base | ✅ **success / success** | 36211838221 / 36211838235 |
-| Version objetivo | 🚧 **v0.1.143** | PHP, npm y lock en paridad |
-| CI/Sonar/CodeRabbit del PR | 🚧 pendiente | PR #178 · Issue #140 · v0.1.143 |
-| Producción objetivo | ✅ sin cambio runtime | calidad/CI solamente |
-
-## Huella del cambio
-<!-- grindflow:git-delta -->
-| Archivos | Inserciones | Eliminaciones | Neto |
-| ---: | ---: | ---: | ---: |
-| **13** | **+477** | **−88** | **+389** |
-
-## Calidad y entrega
-<!-- grindflow:gate-plan -->
-| Control | Estado / contrato |
+<!-- factory:status:start -->
+| Señal | Estado |
 | --- | --- |
-| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · MariaDB · browser · real-stack · legacy · symfony-preview** |
-| PR + snapshot exacto | **PR #178 · Issue #140 · v0.1.143**; README debe coincidir con HEAD final |
-| Gate agregador obligatorio | **validate** exige php-quality seleccionado; Sonar y CodeRabbit separados |
-| Static analysis | PHPStan/Larastan nivel 6; baseline solo para deuda reproducible y sin ignores obsoletos · Rector PHP 8.5 + dead-code/code-quality nivel 0 + Laravel code quality |
-| CI local canónico | **GrindFlow CI / validate** |
-| Rol del PR | **Ingeniería de software · Infraestructura · QA · Seguridad** |
+| main SHA | UNKNOWN |
+| versión | UNKNOWN |
+| CI | UNKNOWN |
+| release | UNKNOWN |
+| health | UNKNOWN |
+| smoke/observer | UNKNOWN |
+| quality/security | UNKNOWN |
+| Issue activo | UNKNOWN |
+| PR activo | UNKNOWN |
+| último release | UNKNOWN |
+<!-- factory:status:end -->
 
-## Flujo de entrega
+### Progress + Readiness
+
+<!-- factory:progress-readiness:start -->
+| Señal | Estado |
+| --- | --- |
+| Target | UNKNOWN |
+| Progress | UNKNOWN |
+| Readiness | UNKNOWN |
+| Evidence freshness | UNKNOWN |
+| Critical blockers | UNKNOWN |
+| Trend | UNKNOWN |
+
+| Dimensión | Progress | Readiness |
+| --- | --- | --- |
+| UNKNOWN | UNKNOWN | UNKNOWN |
+<!-- factory:progress-readiness:end -->
+
+> Los bloques anteriores son derivados. `UNKNOWN` o `PENDING` significa que falta evidencia canónica; nunca se promueve a `GREEN` o `DEGRADED` sin evidencia.
+
+## Work Queue
+
+- **NOW:** [#126 · escrituras productivas autónomas con backup verificable](https://github.com/pl0n3r/GrindFlow/issues/126).
+- **NEXT:** seleccionar el siguiente trabajo `ready` desde el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) después de cerrar el trabajo activo.
+- **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+- **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
+
+Esta vista resume el trabajo; no sustituye el roadmap, los Issues ni las Releases.
+
+## Qué hace el producto
+
+GrindFlow gestiona el ciclo de vida de contenido multimedia para equipos y creadores: biblioteca y organización de recursos, programación, distribución a destinos configurados, enlaces rastreables, atribución de tráfico y soporte a operaciones de ingresos. La especificación durable está en [`docs/GRINDFLOW-SPEC.md`](docs/GRINDFLOW-SPEC.md) y los requisitos verificables en [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+
+## Arquitectura en 60 segundos
+
 ```mermaid
 flowchart LR
-  A["main v0.1.142"] --> P["#140 · análisis estático"]
-  P --> Q["PHPStan L6 + Rector dry-run"]
-  Q --> V["CI / validate · Sonar · CodeRabbit"]
-  V --> M["squash merge serial"]
-  M --> X["exact-main + Observer + Smoke"]
+    U[Creadores y equipos] --> G[GrindFlow]
+    G --> C[Biblioteca y reglas]
+    C --> S[Scheduling]
+    S --> D[Distribution]
+    D --> T[Traffic attribution]
+    G --> A[Administración]
+    G --> P[Superficie pública]
+    F[Factory governance] --> G
 ```
 
-## Qué se hizo
-- Conserva PHPStan nivel 6 con Larastan ya instalado; main no muestra deuda, por eso no se crea baseline. Si aparece deuda reproducible, el contrato exige baseline no vacío/configurado y `reportUnmatchedIgnoredErrors: true`.
-- Añade Rector 2.6.7 + rector-laravel 2.6.2 como toolchain aislado de CI, sin dependencia runtime.
-- Rector usa PHP sets, dead-code/code-quality nivel 0 y Laravel code quality, siempre en `--dry-run`.
-- `php-quality` instala/cachea el toolchain, ejecuta PHPStan y luego Rector; `validate` sigue exigiendo el gate cuando el scope lo selecciona.
-- Contratos fallan si Rector deja de seleccionar php-quality o si desaparece PHPStan/Rector del workflow.
-- AGENTS documenta los comandos locales y prohíbe baseline vacío o autoescritura de Rector en CI.
+La arquitectura objetivo es un monolito modular API-first. La transición tecnológica conserva el runtime existente hasta demostrar paridad y cutover; el README no convierte un objetivo arquitectónico en estado desplegado.
 
-## Archivos modificados en esta entrega candidata
-<!-- grindflow:changed-files -->
-- `.github/workflows/grindflow-ci.yml`
-- `AGENTS.md`
-- `README.md`
-- `config/version.php`
-- `package-lock.json`
-- `package.json`
-- `phpstan.neon.dist`
-- `rector.php`
-- `scripts/ci-scope-contract.sh`
-- `scripts/ci-scope.sh`
-- `scripts/static-analysis-contract.sh`
-- `tools/rector/composer.json`
-- `tools/rector/composer.lock`
+## Stack e infraestructura
 
-## Validación
-- `scripts/static-analysis-contract.sh` comprueba Larastan/nivel 6, toolchain fijado, Rector conservador y comandos obligatorios del gate.
-- `scripts/ci-scope-contract.sh` demuestra que `rector.php` y el manifest del toolchain seleccionan php-quality + tests + MariaDB + browser + real-stack.
-- Por tocar `grindflow-ci.yml`, el clasificador fuerza la matriz completa; no se reduce cobertura.
-- No cambia Laravel/Symfony runtime, DB, Hostinger, permisos, secretos ni datos productivos.
-- Estado final exige CI/Sonar/CodeRabbit del mismo HEAD y exact-main + Observer + Smoke tras merge.
+- **Objetivo backend:** PHP 8.5 + Symfony 7.4 LTS + Doctrine ORM/DBAL/Migrations.
+- **Datos:** MariaDB.
+- **Administración objetivo:** React + TypeScript + Vite.
+- **Público objetivo:** Twig/SSR.
+- **Transición:** Laravel y el legado Next.js continúan operativos hasta paridad y cutover verificados.
+- **Hosting inicial:** Hostinger, con portabilidad prevista por la arquitectura.
+- **CI/gobernanza:** GitHub Actions consumiendo contratos reutilizables de Factory.
 
-## Qué sigue
-[Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+La fuente técnica de la transición es [`docs/STACK-TRANSITION-SYMFONY.md`](docs/STACK-TRANSITION-SYMFONY.md); no se infiere estado de producción desde esta sección.
 
-## Panorama general pendiente
-| Lane | Frente | Estado |
-| --- | --- | --- |
-| **NOW** | 🚧 #140 · PHPStan/Rector en CI | 🚧 candidata v0.1.143 |
-| **NEXT** | 🚧 #129 · cierre adopción Factory | 🚧 tras #140/#125 |
-| **BLOCKED / EXTERNAL** | ⛔ #125 branch protection + #139 Dependabot + #146 media storage | ⛔ dependencias externas |
-| **LATER** | 🚧 roadmap de producto | 🚧 preservado |
+## Ciclo de entrega
 
+Issue → reserva canónica → rama enfocada → PR → gates de GrindFlow/Factory → revisión → squash merge serial → verificación exact-main → release/deploy cuando aplique → smoke/observer → estado operativo basado en evidencia.
+
+Las reglas ejecutables del ciclo están en [`AGENTS.md`](AGENTS.md) y la gobernanza durable en [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md).
+
+## Calidad y seguridad
+
+- `GrindFlow CI / validate` agrega los gates seleccionados por alcance; Sonar y CodeRabbit aportan revisión adicional.
+- Los secretos y credenciales viven fuera del repositorio y no se publican en README, Issues ni logs.
+- Cambios de datos, despliegue y producción respetan migraciones, backup/restore, rollback y smoke definidos por la documentación operativa.
+- Estado desconocido falla cerrado: un badge, una versión o un merge no demuestran por sí solos salud ni despliegue.
+
+Consulta [`AGENTS.md`](AGENTS.md), [`decisiones.yml`](decisiones.yml) y [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md) para las reglas vigentes.
+
+## Roadmap y fuentes de verdad
+
+- **Roadmap canónico:** [Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2).
+- **Especificación:** [`docs/GRINDFLOW-SPEC.md`](docs/GRINDFLOW-SPEC.md).
+- **Requisitos:** [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+- **Modelo de desarrollo:** [`docs/DEVELOPMENT-MODEL.md`](docs/DEVELOPMENT-MODEL.md).
+- **Decisiones vigentes:** [`decisiones.yml`](decisiones.yml).
+- **Contrato operativo para agentes:** [`AGENTS.md`](AGENTS.md).
+- **Documentación profunda:** [`docs/`](docs/).
+
+El README enlaza estas fuentes; no las duplica ni funciona como changelog.
+
+## Desarrollo local
+
+Para el frontend/legado Node declarado actualmente en `package.json`:
+
+```bash
+npm ci
+npm run validate
+```
+
+Los comandos y gates PHP/Symfony vigentes se mantienen en [`AGENTS.md`](AGENTS.md) y en la documentación de transición. Ejecuta solo los gates correspondientes al área modificada; no uses una ejecución local como evidencia de producción.
+
+## Mapa de la fábrica
+
+- **Factory:** governance/kit y contratos reutilizables.
+- **ControlBot:** control plane privado de proyectos, trabajo, decisiones e incidentes.
+- **FactoryRunner:** execution plane.
+- **Condor:** producto.
+- **GrindFlow:** **producto actual**, enfocado en contenido, distribución y tráfico.
+- **BRVTAL:** producto.
+- **AutoFactory:** herramienta local/manual.
+
+Cada repositorio conserva su responsabilidad; GrindFlow consume gobernanza de Factory sin convertirse en un segundo control plane.

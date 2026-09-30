@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace GrindFlow\Identity\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Security\Core\User\EquatableInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'gf_identity_users')]
 #[ORM\UniqueConstraint(name: 'uq_gf_identity_users_email', columns: ['email'])]
-class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
+class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface, EquatableInterface
 {
     #[ORM\Id]
     #[ORM\Column(type: 'string', length: 36)]
@@ -32,11 +33,18 @@ class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(name: 'is_active', type: 'boolean')]
     private bool $active = true;
 
+    #[ORM\Column(name: 'session_generation', type: 'integer', options: ['unsigned' => true])]
+    private int $sessionGeneration = 0;
+
+    #[ORM\Column(name: 'last_access_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $lastAccessAt = null;
+
     #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(name: 'updated_at', type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
+
     public function getUserIdentifier(): string
     {
         return $this->email;
@@ -49,14 +57,22 @@ class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getRoles(): array
     {
-        // Platform account != membership-based organization permission.
         return ['ROLE_USER'];
     }
 
     #[\Deprecated]
     public function eraseCredentials(): void
     {
-        // No plaintext credentials are persisted in this entity.
+    }
+
+    public function isEqualTo(UserInterface $user): bool
+    {
+        return $user instanceof self
+            && hash_equals($this->email, $user->email)
+            && hash_equals($this->passwordHash, $user->passwordHash)
+            && $this->active === $user->active
+            && $this->platformRole === $user->platformRole
+            && $this->sessionGeneration === $user->sessionGeneration;
     }
 
     public function isActive(): bool
@@ -72,5 +88,10 @@ class IdentityUser implements UserInterface, PasswordAuthenticatedUserInterface
     public function displayName(): string
     {
         return $this->name;
+    }
+
+    public function email(): string
+    {
+        return $this->email;
     }
 }

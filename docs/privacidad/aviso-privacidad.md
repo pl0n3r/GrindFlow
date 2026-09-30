@@ -17,7 +17,7 @@
 
 | Tratamiento | Categoría | Campos | Finalidad | Base documentada | Consentimiento | Proveedores | Retención |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| account_credentials | authentication | password, remember_token | account_security | review_required | review_required | ninguno_declarado | review_required |
+| account_credentials | authentication | password, password_hash, remember_token, password_reset_token_hash, password_reset_expires_at, security_event | account_security | review_required | review_required | ninguno_declarado | review_required |
 | account_identity | contact | name, display_name, handle, email, email_verified_at, platform_role, role | account_access | review_required | review_required | supabase | review_required |
 | cloud_connections | authentication | authorized_by_user_id, created_by, provider, label, account_identifier, account_email, access_ciphertext, refresh_ciphertext, token_expires_at, scopes, cursor, delta_cursor, root_path, root_folder_id, root_folder_path, default_profile_id, metadata | cloud_media_connection | review_required | review_required | dropbox, google_drive, supabase | review_required |
 | legacy_supabase_link_clicks | usage | tracking_link_id, occurred_at, country, referrer, ua_family, network | traffic_click_analytics | review_required | review_required | supabase | review_required |
@@ -25,6 +25,9 @@
 | legacy_supabase_upload_audit | location | upload_link_id, r2_key, bytes, mime_type, ip, occurred_at | upload_security_audit | review_required | review_required | supabase | review_required |
 | media_vault | usage | ingested_by_user_id, profile_id, original_filename, source_type, source_ref, storage_disk, storage_key, r2_key, sha256, checksum_sha256, byte_size, file_type, mime_type, outfit_tag, session_date, metadata, derivatives | media_management | review_required | review_required | cloudflare_r2, supabase | review_required |
 | organization_membership | identification | user_id, organization_id, role | tenant_authorization | review_required | review_required | supabase | review_required |
+| staff_access_metadata | usage | last_access_at, failed_login_count | staff_security_monitoring | review_required | review_required | ninguno_declarado | review_required |
+| staff_contact | contact | email | staff_invitation_and_recovery | review_required | review_required | ninguno_declarado | review_required |
+| staff_identity | identification | staff_id, name, role, status | staff_administration | review_required | review_required | ninguno_declarado | review_required |
 | traffic_dedupe | usage | visitor_hash, last_counted_at | traffic_deduplication | review_required | review_required | ninguno_declarado | dedupe_24h |
 | traffic_links | usage | created_by_user_id, profile_id, slug, label, destination_url, channel, campaign, network, status, clicks_count, expires_at | traffic_attribution | review_required | review_required | supabase | review_required |
 | traffic_metrics | usage | metric_date, clicks | traffic_measurement | review_required | review_required | ninguno_declarado | review_required |

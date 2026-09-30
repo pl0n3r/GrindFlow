@@ -7,7 +7,7 @@ Producto: `pl0n3r/GrindFlow`
 ## account_credentials
 
 - Categoría: `authentication`
-- Campos de software: `password`, `remember_token`
+- Campos de software: `password`, `password_hash`, `remember_token`, `password_reset_token_hash`, `password_reset_expires_at`, `security_event`
 - Finalidad: `account_security`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`
@@ -82,6 +82,36 @@ Producto: `pl0n3r/GrindFlow`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`
 - Proveedores: `supabase`
+- Retención: `review_required`
+
+## staff_access_metadata
+
+- Categoría: `usage`
+- Campos de software: `last_access_at`, `failed_login_count`
+- Finalidad: `staff_security_monitoring`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
+## staff_contact
+
+- Categoría: `contact`
+- Campos de software: `email`
+- Finalidad: `staff_invitation_and_recovery`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
+## staff_identity
+
+- Categoría: `identification`
+- Campos de software: `staff_id`, `name`, `role`, `status`
+- Finalidad: `staff_administration`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
 - Retención: `review_required`
 
 ## traffic_dedupe

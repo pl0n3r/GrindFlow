@@ -1,0 +1,12 @@
+services:
+  GrindFlow\Infrastructure\Mail\InMemoryPasswordRecoveryNotifier:
+    public: true
+
+  GrindFlow\Identity\Security\PasswordRecoveryNotifier:
+    alias: GrindFlow\Infrastructure\Mail\InMemoryPasswordRecoveryNotifier
+    public: true
+
+  GrindFlow\Ops\Security\StaffOpsConfiguration:
+    arguments:
+      $keysJson: '{"grindflow-test":"test-secret-not-production"}'
+      $allowlist: '127.0.0.1'

@@ -14,7 +14,11 @@
       "category": "authentication",
       "fields": [
         "password",
-        "remember_token"
+        "password_hash",
+        "remember_token",
+        "password_reset_token_hash",
+        "password_reset_expires_at",
+        "security_event"
       ],
       "purpose": "account_security",
       "basis": "review_required",
@@ -229,6 +233,46 @@
         "clicks"
       ],
       "purpose": "traffic_measurement",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_identity",
+      "category": "identification",
+      "fields": [
+        "staff_id",
+        "name",
+        "role",
+        "status"
+      ],
+      "purpose": "staff_administration",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_contact",
+      "category": "contact",
+      "fields": [
+        "email"
+      ],
+      "purpose": "staff_invitation_and_recovery",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_access_metadata",
+      "category": "usage",
+      "fields": [
+        "last_access_at",
+        "failed_login_count"
+      ],
+      "purpose": "staff_security_monitoring",
       "basis": "review_required",
       "retention": "review_required",
       "consent": "review_required",

@@ -1,0 +1,134 @@
+name: Coordinación
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, edited, ready_for_review, converted_to_draft, closed]
+  issues:
+    types: [labeled, closed, reopened]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coordinacion-${{ github.event.issue.number || github.event.pull_request.head.ref || github.run_id }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  comentario:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request == null &&
+      github.event.sender.login == github.event.comment.user.login &&
+      (
+        startsWith(github.event.comment.body, '/tomar') ||
+        github.event.comment.body == '/liberar-forzado' ||
+        github.event.comment.body == '/adoptar-contrato-huerfana' ||
+        startsWith(github.event.comment.body, '/liberar ') ||
+        startsWith(github.event.comment.body, '/transferir ') ||
+        startsWith(github.event.comment.body, '/migrar-contrato ') ||
+        startsWith(github.event.comment.body, '/renovar-contrato ')
+      )
+    # GitHub valida el máximo permission envelope del reusable antes de
+    # seleccionar el job interno. El reusable conserva mínimo privilegio por job.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: write
+    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    with:
+      operation: comment
+      issue_number: ${{ github.event.issue.number }}
+      actor: ${{ github.event.comment.user.login }}
+      association: ${{ github.event.comment.author_association }}
+      body: ${{ github.event.comment.body }}
+
+      profile: es
+  etiqueta:
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'estado: reservado'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: write
+    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    with:
+      operation: label
+      issue_number: ${{ github.event.issue.number }}
+      actor: ${{ github.event.sender.login }}
+      label: ${{ github.event.label.name }}
+
+      profile: es
+  pr:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # GitHub valida el máximo permiso del reusable completo antes de evaluar
+    # qué operación interna se ejecutará. La operación pr sigue estrechando
+    # permisos dentro de Factory.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: write
+    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    with:
+      operation: pr
+      pr_number: ${{ github.event.pull_request.number }}
+      action: ${{ github.event.action }}
+
+      profile: es
+  validar-pr:
+    if: >-
+      github.event_name == 'pull_request' &&
+      !(
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.head.ref == 'factory/bootstrap-coordination-187'
+      )
+    # Mismo sobre de carga; el job validar-pr del reusable conserva permisos
+    # read-only (contents/issues/pull-requests: read).
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: write
+    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    with:
+      operation: validate
+      pr_number: ${{ github.event.pull_request.number }}
+      require_reservation: true
+
+      profile: es
+  issue:
+    if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'reopened')
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: write
+    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    with:
+      operation: issue
+      issue_number: ${{ github.event.issue.number }}
+      action: ${{ github.event.action }}
+
+      profile: es
+  sweep:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: write
+    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    with:
+      operation: sweep
+
+      profile: es
