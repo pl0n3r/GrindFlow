@@ -17,7 +17,7 @@ class AgentsFinanceCompactionTests(unittest.TestCase):
         finance = (ROOT / "docs" / "AGENT-FINANCE.md").read_text()
 
         for heading in FINANCE_HEADINGS:
-            self.assertIn(heading, finance)
+            self.assertEqual(1, finance.count(heading))
             self.assertNotIn(heading, agents)
 
         for phrase in (
