@@ -3,6 +3,9 @@ name: Política Factory v1
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, edited]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 
 permissions:
   contents: read
@@ -14,3 +17,4 @@ jobs:
     uses: pl0n3r/factory/.github/workflows/politica.yml@v1
     with:
       pr_number: ${{ github.event.pull_request.number }}
+      required_review_bot: coderabbitai[bot]

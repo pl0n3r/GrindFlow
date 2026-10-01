@@ -99,10 +99,11 @@ verdes NO sustituyen la revisión final del mismo head.
 1. Estabilizar el SHA final del PR; comprobar CI `GrindFlow CI / validate` y
    Sonar satisfactorios para ese SHA y solicitar/confirmar CodeRabbit full review.
 2. Antes de ejecutar squash/merge, verificar en GitHub que **CodeRabbit terminó
-   explícitamente su revisión** de ese SHA: revisión final registrada o resumen
-   inequívoco de finalización. Un comentario de «Currently processing», una
-   revisión parcial, silencio, un check ausente o la ausencia de comentarios/hilos
-   NO son aprobación ni finalización.
+   explícitamente una review formal** de ese SHA. Un resumen o comentario puede
+   servir como evidencia auxiliar, pero NO sustituye una review formal registrada
+   sobre el HEAD exacto. Un comentario de «Currently processing», una revisión
+   parcial, silencio, un check ausente o la ausencia de comentarios/hilos NO son
+   aprobación ni finalización.
 3. Inspeccionar revisión, comentarios inline e hilos; corregir TODOS los
    hallazgos accionables o justificar y resolver los falsos positivos con
    evidencia. No fusionar con hilos accionables abiertos o cambios solicitados.
@@ -122,6 +123,8 @@ verdes NO sustituyen la revisión final del mismo head.
 CodeRabbit todavía mostraba «Currently processing», sin revisión final visible.
 Esa conducta no se repite. Esta es una regla de actuación del agente; por sí
 sola no implica que GitHub tenga un ruleset/required check configurado.
+
+**Enforcement machine-readable:** `.github/factory-policy.json` es la policy canónica del consumidor y exige `required_review_bot=coderabbitai[bot]`. El caller `.github/workflows/politica.yml` pasa explícitamente el mismo reviewer para que el bootstrap no dependa de que el archivo ya exista en BASE. Factory resuelve la policy desde la BASE exacta y valida la review sustantiva contra el HEAD exacto; una review de otro SHA, `CHANGES_REQUESTED`, rate-limit o un check sin review formal no satisface la compuerta.
 
 
 ### Factory deploy paralelo y reversible
