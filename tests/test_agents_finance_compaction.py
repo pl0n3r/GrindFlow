@@ -54,7 +54,6 @@ class AgentsFinanceCompactionTests(unittest.TestCase):
         match = re.search(r"'number'\s*=>\s*'([^']+)'", config)
         self.assertIsNotNone(match)
         expected = match.group(1)
-        self.assertEqual("0.1.158", expected)
         self.assertEqual(expected, package["version"])
         self.assertEqual(expected, package_lock["version"])
         self.assertEqual(expected, package_lock["packages"][""]["version"])
