@@ -64,6 +64,7 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
             "coveredCommitId",
             "HEAD exacto",
             "Política Factory v1",
+            "hallazgos bloqueantes",
             "Si cambia el HEAD",
             "Full review finished",
         ):
