@@ -92,40 +92,56 @@ Reglas:
 
 ### Regla BLOQUEANTE de CodeRabbit antes de fusionar
 
-**Decisión explícita del propietario (21/09/2026), tras PR #72:** CodeRabbit
-es una compuerta de revisión obligatoria para CADA PR de GrindFlow. CI y Sonar
-verdes NO sustituyen la revisión final del mismo head.
+**Decisiones explícitas del propietario:** desde el 21/09/2026 CodeRabbit es
+una compuerta de revisión obligatoria para CADA PR de GrindFlow. El 02/10/2026,
+en #219, el propietario sustituyó la opción A (solo review formal exact-head)
+por la opción B: una **review formal exact-head** o una **cobertura terminal
+exact-head equivalente** pueden satisfacer la evidencia del reviewer-bot. CI y
+Sonar verdes, por sí solos, NO sustituyen esa evidencia.
 
-1. Estabilizar el SHA final del PR; comprobar CI `GrindFlow CI / validate` y
-   Sonar satisfactorios para ese SHA y solicitar/confirmar CodeRabbit full review.
-2. Antes de ejecutar squash/merge, verificar en GitHub que **CodeRabbit terminó
-   explícitamente una review formal** de ese SHA. Un resumen o comentario puede
-   servir como evidencia auxiliar, pero NO sustituye una review formal registrada
-   sobre el HEAD exacto. Un comentario de «Currently processing», una revisión
-   parcial, silencio, un check ausente o la ausencia de comentarios/hilos NO son
-   aprobación ni finalización.
-3. Inspeccionar revisión, comentarios inline e hilos; corregir TODOS los
-   hallazgos accionables o justificar y resolver los falsos positivos con
-   evidencia. No fusionar con hilos accionables abiertos o cambios solicitados.
-4. Si se modifica la rama, el resultado del head anterior deja de valer:
-   volver a verificar CI/Sonar y obtener revisión final de CodeRabbit sobre el
-   NUEVO SHA antes de fusionar. Verificar base/head de nuevo para evitar carreras.
-5. Si CodeRabbit demora indefinidamente, falla, cancela o no entrega evidencia
-   final, **mantener el PR abierto y bloquear el merge**; registrar el bloqueo
-   y avanzar únicamente en trabajo independiente seguro. No hay excepción
-   automática por timeout, CI verde, ausencia de findings ni presión de entrega.
+1. Estabilizar el SHA final del PR y comprobar CI `GrindFlow CI / validate` y
+   Sonar satisfactorios para ese SHA.
+2. Antes de ejecutar squash/merge, verificar una de estas dos evidencias sobre
+   el **HEAD exacto**:
+   - una review formal sustantiva de `coderabbitai[bot]` registrada sobre ese
+     SHA y sin `CHANGES_REQUESTED`; o
+   - un único marker canónico `final_review_risk_coverage` publicado por
+     `coderabbitai[bot]`, con `coveredCommitId` igual al HEAD exacto, sin
+     hallazgos bloqueantes y con `Política Factory v1` en SUCCESS sobre ese
+     mismo SHA.
+   Un comentario genérico «Full review finished», «Currently processing», una
+   revisión parcial, silencio, un check ausente o un status satisfactorio sin
+   la evidencia anterior NO son aprobación ni finalización.
+3. Inspeccionar review, comentarios inline e hilos; corregir TODOS los hallazgos
+   accionables o justificar y resolver los falsos positivos con evidencia. No
+   fusionar con hilos accionables abiertos ni cambios solicitados.
+4. Si cambia el HEAD, toda review/cobertura del SHA anterior deja de valer:
+   volver a verificar CI/Sonar y obtener review formal o cobertura terminal
+   válida sobre el NUEVO SHA antes de fusionar. Verificar base/head de nuevo
+   para evitar carreras.
+5. Si CodeRabbit demora indefinidamente, falla, cancela o no entrega ninguna de
+   las dos evidencias finales válidas, **mantener el PR abierto y bloquear el
+   merge**; registrar el bloqueo y avanzar únicamente en trabajo independiente
+   seguro. No hay excepción automática por timeout, rate-limit, CI verde,
+   ausencia de findings ni presión de entrega.
 6. No reinterpretar `mergeable=true` de GitHub como evidencia del gate de
    CodeRabbit. No registrar `CodeRabbit aprobado` ni `review completada` sin
-   prueba explícita. Una excepción excepcional requiere instrucción expresa
-   del propietario para ESA PR y debe quedar documentada antes de ejecutarla.
+   prueba explícita. Las demás puertas humanas, CI, Sonar y resolución de
+   hallazgos siguen vigentes.
 
 **Lección registrada:** PR #72 fue fusionada con CI/Sonar verdes mientras
 CodeRabbit todavía mostraba «Currently processing», sin revisión final visible.
-Esa conducta no se repite. Esta es una regla de actuación del agente; por sí
-sola no implica que GitHub tenga un ruleset/required check configurado.
+Esa conducta no se repite. La opción B de #219 no convierte comentarios
+genéricos en evidencia ni amplía autoridad.
 
-**Enforcement machine-readable:** `.github/factory-policy.json` es la policy canónica del consumidor y exige `required_review_bot=coderabbitai[bot]`. El caller `.github/workflows/politica.yml` pasa explícitamente el mismo reviewer para que el bootstrap no dependa de que el archivo ya exista en BASE. Factory resuelve la policy desde la BASE exacta y valida la review sustantiva contra el HEAD exacto; una review de otro SHA, `CHANGES_REQUESTED`, rate-limit o un check sin review formal no satisface la compuerta.
-
+**Enforcement machine-readable:** `.github/factory-policy.json` es la policy
+canónica del consumidor y exige `required_review_bot=coderabbitai[bot]`. El
+caller `.github/workflows/politica.yml` pasa explícitamente el mismo reviewer.
+Factory v1 valida una review sustantiva exact-head **o** la cobertura canónica
+`final_review_risk_coverage` exact-head del reviewer-bot requerido. Una review
+de otro SHA, `CHANGES_REQUESTED`, rate-limit, un check sin evidencia del bot o
+un comentario genérico no satisfacen la compuerta. `Política Factory v1` debe
+terminar en SUCCESS sobre el mismo SHA usado como evidencia.
 
 ### Factory deploy paralelo y reversible
 
