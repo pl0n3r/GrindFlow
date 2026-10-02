@@ -45,6 +45,7 @@ stack objetivo. Documentar decisiones durables en el mismo PR que las aplica.
 | Symfony, identidad, permisos, Vault, frontend React | `symfony/src/`, `symfony/frontend/`, migraciones y tests Symfony | `symfony-preview`: PHP, MariaDB descartable, TypeScript/Vite y Chromium |
 | Laravel operativo | `app/`, `routes/`, `database/`, `tests/` y configuración del hosting | Gates PHP, tests, MariaDB y navegador seleccionados |
 | Traffic (links, atribución, CSV) | [`docs/AGENT-TRAFFIC.md`](docs/AGENT-TRAFFIC.md), requisitos `GF-FR-006*` | Tests Traffic relevantes; tenant, privacidad y dedupe fail-closed |
+| Finance (ledger, reversas, reportes) | [`docs/AGENT-FINANCE.md`](docs/AGENT-FINANCE.md), requisitos Finance aplicables | Tests Finance relevantes; tenant, enteros monetarios y ledger append-only |
 | Next.js y workers antiguos | `src/`, `workers/`, `supabase/` y [archivo histórico](docs/AGENTS-LEGACY-ARCHIVE.md) | Gate `legacy` y contratos relevantes; no ampliar el legado por inercia |
 | Versionado, README, GitHub Actions, Sonar | [`docs/AGENT-OPERATIONS.md`](docs/AGENT-OPERATIONS.md), `scripts/ci-scope.sh`, `scripts/readme-dashboard.py`, `scripts/release-version.py`, `docs/GOVERNANCE.md` | `preflight`, `fast`, `validate`, Sonar y exact-main |
 | Hostinger y datos reales | `docs/DEPLOY-HOSTINGER.md`, reglas de smoke/diagnósticos y plan de transición | Observer + smoke lectura; mutaciones requieren operación autorizada |
@@ -375,27 +376,6 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Probar >100 filas con misma fecha y 2 organizaciones, paginacion
   determinista, filtros combinados + links, destino inactivo,
   paginas fuera de rango y query de pagina malformada.
-
-### Finance: reconciliacion por eventos, no saldo bancario
-
-- La fecha filtrada en Finance es `occurred_on` del asiento: una reversa
-  cuenta en SU propia fecha UTC (puede generar neto negativo temporal).
-  No presentar esto como conciliacion de pagos bancarios o saldo historico
-  sin verificar el periodo completo de vida de los asientos.
-- Un SOLO builder tenant-scoped genera ledger paginado, totales por moneda,
-  resumen por moneda+beneficiario y CSV de TODOS los grupos coincidentes.
-  No sumar monedas distintas ni usar el preview de 25 filas para reportes.
-- Preservar currency, beneficiary, from/to validados en enlaces de pagina,
-  y excluir otros parametros. Limitar page y no entregar identificadores
-  internos, notas, cookies ni nombres de clientes fuera del tenant en CSV.
-- Beneficiarios sin miembro activo aparecen como 'Former beneficiary'
-  y nulos como 'Organization / unassigned', sin intentar inferirlos de
-  records de otra organizacion; un beneficiary_id arbitrario no es filtro
-  autorizado. Nombres que comiencen con formula de planilla se prefijan.
-- Finance solo Admin/Studio autorizados, GET fallback con schema no migrado,
-  descarga 503 hasta schema y encabezados private/no-store/nosniff.
-- Nunca reescribir, borrar ni compensar el ledger automaticamente para
-  cuadrar un reporte. La gestion de reversas permanece append-only.
 
 ### Scheduler: search sobre opciones de creacion (mas de 100)
 
@@ -731,30 +711,6 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
 - MariaDB prohibe SQL UPDATE/DELETE sobre el ledger; el modelo prohibe
   mutaciones normales. Antes de migrar la tabla, el flujo previo continua y
   la UI explica que el timeline requiere migration.
-
-### Regla de Finance
-
-- `revenue_allocations` es un ledger tenant-owned **append-only**. No existe
-  update/delete funcional; una correccion crea una fila nueva con
-  `reversal_of_id`. MariaDB refuerza el contrato con triggers BEFORE UPDATE /
-  BEFORE DELETE para que SQL directo tampoco pueda reescribir historia.
-- Solo Admin/Studio pueden ver o mutar Finance. Editor/Model no reciben acceso
-  por ocultar UI: la autorizacion se repite server-side.
-- Los montos se persisten como enteros positivos en `amount_minor`; nunca usar
-  float/double para dinero. `currency` es un codigo de tres letras en mayuscula.
-- El beneficiario es opcional pero, si existe, debe tener membership en la misma
-  organizacion al momento de crear el asiento.
-- Cada asiento conserva actor, fecha, fuente y nota. Si un actor/beneficiario se
-  elimina, su FK puede quedar null sin reescribir el asiento historico.
-- Una reversa copia monto, moneda, fuente y beneficiario del original, exige
-  razon y solo puede existir una vez por asiento. Una reversa no se revierte.
-- Totales netos se derivan como asignaciones originales menos reversas **por
-  moneda**; nunca se suman minor units de currencies distintas y no se persiste
-  un balance mutable separado en este slice.
-- La migration de Finance es explicita. Antes de aplicarla, el GET explica
-  `Migration required` y los writes responden 503 antes del FormRequest.
-- Finance core v1 no implementa cobros, payouts bancarios, impuestos, invoices
-  ni conciliacion; esos flujos deben vivir detras de este ledger auditable.
 
 ### Regla de direct uploads del Vault
 
