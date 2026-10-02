@@ -84,6 +84,8 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
             "HEAD exacto",
             "Politica Factory v1",
             "review_round_limit=3",
+            "no existen hallazgos bloqueantes",
+            "si cambia el HEAD la cobertura debe renovarse",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, decision["text"])
