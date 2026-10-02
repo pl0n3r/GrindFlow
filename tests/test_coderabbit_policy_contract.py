@@ -64,7 +64,7 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
             "coveredCommitId",
             "HEAD exacto",
             "Política Factory v1",
-            "si cambia el HEAD",
+            "Si cambia el HEAD",
             "Full review finished",
         ):
             with self.subTest(expected=expected):
