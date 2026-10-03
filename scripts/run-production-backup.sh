@@ -14,8 +14,8 @@ set -euo pipefail
 [[ "$HOSTINGER_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "invalid SSH port" >&2; exit 2; }
 (( HOSTINGER_SSH_PORT >= 1 && HOSTINGER_SSH_PORT <= 65535 )) || { echo "invalid SSH port" >&2; exit 2; }
 [[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]] || { echo "invalid expected pending count" >&2; exit 2; }
-[[ "$HOSTINGER_RELEASE_ROOT" == /* && "$HOSTINGER_RELEASE_ROOT" != "/" ]] || { echo "invalid release root" >&2; exit 2; }
-[[ "$HOSTINGER_RELEASE_ROOT" != *".."* && "$HOSTINGER_RELEASE_ROOT" != *\\* ]] || { echo "invalid release root" >&2; exit 2; }
+[[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]] || { echo "invalid release root" >&2; exit 2; }
+[[ "$HOSTINGER_RELEASE_ROOT" != *".."* ]] || { echo "invalid release root" >&2; exit 2; }
 
 workdir="$(mktemp -d)"
 keyfile="$workdir/key"
