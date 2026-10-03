@@ -20,6 +20,40 @@ flujo antiguo basado en Next.js/Docker sigue documentado en
 - GrindFlow invalida automaticamente caches Laravel cuando detecta cambios en
   rutas/config/bootstrap/composer mediante `ReleaseCacheGuard`.
 
+## Cutover monotónico de deploy
+
+El deploy reversible Factory es el destino operativo para eliminar carreras de
+redeploy fuera de orden. Un evento `push` solo puede observar, publicar release,
+ejecutar Production Smoke o entrar al caller Factory cuando su `GITHUB_SHA`
+sigue siendo el HEAD remoto actual de la rama principal. Los eventos atrasados
+se registran como stale y terminan sin I/O productivo ni mutaciones de Issues.
+
+El caller `.github/workflows/deploy-factory.yml` permanece **fail-closed** con
+`FACTORY_DEPLOY_ENABLED`. Añadir el trigger `push: main` no habilita por sí
+solo un deploy: el job reusable solo corre cuando el guard confirma el SHA
+actual y el flag explícito está en `true`.
+
+Orden obligatorio del cutover:
+
+1. verificar por canal privado que `HOSTINGER_SSH_HOST`,
+   `HOSTINGER_SSH_USER`, `HOSTINGER_SSH_PORT`,
+   `HOSTINGER_RELEASE_ROOT`, `DEPLOY_SSH_KEY` y
+   `HOSTINGER_KNOWN_HOSTS` están configurados;
+2. ejecutar una prueba manual del deploy Factory con el HEAD actual y confirmar
+   `/health` exacto + rollback de artefacto;
+3. **desactivar el auto-redeploy Git/hPanel antes de habilitar**
+   `FACTORY_DEPLOY_ENABLED=true`; nunca mantener dos autoridades de deploy;
+4. habilitar el flag, promover un único HEAD de `main` y observar
+   Deploy Observer + Production Smoke;
+5. conservar Git/hPanel solo como ruta manual de recuperación, sin webhook o
+   auto-redeploy activo.
+
+Este repositorio no puede demostrar por sí mismo que el paso 3 ocurrió en
+hPanel. No marcar el cutover como completado hasta observar esa configuración y
+un deploy Factory real. Ante rollback del mecanismo nuevo, deshabilitar el flag
+Factory antes de reactivar temporalmente hPanel; nunca dejar ambos activos a la
+vez.
+
 ## Primer arranque
 
 Desde `public_html`:
