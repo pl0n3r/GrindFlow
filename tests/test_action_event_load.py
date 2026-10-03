@@ -25,10 +25,18 @@ class ActionEventLoadTests(unittest.TestCase):
             self.assertIn("GITHUB_STEP_SUMMARY", source)
 
         self.assertIn("expected_pending:", migration)
-        self.assertIn("backup_receipt:", migration)
-        self.assertIn("BACKUP_RECEIPT: ${{ inputs.backup_receipt }}", migration)
+        self.assertNotIn("backup_receipt:", migration)
+        self.assertNotIn("BACKUP_RECEIPT", migration)
         self.assertNotIn("backup_verified:", migration)
         self.assertIn("EXPECTED_PENDING: ${{ inputs.expected_pending }}", migration)
+        self.assertIn("github.triggering_actor == github.repository_owner", migration)
+
+        job_header = migration.split("    steps:", 1)[0]
+        self.assertNotIn("PRODUCTION_E2E_PASSWORD", job_header)
+        self.assertEqual(
+            migration.count("E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}"),
+            2,
+        )
 
     def test_global_check_run_sonar_relay_is_removed(self):
         self.assertFalse((WORKFLOWS / "sonar-pr-details.yml").exists())

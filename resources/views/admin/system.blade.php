@@ -44,7 +44,7 @@
                 </div>
             @endif
 
-            @if ($errors->has('migration') || $errors->has('backup_receipt') || $errors->has('confirmation') || $errors->has('migration_batch'))
+            @if ($errors->has('migration') || $errors->has('confirmation') || $errors->has('migration_batch'))
                 <div class="gf-alert" role="alert">
                     {{ $errors->first() }}
                 </div>
@@ -242,8 +242,8 @@
                             </h3>
                             <p class="gf-system-copy">
                                 Revisa el lote exacto antes de continuar. CI no ejecuta
-                                migraciones productivas. Esta pantalla no hace ni verifica
-                                backups: confirma un respaldo externo restaurable por separado.
+                                migraciones productivas. El respaldo reciente se resuelve y
+                                verifica server-side para el fingerprint exacto de este lote.
                             </p>
 
                             @if ($pendingMigrations === null)
@@ -274,28 +274,6 @@
                                     name="migration_batch"
                                     value="{{ $migrationFingerprint }}"
                                 >
-
-                                <div class="gf-field">
-                                    <label for="backup_receipt">
-                                        Recibo SHA-256 del backup DB verificable
-                                    </label>
-                                    <input
-                                        class="gf-input"
-                                        id="backup_receipt"
-                                        name="backup_receipt"
-                                        type="text"
-                                        inputmode="latin"
-                                        autocomplete="off"
-                                        spellcheck="false"
-                                        pattern="[a-f0-9]{64}"
-                                        maxlength="64"
-                                        required
-                                    >
-                                    <p class="gf-system-copy">
-                                        Debe corresponder al lote actual y a un archivo .sql.gz
-                                        comprobado hace menos de 15 minutos.
-                                    </p>
-                                </div>
 
                                 <div class="gf-field">
                                     <label for="confirmation">

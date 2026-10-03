@@ -67,7 +67,7 @@ Producto: `pl0n3r/GrindFlow`
 ## media_vault
 
 - Categoría: `usage`
-- Campos de software: `ingested_by_user_id`, `profile_id`, `original_filename`, `source_type`, `source_ref`, `storage_disk`, `storage_key`, `r2_key`, `sha256`, `checksum_sha256`, `byte_size`, `file_type`, `mime_type`, `outfit_tag`, `session_date`, `metadata`, `derivatives`
+- Campos de software: `ingested_by_user_id`, `profile_id`, `assigned_at`, `assigned_by_user_id`, `original_filename`, `source_type`, `source_ref`, `storage_disk`, `storage_key`, `r2_key`, `sha256`, `checksum_sha256`, `byte_size`, `file_type`, `mime_type`, `outfit_tag`, `session_date`, `metadata`, `derivatives`
 - Finalidad: `media_management`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`

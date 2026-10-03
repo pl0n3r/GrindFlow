@@ -25,6 +25,7 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
         cls.policy = json.loads((ROOT / ".github/factory-policy.json").read_text(encoding="utf-8"))
         cls.workflow = (ROOT / ".github/workflows/politica.yml").read_text(encoding="utf-8")
         cls.docs = (ROOT / "docs/AGENT-OPERATIONS.md").read_text(encoding="utf-8")
+        cls.decisions = json.loads((ROOT / "decisiones.yml").read_text(encoding="utf-8"))
 
     def test_factory_policy_requires_coderabbit(self) -> None:
         self.assertEqual(self.policy, {"version": 1, "required_review_bot": REVIEWER})
@@ -55,8 +56,53 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
         self.assertFalse(substantive_review_satisfies(empty, required_bot=REVIEWER, head_sha="2"*40))
         self.assertFalse(substantive_review_satisfies(status, required_bot=REVIEWER, head_sha="2"*40))
 
+    def test_documented_rule_accepts_exact_head_review_or_terminal_coverage(self) -> None:
+        for expected in (
+            "review formal",
+            "final_review_risk_coverage",
+            "coderabbitai[bot]",
+            "coveredCommitId",
+            "HEAD exacto",
+            "Política Factory v1",
+            "hallazgos bloqueantes",
+            "Si cambia el HEAD",
+            "Full review finished",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, self.docs)
+
+    def test_owner_decision_b_is_recorded_without_changing_round_limit(self) -> None:
+        self.assertEqual(self.decisions["review_round_limit"], 3)
+        decision = next(item for item in self.decisions["decisions"] if item["id"] == "D-062")
+        self.assertEqual(decision["status"], "active")
+        for expected in (
+            "#219",
+            "A por B",
+            "final_review_risk_coverage",
+            "coderabbitai[bot]",
+            "coveredCommitId",
+            "HEAD exacto",
+            "Politica Factory v1",
+            "review_round_limit=3",
+            "no existen hallazgos bloqueantes",
+            "si cambia el HEAD la cobertura debe renovarse",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, decision["text"])
+
     def test_documented_rule_and_machine_policy_stay_aligned(self) -> None:
-        for expected in (".github/factory-policy.json","coderabbitai[bot]","HEAD exacto","review formal","CHANGES_REQUESTED","rate-limit","check sin review formal"):
+        self.assertEqual(self.policy, {"version": 1, "required_review_bot": REVIEWER})
+        self.assertEqual(self.workflow.count("required_review_bot: coderabbitai[bot]"), 1)
+        for expected in (
+            ".github/factory-policy.json",
+            "coderabbitai[bot]",
+            "HEAD exacto",
+            "review formal",
+            "final_review_risk_coverage",
+            "CHANGES_REQUESTED",
+            "rate-limit",
+            "Política Factory v1",
+        ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, self.docs)
 

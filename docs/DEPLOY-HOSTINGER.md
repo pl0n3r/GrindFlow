@@ -165,15 +165,17 @@ preferido no requiere SSH:
 3. revisar el contador **Pending migrations** y su fingerprint;
 4. crear un backup DB real `.sql.gz` en almacenamiento privado y registrar
    su evidencia con `operations:record-db-backup` para ese fingerprint;
-5. introducir el `backup_receipt` vigente y la confirmacion `MIGRAR`;
+5. introducir únicamente la confirmacion `MIGRAR`;
 6. pulsar **Run pending migrations** una sola vez;
 7. confirmar que el contador vuelve a cero y dejar que Production Smoke valide
    las rutas autenticadas.
 
-La accion usa CSRF, requiere `platform_role=admin`, vuelve a validar el recibo
-contra archivo/checksum/fingerprint/TTL y toma un lock local exclusivo antes de
-ejecutar. GitHub Actions y Production Smoke nunca ejecutan migraciones de
-produccion por si mismos.
+La accion usa CSRF, requiere `platform_role=admin`, resuelve server-side el
+receipt más reciente desde el puntero privado del fingerprint exacto, vuelve a
+validar archivo/checksum/fingerprint/TTL y toma un lock local exclusivo antes de
+ejecutar. El receipt no se copia al navegador ni se envía como input del
+workflow de migración. GitHub Actions y Production Smoke nunca ejecutan
+migraciones de produccion por si mismos.
 
 SSH queda como ruta de diagnostico/recuperacion si la interfaz administrativa
 no puede arrancar. No ejecutar `artisan migrate --force` directamente: ese
@@ -259,7 +261,7 @@ Reglas operativas:
 
 `APP_PHASE` admite únicamente `construccion` o `live`. En construcción, operaciones no destructivas/versionadas pueden automatizarse. En live, la automatización de escrituras falla cerrado.
 
-Las migraciones de base de datos son un caso reforzado: el POST de Admin System y `.github/workflows/production-migration.yml` ya no aceptan `backup_confirmed=1` ni un booleano `backup_verified`. Exigen un `backup_receipt` de 64 hex generado por `VerifiedBackupEvidence` sobre un archivo `operations/database-backups/*.sql.gz` real. El recibo liga checksum, fingerprint de migraciones y timestamp; vence a los 15 minutos y se vuelve inválido si cambia el archivo o el lote.
+Las migraciones de base de datos son un caso reforzado: el POST de Admin System y `.github/workflows/production-migration.yml` no aceptan `backup_confirmed=1`, `backup_verified` ni un `backup_receipt` aportado por cliente. `VerifiedBackupEvidence` registra server-side un receipt privado sobre un archivo `operations/database-backups/*.sql.gz` real y publica un puntero privado 0600 ligado al fingerprint exacto. El receipt conserva checksum, fingerprint y timestamp; vence a los 15 minutos y se vuelve inválido si cambia el archivo o el lote.
 
 El adaptador Factory `ops/factory/backup` conserva rollback de **release**, no hace dump de MariaDB. No confundirlo con backup DB. Hasta que un paso de backup de base produzca el archivo y su recibo verificable, el flujo de migración debe permanecer bloqueado. Nunca recrear el bypass mediante checkbox, comentario o input booleano.
 
@@ -271,4 +273,4 @@ php artisan operations:record-db-backup \
   <fingerprint-de-migraciones>
 ```
 
-El comando imprime únicamente el ID SHA-256 del recibo. Ese valor se entrega como `backup_receipt` al workflow/controlador; el servidor vuelve a comprobar archivo, checksum, fingerprint y TTL antes de ejecutar la migración.
+El comando registra el receipt y actualiza el puntero privado del fingerprint. El ID puede aparecer como salida diagnóstica del comando, pero **no** se copia ni se entrega como input a Production Migration o al controlador. La migración resuelve el puntero en el servidor y vuelve a comprobar receipt, archivo, checksum, fingerprint y TTL antes de ejecutar.

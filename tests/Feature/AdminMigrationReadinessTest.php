@@ -31,7 +31,7 @@ class AdminMigrationReadinessTest extends TestCase
             ->assertSee('2026_09_18_200000_create_scheduling_tables')
             ->assertSee('2026_09_19_021500_create_publication_deliveries_table')
             ->assertSee('name="migration_batch"', false)
-            ->assertSee('name="backup_receipt"', false)
+            ->assertDontSee('name="backup_receipt"', false)
             ->assertSee('name="confirmation"', false);
 
         $response->assertDontSee('Database schema is current');
@@ -62,7 +62,6 @@ class AdminMigrationReadinessTest extends TestCase
         $this->actingAs($this->admin())
             ->post(route('admin.system.migrate'))
             ->assertSessionHasErrors([
-                'backup_receipt',
                 'confirmation',
                 'migration_batch',
             ]);
@@ -78,7 +77,6 @@ class AdminMigrationReadinessTest extends TestCase
 
         $this->actingAs($this->admin())
             ->post(route('admin.system.migrate'), [
-                'backup_receipt' => str_repeat('a', 64),
                 'confirmation' => 'MIGRAR',
                 'migration_batch' => str_repeat('b', 64),
             ])
@@ -95,7 +93,7 @@ class AdminMigrationReadinessTest extends TestCase
         Storage::fake('local');
         $archive = 'operations/database-backups/readiness-test.sql.gz';
         Storage::disk('local')->put($archive, 'database-backup');
-        $receipt = app(VerifiedBackupEvidence::class)->record($archive, $fingerprint);
+        app(VerifiedBackupEvidence::class)->record($archive, $fingerprint);
 
         Artisan::shouldReceive('call')
             ->once()
@@ -104,7 +102,6 @@ class AdminMigrationReadinessTest extends TestCase
 
         $this->actingAs($this->admin())
             ->post(route('admin.system.migrate'), [
-                'backup_receipt' => $receipt,
                 'confirmation' => 'MIGRAR',
                 'migration_batch' => $fingerprint,
             ])
