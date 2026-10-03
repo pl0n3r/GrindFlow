@@ -74,7 +74,14 @@ class OperationalProfileTest extends TestCase
         app(TenantContext::class)->runWithinOrganization(
             $user,
             $organizationA->id,
-            function () use ($organizationB): void {
+            function () use ($organizationA, $organizationB): void {
+                $massAssigned = OperationalProfile::query()->create([
+                    'organization_id' => $organizationB->id,
+                    'name' => 'Mass assigned tenant',
+                    'slug' => 'mass-assigned-tenant',
+                ]);
+                $this->assertSame($organizationA->id, $massAssigned->organization_id);
+
                 $this->expectException(AuthorizationException::class);
 
                 $profile = new OperationalProfile([
