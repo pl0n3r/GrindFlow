@@ -29,17 +29,24 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
         )
         pointer_method = evidence[pointer_start:pointer_end]
 
-        self.assertIn("tempnam($directory, '.tmp-receipt-')", pointer_method)
-        self.assertIn("$temporaryMetadata = @lstat($temporaryPath);", pointer_method)
+        pointer_writer = evidence.split(
+            "private function writeLatestPointer", 1
+        )[1].split("private function assertFingerprint", 1)[0]
+        self.assertIn("tempnam($directory, '.tmp-receipt-')", pointer_writer)
+        self.assertIn("$temporaryMetadata = @lstat($temporaryPath);", pointer_writer)
         self.assertIn(
             "($temporaryMetadata['mode'] & 0170000) !== 0100000",
-            pointer_method,
+            pointer_writer,
         )
-        self.assertIn("($temporaryMetadata['mode'] & 0777) !== 0600", pointer_method)
+        self.assertIn(
+            "($temporaryMetadata['mode'] & 0777) !== 0600",
+            pointer_writer,
+        )
         self.assertLess(
-            pointer_method.index("$temporaryMetadata = @lstat($temporaryPath);"),
-            pointer_method.index("@rename($temporaryPath, $pointerPath)"),
+            pointer_writer.index("$temporaryMetadata = @lstat($temporaryPath);"),
+            pointer_writer.index("@rename($temporaryPath, $pointerPath)"),
         )
+        self.assertNotIn("@chmod($pointerPath, 0600)", pointer_writer)
 
         controller = CONTROLLER.read_text(encoding="utf-8")
         behavior = BEHAVIOR.read_text(encoding="utf-8")
