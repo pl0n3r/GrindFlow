@@ -153,8 +153,12 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
 
             def archive_from(result):
                 values = dict(line.split("=", 1) for line in result.stdout.splitlines())
-                self.assertEqual(values["BACKUP_RECEIPT"], receipt)
+                self.assertEqual(
+                    set(values),
+                    {"MIGRATION_FINGERPRINT", "BACKUP_ARCHIVE"},
+                )
                 self.assertEqual(values["MIGRATION_FINGERPRINT"], fingerprint)
+                self.assertNotIn(receipt, result.stdout)
                 return values["BACKUP_ARCHIVE"]
 
             first_archive = archive_from(first)
@@ -193,13 +197,14 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertNotIn('return """', script)
         self.assertNotIn("cat .env", script)
 
-    def test_receipt_uses_canonical_verified_backup_command(self):
+    def test_receipt_uses_canonical_verified_backup_command_without_leaving_host(self):
         script = SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("operations:record-db-backup", script)
         self.assertIn('[[ "$receipt" =~ ^[0-9a-f]{64}$ ]]', script)
-        self.assertIn("BACKUP_RECEIPT=", script)
+        self.assertNotIn("BACKUP_RECEIPT=", script)
         self.assertIn("MIGRATION_FINGERPRINT=", script)
+        self.assertIn("BACKUP_ARCHIVE=", script)
 
     def test_workflow_is_manual_owner_only_and_never_runs_migrations(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -210,9 +215,10 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             "github.actor == github.repository_owner && github.triggering_actor == github.repository_owner",
             workflow,
         )
-        self.assertIn("production-backup-receipt-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
+        self.assertNotIn("production-backup-receipt-", workflow)
+        self.assertNotIn("actions/upload-artifact", workflow)
+        self.assertNotIn("backup_receipt", workflow.lower())
         self.assertIn("run-production-backup.sh", workflow)
-        self.assertIn("retention-days: 1", workflow)
         job_header = workflow.split("    steps:", 1)[0]
         self.assertNotIn("secrets.DEPLOY_SSH_KEY", job_header)
         self.assertNotIn("secrets.HOSTINGER_KNOWN_HOSTS", job_header)
