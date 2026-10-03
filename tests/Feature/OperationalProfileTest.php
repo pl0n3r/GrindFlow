@@ -81,6 +81,14 @@ class OperationalProfileTest extends TestCase
                     'slug' => 'mass-assigned-tenant',
                 ]);
                 $this->assertSame($organizationA->id, $massAssigned->organization_id);
+                $this->assertDatabaseHas('operational_profiles', [
+                    'id' => $massAssigned->id,
+                    'organization_id' => $organizationA->id,
+                ]);
+                $this->assertDatabaseMissing('operational_profiles', [
+                    'organization_id' => $organizationB->id,
+                    'slug' => 'mass-assigned-tenant',
+                ]);
 
                 $this->expectException(AuthorizationException::class);
 
