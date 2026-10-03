@@ -46,7 +46,7 @@ return [
 
     'media' => [
         'disk' => env('MEDIA_DISK', env('FILESYSTEM_DISK', 'local')),
-        'guest_upload_signing_key' => env('MOBILE_UPLOAD_SIGNING_KEY', env('APP_KEY')),
+        'guest_upload_signing_key' => env('MOBILE_UPLOAD_SIGNING_KEY'),
         'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', 'media'),
         'staging_disk' => env('MEDIA_STAGING_DISK', 'media'),
         'ffprobe' => [
