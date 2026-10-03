@@ -62,6 +62,11 @@ referencias obsoletas o marcarlas históricas sin borrar su trazabilidad. Actual
 el mismo PR con los tests y controles implicados; el
 [registro de auditoría](docs/AGENTS-AUDIT.md) explica esta depuración.
 
+**Presupuesto local de contexto:** `AGENTS.md` debe permanecer en **<= 500 líneas**.
+Este límite es un guardrail propio de GrindFlow, no una restricción de Factory. Si
+el archivo necesita crecer por encima del presupuesto, mover el detalle durable a
+`docs/` y enlazarlo desde el mapa de lectura en lugar de acumularlo aquí.
+
 ---
 
 ## Decisión vigente y obligatoria · transición de stack 20/09/2026
