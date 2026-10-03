@@ -82,6 +82,18 @@ class GuestMobileUploadFlowTest extends TestCase
             'status' => VaultTriageItem::STATUS_PENDING,
             'assigned_profile_id' => null,
         ]);
+
+        $this->post(route('guest.upload.store'), [
+            'grant' => $token,
+            'media' => [
+                UploadedFile::fake()->create('replay.jpg', 4, 'image/jpeg'),
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertSee('No pudimos enviar los archivos.');
+
+        $this->assertDatabaseCount('media_assets', 1);
+        $this->assertDatabaseCount('mobile_upload_grant_uses', 1);
         $this->assertGuest();
     }
 
