@@ -50,7 +50,7 @@ class AgentsSmokeE2ECompactionTests(unittest.TestCase):
             "::add-mask::",
             "METADATA sintética procesada",
             "Agrupar validaciones E2E en la misma sesion autenticada",
-            "no esconder fallos mediante retries excesivos",
+            "ni esconder fallos mediante retries excesivos",
             "No presentar un job omitido como validación de producción satisfactoria",
         )
 
