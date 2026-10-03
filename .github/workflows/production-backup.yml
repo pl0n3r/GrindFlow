@@ -29,14 +29,28 @@ jobs:
       HOSTINGER_SSH_USER: ${{ vars.HOSTINGER_SSH_USER }}
       HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
       HOSTINGER_RELEASE_ROOT: ${{ vars.HOSTINGER_RELEASE_ROOT }}
-      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
+      SSH_KEY_PATH: ${{ runner.temp }}/grindflow-deploy-key
+      KNOWN_HOSTS_PATH: ${{ runner.temp }}/grindflow-known-hosts
 
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+
+      - name: Install strict SSH material
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ -n "$DEPLOY_SSH_KEY" ]] || { echo "::error::DEPLOY_SSH_KEY is not configured"; exit 1; }
+          [[ -n "$HOSTINGER_KNOWN_HOSTS" ]] || { echo "::error::HOSTINGER_KNOWN_HOSTS is not configured"; exit 1; }
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$SSH_KEY_PATH"
+          printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$KNOWN_HOSTS_PATH"
+          chmod 0600 "$SSH_KEY_PATH" "$KNOWN_HOSTS_PATH"
 
       - name: Validate backup script
         run: bash -n scripts/run-production-backup.sh
