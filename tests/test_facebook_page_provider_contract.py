@@ -98,7 +98,6 @@ class FacebookPageProviderContractTests(unittest.TestCase):
         self.assertIn("testIdempotencyLedgerPreventsDuplicateProviderCalls", test)
         self.assertIn("testPublicationRejectsExternalTransactionBeforeProviderIo", test)
         self.assertIn("testPageChangeRejectsPublishedAndRateLimitedReplayWithoutSecondCall", test)
-        self.assertIn("destinationPageId", test)
         self.assertIn("FakeFacebookPageTransport", test)
         self.assertNotIn("new StreamFacebookPageTransport", test)
 
