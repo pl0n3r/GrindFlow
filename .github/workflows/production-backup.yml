@@ -112,6 +112,9 @@ jobs:
 
       - name: Publish safe summary
         shell: bash
+        env:
+          BACKUP_FINGERPRINT: ${{ steps.backup.outputs.fingerprint }}
+          BACKUP_ARCHIVE: ${{ steps.backup.outputs.archive }}
         run: |
           {
             echo "## Production database backup"
@@ -120,8 +123,8 @@ jobs:
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
             printf 'Artifact: `production-backup-receipt-%s-%s`\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
             printf 'Expected pending migrations: **%s**\n' "$EXPECTED_PENDING"
-            printf 'Migration fingerprint: `%s`\n' "${{ steps.backup.outputs.fingerprint }}"
-            printf 'Server-local archive: `%s`\n' "${{ steps.backup.outputs.archive }}"
+            printf 'Migration fingerprint: `%s`\n' "$BACKUP_FINGERPRINT"
+            printf 'Server-local archive: `%s`\n' "$BACKUP_ARCHIVE"
             echo "The receipt value is masked in logs and is available only in the authenticated short-lived artifact."
             echo "This workflow does not run migrations."
           } >> "$GITHUB_STEP_SUMMARY"
