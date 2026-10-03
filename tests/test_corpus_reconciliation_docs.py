@@ -83,6 +83,25 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("Numeración deliberadamente NO se mezcla", current)
         self.assertIn("#901–#1000 · SaaS y plataforma", current)
 
+    def test_gap_closure_preserves_verified_titles_and_unknowns(self):
+        gap = read_doc("CORPUS-HISTORICAL-GAP-CLOSURE-PASS-4.md")
+
+        for title in (
+            "`#5861–#5880` · Live Audience Intelligence",
+            "`#6101–#6120` · Dynamic Pricing Intelligence",
+            "`#6921–#6940` · Governance Control Plane",
+            "`#7081–#7100` · Crisis Management Intelligence",
+            "`#7381–#7400` · Recovery Readiness Intelligence",
+            "`#8121–#8140` · Technical Knowledge Retrieval",
+        ):
+            self.assertIn(title, gap)
+
+        # Gaps with only macro evidence stay explicit instead of being invented.
+        self.assertIn("`#7921–#7940`", gap)
+        self.assertIn("`#8141–#8240`", gap)
+        self.assertIn("`#8281–#8300`", gap)
+        self.assertIn("no se rellenan por inferencia", gap)
+
     def test_release_identity_matches_across_manifests(self):
         config = (ROOT / "config" / "version.php").read_text(encoding="utf-8")
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
