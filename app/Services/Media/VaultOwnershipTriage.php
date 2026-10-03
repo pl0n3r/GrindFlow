@@ -15,9 +15,7 @@ use LogicException;
 
 final readonly class VaultOwnershipTriage
 {
-    public function __construct(private TenantContext $context)
-    {
-    }
+    public function __construct(private TenantContext $context) {}
 
     public function queueAmbiguous(MediaAsset $asset): VaultTriageItem
     {
