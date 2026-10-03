@@ -59,11 +59,13 @@ class VaultTriageTests(unittest.TestCase):
             "politica-tratamiento.md",
             "aviso-privacidad.md",
             "registro-tratamientos.md",
-            "retencion.md",
         ):
             content = (ROOT / "docs/privacidad" / name).read_text(encoding="utf-8")
             self.assertIn("assigned_by_user_id", content, name)
             self.assertIn("assigned_at", content, name)
+
+        retention = (ROOT / "docs/privacidad/retencion.md").read_text(encoding="utf-8")
+        self.assertIn("| media_vault | usage | review_required | review_required |", retention)
 
     def test_release_identity_matches_across_manifests(self):
         php = (ROOT / "config/version.php").read_text(encoding="utf-8")
