@@ -36,6 +36,11 @@
       "id": "D-061",
       "status": "active",
       "text": "GrindFlow mantiene ownership personal y adopta required checks del ruleset main-required-checks con Etiquetas, auto-merge y coordinacion Factory como modelo final de serializacion; Merge Queue nativa no es requisito obligatorio mientras el repositorio sea User-owned y reintroducirla como requisito exige una nueva decision explicita del propietario."
+    },
+    {
+      "id": "D-062",
+      "status": "active",
+      "text": "El 2026-10-02 el propietario sustituyo explicitamente A por B en #219: GrindFlow acepta una review formal exact-head o final_review_risk_coverage como evidencia equivalente solo si el marker lo publica coderabbitai[bot], coveredCommitId coincide con el HEAD exacto, no existen hallazgos bloqueantes y Politica Factory v1 termina en SUCCESS sobre ese mismo SHA; si cambia el HEAD la cobertura debe renovarse. Las demas compuertas y review_round_limit=3 permanecen vigentes."
     }
   ]
 }
