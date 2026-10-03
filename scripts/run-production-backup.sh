@@ -5,8 +5,8 @@ set -euo pipefail
 : "${HOSTINGER_SSH_USER:?HOSTINGER_SSH_USER is required}"
 : "${HOSTINGER_SSH_PORT:?HOSTINGER_SSH_PORT is required}"
 : "${HOSTINGER_RELEASE_ROOT:?HOSTINGER_RELEASE_ROOT is required}"
-: "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY is required}"
-: "${HOSTINGER_KNOWN_HOSTS:?HOSTINGER_KNOWN_HOSTS is required}"
+: "${SSH_KEY_PATH:?SSH_KEY_PATH is required}"
+: "${KNOWN_HOSTS_PATH:?KNOWN_HOSTS_PATH is required}"
 : "${EXPECTED_PENDING:?EXPECTED_PENDING is required}"
 
 [[ "$HOSTINGER_SSH_HOST" =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { echo "invalid SSH host" >&2; exit 2; }
@@ -17,24 +17,17 @@ set -euo pipefail
 [[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]] || { echo "invalid release root" >&2; exit 2; }
 [[ "$HOSTINGER_RELEASE_ROOT" != *".."* ]] || { echo "invalid release root" >&2; exit 2; }
 
-workdir="$(mktemp -d)"
-keyfile="$workdir/key"
-knownfile="$workdir/known_hosts"
-cleanup() { rm -rf "$workdir"; }
-trap cleanup EXIT
-
-printf '%s\n' "$DEPLOY_SSH_KEY" > "$keyfile"
-printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$knownfile"
-chmod 600 "$keyfile" "$knownfile"
+[[ -f "$SSH_KEY_PATH" && ! -L "$SSH_KEY_PATH" && -s "$SSH_KEY_PATH" ]] || { echo "SSH private key is unavailable" >&2; exit 2; }
+[[ -f "$KNOWN_HOSTS_PATH" && ! -L "$KNOWN_HOSTS_PATH" && -s "$KNOWN_HOSTS_PATH" ]] || { echo "strict known_hosts evidence is unavailable" >&2; exit 2; }
 
 ssh_args=(
   ssh
-  -i "$keyfile"
+  -i "$SSH_KEY_PATH"
   -p "$HOSTINGER_SSH_PORT"
   -o BatchMode=yes
   -o IdentitiesOnly=yes
   -o StrictHostKeyChecking=yes
-  -o "UserKnownHostsFile=$knownfile"
+  -o "UserKnownHostsFile=$KNOWN_HOSTS_PATH"
   "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST"
 )
 
