@@ -227,6 +227,10 @@ final readonly class FacebookPagePublicationService
                 'page_id' => $this->provider->destinationPageId(),
                 'message' => $command->message,
                 'link' => $command->link,
+                'media' => $command->hasMedia() ? [
+                    'mime' => $command->mediaMime,
+                    'sha256' => strtolower((string) $command->mediaSha256),
+                ] : null,
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         } catch (JsonException) {
             throw DistributionProviderException::rejected();
