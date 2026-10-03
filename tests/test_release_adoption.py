@@ -26,9 +26,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  current-main:
+    name: current-main
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      current: ${{ steps.guard.outputs.current }}
+      remote_sha: ${{ steps.guard.outputs.remote_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: guard
+        name: Reject stale main event
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash scripts/current-main-event-guard.sh
+
+  stale-event:
+    name: stale-main-event
+    needs: current-main
+    if: needs.current-main.outputs.current != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Record ignored stale event
+        run: |
+          {
+            echo '## Stale main event ignored'
+            echo
+            echo "Event SHA: \`$GITHUB_SHA\`"
+            echo "Current main: \`${{ needs.current-main.outputs.remote_sha }}\`"
+            echo 'No production I/O or release mutation was executed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release:
     name: Publish GitHub Release
-    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main'
+    needs: current-main
+    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true'
     permissions:
       contents: write
     uses: pl0n3r/factory/.github/workflows/release.yml@v1
@@ -136,6 +174,9 @@ class ReleaseAdoptionTests(unittest.TestCase):
             ("      version_source: config/version.php\n", "      version_source: config/version.json\n"),
             ("      contents: write\n", "      contents: write\n      issues: write\n"),
             ("  queue: max\n", ""),
+            ("    needs: current-main\n", ""),
+            (" && needs.current-main.outputs.current == 'true'", ""),
+            ("        run: bash scripts/current-main-event-guard.sh\n", "        run: echo current=true\n"),
         )
         for old, new in mutations:
             with self.subTest(old=old, new=new):
