@@ -98,7 +98,11 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         job_header = workflow.split("    steps:", 1)[0]
         self.assertNotIn("secrets.DEPLOY_SSH_KEY", job_header)
         self.assertNotIn("secrets.HOSTINGER_KNOWN_HOSTS", job_header)
+        self.assertNotIn("runner.temp", job_header)
         self.assertIn("Install strict SSH material", workflow)
+        self.assertIn('SSH_KEY_PATH="$RUNNER_TEMP/grindflow-deploy-key"', workflow)
+        self.assertIn('KNOWN_HOSTS_PATH="$RUNNER_TEMP/grindflow-known-hosts"', workflow)
+        self.assertIn('"$GITHUB_ENV"', workflow)
         self.assertNotIn("DEPLOY_SSH_KEY", script)
         self.assertNotIn("HOSTINGER_KNOWN_HOSTS", script)
         self.assertNotIn("production-migration.yml", workflow)
