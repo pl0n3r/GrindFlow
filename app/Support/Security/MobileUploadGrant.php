@@ -75,6 +75,29 @@ final readonly class MobileUploadGrant
     public function validate(string $token, string $organizationId, int $now): array
     {
         self::identifier($organizationId, 'organization_id');
+
+        $grant = $this->validateForGuest($token, $now);
+
+        if (! hash_equals($grant['organization_id'], $organizationId)) {
+            throw new RuntimeException('Guest upload grant tenant mismatch.');
+        }
+
+        return $grant;
+    }
+
+    /**
+     * @return array{
+     *     scope: string,
+     *     organization_id: string,
+     *     issued_at: int,
+     *     expires_at: int,
+     *     max_files: int,
+     *     max_bytes: int,
+     *     nonce: string
+     * }
+     */
+    public function validateForGuest(string $token, int $now): array
+    {
         if ($now < 1) {
             throw new InvalidArgumentException('now invalid.');
         }
@@ -119,9 +142,6 @@ final readonly class MobileUploadGrant
         self::identifier($nonce, 'nonce');
         self::limits($maxFiles, $maxBytes);
 
-        if (! hash_equals($tenant, $organizationId)) {
-            throw new RuntimeException('Guest upload grant tenant mismatch.');
-        }
         if ($issuedAt < 1 || $expiresAt <= $issuedAt || $expiresAt - $issuedAt > self::MAX_TTL_SECONDS) {
             throw new RuntimeException('Guest upload grant lifetime invalid.');
         }

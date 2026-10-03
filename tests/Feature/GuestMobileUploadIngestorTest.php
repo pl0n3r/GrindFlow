@@ -57,7 +57,6 @@ class GuestMobileUploadIngestorTest extends TestCase
 
         $explicit = $service->ingest(
             $explicitToken,
-            (string) $organization->getKey(),
             [UploadedFile::fake()->create('explicit.jpg', 4, 'image/jpeg')],
             (string) $profile->getKey(),
             1_100,
@@ -76,7 +75,6 @@ class GuestMobileUploadIngestorTest extends TestCase
 
         $ambiguous = $service->ingest(
             $ambiguousToken,
-            (string) $organization->getKey(),
             [UploadedFile::fake()->create('ambiguous.png', 4, 'image/png')],
             null,
             1_100,
@@ -124,7 +122,6 @@ class GuestMobileUploadIngestorTest extends TestCase
         try {
             $service->ingest(
                 $this->grant((string) $organization->getKey(), 'nonce-invalid-mime'),
-                (string) $organization->getKey(),
                 [UploadedFile::fake()->create('payload.txt', 1, 'text/plain')],
                 null,
                 1_100,
@@ -154,7 +151,6 @@ class GuestMobileUploadIngestorTest extends TestCase
         try {
             $service->ingest(
                 $this->grant((string) $organization->getKey(), 'nonce-cross-profile'),
-                (string) $organization->getKey(),
                 [UploadedFile::fake()->create('cross.jpg', 1, 'image/jpeg')],
                 (string) $foreignProfile->getKey(),
                 1_100,
@@ -170,7 +166,6 @@ class GuestMobileUploadIngestorTest extends TestCase
         );
         $service->ingest(
             $replayToken,
-            (string) $organization->getKey(),
             [UploadedFile::fake()->create('first.jpg', 1, 'image/jpeg')],
             null,
             1_100,
@@ -181,7 +176,6 @@ class GuestMobileUploadIngestorTest extends TestCase
 
         $service->ingest(
             $replayToken,
-            (string) $organization->getKey(),
             [UploadedFile::fake()->create('replay.jpg', 1, 'image/jpeg')],
             null,
             1_100,

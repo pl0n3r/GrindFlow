@@ -31,6 +31,8 @@ class MobileUploadIngestTests(unittest.TestCase):
         self.assertIn("$this->actorId = null", tenant)
         self.assertIn("Organization::query()->whereKey", tenant)
         self.assertIn("MobileUploadGrantUse::query()->create", service)
+        self.assertIn("validateForGuest($token, $now)", service)
+        self.assertNotIn("expectedOrganizationId", service)
         self.assertIn("'ingested_by_user_id' => null", service)
         self.assertIn("OperationalProfile::query()->find($profileId)", service)
         self.assertIn("'profile_id' => $profile->getKey()", service)

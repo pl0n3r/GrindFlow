@@ -33,16 +33,11 @@ final readonly class GuestMobileUploadIngestor
      */
     public function ingest(
         string $token,
-        string $expectedOrganizationId,
         array $files,
         ?string $profileId,
         int $now,
     ): array {
-        $grant = $this->grants->validate(
-            $token,
-            $expectedOrganizationId,
-            $now,
-        );
+        $grant = $this->grants->validateForGuest($token, $now);
 
         $prepared = $this->prepareFiles(
             $files,
