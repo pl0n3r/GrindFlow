@@ -71,6 +71,12 @@ final class VerifiedBackupEvidence
             throw new RuntimeException('Verified database backup pointer is missing or unsafe.');
         }
 
+        $permissions = fileperms($pointerPath);
+
+        if ($permissions === false || ($permissions & 0777) !== 0600) {
+            throw new RuntimeException('Verified database backup pointer permissions are unsafe.');
+        }
+
         $size = filesize($pointerPath);
 
         if ($size === false || $size < 64 || $size > 65) {
