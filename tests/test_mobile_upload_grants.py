@@ -27,6 +27,7 @@ class MobileUploadGrantTests(unittest.TestCase):
         self.assertTrue(token.startswith("v1."))
         self.assertEqual(grant["scope"], "guest-upload")
         self.assertEqual(grant["organization_id"], "org-123")
+        self.assertEqual(grant["issued_at"], 1000)
         self.assertEqual(grant["expires_at"], 2000)
         self.assertEqual(grant["max_files"], 5)
         self.assertEqual(grant["max_bytes"], 10485760)
@@ -44,6 +45,9 @@ class MobileUploadGrantTests(unittest.TestCase):
             "tampered",
             "expired",
             "cross_tenant",
+            "future_issued",
+            "too_long_issue",
+            "too_long_signed",
             "zero_files",
             "zero_bytes",
             "too_many_files",
@@ -54,6 +58,9 @@ class MobileUploadGrantTests(unittest.TestCase):
         self.assertIn("signature", data["tampered"]["message"].lower())
         self.assertIn("expired", data["expired"]["message"].lower())
         self.assertIn("tenant", data["cross_tenant"]["message"].lower())
+        self.assertIn("not active", data["future_issued"]["message"].lower())
+        self.assertIn("lifetime", data["too_long_issue"]["message"].lower())
+        self.assertIn("lifetime", data["too_long_signed"]["message"].lower())
         self.assertIn("limits", data["zero_files"]["message"].lower())
         self.assertIn("limits", data["zero_bytes"]["message"].lower())
         self.assertIn("limits", data["too_many_files"]["message"].lower())
