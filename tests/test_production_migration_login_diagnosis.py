@@ -19,6 +19,7 @@ class _Fixture(http.server.BaseHTTPRequestHandler):
     login_status = 302
     admin_status = 403
     cookie_value = "private-cookie-sentinel"
+    close_login_without_response = False
 
     def log_message(self, *args: object) -> None:
         pass
@@ -51,6 +52,9 @@ class _Fixture(http.server.BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         self.rfile.read(length)
         if self.path == "/login":
+            if type(self).close_login_without_response:
+                self.close_connection = True
+                return
             location = "/dashboard" if type(self).login_status in (302, 303) else None
             self._reply(type(self).login_status, location=location)
             return
@@ -70,9 +74,16 @@ class ProductionMigrationLoginDiagnosisTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=3)
 
-    def _run(self, *, login_status: int, admin_status: int):
+    def _run(
+        self,
+        *,
+        login_status: int,
+        admin_status: int,
+        close_login_without_response: bool = False,
+    ):
         _Fixture.login_status = login_status
         _Fixture.admin_status = admin_status
+        _Fixture.close_login_without_response = close_login_without_response
         secret = "production-password-sentinel"
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "result.json"
@@ -102,6 +113,14 @@ class ProductionMigrationLoginDiagnosisTests(unittest.TestCase):
         self.assertNotEqual(login_failure.returncode, 0)
         self.assertEqual(login_payload["diagnostic_code"], "login_failed")
 
+        transport_failure, transport_payload, _ = self._run(
+            login_status=302,
+            admin_status=403,
+            close_login_without_response=True,
+        )
+        self.assertNotEqual(transport_failure.returncode, 0)
+        self.assertEqual(transport_payload["diagnostic_code"], "login_request_failed")
+
         access_denied, access_payload, _ = self._run(login_status=302, admin_status=403)
         self.assertNotEqual(access_denied.returncode, 0)
         self.assertEqual(access_payload["diagnostic_code"], "admin_system_access_denied")
@@ -112,6 +131,16 @@ class ProductionMigrationLoginDiagnosisTests(unittest.TestCase):
         self.assertEqual(
             session_payload["diagnostic_code"],
             "login_session_not_persisted",
+        )
+
+        admin_unavailable, unavailable_payload, _ = self._run(
+            login_status=302,
+            admin_status=503,
+        )
+        self.assertNotEqual(admin_unavailable.returncode, 0)
+        self.assertEqual(
+            unavailable_payload["diagnostic_code"],
+            "admin_system_unavailable",
         )
 
     def test_result_and_logs_never_contain_credentials_or_cookies(self) -> None:
@@ -132,7 +161,11 @@ class ProductionMigrationLoginDiagnosisTests(unittest.TestCase):
 
         self.assertIn("E2E_USER_EMAIL: e2e-oidc-smoke@grindflow.test", workflow)
         self.assertIn('backup_state="resolved and validated server-side"', summary)
-        self.assertGreaterEqual(summary.count('backup_state="no ejecutado"'), 2)
+        self.assertEqual(summary.count('backup_state="no ejecutado"'), 1)
+        self.assertIn(
+            'backup_state="no confirmado (falló el paso de migración)"',
+            summary,
+        )
         self.assertEqual(
             summary.count("resolved and validated server-side"),
             1,
