@@ -1624,7 +1624,7 @@ a {
 .gf-upload-picker__label small{margin-top:6px;color:var(--gf-muted);line-height:1.5}
 .gf-upload-picker__icon{display:grid;width:48px;height:48px;flex:0 0 auto;place-items:center;border-radius:15px;color:var(--gf-cyan);background:rgba(56,232,255,.09);font-size:25px}
 .gf-upload-picker__input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0}
-.gf-upload-picker__input:focus-visible+.gf-upload-picker__label{outline:2px solid var(--gf-cyan);outline-offset:3px}
+.gf-upload-picker:focus-within .gf-upload-picker__label{outline:2px solid var(--gf-cyan);outline-offset:3px}
 .gf-guest-upload__help,.gf-guest-upload__privacy{color:var(--gf-muted);font-size:12px;line-height:1.65}
 .gf-guest-upload__help{margin:0}
 .gf-guest-upload__privacy{max-width:610px;margin:18px auto 0;text-align:center}
