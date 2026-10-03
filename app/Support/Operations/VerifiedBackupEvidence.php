@@ -190,7 +190,19 @@ final class VerifiedBackupEvidence
                 throw new RuntimeException('Verified database backup pointer could not be published.');
             }
 
-            if (! is_file($pointerPath) || is_link($pointerPath) || @chmod($pointerPath, 0600) === false) {
+            if (is_link($pointerPath)) {
+                @unlink($pointerPath);
+
+                throw new RuntimeException('Verified database backup pointer could not be secured.');
+            }
+
+            if (! is_file($pointerPath)) {
+                @unlink($pointerPath);
+
+                throw new RuntimeException('Verified database backup pointer could not be secured.');
+            }
+
+            if (@chmod($pointerPath, 0600) === false) {
                 @unlink($pointerPath);
 
                 throw new RuntimeException('Verified database backup pointer could not be secured.');
