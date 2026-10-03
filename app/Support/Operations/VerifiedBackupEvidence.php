@@ -190,13 +190,12 @@ final class VerifiedBackupEvidence
                 throw new RuntimeException('Verified database backup pointer could not be published.');
             }
 
-            if (is_link($pointerPath)) {
-                @unlink($pointerPath);
+            $pointerMetadata = @lstat($pointerPath);
 
-                throw new RuntimeException('Verified database backup pointer could not be secured.');
-            }
-
-            if (! is_file($pointerPath)) {
+            if (
+                $pointerMetadata === false
+                || ($pointerMetadata['mode'] & 0170000) !== 0100000
+            ) {
                 @unlink($pointerPath);
 
                 throw new RuntimeException('Verified database backup pointer could not be secured.');
