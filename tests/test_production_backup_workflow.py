@@ -22,12 +22,15 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             'case "$release" in',
             'release="$(readlink -f "$current")"',
             'php_bin="/opt/alt/php85/usr/bin/php"',
+            '-f vendor/autoload.php',
             "database dump utility is unavailable",
             "pending migration count changed",
             '[[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]',
             '[[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]]',
         ):
             self.assertIn(signal, script)
+
+        self.assertEqual(script.count('require "vendor/autoload.php";'), 2)
 
         base_env = {
             **os.environ,
