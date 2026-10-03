@@ -98,7 +98,8 @@ final readonly class GuestMobileUploadController
             'submittedCount' => $submittedCount,
         ], $status)
             ->header('Cache-Control', 'no-store, max-age=0')
-            ->header('X-Content-Type-Options', 'nosniff');
+            ->header('X-Content-Type-Options', 'nosniff')
+            ->header('Referrer-Policy', 'no-referrer');
     }
 
     /**
