@@ -536,6 +536,161 @@ final class FacebookPageProviderTest extends WebTestCase
         self::assertNull($published['retry_not_before']);
     }
 
+    public function testActiveExternalTransactionIsRejectedBeforeProviderIo(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $transport = new FakeFacebookPageTransport();
+        $service = new FacebookPagePublicationService(
+            $db,
+            $this->provider(
+                $organization,
+                'test-facebook-page-token-do-not-log',
+                $transport,
+            ),
+        );
+        $command = new DistributionCommand(
+            $organization,
+            'external-transaction-'.Uuid::v7()->toRfc4122(),
+            'No publicar dentro de una transacción externa',
+        );
+
+        $db->beginTransaction();
+        try {
+            $failure = $this->captureProviderException(
+                fn () => $service->publish($command),
+            );
+
+            self::assertSame(
+                DistributionProviderException::KIND_CONFIGURATION,
+                $failure->kind,
+            );
+            self::assertSame(0, $transport->calls);
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_external_publication_attempts WHERE organization_id = :organization AND idempotency_key = :key',
+                ['organization' => $organization, 'key' => $command->idempotencyKey],
+            ));
+        } finally {
+            if ($db->getTransactionNestingLevel() > 0) {
+                $db->rollBack();
+            }
+        }
+    }
+
+    public function testDestinationPageChangeRejectsPublishedReplayWithoutProviderIo(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $key = 'page-published-'.Uuid::v7()->toRfc4122();
+        $command = new DistributionCommand($organization, $key, 'Destino inmutable');
+
+        $firstTransport = new FakeFacebookPageTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"111111_222222"}'],
+        ]);
+        $firstService = new FacebookPagePublicationService(
+            $db,
+            $this->provider(
+                $organization,
+                'test-facebook-page-token-do-not-log',
+                $firstTransport,
+                '111111',
+            ),
+        );
+        $firstService->publish($command);
+        self::assertSame(1, $firstTransport->calls);
+
+        $secondTransport = new FakeFacebookPageTransport();
+        $secondService = new FacebookPagePublicationService(
+            $db,
+            $this->provider(
+                $organization,
+                'test-facebook-page-token-do-not-log',
+                $secondTransport,
+                '222222',
+            ),
+        );
+
+        $failure = $this->captureProviderException(
+            fn () => $secondService->publish($command),
+        );
+
+        self::assertSame(DistributionProviderException::KIND_REJECTED, $failure->kind);
+        self::assertSame(0, $secondTransport->calls);
+        self::assertSame('published', (string) $db->fetchOne(
+            'SELECT status FROM gf_external_publication_attempts WHERE organization_id = :organization AND idempotency_key = :key',
+            ['organization' => $organization, 'key' => $key],
+        ));
+    }
+
+    public function testDestinationPageChangeRejectsRateLimitedReplayWithoutProviderIo(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $now = new DateTimeImmutable('2026-10-03 19:00:00', new DateTimeZone('UTC'));
+        $clock = static function () use (&$now): DateTimeImmutable {
+            return $now;
+        };
+        $key = 'page-rate-limited-'.Uuid::v7()->toRfc4122();
+        $command = new DistributionCommand(
+            $organization,
+            $key,
+            'Destino rate limited inmutable',
+        );
+
+        $firstTransport = new FakeFacebookPageTransport([
+            ['status' => 429, 'headers' => ['retry-after' => '60'], 'body' => '{"error":"rate"}'],
+        ]);
+        $firstService = new FacebookPagePublicationService(
+            $db,
+            $this->provider(
+                $organization,
+                'test-facebook-page-token-do-not-log',
+                $firstTransport,
+                '111111',
+            ),
+            $clock,
+        );
+
+        $initial = $this->captureProviderException(
+            fn () => $firstService->publish($command),
+        );
+        self::assertSame(DistributionProviderException::KIND_RATE_LIMIT, $initial->kind);
+        self::assertSame(1, $firstTransport->calls);
+
+        $now = $now->modify('+61 seconds');
+
+        $secondTransport = new FakeFacebookPageTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"222222_333333"}'],
+        ]);
+        $secondService = new FacebookPagePublicationService(
+            $db,
+            $this->provider(
+                $organization,
+                'test-facebook-page-token-do-not-log',
+                $secondTransport,
+                '222222',
+            ),
+            $clock,
+        );
+
+        $failure = $this->captureProviderException(
+            fn () => $secondService->publish($command),
+        );
+
+        self::assertSame(DistributionProviderException::KIND_REJECTED, $failure->kind);
+        self::assertSame(0, $secondTransport->calls);
+        self::assertSame('rate_limited', (string) $db->fetchOne(
+            'SELECT status FROM gf_external_publication_attempts WHERE organization_id = :organization AND idempotency_key = :key',
+            ['organization' => $organization, 'key' => $key],
+        ));
+    }
+
     private function provider(
         string $organization,
         string $token,
