@@ -106,7 +106,10 @@ del archivo. Una copia de hPanel, un comentario o un booleano sin archivo
 verificable no satisfacen la política. Si falta el receipt, el controlador
 falla cerrado antes de ejecutar `migrate`.
 
-En un run fallido, el resumen del workflow muestra
-`Verified backup evidence: no ejecutado`; solo un run de migración exitoso
-puede mostrar `resolved and validated server-side`. Esto evita convertir un
-paso no alcanzado en evidencia operativa.
+El resumen distingue tres estados de evidencia: si faltan las credenciales,
+muestra `Verified backup evidence: no ejecutado`; si el paso de migración
+termina correctamente, muestra `resolved and validated server-side`; y si el
+paso falla después de iniciarse, muestra `no confirmado (falló el paso de
+migración)`. Así el workflow no afirma que una validación se omitió cuando el
+fallo pudo ocurrir después de alcanzarla, ni convierte incertidumbre en
+evidencia operativa.
