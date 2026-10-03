@@ -17,7 +17,7 @@ PACKAGE = ROOT / "package.json"
 
 
 class CurrentMainEventGuardTests(unittest.TestCase):
-    def run_guard(self, event_sha: str, remote_sha: str):
+    def run_guard(self, event_sha: str, remote_sha: str, event_name: str = "push"):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             fake_git = tmp_path / "git"
@@ -33,7 +33,7 @@ class CurrentMainEventGuardTests(unittest.TestCase):
                 {
                     "PATH": f"{tmp}:{env.get('PATH', '')}",
                     "REMOTE_SHA": remote_sha,
-                    "GITHUB_EVENT_NAME": "push",
+                    "GITHUB_EVENT_NAME": event_name,
                     "GITHUB_SHA": event_sha,
                     "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
                     "DEFAULT_BRANCH": "main",
@@ -70,6 +70,16 @@ class CurrentMainEventGuardTests(unittest.TestCase):
         self.assertEqual(values["stale"], "true")
 
         result, _ = self.run_guard(current, "not-a-sha")
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_guard_accepts_workflow_dispatch_and_rejects_other_events(self):
+        current = "c" * 40
+
+        result, values = self.run_guard(current, current, "workflow_dispatch")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(values["current"], "true")
+
+        result, _ = self.run_guard(current, current, "pull_request")
         self.assertNotEqual(result.returncode, 0)
 
     def test_production_observer_and_smoke_gate_before_io(self):
