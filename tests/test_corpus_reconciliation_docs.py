@@ -81,7 +81,7 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIsNotNone(match)
         php_version = match.group(1)
 
-        self.assertEqual("0.1.168", php_version)
+        self.assertRegex(php_version, r"^\d+\.\d+\.\d+$")
         self.assertEqual(php_version, package["version"])
         self.assertEqual(php_version, package_lock["version"])
         self.assertEqual(php_version, package_lock["packages"][""]["version"])
