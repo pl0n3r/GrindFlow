@@ -74,6 +74,8 @@ class FacebookPageProviderContractTests(unittest.TestCase):
         self.assertIn("'published' => $this->storedOutcome", service)
         self.assertIn("'ambiguous', 'in_flight' => throw DistributionProviderException::ambiguous()", service)
         self.assertIn("'status' => 'in_flight'", service)
+        self.assertIn("getTransactionNestingLevel() > 0", service)
+        self.assertIn("'page_id' => $this->provider->destinationPageId()", service)
         self.assertIn("external publication attempts cannot be deleted", migration)
 
     def test_rate_limit_contract_is_persisted_and_bounded(self):
@@ -94,6 +96,9 @@ class FacebookPageProviderContractTests(unittest.TestCase):
         self.assertIn("testIdempotencyKeyRejectsDifferentFingerprintWithoutSecondCall", test)
         self.assertIn("testRateLimitLedgerBlocksEarlyRetryAndAllowsOneRetryAfterWindow", test)
         self.assertIn("testIdempotencyLedgerPreventsDuplicateProviderCalls", test)
+        self.assertIn("testPublicationRejectsExternalTransactionBeforeProviderIo", test)
+        self.assertIn("testPageChangeRejectsPublishedAndRateLimitedReplayWithoutSecondCall", test)
+        self.assertIn("destinationPageId", test)
         self.assertIn("FakeFacebookPageTransport", test)
         self.assertNotIn("new StreamFacebookPageTransport", test)
 
