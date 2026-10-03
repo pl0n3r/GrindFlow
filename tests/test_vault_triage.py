@@ -74,10 +74,11 @@ class VaultTriageTests(unittest.TestCase):
 
         match = re.search(r"'number'\s*=>\s*'([^']+)'", php)
         self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), "0.1.164")
-        self.assertEqual(package["version"], "0.1.164")
-        self.assertEqual(lock["version"], "0.1.164")
-        self.assertEqual(lock["packages"][""]["version"], "0.1.164")
+        version = match.group(1)
+        self.assertRegex(version, r"^\d+\.\d+\.\d+$")
+        self.assertEqual(package["version"], version)
+        self.assertEqual(lock["version"], version)
+        self.assertEqual(lock["packages"][""]["version"], version)
 
 
 if __name__ == "__main__":
