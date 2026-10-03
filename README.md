@@ -71,6 +71,10 @@ flowchart LR
 
 La arquitectura objetivo es un monolito modular API-first. La transición tecnológica conserva el runtime existente hasta demostrar paridad y cutover; el README no convierte un objetivo arquitectónico en estado desplegado.
 
+### Distribution Symfony · provider pilot
+
+Symfony S4 incluye un port de Distribution y un adaptador **Facebook Pages** fail-closed con configuración por entorno y ledger tenant-safe de idempotencia. Este fundamento **no está conectado todavía a Schedule Draft/Composer y no ejecuta publicación live**: CI usa transporte fake y la validación externa con credenciales de piloto pertenece a una transición posterior. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
+
 ## Stack e infraestructura
 
 - **Objetivo backend:** PHP 8.5 + Symfony 7.4 LTS + Doctrine ORM/DBAL/Migrations.
