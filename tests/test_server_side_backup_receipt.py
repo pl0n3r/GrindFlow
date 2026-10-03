@@ -23,8 +23,13 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
         self.assertIn("assertLatestValidForFingerprint", evidence)
         self.assertIn("$this->assertValid($receiptId, $migrationFingerprint);", evidence)
         self.assertIn("tempnam($directory, '.tmp-receipt-')", evidence)
-        self.assertIn("@rename($temporaryPath, $pointerPath)", evidence)
-        self.assertIn("@chmod($pointerPath, 0600)", evidence)
+        self.assertIn("$temporaryMetadata = @lstat($temporaryPath);", evidence)
+        self.assertIn("($temporaryMetadata['mode'] & 0170000) !== 0100000", evidence)
+        self.assertIn("($temporaryMetadata['mode'] & 0777) !== 0600", evidence)
+        self.assertLess(
+            evidence.index("$temporaryMetadata = @lstat($temporaryPath);"),
+            evidence.index("@rename($temporaryPath, $pointerPath)"),
+        )
 
         controller = CONTROLLER.read_text(encoding="utf-8")
         behavior = BEHAVIOR.read_text(encoding="utf-8")
