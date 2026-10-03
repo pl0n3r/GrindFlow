@@ -17,6 +17,8 @@ final readonly class MobileUploadGrant
 
     private const int MAX_BYTES_CAP = 104857600;
 
+    private const int MAX_TTL_SECONDS = 3600;
+
     public function __construct(private string $signingKey)
     {
         if (strlen($signingKey) < 32 || preg_match('/[\r\n]/', $signingKey) === 1) {
@@ -26,6 +28,7 @@ final readonly class MobileUploadGrant
 
     public function issue(
         string $organizationId,
+        int $issuedAt,
         int $expiresAt,
         int $maxFiles,
         int $maxBytes,
@@ -33,8 +36,11 @@ final readonly class MobileUploadGrant
     ): string {
         self::identifier($organizationId, 'organization_id');
         self::identifier($nonce, 'nonce');
-        if ($expiresAt < 1) {
-            throw new InvalidArgumentException('expires_at invalid.');
+        if ($issuedAt < 1) {
+            throw new InvalidArgumentException('issued_at invalid.');
+        }
+        if ($expiresAt <= $issuedAt || $expiresAt - $issuedAt > self::MAX_TTL_SECONDS) {
+            throw new InvalidArgumentException('Guest upload grant lifetime invalid.');
         }
         self::limits($maxFiles, $maxBytes);
 
@@ -42,6 +48,7 @@ final readonly class MobileUploadGrant
             'v' => 1,
             'scope' => self::SCOPE,
             'organization_id' => $organizationId,
+            'issued_at' => $issuedAt,
             'expires_at' => $expiresAt,
             'max_files' => $maxFiles,
             'max_bytes' => $maxBytes,
@@ -58,6 +65,7 @@ final readonly class MobileUploadGrant
      * @return array{
      *     scope: string,
      *     organization_id: string,
+     *     issued_at: int,
      *     expires_at: int,
      *     max_files: int,
      *     max_bytes: int,
@@ -88,7 +96,7 @@ final readonly class MobileUploadGrant
             throw new RuntimeException('Guest upload grant payload invalid.');
         }
 
-        $expectedKeys = ['v', 'scope', 'organization_id', 'expires_at', 'max_files', 'max_bytes', 'nonce'];
+        $expectedKeys = ['v', 'scope', 'organization_id', 'issued_at', 'expires_at', 'max_files', 'max_bytes', 'nonce'];
         $keys = array_keys($payload);
         sort($keys, SORT_STRING);
         $sortedExpected = $expectedKeys;
@@ -99,11 +107,12 @@ final readonly class MobileUploadGrant
 
         $tenant = $payload['organization_id'] ?? null;
         $nonce = $payload['nonce'] ?? null;
+        $issuedAt = $payload['issued_at'] ?? null;
         $expiresAt = $payload['expires_at'] ?? null;
         $maxFiles = $payload['max_files'] ?? null;
         $maxBytes = $payload['max_bytes'] ?? null;
 
-        if (! is_string($tenant) || ! is_string($nonce) || ! is_int($expiresAt) || ! is_int($maxFiles) || ! is_int($maxBytes)) {
+        if (! is_string($tenant) || ! is_string($nonce) || ! is_int($issuedAt) || ! is_int($expiresAt) || ! is_int($maxFiles) || ! is_int($maxBytes)) {
             throw new RuntimeException('Guest upload grant payload invalid.');
         }
         self::identifier($tenant, 'organization_id');
@@ -113,6 +122,12 @@ final readonly class MobileUploadGrant
         if (! hash_equals($tenant, $organizationId)) {
             throw new RuntimeException('Guest upload grant tenant mismatch.');
         }
+        if ($issuedAt < 1 || $expiresAt <= $issuedAt || $expiresAt - $issuedAt > self::MAX_TTL_SECONDS) {
+            throw new RuntimeException('Guest upload grant lifetime invalid.');
+        }
+        if ($issuedAt > $now) {
+            throw new RuntimeException('Guest upload grant not active.');
+        }
         if ($expiresAt <= $now) {
             throw new RuntimeException('Guest upload grant expired.');
         }
@@ -120,6 +135,7 @@ final readonly class MobileUploadGrant
         return [
             'scope' => self::SCOPE,
             'organization_id' => $tenant,
+            'issued_at' => $issuedAt,
             'expires_at' => $expiresAt,
             'max_files' => $maxFiles,
             'max_bytes' => $maxBytes,
