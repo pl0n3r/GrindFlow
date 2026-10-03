@@ -30,8 +30,6 @@ jobs:
       HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
       HOSTINGER_RELEASE_ROOT: ${{ vars.HOSTINGER_RELEASE_ROOT }}
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
-      SSH_KEY_PATH: ${{ runner.temp }}/grindflow-deploy-key
-      KNOWN_HOSTS_PATH: ${{ runner.temp }}/grindflow-known-hosts
 
     steps:
       - uses: actions/checkout@v5
@@ -45,6 +43,10 @@ jobs:
           HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          SSH_KEY_PATH="$RUNNER_TEMP/grindflow-deploy-key"
+          KNOWN_HOSTS_PATH="$RUNNER_TEMP/grindflow-known-hosts"
+          printf 'SSH_KEY_PATH=%s\n' "$SSH_KEY_PATH" >> "$GITHUB_ENV"
+          printf 'KNOWN_HOSTS_PATH=%s\n' "$KNOWN_HOSTS_PATH" >> "$GITHUB_ENV"
           [[ -n "$DEPLOY_SSH_KEY" ]] || { echo "::error::DEPLOY_SSH_KEY is not configured"; exit 1; }
           [[ -n "$HOSTINGER_KNOWN_HOSTS" ]] || { echo "::error::HOSTINGER_KNOWN_HOSTS is not configured"; exit 1; }
           umask 077
