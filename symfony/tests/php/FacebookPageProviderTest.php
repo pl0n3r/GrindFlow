@@ -800,4 +800,39 @@ final class FakeFacebookPageTransport implements FacebookPageTransport
 
         return $response;
     }
+
+    public function postPhoto(
+        string $graphVersion,
+        string $pageId,
+        string $accessToken,
+        string $caption,
+        string $filePath,
+        string $mimeType,
+    ): array {
+        ++$this->calls;
+        $this->requests[] = [
+            'graph_version' => $graphVersion,
+            'page_id' => $pageId,
+            'access_token' => $accessToken,
+            'payload' => [
+                'message' => $caption,
+                'link' => 'private-media:'.basename($filePath).':'.$mimeType,
+            ],
+        ];
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
+        $response = array_shift($this->responses);
+        if (!is_array($response)) {
+            return [
+                'status' => 200,
+                'headers' => [],
+                'body' => '{"id":"default_test_photo_publication"}',
+            ];
+        }
+
+        return $response;
+    }
 }
