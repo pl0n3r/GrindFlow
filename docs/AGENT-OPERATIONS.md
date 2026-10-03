@@ -213,9 +213,10 @@ terminar en SUCCESS sobre el mismo SHA usado como evidencia.
   ese bridge, recuperar el artifact por GitHub y correlacionar incident IDs.
 - Las migraciones de produccion siguen siendo una accion explicita y serializada.
   El workflow `GrindFlow Production Migration` se ejecuta solo mediante
-  `workflow_dispatch` del OWNER, recibe el pending count exacto aprobado y un
-  `backup_receipt` de 64 hex; autentica la cuenta E2E y usa el mismo endpoint
-  protegido de `Admin > System`, sin recibir credenciales directas de base de datos.
+  `workflow_dispatch` del OWNER, exige que actor original y triggering actor sean
+  el OWNER, recibe solo el pending count exacto aprobado y resuelve server-side
+  la evidencia privada del backup por fingerprint; autentica la cuenta E2E y usa
+  el mismo endpoint protegido de `Admin > System`, sin recibir credenciales directas de base de datos.
 - La migracion aborta sin cambios si el pending count no coincide exactamente con
   el valor aprobado. Ampliar ese conteo requiere una nueva ejecucion explicita.
 - El flujo puede reintentar GETs de preflight/verificacion ante fallos transitorios
@@ -235,11 +236,12 @@ terminar en SUCCESS sobre el mismo SHA usado como evidencia.
   del contrato operativo y no se elimina sin reemplazo equivalente validado.
 - Las migraciones de produccion nunca las ejecuta CI ni el smoke. El camino
   preferido para el operador es `Admin > System > Run pending migrations`;
-  exige platform admin, CSRF, inventario visible, `backup_receipt` verificable
-  de un backup DB reciente ligado al fingerprint, confirmacion `MIGRAR` y el
-  fingerprint del lote pendiente (nombres + SHA-256 de archivos) revalidado
-  dentro del lock justo antes de ejecutar. El servidor vuelve a validar recibo,
-  archivo, checksum, fingerprint y TTL; una confirmacion booleana nunca sustituye
-  esa evidencia. SSH es solo fallback de diagnostico/recuperacion del control
+  exige platform admin, CSRF, inventario visible, evidencia privada de un backup
+  DB reciente resuelta server-side para el fingerprint exacto, confirmacion
+  `MIGRAR` y el fingerprint del lote pendiente (nombres + SHA-256 de archivos)
+  revalidado dentro del lock justo antes de ejecutar. El servidor vuelve a validar
+  puntero, recibo, archivo, checksum, fingerprint y TTL; una confirmacion booleana
+  nunca sustituye esa evidencia ni el identificador del recibo sale del host. SSH
+  es solo fallback de diagnostico/recuperacion del control
   plane y no autoriza ejecutar `artisan migrate --force` saltandose estas guardas.
 - Nunca se expone `laravel.log` crudo mediante una ruta publica o autenticada.

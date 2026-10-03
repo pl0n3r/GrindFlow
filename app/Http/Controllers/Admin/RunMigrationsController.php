@@ -28,7 +28,6 @@ class RunMigrationsController extends Controller
         );
 
         $validated = $request->validate([
-            'backup_receipt' => ['required', 'regex:/\\A[a-f0-9]{64}\\z/'],
             'confirmation' => ['required', 'in:MIGRAR'],
             'migration_batch' => [
                 'required',
@@ -79,8 +78,7 @@ class RunMigrationsController extends Controller
             }
 
             try {
-                $backupEvidence->assertValid(
-                    (string) $validated['backup_receipt'],
+                $backupEvidence->assertLatestValidForFingerprint(
                     $snapshot['fingerprint'],
                 );
                 $writePolicy->assertAutonomousWriteAllowed(
