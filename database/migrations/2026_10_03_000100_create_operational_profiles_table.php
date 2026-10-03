@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /** Create the tenant-scoped operational profile table. */
     public function up(): void
     {
         Schema::create('operational_profiles', function (Blueprint $table): void {
@@ -22,6 +23,7 @@ return new class extends Migration
         });
     }
 
+    /** Remove the operational profile table on rollback. */
     public function down(): void
     {
         Schema::dropIfExists('operational_profiles');
