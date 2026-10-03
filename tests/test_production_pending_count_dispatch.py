@@ -76,9 +76,13 @@ class ProductionPendingCountDispatchTests(unittest.TestCase):
             'backup_state="resolved and validated server-side"',
             self.migration,
         )
-        self.assertGreaterEqual(
+        self.assertEqual(
             self.migration.count('backup_state="no ejecutado"'),
-            2,
+            1,
+        )
+        self.assertIn(
+            'backup_state="no confirmado (falló el paso de migración)"',
+            self.migration,
         )
         self.assertIn(
             "printf 'Verified backup evidence: **%s**\\n' \"$backup_state\"",
