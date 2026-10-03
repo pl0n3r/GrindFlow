@@ -22,13 +22,23 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
         self.assertIn("writeLatestPointer($receiptId, $migrationFingerprint)", evidence)
         self.assertIn("assertLatestValidForFingerprint", evidence)
         self.assertIn("$this->assertValid($receiptId, $migrationFingerprint);", evidence)
-        self.assertIn("tempnam($directory, '.tmp-receipt-')", evidence)
-        self.assertIn("$temporaryMetadata = @lstat($temporaryPath);", evidence)
-        self.assertIn("($temporaryMetadata['mode'] & 0170000) !== 0100000", evidence)
-        self.assertIn("($temporaryMetadata['mode'] & 0777) !== 0600", evidence)
+        pointer_start = evidence.index("private function writeLatestPointer(")
+        pointer_end = evidence.index(
+            "\n    private function assertFingerprint",
+            pointer_start,
+        )
+        pointer_method = evidence[pointer_start:pointer_end]
+
+        self.assertIn("tempnam($directory, '.tmp-receipt-')", pointer_method)
+        self.assertIn("$temporaryMetadata = @lstat($temporaryPath);", pointer_method)
+        self.assertIn(
+            "($temporaryMetadata['mode'] & 0170000) !== 0100000",
+            pointer_method,
+        )
+        self.assertIn("($temporaryMetadata['mode'] & 0777) !== 0600", pointer_method)
         self.assertLess(
-            evidence.index("$temporaryMetadata = @lstat($temporaryPath);"),
-            evidence.index("@rename($temporaryPath, $pointerPath)"),
+            pointer_method.index("$temporaryMetadata = @lstat($temporaryPath);"),
+            pointer_method.index("@rename($temporaryPath, $pointerPath)"),
         )
 
         controller = CONTROLLER.read_text(encoding="utf-8")
