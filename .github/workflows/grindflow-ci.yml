@@ -248,6 +248,7 @@ jobs:
           [[ -f tests/test_production_backup_workflow.py ]] && python3 -m unittest tests/test_production_backup_workflow.py
           [[ -f tests/test_vault_triage.py ]] && python3 -m unittest tests/test_vault_triage.py
           [[ -f tests/test_mobile_upload_ingest.py ]] && python3 -m unittest tests/test_mobile_upload_ingest.py
+          [[ -f tests/test_mobile_upload_ux.py ]] && python3 -m unittest tests/test_mobile_upload_ux.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
