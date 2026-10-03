@@ -34,8 +34,8 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             "HOSTINGER_SSH_HOST": "example.test",
             "HOSTINGER_SSH_USER": "deploy",
             "HOSTINGER_SSH_PORT": "22",
-            "DEPLOY_SSH_KEY": "test-key",
-            "HOSTINGER_KNOWN_HOSTS": "example.test ssh-ed25519 test",
+            "SSH_KEY_PATH": "/tmp/grindflow-test-key",
+            "KNOWN_HOSTS_PATH": "/tmp/grindflow-test-known-hosts",
             "EXPECTED_PENDING": "1",
         }
         for unsafe_root in (
@@ -92,6 +92,12 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn("github.actor == github.repository_owner", workflow)
         self.assertIn("run-production-backup.sh", workflow)
         self.assertIn("retention-days: 1", workflow)
+        job_header = workflow.split("    steps:", 1)[0]
+        self.assertNotIn("secrets.DEPLOY_SSH_KEY", job_header)
+        self.assertNotIn("secrets.HOSTINGER_KNOWN_HOSTS", job_header)
+        self.assertIn("Install strict SSH material", workflow)
+        self.assertNotIn("DEPLOY_SSH_KEY", script)
+        self.assertNotIn("HOSTINGER_KNOWN_HOSTS", script)
         self.assertNotIn("production-migration.yml", workflow)
         self.assertNotIn("artisan migrate", script)
         self.assertNotIn("/admin/system/migrations", script)
