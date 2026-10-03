@@ -39,16 +39,17 @@ Orden obligatorio del cutover:
    `HOSTINGER_SSH_USER`, `HOSTINGER_SSH_PORT`,
    `HOSTINGER_RELEASE_ROOT`, `DEPLOY_SSH_KEY` y
    `HOSTINGER_KNOWN_HOSTS` están configurados;
-2. ejecutar una prueba manual del deploy Factory con el HEAD actual y confirmar
-   `/health` exacto + rollback de artefacto;
-3. **desactivar el auto-redeploy Git/hPanel antes de habilitar**
-   `FACTORY_DEPLOY_ENABLED=true`; nunca mantener dos autoridades de deploy;
-4. habilitar el flag, promover un único HEAD de `main` y observar
-   Deploy Observer + Production Smoke;
-5. conservar Git/hPanel solo como ruta manual de recuperación, sin webhook o
-   auto-redeploy activo.
+2. **desactivar el auto-redeploy Git/hPanel y confirmar la desactivación antes
+   de habilitar** `FACTORY_DEPLOY_ENABLED=true`; nunca mantener dos
+   autoridades de deploy;
+3. habilitar `FACTORY_DEPLOY_ENABLED=true`;
+4. ejecutar una prueba manual del deploy Factory con el HEAD actual y confirmar
+   `/health` exacto, Production Smoke y el rollback de artefacto;
+5. conservar Factory como única autoridad automática para los siguientes
+   `push` a `main`; Git/hPanel queda solo como ruta manual de recuperación,
+   sin webhook o auto-redeploy activo.
 
-Este repositorio no puede demostrar por sí mismo que el paso 3 ocurrió en
+Este repositorio no puede demostrar por sí mismo que el paso 2 ocurrió en
 hPanel. No marcar el cutover como completado hasta observar esa configuración y
 un deploy Factory real. Ante rollback del mecanismo nuevo, deshabilitar el flag
 Factory antes de reactivar temporalmente hPanel; nunca dejar ambos activos a la

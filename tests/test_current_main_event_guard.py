@@ -111,9 +111,16 @@ class CurrentMainEventGuardTests(unittest.TestCase):
 
     def test_hostinger_runbook_keeps_external_cutover_explicit(self):
         text = DOCS.read_text(encoding="utf-8")
-        self.assertIn("desactivar el auto-redeploy Git/hPanel antes de habilitar", text)
-        self.assertIn("nunca mantener dos autoridades de deploy", text)
-        self.assertIn("no puede demostrar por sí mismo", text)
+        verify = text.index("verificar por canal privado")
+        disable = text.index("desactivar el auto-redeploy Git/hPanel")
+        enable = text.index("habilitar `FACTORY_DEPLOY_ENABLED=true`")
+        manual = text.index("ejecutar una prueba manual del deploy Factory")
+        self.assertLess(verify, disable)
+        self.assertLess(disable, enable)
+        self.assertLess(enable, manual)
+        self.assertIn("nunca mantener dos", text)
+        self.assertIn("autoridades de deploy", text)
+        self.assertIn("no puede demostrar por sí mismo que el paso 2 ocurrió", text)
 
     def test_regression_is_wired_into_npm_test(self):
         text = PACKAGE.read_text(encoding="utf-8")
