@@ -16,7 +16,7 @@ final class MobileUploadGrant
     public function __construct(private readonly string $signingKey)
     {
         if (strlen($signingKey) < 32 || preg_match('/[\r\n]/', $signingKey) === 1) {
-            throw new InvalidArgumentException('Mobile upload signing key is invalid.');
+            throw new InvalidArgumentException('Guest upload signing key is invalid.');
         }
     }
 
@@ -59,19 +59,19 @@ final class MobileUploadGrant
 
         $parts = explode('.', $token);
         if (count($parts) !== 3 || $parts[0] !== self::VERSION) {
-            throw new RuntimeException('Mobile upload grant format invalid.');
+            throw new RuntimeException('Guest upload grant format invalid.');
         }
 
         [$version, $encoded, $encodedSignature] = $parts;
         $provided = self::decode($encodedSignature);
         $expected = hash_hmac('sha256', $version . '.' . $encoded, $this->signingKey, true);
         if (!hash_equals($expected, $provided)) {
-            throw new RuntimeException('Mobile upload grant signature invalid.');
+            throw new RuntimeException('Guest upload grant signature invalid.');
         }
 
         $payload = json_decode(self::decode($encoded), true, 16, JSON_THROW_ON_ERROR);
         if (!is_array($payload) || array_is_list($payload)) {
-            throw new RuntimeException('Mobile upload grant payload invalid.');
+            throw new RuntimeException('Guest upload grant payload invalid.');
         }
 
         $expectedKeys = ['v','scope','organization_id','expires_at','max_files','max_bytes','nonce'];
@@ -80,7 +80,7 @@ final class MobileUploadGrant
         $sortedExpected = $expectedKeys;
         sort($sortedExpected, SORT_STRING);
         if ($keys !== $sortedExpected || ($payload['v'] ?? null) !== 1 || ($payload['scope'] ?? null) !== self::SCOPE) {
-            throw new RuntimeException('Mobile upload grant payload invalid.');
+            throw new RuntimeException('Guest upload grant payload invalid.');
         }
 
         $tenant = $payload['organization_id'] ?? null;
@@ -90,17 +90,17 @@ final class MobileUploadGrant
         $maxBytes = $payload['max_bytes'] ?? null;
 
         if (!is_string($tenant) || !is_string($nonce) || !is_int($expiresAt) || !is_int($maxFiles) || !is_int($maxBytes)) {
-            throw new RuntimeException('Mobile upload grant payload invalid.');
+            throw new RuntimeException('Guest upload grant payload invalid.');
         }
         self::identifier($tenant, 'organization_id');
         self::identifier($nonce, 'nonce');
         self::limits($maxFiles, $maxBytes);
 
         if (!hash_equals($tenant, $organizationId)) {
-            throw new RuntimeException('Mobile upload grant tenant mismatch.');
+            throw new RuntimeException('Guest upload grant tenant mismatch.');
         }
         if ($expiresAt <= $now) {
-            throw new RuntimeException('Mobile upload grant expired.');
+            throw new RuntimeException('Guest upload grant expired.');
         }
 
         return [
@@ -116,7 +116,7 @@ final class MobileUploadGrant
     private static function limits(int $maxFiles, int $maxBytes): void
     {
         if ($maxFiles < 1 || $maxFiles > self::MAX_FILES_CAP || $maxBytes < 1 || $maxBytes > self::MAX_BYTES_CAP) {
-            throw new InvalidArgumentException('Mobile upload grant limits invalid.');
+            throw new InvalidArgumentException('Guest upload grant limits invalid.');
         }
     }
 
@@ -139,7 +139,7 @@ final class MobileUploadGrant
     private static function decode(string $value): string
     {
         if ($value === '' || preg_match('/^[A-Za-z0-9_-]+$/D', $value) !== 1) {
-            throw new RuntimeException('Mobile upload grant encoding invalid.');
+            throw new RuntimeException('Guest upload grant encoding invalid.');
         }
         $padding = strlen($value) % 4;
         if ($padding !== 0) {
@@ -147,7 +147,7 @@ final class MobileUploadGrant
         }
         $decoded = base64_decode(strtr($value, '-_', '+/'), true);
         if ($decoded === false) {
-            throw new RuntimeException('Mobile upload grant encoding invalid.');
+            throw new RuntimeException('Guest upload grant encoding invalid.');
         }
         return $decoded;
     }
