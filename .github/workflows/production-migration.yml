@@ -101,7 +101,7 @@ jobs:
             backup_state="resolved and validated server-side"
           else
             state="failed safely; inspect the result artifact"
-            backup_state="no ejecutado"
+            backup_state="no confirmado (falló el paso de migración)"
           fi
 
           {
