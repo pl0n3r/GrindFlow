@@ -32,15 +32,30 @@ class MobileUploadGrantTests(unittest.TestCase):
         self.assertEqual(grant["max_bytes"], 10485760)
         self.assertEqual(grant["nonce"], "nonce-1")
 
+        boundary = data["boundary"]
+        self.assertEqual(boundary["max_files"], 25)
+        self.assertEqual(boundary["max_bytes"], 104857600)
+        self.assertEqual(boundary["nonce"], "nonce-max")
+
     def test_invalid_expired_or_cross_tenant_grant_fails_closed(self):
         data = scenario("invalid")
 
-        for key in ("tampered", "expired", "cross_tenant", "too_many_files", "too_many_bytes"):
+        for key in (
+            "tampered",
+            "expired",
+            "cross_tenant",
+            "zero_files",
+            "zero_bytes",
+            "too_many_files",
+            "too_many_bytes",
+        ):
             self.assertFalse(data[key]["ok"], key)
 
         self.assertIn("signature", data["tampered"]["message"].lower())
         self.assertIn("expired", data["expired"]["message"].lower())
         self.assertIn("tenant", data["cross_tenant"]["message"].lower())
+        self.assertIn("limits", data["zero_files"]["message"].lower())
+        self.assertIn("limits", data["zero_bytes"]["message"].lower())
         self.assertIn("limits", data["too_many_files"]["message"].lower())
         self.assertIn("limits", data["too_many_bytes"]["message"].lower())
 
