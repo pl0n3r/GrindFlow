@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,8 +25,33 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             "database dump utility is unavailable",
             "pending migration count changed",
             '[[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]',
+            '[[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]]',
         ):
             self.assertIn(signal, script)
+
+        base_env = {
+            **os.environ,
+            "HOSTINGER_SSH_HOST": "example.test",
+            "HOSTINGER_SSH_USER": "deploy",
+            "HOSTINGER_SSH_PORT": "22",
+            "DEPLOY_SSH_KEY": "test-key",
+            "HOSTINGER_KNOWN_HOSTS": "example.test ssh-ed25519 test",
+            "EXPECTED_PENDING": "1",
+        }
+        for unsafe_root in (
+            "/home/deploy/domain with space",
+            "/home/deploy/domain;touch-pwned",
+            "/home/deploy/domain$HOME",
+        ):
+            result = subprocess.run(
+                ["/bin/bash", str(SCRIPT)],
+                env={**base_env, "HOSTINGER_RELEASE_ROOT": unsafe_root},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 2, unsafe_root)
+            self.assertIn("invalid release root", result.stderr)
 
     def test_dump_is_private_atomic_and_gzip_verified(self):
         script = SCRIPT.read_text(encoding="utf-8")
