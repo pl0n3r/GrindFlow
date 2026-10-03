@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Vault;
 use App\Http\Requests\Vault\GuestMobileUploadRequest;
 use App\Services\Media\GuestMobileUploadIngestor;
 use App\Support\Security\MobileUploadGrant;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -55,7 +56,7 @@ final readonly class GuestMobileUploadController
                 $grant,
                 submittedCount: count($assets),
             );
-        } catch (ValidationException|InvalidArgumentException|LogicException|RuntimeException) {
+        } catch (AuthorizationException|ValidationException|InvalidArgumentException|LogicException|RuntimeException) {
             $grant = $this->safeGrant($token);
 
             return $this->page(

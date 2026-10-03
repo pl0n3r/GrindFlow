@@ -63,16 +63,6 @@
                     <input type="hidden" name="grant" value="{{ $token }}">
 
                     <div class="gf-upload-picker">
-                        <label class="gf-upload-picker__label" for="guest-media">
-                            <span class="gf-upload-picker__icon" aria-hidden="true">＋</span>
-                            <span>
-                                <strong>Agregar fotos o videos</strong>
-                                <small>
-                                    Máximo {{ $maxFiles }} archivos ·
-                                    {{ number_format($maxBytes / 1048576, 1) }} MB en total
-                                </small>
-                            </span>
-                        </label>
                         <input
                             class="gf-upload-picker__input"
                             id="guest-media"
@@ -83,6 +73,16 @@
                             required
                             aria-describedby="guest-upload-help guest-upload-rejections"
                         >
+                        <label class="gf-upload-picker__label" for="guest-media">
+                            <span class="gf-upload-picker__icon" aria-hidden="true">＋</span>
+                            <span>
+                                <strong>Agregar fotos o videos</strong>
+                                <small>
+                                    Máximo {{ $maxFiles }} archivos ·
+                                    {{ number_format($maxBytes / 1048576, 1) }} MB en total
+                                </small>
+                            </span>
+                        </label>
                     </div>
 
                     <p class="gf-guest-upload__help" id="guest-upload-help">

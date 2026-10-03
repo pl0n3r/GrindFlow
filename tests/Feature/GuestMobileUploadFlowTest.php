@@ -97,6 +97,27 @@ class GuestMobileUploadFlowTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_signed_grant_for_deleted_tenant_fails_closed(): void
+    {
+        $organization = Organization::factory()->create();
+        $token = $this->token($organization, 'deleted-tenant');
+        $organization->delete();
+
+        $this->post(route('guest.upload.store'), [
+            'grant' => $token,
+            'media' => [
+                UploadedFile::fake()->create('orphan.jpg', 4, 'image/jpeg'),
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertSee('No pudimos enviar los archivos.')
+            ->assertDontSee('deleted-tenant');
+
+        $this->assertDatabaseCount('media_assets', 0);
+        $this->assertDatabaseCount('mobile_upload_grant_uses', 0);
+        $this->assertGuest();
+    }
+
     public function test_invalid_link_and_invalid_media_fail_closed_with_public_errors(): void
     {
         $this->get(route('guest.upload.show', ['token' => 'v1.invalid.signature']))

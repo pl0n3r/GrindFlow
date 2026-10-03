@@ -57,7 +57,8 @@ class MobileUploadUxTests(unittest.TestCase):
         self.assertNotIn("middleware('auth')", public_routes)
         self.assertIn("$this->ingestor->ingest(", controller)
         self.assertIn("validateForGuest", controller)
-        view_payload = controller.split("return response()->view", 1)[1].split("], $status)", 1)[0]\n        self.assertNotIn("organization_id", view_payload)
+        view_payload = controller.split("return response()->view", 1)[1].split("], $status)", 1)[0]
+        self.assertNotIn("organization_id", view_payload)
         self.assertIn("$grant['organization_id']", ingestor)
         self.assertIn("'ingested_by_user_id' => null", ingestor)
         self.assertIn("MobileUploadGrant::class", provider)
@@ -65,6 +66,11 @@ class MobileUploadUxTests(unittest.TestCase):
         self.assertNotIn("env(\'APP_KEY\')", config)
         self.assertIn("Referrer-Policy", controller)
         self.assertIn("no-referrer", controller)
+        self.assertIn("AuthorizationException", controller)
+        self.assertLess(
+            view.index('class="gf-upload-picker__input"'),
+            view.index('class="gf-upload-picker__label"'),
+        )
         self.assertIn(
             "test_guest_mobile_flow_works_without_authenticated_session_and_preserves_tenant_scope",
             feature,
