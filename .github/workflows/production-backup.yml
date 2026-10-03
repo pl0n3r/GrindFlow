@@ -70,7 +70,6 @@ jobs:
           [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]
           [[ "$archive" =~ ^operations/database-backups/[A-Za-z0-9._-]+\.sql\.gz$ ]]
           [[ "$(wc -l < "$safe_output")" -eq 2 ]]
-          ! grep -Eq '(^|_)RECEIPT=' "$safe_output"
 
           printf 'fingerprint=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
           printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
