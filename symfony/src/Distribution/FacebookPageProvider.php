@@ -28,15 +28,9 @@ final readonly class FacebookPageProvider implements DistributionProvider
     {
         $this->assertAvailableFor($command->organizationId);
 
-        if ($command->hasMedia() && !method_exists($this->transport, 'postPhoto')) {
-            throw DistributionProviderException::configuration();
-        }
-
         try {
             if ($command->hasMedia()) {
-                /** @var callable(string,string,string,string,string,string):array{status:int,headers:array<string,string>,body:string} $postPhoto */
-                $postPhoto = [$this->transport, 'postPhoto'];
-                $response = $postPhoto(
+                $response = $this->transport->postPhoto(
                     $this->configuration->graphVersion(),
                     $this->configuration->pageId(),
                     $this->configuration->accessToken(),
