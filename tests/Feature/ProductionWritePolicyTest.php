@@ -76,6 +76,7 @@ class ProductionWritePolicyTest extends TestCase
         $receipt = $evidence->record($archive, $fingerprint);
 
         $evidence->assertValid($receipt, $fingerprint);
+        $evidence->assertLatestValidForFingerprint($fingerprint);
 
         foreach ([[false, true], [true, false]] as [$backup, $lock]) {
             try {
@@ -113,7 +114,7 @@ class ProductionWritePolicyTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('checksum does not match');
-        $evidence->assertValid($receipt, $fingerprint);
+        $evidence->assertLatestValidForFingerprint($fingerprint);
     }
 
     public function test_backup_receipt_expires_after_fifteen_minutes(): void
@@ -123,13 +124,13 @@ class ProductionWritePolicyTest extends TestCase
         $archive = 'operations/database-backups/expiry-test.sql.gz';
         Storage::disk('local')->put($archive, 'database-backup');
         $evidence = app(VerifiedBackupEvidence::class);
-        $receipt = $evidence->record($archive, $fingerprint);
+        $evidence->record($archive, $fingerprint);
 
         $this->travel(16)->minutes();
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('not recent enough');
-        $evidence->assertValid($receipt, $fingerprint);
+        $evidence->assertLatestValidForFingerprint($fingerprint);
     }
 
     public function test_documentation_and_migration_flow_require_verifiable_backup_evidence(): void
@@ -141,10 +142,9 @@ class ProductionWritePolicyTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.system.migrate'), [
-                'backup_confirmed' => '1',
                 'confirmation' => 'MIGRAR',
                 'migration_batch' => str_repeat('a', 64),
             ])
-            ->assertSessionHasErrors('backup_receipt');
+            ->assertSessionHasErrors('migration');
     }
 }

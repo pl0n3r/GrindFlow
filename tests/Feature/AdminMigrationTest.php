@@ -27,7 +27,7 @@ class AdminMigrationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_platform_admin_can_run_pending_migrations_from_system_ui(): void
+    public function test_platform_admin_can_run_pending_migrations_using_server_side_backup_evidence(): void
     {
         $admin = User::factory()->create([
             'platform_role' => UserRole::Admin,
@@ -38,7 +38,8 @@ class AdminMigrationTest extends TestCase
         $fingerprint = str_repeat('a', 64);
         $archive = 'operations/database-backups/admin-test.sql.gz';
         Storage::disk('local')->put($archive, 'database-backup');
-        $receipt = app(VerifiedBackupEvidence::class)->record($archive, $fingerprint);
+        app(VerifiedBackupEvidence::class)->record($archive, $fingerprint);
+
         $readiness = Mockery::mock(MigrationReadiness::class);
         $readiness->shouldReceive('snapshot')
             ->once()
@@ -55,11 +56,42 @@ class AdminMigrationTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.system.migrate'), [
-                'backup_receipt' => $receipt,
                 'confirmation' => 'MIGRAR',
                 'migration_batch' => $fingerprint,
             ])
             ->assertRedirect(route('admin.system'))
             ->assertSessionHas('status', 'Migraciones de base de datos completadas.');
+    }
+
+    public function test_migration_fails_closed_without_latest_server_side_backup_evidence(): void
+    {
+        $admin = User::factory()->create([
+            'platform_role' => UserRole::Admin,
+        ]);
+
+        config(['app.phase' => 'construccion']);
+        Storage::fake('local');
+        $fingerprint = str_repeat('b', 64);
+
+        $readiness = Mockery::mock(MigrationReadiness::class);
+        $readiness->shouldReceive('snapshot')
+            ->once()
+            ->andReturn([
+                'names' => ['2026_09_18_200000_create_scheduling_tables'],
+                'fingerprint' => $fingerprint,
+            ]);
+        $this->app->instance(MigrationReadiness::class, $readiness);
+
+        Artisan::shouldReceive('call')->never();
+
+        $this->actingAs($admin)
+            ->post(route('admin.system.migrate'), [
+                'confirmation' => 'MIGRAR',
+                'migration_batch' => $fingerprint,
+            ])
+            ->assertRedirect(route('admin.system'))
+            ->assertSessionHasErrors([
+                'migration' => 'Verified database backup pointer is missing or unsafe.',
+            ]);
     }
 }
