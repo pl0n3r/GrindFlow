@@ -13,7 +13,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run && python3 -m unittest tests/test_worker_supply_chain_hardening.py && docker build -f workers/Dockerfile -t grindflow-worker-python-ci . && docker build -f workers/node.Dockerfile -t grindflow-worker-node-ci . && bash scripts/smoke-node-worker.sh",
+    "test": "vitest run && python3 -m unittest tests/test_worker_supply_chain_hardening.py && docker build -f workers/Dockerfile -t grindflow-worker-python-ci . && docker build -f workers/node.Dockerfile -t grindflow-worker-node-ci . && bash scripts/smoke-node-worker.sh && python3 -m unittest tests/test_corpus_reconciliation_docs.py",
     "test:watch": "vitest",
     "test:rls": "node scripts/run-rls-tests.mjs",
     "db:reset": "node scripts/apply-migrations.mjs --reset",
