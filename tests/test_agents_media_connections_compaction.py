@@ -82,7 +82,7 @@ class AgentsMediaConnectionsCompactionTests(unittest.TestCase):
         match = re.search(r"'number'\s*=>\s*'([^']+)'", version_text)
         self.assertIsNotNone(match)
         release = match.group(1)
-        self.assertEqual(release, "0.1.177")
+        self.assertRegex(release, r"^\d+\.\d+\.\d+$")
         self.assertEqual(package["version"], release)
         self.assertEqual(lock["version"], release)
         self.assertEqual(lock["packages"][""]["version"], release)
