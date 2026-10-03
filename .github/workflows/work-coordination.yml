@@ -114,6 +114,23 @@ jobs:
       require_reservation: true
 
       profile: es
+  ci-exact-main-post-merge:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Disparar GrindFlow CI exact-main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GF_REPOSITORY: ${{ github.repository }}
+        run: gh workflow run grindflow-ci.yml --repo "$GF_REPOSITORY" --ref main
+
   issue:
     if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'reopened')
     permissions:
