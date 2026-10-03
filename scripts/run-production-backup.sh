@@ -36,7 +36,7 @@ set -euo pipefail
 
 root="$1"
 expected_pending="$2"
-php_bin="/opt/alt/php85/usr/bin/php"
+php_bin="${3:-/opt/alt/php85/usr/bin/php}"
 current="$root/current"
 
 [[ -x "$php_bin" ]] || { echo "production PHP 8.5 CLI is unavailable" >&2; exit 19; }
@@ -71,9 +71,11 @@ command -v gzip >/dev/null || { echo "gzip is unavailable" >&2; exit 28; }
 credentials="$(mktemp)"
 database_file="$(mktemp)"
 tmp_archive=""
+promoted_archive=""
 cleanup_remote() {
-  rm -f "$credentials" "$database_file"
-  [[ -z "$tmp_archive" ]] || rm -f "$tmp_archive"
+  rm -f -- "$credentials" "$database_file"
+  [[ -z "$tmp_archive" ]] || rm -f -- "$tmp_archive"
+  [[ -z "$promoted_archive" ]] || rm -f -- "$promoted_archive"
 }
 trap cleanup_remote EXIT
 chmod 600 "$credentials" "$database_file"
@@ -103,10 +105,15 @@ chmod 600 "$credentials" "$database_file"
       exit(2);
   }
   $quote = static function (string $value): string {
-      return json_encode(
-          str_replace(["\n", "\r"], "", $value),
-          JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
-      );
+      $escaped = strtr($value, [
+          "\\" => "\\\\",
+          chr(8) => "\\b",
+          "\t" => "\\t",
+          "\n" => "\\n",
+          "\r" => "\\r",
+          "\"" => "\\\"",
+      ]);
+      return "\"".$escaped."\"";
   };
   $content = "[client]\n"
       ."host=".$quote($host)."\n"
@@ -128,23 +135,28 @@ mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-archive_name="pre-migration-${timestamp}-${fingerprint:0:12}.sql.gz"
+umask 077
+tmp_archive="$(mktemp "$backup_dir/.tmp-pre-migration-${timestamp}-${fingerprint:0:12}-XXXXXXXX.sql.gz")"
+tmp_name="${tmp_archive##*/}"
+archive_name="${tmp_name#.tmp-}"
 archive_relative="operations/database-backups/$archive_name"
 archive_path="$backup_dir/$archive_name"
-tmp_archive="$backup_dir/.tmp-$archive_name-$$"
-umask 077
 
 "$dump_bin"   --defaults-extra-file="$credentials"   --single-transaction   --quick   --skip-lock-tables   --hex-blob   --default-character-set=utf8mb4   -- "$database" | gzip -9 > "$tmp_archive"
 
 [[ -s "$tmp_archive" ]] || { echo "database backup is empty" >&2; exit 30; }
 gzip -t "$tmp_archive"
 chmod 600 "$tmp_archive"
-mv -f "$tmp_archive" "$archive_path"
-tmp_archive=""
+ln -- "$tmp_archive" "$archive_path" || { echo "database backup archive collision" >&2; exit 31; }
+promoted_archive="$archive_path"
 [[ -f "$archive_path" && ! -L "$archive_path" ]] || { echo "database backup archive is unsafe" >&2; exit 31; }
 
 receipt="$("$php_bin" artisan operations:record-db-backup "$archive_relative" "$fingerprint" --no-interaction 2>/dev/null)"
 [[ "$receipt" =~ ^[0-9a-f]{64}$ ]] || { echo "verified backup receipt was not created" >&2; exit 32; }
+
+rm -f -- "$tmp_archive"
+tmp_archive=""
+promoted_archive=""
 
 printf 'BACKUP_RECEIPT=%s\n' "$receipt"
 printf 'MIGRATION_FINGERPRINT=%s\n' "$fingerprint"
