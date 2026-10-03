@@ -3,6 +3,7 @@
 namespace App\Support\Tenancy;
 
 use App\Models\Membership;
+use App\Models\Organization;
 use App\Models\User;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -32,6 +33,31 @@ class TenantContext
             return $callback();
         } finally {
             $this->actorId = $previousActorId;
+        }
+    }
+
+    public function runWithinGuestOrganization(
+        string $organizationId,
+        Closure $callback,
+    ): mixed {
+        if (
+            trim($organizationId) === ''
+            || Organization::query()->whereKey($organizationId)->exists() === false
+        ) {
+            throw new AuthorizationException('Guest tenant context is invalid.');
+        }
+
+        $previousActorId = $this->actorId;
+        $previousOrganizationId = $this->organizationId;
+
+        $this->actorId = null;
+        $this->organizationId = $organizationId;
+
+        try {
+            return $callback();
+        } finally {
+            $this->actorId = $previousActorId;
+            $this->organizationId = $previousOrganizationId;
         }
     }
 
