@@ -14,6 +14,7 @@ use App\Http\Controllers\Scheduling\SchedulerController;
 use App\Http\Controllers\Traffic\TrackedLinkRedirectController;
 use App\Http\Controllers\Traffic\TrafficController;
 use App\Http\Controllers\Vault\DirectUploadController;
+use App\Http\Controllers\Vault\GuestMobileUploadController;
 use App\Http\Controllers\Vault\VaultController;
 use App\Http\Middleware\RequireDistributionSchema;
 use App\Http\Middleware\RequireFinanceSchema;
@@ -63,6 +64,15 @@ Route::get('/l/{token}', TrackedLinkRedirectController::class)
     ->middleware('throttle:120,1')
     ->where('token', '[A-Za-z0-9]{22}')
     ->name('traffic.redirect');
+
+Route::get('/mobile-upload/{token}', [GuestMobileUploadController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->where('token', '[A-Za-z0-9._-]+')
+    ->name('guest.mobile-upload.show');
+
+Route::post('/mobile-upload', [GuestMobileUploadController::class, 'store'])
+    ->middleware('throttle:12,1')
+    ->name('guest.mobile-upload.store');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])
