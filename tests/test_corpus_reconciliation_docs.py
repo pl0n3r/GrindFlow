@@ -25,7 +25,7 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         ranges = [
             (int(start), int(end))
             for start, end in re.findall(
-                r"^- \\*\\*#(\\d+)–#(\\d+) · .+\\*\\*$",
+                r"^- \*\*#(\d+)–#(\d+) · .+\*\*$",
                 source,
                 flags=re.MULTILINE,
             )
@@ -47,13 +47,13 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         domains = [
             (int(start), int(end))
             for start, end in re.findall(
-                r"^## .+ · #(\\d+)–#(\\d+)$",
+                r"^## .+ · #(\d+)–#(\d+)$",
                 consolidated,
                 flags=re.MULTILINE,
             )
         ]
         rows = re.findall(
-            r"^\\| #(\\d+)–#(\\d+) \\| .+? \\| \\*\\*(.+?)\\*\\* \\|",
+            r"^\| #(\d+)–#(\d+) \| .+? \| \*\*(.+?)\*\* \|",
             classification,
             flags=re.MULTILINE,
         )
@@ -119,16 +119,34 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("Se conserva como fuente independiente", current)
         self.assertIn("conservando procedencia de ambas series", current)
 
+    def test_gap_closure_preserves_verified_titles_and_unknowns(self):
+        gap = read_doc("CORPUS-HISTORICAL-GAP-CLOSURE-PASS-4.md")
+
+        for title in (
+            "`#5861–#5880` · Live Audience Intelligence",
+            "`#6101–#6120` · Dynamic Pricing Intelligence",
+            "`#6921–#6940` · Governance Control Plane",
+            "`#7081–#7100` · Crisis Management Intelligence",
+            "`#7381–#7400` · Recovery Readiness Intelligence",
+            "`#8121–#8140` · Technical Knowledge Retrieval",
+        ):
+            self.assertIn(title, gap)
+
+        self.assertIn("`#7921–#7940`", gap)
+        self.assertIn("`#8141–#8240`", gap)
+        self.assertIn("`#8281–#8300`", gap)
+        self.assertIn("no se rellenan por inferencia", gap)
+
     def test_release_identity_matches_across_manifests(self):
         config = (ROOT / "config" / "version.php").read_text(encoding="utf-8")
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         package_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 
-        match = re.search(r"'number'\\s*=>\\s*'([^']+)'", config)
+        match = re.search(r"'number'\s*=>\s*'([^']+)'", config)
         self.assertIsNotNone(match)
         php_version = match.group(1)
 
-        self.assertRegex(php_version, r"^\\d+\\.\\d+\\.\\d+$")
+        self.assertRegex(php_version, r"^\d+\.\d+\.\d+$")
         self.assertEqual(php_version, package["version"])
         self.assertEqual(php_version, package_lock["version"])
         self.assertEqual(php_version, package_lock["packages"][""]["version"])
