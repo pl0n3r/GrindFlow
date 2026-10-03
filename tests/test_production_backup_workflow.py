@@ -17,6 +17,8 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             "UserKnownHostsFile=",
             '[[ -L "$current" ]]',
             'case "$release" in',
+            'release="$(readlink -f "$current")"',
+            'php_bin="/opt/alt/php85/usr/bin/php"',
             "database dump utility is unavailable",
             "pending migration count changed",
             '[[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]',
@@ -43,6 +45,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn('chmod 600 "$credentials" "$database_file"', remote)
         self.assertNotIn("DB_PASSWORD", script)
         self.assertNotIn("set -x", script)
+        self.assertNotIn('return """', script)
         self.assertNotIn("cat .env", script)
 
     def test_receipt_uses_canonical_verified_backup_command(self):
