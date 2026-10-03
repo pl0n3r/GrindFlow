@@ -72,6 +72,17 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("300", historical)
         self.assertIn("No aparece una nueva brecha P0/P1", historical)
 
+    def test_reused_ranges_remain_separate_sources(self):
+        historical = read_doc("CORPUS-HISTORICAL-RECOVERY-PASS-3.md")
+        current = read_doc("CORPUS-CURRENT-SESSION-66-1000-INDEX.md")
+
+        # Historical numbering was reused across sessions: keep provenance instead
+        # of pretending the numeric range is a globally unique identifier.
+        self.assertGreaterEqual(historical.count("`#1741–#1760`"), 5)
+        self.assertIn("`#7021–#7040` · Risk Appetite Management", historical)
+        self.assertIn("Numeración deliberadamente NO se mezcla", current)
+        self.assertIn("#901–#1000 · SaaS y plataforma", current)
+
     def test_release_identity_matches_across_manifests(self):
         config = (ROOT / "config" / "version.php").read_text(encoding="utf-8")
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
