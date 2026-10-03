@@ -11,70 +11,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_CALLER = """name: GrindFlow Tag Release
-
-on:
-  push:
-    branches: [main]
-
-permissions:
-  contents: read
-
-concurrency:
-  group: grindflow-tag-release-${{ github.ref }}
-  queue: max
-  cancel-in-progress: false
-
-jobs:
-  current-main:
-    name: current-main
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    permissions:
-      contents: read
-    outputs:
-      current: ${{ steps.guard.outputs.current }}
-      remote_sha: ${{ steps.guard.outputs.remote_sha }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - id: guard
-        name: Reject stale main event
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: bash scripts/current-main-event-guard.sh
-
-  stale-event:
-    name: stale-main-event
-    needs: current-main
-    if: needs.current-main.outputs.current != 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Record ignored stale event
-        run: |
-          {
-            echo '## Stale main event ignored'
-            echo
-            echo "Event SHA: \\`$GITHUB_SHA\\`"
-            echo "Current main: \\`${{ needs.current-main.outputs.remote_sha }}\\`"
-            echo 'No production I/O or release mutation was executed.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  release:
-    name: Publish GitHub Release
-    needs: current-main
-    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true'
-    permissions:
-      contents: write
-    uses: pl0n3r/factory/.github/workflows/release.yml@v1
-    with:
-      version_source: config/version.php
-      version_format: php-array
-      version_key: number
-"""
+CANONICAL_CALLER = "name: GrindFlow Tag Release\n\non:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: grindflow-tag-release-${{ github.ref }}\n  queue: max\n  cancel-in-progress: false\n\njobs:\n  current-main:\n    name: current-main\n    runs-on: ubuntu-latest\n    timeout-minutes: 2\n    permissions:\n      contents: read\n    outputs:\n      current: ${{ steps.guard.outputs.current }}\n      remote_sha: ${{ steps.guard.outputs.remote_sha }}\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n        with:\n          persist-credentials: false\n      - id: guard\n        name: Reject stale main event\n        env:\n          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}\n        run: bash scripts/current-main-event-guard.sh\n\n  stale-event:\n    name: stale-main-event\n    needs: current-main\n    if: needs.current-main.outputs.current != 'true'\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n    steps:\n      - name: Record ignored stale event\n        run: |\n          {\n            echo '## Stale main event ignored'\n            echo\n            echo \"Event SHA: \\`$GITHUB_SHA\\`\"\n            echo \"Current main: \\`${{ needs.current-main.outputs.remote_sha }}\\`\"\n            echo 'No production I/O or release mutation was executed.'\n          } >> \"$GITHUB_STEP_SUMMARY\"\n\n  release:\n    name: Publish GitHub Release\n    needs: current-main\n    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true'\n    permissions:\n      contents: write\n    uses: pl0n3r/factory/.github/workflows/release.yml@v1\n    with:\n      version_source: config/version.php\n      version_format: php-array\n      version_key: number\n"
 SEMVER = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 
 
@@ -174,6 +111,9 @@ class ReleaseAdoptionTests(unittest.TestCase):
             ("      version_source: config/version.php\n", "      version_source: config/version.json\n"),
             ("      contents: write\n", "      contents: write\n      issues: write\n"),
             ("  queue: max\n", ""),
+            ("    needs: current-main\n", ""),
+            (" && needs.current-main.outputs.current == 'true'", ""),
+            ("        run: bash scripts/current-main-event-guard.sh\n", "        run: echo current=true\n"),
         )
         for old, new in mutations:
             with self.subTest(old=old, new=new):
