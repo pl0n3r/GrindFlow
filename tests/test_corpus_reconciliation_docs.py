@@ -76,7 +76,7 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("300", historical)
         self.assertIn("No aparece una nueva brecha P0/P1", historical)
 
-    def test_historical_recovery_artifacts_preserve_explicit_gaps(self):
+    def test_historical_recovery_preserves_collisions_and_gaps(self):
         index = read_doc("CORPUS-HISTORICAL-BLOCK-INDEX.md")
         pass2 = read_doc("CORPUS-HISTORICAL-RECOVERY-PASS-2.md")
         pass3 = read_doc("CORPUS-HISTORICAL-RECOVERY-PASS-3.md")
