@@ -77,11 +77,12 @@ class OperationalProfileTest extends TestCase
             function () use ($organizationB): void {
                 $this->expectException(AuthorizationException::class);
 
-                OperationalProfile::query()->create([
-                    'organization_id' => $organizationB->id,
+                $profile = new OperationalProfile([
                     'name' => 'Cross tenant',
                     'slug' => 'cross-tenant',
                 ]);
+                $profile->forceFill(['organization_id' => $organizationB->id]);
+                $profile->save();
             },
         );
     }
