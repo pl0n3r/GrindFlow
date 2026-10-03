@@ -7,13 +7,13 @@
     <title>Carga móvil · GrindFlow</title>
     <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
 </head>
-<body class="gf-mobile-upload">
+<body class="gf-guest-upload">
     <div class="gf-grid" aria-hidden="true"></div>
     <div class="gf-glow gf-glow--cyan" aria-hidden="true"></div>
     <div class="gf-glow gf-glow--violet" aria-hidden="true"></div>
 
-    <main class="gf-mobile-upload__shell">
-        <header class="gf-mobile-upload__header">
+    <main class="gf-guest-upload__shell">
+        <header class="gf-guest-upload__header">
             <a class="gf-brand" href="{{ route('home') }}" aria-label="GrindFlow, inicio">
                 <span class="gf-brand__mark" aria-hidden="true">GF</span>
                 <span class="gf-brand__name">GrindFlow</span>
@@ -24,11 +24,11 @@
             </span>
         </header>
 
-        <section class="gf-mobile-upload__card" aria-labelledby="guest-upload-title">
+        <section class="gf-guest-upload__card" aria-labelledby="guest-upload-title">
             <div>
-                <p class="gf-mobile-upload__eyebrow">Envío invitado protegido</p>
+                <p class="gf-guest-upload__eyebrow">Envío invitado protegido</p>
                 <h1 id="guest-upload-title">Selecciona, revisa y envía.</h1>
-                <p class="gf-mobile-upload__lead">
+                <p class="gf-guest-upload__lead">
                     Puedes revisar cada archivo antes de enviarlo y retirarlo si cambias de idea.
                     El enlace decide de forma segura dónde se recibe la carga.
                 </p>
@@ -51,9 +51,9 @@
                 </div>
             @else
                 <form
-                    class="gf-mobile-upload__form"
+                    class="gf-guest-upload__form"
                     method="post"
-                    action="{{ route('guest.mobile-upload.store') }}"
+                    action="{{ route('guest.upload.store') }}"
                     enctype="multipart/form-data"
                     data-guest-upload
                     data-max-files="{{ $maxFiles }}"
@@ -85,7 +85,7 @@
                         >
                     </div>
 
-                    <p class="gf-mobile-upload__help" id="guest-upload-help">
+                    <p class="gf-guest-upload__help" id="guest-upload-help">
                         Revisa los previews. Los archivos rechazados no se incluirán en el envío.
                     </p>
 
@@ -103,7 +103,7 @@
                         aria-label="Archivos listos para enviar"
                     ></div>
 
-                    <div class="gf-mobile-upload__summary" aria-live="polite">
+                    <div class="gf-guest-upload__summary" aria-live="polite">
                         <span data-upload-count>0 archivos listos</span>
                         <span data-upload-bytes>0 MB</span>
                     </div>
@@ -115,7 +115,7 @@
             @endif
         </section>
 
-        <p class="gf-mobile-upload__privacy">
+        <p class="gf-guest-upload__privacy">
             No necesitas iniciar sesión. El servidor vuelve a validar límites, tipo de archivo y alcance del enlace antes de guardar cualquier medio.
         </p>
     </main>
