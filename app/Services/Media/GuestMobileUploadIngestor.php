@@ -28,7 +28,7 @@ final readonly class GuestMobileUploadIngestor
     ) {}
 
     /**
-     * @param  list<UploadedFile>  $files
+     * @param  list<mixed>  $files
      * @return list<MediaAsset>
      */
     public function ingest(
@@ -94,7 +94,7 @@ final readonly class GuestMobileUploadIngestor
     }
 
     /**
-     * @param  list<UploadedFile>  $files
+     * @param  list<mixed>  $files
      * @return list<array{
      *     file: UploadedFile,
      *     real_path: string,
