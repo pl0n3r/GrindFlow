@@ -73,7 +73,15 @@ class ProductionPendingCountDispatchTests(unittest.TestCase):
         self.assertIn("This workflow does not run migrations.", self.backup)
         self.assertNotIn("run-production-migrations.sh", self.backup)
         self.assertIn(
-            "Verified backup evidence: **resolved and validated server-side**",
+            'backup_state="resolved and validated server-side"',
+            self.migration,
+        )
+        self.assertGreaterEqual(
+            self.migration.count('backup_state="no ejecutado"'),
+            2,
+        )
+        self.assertIn(
+            "printf 'Verified backup evidence: **%s**\\n' \"$backup_state\"",
             self.migration,
         )
         self.assertNotIn("backup_receipt:", self.migration.lower())
