@@ -9,7 +9,7 @@ use RuntimeException;
 final class MobileUploadGrant
 {
     private const VERSION = 'v1';
-    private const SCOPE = 'mobile-upload';
+    private const SCOPE = 'guest-upload';
     private const MAX_FILES_CAP = 25;
     private const MAX_BYTES_CAP = 104857600;
 

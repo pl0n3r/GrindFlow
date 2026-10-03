@@ -25,7 +25,7 @@ class MobileUploadGrantTests(unittest.TestCase):
         grant = data["validated"]
 
         self.assertTrue(token.startswith("v1."))
-        self.assertEqual(grant["scope"], "mobile-upload")
+        self.assertEqual(grant["scope"], "guest-upload")
         self.assertEqual(grant["organization_id"], "org-123")
         self.assertEqual(grant["expires_at"], 2000)
         self.assertEqual(grant["max_files"], 5)
