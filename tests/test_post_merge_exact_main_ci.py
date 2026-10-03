@@ -77,7 +77,7 @@ class PostMergeExactMainCiTests(unittest.TestCase):
         match = re.search(r"'number'\s*=>\s*'([^']+)'", self.version_php)
         self.assertIsNotNone(match)
         release = match.group(1)
-        self.assertRegex(release, r"^\\d+\\.\\d+\\.\\d+$")
+        self.assertRegex(release, r"^\d+\.\d+\.\d+$")
         self.assertEqual(self.package["version"], release)
         self.assertEqual(self.lock["version"], release)
         self.assertEqual(self.lock["packages"][""]["version"], release)
