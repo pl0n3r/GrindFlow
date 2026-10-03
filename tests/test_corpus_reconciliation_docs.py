@@ -22,7 +22,11 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("Capacidades compactadas: **332**", source)
         self.assertIn("Dominios: **17**", source)
 
-        capacity_lines = re.findall(r"^- \*\*#\d+–#\d+ · .+\*\*$", source, flags=re.MULTILINE)
+        capacity_lines = re.findall(
+            r"^- \\*\\*#\\d+–#\\d+ · .+\\*\\*$",
+            source,
+            flags=re.MULTILINE,
+        )
         self.assertEqual(332, len(capacity_lines))
 
     def test_macro_classification_covers_all_domains(self):
@@ -43,16 +47,13 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
 
         seen = set()
         for row in rows:
-            match = re.search(r"\| \*\*(.+?)\*\* \|", row)
+            match = re.search(r"\\| \\*\\*(.+?)\\*\\* \\|", row)
             self.assertIsNotNone(match, row)
             classification = match.group(1)
             self.assertIn(classification, allowed, row)
             seen.add(classification)
 
-        self.assertIn("YA CUBIERTO", seen)
-        self.assertIn("BRECHA MVP", seen)
-        self.assertIn("POST-MVP", seen)
-        self.assertIn("NECESITA DECISIÓN", seen)
+        self.assertEqual(allowed, seen)
 
     def test_reconciliation_method_preserves_provenance(self):
         method = read_doc("CORPUS-RECONCILIATION-METHOD.md")
@@ -67,38 +68,44 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         ):
             self.assertIn(rule, method)
 
-        self.assertIn("No releer ni regenerar #1–#8040 requisito por requisito", baseline)
+        self.assertIn(
+            "No releer ni regenerar #1–#8040 requisito por requisito",
+            baseline,
+        )
         self.assertIn("#8041–#8340", historical)
         self.assertIn("300", historical)
         self.assertIn("No aparece una nueva brecha P0/P1", historical)
 
     def test_historical_recovery_artifacts_preserve_explicit_gaps(self):
-        required = (
-            "CORPUS-HISTORICAL-BLOCK-INDEX.md",
-            "CORPUS-HISTORICAL-MACRO-CLASSIFICATION.md",
-            "CORPUS-HISTORICAL-RECOVERY-PASS-2.md",
-            "CORPUS-HISTORICAL-RECOVERY-PASS-3.md",
-            "CORPUS-CURRENT-SESSION-66-1000-INDEX.md",
-        )
-        for name in required:
-            self.assertTrue((DOCS / name).is_file(), name)
-
-        block_index = read_doc("CORPUS-HISTORICAL-BLOCK-INDEX.md")
-        recovery = read_doc("CORPUS-HISTORICAL-RECOVERY-PASS-3.md")
+        index = read_doc("CORPUS-HISTORICAL-BLOCK-INDEX.md")
+        pass2 = read_doc("CORPUS-HISTORICAL-RECOVERY-PASS-2.md")
+        pass3 = read_doc("CORPUS-HISTORICAL-RECOVERY-PASS-3.md")
         current = read_doc("CORPUS-CURRENT-SESSION-66-1000-INDEX.md")
 
-        self.assertIn("NO RECUPERADO", block_index)
-        self.assertIn("no se rellen", recovery.lower())
-        self.assertIn("#66", current)
-        self.assertIn("#1000", current)
-        self.assertIn("fuente", current.lower())
+        self.assertIn("Dos bloques con el mismo rango pero tema distinto", index)
+        self.assertIn("`NO RECUPERADO` significa", index)
+        self.assertIn(
+            "Zonas todavía no recuperadas con evidencia suficiente",
+            index,
+        )
+        self.assertIn(
+            "Recuperar únicamente resúmenes/índices de las zonas marcadas",
+            index,
+        )
+        self.assertIn("Estado de huecos después de la pasada 2", pass2)
+        self.assertIn("siguen parcialmente sin título original", pass3)
+        self.assertIn("mantiene huecos", pass3)
+        self.assertIn("Los huecos remanentes ya están acotados", pass3)
+        self.assertIn("#66–#1000", current)
+        self.assertIn("Se conserva como fuente independiente", current)
+        self.assertIn("conservando procedencia de ambas series", current)
 
     def test_release_identity_matches_across_manifests(self):
         config = (ROOT / "config" / "version.php").read_text(encoding="utf-8")
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         package_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 
-        match = re.search(r"'number'\s*=>\s*'([^']+)'", config)
+        match = re.search(r"'number'\\s*=>\\s*'([^']+)'", config)
         self.assertIsNotNone(match)
         php_version = match.group(1)
 
