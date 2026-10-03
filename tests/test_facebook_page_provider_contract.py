@@ -85,7 +85,10 @@ class FacebookPageProviderContractTests(unittest.TestCase):
         self.assertIn("retry_after_seconds", migration)
         self.assertIn("retry_not_before", migration)
         self.assertIn("'rate_limited' => $this->resumeRateLimited", service)
-        self.assertIn("'status' => 'rate_limited'", service)
+        self.assertIn(
+            "DistributionProviderException::KIND_RATE_LIMIT => 'rate_limited'",
+            service,
+        )
         self.assertIn("'status' => 'in_flight'", service)
         self.assertIn("max(60, min", service)
         self.assertIn("private ?Closure $clock = null", service)
