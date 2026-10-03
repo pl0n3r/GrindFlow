@@ -46,6 +46,9 @@ class MobileUploadUxTests(unittest.TestCase):
             ROOT / "app/Providers/AppServiceProvider.php"
         ).read_text(encoding="utf-8")
         config = (ROOT / "config/grindflow.php").read_text(encoding="utf-8")
+        view = (
+            ROOT / "resources/views/vault/guest-upload.blade.php"
+        ).read_text(encoding="utf-8")
         feature = (
             ROOT / "tests/Feature/GuestMobileUploadFlowTest.php"
         ).read_text(encoding="utf-8")
