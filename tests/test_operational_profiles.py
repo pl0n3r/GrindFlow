@@ -21,6 +21,7 @@ class OperationalProfileTests(unittest.TestCase):
         self.assertIn("use HasUuids;", model)
         self.assertNotIn("membership_id", model)
         self.assertNotIn("user_id", model)
+        self.assertNotIn("'organization_id'", model)
 
         self.assertIn("Schema::create('operational_profiles'", migration)
         self.assertIn("$table->foreignUuid('organization_id')", migration)
