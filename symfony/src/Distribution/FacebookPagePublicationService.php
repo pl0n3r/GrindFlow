@@ -26,6 +26,10 @@ final readonly class FacebookPagePublicationService
     {
         $this->provider->assertAvailableFor($command->organizationId);
 
+        if ($this->db->getTransactionNestingLevel() > 0) {
+            throw DistributionProviderException::configuration();
+        }
+
         if (!$this->db->createSchemaManager()->tablesExist(['gf_external_publication_attempts'])) {
             throw DistributionProviderException::configuration();
         }
@@ -220,6 +224,7 @@ final readonly class FacebookPagePublicationService
             $json = json_encode([
                 'provider' => self::PROVIDER,
                 'organization_id' => strtolower($command->organizationId),
+                'page_id' => $this->provider->destinationPageId(),
                 'message' => $command->message,
                 'link' => $command->link,
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
