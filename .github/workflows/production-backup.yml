@@ -1,0 +1,111 @@
+name: GrindFlow Production Backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_pending:
+        description: 'Exact pending migration count expected in production'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '7'
+
+concurrency:
+  group: grindflow-production-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: production-backup
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HOSTINGER_SSH_HOST: ${{ vars.HOSTINGER_SSH_HOST }}
+      HOSTINGER_SSH_USER: ${{ vars.HOSTINGER_SSH_USER }}
+      HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
+      HOSTINGER_RELEASE_ROOT: ${{ vars.HOSTINGER_RELEASE_ROOT }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+      EXPECTED_PENDING: ${{ inputs.expected_pending }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Validate backup script
+        run: bash -n scripts/run-production-backup.sh
+
+      - id: backup
+        name: Create verified production database backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          safe_output="$(mktemp)"
+          result_json="production-backup-result.json"
+          trap 'rm -f "$safe_output"' EXIT
+
+          bash scripts/run-production-backup.sh > "$safe_output"
+
+          receipt="$(sed -n 's/^BACKUP_RECEIPT=//p' "$safe_output")"
+          fingerprint="$(sed -n 's/^MIGRATION_FINGERPRINT=//p' "$safe_output")"
+          archive="$(sed -n 's/^BACKUP_ARCHIVE=//p' "$safe_output")"
+
+          [[ "$receipt" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$archive" =~ ^operations/database-backups/[A-Za-z0-9._-]+\.sql\.gz$ ]]
+          [[ "$(wc -l < "$safe_output")" -eq 3 ]]
+
+          echo "::add-mask::$receipt"
+          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
+          printf 'fingerprint=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
+          printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+
+          python3 - "$result_json" "$receipt" "$fingerprint" "$archive" <<'PY'
+          import json
+          import sys
+
+          path, receipt, fingerprint, archive = sys.argv[1:5]
+          with open(path, "w", encoding="utf-8") as handle:
+              json.dump(
+                  {
+                      "version": 1,
+                      "backup_receipt": receipt,
+                      "migration_fingerprint": fingerprint,
+                      "archive": archive,
+                  },
+                  handle,
+                  indent=2,
+              )
+              handle.write("\n")
+          PY
+          chmod 600 "$result_json"
+
+      - name: Upload short-lived backup receipt
+        uses: actions/upload-artifact@v6
+        with:
+          name: production-backup-receipt-${{ github.run_id }}
+          path: production-backup-result.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Publish safe summary
+        shell: bash
+        run: |
+          {
+            echo "## Production database backup"
+            echo
+            echo "Status: **verified receipt created**"
+            printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
+            printf 'Artifact: `production-backup-receipt-%s`\n' "$GITHUB_RUN_ID"
+            printf 'Expected pending migrations: **%s**\n' "$EXPECTED_PENDING"
+            printf 'Migration fingerprint: `%s`\n' "${{ steps.backup.outputs.fingerprint }}"
+            printf 'Server-local archive: `%s`\n' "${{ steps.backup.outputs.archive }}"
+            echo "The receipt value is masked in logs and is available only in the authenticated short-lived artifact."
+            echo "This workflow does not run migrations."
+          } >> "$GITHUB_STEP_SUMMARY"
