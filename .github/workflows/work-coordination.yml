@@ -156,4 +156,5 @@ jobs:
       - name: Dispatch GrindFlow CI on exact main
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: gh workflow run grindflow-ci.yml --ref main

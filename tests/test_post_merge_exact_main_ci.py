@@ -48,6 +48,7 @@ class PostMergeExactMainCiTests(unittest.TestCase):
         self.assertEqual(permission_lines, {"actions: write", "contents: read"})
 
         self.assertIn("GH_TOKEN: ${{ github.token }}", self.job)
+        self.assertIn("GH_REPO: ${{ github.repository }}", self.job)
         self.assertNotIn("actions/checkout", self.job)
 
         forbidden = (
