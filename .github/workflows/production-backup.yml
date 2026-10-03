@@ -60,52 +60,20 @@ jobs:
         run: |
           set -euo pipefail
           safe_output="$(mktemp)"
-          result_json="production-backup-result.json"
           trap 'rm -f "$safe_output"' EXIT
 
           bash scripts/run-production-backup.sh > "$safe_output"
 
-          receipt="$(sed -n 's/^BACKUP_RECEIPT=//p' "$safe_output")"
           fingerprint="$(sed -n 's/^MIGRATION_FINGERPRINT=//p' "$safe_output")"
           archive="$(sed -n 's/^BACKUP_ARCHIVE=//p' "$safe_output")"
 
-          [[ "$receipt" =~ ^[0-9a-f]{64}$ ]]
           [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]
           [[ "$archive" =~ ^operations/database-backups/[A-Za-z0-9._-]+\.sql\.gz$ ]]
-          [[ "$(wc -l < "$safe_output")" -eq 3 ]]
+          [[ "$(wc -l < "$safe_output")" -eq 2 ]]
+          ! grep -Eq '(^|_)RECEIPT=' "$safe_output"
 
-          echo "::add-mask::$receipt"
-          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
           printf 'fingerprint=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
           printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
-
-          python3 - "$result_json" "$receipt" "$fingerprint" "$archive" <<'PY'
-          import json
-          import sys
-
-          path, receipt, fingerprint, archive = sys.argv[1:5]
-          with open(path, "w", encoding="utf-8") as handle:
-              json.dump(
-                  {
-                      "version": 1,
-                      "backup_receipt": receipt,
-                      "migration_fingerprint": fingerprint,
-                      "archive": archive,
-                  },
-                  handle,
-                  indent=2,
-              )
-              handle.write("\n")
-          PY
-          chmod 600 "$result_json"
-
-      - name: Upload short-lived backup receipt
-        uses: actions/upload-artifact@v6
-        with:
-          name: production-backup-receipt-${{ github.run_id }}-${{ github.run_attempt }}
-          path: production-backup-result.json
-          if-no-files-found: error
-          retention-days: 1
 
       - name: Publish safe summary
         shell: bash
@@ -116,12 +84,11 @@ jobs:
           {
             echo "## Production database backup"
             echo
-            echo "Status: **verified receipt created**"
+            echo "Status: **verified evidence recorded server-side**"
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
-            printf 'Artifact: `production-backup-receipt-%s-%s`\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
             printf 'Expected pending migrations: **%s**\n' "$EXPECTED_PENDING"
             printf 'Migration fingerprint: `%s`\n' "$BACKUP_FINGERPRINT"
             printf 'Server-local archive: `%s`\n' "$BACKUP_ARCHIVE"
-            echo "The receipt value is masked in logs and is available only in the authenticated short-lived artifact."
+            echo "Backup evidence remains private on the production host and is resolved server-side by Migration."
             echo "This workflow does not run migrations."
           } >> "$GITHUB_STEP_SUMMARY"
