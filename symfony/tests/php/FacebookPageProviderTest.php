@@ -68,6 +68,43 @@ final class FacebookPageProviderTest extends WebTestCase
         self::assertStringNotContainsString($token, $outcome->externalPublicationId);
     }
 
+    public function testProviderUsesExplicitPhotoTransportForPrivateMedia(): void
+    {
+        $organization = Uuid::v7()->toRfc4122();
+        $transport = new FakeFacebookPageTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_456"}'],
+        ]);
+        $provider = $this->provider(
+            $organization,
+            'test-facebook-page-token-do-not-log',
+            $transport,
+        );
+        $path = tempnam(sys_get_temp_dir(), 'grindflow-photo-');
+        self::assertIsString($path);
+        self::assertNotFalse(file_put_contents($path, 'private-photo'));
+        $command = new DistributionCommand(
+            $organization,
+            'photo-'.Uuid::v7()->toRfc4122(),
+            'Caption de foto',
+            null,
+            $path,
+            'image/png',
+            hash('sha256', 'private-photo'),
+        );
+
+        try {
+            $outcome = $provider->publish($command);
+        } finally {
+            @unlink($path);
+        }
+
+        self::assertSame('page_photo_456', $outcome->externalPublicationId);
+        self::assertSame(1, $transport->calls);
+        self::assertCount(1, $transport->requests);
+        self::assertSame('Caption de foto', $transport->requests[0]['payload']['message']);
+        self::assertStringContainsString(':image/png', $transport->requests[0]['payload']['link']);
+    }
+
     public function testProviderFailsClosedBeforeIo(): void
     {
         $organization = Uuid::v7()->toRfc4122();
