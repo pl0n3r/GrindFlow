@@ -9,6 +9,8 @@ EVIDENCE = ROOT / "app/Support/Operations/VerifiedBackupEvidence.php"
 CONTROLLER = ROOT / "app/Http/Controllers/Admin/RunMigrationsController.php"
 WORKFLOW = ROOT / ".github/workflows/production-migration.yml"
 SCRIPT = ROOT / "scripts/run-production-migrations.sh"
+BEHAVIOR = ROOT / "tests/Feature/VerifiedBackupEvidenceServerSideTest.php"
+VIEW = ROOT / "resources/views/admin/system.blade.php"
 
 
 class ServerSideBackupReceiptTests(unittest.TestCase):
@@ -25,17 +27,24 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
         self.assertIn("@chmod($pointerPath, 0600)", evidence)
 
         controller = CONTROLLER.read_text(encoding="utf-8")
+        behavior = BEHAVIOR.read_text(encoding="utf-8")
         self.assertIn("assertLatestValidForFingerprint", controller)
         self.assertNotIn("'backup_receipt' =>", controller)
+        self.assertIn("test_latest_receipt_is_private_and_validated_server_side", behavior)
+        self.assertIn("test_failed_pointer_publication_removes_new_receipt", behavior)
 
     def test_missing_stale_mismatched_or_tampered_evidence_fails_closed(self):
         evidence = EVIDENCE.read_text(encoding="utf-8")
+        behavior = BEHAVIOR.read_text(encoding="utf-8")
 
         self.assertIn("Verified database backup pointer is missing or unsafe.", evidence)
         self.assertIn("Verified database backup pointer is malformed.", evidence)
         self.assertIn("Database backup receipt is not recent enough.", evidence)
         self.assertIn("Database backup receipt belongs to another migration batch.", evidence)
         self.assertIn("Verified database backup archive checksum does not match.", evidence)
+        self.assertIn("pointer permissions are unsafe", evidence)
+        self.assertIn("test_latest_receipt_fails_closed_for_missing_malformed_or_open_pointer", behavior)
+        self.assertIn("test_latest_receipt_fails_closed_for_stale_mismatch_and_tampering", behavior)
         self.assertRegex(
             evidence,
             re.compile(
@@ -48,11 +57,13 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
     def test_production_migration_has_no_backup_receipt_input_env_or_post_field(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         script = SCRIPT.read_text(encoding="utf-8")
+        view = VIEW.read_text(encoding="utf-8")
 
         self.assertNotIn("backup_receipt:", workflow)
         self.assertNotIn("BACKUP_RECEIPT", workflow)
         self.assertNotIn("BACKUP_RECEIPT", script)
         self.assertNotIn('backup_receipt=', script)
+        self.assertNotIn('name="backup_receipt"', view)
         self.assertIn('confirmation=MIGRAR', script)
         self.assertIn('migration_batch=', script)
         self.assertIn("server-side", workflow)
