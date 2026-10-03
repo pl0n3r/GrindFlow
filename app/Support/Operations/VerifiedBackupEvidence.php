@@ -39,14 +39,7 @@ final class VerifiedBackupEvidence
             'archive_sha256' => $archiveHash,
         ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
-        if ($disk->put($receiptRelativePath, $payload."\n") !== true) {
-            throw new RuntimeException('Database backup receipt could not be stored.');
-        }
-
-        if (@chmod($disk->path($receiptRelativePath), 0600) === false) {
-            $disk->delete($receiptRelativePath);
-            throw new RuntimeException('Database backup receipt could not be secured.');
-        }
+        $this->writeReceipt($receiptId, $payload);
 
         try {
             $this->writeLatestPointer($receiptId, $migrationFingerprint);
@@ -105,8 +98,17 @@ final class VerifiedBackupEvidence
         $receiptRelativePath = "operations/database-backups/{$receiptId}.receipt.json";
         $receiptPath = $disk->path($receiptRelativePath);
 
-        if (! is_file($receiptPath) || is_link($receiptPath)) {
+        $receiptMetadata = @lstat($receiptPath);
+
+        if (
+            $receiptMetadata === false
+            || ($receiptMetadata['mode'] & 0170000) !== 0100000
+        ) {
             throw new RuntimeException('Verified database backup receipt is missing.');
+        }
+
+        if (($receiptMetadata['mode'] & 0777) !== 0600) {
+            throw new RuntimeException('Verified database backup receipt permissions are unsafe.');
         }
 
         $raw = file_get_contents($receiptPath);
@@ -150,6 +152,71 @@ final class VerifiedBackupEvidence
 
         if ($actualHash === false || ! hash_equals($payload['archive_sha256'], $actualHash)) {
             throw new RuntimeException('Verified database backup archive checksum does not match.');
+        }
+    }
+
+    private function writeReceipt(string $receiptId, string $payload): void
+    {
+        $disk = Storage::disk('local');
+        $directory = $disk->path('operations/database-backups');
+
+        if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('Database backup receipt directory could not be created.');
+        }
+
+        if (! is_dir($directory) || is_link($directory) || @chmod($directory, 0700) === false) {
+            throw new RuntimeException('Database backup receipt directory is unsafe.');
+        }
+
+        $receiptPath = $directory."/{$receiptId}.receipt.json";
+
+        if (file_exists($receiptPath) || is_link($receiptPath)) {
+            throw new RuntimeException('Database backup receipt path already exists.');
+        }
+
+        $temporaryPath = tempnam($directory, '.tmp-receipt-json-');
+
+        if ($temporaryPath === false) {
+            throw new RuntimeException('Database backup receipt could not be staged.');
+        }
+
+        try {
+            if (
+                @chmod($temporaryPath, 0600) === false
+                || file_put_contents($temporaryPath, $payload."\n", LOCK_EX) === false
+            ) {
+                throw new RuntimeException('Database backup receipt could not be secured.');
+            }
+
+            $temporaryMetadata = @lstat($temporaryPath);
+
+            if (
+                $temporaryMetadata === false
+                || ($temporaryMetadata['mode'] & 0170000) !== 0100000
+                || ($temporaryMetadata['mode'] & 0777) !== 0600
+            ) {
+                throw new RuntimeException('Database backup receipt could not be secured.');
+            }
+
+            if (@link($temporaryPath, $receiptPath) === false) {
+                throw new RuntimeException('Database backup receipt could not be published.');
+            }
+
+            $receiptMetadata = @lstat($receiptPath);
+
+            if (
+                $receiptMetadata === false
+                || ($receiptMetadata['mode'] & 0170000) !== 0100000
+                || ($receiptMetadata['mode'] & 0777) !== 0600
+            ) {
+                @unlink($receiptPath);
+
+                throw new RuntimeException('Database backup receipt could not be secured.');
+            }
+        } finally {
+            if (is_file($temporaryPath) || is_link($temporaryPath)) {
+                @unlink($temporaryPath);
+            }
         }
     }
 
