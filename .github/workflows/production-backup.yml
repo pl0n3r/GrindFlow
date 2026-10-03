@@ -6,10 +6,7 @@ on:
       expected_pending:
         description: 'Exact pending migration count expected in production'
         required: true
-        type: choice
-        options:
-          - '1'
-          - '7'
+        type: string
 
 concurrency:
   group: grindflow-production-backup
