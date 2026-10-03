@@ -158,7 +158,6 @@ rm -f -- "$tmp_archive"
 tmp_archive=""
 promoted_archive=""
 
-printf 'BACKUP_RECEIPT=%s\n' "$receipt"
 printf 'MIGRATION_FINGERPRINT=%s\n' "$fingerprint"
 printf 'BACKUP_ARCHIVE=%s\n' "$archive_relative"
 REMOTE
