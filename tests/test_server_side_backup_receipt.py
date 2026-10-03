@@ -9,6 +9,8 @@ EVIDENCE = ROOT / "app/Support/Operations/VerifiedBackupEvidence.php"
 CONTROLLER = ROOT / "app/Http/Controllers/Admin/RunMigrationsController.php"
 WORKFLOW = ROOT / ".github/workflows/production-migration.yml"
 SCRIPT = ROOT / "scripts/run-production-migrations.sh"
+BACKUP_WORKFLOW = ROOT / ".github/workflows/production-backup.yml"
+BACKUP_SCRIPT = ROOT / "scripts/run-production-backup.sh"
 BEHAVIOR = ROOT / "tests/Feature/VerifiedBackupEvidenceServerSideTest.php"
 VIEW = ROOT / "resources/views/admin/system.blade.php"
 
@@ -75,6 +77,21 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
                 re.DOTALL,
             ),
         )
+
+    def test_receipt_never_leaves_production_backup_host(self):
+        workflow = BACKUP_WORKFLOW.read_text(encoding="utf-8")
+        script = BACKUP_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("operations:record-db-backup", script)
+        self.assertIn('[[ "$receipt" =~ ^[0-9a-f]{64}$ ]]', script)
+        self.assertNotIn("BACKUP_RECEIPT=", script)
+        self.assertNotIn("receipt=", workflow.lower())
+        self.assertNotIn("backup_receipt", workflow.lower())
+        self.assertNotIn("production-backup-receipt-", workflow)
+        self.assertNotIn("actions/upload-artifact", workflow)
+        self.assertIn("verified evidence recorded server-side", workflow)
+        self.assertIn("MIGRATION_FINGERPRINT=", script)
+        self.assertIn("BACKUP_ARCHIVE=", script)
 
     def test_production_migration_has_no_backup_receipt_input_env_or_post_field(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
