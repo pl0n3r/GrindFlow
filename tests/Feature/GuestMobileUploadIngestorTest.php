@@ -138,7 +138,6 @@ class GuestMobileUploadIngestorTest extends TestCase
                     'nonce-too-large',
                     maxBytes: 1_024,
                 ),
-                (string) $organization->getKey(),
                 [UploadedFile::fake()->create('too-large.jpg', 4, 'image/jpeg')],
                 null,
                 1_100,
