@@ -62,8 +62,10 @@ class MobileUploadUxTests(unittest.TestCase):
         self.assertIn("$grant['organization_id']", ingestor)
         self.assertIn("'ingested_by_user_id' => null", ingestor)
         self.assertIn("MobileUploadGrant::class", provider)
-        self.assertIn("MOBILE_UPLOAD_SIGNING_KEY", config)
-        self.assertNotIn("env(\'APP_KEY\')", config)
+        self.assertIn(
+            "'guest_upload_signing_key' => env('MOBILE_UPLOAD_SIGNING_KEY'),",
+            config,
+        )
         self.assertIn("Referrer-Policy", controller)
         self.assertIn("no-referrer", controller)
         self.assertIn("AuthorizationException", controller)
