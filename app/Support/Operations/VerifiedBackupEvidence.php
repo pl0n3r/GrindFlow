@@ -253,25 +253,18 @@ final class VerifiedBackupEvidence
                 throw new RuntimeException('Verified database backup pointer could not be secured.');
             }
 
-            if (@rename($temporaryPath, $pointerPath) === false) {
-                throw new RuntimeException('Verified database backup pointer could not be published.');
-            }
-
-            $pointerMetadata = @lstat($pointerPath);
+            $temporaryMetadata = @lstat($temporaryPath);
 
             if (
-                $pointerMetadata === false
-                || ($pointerMetadata['mode'] & 0170000) !== 0100000
+                $temporaryMetadata === false
+                || ($temporaryMetadata['mode'] & 0170000) !== 0100000
+                || ($temporaryMetadata['mode'] & 0777) !== 0600
             ) {
-                @unlink($pointerPath);
-
                 throw new RuntimeException('Verified database backup pointer could not be secured.');
             }
 
-            if (@chmod($pointerPath, 0600) === false) {
-                @unlink($pointerPath);
-
-                throw new RuntimeException('Verified database backup pointer could not be secured.');
+            if (@rename($temporaryPath, $pointerPath) === false) {
+                throw new RuntimeException('Verified database backup pointer could not be published.');
             }
         } finally {
             if (is_file($temporaryPath)) {
