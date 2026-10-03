@@ -7,17 +7,17 @@ namespace App\Support\Security;
 use InvalidArgumentException;
 use RuntimeException;
 
-final class MobileUploadGrant
+final readonly class MobileUploadGrant
 {
-    private const VERSION = 'v1';
+    private const string VERSION = 'v1';
 
-    private const SCOPE = 'guest-upload';
+    private const string SCOPE = 'guest-upload';
 
-    private const MAX_FILES_CAP = 25;
+    private const int MAX_FILES_CAP = 25;
 
-    private const MAX_BYTES_CAP = 104857600;
+    private const int MAX_BYTES_CAP = 104857600;
 
-    public function __construct(private readonly string $signingKey)
+    public function __construct(private string $signingKey)
     {
         if (strlen($signingKey) < 32 || preg_match('/[\r\n]/', $signingKey) === 1) {
             throw new InvalidArgumentException('Guest upload signing key is invalid.');
