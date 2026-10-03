@@ -49,7 +49,7 @@ class AgentsVaultIngestionCompactionTests(unittest.TestCase):
             "StagedMediaSource` + `MediaIngestionCoordinator::queueSource",
             "Nunca los persisten en source refs, metadata, errores, logs o Diagnostics",
             "MEDIA_STAGING_DISK",
-            "Un 429 conserva un Retry-After acotado",
+            "un 429 conserva un Retry-After acotado",
         )
 
         for invariant in invariants:
