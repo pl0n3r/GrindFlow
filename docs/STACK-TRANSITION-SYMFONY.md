@@ -493,3 +493,4 @@ la línea base comercial siguen como slices posteriores del roadmap #2.
 - Los enlaces por organización conservan las comprobaciones de permisos existentes; un cambio visual no amplía acceso ni salta autorización server-side.
 
 **Verificación:** prueba de componente para destinos/estado activo y prueba de contrato que impide reintroducir sidebars privados en las vistas; CI Laravel, navegador y análisis estático permanecen obligatorios.
+
