@@ -35,7 +35,8 @@ class OperationalProfileTests(unittest.TestCase):
         self.assertIn("extends TenantModel", model)
         self.assertIn("AuthorizationException::class", feature)
         self.assertIn("'organization_id' => $organizationB->id", feature)
-        self.assertIn("forceFill", feature)
+        self.assertIn("assertSame($organizationA->id, $massAssigned->organization_id)", feature)
+        self.assertIn("forceFill(['organization_id' => $organizationB->id])", feature)
         self.assertIn("test_missing_membership_cannot_enter_profile_tenant_context", feature)
         self.assertIn("runWithinOrganization", feature)
 
