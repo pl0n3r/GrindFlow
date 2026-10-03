@@ -1,6 +1,6 @@
-# GrindFlow — reglas canónicas de Distribution
+# GrindFlow — guía operativa de Distribution
 
-Este documento concentra las reglas operativas de Distribution que antes vivían en `AGENTS.md`. Debe leerse cuando un cambio toque historial de entregas, tracked links de publicaciones, lifecycle de distribución o auditoría de intentos. Las reglas de tenancy, idempotencia, seguridad y fail-closed aquí descritas son normativas.
+Este documento concentra la guía operativa de Distribution que antes vivía en `AGENTS.md`. Debe leerse cuando un cambio toque historial de entregas, tracked links de publicaciones, lifecycle de distribución o auditoría de intentos. La autoridad funcional permanece en [`docs/REQUIREMENTS.md`](REQUIREMENTS.md), especialmente `GF-FR-005`, `GF-FR-006A` y sus extensiones; esta guía orienta implementación y validación sin sustituir esos requisitos.
 
 ### Distribution: historial paginado y conteo real
 
@@ -80,6 +80,6 @@ Este documento concentra las reglas operativas de Distribution que antes vivían
 
 ## Regla de mantenimiento
 
-- Mantener estas cuatro familias en una única fuente canónica: este archivo.
-- Si cambia comportamiento de Distribution, actualizar código, tests y esta documentación en el mismo PR.
-- No copiar estas reglas de vuelta a `AGENTS.md`; allí solo debe permanecer el enlace de descubrimiento.
+- Mantener estas cuatro familias como guía operativa de lectura y validación en este archivo; los requisitos de comportamiento permanecen canónicos en `docs/REQUIREMENTS.md`.
+- Si cambia comportamiento de Distribution, actualizar primero el requisito funcional aplicable y, en el mismo PR, alinear código, tests y esta guía.
+- No copiar esta guía de vuelta a `AGENTS.md`; allí solo debe permanecer el enlace de descubrimiento.
