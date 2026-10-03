@@ -37,9 +37,9 @@ class VaultTriageItem extends TenantModel
     /**
      * @return BelongsTo<OperationalProfile, $this>
      */
-    public function operationalProfile(): BelongsTo
+    public function assignedProfile(): BelongsTo
     {
-        return $this->belongsTo(OperationalProfile::class);
+        return $this->belongsTo(OperationalProfile::class, 'assigned_profile_id');
     }
 
     /**

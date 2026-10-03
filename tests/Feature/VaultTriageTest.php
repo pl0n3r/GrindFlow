@@ -10,8 +10,8 @@ use App\Models\OperationalProfile;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\VaultTriageItem;
+use App\Services\Media\VaultOwnershipTriage;
 use App\Support\Tenancy\TenantContext;
-use App\Support\Vault\VaultTriageQueue;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LogicException;
@@ -23,27 +23,27 @@ class VaultTriageTest extends TestCase
 
     public function test_ambiguous_asset_enters_triage_without_guessing_owner(): void
     {
-        $operator = User::factory()->create();
+        $actor = User::factory()->create();
         $organization = Organization::factory()->create();
-        $this->membership($operator, $organization, UserRole::Studio);
+        $this->membership($actor, $organization, UserRole::Studio);
 
         app(TenantContext::class)->runWithinOrganization(
-            $operator,
+            $actor,
             (string) $organization->getKey(),
             function (): void {
                 $asset = $this->asset('ambiguous.jpg', 'a');
-                $candidate = OperationalProfile::query()->create([
+                OperationalProfile::query()->create([
                     'name' => 'Candidate profile',
                     'slug' => 'candidate-profile',
                 ]);
 
-                $item = app(VaultTriageQueue::class)->enqueueAmbiguous($asset);
+                $item = app(VaultOwnershipTriage::class)->queueAmbiguous($asset);
 
                 $this->assertSame(VaultTriageItem::STATUS_PENDING, $item->status);
-                $this->assertNull($item->operational_profile_id);
+                $this->assertNull($item->assigned_profile_id);
                 $this->assertNull($item->assigned_by_user_id);
                 $this->assertNull($item->assigned_at);
-                $this->assertNotSame($candidate->getKey(), $item->operational_profile_id);
+                $this->assertNull($asset->refresh()->profile_id);
                 $this->assertSame(1, VaultTriageItem::query()->count());
             },
         );
@@ -51,71 +51,58 @@ class VaultTriageTest extends TestCase
 
     public function test_authorized_operator_assigns_profile_with_auditable_transition(): void
     {
-        $operator = User::factory()->create();
+        $actor = User::factory()->create();
         $organization = Organization::factory()->create();
-        $this->membership($operator, $organization, UserRole::Studio);
+        $this->membership($actor, $organization, UserRole::Studio);
 
         app(TenantContext::class)->runWithinOrganization(
-            $operator,
+            $actor,
             (string) $organization->getKey(),
-            function () use ($operator): void {
+            function () use ($actor): void {
                 $asset = $this->asset('assignable.jpg', 'b');
                 $profile = OperationalProfile::query()->create([
                     'name' => 'Explicit owner',
                     'slug' => 'explicit-owner',
                 ]);
-                $item = app(VaultTriageQueue::class)->enqueueAmbiguous($asset);
+                $item = app(VaultOwnershipTriage::class)->queueAmbiguous($asset);
 
-                $assigned = app(VaultTriageQueue::class)->assignProfile(
-                    $item,
-                    $profile,
-                    $operator,
-                );
+                $assigned = app(VaultOwnershipTriage::class)->assign($item, $profile, $actor);
 
                 $this->assertSame(VaultTriageItem::STATUS_ASSIGNED, $assigned->status);
-                $this->assertSame($profile->getKey(), $assigned->operational_profile_id);
-                $this->assertSame($operator->getKey(), $assigned->assigned_by_user_id);
+                $this->assertSame($profile->getKey(), $assigned->assigned_profile_id);
+                $this->assertSame($actor->getKey(), $assigned->assigned_by_user_id);
                 $this->assertNotNull($assigned->assigned_at);
+                $this->assertSame($profile->getKey(), $asset->refresh()->profile_id);
             },
         );
     }
 
     public function test_cross_tenant_unauthorized_or_reassignment_is_rejected(): void
     {
-        $operator = User::factory()->create();
+        $actor = User::factory()->create();
         $viewer = User::factory()->create();
-        $foreignOperator = User::factory()->create();
+        $foreignActor = User::factory()->create();
         $organization = Organization::factory()->create();
         $foreignOrganization = Organization::factory()->create();
 
-        $this->membership($operator, $organization, UserRole::Studio);
+        $this->membership($actor, $organization, UserRole::Studio);
         $this->membership($viewer, $organization, UserRole::Model);
-        $this->membership($foreignOperator, $foreignOrganization, UserRole::Studio);
+        $this->membership($foreignActor, $foreignOrganization, UserRole::Studio);
 
         [$item, $profile, $alternate] = app(TenantContext::class)->runWithinOrganization(
-            $operator,
+            $actor,
             (string) $organization->getKey(),
             function (): array {
-                $item = app(VaultTriageQueue::class)->enqueueAmbiguous(
-                    $this->asset('guarded.jpg', 'c'),
-                );
-
                 return [
-                    $item,
-                    OperationalProfile::query()->create([
-                        'name' => 'Owner A',
-                        'slug' => 'owner-a',
-                    ]),
-                    OperationalProfile::query()->create([
-                        'name' => 'Owner B',
-                        'slug' => 'owner-b',
-                    ]),
+                    app(VaultOwnershipTriage::class)->queueAmbiguous($this->asset('guarded.jpg', 'c')),
+                    OperationalProfile::query()->create(['name' => 'Owner A', 'slug' => 'owner-a']),
+                    OperationalProfile::query()->create(['name' => 'Owner B', 'slug' => 'owner-b']),
                 ];
             },
         );
 
         $foreignProfile = app(TenantContext::class)->runWithinOrganization(
-            $foreignOperator,
+            $foreignActor,
             (string) $foreignOrganization->getKey(),
             fn (): OperationalProfile => OperationalProfile::query()->create([
                 'name' => 'Foreign owner',
@@ -128,11 +115,7 @@ class VaultTriageTest extends TestCase
             app(TenantContext::class)->runWithinOrganization(
                 $viewer,
                 (string) $organization->getKey(),
-                fn (): VaultTriageItem => app(VaultTriageQueue::class)->assignProfile(
-                    $item,
-                    $profile,
-                    $viewer,
-                ),
+                fn (): VaultTriageItem => app(VaultOwnershipTriage::class)->assign($item, $profile, $viewer),
             );
         } catch (AuthorizationException) {
             $unauthorized = true;
@@ -142,13 +125,9 @@ class VaultTriageTest extends TestCase
         $crossTenant = false;
         try {
             app(TenantContext::class)->runWithinOrganization(
-                $operator,
+                $actor,
                 (string) $organization->getKey(),
-                fn (): VaultTriageItem => app(VaultTriageQueue::class)->assignProfile(
-                    $item,
-                    $foreignProfile,
-                    $operator,
-                ),
+                fn (): VaultTriageItem => app(VaultOwnershipTriage::class)->assign($item, $foreignProfile, $actor),
             );
         } catch (AuthorizationException) {
             $crossTenant = true;
@@ -156,14 +135,14 @@ class VaultTriageTest extends TestCase
         $this->assertTrue($crossTenant);
 
         app(TenantContext::class)->runWithinOrganization(
-            $operator,
+            $actor,
             (string) $organization->getKey(),
-            function () use ($item, $profile, $alternate, $operator): void {
-                app(VaultTriageQueue::class)->assignProfile($item, $profile, $operator);
+            function () use ($item, $profile, $alternate, $actor): void {
+                app(VaultOwnershipTriage::class)->assign($item, $profile, $actor);
 
                 $reassignment = false;
                 try {
-                    app(VaultTriageQueue::class)->assignProfile($item, $alternate, $operator);
+                    app(VaultOwnershipTriage::class)->assign($item, $alternate, $actor);
                 } catch (LogicException) {
                     $reassignment = true;
                 }
@@ -191,11 +170,8 @@ class VaultTriageTest extends TestCase
         ]);
     }
 
-    private function membership(
-        User $user,
-        Organization $organization,
-        UserRole $role,
-    ): Membership {
+    private function membership(User $user, Organization $organization, UserRole $role): Membership
+    {
         return Membership::query()->create([
             'organization_id' => $organization->getKey(),
             'user_id' => $user->getKey(),
