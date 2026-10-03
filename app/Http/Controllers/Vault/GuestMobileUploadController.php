@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Vault;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Vault\GuestMobileUploadRequest;
 use App\Services\Media\GuestMobileUploadIngestor;
 use App\Support\Security\MobileUploadGrant;
