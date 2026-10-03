@@ -246,6 +246,7 @@ jobs:
           [[ -f tests/test_staff_ops_acceptance.py ]] && python3 -m unittest tests/test_staff_ops_acceptance.py
           [[ -f tests/test_production_write_policy_acceptance.py ]] && python3 -m unittest tests/test_production_write_policy_acceptance.py
           [[ -f tests/test_production_backup_workflow.py ]] && python3 -m unittest tests/test_production_backup_workflow.py
+          [[ -f tests/test_production_pending_count_dispatch.py ]] && python3 -m unittest tests/test_production_pending_count_dispatch.py
           [[ -f tests/test_vault_triage.py ]] && python3 -m unittest tests/test_vault_triage.py
           [[ -f tests/test_mobile_upload_ingest.py ]] && python3 -m unittest tests/test_mobile_upload_ingest.py
           [[ -f tests/test_mobile_upload_ux.py ]] && python3 -m unittest tests/test_mobile_upload_ux.py
