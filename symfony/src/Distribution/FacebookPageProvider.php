@@ -19,6 +19,11 @@ final readonly class FacebookPageProvider implements DistributionProvider
         $this->configuration->assertAvailableFor($organizationId);
     }
 
+    public function destinationPageId(): string
+    {
+        return $this->configuration->pageId();
+    }
+
     public function publish(DistributionCommand $command): DistributionOutcome
     {
         $this->assertAvailableFor($command->organizationId);
