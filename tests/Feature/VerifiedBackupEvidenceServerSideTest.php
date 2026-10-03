@@ -18,15 +18,26 @@ class VerifiedBackupEvidenceServerSideTest extends TestCase
 
         $evidence = app(VerifiedBackupEvidence::class);
         $receipt = $evidence->record($archive, $fingerprint);
+        $disk = Storage::disk('local');
         $pointer = "operations/database-backups/latest/{$fingerprint}.ref";
-        $pointerPath = Storage::disk('local')->path($pointer);
+        $pointerPath = $disk->path($pointer);
+        $receiptPath = $disk->path("operations/database-backups/{$receipt}.receipt.json");
 
-        Storage::disk('local')->assertExists($pointer);
-        $this->assertSame($receipt, trim((string) Storage::disk('local')->get($pointer)));
-        clearstatcache(true, $pointerPath);
-        $permissions = fileperms($pointerPath);
-        $this->assertIsInt($permissions);
-        $this->assertSame(0600, $permissions & 0777);
+        $disk->assertExists($pointer);
+        $this->assertSame($receipt, trim((string) $disk->get($pointer)));
+
+        foreach ([$pointerPath, $receiptPath] as $privatePath) {
+            clearstatcache(true, $privatePath);
+            $permissions = fileperms($privatePath);
+            $this->assertIsInt($permissions);
+            $this->assertSame(0600, $permissions & 0777);
+        }
+
+        $temporaryReceipts = array_values(array_filter(
+            $disk->files('operations/database-backups'),
+            static fn (string $path): bool => str_contains(basename($path), '.tmp-receipt-json-'),
+        ));
+        $this->assertSame([], $temporaryReceipts);
 
         $evidence->assertLatestValidForFingerprint($fingerprint);
         $this->assertTrue(true);
@@ -62,6 +73,27 @@ class VerifiedBackupEvidenceServerSideTest extends TestCase
         $this->assertRuntimeFailure(
             fn () => $evidence->assertLatestValidForFingerprint($fingerprint),
             'pointer permissions are unsafe',
+        );
+    }
+
+    public function test_latest_receipt_fails_closed_for_open_receipt_permissions(): void
+    {
+        Storage::fake('local');
+        $fingerprint = str_repeat('f', 64);
+        $archive = 'operations/database-backups/receipt-permissions.sql.gz';
+        $disk = Storage::disk('local');
+        $disk->put($archive, 'database-backup');
+
+        $evidence = app(VerifiedBackupEvidence::class);
+        $receipt = $evidence->record($archive, $fingerprint);
+        $receiptPath = $disk->path("operations/database-backups/{$receipt}.receipt.json");
+
+        chmod($receiptPath, 0644);
+        clearstatcache(true, $receiptPath);
+
+        $this->assertRuntimeFailure(
+            fn () => $evidence->assertLatestValidForFingerprint($fingerprint),
+            'receipt permissions are unsafe',
         );
     }
 
