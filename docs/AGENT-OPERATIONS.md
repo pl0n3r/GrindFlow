@@ -90,6 +90,17 @@ Reglas:
 - Migraciones de produccion, acciones destructivas y cambios de secretos nunca
   se presentan como realizados si solo fueron validados en codigo.
 
+### Autonomía de desarrollo pre-live
+
+Por decisión explícita del propietario del **03/10/2026**, GrindFlow debe desarrollar
+todo el backlog pre-live sin detenerse por nuevas puertas de dirección de producto:
+puede materializar e implementar trabajo reversible de construcción, QA, hardening,
+contratos, UI, APIs, adapters y simulaciones. Se difieren —sin bloquear el código que
+los prepara— compras/gasto/planes, credenciales o datos reales, borrado irreversible o
+SQL destructivo y el cambio final a live/go-live. Las compuertas técnicas de integridad
+(CI, seguridad, reservas y evidencia exact-head) siguen siendo evidencia, no decisiones
+de producto.
+
 ### Regla BLOQUEANTE de CodeRabbit antes de fusionar
 
 **Decisiones explícitas del propietario:** desde el 21/09/2026 CodeRabbit es
