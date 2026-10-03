@@ -29,7 +29,6 @@ jobs:
     env:
       BASE_URL: https://www.grindflow.com.co
       E2E_USER_EMAIL: e2e-admin@grindflow.test
-      E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
       OUTPUT_PATH: production-migration-result.json
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
     steps:
@@ -62,6 +61,8 @@ jobs:
       - id: credentials
         name: Check synthetic credentials
         shell: bash
+        env:
+          E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
         run: |
           if [[ -n "$E2E_USER_PASSWORD" ]]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -78,6 +79,8 @@ jobs:
         if: steps.credentials.outputs.configured == 'true'
         continue-on-error: true
         shell: bash
+        env:
+          E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
         run: bash scripts/run-production-migrations.sh
 
       - name: Upload migration result
