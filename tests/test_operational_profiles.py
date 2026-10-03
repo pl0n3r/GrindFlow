@@ -7,7 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class OperationalProfileTests(unittest.TestCase):
+    """Verify source-level contracts for tenant-scoped operational profiles."""
+
     def test_profile_identity_is_distinct_from_membership_and_tenant_scoped(self):
+        """Profile storage must stay independent from membership and user identity."""
         model = (ROOT / "app/Models/OperationalProfile.php").read_text(encoding="utf-8")
         migration = (
             ROOT / "database/migrations/2026_10_03_000100_create_operational_profiles_table.php"
@@ -29,6 +32,7 @@ class OperationalProfileTests(unittest.TestCase):
         self.assertIn("OperationalProfile::query()->pluck('name')->all()", feature)
 
     def test_profile_access_rejects_cross_tenant_and_missing_membership(self):
+        """Tenant protections must reject cross-tenant writes and missing membership."""
         model = (ROOT / "app/Models/OperationalProfile.php").read_text(encoding="utf-8")
         feature = (ROOT / "tests/Feature/OperationalProfileTest.php").read_text(encoding="utf-8")
 
