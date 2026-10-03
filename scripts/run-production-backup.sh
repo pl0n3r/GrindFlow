@@ -48,10 +48,11 @@ case "$release" in
 esac
 [[ -d "$release" && ! -L "$release" ]] || { echo "production release is unsafe" >&2; exit 22; }
 cd "$release"
-[[ -f artisan && -f bootstrap/app.php ]] || { echo "Laravel runtime is unavailable" >&2; exit 23; }
+[[ -f artisan && -f bootstrap/app.php && -f vendor/autoload.php ]] || { echo "Laravel runtime is unavailable" >&2; exit 23; }
 
 snapshot="$(
   "$php_bin" -r '
+    require "vendor/autoload.php";
     $app = require "bootstrap/app.php";
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $snapshot = $app->make(App\Support\Operations\MigrationReadiness::class)->snapshot();
@@ -78,6 +79,7 @@ trap cleanup_remote EXIT
 chmod 600 "$credentials" "$database_file"
 
 "$php_bin" -r '
+  require "vendor/autoload.php";
   $app = require "bootstrap/app.php";
   $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
   $default = (string) config("database.default");
