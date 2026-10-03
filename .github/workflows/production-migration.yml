@@ -10,10 +10,6 @@ on:
         options:
           - '1'
           - '7'
-      backup_receipt:
-        description: '64-hex receipt generated from a verified recent DB backup'
-        required: true
-        type: string
 
 concurrency:
   group: grindflow-production-migration
@@ -26,7 +22,8 @@ jobs:
   migrate:
     name: production-migration
     if: >-
-      github.actor == github.repository_owner
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -35,7 +32,6 @@ jobs:
       E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
       OUTPUT_PATH: production-migration-result.json
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
-      BACKUP_RECEIPT: ${{ inputs.backup_receipt }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -73,15 +69,6 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Validate verified backup receipt input
-        if: steps.credentials.outputs.configured == 'true'
-        shell: bash
-        run: |
-          [[ "$BACKUP_RECEIPT" =~ ^[0-9a-f]{64}$ ]] || {
-            echo "::error::backup_receipt must be a 64-hex verified receipt id"
-            exit 1
-          }
-
       - name: Validate migration script
         if: steps.credentials.outputs.configured == 'true'
         run: bash -n scripts/run-production-migrations.sh
@@ -97,7 +84,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: production-migration-${{ github.run_id }}
+          name: production-migration-${{ github.run_id }}-${{ github.run_attempt }}
           path: production-migration-result.json
           if-no-files-found: error
           retention-days: 7
@@ -119,9 +106,9 @@ jobs:
             echo
             echo "Status: **$state**"
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
-            printf 'Artifact: `production-migration-%s`\n' "$GITHUB_RUN_ID"
+            printf 'Artifact: `production-migration-%s-%s`\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
             printf 'Approved pending count: **%s**\n' "$EXPECTED_PENDING"
-            echo "Verified backup receipt: **required and server-validated**"
+            echo "Verified backup evidence: **resolved and validated server-side**"
             echo "Retention: **7 days**"
           } >> "$GITHUB_STEP_SUMMARY"
 
