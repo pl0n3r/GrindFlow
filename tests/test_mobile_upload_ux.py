@@ -62,10 +62,15 @@ class MobileUploadUxTests(unittest.TestCase):
         self.assertIn("'ingested_by_user_id' => null", ingestor)
         self.assertIn("MobileUploadGrant::class", provider)
         self.assertIn("MOBILE_UPLOAD_SIGNING_KEY", config)
+        self.assertNotIn("env(\'APP_KEY\')", config)
+        self.assertIn("Referrer-Policy", controller)
+        self.assertIn("no-referrer", controller)
         self.assertIn(
             "test_guest_mobile_flow_works_without_authenticated_session_and_preserves_tenant_scope",
             feature,
         )
+        self.assertIn("$this->assertDatabaseCount(\'media_assets\', 1)", feature)
+        self.assertIn("$this->assertDatabaseCount(\'mobile_upload_grant_uses\', 1)", feature)
         self.assertIn("$this->assertGuest()", feature)
 
 
