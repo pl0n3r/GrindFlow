@@ -6,6 +6,10 @@ parameters:
   grindflow_ops_keys_json_default: '{}'
   grindflow_ops_allowlist_default: ''
   grindflow_ops_rate_limit_default: 60
+  grindflow_facebook_pilot_organization_default: ''
+  grindflow_facebook_page_id_default: ''
+  grindflow_facebook_page_access_token_default: ''
+  grindflow_facebook_graph_version_default: 'v26.0'
 
 services:
   _defaults:
@@ -52,6 +56,20 @@ services:
 
   GrindFlow\Identity\Security\PasswordRecoveryNotifier:
     alias: GrindFlow\Infrastructure\Mail\NativePasswordRecoveryNotifier
+
+  GrindFlow\Distribution\FacebookPageConfiguration:
+    arguments:
+      $organizationId: '%env(default:grindflow_facebook_pilot_organization_default:GRINDFLOW_FACEBOOK_PILOT_ORGANIZATION_ID)%'
+      $pageId: '%env(default:grindflow_facebook_page_id_default:GRINDFLOW_FACEBOOK_PAGE_ID)%'
+      $accessToken: '%env(default:grindflow_facebook_page_access_token_default:GRINDFLOW_FACEBOOK_PAGE_ACCESS_TOKEN)%'
+      $graphVersion: '%env(default:grindflow_facebook_graph_version_default:GRINDFLOW_FACEBOOK_GRAPH_VERSION)%'
+
+  GrindFlow\Distribution\FacebookPageTransport:
+    alias: GrindFlow\Distribution\StreamFacebookPageTransport
+
+  GrindFlow\Distribution\FacebookPagePublicationService:
+    arguments:
+      $clock: null
 
   GrindFlow\Ops\Http\StaffOpsController:
     tags: ['controller.service_arguments']
