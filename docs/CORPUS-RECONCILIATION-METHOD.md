@@ -64,8 +64,19 @@ No se considera reconciliado un bloque hasta que todas sus capacidades estén:
 - No convertir ejemplos de pricing, límites o infraestructura futura en decisiones aprobadas.
 - Crear Issues únicamente para brechas reales priorizadas después de la reconciliación.
 
+## Baseline histórico congelado
+
+El tramo `#1–#8040` se conserva como baseline histórico y **no vuelve a procesarse requisito por requisito**. Su mapa canónico está en `docs/CORPUS-HISTORICAL-BASELINE-1-8040.md`.
+
+Esto no declara implementadas todas las definiciones antiguas. Define una regla de entrada: cualquier bloque histórico que reaparezca se compara semánticamente con las fuentes canónicas; solo contradicciones, requisitos únicos, decisiones ambiguas o posibles brechas P0/P1 justifican lectura adicional.
+
 ## Estado actual
 
-- `#8341–#10000` cuenta con consolidación estructural: 1.660 definiciones → 332 capacidades, preservando rangos.
-- El corpus anterior se recuperará por resúmenes/macrobloques y se incorporará usando identidad de origen para resolver numeración reutilizada.
-- Issue #250 es el tracker de convergencia MVP y no puede cerrarse mientras exista un macrobloque recuperado sin clasificación.
+- `#1–#8040` → baseline histórico congelado; macrobloques recuperables mapeados por significado, sin regeneración masiva.
+- `#8041–#8340` → 300 definiciones históricas reconciliadas en 3 macrobloques en `docs/CORPUS-REQUIREMENTS-8041-8340-CLASSIFICATION.md`; no apareció una nueva brecha P0/P1.
+- `#8341–#10000` → consolidación estructural: 1.660 definiciones → 332 capacidades → 17 dominios, preservando rangos.
+- Issue #250 sigue siendo el tracker de convergencia MVP y no puede cerrarse mientras exista un macrobloque recuperado sin clasificación o una capacidad P0/P1 relevante sin representación canónica.
+
+## Regla de continuidad
+
+A partir de este punto **no se relee ninguno de los tramos ya congelados**. El trabajo histórico restante consiste exclusivamente en incorporar nuevos resúmenes/macrobloques que aparezcan, resolver contradicciones y cerrar brechas P0/P1 demostrables contra el producto real.
