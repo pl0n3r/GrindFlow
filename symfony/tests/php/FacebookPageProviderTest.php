@@ -203,6 +203,51 @@ final class FacebookPageProviderTest extends WebTestCase
         self::assertStringNotContainsString($token, $network->getMessage());
     }
 
+    public function testPublicationRejectsExternalTransactionBeforeProviderIo(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $transport = new FakeFacebookPageTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"should_not_publish"}'],
+        ]);
+        $service = new FacebookPagePublicationService(
+            $db,
+            $this->provider(
+                $organization,
+                'test-facebook-page-token-do-not-log',
+                $transport,
+            ),
+        );
+        $command = new DistributionCommand(
+            $organization,
+            'outer-transaction-'.Uuid::v7()->toRfc4122(),
+            'No publicar dentro de una transacción externa',
+        );
+
+        $db->beginTransaction();
+
+        try {
+            $failure = $this->captureProviderException(
+                fn () => $service->publish($command),
+            );
+
+            self::assertSame(DistributionProviderException::KIND_CONFIGURATION, $failure->kind);
+            self::assertSame(0, $transport->calls);
+            self::assertSame(1, $db->getTransactionNestingLevel());
+        } finally {
+            if ($db->getTransactionNestingLevel() > 0) {
+                $db->rollBack();
+            }
+        }
+
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_external_publication_attempts WHERE organization_id = :organization AND idempotency_key = :key',
+            ['organization' => $organization, 'key' => $command->idempotencyKey],
+        ));
+    }
+
     public function testIdempotencyLedgerPreventsDuplicateProviderCalls(): void
     {
         static::createClient();
@@ -351,6 +396,81 @@ final class FacebookPageProviderTest extends WebTestCase
         ));
     }
 
+    public function testPageChangeRejectsPublishedAndRateLimitedReplayWithoutSecondCall(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $token = 'test-facebook-page-token-do-not-log';
+
+        $publishedTransport = new FakeFacebookPageTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_a_publication"}'],
+        ]);
+        $publishedCommand = new DistributionCommand(
+            $organization,
+            'page-change-published-'.Uuid::v7()->toRfc4122(),
+            'Destino A',
+        );
+        $pageAService = new FacebookPagePublicationService(
+            $db,
+            $this->provider($organization, $token, $publishedTransport, '1111111111'),
+        );
+
+        $pageAService->publish($publishedCommand);
+        self::assertSame(1, $publishedTransport->calls);
+
+        $pageBPublishedTransport = new FakeFacebookPageTransport();
+        $pageBPublishedService = new FacebookPagePublicationService(
+            $db,
+            $this->provider($organization, $token, $pageBPublishedTransport, '2222222222'),
+        );
+        $publishedFailure = $this->captureProviderException(
+            fn () => $pageBPublishedService->publish($publishedCommand),
+        );
+
+        self::assertSame(DistributionProviderException::KIND_REJECTED, $publishedFailure->kind);
+        self::assertSame(0, $pageBPublishedTransport->calls);
+
+        $now = new DateTimeImmutable('2026-10-03 19:00:00', new DateTimeZone('UTC'));
+        $clock = static function () use (&$now): DateTimeImmutable {
+            return $now;
+        };
+        $rateTransport = new FakeFacebookPageTransport([
+            ['status' => 429, 'headers' => ['retry-after' => '120'], 'body' => '{"error":"rate"}'],
+        ]);
+        $rateCommand = new DistributionCommand(
+            $organization,
+            'page-change-rate-'.Uuid::v7()->toRfc4122(),
+            'Rate limited en A',
+        );
+        $ratePageAService = new FacebookPagePublicationService(
+            $db,
+            $this->provider($organization, $token, $rateTransport, '3333333333'),
+            $clock,
+        );
+
+        $rateFailure = $this->captureProviderException(
+            fn () => $ratePageAService->publish($rateCommand),
+        );
+        self::assertSame(DistributionProviderException::KIND_RATE_LIMIT, $rateFailure->kind);
+        self::assertSame(1, $rateTransport->calls);
+
+        $now = $now->modify('+121 seconds');
+        $pageBRateTransport = new FakeFacebookPageTransport();
+        $ratePageBService = new FacebookPagePublicationService(
+            $db,
+            $this->provider($organization, $token, $pageBRateTransport, '4444444444'),
+            $clock,
+        );
+        $pageChangedFailure = $this->captureProviderException(
+            fn () => $ratePageBService->publish($rateCommand),
+        );
+
+        self::assertSame(DistributionProviderException::KIND_REJECTED, $pageChangedFailure->kind);
+        self::assertSame(0, $pageBRateTransport->calls);
+    }
+
     public function testRateLimitLedgerBlocksEarlyRetryAndAllowsOneRetryAfterWindow(): void
     {
         static::createClient();
@@ -420,11 +540,12 @@ final class FacebookPageProviderTest extends WebTestCase
         string $organization,
         string $token,
         FacebookPageTransport $transport,
+        string $pageId = '1234567890',
     ): FacebookPageProvider {
         return new FacebookPageProvider(
             new FacebookPageConfiguration(
                 $organization,
-                '1234567890',
+                $pageId,
                 $token,
                 'v26.0',
             ),
@@ -449,11 +570,14 @@ final class FacebookPageProviderTest extends WebTestCase
         return $id;
     }
 
-    private function fingerprint(DistributionCommand $command): string
-    {
+    private function fingerprint(
+        DistributionCommand $command,
+        string $pageId = '1234567890',
+    ): string {
         return hash('sha256', json_encode([
             'provider' => 'facebook_page',
             'organization_id' => strtolower($command->organizationId),
+            'page_id' => $pageId,
             'message' => $command->message,
             'link' => $command->link,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
