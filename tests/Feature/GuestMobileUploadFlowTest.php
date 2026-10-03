@@ -32,7 +32,7 @@ class GuestMobileUploadFlowTest extends TestCase
         $organization = Organization::factory()->create();
         $token = $this->token($organization, 'ux-preview', maxFiles: 2, maxBytes: 2_097_152);
 
-        $response = $this->get(route('guest.mobile-upload.show', ['token' => $token]));
+        $response = $this->get(route('guest.upload.show', ['token' => $token]));
 
         $response
             ->assertOk()
@@ -54,7 +54,7 @@ class GuestMobileUploadFlowTest extends TestCase
         $organization = Organization::factory()->create();
         $token = $this->token($organization, 'tenant-scope');
 
-        $response = $this->post(route('guest.mobile-upload.store'), [
+        $response = $this->post(route('guest.upload.store'), [
             'grant' => $token,
             'media' => [
                 UploadedFile::fake()->create('mobile.jpg', 4, 'image/jpeg'),
@@ -87,13 +87,13 @@ class GuestMobileUploadFlowTest extends TestCase
 
     public function test_invalid_link_and_invalid_media_fail_closed_with_public_errors(): void
     {
-        $this->get(route('guest.mobile-upload.show', ['token' => 'v1.invalid.signature']))
+        $this->get(route('guest.upload.show', ['token' => 'v1.invalid.signature']))
             ->assertNotFound();
 
         $organization = Organization::factory()->create();
         $token = $this->token($organization, 'invalid-media');
 
-        $this->post(route('guest.mobile-upload.store'), [
+        $this->post(route('guest.upload.store'), [
             'grant' => $token,
             'media' => [
                 UploadedFile::fake()->create('payload.txt', 1, 'text/plain'),
