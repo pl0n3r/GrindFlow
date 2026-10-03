@@ -1,6 +1,6 @@
 # GrindFlow · Clasificación de macrobloques históricos recuperados
 
-> Esta matriz clasifica **resúmenes/macrobloques ya recuperados** en `CORPUS-HISTORICAL-BLOCK-INDEX.md` y `CORPUS-HISTORICAL-RECOVERY-PASS-2.md`. No relee ni reconstruye requisitos individuales y no usa el número como identidad global única.
+> Esta matriz clasifica **resúmenes/macrobloques ya recuperados** en `CORPUS-HISTORICAL-BLOCK-INDEX.md`, `CORPUS-HISTORICAL-RECOVERY-PASS-2.md`, `CORPUS-HISTORICAL-RECOVERY-PASS-3.md` y `CORPUS-CURRENT-SESSION-66-1000-INDEX.md`. No relee ni reconstruye requisitos individuales y no usa el número como identidad global única.
 
 ## Resultado ejecutivo
 
@@ -64,6 +64,21 @@ Los bloques recuperados **no cambian el camino crítico del MVP**. Convergen pri
 - momento de habilitar múltiples cuentas por red;
 - profundidad de funcionalidades de estudios/agencias;
 - alcance de IA generativa y automatización avanzada después del circuito principal.
+
+## Absorción de Pass 3 y serie actual #66–#1000
+
+La tercera pasada histórica y el índice de la serie actual amplían la **procedencia**, pero no añaden una familia crítica nueva:
+
+- scheduling, Distribution, OAuth, receipts y reconciliación → se absorben en **primer conector social real** y scheduling ya construido;
+- backups, DR, object storage, checksums y restore drills → se absorben en **Vault/storage recuperable**;
+- carga móvil, conectividad, background/offline y UX móvil → se absorben en **web móvil usable**, dejando app nativa/offline avanzado post-MVP;
+- dashboards, tracking, UTM, conversiones y reporting → se absorben en **Traffic/métricas básicas**, dejando BI/atribución/experimentos avanzados post-MVP;
+- soporte, status, runbooks, onboarding y activación → se absorben en **onboarding/operación de piloto**;
+- IA, Digital Twins, copilot, tendencias, optimización, self-healing, developer platform, Studio avanzado, marketplace y enterprise → **POST-MVP**;
+- seguridad, privacidad, CI/CD, testing, observabilidad y resiliencia → **baseline operativo/ya cubierto**, salvo evidencia concreta de regresión;
+- billing, pricing, packaging, margen y cuotas comerciales definitivas → **NECESITA DECISIÓN**.
+
+Los huecos de títulos originales señalados en Pass 3 permanecen como **huecos de procedencia**, no como autorización para regenerar requisitos.
 
 ## Conclusión de la pasada
 
