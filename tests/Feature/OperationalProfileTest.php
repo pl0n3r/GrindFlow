@@ -102,6 +102,29 @@ class OperationalProfileTest extends TestCase
         );
     }
 
+    public function test_profile_fails_closed_without_tenant_context(): void
+    {
+        $organization = Organization::factory()->create();
+
+        DB::table('operational_profiles')->insert([
+            'id' => fake()->uuid(),
+            'organization_id' => $organization->id,
+            'name' => 'Hidden without context',
+            'slug' => 'hidden-without-context',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->assertSame(0, OperationalProfile::query()->count());
+
+        $this->expectException(AuthorizationException::class);
+
+        OperationalProfile::query()->create([
+            'name' => 'Created without context',
+            'slug' => 'created-without-context',
+        ]);
+    }
+
     public function test_missing_membership_cannot_enter_profile_tenant_context(): void
     {
         $user = User::factory()->create();
