@@ -47,7 +47,7 @@ final class MobileUploadGrant
         $encoded = self::encode($payload);
         $signature = hash_hmac('sha256', self::VERSION.'.'.$encoded, $this->signingKey, true);
 
-        return self::VERSION.'.'.$encoded . '.' . self::encode($signature);
+        return self::VERSION.'.'.$encoded.'.'.self::encode($signature);
     }
 
     public function validate(string $token, string $organizationId, int $now): array
