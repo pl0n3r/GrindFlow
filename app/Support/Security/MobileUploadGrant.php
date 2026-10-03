@@ -54,6 +54,16 @@ final class MobileUploadGrant
         return self::VERSION.'.'.$encoded.'.'.self::encode($signature);
     }
 
+    /**
+     * @return array{
+     *     scope: string,
+     *     organization_id: string,
+     *     expires_at: int,
+     *     max_files: int,
+     *     max_bytes: int,
+     *     nonce: string
+     * }
+     */
     public function validate(string $token, string $organizationId, int $now): array
     {
         self::identifier($organizationId, 'organization_id');
