@@ -60,7 +60,7 @@ class AgentsVaultIngestionCompactionTests(unittest.TestCase):
         package = json.loads(self.text("package.json"))
         lock = json.loads(self.text("package-lock.json"))
 
-        match = re.search(r"'number'\\s*=>\\s*'([^']+)'", php)
+        match = re.search(r"'number'\s*=>\s*'([^']+)'", php)
         self.assertIsNotNone(match)
         release = match.group(1)
         parts = release.split(".")
