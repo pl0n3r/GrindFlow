@@ -45,9 +45,9 @@ final class MobileUploadGrant
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
         $encoded = self::encode($payload);
-        $signature = hash_hmac('sha256', self::VERSION . '.' . $encoded, $this->signingKey, true);
+        $signature = hash_hmac('sha256', self::VERSION.'.'.$encoded, $this->signingKey, true);
 
-        return self::VERSION . '.' . $encoded . '.' . self::encode($signature);
+        return self::VERSION.'.'.$encoded . '.' . self::encode($signature);
     }
 
     public function validate(string $token, string $organizationId, int $now): array
@@ -64,17 +64,17 @@ final class MobileUploadGrant
 
         [$version, $encoded, $encodedSignature] = $parts;
         $provided = self::decode($encodedSignature);
-        $expected = hash_hmac('sha256', $version . '.' . $encoded, $this->signingKey, true);
-        if (!hash_equals($expected, $provided)) {
+        $expected = hash_hmac('sha256', $version.'.'.$encoded, $this->signingKey, true);
+        if (! hash_equals($expected, $provided)) {
             throw new RuntimeException('Guest upload grant signature invalid.');
         }
 
         $payload = json_decode(self::decode($encoded), true, 16, JSON_THROW_ON_ERROR);
-        if (!is_array($payload) || array_is_list($payload)) {
+        if (! is_array($payload) || array_is_list($payload)) {
             throw new RuntimeException('Guest upload grant payload invalid.');
         }
 
-        $expectedKeys = ['v','scope','organization_id','expires_at','max_files','max_bytes','nonce'];
+        $expectedKeys = ['v', 'scope', 'organization_id', 'expires_at', 'max_files', 'max_bytes', 'nonce'];
         $keys = array_keys($payload);
         sort($keys, SORT_STRING);
         $sortedExpected = $expectedKeys;
@@ -89,14 +89,14 @@ final class MobileUploadGrant
         $maxFiles = $payload['max_files'] ?? null;
         $maxBytes = $payload['max_bytes'] ?? null;
 
-        if (!is_string($tenant) || !is_string($nonce) || !is_int($expiresAt) || !is_int($maxFiles) || !is_int($maxBytes)) {
+        if (! is_string($tenant) || ! is_string($nonce) || ! is_int($expiresAt) || ! is_int($maxFiles) || ! is_int($maxBytes)) {
             throw new RuntimeException('Guest upload grant payload invalid.');
         }
         self::identifier($tenant, 'organization_id');
         self::identifier($nonce, 'nonce');
         self::limits($maxFiles, $maxBytes);
 
-        if (!hash_equals($tenant, $organizationId)) {
+        if (! hash_equals($tenant, $organizationId)) {
             throw new RuntimeException('Guest upload grant tenant mismatch.');
         }
         if ($expiresAt <= $now) {
@@ -127,7 +127,7 @@ final class MobileUploadGrant
             || strlen($value) > 128
             || preg_match('/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/D', $value) !== 1
         ) {
-            throw new InvalidArgumentException($label . ' invalid.');
+            throw new InvalidArgumentException($label.' invalid.');
         }
     }
 
