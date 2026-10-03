@@ -42,6 +42,14 @@ class MediaAsset extends TenantModel
     }
 
     /**
+     * @return BelongsTo<OperationalProfile, $this>
+     */
+    public function profile(): BelongsTo
+    {
+        return $this->belongsTo(OperationalProfile::class, 'profile_id');
+    }
+
+    /**
      * @return BelongsTo<MediaAsset, $this>
      */
     public function duplicateOf(): BelongsTo

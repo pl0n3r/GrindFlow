@@ -58,6 +58,18 @@ final class PrivacyAsCodeTest extends TestCase
             self::assertStringContainsString($field, $vault);
         }
 
+        $mediaVault = $this->treatment($data, 'media_vault');
+        self::assertContains('profile_id', $mediaVault['fields']);
+        self::assertContains('assigned_by_user_id', $mediaVault['fields']);
+        self::assertContains('assigned_at', $mediaVault['fields']);
+
+        $triage = file_get_contents(
+            $this->root().'/database/migrations/2026_10_03_000200_create_vault_triage_items_table.php',
+        );
+        foreach (['profile_id', 'assigned_profile_id', 'assigned_by_user_id', 'assigned_at'] as $field) {
+            self::assertStringContainsString($field, $triage);
+        }
+
         $legacyIdentity = file_get_contents(
             $this->root().'/supabase/migrations/20260101000100_core_tenancy.sql',
         );
@@ -145,10 +157,10 @@ final class PrivacyAsCodeTest extends TestCase
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '97966f83fcbf184518f7c6aaec64c2ae2768f8599eb29726516351880c89ae23',
-            'aviso-privacidad.md' => 'a374a4f6335c3941f5f9ecacf3bc2ba2020ae7859bf68f9a035f53d7edf61434',
+            'politica-tratamiento.md' => '85e24efddeec3193fe8ae5d8a9ce0f204b49f5af3fd967b95e9afee156e9593b',
+            'aviso-privacidad.md' => '12d002a416578fe5040874aeb64d7db8c10e4dc2479c0e73d9bde30736359787',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
-            'registro-tratamientos.md' => 'afd34e0eaa59f697aa88d5dc47e005c6d4bea8ca80146c650c1758ffcdda1e7e',
+            'registro-tratamientos.md' => '81c3243808316e7eb7d7675977923170db19609dfcee974369b648daf6958096',
             'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
             'retencion.md' => '83f2248f31c9be19494303c146a1942ff65ec686be81de907fea3fe4a7d8ba23',
         ];
