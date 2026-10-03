@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "AGENTS.md"
 CANONICAL = ROOT / "docs/AGENT-MEDIA-CONNECTIONS.md"
+VAULT_UPLOADS = ROOT / "docs/AGENT-VAULT-UPLOADS.md"
 VERSION = ROOT / "config/version.php"
 PACKAGE = ROOT / "package.json"
 LOCK = ROOT / "package-lock.json"
@@ -67,12 +68,19 @@ class AgentsMediaConnectionsCompactionTests(unittest.TestCase):
         for invariant in invariants:
             self.assertIn(invariant, canonical)
 
-    def test_direct_upload_rules_remain_in_agents(self):
+    def test_direct_upload_rules_remain_outside_media_connections(self):
         agents = AGENTS.read_text(encoding="utf-8")
         canonical = CANONICAL.read_text(encoding="utf-8")
+        vault_uploads = VAULT_UPLOADS.read_text(encoding="utf-8")
 
-        self.assertEqual(agents.count(DIRECT_UPLOAD_HEADING), 1)
         self.assertNotIn(DIRECT_UPLOAD_HEADING, canonical)
+        self.assertEqual(agents.count(DIRECT_UPLOAD_HEADING), 0)
+        self.assertEqual(vault_uploads.count(DIRECT_UPLOAD_HEADING), 1)
+        self.assertEqual(
+            agents.count(DIRECT_UPLOAD_HEADING)
+            + vault_uploads.count(DIRECT_UPLOAD_HEADING),
+            1,
+        )
 
     def test_release_identity_matches_across_manifests(self):
         version_text = VERSION.read_text(encoding="utf-8")
