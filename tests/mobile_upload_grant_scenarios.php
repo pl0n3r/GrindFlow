@@ -1,7 +1,8 @@
 <?php
+
 declare(strict_types=1);
 
-require __DIR__ . '/../app/Support/Security/MobileUploadGrant.php';
+require __DIR__.'/../app/Support/Security/MobileUploadGrant.php';
 
 use App\Support\Security\MobileUploadGrant;
 
