@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import os
 import subprocess
+import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +23,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             '[[ -L "$current" ]]',
             'case "$release" in',
             'release="$(readlink -f "$current")"',
-            'php_bin="/opt/alt/php85/usr/bin/php"',
+            'php_bin="${3:-/opt/alt/php85/usr/bin/php}"',
             '-f vendor/autoload.php',
             "database dump utility is unavailable",
             "pending migration count changed",
@@ -63,8 +65,116 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn("umask 077", script)
         self.assertIn("gzip -t", script)
         self.assertIn('chmod 600 "$tmp_archive"', script)
-        self.assertIn('mv -f "$tmp_archive" "$archive_path"', script)
+        self.assertIn('ln -- "$tmp_archive" "$archive_path"', script)
+        self.assertNotIn('mv -f "$tmp_archive" "$archive_path"', script)
         self.assertNotIn("actions/upload-artifact", script)
+
+    def test_remote_backup_behavior_is_unique_verified_and_cleans_failed_receipt(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
+        fingerprint = "a" * 64
+        receipt = "b" * 64
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            root = tmp_path / "release-root"
+            release = root / "releases" / "r1"
+            (release / "bootstrap").mkdir(parents=True)
+            (release / "vendor").mkdir()
+            for relative in ("artisan", "bootstrap/app.php", "vendor/autoload.php"):
+                (release / relative).write_text("fixture\n", encoding="utf-8")
+            (root / "current").symlink_to(release, target_is_directory=True)
+
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_php = fake_bin / "php"
+            fake_php.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    set -euo pipefail
+                    if [[ "${1:-}" == "-r" ]]; then
+                      code="${2:-}"
+                      shift 2
+                      if [[ "$code" == *"MigrationReadiness::class"* ]]; then
+                        printf '1|%s' "$FAKE_FINGERPRINT"
+                        exit 0
+                      fi
+                      if [[ "$code" == *"database.connections."* ]]; then
+                        credentials="$1"
+                        database_file="$2"
+                        printf '[client]\\nhost="localhost"\\nport=3306\\nuser="fixture"\\npassword="fixture"\\n' > "$credentials"
+                        printf 'grindflow_test' > "$database_file"
+                        chmod 600 "$credentials" "$database_file"
+                        exit 0
+                      fi
+                    fi
+                    if [[ "${1:-}" == "artisan" && "${2:-}" == "operations:record-db-backup" ]]; then
+                      [[ "${FAKE_RECEIPT_FAIL:-0}" != "1" ]] || exit 75
+                      printf '%s\\n' "$FAKE_RECEIPT"
+                      exit 0
+                    fi
+                    exit 76
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake_php.chmod(0o755)
+
+            fake_dump = fake_bin / "mariadb-dump"
+            fake_dump.write_text(
+                "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' '-- deterministic fixture' 'CREATE TABLE fixture (id INT);'\n",
+                encoding="utf-8",
+            )
+            fake_dump.chmod(0o755)
+
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "FAKE_FINGERPRINT": fingerprint,
+                "FAKE_RECEIPT": receipt,
+            }
+
+            def run_remote(*, fail_receipt: bool = False):
+                attempt_env = {**env, "FAKE_RECEIPT_FAIL": "1" if fail_receipt else "0"}
+                return subprocess.run(
+                    ["/bin/bash", "-s", "--", str(root), "1", str(fake_php)],
+                    input=remote,
+                    env=attempt_env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+            first = run_remote()
+            second = run_remote()
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(second.returncode, 0, second.stderr)
+
+            def archive_from(result):
+                values = dict(line.split("=", 1) for line in result.stdout.splitlines())
+                self.assertEqual(values["BACKUP_RECEIPT"], receipt)
+                self.assertEqual(values["MIGRATION_FINGERPRINT"], fingerprint)
+                return values["BACKUP_ARCHIVE"]
+
+            first_archive = archive_from(first)
+            second_archive = archive_from(second)
+            self.assertNotEqual(first_archive, second_archive)
+
+            backup_dir = release / "storage/app/private/operations/database-backups"
+            before_failure = sorted(path.name for path in backup_dir.glob("*.sql.gz"))
+            self.assertEqual(len(before_failure), 2)
+            for name in before_failure:
+                archive = backup_dir / name
+                self.assertEqual(archive.stat().st_mode & 0o777, 0o600)
+                gzip_test = subprocess.run(["gzip", "-t", str(archive)], check=False)
+                self.assertEqual(gzip_test.returncode, 0)
+
+            failed = run_remote(fail_receipt=True)
+            self.assertNotEqual(failed.returncode, 0)
+            after_failure = sorted(path.name for path in backup_dir.glob("*.sql.gz"))
+            self.assertEqual(after_failure, before_failure)
+            self.assertEqual(list(backup_dir.glob(".tmp-*.sql.gz")), [])
 
     def test_database_credentials_never_leave_remote_host(self):
         script = SCRIPT.read_text(encoding="utf-8")
@@ -73,6 +183,10 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         remote = script[remote_start:]
         self.assertIn('config("database.connections.".$default)', remote)
         self.assertIn('--defaults-extra-file="$credentials"', remote)
+        self.assertIn("$escaped = strtr($value", remote)
+        self.assertIn('chr(8) => "\\\\b"', remote)
+        self.assertNotIn("json_encode(", remote)
+        self.assertNotIn("str_replace(", remote)
         self.assertIn('chmod 600 "$credentials" "$database_file"', remote)
         self.assertNotIn("DB_PASSWORD", script)
         self.assertNotIn("set -x", script)
@@ -92,7 +206,11 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         script = SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("github.actor == github.repository_owner", workflow)
+        self.assertIn(
+            "github.actor == github.repository_owner && github.triggering_actor == github.repository_owner",
+            workflow,
+        )
+        self.assertIn("production-backup-receipt-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
         self.assertIn("run-production-backup.sh", workflow)
         self.assertIn("retention-days: 1", workflow)
         job_header = workflow.split("    steps:", 1)[0]
