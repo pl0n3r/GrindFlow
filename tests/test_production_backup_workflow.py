@@ -6,6 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/run-production-backup.sh"
 WORKFLOW = ROOT / ".github/workflows/production-backup.yml"
+CI = ROOT / ".github/workflows/grindflow-ci.yml"
 
 
 class ProductionBackupWorkflowTests(unittest.TestCase):
@@ -68,6 +69,10 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertNotIn("artisan migrate", script)
         self.assertNotIn("/admin/system/migrations", script)
         self.assertNotIn("curl ", script)
+
+        ci = CI.read_text(encoding="utf-8")
+        invocation = "[[ -f tests/test_production_backup_workflow.py ]] && python3 -m unittest tests/test_production_backup_workflow.py"
+        self.assertEqual(ci.count(invocation), 1)
 
 
 if __name__ == "__main__":
