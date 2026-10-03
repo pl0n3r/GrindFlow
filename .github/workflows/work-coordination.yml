@@ -139,3 +139,21 @@ jobs:
     with:
       operation: sweep
       profile: es
+
+  post-merge-exact-main-ci:
+    name: CI exact-main post-merge
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch GrindFlow CI on exact main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run grindflow-ci.yml --ref main
