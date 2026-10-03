@@ -23,7 +23,7 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("Dominios: **17**", source)
 
         capacity_lines = re.findall(
-            r"^- \\*\\*#\\d+–#\\d+ · .+\\*\\*$",
+            r"^- \*\*#\d+–#\d+ · .+\*\*$",
             source,
             flags=re.MULTILINE,
         )
@@ -47,7 +47,7 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
 
         seen = set()
         for row in rows:
-            match = re.search(r"\\| \\*\\*(.+?)\\*\\* \\|", row)
+            match = re.search(r"\| \*\*(.+?)\*\* \|", row)
             self.assertIsNotNone(match, row)
             classification = match.group(1)
             self.assertIn(classification, allowed, row)
@@ -105,7 +105,7 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         package_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 
-        match = re.search(r"'number'\\s*=>\\s*'([^']+)'", config)
+        match = re.search(r"'number'\s*=>\s*'([^']+)'", config)
         self.assertIsNotNone(match)
         php_version = match.group(1)
 
