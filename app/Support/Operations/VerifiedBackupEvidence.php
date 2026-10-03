@@ -10,6 +10,8 @@ final class VerifiedBackupEvidence
 {
     public const int MAX_AGE_SECONDS = 900;
 
+    private const string LATEST_POINTER_DIRECTORY = 'operations/database-backups/latest';
+
     public function record(string $archiveRelativePath, string $migrationFingerprint): string
     {
         $this->assertFingerprint($migrationFingerprint);
@@ -46,7 +48,43 @@ final class VerifiedBackupEvidence
             throw new RuntimeException('Database backup receipt could not be secured.');
         }
 
+        try {
+            $this->writeLatestPointer($receiptId, $migrationFingerprint);
+        } catch (RuntimeException $exception) {
+            $disk->delete($receiptRelativePath);
+
+            throw $exception;
+        }
+
         return $receiptId;
+    }
+
+    public function assertLatestValidForFingerprint(string $migrationFingerprint): void
+    {
+        $this->assertFingerprint($migrationFingerprint);
+
+        $disk = Storage::disk('local');
+        $pointerRelativePath = self::LATEST_POINTER_DIRECTORY."/{$migrationFingerprint}.ref";
+        $pointerPath = $disk->path($pointerRelativePath);
+
+        if (! is_file($pointerPath) || is_link($pointerPath)) {
+            throw new RuntimeException('Verified database backup pointer is missing or unsafe.');
+        }
+
+        $size = filesize($pointerPath);
+
+        if ($size === false || $size < 64 || $size > 65) {
+            throw new RuntimeException('Verified database backup pointer is malformed.');
+        }
+
+        $raw = file_get_contents($pointerPath);
+        $receiptId = is_string($raw) ? trim($raw) : '';
+
+        if (preg_match('/\\A[a-f0-9]{64}\\z/', $receiptId) !== 1) {
+            throw new RuntimeException('Verified database backup pointer is malformed.');
+        }
+
+        $this->assertValid($receiptId, $migrationFingerprint);
     }
 
     public function assertValid(string $receiptId, string $migrationFingerprint): void
@@ -106,6 +144,55 @@ final class VerifiedBackupEvidence
 
         if ($actualHash === false || ! hash_equals($payload['archive_sha256'], $actualHash)) {
             throw new RuntimeException('Verified database backup archive checksum does not match.');
+        }
+    }
+
+    private function writeLatestPointer(string $receiptId, string $migrationFingerprint): void
+    {
+        $disk = Storage::disk('local');
+        $directory = $disk->path(self::LATEST_POINTER_DIRECTORY);
+
+        if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('Verified database backup pointer directory could not be created.');
+        }
+
+        if (! is_dir($directory) || is_link($directory) || @chmod($directory, 0700) === false) {
+            throw new RuntimeException('Verified database backup pointer directory is unsafe.');
+        }
+
+        $pointerPath = $directory."/{$migrationFingerprint}.ref";
+
+        if (is_link($pointerPath)) {
+            throw new RuntimeException('Verified database backup pointer is unsafe.');
+        }
+
+        $temporaryPath = tempnam($directory, '.tmp-receipt-');
+
+        if ($temporaryPath === false) {
+            throw new RuntimeException('Verified database backup pointer could not be staged.');
+        }
+
+        try {
+            if (
+                file_put_contents($temporaryPath, $receiptId."\n", LOCK_EX) === false
+                || @chmod($temporaryPath, 0600) === false
+            ) {
+                throw new RuntimeException('Verified database backup pointer could not be secured.');
+            }
+
+            if (@rename($temporaryPath, $pointerPath) === false) {
+                throw new RuntimeException('Verified database backup pointer could not be published.');
+            }
+
+            if (! is_file($pointerPath) || is_link($pointerPath) || @chmod($pointerPath, 0600) === false) {
+                @unlink($pointerPath);
+
+                throw new RuntimeException('Verified database backup pointer could not be secured.');
+            }
+        } finally {
+            if (is_file($temporaryPath)) {
+                @unlink($temporaryPath);
+            }
         }
     }
 
