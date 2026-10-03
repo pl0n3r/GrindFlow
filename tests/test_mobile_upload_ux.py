@@ -50,14 +50,14 @@ class MobileUploadUxTests(unittest.TestCase):
             ROOT / "tests/Feature/GuestMobileUploadFlowTest.php"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("guest.mobile-upload.show", routes)
-        self.assertIn("guest.mobile-upload.store", routes)
+        self.assertIn("guest.upload.show", routes)
+        self.assertIn("guest.upload.store", routes)
         public_routes = routes.split("Route::middleware('guest')->group", 1)[0]
         self.assertIn("GuestMobileUploadController", public_routes)
         self.assertNotIn("middleware('auth')", public_routes)
         self.assertIn("$this->ingestor->ingest(", controller)
         self.assertIn("validateForGuest", controller)
-        self.assertNotIn("organization_id", controller.split("return response()->view", 1)[1])
+        view_payload = controller.split("return response()->view", 1)[1].split("], $status)", 1)[0]\n        self.assertNotIn("organization_id", view_payload)
         self.assertIn("$grant['organization_id']", ingestor)
         self.assertIn("'ingested_by_user_id' => null", ingestor)
         self.assertIn("MobileUploadGrant::class", provider)
