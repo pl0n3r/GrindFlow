@@ -343,31 +343,7 @@ production content.
 
 ## Migration requirements
 
-### GF-MIG-001 — Laravel foundation
-**Status:** validated-in-code
-
-A Laravel 13 application using PHP 8.5 and MariaDB can install, boot and pass
-the fast/test/database CI gates.
-
-The MariaDB target is validated by the real MariaDB CI database gate.
-
-### GF-MIG-002 — Identity and organizations
-**Status:** validated-in-code
-
-Authentication, roles and organization isolation are migrated to the MariaDB
-target and covered by negative cross-tenant tests before dependent modules move.
-
-The MariaDB tenant-isolation contract is validated by negative application
-tests plus MariaDB-specific integrity tests.
-
-### GF-MIG-003 — Module parity
-Each legacy module receives a parity checklist and targeted regression tests
-before the old implementation is removed.
-
-### GF-MIG-004 — Legacy retirement
-Node/Next/TypeScript application dependencies are removed only after all
-required modules have reached validated-in-code parity.
-
+> **Historia de migración Laravel:** los requisitos históricos `GF-MIG-001` a `GF-MIG-004` viven de forma canónica en [`MIGRATION-LARAVEL.md`](MIGRATION-LARAVEL.md#requisitos-históricos-gf-mig-001004). Los requisitos funcionales vigentes permanecen en este documento.
 
 ### GF-FR-006B — Tenant-scoped daily Traffic CSV
 **Status:** implemented
