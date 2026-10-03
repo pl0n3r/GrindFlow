@@ -43,10 +43,12 @@ set -euo pipefail
 
 root="$1"
 expected_pending="$2"
+php_bin="/opt/alt/php85/usr/bin/php"
 current="$root/current"
 
+[[ -x "$php_bin" ]] || { echo "production PHP 8.5 CLI is unavailable" >&2; exit 19; }
 [[ -L "$current" ]] || { echo "production current release is unavailable" >&2; exit 20; }
-release="$(readlink "$current")"
+release="$(readlink -f "$current")"
 case "$release" in
   "$root"/releases/*) ;;
   *) echo "production current release is outside the release root" >&2; exit 21 ;;
@@ -56,7 +58,7 @@ cd "$release"
 [[ -f artisan && -f bootstrap/app.php ]] || { echo "Laravel runtime is unavailable" >&2; exit 23; }
 
 snapshot="$(
-  php -r '
+  "$php_bin" -r '
     $app = require "bootstrap/app.php";
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $snapshot = $app->make(App\Support\Operations\MigrationReadiness::class)->snapshot();
@@ -82,7 +84,7 @@ cleanup_remote() {
 trap cleanup_remote EXIT
 chmod 600 "$credentials" "$database_file"
 
-php -r '
+"$php_bin" -r '
   $app = require "bootstrap/app.php";
   $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
   $default = (string) config("database.default");
@@ -106,11 +108,10 @@ php -r '
       exit(2);
   }
   $quote = static function (string $value): string {
-      return """.str_replace(
-          ["\\", """, "\n", "\r"],
-          ["\\\\", "\\"", "", ""],
-          $value,
-      ).""";
+      return json_encode(
+          str_replace(["\n", "\r"], "", $value),
+          JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+      );
   };
   $content = "[client]\n"
       ."host=".$quote($host)."\n"
@@ -147,7 +148,7 @@ mv -f "$tmp_archive" "$archive_path"
 tmp_archive=""
 [[ -f "$archive_path" && ! -L "$archive_path" ]] || { echo "database backup archive is unsafe" >&2; exit 31; }
 
-receipt="$(php artisan operations:record-db-backup "$archive_relative" "$fingerprint" --no-interaction 2>/dev/null)"
+receipt="$("$php_bin" artisan operations:record-db-backup "$archive_relative" "$fingerprint" --no-interaction 2>/dev/null)"
 [[ "$receipt" =~ ^[0-9a-f]{64}$ ]] || { echo "verified backup receipt was not created" >&2; exit 32; }
 
 printf 'BACKUP_RECEIPT=%s\n' "$receipt"
