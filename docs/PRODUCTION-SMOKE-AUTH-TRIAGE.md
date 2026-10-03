@@ -57,3 +57,56 @@ printf '%s\n' \
 
 El resultado del ejemplo demuestra solo el formateo del diagnóstico. No es un
 reporte de producción ni un intento de login.
+
+
+## Diagnóstico de Production Migration
+
+El workflow de migración y el Production Smoke deben usar la misma identidad
+sintética dedicada: `e2e-oidc-smoke@grindflow.test`. Production Smoke la
+reconcilia mediante el bootstrap OIDC y la deja como `platform_role=admin`
+sin memberships. La identidad legacy `e2e-admin@grindflow.test` no es una
+fuente válida para inferir el estado de esa cuenta dedicada.
+
+La ruta `/admin/system` está detrás de `auth`; además, el controlador devuelve
+403 cuando la sesión sí existe pero el usuario no es platform admin. Por eso el
+runner de migración clasifica de forma fail-closed:
+
+| Código | Señal | Interpretación permitida |
+| --- | --- | --- |
+| `login_failed` | el POST de login no devuelve 302/303 | el login fue rechazado; no inferir contraseña ni existencia de cuenta |
+| `login_session_not_persisted` | login 302/303 y luego Admin System 302/303 | la sesión no quedó aceptada por la ruta protegida |
+| `admin_system_access_denied` | Admin System 401/403 | existe respuesta de autorización denegada; no ejecutar migración |
+| `admin_system_unavailable` | red o cualquier otra respuesta no-200 | Admin System no es utilizable para la operación |
+
+Los códigos y mensajes son fijos. Cookies, contraseña, HTML remoto y headers no
+se copian al JSON de resultado ni a stdout/stderr.
+
+### Migración manual sin SSH
+
+La migración sigue siendo una acción explícita del dueño. El comando de
+migración, una vez cumplida la evidencia de backup server-side para el
+fingerprint exacto, es:
+
+```bash
+gh workflow run production-migration.yml --repo pl0n3r/GrindFlow --ref main -f expected_pending=<N>
+```
+
+Ese comando **no crea ni sustituye el backup**. Antes de lanzarlo debe existir
+un backup nativo/restaurable de Hostinger. Cuando la política requiera receipt
+server-side, el archivo `.sql.gz` verificado debe estar en el almacenamiento
+local permitido de la app y registrarse desde el Terminal de hPanel —sin SSH—
+con:
+
+```bash
+php artisan operations:record-db-backup operations/database-backups/<archivo>.sql.gz <fingerprint-64-hex>
+```
+
+El receipt dura como máximo 15 minutos y queda ligado al fingerprint y checksum
+del archivo. Una copia de hPanel, un comentario o un booleano sin archivo
+verificable no satisfacen la política. Si falta el receipt, el controlador
+falla cerrado antes de ejecutar `migrate`.
+
+En un run fallido, el resumen del workflow muestra
+`Verified backup evidence: no ejecutado`; solo un run de migración exitoso
+puede mostrar `resolved and validated server-side`. Esto evita convertir un
+paso no alcanzado en evidencia operativa.
