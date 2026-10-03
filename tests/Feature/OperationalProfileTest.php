@@ -18,6 +18,7 @@ class OperationalProfileTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Prove profile identity is independent from membership and tenant-scoped. */
     public function test_profile_identity_is_distinct_from_membership_and_tenant_scoped(): void
     {
         $user = User::factory()->create();
@@ -59,6 +60,7 @@ class OperationalProfileTest extends TestCase
         $this->assertFalse(Schema::hasColumn('operational_profiles', 'user_id'));
     }
 
+    /** Prove cross-tenant writes and missing membership fail closed. */
     public function test_profile_access_rejects_cross_tenant_and_missing_membership(): void
     {
         $user = User::factory()->create();
@@ -102,6 +104,7 @@ class OperationalProfileTest extends TestCase
         );
     }
 
+    /** Prove reads and creates fail closed when no tenant context exists. */
     public function test_profile_fails_closed_without_tenant_context(): void
     {
         $organization = Organization::factory()->create();
@@ -125,6 +128,7 @@ class OperationalProfileTest extends TestCase
         ]);
     }
 
+    /** Prove a user without membership cannot enter the profile tenant context. */
     public function test_missing_membership_cannot_enter_profile_tenant_context(): void
     {
         $user = User::factory()->create();
