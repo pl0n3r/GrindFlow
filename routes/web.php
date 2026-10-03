@@ -65,14 +65,14 @@ Route::get('/l/{token}', TrackedLinkRedirectController::class)
     ->where('token', '[A-Za-z0-9]{22}')
     ->name('traffic.redirect');
 
-Route::get('/mobile-upload/{token}', [GuestMobileUploadController::class, 'show'])
+Route::get('/guest-upload/{token}', [GuestMobileUploadController::class, 'show'])
     ->middleware('throttle:60,1')
     ->where('token', '[A-Za-z0-9._-]+')
-    ->name('guest.mobile-upload.show');
+    ->name('guest.upload.show');
 
-Route::post('/mobile-upload', [GuestMobileUploadController::class, 'store'])
+Route::post('/guest-upload', [GuestMobileUploadController::class, 'store'])
     ->middleware('throttle:12,1')
-    ->name('guest.mobile-upload.store');
+    ->name('guest.upload.store');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])
