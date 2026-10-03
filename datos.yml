@@ -147,6 +147,8 @@
       "fields": [
         "ingested_by_user_id",
         "profile_id",
+        "assigned_at",
+        "assigned_by_user_id",
         "original_filename",
         "source_type",
         "source_ref",
