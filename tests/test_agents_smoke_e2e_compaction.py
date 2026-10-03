@@ -64,10 +64,13 @@ class AgentsSmokeE2ECompactionTests(unittest.TestCase):
 
         match = re.search(r"'number'\s*=>\s*'([^']+)'", php)
         self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), "0.1.173")
-        self.assertEqual(package["version"], "0.1.173")
-        self.assertEqual(lock["version"], "0.1.173")
-        self.assertEqual(lock["packages"][""]["version"], "0.1.173")
+        release = match.group(1)
+        parts = release.split(".")
+        self.assertEqual(len(parts), 3)
+        self.assertTrue(all(part.isdigit() for part in parts))
+        self.assertEqual(package["version"], release)
+        self.assertEqual(lock["version"], release)
+        self.assertEqual(lock["packages"][""]["version"], release)
 
 
 if __name__ == "__main__":
