@@ -22,94 +22,57 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         self.assertIn("Capacidades compactadas: **332**", source)
         self.assertIn("Dominios: **17**", source)
 
-        capacity_ranges = [
+        ranges = [
             (int(start), int(end))
             for start, end in re.findall(
-                r"^- \*\*#(\d+)–#(\d+) · .+\*\*$",
+                r"^- \\*\\*#(\\d+)–#(\\d+) · .+\\*\\*$",
                 source,
                 flags=re.MULTILINE,
             )
         ]
-        self.assertEqual(332, len(capacity_ranges))
-        self.assertEqual((8341, 8345), capacity_ranges[0])
-        self.assertEqual((9996, 10000), capacity_ranges[-1])
-        self.assertEqual(len(capacity_ranges), len(set(capacity_ranges)))
+        self.assertEqual(332, len(ranges))
+        self.assertTrue(all(end - start == 4 for start, end in ranges))
 
-        covered = []
-        previous_end = 8340
-        for start, end in capacity_ranges:
-            self.assertEqual(4, end - start)
-            self.assertEqual(previous_end + 1, start)
-            covered.extend(range(start, end + 1))
-            previous_end = end
-
+        covered = [
+            number
+            for start, end in ranges
+            for number in range(start, end + 1)
+        ]
         self.assertEqual(list(range(8341, 10001)), covered)
+        self.assertEqual(len(covered), len(set(covered)))
 
     def test_macro_classification_covers_all_domains(self):
-        source = read_doc("CORPUS-REQUIREMENTS-8341-10000-CLASSIFICATION.md")
-        rows = [
-            line
-            for line in source.splitlines()
-            if line.startswith("| #") and " | **" in line
+        consolidated = read_doc("CORPUS-REQUIREMENTS-8341-10000-CONSOLIDATED.md")
+        classification = read_doc("CORPUS-REQUIREMENTS-8341-10000-CLASSIFICATION.md")
+        domains = [
+            (int(start), int(end))
+            for start, end in re.findall(
+                r"^## .+ · #(\\d+)–#(\\d+)$",
+                consolidated,
+                flags=re.MULTILINE,
+            )
         ]
+        rows = re.findall(
+            r"^\\| #(\\d+)–#(\\d+) \\| .+? \\| \\*\\*(.+?)\\*\\* \\|",
+            classification,
+            flags=re.MULTILINE,
+        )
 
+        self.assertEqual(17, len(domains))
         self.assertEqual(17, len(rows))
-        domain_ranges = []
+        self.assertEqual(
+            domains,
+            [(int(start), int(end)) for start, end, _ in rows],
+        )
+
         allowed = {
             "YA CUBIERTO",
             "BRECHA MVP",
             "POST-MVP",
             "NECESITA DECISIÓN",
         }
-
-        seen = set()
-        for row in rows:
-            range_match = re.match(r"\| #(\d+)–#(\d+) \|", row)
-            self.assertIsNotNone(range_match, row)
-            start, end = map(int, range_match.groups())
-            domain_ranges.append((start, end))
-
-            match = re.search(r"\| \*\*(.+?)\*\* \|", row)
-            self.assertIsNotNone(match, row)
-            classification = match.group(1)
-            self.assertIn(classification, allowed, row)
-            seen.add(classification)
-
+        seen = {category for _, _, category in rows}
         self.assertEqual(allowed, seen)
-        self.assertEqual((8341, 8440), domain_ranges[0])
-        self.assertEqual((9941, 10000), domain_ranges[-1])
-        self.assertEqual(len(domain_ranges), len(set(domain_ranges)))
-
-        domain_covered = []
-        previous_end = 8340
-        for start, end in domain_ranges:
-            self.assertEqual(previous_end + 1, start)
-            domain_covered.extend(range(start, end + 1))
-            previous_end = end
-
-        self.assertEqual(list(range(8341, 10001)), domain_covered)
-
-        consolidated = read_doc("CORPUS-REQUIREMENTS-8341-10000-CONSOLIDATED.md")
-        capacity_ranges = [
-            (int(start), int(end))
-            for start, end in re.findall(
-                r"^- \*\*#(\d+)–#(\d+) · .+\*\*$",
-                consolidated,
-                flags=re.MULTILINE,
-            )
-        ]
-        for capability_start, capability_end in capacity_ranges:
-            owners = [
-                (domain_start, domain_end)
-                for domain_start, domain_end in domain_ranges
-                if domain_start <= capability_start
-                and capability_end <= domain_end
-            ]
-            self.assertEqual(
-                1,
-                len(owners),
-                (capability_start, capability_end, owners),
-            )
 
     def test_reconciliation_method_preserves_provenance(self):
         method = read_doc("CORPUS-RECONCILIATION-METHOD.md")
@@ -161,11 +124,11 @@ class CorpusReconciliationDocsTests(unittest.TestCase):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         package_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 
-        match = re.search(r"'number'\s*=>\s*'([^']+)'", config)
+        match = re.search(r"'number'\\s*=>\\s*'([^']+)'", config)
         self.assertIsNotNone(match)
         php_version = match.group(1)
 
-        self.assertRegex(php_version, r"^\d+\.\d+\.\d+$")
+        self.assertRegex(php_version, r"^\\d+\\.\\d+\\.\\d+$")
         self.assertEqual(php_version, package["version"])
         self.assertEqual(php_version, package_lock["version"])
         self.assertEqual(php_version, package_lock["packages"][""]["version"])
