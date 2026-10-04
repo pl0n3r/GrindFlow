@@ -4,8 +4,9 @@
 declare(strict_types=1);
 
 /**
- * Read-only target-environment probe for the first image-only pilot path.
+ * Read-only CLI diagnostic for the first image-only pilot path.
  * It never prints filesystem paths, secrets, hashes or media metadata.
+ * Target readiness must be observed through the authenticated web-runtime probe.
  */
 function result(string $status): string
 {
@@ -94,7 +95,7 @@ $payload = [
     'contract' => 'media-pilot-readiness-v1',
     'status' => result($ready ? 'ready' : 'not_ready'),
     'checks' => array_map(static fn (bool $ok): string => result($ok ? 'ready' : 'not_ready'), $checks),
-    'evidence_scope' => 'observed_target_environment',
+    'evidence_scope' => 'cli_diagnostic',
     'ci_equivalent' => false,
 ];
 

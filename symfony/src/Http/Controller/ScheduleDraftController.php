@@ -28,6 +28,47 @@ use Symfony\Component\Uid\Uuid;
  */
 final class ScheduleDraftController extends AbstractController
 {
+    /** Observe media prerequisites inside the same web runtime used by publishFacebook(). */
+    #[Route(
+        '/api/admin/schedules/media-readiness',
+        name: 'grindflow_schedule_media_readiness',
+        methods: ['GET'],
+    )]
+    public function mediaReadiness(
+        Request $request,
+        MembershipContext $memberships,
+        PrivateVaultDirectory $vaultDirectory,
+        VaultPhotoSafetyMaterializer $photoSafety,
+    ): JsonResponse {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'schedule_management_forbidden', 'Tu rol no permite verificar readiness multimedia.');
+        }
+
+        $vaultRoot = '';
+        try {
+            $vaultRoot = $vaultDirectory->root();
+        } catch (\Throwable) {
+            // Empty root keeps the private-vault check fail-closed without exposing paths.
+        }
+        $checks = $photoSafety->runtimeReadiness($vaultRoot);
+        $ready = !in_array(false, $checks, true);
+
+        return $this->privateJson(['data' => [
+            'contract' => 'media-pilot-readiness-v1',
+            'status' => $ready ? 'ready' : 'not_ready',
+            'checks' => array_map(
+                static fn (bool $ok): string => $ok ? 'ready' : 'not_ready',
+                $checks,
+            ),
+            'evidence_scope' => 'web_runtime',
+            'ci_equivalent' => false,
+        ]]);
+    }
+
     /** Read a bounded tenant-scoped agenda, including cancelled draft history. */
     #[Route('/api/admin/schedules', name: 'grindflow_schedule_drafts_list', methods: ['GET'])]
     public function list(

@@ -59,25 +59,33 @@ Para incorporarlo se requerirá evidencia del entorno objetivo de FFmpeg/ffprobe
 
 ## Readiness del entorno objetivo
 
-Después de un deploy autorizado se ejecuta, desde el runtime objetivo:
+El probe CLI sirve únicamente como diagnóstico de build-ahead:
 
 ```bash
 php scripts/media-pilot-readiness.php
 ```
 
-El probe es **read-only respecto del producto**: no crea assets, no modifica DB, no publica y no llama providers. Observa únicamente:
+Su salida usa `evidence_scope=cli_diagnostic`. Aunque devuelva `ready`, **no acredita el runtime web** y nunca basta para cerrar #307 ni para declarar el hosting listo, porque CLI y PHP-FPM pueden tener extensiones, `memory_limit`, directorio temporal o permisos distintos.
+
+Después de un deploy autorizado, la evidencia objetivo debe obtenerse desde el **mismo runtime web que ejecuta `publishFacebook()`**, mediante una sesión administrativa autenticada y tenant seleccionado:
+
+```text
+GET /api/admin/schedules/media-readiness
+```
+
+El endpoint es read-only respecto del producto y providers: no crea assets, no modifica DB, no publica y no llama Facebook. Verifica en ese proceso web:
 
 - decoder GD requerido para JPEG/PNG;
 - directorio temporal disponible y writable;
 - Vault privado resoluble, legible, no symlink y con permisos privados.
 
-La salida JSON solo expone `ready/not_ready`; **no imprime paths, secretos, hashes ni metadata de archivos**. Ejemplo de forma, no evidencia real:
+La respuesta solo expone `ready/not_ready`; **no imprime paths, secretos, hashes ni metadata de archivos**. Forma esperada:
 
 ```json
-{"contract":"media-pilot-readiness-v1","status":"ready","checks":{"decoder":"ready","temporary_storage":"ready","private_vault":"ready"},"evidence_scope":"observed_target_environment","ci_equivalent":false}
+{"data":{"contract":"media-pilot-readiness-v1","status":"ready","checks":{"decoder":"ready","temporary_storage":"ready","private_vault":"ready"},"evidence_scope":"web_runtime","ci_equivalent":false}}
 ```
 
-Un resultado de CI sobre este script o sus tests **no acredita el hosting**. El cierre operativo de #307 requiere una ejecución observada después del deploy autorizado sobre el entorno objetivo.
+Ausencia del endpoint, autenticación inválida, estado `not_ready`, error o evidencia stale ⇒ `BLOCKED_TARGET_ENV`. El cierre operativo de #307 requiere una observación `web_runtime` después del deploy autorizado; CI y el diagnóstico CLI solo pueden demostrar `BUILD_AHEAD_READY`.
 
 ## Autoridad y límites
 

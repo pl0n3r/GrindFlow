@@ -13,6 +13,8 @@ final class VaultPhotoSafetyMaterializer
     public const MAX_BYTES = 8 * 1024 * 1024;
     public const MAX_DIMENSION = 8192;
     public const MAX_PIXELS = 32_000_000;
+    private const DECODE_BYTES_PER_PIXEL = 8;
+    private const MEMORY_SAFETY_MARGIN = 16 * 1024 * 1024;
 
     /**
      * @throws \RuntimeException when the input cannot be safely decoded and re-encoded
@@ -63,6 +65,8 @@ final class VaultPhotoSafetyMaterializer
             || $width * $height > self::MAX_PIXELS) {
             throw new \RuntimeException('Image dimensions exceed the pilot safety limit.');
         }
+
+        $this->assertMemoryAvailable($width, $height, strlen($bytes));
 
         $image = @imagecreatefromstring($bytes);
         if (!$image instanceof \GdImage) {
@@ -142,6 +146,97 @@ final class VaultPhotoSafetyMaterializer
             && function_exists('imagecreatefromstring')
             && function_exists('imagejpeg')
             && function_exists('imagepng');
+    }
+
+    /** @return array{decoder: bool, temporary_storage: bool, private_vault: bool} */
+    public function runtimeReadiness(string $vaultRoot): array
+    {
+        return [
+            'decoder' => $this->decoderAvailable(),
+            'temporary_storage' => $this->temporaryStorageReady(),
+            'private_vault' => $this->privateVaultReady($vaultRoot),
+        ];
+    }
+
+    private function temporaryStorageReady(): bool
+    {
+        $root = sys_get_temp_dir();
+        if (!is_dir($root) || is_link($root) || !is_writable($root)) {
+            return false;
+        }
+
+        $probe = tempnam($root, 'gf-ready-');
+        if (!is_string($probe)) {
+            return false;
+        }
+
+        try {
+            if (!chmod($probe, 0600)) {
+                return false;
+            }
+            $written = file_put_contents($probe, 'ok', LOCK_EX);
+            clearstatcache(true, $probe);
+
+            return $written === 2
+                && filesize($probe) === 2
+                && is_readable($probe)
+                && is_writable($probe);
+        } finally {
+            if (is_file($probe) && !is_link($probe)) {
+                unlink($probe);
+            }
+        }
+    }
+
+    private function privateVaultReady(string $vaultRoot): bool
+    {
+        if ($vaultRoot === '' || !is_dir($vaultRoot) || is_link($vaultRoot) || !is_readable($vaultRoot)) {
+            return false;
+        }
+        $mode = fileperms($vaultRoot);
+
+        return is_int($mode) && ($mode & 0077) === 0;
+    }
+
+    private function assertMemoryAvailable(int $width, int $height, int $inputBytes): void
+    {
+        $limit = $this->memoryLimitBytes();
+        if ($limit === null) {
+            return;
+        }
+
+        $pixels = $width * $height;
+        $required = ($pixels * self::DECODE_BYTES_PER_PIXEL)
+            + $inputBytes
+            + self::MEMORY_SAFETY_MARGIN;
+        $available = max(0, $limit - memory_get_usage(true));
+        if ($required > $available) {
+            throw new \RuntimeException('Image exceeds the available decoder memory budget.');
+        }
+    }
+
+    private function memoryLimitBytes(): ?int
+    {
+        $raw = trim((string) ini_get('memory_limit'));
+        if ($raw === '' || $raw === '-1') {
+            return null;
+        }
+        if (preg_match('/\\A(\\d+)([KMG]?)\\z/i', $raw, $match) !== 1) {
+            return 0;
+        }
+
+        $multiplier = match (strtoupper($match[2])) {
+            'G' => 1024 * 1024 * 1024,
+            'M' => 1024 * 1024,
+            'K' => 1024,
+            default => 1,
+        };
+        $value = (int) $match[1];
+        if ($value > intdiv(PHP_INT_MAX, $multiplier)) {
+            return PHP_INT_MAX;
+        }
+
+        return $value * $multiplier;
     }
 
     private function writePng(\GdImage $image, string $path): bool

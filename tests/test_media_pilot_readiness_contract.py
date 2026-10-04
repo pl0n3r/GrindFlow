@@ -75,6 +75,9 @@ class MediaPilotReadinessContractTests(unittest.TestCase):
             "MAX_PIXELS = 32_000_000",
             "Image decoder rejected",
             "Safe image re-encode failed",
+            "assertMemoryAvailable",
+            "memory_get_usage(true)",
+            "ini_get('memory_limit')",
         ):
             self.assertIn(token, self.materializer)
         publish = self.controller.split("public function publishFacebook", 1)[1].split(
@@ -86,17 +89,24 @@ class MediaPilotReadinessContractTests(unittest.TestCase):
         self.assertIn("self::assertNull($db->fetchOne(", self.schedule_test)
         self.assertIn("self::assertSame(0, $transport->calls);", self.schedule_test)
         self.assertIn("testTrailingPayloadAndCorruptContentFailWithoutLeakingTemporaryCopy", self.materializer_test)
+        self.assertIn("GD decoder is required in CI.", self.materializer_test)
 
     def test_target_readiness_is_observed_separately_from_ci(self) -> None:
         for token in (
             "'decoder'",
             "'temporary_storage'",
             "'private_vault'",
-            "'evidence_scope' => 'observed_target_environment'",
+            "'evidence_scope' => 'cli_diagnostic'",
             "'ci_equivalent' => false",
         ):
             self.assertIn(token, self.readiness)
         self.assertIn("php scripts/media-pilot-readiness.php", self.doc)
+        self.assertIn("GET /api/admin/schedules/media-readiness", self.doc)
+        self.assertIn("evidence_scope=cli_diagnostic", self.doc)
+        self.assertIn("evidence_scope\":\"web_runtime", self.doc)
+        self.assertIn("'/api/admin/schedules/media-readiness'", self.controller)
+        self.assertIn("'evidence_scope' => 'web_runtime'", self.controller)
+        self.assertIn("$photoSafety->runtimeReadiness($vaultRoot)", self.controller)
         self.assertIn("CI no sustituye la observación del entorno objetivo", self.doc)
         self.assertIn("no imprime paths, secretos, hashes", self.doc)
         self.assertNotIn("echo $root", self.readiness)

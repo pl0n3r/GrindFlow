@@ -14,9 +14,7 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
     public function testValidPrivatePngIsDecoderReencodedWithoutChangingOriginal(): void
     {
         $materializer = new VaultPhotoSafetyMaterializer();
-        if (!$materializer->decoderAvailable()) {
-            self::markTestSkipped('GD decoder is not available in this CI runtime.');
-        }
+        $this->requireDecoder($materializer);
 
         $bytes = base64_decode(self::PNG, true);
         self::assertIsString($bytes);
@@ -54,9 +52,7 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
     public function testTrailingPayloadAndCorruptContentFailWithoutLeakingTemporaryCopy(): void
     {
         $materializer = new VaultPhotoSafetyMaterializer();
-        if (!$materializer->decoderAvailable()) {
-            self::markTestSkipped('GD decoder is not available in this CI runtime.');
-        }
+        $this->requireDecoder($materializer);
 
         $png = base64_decode(self::PNG, true);
         self::assertIsString($png);
@@ -84,9 +80,7 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
     public function testDeclaredMimeMismatchFailsClosed(): void
     {
         $materializer = new VaultPhotoSafetyMaterializer();
-        if (!$materializer->decoderAvailable()) {
-            self::markTestSkipped('GD decoder is not available in this CI runtime.');
-        }
+        $this->requireDecoder($materializer);
         $bytes = base64_decode(self::PNG, true);
         self::assertIsString($bytes);
         $source = $this->sourceFile($bytes);
@@ -101,6 +95,17 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
         } finally {
             @unlink($source);
         }
+    }
+
+    private function requireDecoder(VaultPhotoSafetyMaterializer $materializer): void
+    {
+        if ($materializer->decoderAvailable()) {
+            return;
+        }
+        if (getenv('CI') === 'true') {
+            self::fail('GD decoder is required in CI.');
+        }
+        self::markTestSkipped('GD decoder is not available locally.');
     }
 
     private function sourceFile(string $bytes): string
