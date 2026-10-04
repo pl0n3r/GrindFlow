@@ -131,6 +131,17 @@ class SecurityWorkflowContractTests(unittest.TestCase):
                 True,
             ),
             (
+                "invalid gate classification",
+                dict(
+                    actor_outcome="success",
+                    trusted="true",
+                    gate_outcome="success",
+                    gate_status="invalid-gate",
+                ),
+                True,
+                False,
+            ),
+            (
                 "checkout or actor failure",
                 dict(
                     actor_outcome="failure",
