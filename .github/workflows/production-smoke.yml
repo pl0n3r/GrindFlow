@@ -373,16 +373,31 @@ jobs:
             {
               echo '## Media web runtime remains blocked'
               echo
-              printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
-              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-              echo 'Status: `BLOCKED_TARGET_ENV`'
-              if [[ "$diagnostics_available" == "true" ]]; then
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ "$diagnostics_available" == "true" ]]; then
+              run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              blocked_marker="<!-- grindflow-media-runtime-blocked-v1 sha=$GITHUB_SHA run=$GITHUB_RUN_ID -->"
+              {
+                echo "$blocked_marker"
+                printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
+                echo "Run: $run_url"
+                echo 'Status: `BLOCKED_TARGET_ENV`'
                 printf -- '- decoder: `%s`\n' "$decoder_state"
                 printf -- '- temporary_storage: `%s`\n' "$temporary_storage_state"
                 printf -- '- private_vault: `%s`\n' "$private_vault_state"
-              else
-                echo 'Allowlisted subcheck diagnostics unavailable because the closed readiness contract was not observed.'
+              } > "$evidence_file"
+              cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
+
+              existing_comments="$(gh issue view "$MEDIA_READINESS_ISSUE" --json comments --jq '.comments[].body')"
+              if ! grep -Fq -- "$blocked_marker" <<<"$existing_comments"; then
+                gh issue comment "$MEDIA_READINESS_ISSUE" --body-file "$evidence_file"
               fi
+            else
+              echo 'Allowlisted subcheck diagnostics unavailable because the closed readiness contract was not observed.' >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            {
               echo
               echo 'Issue #307 remains open. No remote response body, filesystem path, cookie, header, hash or secret was published.'
             } >> "$GITHUB_STEP_SUMMARY"

@@ -95,7 +95,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 completed = self._run_parser(payload)
                 self.assertEqual(expected_code, completed.returncode, completed.stderr)
 
-    def test_blocked_summary_reports_only_allowlisted_subchecks(self) -> None:
+    def test_blocked_runtime_comments_only_allowlisted_subchecks(self) -> None:
         smoke_log = "\n".join(
             (
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
@@ -107,17 +107,74 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "",
             )
         )
-        completed, calls, summary, _ = self._run_reconcile(smoke_log)
+        completed, calls, summary, proof = self._run_reconcile(smoke_log)
         self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("issue comment 307 --body-file", calls)
         self.assertNotIn("issue close 307", calls)
-        self.assertIn("decoder: `ready`", summary)
-        self.assertIn("temporary_storage: `ready`", summary)
-        self.assertIn("private_vault: `not_ready`", summary)
-        self.assertIn("Exact deployed SHA: `" + "a" * 40 + "`", summary)
-        self.assertIn("actions/runs/12345", summary)
-        self.assertIn("BLOCKED_TARGET_ENV", summary)
-        self.assertNotIn("leak-me", summary)
-        self.assertNotIn("do-not-copy", summary)
+        for content in (summary, proof):
+            self.assertIn("decoder: `ready`", content)
+            self.assertIn("temporary_storage: `ready`", content)
+            self.assertIn("private_vault: `not_ready`", content)
+            self.assertIn("Exact deployed SHA: `" + "a" * 40 + "`", content)
+            self.assertIn("actions/runs/12345", content)
+            self.assertIn("BLOCKED_TARGET_ENV", content)
+            self.assertNotIn("leak-me", content)
+            self.assertNotIn("do-not-copy", content)
+        self.assertIn("grindflow-media-runtime-blocked-v1", proof)
+        for forbidden in ("remote response", "filesystem path", "cookie", "header", "hash", "secret"):
+            self.assertNotIn(forbidden, proof.lower())
+
+    def test_invalid_or_duplicate_subchecks_do_not_publish_blocked_evidence(self) -> None:
+        cases = (
+            "MEDIA_WEB_RUNTIME_READY=0\n",
+            "\n".join(
+                (
+                    "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                    "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                    "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                    "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                    "MEDIA_WEB_RUNTIME_READY=0",
+                    "",
+                )
+            ),
+            "\n".join(
+                (
+                    "MEDIA_WEB_RUNTIME_CHECK_DECODER=arbitrary",
+                    "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                    "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                    "MEDIA_WEB_RUNTIME_READY=0",
+                    "",
+                )
+            ),
+        )
+        for smoke_log in cases:
+            with self.subTest(smoke_log=smoke_log):
+                completed, calls, summary, proof = self._run_reconcile(smoke_log)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("issue comment 307", calls)
+                self.assertEqual("", proof)
+                self.assertIn("diagnostics unavailable", summary)
+
+    def test_blocked_evidence_is_idempotent_per_sha_and_run(self) -> None:
+        smoke_log = "\n".join(
+            (
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "MEDIA_WEB_RUNTIME_READY=0",
+                "",
+            )
+        )
+        first, first_calls, _, first_proof = self._run_reconcile(smoke_log)
+        second, second_calls, _, second_proof = self._run_reconcile(
+            smoke_log,
+            existing_comments=first_proof,
+        )
+        self.assertEqual(0, first.returncode, first.stderr)
+        self.assertEqual(0, second.returncode, second.stderr)
+        self.assertEqual(1, first_calls.count("issue comment 307"))
+        self.assertNotIn("issue comment 307", second_calls)
+        self.assertEqual(first_proof, second_proof)
 
     def test_workflow_closes_issue_307_only_after_successful_exact_deploy_web_runtime_evidence(self) -> None:
         ready = "\n".join(
@@ -192,12 +249,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn("grindflow-media-web-runtime.md", first_path)
         self.assertIn("grindflow-media-web-runtime.md", second_path)
 
-    def test_v0192_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
-        self.assertIn("'number' => '0.1.192'", VERSION)
-        self.assertEqual("0.1.192", PACKAGE["version"])
-        self.assertEqual("0.1.192", LOCK["version"])
-        self.assertEqual("0.1.192", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.192", README)
+    def test_v0193_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
+        self.assertIn("'number' => '0.1.193'", VERSION)
+        self.assertEqual("0.1.193", PACKAGE["version"])
+        self.assertEqual("0.1.193", LOCK["version"])
+        self.assertEqual("0.1.193", LOCK["packages"][""]["version"])
+        self.assertIn("V0.1.193", README)
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod
@@ -257,6 +314,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
     def _run_reconcile(
         cls,
         smoke_log: str,
+        existing_comments: str = "",
     ) -> tuple[subprocess.CompletedProcess[str], str, str, str]:
         script = cls._reconcile_script()
         with tempfile.TemporaryDirectory() as tmp:
@@ -268,7 +326,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             fake_gh.write_text(
                 "#!/bin/sh\n"
                 "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
-                "if [ \"$1 $2\" = \"issue view\" ]; then printf 'OPEN\\n'; fi\n",
+                "if [ \"$1 $2\" = \"issue view\" ]; then\n"
+                "  case \" $* \" in\n"
+                "    *\" --json comments \"*) printf '%s\\n' \"${GH_EXISTING_COMMENTS:-}\" ;;\n"
+                "    *) printf 'OPEN\\n' ;;\n"
+                "  esac\n"
+                "fi\n",
                 encoding="utf-8",
             )
             fake_gh.chmod(0o755)
@@ -280,6 +343,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 {
                     "PATH": f"{bin_dir}:{env['PATH']}",
                     "GH_LOG": str(gh_log),
+                    "GH_EXISTING_COMMENTS": existing_comments,
                     "GITHUB_SHA": "a" * 40,
                     "GITHUB_STEP_SUMMARY": str(summary),
                     "GITHUB_SERVER_URL": "https://github.example",
