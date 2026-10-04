@@ -18,6 +18,10 @@ Mientras cualquiera de `datos.yml.controller.name`, `identifier`, `address` o `r
 
 La habilitación de datos reales requiere un responsable/canal no-placeholder y la revisión humana exigida por `GrindFlow#185` para el alcance aplicable.
 
+## Autoridad temporal y plazos
+
+Este procedimiento no define SLA ni plazo jurídico de respuesta. Cualquier plazo, excepción, obligación de notificación o compromiso frente al titular debe provenir de la revisión humana aplicable; el software no los infiere ni los completa por defecto.
+
 ## Solicitudes de derechos
 
 Tipos operativos contemplados:
