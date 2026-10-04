@@ -139,9 +139,7 @@ final readonly class FacebookPagePublicationService
         return new DistributionOutcome($external);
     }
 
-    /**
-     * @param array<string,mixed> $row
-     */
+    /** @param array<string,mixed> $row */
     private function resumeRateLimited(
         Connection $db,
         DistributionCommand $command,
@@ -220,14 +218,22 @@ final readonly class FacebookPagePublicationService
 
     private function fingerprint(DistributionCommand $command): string
     {
+        $payload = [
+            'provider' => self::PROVIDER,
+            'organization_id' => strtolower($command->organizationId),
+            'page_id' => $this->provider->destinationPageId(),
+            'message' => $command->message,
+            'link' => $command->link,
+        ];
+        if ($command->hasMedia()) {
+            $payload['media'] = [
+                'mime' => $command->mediaMime,
+                'sha256' => strtolower((string) $command->mediaSha256),
+            ];
+        }
+
         try {
-            $json = json_encode([
-                'provider' => self::PROVIDER,
-                'organization_id' => strtolower($command->organizationId),
-                'page_id' => $this->provider->destinationPageId(),
-                'message' => $command->message,
-                'link' => $command->link,
-            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         } catch (JsonException) {
             throw DistributionProviderException::rejected();
         }

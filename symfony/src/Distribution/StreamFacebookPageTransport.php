@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace GrindFlow\Distribution;
 
+use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 final class StreamFacebookPageTransport implements FacebookPageTransport
 {
     private const int MAX_RESPONSE_BYTES = 65536;
+    private const int MAX_PHOTO_BYTES = 8 * 1024 * 1024;
     private const int TIMEOUT_SECONDS = 10;
 
     public function postFeed(
@@ -17,13 +20,7 @@ final class StreamFacebookPageTransport implements FacebookPageTransport
         string $accessToken,
         array $payload,
     ): array {
-        if (
-            !preg_match('/^v\d{1,3}\.\d{1,3}$/', $graphVersion)
-            || !preg_match('/^\d{1,32}$/', $pageId)
-            || trim($accessToken) === ''
-        ) {
-            throw new RuntimeException('facebook_transport_configuration_invalid');
-        }
+        $this->assertConfiguration($graphVersion, $pageId, $accessToken);
 
         $body = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         $url = sprintf(
@@ -32,13 +29,113 @@ final class StreamFacebookPageTransport implements FacebookPageTransport
             rawurlencode($pageId),
         );
 
+        return $this->request($url, $accessToken, 'application/json', $body);
+    }
+
+    public function postPhoto(
+        string $graphVersion,
+        string $pageId,
+        string $accessToken,
+        string $caption,
+        string $mediaPath,
+        string $mediaMime,
+    ): array {
+        $this->assertConfiguration($graphVersion, $pageId, $accessToken);
+
+        if (!in_array($mediaMime, ['image/jpeg', 'image/png'], true)
+            || $mediaPath === '' || str_contains($mediaPath, "\0")
+            || is_link($mediaPath) || !is_file($mediaPath) || !is_readable($mediaPath)) {
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
+        }
+
+        $size = @filesize($mediaPath);
+        if ($size === false || $size < 1 || $size > self::MAX_PHOTO_BYTES) {
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
+        }
+
+        try {
+            $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->file($mediaPath);
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException('facebook_photo_source_invalid', 0, $exception);
+        }
+        if (!is_string($detectedMime) || !hash_equals($mediaMime, $detectedMime)) {
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
+        }
+
+        $photo = @file_get_contents($mediaPath);
+        if ($photo === false || strlen($photo) !== $size) {
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
+        }
+
+        $boundary = '';
+        for ($attempt = 0; $attempt < 3; ++$attempt) {
+            try {
+                $candidate = 'grindflow-'.bin2hex(random_bytes(18));
+            } catch (Throwable $exception) {
+                throw new InvalidArgumentException('facebook_multipart_boundary_failed', 0, $exception);
+            }
+            if (!str_contains($caption, $candidate) && !str_contains($photo, $candidate)) {
+                $boundary = $candidate;
+                break;
+            }
+        }
+        if ($boundary === '') {
+            throw new InvalidArgumentException('facebook_multipart_boundary_failed');
+        }
+
+        $filename = $mediaMime === 'image/jpeg' ? 'upload.jpg' : 'upload.png';
+        $body = '--'.$boundary."\r\n"
+            .'Content-Disposition: form-data; name="caption"'."\r\n\r\n"
+            .$caption."\r\n"
+            .'--'.$boundary."\r\n"
+            .'Content-Disposition: form-data; name="source"; filename="'.$filename.'"'."\r\n"
+            .'Content-Type: '.$mediaMime."\r\n\r\n"
+            .$photo."\r\n"
+            .'--'.$boundary."--\r\n";
+
+        $url = sprintf(
+            'https://graph.facebook.com/%s/%s/photos',
+            rawurlencode($graphVersion),
+            rawurlencode($pageId),
+        );
+
+        return $this->request(
+            $url,
+            $accessToken,
+            'multipart/form-data; boundary='.$boundary,
+            $body,
+        );
+    }
+
+    private function assertConfiguration(
+        string $graphVersion,
+        string $pageId,
+        string $accessToken,
+    ): void {
+        if (
+            !preg_match('/^v\d{1,3}\.\d{1,3}$/', $graphVersion)
+            || !preg_match('/^\d{1,32}$/', $pageId)
+            || trim($accessToken) === ''
+        ) {
+            throw new InvalidArgumentException('facebook_transport_configuration_invalid');
+        }
+    }
+
+    /** @return array{status:int,headers:array<string,string>,body:string} */
+    private function request(
+        string $url,
+        string $accessToken,
+        string $contentType,
+        string $body,
+    ): array {
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
                 'header' => implode("\r\n", [
                     'Authorization: Bearer '.$accessToken,
                     'Accept: application/json',
-                    'Content-Type: application/json',
+                    'Content-Type: '.$contentType,
+                    'Content-Length: '.strlen($body),
                 ])."\r\n",
                 'content' => $body,
                 'timeout' => self::TIMEOUT_SECONDS,

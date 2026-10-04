@@ -67,6 +67,40 @@ class SymfonySchemaStructureTest(unittest.TestCase):
         self.assertEqual("SET NULL", table["foreign_keys"][0]["on_delete"])
         self.assertEqual("gf_child_no_delete", inventory["triggers"][0]["name"])
 
+    def test_replaces_trigger_after_explicit_drop(self) -> None:
+        migration = """<?php
+        public function up($schema): void
+        {
+            $this->addSql('CREATE TABLE gf_note (id CHAR(36) NOT NULL, PRIMARY KEY (id)) ENGINE=InnoDB');
+            $this->addSql("CREATE TRIGGER gf_note_guard BEFORE UPDATE ON gf_note FOR EACH ROW BEGIN SIGNAL SQLSTATE '45000'; END");
+            $this->addSql('DROP TRIGGER IF EXISTS gf_note_guard');
+            $this->addSql("CREATE TRIGGER gf_note_guard AFTER UPDATE ON gf_note FOR EACH ROW BEGIN SIGNAL SQLSTATE '45000'; END");
+        }
+        public function down($schema): void {}
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Version1.php"
+            path.write_text(migration, encoding="utf-8")
+            inventory = MODULE.build_inventory(Path(folder))
+
+        self.assertEqual(1, len(inventory["triggers"]))
+        self.assertEqual("gf_note_guard", inventory["triggers"][0]["name"])
+        self.assertEqual("AFTER", inventory["triggers"][0]["timing"])
+
+    def test_rejects_unknown_non_optional_trigger_drop(self) -> None:
+        migration = """<?php
+        public function up($schema): void
+        {
+            $this->addSql('DROP TRIGGER gf_missing_guard');
+        }
+        public function down($schema): void {}
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Version1.php"
+            path.write_text(migration, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unknown trigger"):
+                MODULE.build_inventory(Path(folder))
+
     def test_down_sql_does_not_mutate_final_inventory(self) -> None:
         migration = """<?php
         public function up($schema): void

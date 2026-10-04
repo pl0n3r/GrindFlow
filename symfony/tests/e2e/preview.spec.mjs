@@ -1777,6 +1777,7 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
   let contentReviewApproved = false;
   let distributionAuthorized = false;
   let scheduleDrafts = [];
+  let scheduleDraftSequence = 0;
   let manualDestinations = [];
   await page.route('**/api/admin/context', (route) => route.fulfill({
     status: 200,
@@ -1984,8 +1985,61 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
             limit: 30,
             manual_handoff_ready: true,
             manual_destination_ready: true,
+            external_delivery_ready: true,
+            external_destination_id: '1234567890',
             mode: 'review_only',
             can_publish: false,
+          },
+        }),
+      });
+    }
+
+    if (url.pathname.endsWith('/delivery-intent')) {
+      expect(request.method()).toBe('PUT');
+      expect(request.headers()['x-csrf-token']).toBe('schedule-token');
+      const payload = request.postDataJSON();
+      expect(Object.keys(payload)).toEqual(['caption']);
+      const draftId = url.pathname.split('/').at(-2);
+      scheduleDrafts = scheduleDrafts.map((draft) => draft.id === draftId
+        ? {
+            ...draft,
+            caption: payload.caption.trim(),
+            delivery_provider: 'facebook_page',
+            delivery_destination_id: '1234567890',
+          }
+        : draft);
+      const draft = scheduleDrafts.find((item) => item.id === draftId);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { draft, changed: true, publishes: false, provider_calls: false },
+        }),
+      });
+    }
+
+    if (url.pathname.endsWith('/publish-facebook')) {
+      expect(request.method()).toBe('POST');
+      expect(request.headers()['x-csrf-token']).toBe('schedule-token');
+      const draftId = url.pathname.split('/').at(-2);
+      scheduleDrafts = scheduleDrafts.map((draft) => draft.id === draftId
+        ? {
+            ...draft,
+            delivery_locked_at: '2026-10-03 23:45:00',
+            external_delivery_status: 'published',
+            external_publication_id: 'page_photo_e2e_123',
+            published_at: '2026-10-03 23:45:01',
+          }
+        : draft);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            status: 'published',
+            external_publication_id: 'page_photo_e2e_123',
+            published_at: '2026-10-03 23:45:01',
+            automatic_retry: false,
           },
         }),
       });
@@ -2044,8 +2098,11 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         asset_id: '00000000-0000-7000-8000-000000000099',
         scheduled_at_utc: '2026-09-22T14:30:00Z',
       });
+      scheduleDraftSequence += 1;
       const draft = {
-        id: '00000000-0000-7000-8000-000000000172',
+        id: scheduleDraftSequence === 1
+          ? '00000000-0000-7000-8000-000000000172'
+          : '00000000-0000-7000-8000-000000000175',
         asset_id: payload.asset_id,
         asset_name: 'campaña.png',
         scheduled_at_utc: payload.scheduled_at_utc,
@@ -2053,6 +2110,13 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
         local_date: '2026-09-22',
         local_time: '09:30',
         status: 'draft',
+        caption: null,
+        delivery_provider: null,
+        delivery_destination_id: null,
+        delivery_locked_at: null,
+        external_delivery_status: null,
+        external_publication_id: null,
+        published_at: null,
         manual_handoff_status: 'none',
         manual_handoff_updated_at: null,
         manual_destination: null,
@@ -2070,8 +2134,9 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
       });
     }
 
-    expect(url.pathname).toBe('/api/admin/schedules/00000000-0000-7000-8000-000000000172/cancel');
-    scheduleDrafts = scheduleDrafts.map((draft) => draft.id === '00000000-0000-7000-8000-000000000172'
+    expect(url.pathname.endsWith('/cancel')).toBeTruthy();
+    const cancelDraftId = url.pathname.split('/').at(-2);
+    scheduleDrafts = scheduleDrafts.map((draft) => draft.id === cancelDraftId
       ? { ...draft, status: 'cancelled', cancelled_at: '2026-09-21 18:30:00' }
       : draft);
     return route.fulfill({
@@ -2209,6 +2274,27 @@ test('S3 mobile weekly planner saves a tenant-safe rule and keeps publication bl
     'Destino manual reactivado.',
   );
   await expect(page.getByText('Activo para nuevas preparaciones', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Recurso listo').selectOption('00000000-0000-7000-8000-000000000099');
+  await page.getByLabel('Horario').selectOption('2026-09-22T14:30:00Z');
+  await page.getByRole('button', { name: 'Guardar borrador' }).click();
+  await expect(page.getByText('Historial interno · 2 borradores')).toBeVisible();
+  await page.getByLabel('Caption para campaña.png').fill('Lanzamiento seguro');
+  await page.getByRole('button', { name: 'Guardar caption y destino' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Caption y Facebook Page guardados. Aún no se ha publicado nada.',
+  );
+  await expect(page.getByText('Facebook Page: 1234567890')).toBeVisible();
+  await page.getByRole('button', { name: 'Publicar foto en Facebook' }).click();
+  await expect(page.locator('.schedule-draft-panel .weekly-feedback')).toContainText(
+    'Facebook confirmó la publicación · page_photo_e2e_123.',
+  );
+  await expect(page.getByText('Publicada en Facebook')).toBeVisible();
+  await expect(page.getByText('ID externo: page_photo_e2e_123')).toBeVisible();
+  await expect(page.getByText('Intención externa bloqueada antes del envío')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancelar borrador de campaña.png' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Publicar foto en Facebook' })).toHaveCount(0);
+
   await page.getByRole('button', { name: 'Revocar autorización' }).click();
   await expect(page.locator('.weekly-feedback')).toContainText('Autorización interna de distribución revocada');
   await expect(page.getByText('Distribución sin autorizar')).toBeVisible();

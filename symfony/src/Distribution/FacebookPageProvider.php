@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GrindFlow\Distribution;
 
+use InvalidArgumentException;
 use JsonException;
 use Throwable;
 
@@ -28,22 +29,41 @@ final readonly class FacebookPageProvider implements DistributionProvider
     {
         $this->assertAvailableFor($command->organizationId);
 
-        $payload = ['message' => $command->message];
-        if ($command->link !== null) {
-            $payload['link'] = $command->link;
-        }
-
         try {
-            $response = $this->transport->postFeed(
-                $this->configuration->graphVersion(),
-                $this->configuration->pageId(),
-                $this->configuration->accessToken(),
-                $payload,
-            );
+            if ($command->hasMedia()) {
+                $response = $this->transport->postPhoto(
+                    $this->configuration->graphVersion(),
+                    $this->configuration->pageId(),
+                    $this->configuration->accessToken(),
+                    $command->message,
+                    (string) $command->mediaPath,
+                    (string) $command->mediaMime,
+                );
+            } else {
+                $payload = ['message' => $command->message];
+                if ($command->link !== null) {
+                    $payload['link'] = $command->link;
+                }
+
+                $response = $this->transport->postFeed(
+                    $this->configuration->graphVersion(),
+                    $this->configuration->pageId(),
+                    $this->configuration->accessToken(),
+                    $payload,
+                );
+            }
+        } catch (InvalidArgumentException) {
+            throw DistributionProviderException::rejected();
         } catch (Throwable) {
             throw DistributionProviderException::ambiguous();
         }
 
+        return $this->outcomeFromResponse($response);
+    }
+
+    /** @param array{status:int,headers:array<string,string>,body:string} $response */
+    private function outcomeFromResponse(array $response): DistributionOutcome
+    {
         $status = $response['status'];
         if ($status >= 200 && $status < 300) {
             try {

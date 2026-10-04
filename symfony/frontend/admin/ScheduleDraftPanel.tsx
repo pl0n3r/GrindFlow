@@ -31,6 +31,20 @@ type Draft = {
   local_date: string;
   local_time: string;
   status: 'draft' | 'cancelled';
+  caption: string | null;
+  delivery_provider: string | null;
+  delivery_destination_id: string | null;
+  delivery_locked_at: string | null;
+  external_delivery_status:
+    | 'in_flight'
+    | 'published'
+    | 'rate_limited'
+    | 'authentication_failed'
+    | 'rejected'
+    | 'ambiguous'
+    | null;
+  external_publication_id: string | null;
+  published_at: string | null;
   manual_handoff_status: 'none' | 'prepared' | 'completed' | 'failed';
   manual_handoff_updated_at: string | null;
   manual_destination: { id: string; label: string } | null;
@@ -72,6 +86,9 @@ export function ScheduleDraftPanel({
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [total, setTotal] = useState(0);
   const [handoffReady, setHandoffReady] = useState(false);
+  const [externalDeliveryReady, setExternalDeliveryReady] = useState(false);
+  const [externalDestinationId, setExternalDestinationId] = useState<string | null>(null);
+  const [captionByDraft, setCaptionByDraft] = useState<Record<string, string>>({});
   const [destinations, setDestinations] = useState<ManualDestination[]>([]);
   const [destinationReady, setDestinationReady] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -132,6 +149,21 @@ export function ScheduleDraftPanel({
       setDrafts(nextDrafts);
       setTotal(scheduleBody.data.total as number);
       setHandoffReady(scheduleBody.data.manual_handoff_ready === true);
+      setExternalDeliveryReady(scheduleBody.data.external_delivery_ready === true);
+      setExternalDestinationId(
+        typeof scheduleBody.data.external_destination_id === 'string'
+          ? scheduleBody.data.external_destination_id
+          : null,
+      );
+      setCaptionByDraft((current) => {
+        const next = { ...current };
+        for (const draft of nextDrafts) {
+          if (!(draft.id in next)) {
+            next[draft.id] = draft.caption ?? '';
+          }
+        }
+        return next;
+      });
       setDestinationByDraft((current) => {
         const next = { ...current };
         for (const draft of nextDrafts) {
@@ -335,6 +367,95 @@ export function ScheduleDraftPanel({
     }
   }
 
+
+  async function saveDeliveryIntent(draft: Draft) {
+    if (!canEdit || !csrf || !externalDeliveryReady || busyId !== null
+      || draft.status !== 'draft' || draft.delivery_locked_at !== null) return;
+    const caption = (captionByDraft[draft.id] ?? draft.caption ?? '').trim();
+    if (caption.length < 1 || caption.length > 5000) {
+      setError('El caption debe contener entre 1 y 5000 caracteres.');
+      return;
+    }
+
+    setBusyId('delivery-intent-' + draft.id);
+    setFeedback('');
+    setError('');
+    try {
+      const response = await fetch(
+        '/api/admin/schedules/' + encodeURIComponent(draft.id) + '/delivery-intent',
+        {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrf,
+          },
+          body: JSON.stringify({ caption }),
+        },
+      );
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo guardar la intención de entrega.');
+      }
+      if (body?.data?.publishes !== false || body?.data?.provider_calls !== false) {
+        throw new Error('No se confirmó el límite de preparación segura.');
+      }
+      setFeedback(body.data.changed
+        ? 'Caption y Facebook Page guardados. Aún no se ha publicado nada.'
+        : 'La intención de entrega ya estaba guardada.');
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error
+        ? caught.message
+        : 'No se pudo guardar la intención de entrega.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function publishFacebook(draft: Draft) {
+    if (!canEdit || !csrf || !externalDeliveryReady || busyId !== null
+      || draft.status !== 'draft' || draft.external_delivery_status === 'ambiguous'
+      || draft.external_delivery_status === 'authentication_failed'
+      || draft.external_delivery_status === 'rejected'
+      || draft.external_delivery_status === 'published') return;
+
+    setBusyId('publish-' + draft.id);
+    setFeedback('');
+    setError('');
+    try {
+      const response = await fetch(
+        '/api/admin/schedules/' + encodeURIComponent(draft.id) + '/publish-facebook',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
+        },
+      );
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body?.error?.message ?? 'No se pudo completar la entrega externa.');
+      }
+      if (body?.data?.status !== 'published' || body?.data?.automatic_retry !== false) {
+        throw new Error('No se confirmó una publicación externa segura.');
+      }
+      setFeedback(
+        'Facebook confirmó la publicación'
+        + (body.data.external_publication_id ? ' · ' + body.data.external_publication_id : '')
+        + '.',
+      );
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error
+        ? caught.message
+        : 'No se pudo completar la entrega externa.');
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function updateManualHandoff(
     draft: Draft,
     action: 'prepare' | 'complete' | 'fail',
@@ -395,7 +516,7 @@ export function ScheduleDraftPanel({
       <div>
         <span className="admin-kicker">S4 · AGENDA INTERNA</span>
         <h3 id="schedule-draft-title">Borradores y salida manual</h3>
-        <p>Reserva un recurso revisado en un slot de la regla semanal. No conecta redes ni realiza publicaciones.</p>
+        <p>Reserva un recurso revisado en un slot semanal. La entrega externa, cuando esté configurada, exige una acción explícita y conserva evidencia separada.</p>
       </div>
 
       {canManualHandoff && manualDestinationCsrf && destinationReady &&
@@ -484,6 +605,22 @@ export function ScheduleDraftPanel({
                     <strong>{draft.asset_name}</strong>
                     <span>{draft.local_date} · {draft.local_time} ({draft.timezone})</span>
                     <small>{draft.status === 'draft' ? 'Borrador reservado' : 'Borrador cancelado'}</small>
+                    {draft.delivery_destination_id &&
+                      <small>Facebook Page: {draft.delivery_destination_id}</small>}
+                    {draft.delivery_locked_at &&
+                      <small>Intención externa bloqueada antes del envío</small>}
+                    {draft.external_delivery_status &&
+                      <small className={'external-delivery-status ' + draft.external_delivery_status}>
+                        {draft.external_delivery_status === 'in_flight' && 'Entrega externa en curso'}
+                        {draft.external_delivery_status === 'published' && 'Publicada en Facebook'}
+                        {draft.external_delivery_status === 'rate_limited' && 'Facebook limitó temporalmente la entrega'}
+                        {draft.external_delivery_status === 'authentication_failed' && 'Facebook requiere revisar autenticación'}
+                        {draft.external_delivery_status === 'rejected' && 'Facebook rechazó la entrega'}
+                        {draft.external_delivery_status === 'ambiguous' && 'Resultado externo incierto · no reintentar a ciegas'}
+                      </small>}
+                    {draft.external_delivery_status === 'published' && draft.external_publication_id &&
+                      <small>ID externo: {draft.external_publication_id}</small>}
+                    {draft.published_at && <small>Confirmada: {draft.published_at}</small>}
                     {draft.manual_destination &&
                       <small>Destino: {draft.manual_destination.label}</small>}
                     {handoffReady &&
@@ -496,7 +633,66 @@ export function ScheduleDraftPanel({
                   </div>
 
                   <div className="schedule-draft-actions">
-                    {canManualHandoff && manualHandoffCsrf && handoffReady && draft.status === 'draft' &&
+                    {canEdit && csrf && externalDeliveryReady && draft.status === 'draft'
+                      && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
+                      <div className="external-delivery-actions">
+                        {draft.delivery_locked_at === null
+                          ? <>
+                              <label>
+                                Caption para Facebook
+                                <textarea
+                                  aria-label={'Caption para ' + draft.asset_name}
+                                  maxLength={5000}
+                                  value={captionByDraft[draft.id] ?? draft.caption ?? ''}
+                                  onChange={(event) => setCaptionByDraft((current) => ({
+                                    ...current,
+                                    [draft.id]: event.target.value,
+                                  }))}
+                                />
+                              </label>
+                              <small>
+                                Destino configurado: Facebook Page {externalDestinationId ?? 'no disponible'}
+                              </small>
+                              <button type="button"
+                                disabled={busyId !== null
+                                  || (captionByDraft[draft.id] ?? draft.caption ?? '').trim().length === 0}
+                                onClick={() => void saveDeliveryIntent(draft)}>
+                                {busyId === 'delivery-intent-' + draft.id
+                                  ? 'Guardando…'
+                                  : 'Guardar caption y destino'}
+                              </button>
+                              <button type="button"
+                                disabled={busyId !== null
+                                  || !draft.caption
+                                  || externalDestinationId === null
+                                  || draft.delivery_provider !== 'facebook_page'
+                                  || draft.delivery_destination_id !== externalDestinationId
+                                  || (captionByDraft[draft.id] ?? draft.caption ?? '').trim() !== draft.caption}
+                                onClick={() => void publishFacebook(draft)}>
+                                {busyId === 'publish-' + draft.id
+                                  ? 'Publicando…'
+                                  : 'Publicar foto en Facebook'}
+                              </button>
+                            </>
+                          : <>
+                              {draft.external_delivery_status === null &&
+                                <button type="button" disabled={busyId !== null}
+                                  onClick={() => void publishFacebook(draft)}>
+                                  {busyId === 'publish-' + draft.id
+                                    ? 'Publicando…'
+                                    : 'Continuar entrega bloqueada'}
+                                </button>}
+                              {draft.external_delivery_status === 'rate_limited' &&
+                                <button type="button" disabled={busyId !== null}
+                                  onClick={() => void publishFacebook(draft)}>
+                                  {busyId === 'publish-' + draft.id
+                                    ? 'Reintentando…'
+                                    : 'Reintentar manualmente'}
+                                </button>}
+                            </>}
+                      </div>}
+                    {canManualHandoff && manualHandoffCsrf && handoffReady && draft.status === 'draft'
+                      && draft.delivery_locked_at === null &&
                       <>
                         {(draft.manual_handoff_status === 'none' || draft.manual_handoff_status === 'failed') &&
                           <>
@@ -531,6 +727,7 @@ export function ScheduleDraftPanel({
                           </>}
                       </>}
                     {canEdit && csrf && draft.status === 'draft'
+                      && draft.delivery_locked_at === null
                       && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
                       <button type="button" disabled={busyId !== null}
                         aria-label={'Cancelar borrador de ' + draft.asset_name}

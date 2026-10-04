@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.184 · esta etiqueta no prueba despliegue ni salud de producción.
+**Versión de código declarada:** V0.1.185 · esta etiqueta no prueba despliegue ni salud de producción.
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
 
@@ -75,7 +75,7 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 ### Distribution Symfony · provider pilot
 
-Symfony S4 incluye un port de Distribution y un adaptador **Facebook Pages** fail-closed con configuración por entorno y ledger tenant-safe de idempotencia. Este fundamento **no está conectado todavía a Schedule Draft/Composer y no ejecuta publicación live**: CI usa transporte fake y la validación externa con credenciales de piloto pertenece a una transición posterior. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
+En el código candidato **V0.1.185**, Symfony S4 implementa la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages** mediante intención durable, lock previo al I/O externo y ledger tenant-safe de idempotencia. Esta capacidad **no se considera desplegada** hasta verificar que el SHA del checkout productivo incluye este cambio. La ruta oficial admite JPEG/PNG verificado desde el Vault privado; **CI no ejecuta publicación live** y usa transporte fake. La validación externa con credenciales de piloto permanece separada y posterior al deploy autorizado. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
 
 ## Stack e infraestructura
 

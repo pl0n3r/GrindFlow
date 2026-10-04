@@ -68,6 +68,43 @@ final class FacebookPageProviderTest extends WebTestCase
         self::assertStringNotContainsString($token, $outcome->externalPublicationId);
     }
 
+    public function testProviderUsesExplicitPhotoTransportForPrivateMedia(): void
+    {
+        $organization = Uuid::v7()->toRfc4122();
+        $transport = new FakeFacebookPageTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_456"}'],
+        ]);
+        $provider = $this->provider(
+            $organization,
+            'test-facebook-page-token-do-not-log',
+            $transport,
+        );
+        $path = tempnam(sys_get_temp_dir(), 'grindflow-photo-');
+        self::assertIsString($path);
+        self::assertNotFalse(file_put_contents($path, 'private-photo'));
+        $command = new DistributionCommand(
+            $organization,
+            'photo-'.Uuid::v7()->toRfc4122(),
+            'Caption de foto',
+            null,
+            $path,
+            'image/png',
+            hash('sha256', 'private-photo'),
+        );
+
+        try {
+            $outcome = $provider->publish($command);
+        } finally {
+            @unlink($path);
+        }
+
+        self::assertSame('page_photo_456', $outcome->externalPublicationId);
+        self::assertSame(1, $transport->calls);
+        self::assertCount(1, $transport->requests);
+        self::assertSame('Caption de foto', $transport->requests[0]['payload']['message']);
+        self::assertStringContainsString(':image/png', $transport->requests[0]['payload']['link']);
+    }
+
     public function testProviderFailsClosedBeforeIo(): void
     {
         $organization = Uuid::v7()->toRfc4122();
@@ -181,6 +218,27 @@ final class FacebookPageProviderTest extends WebTestCase
         );
         self::assertSame(DistributionProviderException::KIND_REJECTED, $rejected->kind);
         self::assertFalse($rejected->automaticRetryAllowed);
+
+        $preSendTransport = new FakeFacebookPageTransport(
+            [],
+            new \InvalidArgumentException('facebook_photo_source_invalid'),
+        );
+        $preSend = $this->captureProviderException(
+            fn () => $this->provider($organization, $token, $preSendTransport)->publish(
+                new DistributionCommand(
+                    $organization,
+                    'local-pre-send',
+                    'No debe salir',
+                    null,
+                    '/private/vault/missing.png',
+                    'image/png',
+                    hash('sha256', 'missing-media'),
+                ),
+            ),
+        );
+        self::assertSame(DistributionProviderException::KIND_REJECTED, $preSend->kind);
+        self::assertFalse($preSend->automaticRetryAllowed);
+        self::assertSame(1, $preSendTransport->calls);
 
         $serverTransport = new FakeFacebookPageTransport([
             ['status' => 503, 'headers' => [], 'body' => '{"error":"unknown"}'],
@@ -768,7 +826,7 @@ final class FakeFacebookPageTransport implements FacebookPageTransport
      */
     public function __construct(
         private array $responses = [],
-        private ?RuntimeException $failure = null,
+        private ?\Throwable $failure = null,
     ) {}
 
     public function postFeed(
@@ -795,6 +853,41 @@ final class FakeFacebookPageTransport implements FacebookPageTransport
                 'status' => 200,
                 'headers' => [],
                 'body' => '{"id":"default_test_publication"}',
+            ];
+        }
+
+        return $response;
+    }
+
+    public function postPhoto(
+        string $graphVersion,
+        string $pageId,
+        string $accessToken,
+        string $caption,
+        string $filePath,
+        string $mimeType,
+    ): array {
+        ++$this->calls;
+        $this->requests[] = [
+            'graph_version' => $graphVersion,
+            'page_id' => $pageId,
+            'access_token' => $accessToken,
+            'payload' => [
+                'message' => $caption,
+                'link' => 'private-media:'.basename($filePath).':'.$mimeType,
+            ],
+        ];
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
+        $response = array_shift($this->responses);
+        if (!is_array($response)) {
+            return [
+                'status' => 200,
+                'headers' => [],
+                'body' => '{"id":"default_test_photo_publication"}',
             ];
         }
 

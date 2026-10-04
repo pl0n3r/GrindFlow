@@ -113,7 +113,7 @@ final class ManualHandoffController extends AbstractController
 
             $draft = $db->fetchAssociative(
                 <<<'SQL'
-                    SELECT id, status, scheduled_at_utc
+                    SELECT id, status, scheduled_at_utc, delivery_locked_at
                     FROM gf_schedule_drafts
                     WHERE id = :draft AND organization_id = :organization
                     FOR UPDATE
@@ -125,6 +125,9 @@ final class ManualHandoffController extends AbstractController
             }
             if ($draft['status'] !== 'draft') {
                 return ['status' => 'cancelled'];
+            }
+            if (($draft['delivery_locked_at'] ?? null) !== null) {
+                return ['status' => 'external_delivery_locked'];
             }
 
             $latest = $db->fetchAssociative(
@@ -242,6 +245,11 @@ final class ManualHandoffController extends AbstractController
             'revoked' => $this->revoked($request),
             'missing' => $this->error(404, 'draft_not_found', 'El borrador no existe en tu organización.'),
             'cancelled' => $this->error(409, 'draft_cancelled', 'Un borrador cancelado no admite salida manual.'),
+            'external_delivery_locked' => $this->error(
+                409,
+                'external_delivery_locked',
+                'Una entrega externa bloqueada no admite salida manual.',
+            ),
             'completed' => $this->error(409, 'manual_handoff_completed', 'La salida manual ya quedó cerrada como realizada.'),
             'not_prepared' => $this->error(409, 'manual_handoff_not_prepared', 'Prepara la salida manual antes de cerrarla.'),
             'not_due' => $this->error(409, 'manual_handoff_not_due', 'La salida manual solo puede cerrarse al llegar el horario programado.'),
