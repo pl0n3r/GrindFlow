@@ -28,6 +28,8 @@ class ScheduleDraftApplicationServiceTests(unittest.TestCase):
             create_source,
         )
         self.assertIn("$drafts->reserve(", create_source)
+        self.assertNotIn("Connection $db", create_source)
+        self.assertNotIn("WeeklySlotCalculator $calculator", create_source)
         self.assertNotIn("->transactional(", create_source)
         self.assertNotIn("FOR UPDATE", create_source)
 
