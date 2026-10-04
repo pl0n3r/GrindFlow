@@ -25,60 +25,60 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertNotIn("GRINDFLOW_SMOKE_PASSWORD", block)
         self.assertNotIn("Authorization:", block)
 
-    def test_readiness_requires_closed_allowlisted_ready_contract_and_emits_only_safe_marker(self) -> None:
-        block = self._readiness_function()
-        for token in (
-            '"contract": "media-pilot-readiness-v1"',
-            '"status": "ready"',
-            '"evidence_scope": "web_runtime"',
-            '"decoder", "temporary_storage", "private_vault"',
-            "MEDIA_WEB_RUNTIME_READY=1",
-            "MEDIA_WEB_RUNTIME_READY=0",
-        ):
-            self.assertIn(token, block)
-        self.assertIn('set(payload) != {"data"}', block)
-        self.assertIn('data.get("ci_equivalent") is not False', block)
-        self.assertIn("set(data) != {", block)
-        self.assertIn("set(checks) != {", block)
+    def test_valid_contract_emits_allowlisted_subcheck_markers(self) -> None:
+        ready = self._payload()
+        completed = self._run_parser(ready)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual(
+            [
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+                "MEDIA_WEB_RUNTIME_READY=1",
+            ],
+            completed.stdout.splitlines(),
+        )
 
-    def test_ci_equivalent_requires_json_boolean_false_strictly(self) -> None:
-        block = self._readiness_function()
-        marker = "if python3 - \"$media_readiness_body\" <<'PY'\n"
-        start = block.index(marker) + len(marker)
-        end = block.index("\nPY\n", start)
-        parser = block[start:end]
+        blocked = self._payload()
+        blocked["data"]["status"] = "not_ready"
+        blocked["data"]["checks"]["private_vault"] = "not_ready"
+        completed = self._run_parser(blocked)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual(
+            [
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "MEDIA_WEB_RUNTIME_READY=0",
+            ],
+            completed.stdout.splitlines(),
+        )
 
-        base = {
-            "data": {
-                "contract": "media-pilot-readiness-v1",
-                "status": "ready",
-                "checks": {
-                    "decoder": "ready",
-                    "temporary_storage": "ready",
-                    "private_vault": "ready",
-                },
-                "evidence_scope": "web_runtime",
-                "ci_equivalent": False,
-            }
-        }
+    def test_invalid_contract_never_emits_remote_or_arbitrary_diagnostics(self) -> None:
+        mutations: list[dict[str, object]] = []
 
-        for value, expected_code in ((False, 0), (0, 1), (None, 1), ("false", 1)):
-            with self.subTest(value=value):
-                payload = json.loads(json.dumps(base))
-                payload["data"]["ci_equivalent"] = value
-                with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
-                    json.dump(payload, handle)
-                    handle.flush()
-                    result = subprocess.run(
-                        ["python3", "-", handle.name],
-                        input=parser,
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                    )
-                self.assertEqual(expected_code, result.returncode, result.stderr)
+        extra = self._payload()
+        extra["data"]["remote_path"] = "/sensitive/path"
+        mutations.append(extra)
 
-    def test_invalid_or_not_ready_response_fails_closed_without_provider_io_or_sensitive_output(self) -> None:
+        arbitrary = self._payload()
+        arbitrary["data"]["checks"]["decoder"] = "leak-me"
+        mutations.append(arbitrary)
+
+        mismatch = self._payload()
+        mismatch["data"]["checks"]["decoder"] = "not_ready"
+        mutations.append(mismatch)
+
+        ci_truthy = self._payload()
+        ci_truthy["data"]["ci_equivalent"] = True
+        mutations.append(ci_truthy)
+
+        for payload in mutations:
+            with self.subTest(payload=payload):
+                completed = self._run_parser(payload)
+                self.assertNotEqual(0, completed.returncode)
+                self.assertEqual("", completed.stdout)
+
         block = self._readiness_function()
         self.assertIn('if [[ "$status" != "200" ]]', block)
         self.assertIn("json.JSONDecodeError", block)
@@ -86,6 +86,14 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertNotIn("facebook", block.lower())
         self.assertNotIn("publish", block.lower())
         self.assertNotIn("--request POST", block)
+
+    def test_ci_equivalent_requires_json_boolean_false_strictly(self) -> None:
+        for value, expected_code in ((False, 0), (0, 1), (None, 1), ("false", 1)):
+            with self.subTest(value=value):
+                payload = self._payload()
+                payload["data"]["ci_equivalent"] = value
+                completed = self._run_parser(payload)
+                self.assertEqual(expected_code, completed.returncode, completed.stderr)
 
     def test_workflow_closes_issue_307_only_after_successful_exact_deploy_web_runtime_evidence(self) -> None:
         step_start = WORKFLOW.index("      - name: Reconcile media web-runtime readiness")
@@ -167,10 +175,48 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod
+    def _payload() -> dict[str, object]:
+        return {
+            "data": {
+                "contract": "media-pilot-readiness-v1",
+                "status": "ready",
+                "checks": {
+                    "decoder": "ready",
+                    "temporary_storage": "ready",
+                    "private_vault": "ready",
+                },
+                "evidence_scope": "web_runtime",
+                "ci_equivalent": False,
+            }
+        }
+
+    @classmethod
+    def _run_parser(cls, payload: object) -> subprocess.CompletedProcess[str]:
+        parser = cls._parser()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+            handle.flush()
+            return subprocess.run(
+                ["python3", "-", handle.name],
+                input=parser,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+    @staticmethod
     def _readiness_function() -> str:
         start = SMOKE.index("check_media_web_runtime_readiness() {")
         end = SMOKE.index("# One anonymous GET after a rejected POST", start)
         return SMOKE[start:end]
+
+    @classmethod
+    def _parser(cls) -> str:
+        block = cls._readiness_function()
+        marker = 'if parsed="$(python3 - "$media_readiness_body" <<\'PY\'\n'
+        start = block.index(marker) + len(marker)
+        end = block.index("\nPY\n", start)
+        return textwrap.dedent(block[start:end])
 
 
 if __name__ == "__main__":
