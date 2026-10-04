@@ -61,20 +61,22 @@ class ProductRequirementsDocsTests(unittest.TestCase):
     def test_traceability_keeps_the_mvp_critical_path(self):
         """Protect the reconciled MVP sequence while product scope grows."""
         trace = read_doc("PRODUCT-CORPUS-TRACEABILITY.md")
+        section = trace.split("## 5. Camino crítico MVP unificado", maxsplit=1)[1]
+        section = section.split("## 6. Confirmado no significa MVP", maxsplit=1)[0]
 
         ordered_markers = (
-            "Vault/storage recuperable",
-            "Web móvil usable",
-            "Composer mínimo",
-            "Scheduling",
-            "Distribution + primer conector social real",
-            "Automatización básica",
-            "Traffic/métricas básicas",
-            "Onboarding/operación",
-            "Piloto",
-            "Go/no-go",
+            "**Vault/storage recuperable**",
+            "**Web móvil usable**",
+            "**Composer mínimo**",
+            "**Scheduling**",
+            "**Distribution + primer conector social real**",
+            "**Automatización básica**",
+            "**Traffic/métricas básicas**",
+            "**Onboarding/operación**",
+            "**Piloto**",
+            "**Go/no-go**",
         )
-        positions = [trace.index(marker) for marker in ordered_markers]
+        positions = [section.index(marker) for marker in ordered_markers]
         self.assertEqual(positions, sorted(positions))
 
     def test_docs_index_declares_product_precedence_and_implementation_boundary(self):
