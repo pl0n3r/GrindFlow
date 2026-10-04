@@ -312,31 +312,46 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          marker_value() {
+            local marker="$1"
+            local matches=()
+            mapfile -t matches < <(grep -E "^$marker=(ready|not_ready)$" production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           ready_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=1' production-smoke.log || true)"
           blocked_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=0' production-smoke.log || true)"
-          decoder_count="$(grep -Ecx 'MEDIA_WEB_RUNTIME_CHECK_DECODER=(ready|not_ready)' production-smoke.log || true)"
-          temporary_count="$(grep -Ecx 'MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=(ready|not_ready)' production-smoke.log || true)"
-          vault_count="$(grep -Ecx 'MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=(ready|not_ready)' production-smoke.log || true)"
-          decoder="$(grep -E '^MEDIA_WEB_RUNTIME_CHECK_DECODER=(ready|not_ready)$' production-smoke.log | tail -n 1 | cut -d= -f2 || true)"
-          temporary="$(grep -E '^MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=(ready|not_ready)$' production-smoke.log | tail -n 1 | cut -d= -f2 || true)"
-          vault="$(grep -E '^MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=(ready|not_ready)$' production-smoke.log | tail -n 1 | cut -d= -f2 || true)"
-          subchecks_unique=false
-          if [[ "$decoder_count" == "1" && "$temporary_count" == "1" && "$vault_count" == "1" ]]; then
-            subchecks_unique=true
+          diagnostics_available=false
+          decoder_state=''
+          temporary_storage_state=''
+          private_vault_state=''
+
+          if decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
+            && temporary_storage_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE)" \
+            && private_vault_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT)"; then
+            diagnostics_available=true
           fi
 
-          if [[ "$ready_count" == "1" && "$blocked_count" == "0" && "$subchecks_unique" == "true" && "$decoder" == "ready" && "$temporary" == "ready" && "$vault" == "ready" ]]; then
+          if [[ "$ready_count" == "1" && "$blocked_count" == "0" \
+            && "$diagnostics_available" == "true" \
+            && "$decoder_state" == "ready" \
+            && "$temporary_storage_state" == "ready" \
+            && "$private_vault_state" == "ready" ]]; then
             {
               echo '## Media web runtime ready'
               echo
               printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
+              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
               echo 'Contract: `media-pilot-readiness-v1`'
               echo 'Evidence scope: `web_runtime`'
               echo 'Status: `ready`'
-              echo 'decoder: `ready`'
-              echo 'temporary_storage: `ready`'
-              echo 'private_vault: `ready`'
-              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              printf -- '- decoder: `%s`\n' "$decoder_state"
+              printf -- '- temporary_storage: `%s`\n' "$temporary_storage_state"
+              printf -- '- private_vault: `%s`\n' "$private_vault_state"
               echo
               echo 'The remote readiness body, filesystem paths, cookies, hashes and secrets are intentionally omitted.'
             } > /tmp/grindflow-media-web-runtime.md
@@ -352,18 +367,18 @@ jobs:
             {
               echo '## Media web runtime remains blocked'
               echo
-              echo 'Authenticated production smoke completed, but media readiness is not uniquely ready.'
               printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
               echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-              if [[ "$subchecks_unique" == "true" ]]; then
-                printf 'decoder: `%s`\n' "$decoder"
-                printf 'temporary_storage: `%s`\n' "$temporary"
-                printf 'private_vault: `%s`\n' "$vault"
+              echo 'Status: `BLOCKED_TARGET_ENV`'
+              if [[ "$diagnostics_available" == "true" ]]; then
+                printf -- '- decoder: `%s`\n' "$decoder_state"
+                printf -- '- temporary_storage: `%s`\n' "$temporary_storage_state"
+                printf -- '- private_vault: `%s`\n' "$private_vault_state"
               else
-                echo 'Subcheck states unavailable because the closed readiness contract was not observed.'
+                echo 'Allowlisted subcheck diagnostics unavailable because the closed readiness contract was not observed.'
               fi
-              echo 'Issue #307 remains open as BLOCKED_TARGET_ENV.'
-              echo 'No remote response body, filesystem path, cookie, hash or secret was published.'
+              echo
+              echo 'Issue #307 remains open. No remote response body, filesystem path, cookie, header, hash or secret was published.'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
