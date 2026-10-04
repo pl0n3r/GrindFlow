@@ -256,6 +256,8 @@ final class ScheduleDraftTest extends WebTestCase
             'created_at' => $at,
         ]);
 
+        $client->disableReboot();
+
         $transport = new SchedulePhotoTransport([
             ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
         ]);
