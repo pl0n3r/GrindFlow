@@ -6,6 +6,10 @@ services:
     alias: GrindFlow\Infrastructure\Mail\InMemoryPasswordRecoveryNotifier
     public: true
 
+  GrindFlow\Distribution\FacebookPageProvider:
+    public: true
+    shared: false
+
   GrindFlow\Ops\Security\StaffOpsConfiguration:
     arguments:
       $keysJson: '{"grindflow-test":"test-secret-not-production"}'
