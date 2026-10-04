@@ -18,6 +18,11 @@ VERSION = re.compile(r"'number'\s*=>\s*'(\d+)\.(\d+)\.(\d+)'")
 DATE = re.compile(r"'released_at'\s*=>\s*'(\d{4}-\d{2}-\d{2})'")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 BOOTSTRAP = (0, 1, 0)
+POLICY_BRIDGE_NO_BUMP_PATHS = frozenset({
+    ".github/workflows/politica.yml",
+    "tests/test_factory_policy_bridge.py",
+    "tests/test_factory_policy_adoption.py",
+})
 
 
 def parse_version(content: str) -> tuple[int, int, int]:
@@ -35,10 +40,16 @@ def parse_version(content: str) -> tuple[int, int, int]:
     return version
 
 
-def transition(previous: tuple[int, int, int] | None, current: tuple[int, int, int]) -> None:
+def transition(
+    previous: tuple[int, int, int] | None,
+    current: tuple[int, int, int],
+    changed: tuple[str, ...] = (),
+) -> None:
     if previous is None:
         if current != BOOTSTRAP:
             raise ValueError("initial GrindFlow release must be 0.1.0")
+        return
+    if current == previous and frozenset(changed) == POLICY_BRIDGE_NO_BUMP_PATHS:
         return
     old_major, old_minor, old_patch = previous
     major, minor, patch = current
@@ -48,6 +59,21 @@ def transition(previous: tuple[int, int, int] | None, current: tuple[int, int, i
     ) and major == 0:
         return
     raise ValueError(f"invalid product-version transition: {previous} -> {current}")
+
+
+def changed_paths(base: str, head: str) -> tuple[str, ...]:
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "--no-renames", base, head, "--"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError("cannot read changed paths from Git")
+    paths = tuple(line for line in result.stdout.splitlines() if line)
+    if not paths:
+        raise ValueError("empty diff cannot bypass product-version transition")
+    return paths
 
 
 def show(sha: str) -> str | None:
@@ -79,6 +105,7 @@ def self_test() -> None:
         ((0, 1, 9), (0, 2, 0)),
     ):
         transition(before, after)
+    transition((0, 1, 9), (0, 1, 9), tuple(POLICY_BRIDGE_NO_BUMP_PATHS))
     for before, after in (
         (None, (0, 1, 1)),
         ((0, 1, 0), (0, 1, 0)),
@@ -92,6 +119,15 @@ def self_test() -> None:
         except ValueError:
             continue
         raise AssertionError(f"unexpectedly accepted {before} -> {after}")
+    for changed in (
+        (".github/workflows/politica.yml",),
+        tuple(POLICY_BRIDGE_NO_BUMP_PATHS | {"README.md"}),
+    ):
+        try:
+            transition((0, 1, 9), (0, 1, 9), changed)
+        except ValueError:
+            continue
+        raise AssertionError("unexpectedly accepted same-version non-canonical diff")
     for bad in (
         sample.replace("2026-09-19", "2026-02-30"),
         sample.replace("0.1.0", "1.0.0"),
@@ -122,7 +158,11 @@ def main() -> int:
         after = show(args.head)
         if after is None:
             raise ValueError("release metadata missing at head")
-        transition(parse_version(before) if before is not None else None, parse_version(after))
+        transition(
+            parse_version(before) if before is not None else None,
+            parse_version(after),
+            changed_paths(args.base, args.head),
+        )
         print("GrindFlow release-version transition verified.")
         return 0
     except ValueError as error:
