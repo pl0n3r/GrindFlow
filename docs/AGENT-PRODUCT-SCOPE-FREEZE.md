@@ -4,7 +4,7 @@ Esta política convierte el corpus histórico de GrindFlow en una **fuente conge
 
 ## Regla canónica
 
-1. **`sigue` no genera requisitos.** `sigue`, `continúa` y `adelante` significan inspeccionar el estado real más reciente del repositorio, Issues, PRs y CI, y ejecutar el siguiente trabajo seguro no duplicado.
+1. **`sigue` no genera requisitos.** `sigue`, `continúa`, `adelante` y `avanza` significan inspeccionar el estado real más reciente del repositorio, Issues, PRs y CI, y ejecutar el siguiente trabajo seguro no duplicado.
 2. **Prohibido continuar numeraciones masivas** o abrir nuevas tandas de specs/requisitos solo porque la serie histórica tenga un número siguiente.
 3. **Prohibido releer o regenerar linealmente miles de definiciones congeladas.** La recuperación histórica se hace por capacidades, macrobloques, procedencia y brechas concretas.
 4. Antes de crear trabajo nuevo, contrastar código, Issues/PRs, `docs/REQUIREMENTS.md`, `docs/GRINDFLOW-SPEC.md` y las consolidaciones del corpus.
@@ -22,7 +22,7 @@ La salida de una revisión histórica debe ser una capacidad reconciliada o una 
 
 ## Interpretación de comandos cortos
 
-- `sigue` / `continúa` / `adelante`: continuar desde el estado real y ejecutar trabajo seguro/no duplicado.
+- `sigue` / `continúa` / `adelante` / `avanza`: continuar desde el estado real y ejecutar trabajo seguro/no duplicado.
 - `sigue con el MVP`: continuar el camino crítico del MVP.
 - `sigue con requisitos`: reconciliar y priorizar requisitos existentes; no generar más por defecto.
 - `revisa los requisitos`: usar consolidaciones y macrobloques; bajar a detalle solo para resolver una brecha, conflicto o requisito único verificable.
