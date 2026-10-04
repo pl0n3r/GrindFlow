@@ -304,6 +304,47 @@ jobs:
             fi
           fi
 
+      - name: Reconcile media web-runtime readiness
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MEDIA_READINESS_ISSUE: '307'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=1' production-smoke.log || true)"
+          blocked_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=0' production-smoke.log || true)"
+
+          if [[ "$ready_count" == "1" && "$blocked_count" == "0" ]]; then
+            {
+              echo '## Media web runtime ready'
+              echo
+              printf 'Exact deployed SHA: `%s`\\n' "$GITHUB_SHA"
+              echo 'Contract: `media-pilot-readiness-v1`'
+              echo 'Evidence scope: `web_runtime`'
+              echo 'Status: `ready`'
+              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo
+              echo 'The remote readiness body, filesystem paths, cookies, hashes and secrets are intentionally omitted.'
+            } > /tmp/grindflow-media-web-runtime.md
+            cat /tmp/grindflow-media-web-runtime.md >> "$GITHUB_STEP_SUMMARY"
+
+            issue_state="$(gh issue view "$MEDIA_READINESS_ISSUE" --json state --jq '.state')"
+            if [[ "$issue_state" == "OPEN" ]]; then
+              gh issue comment "$MEDIA_READINESS_ISSUE" --body-file /tmp/grindflow-media-web-runtime.md
+              gh issue edit "$MEDIA_READINESS_ISSUE" --remove-label 'estado: bloqueado' --add-label 'estado: completado'
+              gh issue close "$MEDIA_READINESS_ISSUE"
+            fi
+          else
+            {
+              echo '## Media web runtime remains blocked'
+              echo
+              echo 'Authenticated production smoke completed, but the allowlisted web-runtime readiness marker was not uniquely ready.'
+              echo 'Issue #307 remains open as BLOCKED_TARGET_ENV.'
+              echo 'No remote response body or sensitive runtime detail was published.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload short-lived smoke diagnostics
         if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
         uses: actions/upload-artifact@v6

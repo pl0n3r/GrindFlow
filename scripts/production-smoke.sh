@@ -38,6 +38,7 @@ vault_html="$workdir/vault.html"
 diagnostics_json="$workdir/diagnostics.json"
 health_body="$workdir/health.json"
 health_headers="$workdir/health.headers"
+media_readiness_body="$workdir/media-readiness.json"
 home_body="$workdir/home.html"
 home_headers="$workdir/home.headers"
 login_headers="$workdir/login.headers"
@@ -344,6 +345,57 @@ check_workspace_modules() {
   printf 'MODULE_READ_ONLY=traffic-csv:ok\n'
 }
 
+# Observe only allowlisted media readiness from the authenticated web runtime.
+# The remote JSON body is never printed or copied into GitHub evidence.
+check_media_web_runtime_readiness() {
+  local status
+  status="$(curl_common --cookie "$cookie_jar" --output "$media_readiness_body" --write-out '%{http_code}' "$BASE_URL/api/admin/schedules/media-readiness" || true)"
+  if [[ "$status" != "200" ]]; then
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+
+  if python3 - "$media_readiness_body" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+if not isinstance(payload, dict) or set(payload) != {"data"}:
+    raise SystemExit(1)
+data = payload.get("data")
+if not isinstance(data, dict) or set(data) != {
+    "contract", "status", "checks", "evidence_scope", "ci_equivalent"
+}:
+    raise SystemExit(1)
+checks = data.get("checks")
+if not isinstance(checks, dict) or set(checks) != {
+    "decoder", "temporary_storage", "private_vault"
+}:
+    raise SystemExit(1)
+expected = {
+    "contract": "media-pilot-readiness-v1",
+    "status": "ready",
+    "evidence_scope": "web_runtime",
+}
+if any(data.get(key) != value for key, value in expected.items()):
+    raise SystemExit(1)
+if data.get("ci_equivalent") is not False:
+    raise SystemExit(1)
+if any(checks.get(key) != "ready" for key in checks):
+    raise SystemExit(1)
+PY
+  then
+    printf 'MEDIA_WEB_RUNTIME_READY=1\n'
+  else
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+  fi
+}
+
 # One anonymous GET after a rejected POST checks if the session/CSRF persisted.
 # Only allowlisted markers leave the private workspace; NEVER re-POST credentials.
 # A changed token is a diagnostic signal, not proof of an invalid password.
@@ -368,7 +420,7 @@ check_failed_login_session() {
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$health_body" "$health_headers" "$home_body" "$home_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
+  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$health_body" "$health_headers" "$media_readiness_body" "$home_body" "$home_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
 
   local health_status health_version health_sha
   local -a health_identity=()
@@ -520,6 +572,7 @@ run_smoke() {
   fi
 
   check_workspace_modules "$vault_path" || return $?
+  check_media_web_runtime_readiness
   printf 'PASS production smoke: /health exact-main, /, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
 }
 
