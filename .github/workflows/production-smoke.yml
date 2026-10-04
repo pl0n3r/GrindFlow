@@ -319,7 +319,7 @@ jobs:
             {
               echo '## Media web runtime ready'
               echo
-              echo "Exact deployed SHA: `$GITHUB_SHA`"
+              printf 'Exact deployed SHA: `%s`\\n' "$GITHUB_SHA"
               echo 'Contract: `media-pilot-readiness-v1`'
               echo 'Evidence scope: `web_runtime`'
               echo 'Status: `ready`'

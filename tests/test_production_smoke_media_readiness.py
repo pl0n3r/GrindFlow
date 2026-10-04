@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,15 +88,75 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertNotIn("--request POST", block)
 
     def test_workflow_closes_issue_307_only_after_successful_exact_deploy_web_runtime_evidence(self) -> None:
-        self.assertIn("steps.smoke.outcome == 'success'", WORKFLOW)
-        self.assertIn("ready_count", WORKFLOW)
-        self.assertIn("blocked_count", WORKFLOW)
-        self.assertIn("Exact deployed SHA:", WORKFLOW)
-        self.assertIn("Evidence scope:", WORKFLOW)
-        self.assertIn("MEDIA_READINESS_ISSUE: '307'", WORKFLOW)
-        self.assertIn('gh issue close "$MEDIA_READINESS_ISSUE"', WORKFLOW)
-        self.assertIn("Issue #307 remains open as BLOCKED_TARGET_ENV.", WORKFLOW)
-        self.assertNotIn('cat "$media_readiness_body"', WORKFLOW)
+        step_start = WORKFLOW.index("      - name: Reconcile media web-runtime readiness")
+        step_end = WORKFLOW.index("      - name: Upload short-lived smoke diagnostics", step_start)
+        step = WORKFLOW[step_start:step_end]
+        self.assertIn("steps.smoke.outcome == 'success'", step)
+        self.assertIn("MEDIA_READINESS_ISSUE: '307'", step)
+        self.assertNotIn('cat "$media_readiness_body"', step)
+
+        run_marker = "        run: |\n"
+        script_start = step.index(run_marker) + len(run_marker)
+        script = textwrap.dedent(step[script_start:])
+
+        cases = (
+            ("MEDIA_WEB_RUNTIME_READY=1\n", True),
+            ("MEDIA_WEB_RUNTIME_READY=0\n", False),
+            ("", False),
+            ("MEDIA_WEB_RUNTIME_READY=1\nMEDIA_WEB_RUNTIME_READY=1\n", False),
+        )
+        for smoke_log, should_close in cases:
+            with self.subTest(smoke_log=smoke_log):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    bin_dir = root / "bin"
+                    bin_dir.mkdir()
+                    gh_log = root / "gh.log"
+                    fake_gh = bin_dir / "gh"
+                    fake_gh.write_text(
+                        "#!/bin/sh\n"
+                        "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
+                        "if [ \"$1 $2\" = \"issue view\" ]; then printf 'OPEN\\n'; fi\n",
+                        encoding="utf-8",
+                    )
+                    fake_gh.chmod(0o755)
+                    (root / "production-smoke.log").write_text(smoke_log, encoding="utf-8")
+                    summary = root / "summary.md"
+                    evidence = Path("/tmp/grindflow-media-web-runtime.md")
+                    evidence.unlink(missing_ok=True)
+
+                    sha = "a" * 40
+                    env = os.environ.copy()
+                    env.update(
+                        {
+                            "PATH": f"{bin_dir}:{env['PATH']}",
+                            "GH_LOG": str(gh_log),
+                            "GITHUB_SHA": sha,
+                            "GITHUB_STEP_SUMMARY": str(summary),
+                            "GITHUB_SERVER_URL": "https://github.example",
+                            "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
+                            "GITHUB_RUN_ID": "12345",
+                            "MEDIA_READINESS_ISSUE": "307",
+                        }
+                    )
+                    completed = subprocess.run(
+                        ["bash", "-c", script],
+                        cwd=root,
+                        env=env,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    calls = gh_log.read_text(encoding="utf-8") if gh_log.exists() else ""
+                    self.assertEqual(should_close, "issue close 307" in calls)
+                    if should_close:
+                        proof = evidence.read_text(encoding="utf-8")
+                        self.assertIn(f"Exact deployed SHA: `{sha}`", proof)
+                        self.assertIn("Evidence scope: `web_runtime`", proof)
+                    else:
+                        self.assertIn("BLOCKED_TARGET_ENV", summary.read_text(encoding="utf-8"))
+                    evidence.unlink(missing_ok=True)
 
     def test_v0191_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
         self.assertIn("'number' => '0.1.191'", VERSION)
