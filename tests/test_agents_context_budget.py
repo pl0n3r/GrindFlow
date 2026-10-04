@@ -23,6 +23,7 @@ CANONICAL_DOCS = (
     "docs/AGENT-VAULT-UPLOADS.md",
     "docs/AGENT-SMOKE-E2E.md",
     "docs/AGENT-OPERATIONS.md",
+    "docs/AGENT-PRODUCT-SCOPE-FREEZE.md",
 )
 
 REQUIRED_PROCESS_HEADINGS = (
@@ -46,6 +47,7 @@ class AgentsContextBudgetTests(unittest.TestCase):
         cls.package = json.loads(PACKAGE.read_text(encoding="utf-8"))
         cls.lock = json.loads(LOCK.read_text(encoding="utf-8"))
         cls.version_php = VERSION.read_text(encoding="utf-8")
+        cls.product_scope_freeze = (ROOT / "docs/AGENT-PRODUCT-SCOPE-FREEZE.md").read_text(encoding="utf-8")
 
     def test_agents_stays_within_local_line_budget(self):
         line_count = len(self.agents.splitlines())
@@ -93,7 +95,40 @@ class AgentsContextBudgetTests(unittest.TestCase):
         self.assertIn(expected, self.package["scripts"]["test"])
         self.assertEqual(self.package["scripts"]["test"].count(expected), 1)
 
-    def test_release_identity_matches_across_manifests(self):
+    def test_agents_links_product_scope_freeze(self):
+        self.assertIn(
+            "[`docs/AGENT-PRODUCT-SCOPE-FREEZE.md`](docs/AGENT-PRODUCT-SCOPE-FREEZE.md)",
+            self.agents,
+        )
+        self.assertIn("`sigue` no genera requisitos", self.agents)
+
+    def test_product_scope_freeze_preserves_no_spec_loop(self):
+        self.assertIn("NO SPEC LOOP", self.product_scope_freeze)
+        self.assertIn("Prohibido continuar numeraciones masivas", self.product_scope_freeze)
+        self.assertIn("decisión explícita del owner", self.product_scope_freeze)
+        self.assertIn(
+            "`sigue`, `continúa`, `adelante` y `avanza` significan inspeccionar el estado real",
+            self.product_scope_freeze,
+        )
+        self.assertIn(
+            "`sigue` / `continúa` / `adelante` / `avanza`: continuar desde el estado real",
+            self.product_scope_freeze,
+        )
+
+    def test_product_scope_freeze_regression_is_wired_into_npm_test(self):
+        expected = "python3 -m unittest tests/test_agents_context_budget.py"
+        self.assertIn(expected, self.package["scripts"]["test"])
+        self.assertEqual(self.package["scripts"]["test"].count(expected), 1)
+
+    def test_product_scope_freeze_preserves_canonical_flow(self):
+        expected = (
+            "fuente histórica → capacidad canónica → estado real → brecha → "
+            "leaf ejecutable → código/tests/evidencia"
+        )
+        self.assertIn(expected, self.product_scope_freeze)
+        self.assertIn(expected, self.agents)
+
+    def test_release_version_is_synchronized(self):
         match = re.search(r"'number'\s*=>\s*'([^']+)'", self.version_php)
         self.assertIsNotNone(match)
         release = match.group(1)
