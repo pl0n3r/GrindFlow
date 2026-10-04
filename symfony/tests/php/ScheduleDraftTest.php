@@ -338,17 +338,6 @@ final class ScheduleDraftTest extends WebTestCase
         self::assertContains('draft', array_column($history['drafts'], 'status'));
 
         $activeDraftId = $replacement['draft']['id'];
-        $client->request('PUT', '/api/admin/schedules/'.$foreignDraft.'/delivery-intent', server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_CSRF_TOKEN' => $csrf,
-        ], content: json_encode(['caption' => 'Caption ajeno'], JSON_THROW_ON_ERROR));
-        self::assertResponseStatusCodeSame(404);
-
-        $client->request('PUT', '/api/admin/schedules/'.$activeDraftId.'/delivery-intent', server: [
-            'CONTENT_TYPE' => 'application/json',
-        ], content: json_encode(['caption' => 'Caption seguro'], JSON_THROW_ON_ERROR));
-        self::assertResponseStatusCodeSame(403);
-
         $transport = new SchedulePhotoTransport([
             ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
         ]);
@@ -366,6 +355,17 @@ final class ScheduleDraftTest extends WebTestCase
             FacebookPagePublicationService::class,
             new FacebookPagePublicationService($db, $provider),
         );
+
+        $client->request('PUT', '/api/admin/schedules/'.$foreignDraft.'/delivery-intent', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_CSRF_TOKEN' => $csrf,
+        ], content: json_encode(['caption' => 'Caption ajeno'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(404);
+
+        $client->request('PUT', '/api/admin/schedules/'.$activeDraftId.'/delivery-intent', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode(['caption' => 'Caption seguro'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(403);
 
         $client->request('PUT', '/api/admin/schedules/'.$activeDraftId.'/delivery-intent', server: [
             'CONTENT_TYPE' => 'application/json',
