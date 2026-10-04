@@ -152,7 +152,13 @@ jobs:
           fi
 
       - name: Retirar de la cola si no es puerta válida y confiable
-        if: always() && (steps.actor.outputs.trusted != 'true' || steps.gate.outputs.status != 'gate')
+        if: >-
+          always() &&
+          steps.actor.outcome == 'success' &&
+          (
+            steps.actor.outputs.trusted != 'true' ||
+            (steps.gate.outcome == 'success' && steps.gate.outputs.status != 'gate')
+          )
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORIO: ${{ github.repository }}
