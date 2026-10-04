@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +38,43 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn('set(payload) != {"data"}', block)
         self.assertIn("set(data) != {", block)
         self.assertIn("set(checks) != {", block)
+
+    def test_ci_equivalent_requires_json_boolean_false_strictly(self) -> None:
+        block = self._readiness_function()
+        marker = "if python3 - \"$media_readiness_body\" <<'PY'\n"
+        start = block.index(marker) + len(marker)
+        end = block.index("\nPY\n", start)
+        parser = block[start:end]
+
+        base = {
+            "data": {
+                "contract": "media-pilot-readiness-v1",
+                "status": "ready",
+                "checks": {
+                    "decoder": "ready",
+                    "temporary_storage": "ready",
+                    "private_vault": "ready",
+                },
+                "evidence_scope": "web_runtime",
+                "ci_equivalent": False,
+            }
+        }
+
+        for value, expected_code in ((False, 0), (0, 1), (None, 1), ("false", 1)):
+            with self.subTest(value=value):
+                payload = json.loads(json.dumps(base))
+                payload["data"]["ci_equivalent"] = value
+                with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+                    json.dump(payload, handle)
+                    handle.flush()
+                    result = subprocess.run(
+                        ["python3", "-", handle.name],
+                        input=parser,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                self.assertEqual(expected_code, result.returncode, result.stderr)
 
     def test_invalid_or_not_ready_response_fails_closed_without_provider_io_or_sensitive_output(self) -> None:
         block = self._readiness_function()

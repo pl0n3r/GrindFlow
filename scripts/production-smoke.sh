@@ -381,9 +381,10 @@ expected = {
     "contract": "media-pilot-readiness-v1",
     "status": "ready",
     "evidence_scope": "web_runtime",
-    "ci_equivalent": False,
 }
 if any(data.get(key) != value for key, value in expected.items()):
+    raise SystemExit(1)
+if data.get("ci_equivalent") is not False:
     raise SystemExit(1)
 if any(checks.get(key) != "ready" for key in checks):
     raise SystemExit(1)
