@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://www.grindflow.com.co}"
-E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-admin@grindflow.test}"
+E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-oidc-smoke@grindflow.test}"
 OUTPUT_PATH="${OUTPUT_PATH:-production-migration-result.json}"
 EXPECTED_PENDING="${EXPECTED_PENDING:-1}"
 : "${E2E_USER_PASSWORD:?E2E_USER_PASSWORD is required}"
@@ -14,6 +14,7 @@ fi
 
 workdir="$(mktemp -d)"
 cookie_jar="$workdir/cookies.txt"
+password_file="$workdir/login-password"
 login_html="$workdir/login.html"
 system_before="$workdir/system-before.html"
 system_after="$workdir/system-after.html"
@@ -23,24 +24,33 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Keep the production credential out of curl argv and retained output.
+umask 077
+printf '%s' "$E2E_USER_PASSWORD" > "$password_file"
+chmod 600 "$password_file"
+unset E2E_USER_PASSWORD
+
 write_result() {
   local ok="$1"
   local before="$2"
   local after="$3"
   local message="$4"
+  local diagnostic_code="${5:-operation_failed}"
 
-  python3 - "$OUTPUT_PATH" "$ok" "$before" "$after" "$message" <<'PY'
+  python3 - "$OUTPUT_PATH" "$ok" "$before" "$after" "$message" "$diagnostic_code" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
 
-output_path, ok, before, after, message = sys.argv[1:6]
+output_path, ok, before, after, message, diagnostic_code = sys.argv[1:7]
+success = ok == "true"
 
 payload = {
     "generated_at": datetime.now(timezone.utc).isoformat(),
-    "ok": ok == "true",
+    "ok": success,
     "pending_before": None if before == "unknown" else int(before),
     "pending_after": None if after == "unknown" else int(after),
+    "diagnostic_code": None if success else diagnostic_code,
     "message": message,
 }
 
@@ -201,8 +211,13 @@ if ! login_token="$(extract_login_csrf)"; then
   exit 1
 fi
 
-if ! login_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 30   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$login_token"   --data-urlencode "email=$E2E_USER_EMAIL"   --data-urlencode "password=$E2E_USER_PASSWORD"   "$BASE_URL/login")"; then
-  write_result false unknown unknown "Synthetic production login request failed."
+set +e
+login_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 30   --cookie "$cookie_jar"   --cookie-jar "$cookie_jar"   --output /dev/null   --write-out '%{http_code}'   --request POST   --data-urlencode "_token=$login_token"   --data-urlencode "email=$E2E_USER_EMAIL"   --data-urlencode "password@$password_file"   "$BASE_URL/login")"
+login_exit=$?
+set -e
+
+if (( login_exit != 0 )); then
+  write_result false unknown unknown "Synthetic production login request failed." "login_request_failed"
   printf 'ERROR: synthetic production login request failed.\n' >&2
   exit 1
 fi
@@ -210,23 +225,41 @@ fi
 case "$login_status" in
   302|303) ;;
   *)
-    write_result false unknown unknown "Synthetic production login failed."
-    printf 'ERROR: login returned HTTP %s.\n' "$login_status" >&2
+    write_result false unknown unknown "Synthetic production login failed." "login_failed"
+    printf 'ERROR: synthetic production login failed with a rejected HTTP response.\n' >&2
     exit 1
     ;;
 esac
 
-if ! system_status="$(curl_read   --cookie "$cookie_jar"   --output "$system_before"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"; then
-  write_result false unknown unknown "Admin System was unreachable after bounded retries."
-  printf 'ERROR: Admin System is unreachable.\n' >&2
+set +e
+system_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 30   --cookie "$cookie_jar"   --output "$system_before"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"
+system_exit=$?
+set -e
+
+if (( system_exit != 0 )); then
+  write_result false unknown unknown "Admin System was unreachable after the login attempt." "admin_system_unavailable"
+  printf 'ERROR: Admin System is unreachable after the login attempt.\n' >&2
   exit 1
 fi
 
-if [[ "$system_status" != "200" ]]; then
-  write_result false unknown unknown "Admin System is unavailable."
-  printf 'ERROR: Admin System returned HTTP %s.\n' "$system_status" >&2
-  exit 1
-fi
+case "$system_status" in
+  200) ;;
+  302|303)
+    write_result false unknown unknown "Synthetic login did not establish a session accepted by Admin System." "login_session_not_persisted"
+    printf 'ERROR: authenticated session was not accepted by Admin System.\n' >&2
+    exit 1
+    ;;
+  401|403)
+    write_result false unknown unknown "Synthetic production session lacks access to Admin System." "admin_system_access_denied"
+    printf 'ERROR: authenticated session is not authorized for Admin System.\n' >&2
+    exit 1
+    ;;
+  *)
+    write_result false unknown unknown "Admin System is unavailable after authentication." "admin_system_unavailable"
+    printf 'ERROR: Admin System is unavailable after authentication.\n' >&2
+    exit 1
+    ;;
+esac
 
 if ! pending_before="$(extract_pending_count "$system_before")"; then
   write_result false unknown unknown "Unable to determine pending migration count."
