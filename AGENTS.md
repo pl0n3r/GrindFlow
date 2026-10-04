@@ -55,12 +55,15 @@ stack objetivo. Documentar decisiones durables en el mismo PR que las aplica.
 | Versionado, README, GitHub Actions, Sonar | [`docs/AGENT-OPERATIONS.md`](docs/AGENT-OPERATIONS.md), `scripts/ci-scope.sh`, `scripts/readme-dashboard.py`, `scripts/release-version.py`, `docs/GOVERNANCE.md` | `preflight`, `fast`, `validate`, Sonar y exact-main |
 | Hostinger y datos reales | `docs/DEPLOY-HOSTINGER.md`, reglas de smoke/diagnósticos y plan de transición | Observer + smoke lectura; mutaciones requieren operación autorizada |
 | Smoke/E2E (producción y navegador CI) | [`docs/AGENT-SMOKE-E2E.md`](docs/AGENT-SMOKE-E2E.md), scripts browser/smoke aplicables | Autenticación obligatoria, producción read-only, sesión reutilizada, secretos protegidos y E2E sin retries que oculten fallos |
+| Alcance de producto / corpus histórico | [`docs/AGENT-PRODUCT-SCOPE-FREEZE.md`](docs/AGENT-PRODUCT-SCOPE-FREEZE.md) | `sigue` no genera requisitos: convertir fuentes congeladas en brechas reales y leaves ejecutables |
 
 **Regla para cambiar estas instrucciones:** comprobar que los paths, comandos,
 gates, decisiones y versiones descritos existen realmente en `main`; eliminar
 referencias obsoletas o marcarlas históricas sin borrar su trazabilidad. Actualizar
 el mismo PR con los tests y controles implicados; el
 [registro de auditoría](docs/AGENTS-AUDIT.md) explica esta depuración.
+
+**NO SPEC LOOP:** `sigue` no genera requisitos ni reabre numeraciones masivas. El flujo obligatorio es `fuente histórica → capacidad canónica → estado real → brecha → leaf ejecutable → código/tests/evidencia`; detalle y excepciones en [`docs/AGENT-PRODUCT-SCOPE-FREEZE.md`](docs/AGENT-PRODUCT-SCOPE-FREEZE.md).
 
 **Presupuesto local de contexto:** `AGENTS.md` debe permanecer en **<= 500 líneas**.
 Este límite es un guardrail propio de GrindFlow, no una restricción de Factory. Si
