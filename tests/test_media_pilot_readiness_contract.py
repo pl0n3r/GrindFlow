@@ -91,6 +91,19 @@ class MediaPilotReadinessContractTests(unittest.TestCase):
         self.assertIn("testTrailingPayloadAndCorruptContentFailWithoutLeakingTemporaryCopy", self.materializer_test)
         self.assertIn("GD decoder is required in CI.", self.materializer_test)
 
+    def test_decoded_buffer_is_the_only_source_for_integrity_and_dimensions(self) -> None:
+        read = self.materializer.index("$bytes = @file_get_contents($sourcePath);")
+        buffer_hash = self.materializer.index("hash('sha256', $bytes)")
+        framing = self.materializer.index("$this->assertNoTrailingPayload($bytes, $mimeType);")
+        dimensions = self.materializer.index("@getimagesizefromstring($bytes)")
+        decode = self.materializer.index("$image = @imagecreatefromstring($bytes);")
+        self.assertLess(read, buffer_hash)
+        self.assertLess(buffer_hash, framing)
+        self.assertLess(framing, dimensions)
+        self.assertLess(dimensions, decode)
+        self.assertNotIn("$dimensions = @getimagesize($sourcePath)", self.materializer)
+        self.assertIn("function_exists('getimagesizefromstring')", self.materializer)
+
     def test_target_readiness_is_observed_separately_from_ci(self) -> None:
         for token in (
             "'decoder'",

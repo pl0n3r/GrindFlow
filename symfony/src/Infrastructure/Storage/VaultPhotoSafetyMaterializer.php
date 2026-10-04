@@ -54,7 +54,7 @@ final class VaultPhotoSafetyMaterializer
         }
         $this->assertNoTrailingPayload($bytes, $mimeType);
 
-        $dimensions = @getimagesize($sourcePath);
+        $dimensions = @getimagesizefromstring($bytes);
         if (!is_array($dimensions) || !isset($dimensions[0], $dimensions[1], $dimensions['mime'])
             || $dimensions['mime'] !== $mimeType) {
             throw new \RuntimeException('Image header does not match the declared type.');
@@ -143,7 +143,7 @@ final class VaultPhotoSafetyMaterializer
     public function decoderAvailable(): bool
     {
         return extension_loaded('gd')
-            && function_exists('getimagesize')
+            && function_exists('getimagesizefromstring')
             && function_exists('imagecreatefromstring')
             && function_exists('imagejpeg')
             && function_exists('imagepng');
@@ -222,7 +222,7 @@ final class VaultPhotoSafetyMaterializer
         if ($raw === '' || $raw === '-1') {
             return null;
         }
-        if (preg_match('/\\A(\\d+)([KMG]?)\\z/i', $raw, $match) !== 1) {
+        if (preg_match('/\A(\d+)([KMG]?)\z/i', $raw, $match) !== 1) {
             return 0;
         }
 
