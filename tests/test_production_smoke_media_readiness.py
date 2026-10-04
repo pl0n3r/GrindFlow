@@ -95,76 +95,73 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 completed = self._run_parser(payload)
                 self.assertEqual(expected_code, completed.returncode, completed.stderr)
 
+    def test_blocked_summary_reports_only_allowlisted_subchecks(self) -> None:
+        smoke_log = "\n".join(
+            (
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "MEDIA_WEB_RUNTIME_CHECK_EVIL=leak-me",
+                "MEDIA_WEB_RUNTIME_READY=0",
+                "SECRET=do-not-copy",
+                "",
+            )
+        )
+        completed, calls, summary = self._run_reconcile(smoke_log)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertNotIn("issue close 307", calls)
+        self.assertIn("decoder: `ready`", summary)
+        self.assertIn("temporary_storage: `ready`", summary)
+        self.assertIn("private_vault: `not_ready`", summary)
+        self.assertIn("Exact deployed SHA: `" + "a" * 40 + "`", summary)
+        self.assertIn("actions/runs/12345", summary)
+        self.assertIn("BLOCKED_TARGET_ENV", summary)
+        self.assertNotIn("leak-me", summary)
+        self.assertNotIn("do-not-copy", summary)
+
     def test_workflow_closes_issue_307_only_after_successful_exact_deploy_web_runtime_evidence(self) -> None:
-        step_start = WORKFLOW.index("      - name: Reconcile media web-runtime readiness")
-        step_end = WORKFLOW.index("      - name: Upload short-lived smoke diagnostics", step_start)
-        step = WORKFLOW[step_start:step_end]
-        self.assertIn("steps.smoke.outcome == 'success'", step)
-        self.assertIn("MEDIA_READINESS_ISSUE: '307'", step)
-        self.assertNotIn('cat "$media_readiness_body"', step)
-
-        run_marker = "        run: |\n"
-        script_start = step.index(run_marker) + len(run_marker)
-        script = textwrap.dedent(step[script_start:])
-
+        ready = "\n".join(
+            (
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+                "MEDIA_WEB_RUNTIME_READY=1",
+                "",
+            )
+        )
+        blocked = "\n".join(
+            (
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "MEDIA_WEB_RUNTIME_READY=0",
+                "",
+            )
+        )
+        duplicate_subcheck = ready + "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready\n"
         cases = (
-            ("MEDIA_WEB_RUNTIME_READY=1\n", True),
-            ("MEDIA_WEB_RUNTIME_READY=0\n", False),
+            (ready, True),
+            (blocked, False),
             ("", False),
-            ("MEDIA_WEB_RUNTIME_READY=1\nMEDIA_WEB_RUNTIME_READY=1\n", False),
+            (ready + "MEDIA_WEB_RUNTIME_READY=1\n", False),
+            ("MEDIA_WEB_RUNTIME_READY=1\n", False),
+            (duplicate_subcheck, False),
         )
         for smoke_log, should_close in cases:
             with self.subTest(smoke_log=smoke_log):
-                with tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
-                    bin_dir = root / "bin"
-                    bin_dir.mkdir()
-                    gh_log = root / "gh.log"
-                    fake_gh = bin_dir / "gh"
-                    fake_gh.write_text(
-                        "#!/bin/sh\n"
-                        "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
-                        "if [ \"$1 $2\" = \"issue view\" ]; then printf 'OPEN\\n'; fi\n",
-                        encoding="utf-8",
-                    )
-                    fake_gh.chmod(0o755)
-                    (root / "production-smoke.log").write_text(smoke_log, encoding="utf-8")
-                    summary = root / "summary.md"
-                    evidence = Path("/tmp/grindflow-media-web-runtime.md")
-                    evidence.unlink(missing_ok=True)
-
-                    sha = "a" * 40
-                    env = os.environ.copy()
-                    env.update(
-                        {
-                            "PATH": f"{bin_dir}:{env['PATH']}",
-                            "GH_LOG": str(gh_log),
-                            "GITHUB_SHA": sha,
-                            "GITHUB_STEP_SUMMARY": str(summary),
-                            "GITHUB_SERVER_URL": "https://github.example",
-                            "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
-                            "GITHUB_RUN_ID": "12345",
-                            "MEDIA_READINESS_ISSUE": "307",
-                        }
-                    )
-                    completed = subprocess.run(
-                        ["bash", "-c", script],
-                        cwd=root,
-                        env=env,
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                    )
-                    self.assertEqual(0, completed.returncode, completed.stderr)
-                    calls = gh_log.read_text(encoding="utf-8") if gh_log.exists() else ""
-                    self.assertEqual(should_close, "issue close 307" in calls)
-                    if should_close:
-                        proof = evidence.read_text(encoding="utf-8")
-                        self.assertIn(f"Exact deployed SHA: `{sha}`", proof)
-                        self.assertIn("Evidence scope: `web_runtime`", proof)
-                    else:
-                        self.assertIn("BLOCKED_TARGET_ENV", summary.read_text(encoding="utf-8"))
-                    evidence.unlink(missing_ok=True)
+                completed, calls, summary = self._run_reconcile(smoke_log)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual(should_close, "issue close 307" in calls)
+                if should_close:
+                    proof = Path("/tmp/grindflow-media-web-runtime.md").read_text(encoding="utf-8")
+                    self.assertIn("Exact deployed SHA: `" + "a" * 40 + "`", proof)
+                    self.assertIn("Evidence scope: `web_runtime`", proof)
+                    self.assertIn("decoder: `ready`", proof)
+                    self.assertIn("temporary_storage: `ready`", proof)
+                    self.assertIn("private_vault: `ready`", proof)
+                else:
+                    self.assertIn("BLOCKED_TARGET_ENV", summary)
+                Path("/tmp/grindflow-media-web-runtime.md").unlink(missing_ok=True)
 
     def test_v0191_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
         self.assertIn("'number' => '0.1.191'", VERSION)
@@ -217,6 +214,60 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         start = block.index(marker) + len(marker)
         end = block.index("\nPY\n", start)
         return textwrap.dedent(block[start:end])
+
+    @staticmethod
+    def _reconcile_script() -> str:
+        start = WORKFLOW.index("      - name: Reconcile media web-runtime readiness")
+        end = WORKFLOW.index("      - name: Upload short-lived smoke diagnostics", start)
+        step = WORKFLOW[start:end]
+        marker = "        run: |\n"
+        script_start = step.index(marker) + len(marker)
+        return textwrap.dedent(step[script_start:])
+
+    @classmethod
+    def _run_reconcile(cls, smoke_log: str) -> tuple[subprocess.CompletedProcess[str], str, str]:
+        script = cls._reconcile_script()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            gh_log = root / "gh.log"
+            fake_gh = bin_dir / "gh"
+            fake_gh.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
+                "if [ \"$1 $2\" = \"issue view\" ]; then printf 'OPEN\\n'; fi\n",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            (root / "production-smoke.log").write_text(smoke_log, encoding="utf-8")
+            summary = root / "summary.md"
+            evidence = Path("/tmp/grindflow-media-web-runtime.md")
+            evidence.unlink(missing_ok=True)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "GH_LOG": str(gh_log),
+                    "GITHUB_SHA": "a" * 40,
+                    "GITHUB_STEP_SUMMARY": str(summary),
+                    "GITHUB_SERVER_URL": "https://github.example",
+                    "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
+                    "GITHUB_RUN_ID": "12345",
+                    "MEDIA_READINESS_ISSUE": "307",
+                }
+            )
+            completed = subprocess.run(
+                ["bash", "-c", script],
+                cwd=root,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            calls = gh_log.read_text(encoding="utf-8") if gh_log.exists() else ""
+            summary_text = summary.read_text(encoding="utf-8") if summary.exists() else ""
+            return completed, calls, summary_text
 
 
 if __name__ == "__main__":
