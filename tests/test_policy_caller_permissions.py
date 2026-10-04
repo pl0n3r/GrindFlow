@@ -15,23 +15,50 @@ class PolicyCallerPermissionsTests(unittest.TestCase):
     def _text(self) -> str:
         return CALLER.read_text(encoding="utf-8")
 
-    def _job_permissions(self) -> dict[str, str]:
-        text = self._text()
-        job = text.split("  factory-policy:\n", 1)[1]
-        match = re.search(
-            r"^    permissions:\n(?P<body>(?:^      [a-z-]+: [a-z]+\n)+)",
-            job,
-            flags=re.MULTILINE,
+    @staticmethod
+    def _direct_mapping(lines: list[str], header_index: int, child_indent: int) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for line in lines[header_index + 1 :]:
+            if not line.strip():
+                continue
+            indent = len(line) - len(line.lstrip())
+            if indent < child_indent:
+                break
+            if indent != child_indent:
+                continue
+            match = re.fullmatch(r"\\s*([a-z-]+):\\s*([a-z]+)\\s*", line)
+            if match is None:
+                break
+            mapping[match.group(1)] = match.group(2)
+        return mapping
+
+    def _permission_maps(self) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+        lines = self._text().splitlines()
+
+        global_index = next(
+            index
+            for index, line in enumerate(lines)
+            if line == "permissions:"
         )
-        self.assertIsNotNone(match)
-        assert match is not None
-        return {
-            key: value
-            for key, value in (
-                line.strip().split(": ", 1)
-                for line in match.group("body").splitlines()
-            )
-        }
+        global_permissions = self._direct_mapping(lines, global_index, 2)
+
+        jobs_index = next(index for index, line in enumerate(lines) if line == "jobs:")
+        job_permissions: dict[str, dict[str, str]] = {}
+        current_job: str | None = None
+        for index, line in enumerate(lines[jobs_index + 1 :], start=jobs_index + 1):
+            job_match = re.fullmatch(r"  ([a-z0-9-]+):\\s*", line)
+            if job_match is not None:
+                current_job = job_match.group(1)
+                continue
+            if current_job is not None and line == "    permissions:":
+                job_permissions[current_job] = self._direct_mapping(lines, index, 6)
+
+        return global_permissions, job_permissions
+
+    def _job_permissions(self) -> dict[str, str]:
+        _, jobs = self._permission_maps()
+        self.assertIn("factory-policy", jobs)
+        return jobs["factory-policy"]
 
     def test_policy_caller_grants_exact_reusable_permissions(self) -> None:
         self.assertEqual(
@@ -45,17 +72,25 @@ class PolicyCallerPermissionsTests(unittest.TestCase):
         )
 
     def test_policy_caller_does_not_expand_other_permissions(self) -> None:
-        text = self._text()
-        top = text.split("jobs:", 1)[0]
-        self.assertIn("permissions:\n  contents: read\n  pull-requests: read", top)
-        for forbidden in (
-            "contents: write",
-            "pull-requests: write",
-            "actions: write",
-            "packages: write",
-            "id-token: write",
-        ):
-            self.assertNotIn(forbidden, text)
+        global_permissions, job_permissions = self._permission_maps()
+        self.assertEqual(
+            global_permissions,
+            {
+                "contents": "read",
+                "pull-requests": "read",
+            },
+        )
+        self.assertEqual(
+            job_permissions,
+            {
+                "factory-policy": {
+                    "contents": "read",
+                    "pull-requests": "read",
+                    "issues": "write",
+                    "checks": "read",
+                },
+            },
+        )
 
     def test_policy_caller_keeps_factory_v1_and_existing_contract(self) -> None:
         text = self._text()
