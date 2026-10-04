@@ -10,6 +10,7 @@ use GrindFlow\Distribution\FacebookPageProvider;
 use GrindFlow\Distribution\FacebookPagePublicationService;
 use GrindFlow\Distribution\FacebookPageTransport;
 use GrindFlow\Kernel;
+use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Uid\Uuid;
 
@@ -26,6 +27,10 @@ final class ScheduleDraftTest extends WebTestCase
         $client->disableReboot();
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
+        self::assertInstanceOf(
+            ScheduleDraftApplicationService::class,
+            static::getContainer()->get(ScheduleDraftApplicationService::class),
+        );
 
         $user = Uuid::v7()->toRfc4122();
         $mine = Uuid::v7()->toRfc4122();
