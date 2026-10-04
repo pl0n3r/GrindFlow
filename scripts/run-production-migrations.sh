@@ -64,6 +64,21 @@ curl_read() {
   curl     --fail     --silent     --show-error     --retry 4     --retry-all-errors     --retry-delay 2     --connect-timeout 10     --max-time 30     "$@"
 }
 
+curl_status_read() {
+  # Read-only HTTP probe with bounded retries for transient transport/5xx
+  # failures. HTTP 302/303/401/403 remain terminal diagnostic statuses.
+  curl \
+    --silent \
+    --show-error \
+    --retry 4 \
+    --retry-all-errors \
+    --retry-delay 2 \
+    --retry-max-time 60 \
+    --connect-timeout 10 \
+    --max-time 30 \
+    "$@"
+}
+
 extract_login_csrf() {
   python3 - "$login_html" <<'PY'
 from html.parser import HTMLParser
@@ -232,7 +247,11 @@ case "$login_status" in
 esac
 
 set +e
-system_status="$(curl   --silent   --show-error   --connect-timeout 10   --max-time 30   --cookie "$cookie_jar"   --output "$system_before"   --write-out '%{http_code}'   "$BASE_URL/admin/system")"
+system_status="$(curl_status_read \
+  --cookie "$cookie_jar" \
+  --output "$system_before" \
+  --write-out '%{http_code}' \
+  "$BASE_URL/admin/system")"
 system_exit=$?
 set -e
 

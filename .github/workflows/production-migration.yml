@@ -93,15 +93,44 @@ jobs:
         if: always()
         shell: bash
         run: |
+          result_state="$(python3 - <<'PY'
+          import json
+
+          try:
+              with open("production-migration-result.json", encoding="utf-8") as handle:
+                  payload = json.load(handle)
+          except (OSError, UnicodeError, json.JSONDecodeError):
+              print("ambiguous")
+              raise SystemExit(0)
+
+          ok = payload.get("ok") is True
+          before = payload.get("pending_before")
+          after = payload.get("pending_after")
+
+          if ok and before == 0 and after == 0:
+              print("no-op")
+          elif ok and isinstance(before, int) and before > 0 and after == 0:
+              print("applied")
+          else:
+              print("ambiguous")
+          PY
+          )"
+
           if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
             state="blocked: production E2E credentials are not configured"
             backup_state="no ejecutado"
-          elif [[ "${{ steps.migrate.outcome }}" == "success" ]]; then
-            state="completed"
-            backup_state="resolved and validated server-side"
-          else
+          elif [[ "${{ steps.migrate.outcome }}" != "success" ]]; then
             state="failed safely; inspect the result artifact"
             backup_state="no confirmado (falló el paso de migración)"
+          elif [[ "$result_state" == "applied" ]]; then
+            state="completed"
+            backup_state="resolved and validated server-side"
+          elif [[ "$result_state" == "no-op" ]]; then
+            state="completed; no pending migrations"
+            backup_state="no requerido (sin lote pendiente)"
+          else
+            state="failed safely; result evidence is ambiguous"
+            backup_state="no confirmado (evidencia ambigua)"
           fi
 
           {
