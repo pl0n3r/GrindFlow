@@ -107,7 +107,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "",
             )
         )
-        completed, calls, summary = self._run_reconcile(smoke_log)
+        completed, calls, summary, _ = self._run_reconcile(smoke_log)
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertNotIn("issue close 307", calls)
         self.assertIn("decoder: `ready`", summary)
@@ -149,11 +149,10 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         )
         for smoke_log, should_close in cases:
             with self.subTest(smoke_log=smoke_log):
-                completed, calls, summary = self._run_reconcile(smoke_log)
+                completed, calls, summary, proof = self._run_reconcile(smoke_log)
                 self.assertEqual(0, completed.returncode, completed.stderr)
                 self.assertEqual(should_close, "issue close 307" in calls)
                 if should_close:
-                    proof = Path("/tmp/grindflow-media-web-runtime.md").read_text(encoding="utf-8")
                     self.assertIn("Exact deployed SHA: `" + "a" * 40 + "`", proof)
                     self.assertIn("Evidence scope: `web_runtime`", proof)
                     self.assertIn("decoder: `ready`", proof)
@@ -161,7 +160,37 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                     self.assertIn("private_vault: `ready`", proof)
                 else:
                     self.assertIn("BLOCKED_TARGET_ENV", summary)
-                Path("/tmp/grindflow-media-web-runtime.md").unlink(missing_ok=True)
+
+    def test_reconcile_invocations_use_isolated_evidence_paths(self) -> None:
+        ready = "\n".join(
+            (
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+                "MEDIA_WEB_RUNTIME_READY=1",
+                "",
+            )
+        )
+        first, first_calls, _, first_proof = self._run_reconcile(ready)
+        second, second_calls, _, second_proof = self._run_reconcile(ready)
+        self.assertEqual(0, first.returncode, first.stderr)
+        self.assertEqual(0, second.returncode, second.stderr)
+        self.assertEqual(first_proof, second_proof)
+        self.assertIn("Evidence scope: `web_runtime`", first_proof)
+
+        first_path = next(
+            line.rsplit(" --body-file ", 1)[1]
+            for line in first_calls.splitlines()
+            if " --body-file " in line
+        )
+        second_path = next(
+            line.rsplit(" --body-file ", 1)[1]
+            for line in second_calls.splitlines()
+            if " --body-file " in line
+        )
+        self.assertNotEqual(first_path, second_path)
+        self.assertIn("grindflow-media-web-runtime.md", first_path)
+        self.assertIn("grindflow-media-web-runtime.md", second_path)
 
     def test_v0192_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
         self.assertIn("'number' => '0.1.192'", VERSION)
@@ -225,7 +254,10 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         return textwrap.dedent(step[script_start:])
 
     @classmethod
-    def _run_reconcile(cls, smoke_log: str) -> tuple[subprocess.CompletedProcess[str], str, str]:
+    def _run_reconcile(
+        cls,
+        smoke_log: str,
+    ) -> tuple[subprocess.CompletedProcess[str], str, str, str]:
         script = cls._reconcile_script()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -242,8 +274,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             fake_gh.chmod(0o755)
             (root / "production-smoke.log").write_text(smoke_log, encoding="utf-8")
             summary = root / "summary.md"
-            evidence = Path("/tmp/grindflow-media-web-runtime.md")
-            evidence.unlink(missing_ok=True)
+            evidence = root / "grindflow-media-web-runtime.md"
             env = os.environ.copy()
             env.update(
                 {
@@ -255,6 +286,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                     "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
                     "GITHUB_RUN_ID": "12345",
                     "MEDIA_READINESS_ISSUE": "307",
+                    "MEDIA_WEB_RUNTIME_EVIDENCE_PATH": str(evidence),
                 }
             )
             completed = subprocess.run(
@@ -267,7 +299,8 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             )
             calls = gh_log.read_text(encoding="utf-8") if gh_log.exists() else ""
             summary_text = summary.read_text(encoding="utf-8") if summary.exists() else ""
-            return completed, calls, summary_text
+            proof = evidence.read_text(encoding="utf-8") if evidence.exists() else ""
+            return completed, calls, summary_text, proof
 
 
 if __name__ == "__main__":

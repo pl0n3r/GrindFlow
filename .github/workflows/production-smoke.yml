@@ -313,6 +313,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [[ -n "${MEDIA_WEB_RUNTIME_EVIDENCE_PATH:-}" ]]; then
+            evidence_file="$MEDIA_WEB_RUNTIME_EVIDENCE_PATH"
+          else
+            evidence_file="$(mktemp "${RUNNER_TEMP:-/tmp}/grindflow-media-web-runtime.XXXXXX")"
+          fi
+
           marker_value() {
             local marker="$1"
             local matches=()
@@ -354,12 +360,12 @@ jobs:
               printf -- '- private_vault: `%s`\n' "$private_vault_state"
               echo
               echo 'The remote readiness body, filesystem paths, cookies, hashes and secrets are intentionally omitted.'
-            } > /tmp/grindflow-media-web-runtime.md
-            cat /tmp/grindflow-media-web-runtime.md >> "$GITHUB_STEP_SUMMARY"
+            } > "$evidence_file"
+            cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
 
             issue_state="$(gh issue view "$MEDIA_READINESS_ISSUE" --json state --jq '.state')"
             if [[ "$issue_state" == "OPEN" ]]; then
-              gh issue comment "$MEDIA_READINESS_ISSUE" --body-file /tmp/grindflow-media-web-runtime.md
+              gh issue comment "$MEDIA_READINESS_ISSUE" --body-file "$evidence_file"
               gh issue edit "$MEDIA_READINESS_ISSUE" --remove-label 'estado: bloqueado' --add-label 'estado: completado'
               gh issue close "$MEDIA_READINESS_ISSUE"
             fi
