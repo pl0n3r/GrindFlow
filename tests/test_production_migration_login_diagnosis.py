@@ -372,7 +372,11 @@ class ProductionMigrationLoginDiagnosisTests(unittest.TestCase):
             runbook,
         )
         self.assertIn(
-            "sin demostrar que haya ocurrido la revisión autorizada",
+            "también en un `push` a `main`",
+            runbook,
+        )
+        self.assertIn(
+            "revisión autorizada descrita arriba",
             runbook,
         )
         self.assertIn(
