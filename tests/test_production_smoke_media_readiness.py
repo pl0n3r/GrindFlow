@@ -163,12 +163,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                     self.assertIn("BLOCKED_TARGET_ENV", summary)
                 Path("/tmp/grindflow-media-web-runtime.md").unlink(missing_ok=True)
 
-    def test_v0191_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
-        self.assertIn("'number' => '0.1.191'", VERSION)
-        self.assertEqual("0.1.191", PACKAGE["version"])
-        self.assertEqual("0.1.191", LOCK["version"])
-        self.assertEqual("0.1.191", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.191", README)
+    def test_v0192_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
+        self.assertIn("'number' => '0.1.192'", VERSION)
+        self.assertEqual("0.1.192", PACKAGE["version"])
+        self.assertEqual("0.1.192", LOCK["version"])
+        self.assertEqual("0.1.192", LOCK["packages"][""]["version"])
+        self.assertIn("V0.1.192", README)
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod
