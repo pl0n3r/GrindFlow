@@ -106,6 +106,14 @@ class AgentsContextBudgetTests(unittest.TestCase):
         self.assertIn("NO SPEC LOOP", self.product_scope_freeze)
         self.assertIn("Prohibido continuar numeraciones masivas", self.product_scope_freeze)
         self.assertIn("decisión explícita del owner", self.product_scope_freeze)
+        self.assertIn(
+            "`sigue`, `continúa`, `adelante` y `avanza` significan inspeccionar el estado real",
+            self.product_scope_freeze,
+        )
+        self.assertIn(
+            "`sigue` / `continúa` / `adelante` / `avanza`: continuar desde el estado real",
+            self.product_scope_freeze,
+        )
 
     def test_product_scope_freeze_regression_is_wired_into_npm_test(self):
         expected = "python3 -m unittest tests/test_agents_context_budget.py"
