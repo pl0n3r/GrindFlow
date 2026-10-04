@@ -38,6 +38,8 @@ final class Version20261003224700 extends AbstractMigration
                     delivery_locked_at IS NULL
                     OR (
                         status = 'draft'
+                        AND delivery_provider IS NOT NULL
+                        AND delivery_destination_id IS NOT NULL
                         AND delivery_provider = 'facebook_page'
                         AND delivery_destination_id REGEXP '^[0-9]{1,32}$'
                         AND caption IS NOT NULL
