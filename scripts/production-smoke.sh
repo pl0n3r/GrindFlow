@@ -342,22 +342,24 @@ check_workspace_modules() {
      ! grep -Fq 'date_utc,label,short_link,channel,campaign,status,clicks' "$csv_body"; then
     module_failure "traffic CSV"; return $?
   fi
-  printf 'MODULE_READ_ONLY=traffic-csv:ok\n'
+  printf 'MODULE_READ_ONLY=%s:ok\n' "traffic-csv"
 }
 
 # Observe only allowlisted media readiness from the authenticated web runtime.
 # The remote JSON body is never printed or copied into GitHub evidence.
 check_media_web_runtime_readiness() {
-  local status
+  local status parsed
   status="$(curl_common --cookie "$cookie_jar" --output "$media_readiness_body" --write-out '%{http_code}' "$BASE_URL/api/admin/schedules/media-readiness" || true)"
   if [[ "$status" != "200" ]]; then
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
   fi
 
-  if python3 - "$media_readiness_body" <<'PY'
+  if parsed="$(python3 - "$media_readiness_body" <<'PY'
 import json
 import sys
+
+ORDER = ("decoder", "temporary_storage", "private_vault")
 
 try:
     with open(sys.argv[1], "r", encoding="utf-8") as handle:
@@ -373,24 +375,28 @@ if not isinstance(data, dict) or set(data) != {
 }:
     raise SystemExit(1)
 checks = data.get("checks")
-if not isinstance(checks, dict) or set(checks) != {
-    "decoder", "temporary_storage", "private_vault"
-}:
+if not isinstance(checks, dict) or set(checks) != set(ORDER):
     raise SystemExit(1)
-expected = {
-    "contract": "media-pilot-readiness-v1",
-    "status": "ready",
-    "evidence_scope": "web_runtime",
-}
-if any(data.get(key) != value for key, value in expected.items()):
+if data.get("contract") != "media-pilot-readiness-v1":
+    raise SystemExit(1)
+if data.get("evidence_scope") != "web_runtime":
     raise SystemExit(1)
 if data.get("ci_equivalent") is not False:
     raise SystemExit(1)
-if any(checks.get(key) != "ready" for key in checks):
+if data.get("status") not in {"ready", "not_ready"}:
     raise SystemExit(1)
+if any(checks.get(key) not in {"ready", "not_ready"} for key in ORDER):
+    raise SystemExit(1)
+all_ready = all(checks[key] == "ready" for key in ORDER)
+if (data["status"] == "ready") != all_ready:
+    raise SystemExit(1)
+
+for key in ORDER:
+    print(f"MEDIA_WEB_RUNTIME_CHECK_{key.upper()}={checks[key]}")
+print(f"MEDIA_WEB_RUNTIME_READY={1 if all_ready else 0}")
 PY
-  then
-    printf 'MEDIA_WEB_RUNTIME_READY=1\n'
+  )"; then
+    printf '%s\n' "$parsed"
   else
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
   fi
