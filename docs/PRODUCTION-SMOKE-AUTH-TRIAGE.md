@@ -113,3 +113,33 @@ paso falla después de iniciarse, muestra `no confirmado (falló el paso de
 migración)`. Así el workflow no afirma que una validación se omitió cuando el
 fallo pudo ocurrir después de alcanzarla, ni convierte incertidumbre en
 evidencia operativa.
+
+
+## Recuperación segura de la identidad sintética de Production Migration
+
+La identidad dedicada para Production Migration es `e2e-oidc-smoke@grindflow.test`.
+Solo se reconcilia cuando una revisión autorizada haya confirmado que la identidad
+sintética es la causa del rechazo. No se cambia ni se reutiliza
+`e2e-admin@grindflow.test`, y nunca se copian contraseñas, tokens, cookies ni
+payloads remotos a Issues, logs o documentación.
+
+La recuperación canónica reutiliza **GrindFlow Production Smoke**:
+
+1. ejecutar el workflow `.github/workflows/production-smoke.yml` sobre el SHA
+   exacto autorizado;
+2. dejar que el step **Reconcile synthetic smoke identity through GitHub OIDC**
+   obtenga el token OIDC efímero del runner;
+3. ese step llama exclusivamente a
+   `/internal/production-smoke/bootstrap`, ligado al SHA esperado y a la fase
+   permitida, para reconciliar la identidad sintética;
+4. si el bootstrap no devuelve su éxito canónico, el workflow falla antes del
+   login y solo publica códigos allowlisted; no se intenta reparar manualmente
+   la cuenta ni se prueba otra credencial;
+5. una vez que Production Smoke vuelva a pasar con evidencia exact-SHA, se puede
+   reintentar Production Migration mediante su workflow owner-only y su
+   aprobación explícita de pending migrations.
+
+Esta recuperación no ejecuta migraciones por sí misma ni sustituye la decisión
+vigente de #238 sobre cualquier lote productivo protegido. Si la evidencia no
+demuestra que la identidad sintética sea la causa, conservar el diagnóstico
+fail-closed y no mutar usuarios.
