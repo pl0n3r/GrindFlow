@@ -256,6 +256,24 @@ final class ScheduleDraftTest extends WebTestCase
             'created_at' => $at,
         ]);
 
+        $transport = new SchedulePhotoTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
+        ]);
+        $provider = new FacebookPageProvider(
+            new FacebookPageConfiguration(
+                $mine,
+                '1234567890',
+                'test-facebook-page-token-do-not-log',
+                'v26.0',
+            ),
+            $transport,
+        );
+        static::getContainer()->set(FacebookPageProvider::class, $provider);
+        static::getContainer()->set(
+            FacebookPagePublicationService::class,
+            new FacebookPagePublicationService($db, $provider),
+        );
+
         $client->request('GET', '/api/admin/schedules');
         self::assertResponseIsSuccessful();
         $agenda = json_decode((string) $client->getResponse()->getContent(), true)['data'];
@@ -353,24 +371,6 @@ final class ScheduleDraftTest extends WebTestCase
                 'MariaDB must reject partial delivery provider/destination pairs.',
             );
         }
-
-        $transport = new SchedulePhotoTransport([
-            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
-        ]);
-        $provider = new FacebookPageProvider(
-            new FacebookPageConfiguration(
-                $mine,
-                '1234567890',
-                'test-facebook-page-token-do-not-log',
-                'v26.0',
-            ),
-            $transport,
-        );
-        static::getContainer()->set(FacebookPageProvider::class, $provider);
-        static::getContainer()->set(
-            FacebookPagePublicationService::class,
-            new FacebookPagePublicationService($db, $provider),
-        );
 
         $client->request('PUT', '/api/admin/schedules/'.$foreignDraft.'/delivery-intent', server: [
             'CONTENT_TYPE' => 'application/json',
