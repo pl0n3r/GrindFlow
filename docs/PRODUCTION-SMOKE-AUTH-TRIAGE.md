@@ -123,23 +123,17 @@ sintética es la causa del rechazo. No se cambia ni se reutiliza
 `e2e-admin@grindflow.test`, y nunca se copian contraseñas, tokens, cookies ni
 payloads remotos a Issues, logs o documentación.
 
-La recuperación canónica reutiliza **GrindFlow Production Smoke**:
+**No usar GrindFlow Production Smoke como vía de reconciliación de identidad.**
+El workflow `.github/workflows/production-smoke.yml` puede ejecutar el step
+**Reconcile synthetic smoke identity through GitHub OIDC** y llamar a
+`/internal/production-smoke/bootstrap` también en un `push` a `main`, sin
+demostrar que haya ocurrido la revisión autorizada descrita arriba. Por tanto,
+ese bootstrap no constituye una operación de recuperación autorizada para
+Production Migration.
 
-1. ejecutar el workflow `.github/workflows/production-smoke.yml` sobre el SHA
-   exacto autorizado;
-2. dejar que el step **Reconcile synthetic smoke identity through GitHub OIDC**
-   obtenga el token OIDC efímero del runner;
-3. ese step llama exclusivamente a
-   `/internal/production-smoke/bootstrap`, ligado al SHA esperado y a la fase
-   permitida, para reconciliar la identidad sintética;
-4. si el bootstrap no devuelve su éxito canónico, el workflow falla antes del
-   login y solo publica códigos allowlisted; no se intenta reparar manualmente
-   la cuenta ni se prueba otra credencial;
-5. una vez que Production Smoke vuelva a pasar con evidencia exact-SHA, se puede
-   reintentar Production Migration mediante su workflow owner-only y su
-   aprobación explícita de pending migrations.
-
-Esta recuperación no ejecuta migraciones por sí misma ni sustituye la decisión
-vigente de #238 sobre cualquier lote productivo protegido. Si la evidencia no
-demuestra que la identidad sintética sea la causa, conservar el diagnóstico
-fail-closed y no mutar usuarios.
+Hasta que exista una operación separada que exija explícitamente autorización
+antes de cualquier escritura, mantener únicamente el diagnóstico fail-closed:
+no modificar usuarios, no reutilizar otra identidad y no probar credenciales
+alternativas. Una futura operación de reconciliación tampoco debe ejecutar
+migraciones por sí misma ni sustituir la decisión vigente de #238 sobre
+cualquier lote productivo protegido.
