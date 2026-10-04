@@ -29,8 +29,17 @@ jobs:
         raise ValueError("eventos o permisos del caller Factory divergentes")
     if "pull_request_target:" in text or re.search(r"^\s+push:", text, re.MULTILINE):
         raise ValueError("caller Factory debe limitarse a pull_request y pull_request_review")
-    if "secrets: inherit" in text or "issues:" in text or "contents: write" in text:
+    if "secrets: inherit" in text or "contents: write" in text:
         raise ValueError("caller Factory excede permisos mínimos")
+    expected_job_permissions = """    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      checks: read
+"""
+    job = text.split("  factory-policy:\n", 1)[1]
+    if not job.startswith("    name: Factory policy\n" + expected_job_permissions):
+        raise ValueError("caller Factory no conserva el envelope exacto requerido")
     if text.count("pl0n3r/factory/.github/workflows/politica.yml@v1") != 1:
         raise ValueError("caller Factory debe fijarse exactamente a @v1")
     if re.search(r"politica\.yml@(main|master|HEAD|v\d+\.\d+\.\d+)", text):
