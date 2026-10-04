@@ -275,6 +275,32 @@ final class ScheduleDraftTest extends WebTestCase
             'created_at' => $at,
         ]);
 
+        $lockedNullPairBlocked = false;
+        try {
+            $db->insert('gf_schedule_drafts', [
+                'id' => Uuid::v7()->toRfc4122(),
+                'organization_id' => $mine,
+                'asset_id' => $secondAsset,
+                'created_by' => $user,
+                'scheduled_at_utc' => $foreignDateTime,
+                'timezone' => 'UTC',
+                'local_date' => substr($foreignDateTime, 0, 10),
+                'local_time' => '23:59',
+                'status' => 'draft',
+                'caption' => 'Locked draft requires a complete delivery pair',
+                'delivery_provider' => null,
+                'delivery_destination_id' => null,
+                'delivery_locked_at' => $at,
+                'created_at' => $at,
+            ]);
+        } catch (\Doctrine\DBAL\Exception) {
+            $lockedNullPairBlocked = true;
+        }
+        self::assertTrue(
+            $lockedNullPairBlocked,
+            'MariaDB must reject a locked draft with a NULL delivery pair.',
+        );
+
         $client->request('GET', '/api/admin/schedules');
         self::assertResponseIsSuccessful();
         $agenda = json_decode((string) $client->getResponse()->getContent(), true)['data'];
@@ -419,6 +445,29 @@ final class ScheduleDraftTest extends WebTestCase
             'size_bytes' => strlen($blob),
             'sha256' => hash('sha256', $blob),
         ], ['id' => $secondAsset, 'organization_id' => $mine]);
+
+        $db->executeStatement(
+            'RENAME TABLE gf_external_publication_attempts TO gf_external_publication_attempts_unavailable',
+        );
+        try {
+            $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/publish-facebook', server: [
+                'HTTP_X_CSRF_TOKEN' => $csrf,
+            ]);
+            self::assertResponseStatusCodeSame(409);
+            self::assertSame(
+                'external_delivery_unavailable',
+                json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
+            );
+            self::assertNull($db->fetchOne(
+                'SELECT delivery_locked_at FROM gf_schedule_drafts WHERE id = :id',
+                ['id' => $activeDraftId],
+            ));
+            self::assertSame(0, $transport->calls);
+        } finally {
+            $db->executeStatement(
+                'RENAME TABLE gf_external_publication_attempts_unavailable TO gf_external_publication_attempts',
+            );
+        }
 
         $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/publish-facebook', server: [
             'HTTP_X_CSRF_TOKEN' => $csrf,

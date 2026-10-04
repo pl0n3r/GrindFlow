@@ -565,6 +565,7 @@ final class ScheduleDraftController extends AbstractController
             $id,
             $pageId,
             $vaultVerifier,
+            $vaultDirectory,
         ): array {
             $organization = $context['organization']['id'];
             $user = $context['user']->id();
@@ -634,6 +635,14 @@ final class ScheduleDraftController extends AbstractController
             if ($this->vaultStatus($vaultVerifier, $draft) !== 'verified') {
                 return ['status' => 'blob_invalid'];
             }
+            if (!$db->createSchemaManager()->tablesExist(['gf_external_publication_attempts'])) {
+                return ['status' => 'ledger_unavailable'];
+            }
+            try {
+                $vaultRoot = $vaultDirectory->root();
+            } catch (\Throwable) {
+                return ['status' => 'vault_unavailable'];
+            }
 
             if (($draft['delivery_locked_at'] ?? null) === null) {
                 $lockedAt = gmdate('Y-m-d H:i:s');
@@ -643,7 +652,7 @@ final class ScheduleDraftController extends AbstractController
                 $draft['delivery_locked_at'] = $lockedAt;
             }
 
-            return ['status' => 'ok', 'draft' => $draft];
+            return ['status' => 'ok', 'draft' => $draft, 'vault_root' => $vaultRoot];
         });
 
         if ($result['status'] === 'revoked') {
@@ -668,14 +677,19 @@ final class ScheduleDraftController extends AbstractController
         if ($result['status'] === 'blob_invalid') {
             return $this->error(409, 'vault_blob_unverified', 'El original privado no pudo verificarse.');
         }
+        if ($result['status'] === 'ledger_unavailable') {
+            return $this->error(409, 'external_delivery_unavailable', 'El registro de entregas externas no está disponible.');
+        }
+        if ($result['status'] === 'vault_unavailable') {
+            return $this->error(409, 'vault_blob_unavailable', 'El almacenamiento privado no está disponible.');
+        }
 
         $draft = $result['draft'];
         if ($this->vaultStatus($vaultVerifier, $draft) !== 'verified') {
             return $this->error(409, 'vault_blob_unverified', 'El original privado dejó de ser verificable antes del envío.');
         }
-        try {
-            $root = $vaultDirectory->root();
-        } catch (\Throwable) {
+        $root = $result['vault_root'] ?? null;
+        if (!is_string($root) || $root === '') {
             return $this->error(409, 'vault_blob_unavailable', 'El almacenamiento privado no está disponible.');
         }
         $mediaPath = $root.'/'.(string) $draft['storage_key'].'.blob';

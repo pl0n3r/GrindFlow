@@ -664,6 +664,7 @@ export function ScheduleDraftPanel({
                               <button type="button"
                                 disabled={busyId !== null
                                   || !draft.caption
+                                  || externalDestinationId === null
                                   || draft.delivery_provider !== 'facebook_page'
                                   || draft.delivery_destination_id !== externalDestinationId
                                   || (captionByDraft[draft.id] ?? draft.caption ?? '').trim() !== draft.caption}
