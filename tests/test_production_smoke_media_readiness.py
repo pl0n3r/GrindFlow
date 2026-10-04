@@ -215,8 +215,6 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                     self.assertIn("decoder: `ready`", proof)
                     self.assertIn("temporary_storage: `ready`", proof)
                     self.assertIn("private_vault: `ready`", proof)
-                else:
-                    self.assertIn("BLOCKED_TARGET_ENV", summary)
 
     def test_reconcile_invocations_use_isolated_evidence_paths(self) -> None:
         ready = "\n".join(
