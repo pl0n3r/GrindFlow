@@ -228,8 +228,11 @@ class ProductionMigrationLoginDiagnosisTests(unittest.TestCase):
         noop_branch = summary.split(
             'elif [[ "$result_state" == "no-op" ]]',
             1,
-        )[1].split("else", 1)[0]
-        ambiguous_branch = summary.rsplit("else", 1)[1].split("fi", 1)[0]
+        )[1].split("\n          else\n", 1)[0]
+        ambiguous_branch = summary.rsplit("\n          else\n", 1)[1].split(
+            "\n          fi\n",
+            1,
+        )[0]
 
         self.assertIn('backup_state="no ejecutado"', credentials_branch)
         self.assertIn(
