@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Regression: Factory 1.0.24 policy caller permission envelope."""
+
 from __future__ import annotations
 
 import re
