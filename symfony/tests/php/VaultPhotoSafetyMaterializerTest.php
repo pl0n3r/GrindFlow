@@ -77,6 +77,36 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
         }
     }
 
+    public function testSameSizeContentDriftFailsAgainstTheDecodedBufferHash(): void
+    {
+        $materializer = new VaultPhotoSafetyMaterializer();
+        $this->requireDecoder($materializer);
+
+        $original = base64_decode(self::PNG, true);
+        self::assertIsString($original);
+        $source = $this->sourceFile($original);
+        $expectedHash = hash('sha256', $original);
+
+        $drifted = $original;
+        $offset = max(8, intdiv(strlen($drifted), 2));
+        $drifted[$offset] = chr(ord($drifted[$offset]) ^ 0x01);
+        self::assertSame(strlen($original), strlen($drifted));
+        self::assertSame(strlen($drifted), file_put_contents($source, $drifted));
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Private image integrity changed.');
+            $materializer->materialize(
+                $source,
+                'image/png',
+                strlen($original),
+                $expectedHash,
+            );
+        } finally {
+            @unlink($source);
+        }
+    }
+
     public function testDeclaredMimeMismatchFailsClosed(): void
     {
         $materializer = new VaultPhotoSafetyMaterializer();
