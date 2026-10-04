@@ -66,7 +66,7 @@ curl_read() {
 
 curl_status_read() {
   # Read-only HTTP probe with bounded retries for transient transport/5xx
-  # failures. No --fail: 302/303/401/403 remain terminal diagnostic statuses.
+  # failures. HTTP 302/303/401/403 remain terminal diagnostic statuses.
   curl \
     --silent \
     --show-error \
