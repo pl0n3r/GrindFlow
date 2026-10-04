@@ -12,6 +12,7 @@ use GrindFlow\Distribution\FacebookPagePublicationService;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
+use GrindFlow\Infrastructure\Storage\VaultPhotoSafetyMaterializer;
 use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -189,7 +190,7 @@ final class ScheduleDraftController extends AbstractController
         if ($keys !== ['asset_id', 'scheduled_at_utc']
             || !is_string($body['asset_id']) || !Uuid::isValid($body['asset_id'])
             || !is_string($body['scheduled_at_utc'])
-            || preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D', $body['scheduled_at_utc']) !== 1) {
+            || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $body['scheduled_at_utc']) !== 1) {
             return $this->error(422, 'invalid_schedule', 'Selecciona un recurso y un slot UTC válido.');
         }
 
@@ -230,7 +231,6 @@ final class ScheduleDraftController extends AbstractController
             'publishes' => false,
         ]], $result['changed'] ? 201 : 200);
     }
-
 
     /** Persist a mutable caption + configured Page snapshot without external I/O. */
     #[Route(
@@ -369,7 +369,7 @@ final class ScheduleDraftController extends AbstractController
         ]]);
     }
 
-    /** Lock the durable intent, commit, then perform one explicit provider call. */
+    /** Materialize a safe copy, lock the durable intent, commit, then call the provider. */
     #[Route(
         '/api/admin/schedules/{id}/publish-facebook',
         name: 'grindflow_schedule_drafts_publish_facebook',
@@ -384,6 +384,7 @@ final class ScheduleDraftController extends AbstractController
         FacebookPagePublicationService $publication,
         VaultBlobVerifier $vaultVerifier,
         PrivateVaultDirectory $vaultDirectory,
+        VaultPhotoSafetyMaterializer $photoSafety,
     ): JsonResponse {
         $context = $this->context($request, $memberships);
         if ($context instanceof JsonResponse) {
@@ -415,6 +416,7 @@ final class ScheduleDraftController extends AbstractController
             $pageId,
             $vaultVerifier,
             $vaultDirectory,
+            $photoSafety,
         ): array {
             $organization = $context['organization']['id'];
             $user = $context['user']->id();
@@ -493,15 +495,32 @@ final class ScheduleDraftController extends AbstractController
                 return ['status' => 'vault_unavailable'];
             }
 
-            if (($draft['delivery_locked_at'] ?? null) === null) {
-                $lockedAt = gmdate('Y-m-d H:i:s');
-                $db->update('gf_schedule_drafts', [
-                    'delivery_locked_at' => $lockedAt,
-                ], ['id' => $id, 'organization_id' => $organization]);
-                $draft['delivery_locked_at'] = $lockedAt;
+            $originalPath = $vaultRoot.'/'.(string) $draft['storage_key'].'.blob';
+            try {
+                $safeMediaPath = $photoSafety->materialize(
+                    $originalPath,
+                    (string) $draft['mime_type'],
+                    (int) $draft['size_bytes'],
+                    strtolower((string) $draft['sha256']),
+                );
+            } catch (\Throwable) {
+                return ['status' => 'media_unsafe'];
             }
 
-            return ['status' => 'ok', 'draft' => $draft, 'vault_root' => $vaultRoot];
+            try {
+                if (($draft['delivery_locked_at'] ?? null) === null) {
+                    $lockedAt = gmdate('Y-m-d H:i:s');
+                    $db->update('gf_schedule_drafts', [
+                        'delivery_locked_at' => $lockedAt,
+                    ], ['id' => $id, 'organization_id' => $organization]);
+                    $draft['delivery_locked_at'] = $lockedAt;
+                }
+
+                return ['status' => 'ok', 'draft' => $draft, 'safe_media_path' => $safeMediaPath];
+            } catch (\Throwable $exception) {
+                $photoSafety->cleanup($safeMediaPath);
+                throw $exception;
+            }
         });
 
         if ($result['status'] === 'revoked') {
@@ -532,63 +551,66 @@ final class ScheduleDraftController extends AbstractController
         if ($result['status'] === 'vault_unavailable') {
             return $this->error(409, 'vault_blob_unavailable', 'El almacenamiento privado no está disponible.');
         }
+        if ($result['status'] === 'media_unsafe') {
+            return $this->error(409, 'media_not_safe_to_publish', 'La imagen privada no pudo prepararse de forma segura.');
+        }
 
         $draft = $result['draft'];
-        if ($this->vaultStatus($vaultVerifier, $draft) !== 'verified') {
-            return $this->error(409, 'vault_blob_unverified', 'El original privado dejó de ser verificable antes del envío.');
+        $safeMediaPath = $result['safe_media_path'] ?? null;
+        if (!is_string($safeMediaPath) || $safeMediaPath === '' || !is_file($safeMediaPath)) {
+            return $this->error(409, 'media_not_safe_to_publish', 'La imagen privada no pudo prepararse de forma segura.');
         }
-        $root = $result['vault_root'] ?? null;
-        if (!is_string($root) || $root === '') {
-            return $this->error(409, 'vault_blob_unavailable', 'El almacenamiento privado no está disponible.');
-        }
-        $mediaPath = $root.'/'.(string) $draft['storage_key'].'.blob';
         $key = 'schedule-draft:'.$id.':facebook_page:v1';
         $command = new DistributionCommand(
             $context['organization']['id'],
             $key,
             (string) $draft['caption'],
             null,
-            $mediaPath,
+            $safeMediaPath,
             (string) $draft['mime_type'],
             strtolower((string) $draft['sha256']),
         );
 
         try {
-            $outcome = $publication->publish($command);
-        } catch (DistributionProviderException $exception) {
-            $safe = match ($exception->kind) {
-                DistributionProviderException::KIND_CONFIGURATION => [409, 'facebook_page_unavailable', 'Facebook Page no está disponible para esta organización.'],
-                DistributionProviderException::KIND_AUTHENTICATION => [409, 'authentication_failed', 'Facebook Page requiere revisar su autenticación.'],
-                DistributionProviderException::KIND_RATE_LIMIT => [429, 'rate_limited', 'Facebook Page limitó temporalmente la entrega. Reintenta manualmente más tarde.'],
-                DistributionProviderException::KIND_REJECTED => [409, 'rejected', 'Facebook Page rechazó la entrega sin marcarla como publicada.'],
-                default => [409, 'ambiguous', 'El resultado externo es incierto. No reintentes a ciegas.'],
-            };
-            $response = $this->error($safe[0], $safe[1], $safe[2]);
-            if ($exception->kind === DistributionProviderException::KIND_RATE_LIMIT
-                && $exception->retryAfterSeconds !== null) {
-                $response->headers->set('Retry-After', (string) $exception->retryAfterSeconds);
+            try {
+                $outcome = $publication->publish($command);
+            } catch (DistributionProviderException $exception) {
+                $safe = match ($exception->kind) {
+                    DistributionProviderException::KIND_CONFIGURATION => [409, 'facebook_page_unavailable', 'Facebook Page no está disponible para esta organización.'],
+                    DistributionProviderException::KIND_AUTHENTICATION => [409, 'authentication_failed', 'Facebook Page requiere revisar su autenticación.'],
+                    DistributionProviderException::KIND_RATE_LIMIT => [429, 'rate_limited', 'Facebook Page limitó temporalmente la entrega. Reintenta manualmente más tarde.'],
+                    DistributionProviderException::KIND_REJECTED => [409, 'rejected', 'Facebook Page rechazó la entrega sin marcarla como publicada.'],
+                    default => [409, 'ambiguous', 'El resultado externo es incierto. No reintentes a ciegas.'],
+                };
+                $response = $this->error($safe[0], $safe[1], $safe[2]);
+                if ($exception->kind === DistributionProviderException::KIND_RATE_LIMIT
+                    && $exception->retryAfterSeconds !== null) {
+                    $response->headers->set('Retry-After', (string) $exception->retryAfterSeconds);
+                }
+                return $response;
             }
-            return $response;
+
+            $publishedAt = $db->fetchOne(
+                <<<'SQL'
+                    SELECT updated_at FROM gf_external_publication_attempts
+                    WHERE organization_id = :organization
+                      AND provider = 'facebook_page'
+                      AND idempotency_key = :key
+                      AND status = 'published'
+                    LIMIT 1
+                    SQL,
+                ['organization' => $context['organization']['id'], 'key' => $key],
+            );
+
+            return $this->privateJson(['data' => [
+                'status' => 'published',
+                'external_publication_id' => $outcome->externalPublicationId,
+                'published_at' => is_string($publishedAt) ? $publishedAt : null,
+                'automatic_retry' => false,
+            ]]);
+        } finally {
+            $photoSafety->cleanup($safeMediaPath);
         }
-
-        $publishedAt = $db->fetchOne(
-            <<<'SQL'
-                SELECT updated_at FROM gf_external_publication_attempts
-                WHERE organization_id = :organization
-                  AND provider = 'facebook_page'
-                  AND idempotency_key = :key
-                  AND status = 'published'
-                LIMIT 1
-                SQL,
-            ['organization' => $context['organization']['id'], 'key' => $key],
-        );
-
-        return $this->privateJson(['data' => [
-            'status' => 'published',
-            'external_publication_id' => $outcome->externalPublicationId,
-            'published_at' => is_string($publishedAt) ? $publishedAt : null,
-            'automatic_retry' => false,
-        ]]);
     }
 
     /** Cancel in place without erasing the audit-relevant assignment. */

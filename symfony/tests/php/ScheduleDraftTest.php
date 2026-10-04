@@ -438,14 +438,18 @@ final class ScheduleDraftTest extends WebTestCase
             json_decode((string) $client->getResponse()->getContent(), true)['data']['changed'],
         );
 
-        $blob = 'synthetic-private-photo';
+        $blob = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGJAQoAHxcCAk+Uzr4AAAAASUVORK5CYII=',
+            true,
+        );
+        self::assertIsString($blob);
         $projectDir = (string) static::getContainer()->getParameter('kernel.project_dir');
         $vaultDir = $projectDir.'/var/vault';
         if (!is_dir($vaultDir)) {
             self::assertTrue(mkdir($vaultDir, 0700, true) || is_dir($vaultDir));
         }
         $blobPath = $vaultDir.'/'.$secondAsset.'.blob';
-        self::assertNotFalse(file_put_contents($blobPath, $blob));
+        self::assertSame(strlen($blob), file_put_contents($blobPath, $blob));
         $db->update('gf_vault_assets', [
             'size_bytes' => strlen($blob),
             'sha256' => hash('sha256', $blob),
@@ -473,6 +477,32 @@ final class ScheduleDraftTest extends WebTestCase
                 'RENAME TABLE gf_external_publication_attempts_unavailable TO gf_external_publication_attempts',
             );
         }
+
+        $tainted = $blob.'trailing-payload';
+        self::assertSame(strlen($tainted), file_put_contents($blobPath, $tainted));
+        $db->update('gf_vault_assets', [
+            'size_bytes' => strlen($tainted),
+            'sha256' => hash('sha256', $tainted),
+        ], ['id' => $secondAsset, 'organization_id' => $mine]);
+        $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/publish-facebook', server: [
+            'HTTP_X_CSRF_TOKEN' => $csrf,
+        ]);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame(
+            'media_not_safe_to_publish',
+            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
+        );
+        self::assertNull($db->fetchOne(
+            'SELECT delivery_locked_at FROM gf_schedule_drafts WHERE id = :id',
+            ['id' => $activeDraftId],
+        ));
+        self::assertSame(0, $transport->calls);
+
+        self::assertSame(strlen($blob), file_put_contents($blobPath, $blob));
+        $db->update('gf_vault_assets', [
+            'size_bytes' => strlen($blob),
+            'sha256' => hash('sha256', $blob),
+        ], ['id' => $secondAsset, 'organization_id' => $mine]);
 
         $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/publish-facebook', server: [
             'HTTP_X_CSRF_TOKEN' => $csrf,
@@ -550,7 +580,6 @@ final class ScheduleDraftTest extends WebTestCase
     }
 }
 
-
 /** @internal test-only transport; no network access. */
 final class SchedulePhotoTransport implements FacebookPageTransport
 {
@@ -579,11 +608,15 @@ final class SchedulePhotoTransport implements FacebookPageTransport
         string $mimeType,
     ): array {
         ++$this->calls;
+        $dimensions = is_file($filePath) ? getimagesize($filePath) : false;
         if ($graphVersion !== 'v26.0'
             || $pageId !== '1234567890'
             || $accessToken === ''
             || $caption !== "Caption seguro\npara Facebook"
             || !is_file($filePath)
+            || !str_starts_with(basename($filePath), 'gf-photo-')
+            || !is_array($dimensions)
+            || ($dimensions['mime'] ?? null) !== 'image/png'
             || $mimeType !== 'image/png') {
             throw new \RuntimeException('Unexpected photo request.');
         }
