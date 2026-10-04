@@ -31,10 +31,23 @@ jobs:
         raise ValueError("caller Factory debe limitarse a pull_request y pull_request_review")
     if "secrets: inherit" in text or "issues:" in text or "contents: write" in text:
         raise ValueError("caller Factory excede permisos mínimos")
-    if text.count("pl0n3r/factory/.github/workflows/politica.yml@v1") != 1:
-        raise ValueError("caller Factory debe fijarse exactamente a @v1")
+    refs = re.findall(
+        r"pl0n3r/factory/\.github/workflows/politica\.yml@([^\s]+)",
+        text,
+    )
+    if len(refs) != 1:
+        raise ValueError("caller Factory debe fijar exactamente un reusable Policy")
+    ref = refs[0]
+    if ref == "v1":
+        pass
+    elif re.fullmatch(r"[0-9a-f]{40}", ref):
+        factory_refs = re.findall(r"(?m)^\s+factory_ref:\s*([^\s]+)\s*$", text)
+        if factory_refs != [ref]:
+            raise ValueError("caller Factory por SHA exige factory_ref idéntico")
+    else:
+        raise ValueError("ref Factory debe ser @v1 o SHA lowercase exacto de 40 hex")
     if re.search(r"politica\.yml@(main|master|HEAD|v\d+\.\d+\.\d+)", text):
-        raise ValueError("ref Factory no corresponde al canal mayor aprobado")
+        raise ValueError("ref Factory no corresponde a un canal aprobado")
     if not re.search(
         r"pr_number:\s*\$\{\{ github\.event\.pull_request\.number \}\}", text
     ):
@@ -67,12 +80,32 @@ class FactoryPolicyAdoptionTests(unittest.TestCase):
                 "  pull_request_review:\n",
                 "  pull_request_target:\n    branches: [main]\n  pull_request_review:\n",
             ),
-            self.workflow.replace("politica.yml@v1", "politica.yml@main"),
+            re.sub(
+                r"(pl0n3r/factory/\.github/workflows/politica\.yml@)[^\s]+",
+                r"\1main",
+                self.workflow,
+                count=1,
+            ),
         )
         for candidate in variants:
             with self.subTest(candidate=candidate):
                 with self.assertRaises(ValueError):
                     validate_factory_caller(candidate)
+
+    def test_exact_sha_caller_rejects_mismatched_factory_ref(self):
+        match = re.search(
+            r"pl0n3r/factory/\.github/workflows/politica\.yml@([0-9a-f]{40})",
+            self.workflow,
+        )
+        if match is None:
+            self.skipTest("caller actual usa el canal estable @v1")
+        candidate = self.workflow.replace(
+            f"factory_ref: {match.group(1)}",
+            "factory_ref: 0000000000000000000000000000000000000000",
+            1,
+        )
+        with self.assertRaises(ValueError):
+            validate_factory_caller(candidate)
 
     def test_owner_gate_comes_from_protected_base_not_candidate(self):
         workflow = self.owner_workflow
