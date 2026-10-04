@@ -4,6 +4,7 @@ Factory es la dueña de la lógica de tags anotados, carreras e idempotencia:
 el proyecto no copia ni relaja sus comprobaciones.
 """
 
+import importlib.util
 import json
 import re
 import subprocess
@@ -11,6 +12,18 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_VERSION_SCRIPT = ROOT / "scripts" / "release-version.py"
+
+
+def load_release_version_module():
+    spec = importlib.util.spec_from_file_location("_grindflow_release_version", RELEASE_VERSION_SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("No se pudo cargar release-version.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 CANONICAL_CALLER = """name: GrindFlow Tag Release
 
 on:
@@ -225,6 +238,37 @@ class ReleaseAdoptionTests(unittest.TestCase):
             with self.subTest(package=package[:70], lock=lock[:70]):
                 with self.assertRaises(ValueError):
                     release_version(self.php, package, lock)
+
+    def test_release_version_allows_same_version_only_for_policy_bridge_paths(self):
+        module = load_release_version_module()
+        paths = tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS))
+        module.transition((0, 1, 193), (0, 1, 193), paths)
+
+    def test_release_version_same_version_rejects_extra_runtime_or_version_paths(self):
+        module = load_release_version_module()
+        cases = (
+            (),
+            (".github/workflows/politica.yml",),
+            tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"README.md"})),
+            tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"config/version.php"})),
+            tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"symfony/src/Kernel.php"})),
+        )
+        for paths in cases:
+            with self.subTest(paths=paths):
+                with self.assertRaises(ValueError):
+                    module.transition((0, 1, 193), (0, 1, 193), paths)
+
+    def test_release_version_normal_patch_transition_remains_required_outside_policy_bridge(self):
+        module = load_release_version_module()
+        module.transition((0, 1, 193), (0, 1, 194), ("README.md",))
+        with self.assertRaises(ValueError):
+            module.transition((0, 1, 193), (0, 1, 193), ("README.md",))
+        with self.assertRaises(ValueError):
+            module.transition((0, 1, 193), (0, 1, 195), ("README.md",))
+
+    def test_release_identity_is_synchronized(self):
+        self.assertEqual(release_version(self.php, self.package, self.lock), "0.1.194")
+        self.assertIn("V0.1.194", (ROOT / "README.md").read_text(encoding="utf-8"))
 
     def test_grindflow_ci_runs_release_contract_without_removing_validate(self):
         ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")
