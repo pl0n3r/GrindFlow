@@ -120,7 +120,7 @@ class AgentsContextBudgetTests(unittest.TestCase):
         self.assertIn(expected, self.product_scope_freeze)
         self.assertIn(expected, self.agents)
 
-    def test_release_identity_matches_across_manifests(self):
+    def test_release_version_is_synchronized(self):
         match = re.search(r"'number'\s*=>\s*'([^']+)'", self.version_php)
         self.assertIsNotNone(match)
         release = match.group(1)
