@@ -247,6 +247,7 @@ class ReleaseAdoptionTests(unittest.TestCase):
     def test_release_version_same_version_rejects_extra_runtime_or_version_paths(self):
         module = load_release_version_module()
         cases = (
+            (),
             (".github/workflows/politica.yml",),
             tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"README.md"})),
             tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"config/version.php"})),
