@@ -23,6 +23,7 @@ final class ScheduleDraftTest extends WebTestCase
     public function testDraftsAreTenantSafeCapacityAwareCancellableAndNeverPublish(): void
     {
         $client = static::createClient();
+        $client->disableReboot();
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
 
@@ -36,6 +37,24 @@ final class ScheduleDraftTest extends WebTestCase
         $foreignDraft = Uuid::v7()->toRfc4122();
         $at = gmdate('Y-m-d H:i:s');
         $password = 'synthetic-schedule-draft-password-123';
+
+        $transport = new SchedulePhotoTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
+        ]);
+        $provider = new FacebookPageProvider(
+            new FacebookPageConfiguration(
+                $mine,
+                '1234567890',
+                'test-facebook-page-token-do-not-log',
+                'v26.0',
+            ),
+            $transport,
+        );
+        static::getContainer()->set(FacebookPageProvider::class, $provider);
+        static::getContainer()->set(
+            FacebookPagePublicationService::class,
+            new FacebookPagePublicationService($db, $provider),
+        );
 
         $client->request(
             'POST',
@@ -255,26 +274,6 @@ final class ScheduleDraftTest extends WebTestCase
             'status' => 'draft',
             'created_at' => $at,
         ]);
-
-        $client->disableReboot();
-
-        $transport = new SchedulePhotoTransport([
-            ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
-        ]);
-        $provider = new FacebookPageProvider(
-            new FacebookPageConfiguration(
-                $mine,
-                '1234567890',
-                'test-facebook-page-token-do-not-log',
-                'v26.0',
-            ),
-            $transport,
-        );
-        static::getContainer()->set(FacebookPageProvider::class, $provider);
-        static::getContainer()->set(
-            FacebookPagePublicationService::class,
-            new FacebookPagePublicationService($db, $provider),
-        );
 
         $client->request('GET', '/api/admin/schedules');
         self::assertResponseIsSuccessful();
