@@ -5,6 +5,7 @@
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
 **Versión de código declarada:** V0.1.187 · esta etiqueta no prueba despliegue ni salud de producción.
+<!-- recovery-sync: issue-303 · base=8ae5f245dc4337e77ba6ec305f5cded3ce0409f6 · previous=V0.1.186 -->
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
 
