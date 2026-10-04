@@ -40,6 +40,8 @@ class S4ComposerExternalDeliveryContractTests(unittest.TestCase):
 
     def test_authorization_and_immutability_fail_closed(self):
         controller = self.text("symfony/src/Http/Controller/ScheduleDraftController.php")
+        manual_handoff = self.text("symfony/src/Http/Controller/ManualHandoffController.php")
+        manual_lock_test = self.text("symfony/tests/php/ManualHandoffExternalDeliveryLockTest.php")
         migrations = self.migrations()
 
         self.assertIn("content_prepare", controller)
@@ -49,9 +51,13 @@ class S4ComposerExternalDeliveryContractTests(unittest.TestCase):
         self.assertIn("assetEligibility", controller)
         self.assertIn("delivery_intent_locked", controller)
         self.assertIn("delivery_destination_id", controller)
+        self.assertIn("delivery_locked_at", manual_handoff)
+        self.assertIn("external_delivery_locked", manual_handoff)
+        self.assertIn("external_delivery_locked", manual_lock_test)
+        self.assertIn("gf_manual_handoff_events", manual_lock_test)
+        self.assertIn("delivery provider and destination must be a complete pair", migrations)
         self.assertIn("delivery_provider IS NOT NULL", migrations)
         self.assertIn("delivery_destination_id IS NOT NULL", migrations)
-        self.assertIn("delivery provider and destination must be a complete pair", migrations)
         self.assertIn("gf_schedule_drafts_lifecycle_update", migrations)
         self.assertIn("schedule draft", migrations.lower())
         self.assertIn("cannot", migrations.lower())
