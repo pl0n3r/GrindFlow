@@ -38,9 +38,7 @@ final class VaultPhotoSafetyMaterializer
 
         clearstatcache(true, $sourcePath);
         $actualSize = @filesize($sourcePath);
-        $actualHash = @hash_file('sha256', $sourcePath);
-        if ($actualSize !== $expectedSize || $actualHash === false
-            || !hash_equals(strtolower($expectedSha256), $actualHash)) {
+        if ($actualSize !== $expectedSize) {
             throw new \RuntimeException('Private image integrity changed.');
         }
         if (!$this->decoderAvailable()) {
@@ -50,6 +48,9 @@ final class VaultPhotoSafetyMaterializer
         $bytes = @file_get_contents($sourcePath);
         if (!is_string($bytes) || strlen($bytes) !== $expectedSize) {
             throw new \RuntimeException('Private image could not be read.');
+        }
+        if (!hash_equals(strtolower($expectedSha256), hash('sha256', $bytes))) {
+            throw new \RuntimeException('Private image integrity changed.');
         }
         $this->assertNoTrailingPayload($bytes, $mimeType);
 
