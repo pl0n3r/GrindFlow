@@ -49,6 +49,9 @@ class S4ComposerExternalDeliveryContractTests(unittest.TestCase):
         self.assertIn("assetEligibility", controller)
         self.assertIn("delivery_intent_locked", controller)
         self.assertIn("delivery_destination_id", controller)
+        self.assertIn("delivery_provider IS NOT NULL", migrations)
+        self.assertIn("delivery_destination_id IS NOT NULL", migrations)
+        self.assertIn("delivery provider and destination must be a complete pair", migrations)
         self.assertIn("gf_schedule_drafts_lifecycle_update", migrations)
         self.assertIn("schedule draft", migrations.lower())
         self.assertIn("cannot", migrations.lower())
@@ -100,6 +103,8 @@ class S4ComposerExternalDeliveryContractTests(unittest.TestCase):
         self.assertIn("MAX_PHOTO_BYTES", transport)
         self.assertIn("postPhoto", provider)
         self.assertIn("postPhoto", transport_port)
+        self.assertIn("catch (InvalidArgumentException)", provider)
+        self.assertIn("throw new InvalidArgumentException('facebook_photo_source_invalid'", transport)
         self.assertNotIn("public_url", controller.lower())
 
     def test_draft_lock_and_external_ledger_have_single_responsibility(self):

@@ -14,6 +14,7 @@ use GrindFlow\Distribution\FacebookPageConfiguration;
 use GrindFlow\Distribution\FacebookPageProvider;
 use GrindFlow\Distribution\FacebookPagePublicationService;
 use GrindFlow\Distribution\FacebookPageTransport;
+use GrindFlow\Distribution\StreamFacebookPageTransport;
 use GrindFlow\Kernel;
 use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -218,6 +219,26 @@ final class FacebookPageProviderTest extends WebTestCase
         );
         self::assertSame(DistributionProviderException::KIND_REJECTED, $rejected->kind);
         self::assertFalse($rejected->automaticRetryAllowed);
+
+        $missingMediaPath = sys_get_temp_dir().'/grindflow-missing-'.Uuid::v7()->toRfc4122().'.png';
+        self::assertFileDoesNotExist($missingMediaPath);
+        $preSend = $this->captureProviderException(
+            fn () => $this->provider(
+                $organization,
+                $token,
+                new StreamFacebookPageTransport(),
+            )->publish(new DistributionCommand(
+                $organization,
+                'local-pre-send',
+                'No debe salir',
+                null,
+                $missingMediaPath,
+                'image/png',
+                hash('sha256', 'missing-media'),
+            )),
+        );
+        self::assertSame(DistributionProviderException::KIND_REJECTED, $preSend->kind);
+        self::assertFalse($preSend->automaticRetryAllowed);
 
         $serverTransport = new FakeFacebookPageTransport([
             ['status' => 503, 'headers' => [], 'body' => '{"error":"unknown"}'],

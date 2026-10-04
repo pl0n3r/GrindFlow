@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GrindFlow\Distribution;
 
+use InvalidArgumentException;
 use JsonException;
 use Throwable;
 
@@ -51,6 +52,8 @@ final readonly class FacebookPageProvider implements DistributionProvider
                     $payload,
                 );
             }
+        } catch (InvalidArgumentException) {
+            throw DistributionProviderException::rejected();
         } catch (Throwable) {
             throw DistributionProviderException::ambiguous();
         }

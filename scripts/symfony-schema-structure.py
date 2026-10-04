@@ -28,6 +28,10 @@ CREATE_TRIGGER = re.compile(
     rf"(BEFORE|AFTER)\s+(INSERT|UPDATE|DELETE)\s+ON\s+`?({IDENTIFIER})`?",
     REGEX_FLAGS,
 )
+DROP_TRIGGER = re.compile(
+    rf"^DROP\s+TRIGGER\s+(?:(IF\s+EXISTS)\s+)?`?({IDENTIFIER})`?$",
+    REGEX_FLAGS,
+)
 ALTER_TABLE = re.compile(
     rf"^ALTER\s+TABLE\s+`?({IDENTIFIER})`?\s+(.+)$",
     REGEX_FLAGS,
@@ -401,6 +405,26 @@ def apply_trigger(
     }
 
 
+def apply_drop_trigger(
+    statement: str,
+    migration: str,
+    triggers: dict[str, dict[str, str]],
+) -> None:
+    """Apply one DROP TRIGGER statement while preserving fail-closed scope."""
+    match = DROP_TRIGGER.match(normalize_space(statement))
+    if match is None:
+        raise ValueError(f"unsupported DROP TRIGGER statement in {migration}")
+
+    if_exists, trigger = match.groups()
+    if not trigger.startswith("gf_"):
+        raise ValueError(f"Symfony trigger must use gf_ prefix: {trigger}")
+    if trigger not in triggers:
+        if if_exists is not None:
+            return
+        raise ValueError(f"DROP TRIGGER targets unknown trigger: {trigger}")
+    del triggers[trigger]
+
+
 def apply_statement(
     statement: str,
     migration: str,
@@ -417,6 +441,9 @@ def apply_statement(
         return
     if upper.startswith("ALTER TABLE "):
         apply_alter_table(statement, tables)
+        return
+    if upper.startswith("DROP TRIGGER "):
+        apply_drop_trigger(statement, migration, triggers)
         return
     if upper.startswith("CREATE TRIGGER "):
         apply_trigger(statement, migration, triggers, duplicate_triggers)

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GrindFlow\Distribution;
 
+use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 final class StreamFacebookPageTransport implements FacebookPageTransport
 {
@@ -43,34 +45,42 @@ final class StreamFacebookPageTransport implements FacebookPageTransport
         if (!in_array($mediaMime, ['image/jpeg', 'image/png'], true)
             || $mediaPath === '' || str_contains($mediaPath, "\0")
             || is_link($mediaPath) || !is_file($mediaPath) || !is_readable($mediaPath)) {
-            throw new RuntimeException('facebook_photo_source_invalid');
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
         }
 
         $size = @filesize($mediaPath);
         if ($size === false || $size < 1 || $size > self::MAX_PHOTO_BYTES) {
-            throw new RuntimeException('facebook_photo_source_invalid');
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
         }
 
-        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->file($mediaPath);
+        try {
+            $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->file($mediaPath);
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException('facebook_photo_source_invalid', 0, $exception);
+        }
         if (!is_string($detectedMime) || !hash_equals($mediaMime, $detectedMime)) {
-            throw new RuntimeException('facebook_photo_source_invalid');
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
         }
 
         $photo = @file_get_contents($mediaPath);
         if ($photo === false || strlen($photo) !== $size) {
-            throw new RuntimeException('facebook_photo_source_invalid');
+            throw new InvalidArgumentException('facebook_photo_source_invalid');
         }
 
         $boundary = '';
         for ($attempt = 0; $attempt < 3; ++$attempt) {
-            $candidate = 'grindflow-'.bin2hex(random_bytes(18));
+            try {
+                $candidate = 'grindflow-'.bin2hex(random_bytes(18));
+            } catch (Throwable $exception) {
+                throw new InvalidArgumentException('facebook_multipart_boundary_failed', 0, $exception);
+            }
             if (!str_contains($caption, $candidate) && !str_contains($photo, $candidate)) {
                 $boundary = $candidate;
                 break;
             }
         }
         if ($boundary === '') {
-            throw new RuntimeException('facebook_multipart_boundary_failed');
+            throw new InvalidArgumentException('facebook_multipart_boundary_failed');
         }
 
         $filename = $mediaMime === 'image/jpeg' ? 'upload.jpg' : 'upload.png';
@@ -107,7 +117,7 @@ final class StreamFacebookPageTransport implements FacebookPageTransport
             || !preg_match('/^\d{1,32}$/', $pageId)
             || trim($accessToken) === ''
         ) {
-            throw new RuntimeException('facebook_transport_configuration_invalid');
+            throw new InvalidArgumentException('facebook_transport_configuration_invalid');
         }
     }
 

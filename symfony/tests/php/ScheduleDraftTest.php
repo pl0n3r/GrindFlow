@@ -338,6 +338,22 @@ final class ScheduleDraftTest extends WebTestCase
         self::assertContains('draft', array_column($history['drafts'], 'status'));
 
         $activeDraftId = $replacement['draft']['id'];
+        foreach ([
+            ['delivery_provider' => 'facebook_page', 'delivery_destination_id' => null],
+            ['delivery_provider' => null, 'delivery_destination_id' => '1234567890'],
+        ] as $partialDelivery) {
+            $partialPairBlocked = false;
+            try {
+                $db->update('gf_schedule_drafts', $partialDelivery, ['id' => $activeDraftId]);
+            } catch (\Doctrine\DBAL\Exception) {
+                $partialPairBlocked = true;
+            }
+            self::assertTrue(
+                $partialPairBlocked,
+                'MariaDB must reject partial delivery provider/destination pairs.',
+            );
+        }
+
         $transport = new SchedulePhotoTransport([
             ['status' => 200, 'headers' => [], 'body' => '{"id":"page_photo_123"}'],
         ]);
