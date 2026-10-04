@@ -73,6 +73,7 @@ curl_status_read() {
     --retry 4 \
     --retry-all-errors \
     --retry-delay 2 \
+    --retry-max-time 60 \
     --connect-timeout 10 \
     --max-time 30 \
     "$@"
