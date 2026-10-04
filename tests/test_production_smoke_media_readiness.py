@@ -29,13 +29,13 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             '"contract": "media-pilot-readiness-v1"',
             '"status": "ready"',
             '"evidence_scope": "web_runtime"',
-            '"ci_equivalent": False',
             '"decoder", "temporary_storage", "private_vault"',
             "MEDIA_WEB_RUNTIME_READY=1",
             "MEDIA_WEB_RUNTIME_READY=0",
         ):
             self.assertIn(token, block)
         self.assertIn('set(payload) != {"data"}', block)
+        self.assertIn('data.get("ci_equivalent") is not False', block)
         self.assertIn("set(data) != {", block)
         self.assertIn("set(checks) != {", block)
 
