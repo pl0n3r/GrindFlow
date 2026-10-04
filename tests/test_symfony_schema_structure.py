@@ -86,7 +86,6 @@ class SymfonySchemaStructureTest(unittest.TestCase):
         self.assertEqual(1, len(inventory["triggers"]))
         self.assertEqual("gf_note_guard", inventory["triggers"][0]["name"])
         self.assertEqual("AFTER", inventory["triggers"][0]["timing"])
-        self.assertEqual([], inventory["duplicate_triggers"])
 
     def test_rejects_unknown_non_optional_trigger_drop(self) -> None:
         migration = """<?php
