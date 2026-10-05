@@ -63,8 +63,13 @@ if (! is_file($bootstrap) || ! is_file($autoload)) {
  */
 $_SERVER['SCRIPT_NAME'] = '/s4/index.php';
 $_SERVER['PHP_SELF'] = '/s4/index.php';
+$_SERVER['SCRIPT_FILENAME'] = __DIR__.'/s4/index.php';
 
-require $bootstrap;
+try {
+    require $bootstrap;
+} catch (Throwable) {
+    s4State('runtime_unavailable', 503);
+}
 
 if ($path === '/s4/_bridge-readiness') {
     $appSecret = (string) ($_SERVER['APP_SECRET'] ?? $_ENV['APP_SECRET'] ?? getenv('APP_SECRET') ?: '');
