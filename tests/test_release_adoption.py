@@ -267,8 +267,8 @@ class ReleaseAdoptionTests(unittest.TestCase):
             module.transition((0, 1, 193), (0, 1, 195), ("README.md",))
 
     def test_release_identity_is_synchronized(self):
-        self.assertEqual(release_version(self.php, self.package, self.lock), "0.1.197")
-        self.assertIn("V0.1.197", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertEqual(release_version(self.php, self.package, self.lock), "0.1.198")
+        self.assertIn("V0.1.198", (ROOT / "README.md").read_text(encoding="utf-8"))
 
     def test_grindflow_ci_runs_release_contract_without_removing_validate(self):
         ci = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(encoding="utf-8")

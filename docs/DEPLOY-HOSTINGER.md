@@ -174,6 +174,33 @@ Esto cubre el redeploy Git/hPanel que no invoque el script de preparación.
 La operación es idempotente: si identidad, hash, verificación y rol ya coinciden,
 no escribe ni crea un backup adicional.
 
+## Preparación del runtime S4 después de un Redeploy Git/hPanel
+
+El checkout Git exacto no demuestra que `symfony/vendor` esté preparado. El árbol
+versionado excluye `symfony/vendor/` y el Redeploy Git/hPanel no se asume que ejecute
+Composer. Mientras hPanel siga siendo la autoridad productiva, el workflow
+`S4 Runtime Prepare` puede completar **solo** esas dependencias después de que
+`GrindFlow Deploy Observer` haya confirmado el SHA exacto.
+
+Contrato de seguridad:
+
+- no cambia la autoridad de deploy, no activa `FACTORY_DEPLOY_ENABLED` y no realiza cutover;
+- exige que el SHA observado siga siendo el `main` remoto actual antes de cualquier SSH;
+- exige `APP_PHASE=construccion` en el host y falla cerrado en cualquier otro valor;
+- usa `HOSTINGER_GIT_ROOT` como ruta allowlisted del checkout hPanel y las mismas
+  variables SSH/known-hosts gobernadas; valores ausentes o inválidos abortan antes de escribir;
+- ejecuta Composer únicamente contra `symfony/composer.lock`, en staging privado,
+  sin scripts/plugins de Composer, y promueve `symfony/vendor` con rollback al runtime anterior;
+- no ejecuta migraciones Doctrine, no provisiona identidades, no cambia `.env`, no toca datos
+  y no realiza provider I/O;
+- después de preparar dependencias solo hace GET a `/s4/_bridge-readiness`.
+  `config_missing`, `schema_missing` e `identity_unavailable` siguen siendo bloqueos
+  válidos; únicamente `runtime_unavailable` debe desaparecer para considerar resuelta
+  esta capa de preparación.
+
+Si falta configuración SSH o `HOSTINGER_GIT_ROOT`, el resultado correcto es fail-closed.
+No adivines una ruta del hosting ni sustituyas el cutover Factory por un segundo deploy.
+
 ## Base de datos
 
 Hostinger Web/Cloud usa MariaDB. GrindFlow se conecta mediante el driver Laravel

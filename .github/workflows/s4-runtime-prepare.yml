@@ -1,0 +1,159 @@
+name: S4 Runtime Prepare
+
+on:
+  workflow_run:
+    workflows: ["GrindFlow Deploy Observer"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-s4-runtime-prepare
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: exact-s4-runtime-prepare
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+      github.event.workflow_run.repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OBSERVED_SHA: ${{ github.event.workflow_run.head_sha }}
+      PRODUCTION_URL: https://www.grindflow.com.co
+    steps:
+      - id: current
+        name: Resolve trusted current-main SHA before production I/O
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          [[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || exit 1
+          [[ "$DEFAULT_BRANCH" != -* && "$DEFAULT_BRANCH" != *..* && "$DEFAULT_BRANCH" != *//* ]] || exit 1
+
+          remote_ref="refs/heads/$DEFAULT_BRANCH"
+          remote="$(git ls-remote --heads "https://github.com/$GITHUB_REPOSITORY.git" "$remote_ref")"
+          [[ "$(printf '%s\n' "$remote" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')" == "1" ]] || exit 1
+
+          trusted_sha="$(awk 'NR == 1 {print $1}' <<< "$remote")"
+          trusted_ref="$(awk 'NR == 1 {print $2}' <<< "$remote")"
+          [[ "$trusted_sha" =~ ^[0-9a-f]{40}$ && "$trusted_ref" == "$remote_ref" ]] || exit 1
+
+          if [[ "$trusted_sha" != "$OBSERVED_SHA" ]]; then
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo 'Observed deploy is no longer current-main; no production I/O executed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo 'current=true' >> "$GITHUB_OUTPUT"
+          echo "trusted_sha=$trusted_sha" >> "$GITHUB_OUTPUT"
+
+      - id: helper
+        name: Fetch helper only from trusted current-main SHA
+        if: steps.current.outputs.current == 'true'
+        shell: bash
+        env:
+          TRUSTED_SHA: ${{ steps.current.outputs.trusted_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          helper="$(mktemp)"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 \
+            --output "$helper" \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$TRUSTED_SHA/scripts/prepare-s4-runtime.sh"
+          bash -n "$helper"
+          echo "path=$helper" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Symfony dependencies on exact hPanel checkout
+        if: steps.current.outputs.current == 'true'
+        shell: bash
+        env:
+          TRUSTED_SHA: ${{ steps.current.outputs.trusted_sha }}
+          HELPER_PATH: ${{ steps.helper.outputs.path }}
+          SSH_HOST: ${{ vars.HOSTINGER_SSH_HOST }}
+          SSH_USER: ${{ vars.HOSTINGER_SSH_USER }}
+          SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
+          GIT_ROOT: ${{ vars.HOSTINGER_GIT_ROOT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ -f "$HELPER_PATH" ]] || { echo '::error::Trusted helper was not materialized'; exit 1; }
+          [[ "$SSH_HOST" =~ ^[A-Za-z0-9.-]+$ && "$SSH_HOST" != -* ]] || { echo '::error::Invalid SSH host configuration'; exit 1; }
+          [[ "$SSH_USER" =~ ^[A-Za-z0-9._-]+$ && "$SSH_USER" != -* ]] || { echo '::error::Invalid SSH user configuration'; exit 1; }
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] || { echo '::error::Invalid SSH port configuration'; exit 1; }
+          (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || { echo '::error::Invalid SSH port range'; exit 1; }
+          [[ "$GIT_ROOT" =~ ^/[A-Za-z0-9._/-]+$ && "$GIT_ROOT" != '/' && "$GIT_ROOT" != *'..'* && "$GIT_ROOT" != *'//'* ]] \
+            || { echo '::error::Invalid hPanel Git root configuration'; exit 1; }
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$HOSTINGER_KNOWN_HOSTS" ]] \
+            || { echo '::error::S4 runtime prepare SSH material is not configured'; exit 1; }
+
+          ssh_dir="$(mktemp -d)"
+          trap 'rm -rf "$ssh_dir" "$HELPER_PATH"' EXIT
+          key="$ssh_dir/key"
+          known="$ssh_dir/known_hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$known"
+          chmod 600 "$key" "$known"
+
+          ssh_args=(
+            -p "$SSH_PORT"
+            -i "$key"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$known"
+            -o ConnectTimeout=10
+          )
+          ssh "${ssh_args[@]}" "$SSH_USER@$SSH_HOST" \
+            "cd '$GIT_ROOT' && EXPECTED_SHA='$TRUSTED_SHA' bash -s" \
+            < "$HELPER_PATH"
+
+      - name: Reconfirm trusted current-main SHA after preparation
+        if: steps.current.outputs.current == 'true'
+        shell: bash
+        env:
+          TRUSTED_SHA: ${{ steps.current.outputs.trusted_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          remote_ref="refs/heads/$DEFAULT_BRANCH"
+          remote="$(git ls-remote --heads "https://github.com/$GITHUB_REPOSITORY.git" "$remote_ref")"
+          [[ "$(printf '%s\n' "$remote" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')" == "1" ]] || exit 1
+          remote_sha="$(awk 'NR == 1 {print $1}' <<< "$remote")"
+          remote_name="$(awk 'NR == 1 {print $2}' <<< "$remote")"
+          [[ "$remote_sha" == "$TRUSTED_SHA" && "$remote_name" == "$remote_ref" ]] \
+            || { echo '::error::main changed during S4 runtime preparation'; exit 1; }
+
+      - name: Verify S4 bridge no longer reports runtime_unavailable
+        if: steps.current.outputs.current == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          trap 'rm -f "$body"' EXIT
+          status="$(curl --silent --show-error --connect-timeout 3 --max-time 10 \
+            --output "$body" --write-out '%{http_code}' \
+            -H 'Cache-Control: no-cache' \
+            "$PRODUCTION_URL/s4/_bridge-readiness?probe=$GITHUB_RUN_ID")"
+          state="$(jq -r 'if type == "object" and (.state | type) == "string" then .state else "invalid" end' "$body" 2>/dev/null || printf invalid)"
+          case "$status:$state" in
+            200:ready_for_web_probe)
+              echo 'S4 runtime dependencies prepared; bridge is ready for the web probe.' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            503:config_missing|503:schema_missing|503:identity_unavailable)
+              printf 'S4 runtime dependencies prepared; next fail-closed blocker: `%s`.\n' "$state" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo '::error::S4 bridge still lacks runtime readiness or returned an invalid state.'
+              exit 1
+              ;;
+          esac
