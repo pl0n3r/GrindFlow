@@ -15,6 +15,7 @@ SCRIPT = ROOT / "scripts" / "prepare-s4-runtime.sh"
 MEDIA_READINESS = ROOT / "scripts" / "media-pilot-readiness.php"
 WORKFLOW = ROOT / ".github" / "workflows" / "s4-runtime-prepare.yml"
 DEPLOY_DOC = ROOT / "docs" / "DEPLOY-HOSTINGER.md"
+APP_CONFIG = ROOT / "config" / "app.php"
 
 
 class S4RuntimePrepareTests(unittest.TestCase):
@@ -82,6 +83,7 @@ class S4RuntimePrepareTests(unittest.TestCase):
             'if [[ "${1:-}" == "-r" && "${2:-}" == *parse_ini_file* ]]; then\n'
             '  [[ "${FAKE_PHP_PHASE_MISSING:-0}" != 1 ]] || exit 10\n'
             '  [[ "${FAKE_PHP_PHASE_OTHER:-0}" != 1 ]] || exit 11\n'
+            '  [[ "${FAKE_PHP_PHASE_FAILURE:-0}" != 1 ]] || exit 42\n'
             '  exit 0\n'
             'fi\n'
             'if [[ -n "${FAKE_COMPOSER_PATH:-}" && "${1:-}" == "$FAKE_COMPOSER_PATH" ]]; then\n'
@@ -138,7 +140,30 @@ class S4RuntimePrepareTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(marker.read_text(encoding="utf-8").strip(), str(php))
-            self.assertIn('composer_command=("$php_bin" "$composer_path")', self.script)
+        finally:
+            tmp.cleanup()
+
+    def test_shell_composer_shebang_containing_php_path_text_is_not_forced_through_php(self) -> None:
+        tmp, repo, sha, composer, php = self._fixture()
+        try:
+            php_tools = repo / "php-tools" / "bin"
+            php_tools.mkdir(parents=True)
+            shell = php_tools / "bash"
+            shell.symlink_to("/bin/bash")
+            original = composer.read_text(encoding="utf-8").split("\n", 1)[1]
+            composer.write_text(f"#!{shell}\n{original}", encoding="utf-8")
+            composer.chmod(composer.stat().st_mode | stat.S_IXUSR)
+            marker = repo / "php-used-for-shell-composer.txt"
+            result = self._run(
+                repo,
+                sha,
+                composer,
+                php,
+                FAKE_COMPOSER_PATH=str(composer),
+                FAKE_PHP_COMPOSER_MARKER=str(marker),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(marker.exists())
         finally:
             tmp.cleanup()
 
@@ -180,10 +205,39 @@ class S4RuntimePrepareTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
+    def test_unexpected_phase_probe_failure_reports_phase_check_failed(self) -> None:
+        tmp, repo, sha, composer, php = self._fixture()
+        try:
+            result = self._run(
+                repo, sha, composer, php, FAKE_PHP_PHASE_FAILURE="1"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("S4_RUNTIME_PREPARE_ERROR:phase-check-failed", result.stderr)
+            self.assertNotIn("phase-not-construction", result.stderr)
+        finally:
+            tmp.cleanup()
+
+    def test_missing_app_phase_defaults_to_construction_not_live(self) -> None:
+        probe = subprocess.run(
+            [
+                "php",
+                "-r",
+                'function env($key, $default = null) { return $default; } $config = require $argv[1]; echo $config["phase"];',
+                str(APP_CONFIG),
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(probe.returncode, 0, probe.stderr)
+        self.assertEqual(probe.stdout, "construccion")
+
     def test_private_vault_wrong_mode_is_reported_as_mode_not_private(self) -> None:
         vault = ROOT / "symfony" / "var" / "vault"
+        vault_existed = vault.exists()
         vault.mkdir(parents=True, exist_ok=True)
-        previous_mode = stat.S_IMODE(vault.stat().st_mode)
+        previous_mode = stat.S_IMODE(vault.stat().st_mode) if vault_existed else None
         try:
             vault.chmod(0o755)
             result = subprocess.run(
@@ -201,7 +255,10 @@ class S4RuntimePrepareTests(unittest.TestCase):
             serialized = json.dumps(payload, sort_keys=True)
             self.assertNotIn(str(vault), serialized)
         finally:
-            vault.chmod(previous_mode)
+            if vault_existed and previous_mode is not None:
+                vault.chmod(previous_mode)
+            elif vault.exists():
+                vault.rmdir()
 
     def test_prepare_is_exact_sha_locked_and_installs_only_locked_symfony_dependencies(
         self,
