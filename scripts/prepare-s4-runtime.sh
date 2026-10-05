@@ -26,15 +26,62 @@ composer_bin="${COMPOSER_BIN:-composer2}"
 if [[ "$php_bin" == */* ]]; then
   [[ -x "$php_bin" ]] || fail "php-unavailable"
 else
-  command -v "$php_bin" >/dev/null 2>&1 || fail "php-unavailable"
+  php_bin="$(command -v "$php_bin" 2>/dev/null || true)"
+  [[ -n "$php_bin" ]] || fail "php-unavailable"
 fi
 if [[ "$composer_bin" == */* ]]; then
-  [[ -x "$composer_bin" ]] || fail "composer-unavailable"
+  [[ -f "$composer_bin" && -r "$composer_bin" ]] || fail "composer-unavailable"
+  composer_path="$composer_bin"
 else
-  command -v "$composer_bin" >/dev/null 2>&1 || fail "composer-unavailable"
+  composer_path="$(command -v "$composer_bin" 2>/dev/null || true)"
+  [[ -n "$composer_path" ]] || fail "composer-unavailable"
 fi
 
-"$php_bin" -r '$v=@parse_ini_file($argv[1], false, INI_SCANNER_RAW); exit(is_array($v) && (($v["APP_PHASE"] ?? null) === "construccion") ? 0 : 9);' "$root/.env" >/dev/null 2>&1   || fail "phase-not-construction"
+phase_rc=0
+"$php_bin" -r '$v=@parse_ini_file($argv[1], false, INI_SCANNER_RAW); if (!is_array($v) || !array_key_exists("APP_PHASE", $v) || trim((string) $v["APP_PHASE"]) === "") { exit(10); } exit(((string) $v["APP_PHASE"]) === "construccion" ? 0 : 11);' "$root/.env" >/dev/null 2>&1 || phase_rc=$?
+case "$phase_rc" in
+  0) ;;
+  10)
+    printf 'S4_RUNTIME_PREPARE_ACTION:add APP_PHASE="construccion" to .env\n' >&2
+    fail "phase-missing"
+    ;;
+  11) fail "phase-not-construction" ;;
+  *) fail "phase-check-failed" ;;
+esac
+
+composer_log_error="composer-log-unavailable"
+composer_log_dir="${S4_RUNTIME_LOG_DIR:-${HOME:-$root}/.grindflow/logs}"
+mkdir -p "$composer_log_dir" || fail "$composer_log_error"
+chmod 0700 "$composer_log_dir" || fail "$composer_log_error"
+composer_log="$composer_log_dir/s4-runtime-composer.log"
+: > "$composer_log" || fail "$composer_log_error"
+chmod 0600 "$composer_log" || fail "$composer_log_error"
+
+composer_command=("$composer_path")
+composer_first_line="$(head -n 1 "$composer_path" 2>/dev/null || true)"
+composer_is_php=false
+if [[ "$composer_first_line" == '<?php'* ]] \
+  || [[ "$composer_first_line" =~ ^#!.*/php([0-9.]*)?([[:space:]].*)?$ ]] \
+  || [[ "$composer_first_line" =~ ^#!/usr/bin/env[[:space:]]+php([0-9.]*)?([[:space:]].*)?$ ]]; then
+  composer_is_php=true
+fi
+if [[ "$composer_path" == *.phar || "$composer_is_php" == true ]]; then
+  composer_command=("$php_bin" "$composer_path")
+fi
+
+classify_composer_failure() {
+  if grep -Eqi 'requires[[:space:]]+php|your php version|php version.*(does not|not satisfy)|does not satisfy.*php' "$composer_log"; then
+    printf '%s' 'composer-php-version-unsatisfied'
+  elif grep -Eqi 'lock file.*not up to date|locked package|installable set of packages|composer.lock.*incompatible' "$composer_log"; then
+    printf '%s' 'composer-lock-incompatible'
+  elif grep -Eqi 'could not resolve host|network is unreachable|connection timed out|failed to connect|curl error (6|7|28)' "$composer_log"; then
+    printf '%s' 'composer-network-unavailable'
+  elif grep -Eqi 'allowed memory size|out of memory|memory exhausted' "$composer_log"; then
+    printf '%s' 'composer-memory-exhausted'
+  else
+    printf '%s' 'composer-install-failed'
+  fi
+}
 
 stage="$symfony_root/.vendor-stage-$$"
 backup="$symfony_root/.vendor-backup-$$"
@@ -77,12 +124,16 @@ if [[ -L "$symfony_root/vendor" || ( -e "$symfony_root/vendor" && ! -d "$symfony
   fail "vendor-target-invalid"
 fi
 
-if ! COMPOSER_VENDOR_DIR="$stage" "$composer_bin" --working-dir="$symfony_root" install   --no-dev --prefer-dist --no-interaction --optimize-autoloader --no-scripts --no-plugins --no-progress --quiet   >/dev/null 2>&1; then
-  fail "composer-install-failed"
+if ! COMPOSER_VENDOR_DIR="$stage" "${composer_command[@]}" --working-dir="$symfony_root" install \
+  --no-dev --prefer-dist --no-interaction --optimize-autoloader --no-scripts --no-plugins --no-progress \
+  >"$composer_log" 2>&1; then
+  printf 'S4_RUNTIME_PREPARE_DETAIL:composer-log-private\n' >&2
+  fail "$(classify_composer_failure)"
 fi
 
 [[ -f "$stage/autoload.php" ]] || fail "staged-autoload-missing"
-"$php_bin" -r 'require $argv[1];' "$stage/autoload.php" >/dev/null 2>&1   || fail "staged-autoload-invalid"
+COMPOSER_VENDOR_DIR="$stage" "$php_bin" -r 'require $argv[1];' "$stage/autoload.php" >/dev/null 2>&1 \
+  || fail "staged-autoload-invalid"
 
 current_sha_after_prepare="$(git -C "$root" rev-parse HEAD 2>/dev/null || true)"
 [[ "$current_sha_after_prepare" == "$expected_sha" ]] || fail "checkout-sha-changed-during-prepare"

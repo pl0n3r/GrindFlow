@@ -201,6 +201,56 @@ Contrato de seguridad:
 Si falta configuración SSH o `HOSTINGER_GIT_ROOT`, el resultado correcto es fail-closed.
 No adivines una ruta del hosting ni sustituyas el cutover Factory por un segundo deploy.
 
+### Camino manual del dueño en hPanel
+
+Cuando GitHub no tiene credenciales SSH, esta preparación se ejecuta manualmente en el checkout hPanel. No copies secretos al chat ni al repositorio.
+
+1. **Comprobar prerrequisitos y fase**, desde el checkout real:
+
+   ```bash
+   cd "$HOME/domains/grindflow.com.co/public_html"
+   EXPECTED_SHA="$(git rev-parse HEAD)"
+   /opt/alt/php85/usr/bin/php -v
+   test -f .env
+   grep -qE '^APP_PHASE="?construccion"?$' .env
+   ```
+
+   Si el último comando falla porque falta la variable, edita el `.env` privado en hPanel y añade exactamente `APP_PHASE="construccion"`. No imprimas el archivo completo. La aplicación y el preparador usan construcción como default fail-closed; `live` siempre requiere configuración explícita.
+
+2. **Preparar `symfony/vendor` con PHP 8.5**:
+
+   ```bash
+   EXPECTED_SHA="$EXPECTED_SHA" \
+   PHP_BIN=/opt/alt/php85/usr/bin/php \
+   COMPOSER_BIN=/usr/local/bin/composer2 \
+   bash scripts/prepare-s4-runtime.sh
+   ```
+
+   El script detecta launchers PHP/phar y ejecuta Composer mediante `PHP_BIN`. Si ese launcher concreto del hosting no es un archivo PHP legible, puede usarse temporalmente el wrapper privado ya preparado por el dueño mediante `COMPOSER_BIN="$HOME/bin/composer2-php85"`. Ante un error de Composer, revisa localmente `$HOME/.grindflow/logs/s4-runtime-composer.log`; no pegues ese log en Issues o chats.
+
+3. **Comprobar el bridge de solo lectura**:
+
+   ```bash
+   curl -sS \
+     -D /tmp/grindflow-s4-headers.txt \
+     -o /tmp/grindflow-s4-body.json \
+     -w '%{http_code}\n' \
+     https://www.grindflow.com.co/s4/_bridge-readiness
+   cat /tmp/grindflow-s4-body.json
+   ```
+
+   `runtime_unavailable` indica que esta preparación no quedó lista. `config_missing`, `schema_missing` o `identity_unavailable` son bloqueos válidos de las siguientes capas y no autorizan migraciones ni provisioning desde CI. `ready_for_web_probe` es la señal para continuar con la validación web prevista.
+
+Si un Redeploy Git/hPanel elimina `symfony/vendor`, repite el paso 2 sobre el SHA exacto. Si elimina `symfony/var/vault`, recréalo sin contenido sensible y restaura permisos privados antes del readiness:
+
+```bash
+umask 077
+mkdir -p symfony/var/vault
+chmod 700 symfony/var/vault
+```
+
+No reconstruyas secretos desde el repositorio. Si desaparecen archivos de entorno privados, restáuralos por el canal privado/backup de hPanel antes de ejecutar cualquier preparación.
+
 ## Base de datos
 
 Hostinger Web/Cloud usa MariaDB. GrindFlow se conecta mediante el driver Laravel
