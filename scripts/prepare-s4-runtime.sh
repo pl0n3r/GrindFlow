@@ -36,8 +36,8 @@ fi
 
 "$php_bin" -r '$v=@parse_ini_file($argv[1], false, INI_SCANNER_RAW); exit(is_array($v) && (($v["APP_PHASE"] ?? null) === "construccion") ? 0 : 9);' "$root/.env" >/dev/null 2>&1   || fail "phase-not-construction"
 
-stage="$symfony_root/.vendor-stage-$"
-backup="$symfony_root/.vendor-backup-$"
+stage="$symfony_root/.vendor-stage-$$"
+backup="$symfony_root/.vendor-backup-$$"
 had_previous=false
 promoted=false
 prepared=false
