@@ -213,6 +213,8 @@ class S4RuntimePrepareTests(unittest.TestCase):
         ):
             self.assertIn(snippet, self.workflow + self.script)
         self.assertNotIn("actions/checkout@", self.workflow)
+        self.assertIn('stage="$symfony_root/.vendor-stage-$"', self.script)
+        self.assertIn('backup="$symfony_root/.vendor-backup-$"', self.script)
 
     def test_prepare_never_migrates_provisions_changes_secrets_or_enables_factory_cutover(
         self,
@@ -235,6 +237,8 @@ class S4RuntimePrepareTests(unittest.TestCase):
         self,
     ) -> None:
         self.assertIn("/s4/_bridge-readiness", self.workflow)
+        self.assertIn(".data.state", self.workflow)
+        self.assertNotIn("(.state | type)", self.workflow)
         self.assertIn("200:ready_for_web_probe", self.workflow)
         for state in ("config_missing", "schema_missing", "identity_unavailable"):
             self.assertIn(f"503:{state}", self.workflow)
