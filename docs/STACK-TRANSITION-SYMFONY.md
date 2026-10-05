@@ -494,3 +494,12 @@ la línea base comercial siguen como slices posteriores del roadmap #2.
 
 **Verificación:** prueba de componente para destinos/estado activo y prueba de contrato que impide reintroducir sidebars privados en las vistas; CI Laravel, navegador y análisis estático permanecen obligatorios.
 
+
+
+## Bridge productivo selectivo `/s4` durante coexistencia
+
+Mientras Laravel siga siendo el front controller por defecto, el runtime Symfony S4 se expone de forma reversible únicamente bajo el prefijo explícito `/s4`. Apache dirige solo ese namespace a `public/s4.php`; el bridge conserva `/s4` como base URL pública y entrega al kernel Symfony las rutas internas existentes. El acceso directo a `/s4.php` no constituye un segundo namespace válido.
+
+El deploy instala las dependencias bloqueadas de `symfony/composer.lock`, pero **no** ejecuta Doctrine migrations, no crea identidades/membresías Symfony y no copia secretos. El preflight read-only `/s4/_bridge-readiness` devuelve únicamente estados allowlisted (`runtime_unavailable`, `config_missing`, `schema_missing`, `identity_unavailable`, `ready_for_web_probe`) y nunca rutas, DSN, usuarios, cookies ni secretos.
+
+Production Smoke debe mantener dos sesiones independientes. Laravel conserva su cookie jar actual; S4 usa otra cookie jar y su propio flujo `/s4/login` → `/s4/organizations` → `/s4/organizations/select` antes de consultar `/s4/api/admin/schedules/media-readiness`. Una sesión Laravel nunca acredita identidad ni tenant Symfony. Cualquier preflight, login, membership o selección incompleta permanece `BLOCKED_TARGET_ENV`; el smoke no llama al provider ni convierte ese bloqueo en evidencia de publicación. Las Doctrine migrations y el aprovisionamiento de identidad productiva siguen siendo operaciones separadas y gobernadas.

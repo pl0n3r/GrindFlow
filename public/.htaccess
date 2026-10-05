@@ -11,6 +11,11 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-TOKEN}]
 
+    # Symfony remains isolated during coexistence. Only the explicit /s4
+    # namespace reaches its front controller; every other application route
+    # continues through Laravel below.
+    RewriteRule ^s4(?:/.*)?$ s4.php [QSA,L]
+
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]

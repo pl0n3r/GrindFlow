@@ -15,6 +15,8 @@ command -v "$COMPOSER_BIN" >/dev/null 2>&1 || fail "Composer command not found: 
 [[ -f artisan ]] || fail "Run this script from the GrindFlow repository root."
 [[ -f composer.json ]] || fail "composer.json not found."
 [[ -f .env ]] || fail ".env is missing. Create it outside source control before deploying."
+[[ -f symfony/composer.json ]] || fail "Symfony composer.json is missing."
+[[ -f symfony/composer.lock ]] || fail "Symfony composer.lock is missing."
 
 PHP_VERSION_ID="$("$PHP_BIN" -r 'echo PHP_VERSION_ID;')"
 if (( PHP_VERSION_ID < 80401 )); then
@@ -26,8 +28,22 @@ if ! grep -Eq '^APP_KEY=base64:.+' .env; then
 fi
 
 printf 'Using PHP: %s\n' "$("$PHP_BIN" -r 'echo PHP_VERSION;')"
-printf 'Installing production Composer dependencies...\n'
-"$COMPOSER_BIN" install   --no-dev   --prefer-dist   --no-interaction   --optimize-autoloader
+printf 'Installing Laravel production Composer dependencies...\n'
+"$COMPOSER_BIN" install \
+  --no-dev \
+  --prefer-dist \
+  --no-interaction \
+  --optimize-autoloader
+
+printf 'Installing isolated Symfony production Composer dependencies...\n'
+(
+  cd symfony
+  "$COMPOSER_BIN" install \
+    --no-dev \
+    --prefer-dist \
+    --no-interaction \
+    --optimize-autoloader
+)
 
 # Production may still carry the legacy member-bound smoke address in .env.
 # Override this deploy process before config:cache/provisioning; the OIDC bootstrap
@@ -62,7 +78,10 @@ fi
 cat <<'EOF'
 Deploy preparation completed.
 
-This script does not run destructive SQL. During APP_PHASE=construccion it
-reconciles only the reserved synthetic Production Smoke identity after taking
-its private rollback backup. Database migrations remain a separate operation.
+This script installs the locked Laravel and isolated Symfony dependencies, but
+does not run Doctrine migrations, create Symfony identities, publish provider
+traffic, or treat Symfony configuration/schema readiness as proven. During
+APP_PHASE=construccion it reconciles only the reserved Laravel Production Smoke
+identity after taking its private rollback backup. Database migrations remain a
+separate governed operation.
 EOF
