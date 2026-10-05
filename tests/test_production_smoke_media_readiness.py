@@ -98,6 +98,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
     def test_blocked_runtime_comments_only_allowlisted_subchecks(self) -> None:
         smoke_log = "\n".join(
             (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed",
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
@@ -124,40 +125,44 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         for forbidden in ("remote response", "filesystem path", "cookie", "header", "hash", "secret"):
             self.assertNotIn(forbidden, proof.lower())
 
-    def test_invalid_or_duplicate_subchecks_do_not_publish_blocked_evidence(self) -> None:
-        cases = (
-            "MEDIA_WEB_RUNTIME_READY=0\n",
-            "\n".join(
-                (
-                    "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
-                    "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
-                    "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
-                    "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
-                    "MEDIA_WEB_RUNTIME_READY=0",
-                    "",
-                )
-            ),
-            "\n".join(
-                (
-                    "MEDIA_WEB_RUNTIME_CHECK_DECODER=arbitrary",
-                    "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
-                    "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
-                    "MEDIA_WEB_RUNTIME_READY=0",
-                    "",
-                )
-            ),
-        )
-        for smoke_log in cases:
-            with self.subTest(smoke_log=smoke_log):
-                completed, calls, summary, proof = self._run_reconcile(smoke_log)
-                self.assertEqual(0, completed.returncode, completed.stderr)
-                self.assertNotIn("issue comment 307", calls)
-                self.assertEqual("", proof)
-                self.assertIn("diagnostics unavailable", summary)
+    def test_missing_diagnostics_posts_single_classified_comment_and_never_closes(self) -> None:
+        cases = {
+            "endpoint_unreachable": "MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "http_non_200": "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "contract_invalid": "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "markers_absent": "MEDIA_WEB_RUNTIME_READY=0\n",
+        }
+        for reason, smoke_log in cases.items():
+            with self.subTest(reason=reason):
+                first, first_calls, _, proof = self._run_reconcile(smoke_log)
+                second, second_calls, _, _ = self._run_reconcile(smoke_log, existing_comments=proof)
+                self.assertEqual(0, first.returncode, first.stderr)
+                self.assertEqual(0, second.returncode, second.stderr)
+                self.assertIn("issue comment 307 --body-file", first_calls)
+                self.assertNotIn("issue close 307", first_calls)
+                self.assertNotIn("issue comment 307", second_calls)
+                self.assertIn("Media web runtime: diagnóstico no disponible", proof)
+                self.assertIn(f"Cause: `{reason}`", proof)
+                self.assertIn("grindflow-media-runtime-unavailable-v1", proof)
+
+    def test_workflow_dispatch_emits_same_markers_as_push(self) -> None:
+        self.assertIn("  push:\n    branches: [main]\n  workflow_dispatch:", WORKFLOW)
+        self.assertEqual(1, WORKFLOW.count("run: bash scripts/production-smoke.sh >production-smoke.log 2>&1"))
+        reconcile = self._reconcile_script()
+        self.assertNotIn("github.event_name", reconcile)
+        for marker in (
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC",
+            "MEDIA_WEB_RUNTIME_CHECK_DECODER",
+            "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE",
+            "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT",
+            "MEDIA_WEB_RUNTIME_READY",
+        ):
+            self.assertIn(marker, SMOKE)
 
     def test_blocked_evidence_is_idempotent_per_sha_and_run(self) -> None:
         smoke_log = "\n".join(
             (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed",
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
@@ -176,9 +181,10 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertNotIn("issue comment 307", second_calls)
         self.assertEqual(first_proof, second_proof)
 
-    def test_workflow_closes_issue_307_only_after_successful_exact_deploy_web_runtime_evidence(self) -> None:
+    def test_all_ready_web_runtime_closes_readiness_issue_with_allowlisted_evidence(self) -> None:
         ready = "\n".join(
             (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed",
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
@@ -188,6 +194,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         )
         blocked = "\n".join(
             (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed",
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
@@ -219,6 +226,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
     def test_reconcile_invocations_use_isolated_evidence_paths(self) -> None:
         ready = "\n".join(
             (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed",
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
