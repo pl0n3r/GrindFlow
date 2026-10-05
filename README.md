@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.197 · esta etiqueta no prueba despliegue ni salud de producción.
+**Versión de código declarada:** V0.1.198 · esta etiqueta no prueba despliegue ni salud de producción.
 <!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
@@ -47,10 +47,10 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#327 · bridge Symfony S4 reversible y verificable](https://github.com/pl0n3r/GrindFlow/issues/327).
+- **NOW:** [#333 · preparación exact-SHA de dependencias Symfony para S4](https://github.com/pl0n3r/GrindFlow/issues/333).
 - **NEXT:** seleccionar el siguiente trabajo `ready` desde el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) después de cerrar el trabajo activo.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
-- **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
+- **BLOCKED:** [#307 · readiness multimedia en entorno objetivo](https://github.com/pl0n3r/GrindFlow/issues/307), [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
 Esta vista resume el trabajo; no sustituye el roadmap, los Issues ni las Releases.
 
@@ -76,7 +76,7 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 ### Distribution Symfony · provider pilot
 
-En el código candidato **V0.1.197**, Symfony S4 implementa la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages** mediante intención durable, lock previo al I/O externo y ledger tenant-safe de idempotencia. Esta capacidad **no se considera desplegada** hasta verificar que el SHA del checkout productivo incluye este cambio. La ruta oficial admite JPEG/PNG verificado desde el Vault privado; **CI no ejecuta publicación live** y usa transporte fake. La validación externa con credenciales de piloto permanece separada y posterior al deploy autorizado. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
+En el código candidato **V0.1.198**, Symfony S4 implementa la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages** mediante intención durable, lock previo al I/O externo y ledger tenant-safe de idempotencia. Esta capacidad **no se considera desplegada** hasta verificar que el SHA del checkout productivo incluye este cambio. La ruta oficial admite JPEG/PNG verificado desde el Vault privado; **CI no ejecuta publicación live** y usa transporte fake. La preparación exact-SHA de `symfony/vendor` para el bridge S4 permanece separada del deploy Git/hPanel y no constituye cutover. La validación externa con credenciales de piloto permanece separada y posterior al deploy autorizado. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
 
 ## Stack e infraestructura
 
