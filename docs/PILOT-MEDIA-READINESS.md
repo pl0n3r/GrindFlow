@@ -87,6 +87,8 @@ La respuesta solo expone `ready/not_ready`; **no imprime paths, secretos, hashes
 
 Ausencia del endpoint, autenticación inválida, estado `not_ready`, error o evidencia stale ⇒ `BLOCKED_TARGET_ENV`. El cierre operativo de #307 requiere una observación `web_runtime` después del deploy autorizado; CI y el diagnóstico CLI solo pueden demostrar `BUILD_AHEAD_READY`.
 
+El Production Smoke emite una causa allowlisted: `observed`, `endpoint_unreachable`, `http_non_200` o `contract_invalid`; si el marcador o los sub-checks esperados faltan, la reconciliación clasifica `markers_absent`. Cuando no existe diagnóstico web válido, publica **una sola vez por SHA+run** un comentario «Media web runtime: diagnóstico no disponible» con el run, SHA y causa clasificada. Nunca copia body remoto, paths, cookies, headers, hashes ni secretos. Los eventos `push` y `workflow_dispatch` usan el mismo smoke y los mismos marcadores.
+
 ## Autoridad y límites
 
 Este build-ahead no autoriza:
