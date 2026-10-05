@@ -329,6 +329,219 @@ jobs:
             printf '%s\n' "${matches[0]#*=}"
           }
 
+          diagnostic_reason() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=(observed|endpoint_unreachable|http_non_200|contract_invalid)
+          ready_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=1' production-smoke.log || true)"
+          blocked_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=0' production-smoke.log || true)"
+          diagnostics_available=false
+          diagnostic_state="$(diagnostic_reason)"
+          decoder_state=''
+          temporary_storage_state=''
+          private_vault_state=''
+
+          if [[ "$diagnostic_state" == "observed" ]] \
+            && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
+            && temporary_storage_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE)" \
+            && private_vault_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT)"; then
+            diagnostics_available=true
+          elif [[ "$diagnostic_state" == "observed" ]]; then
+            diagnostic_state='markers_absent'
+          fi
+
+          if [[ "$ready_count" == "1" && "$blocked_count" == "0" \
+            && "$diagnostics_available" == "true" \
+            && "$decoder_state" == "ready" \
+            && "$temporary_storage_state" == "ready" \
+            && "$private_vault_state" == "ready" ]]; then
+            {
+              echo '## Media web runtime ready'
+              echo
+              printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
+              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo 'Contract: `media-pilot-readiness-v1`'
+              echo 'Evidence scope: `web_runtime`'
+              echo 'Status: `ready`'
+              printf -- '- decoder: `%s`\n' "$decoder_state"
+              printf -- '- temporary_storage: `%s`\n' "$temporary_storage_state"
+              printf -- '- private_vault: `%s`\n' "$private_vault_state"
+              echo
+              echo 'The remote readiness body, filesystem paths, cookies, hashes and secrets are intentionally omitted.'
+            } > "$evidence_file"
+            cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
+
+            issue_state="$(gh issue view "$MEDIA_READINESS_ISSUE" --json state --jq '.state')"
+            if [[ "$issue_state" == "OPEN" ]]; then
+              gh issue comment "$MEDIA_READINESS_ISSUE" --body-file "$evidence_file"
+              gh issue edit "$MEDIA_READINESS_ISSUE" --remove-label 'estado: bloqueado' --add-label 'estado: completado'
+              gh issue close "$MEDIA_READINESS_ISSUE"
+            fi
+          else
+            {
+              echo '## Media web runtime remains blocked'
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ "$diagnostics_available" == "true" ]]; then
+              run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              blocked_marker="<!-- grindflow-media-runtime-blocked-v1 sha=$GITHUB_SHA run=$GITHUB_RUN_ID -->"
+              {
+                echo "$blocked_marker"
+                printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
+                echo "Run: $run_url"
+                echo 'Status: `BLOCKED_TARGET_ENV`'
+                printf -- '- decoder: `%s`\n' "$decoder_state"
+                printf -- '- temporary_storage: `%s`\n' "$temporary_storage_state"
+                printf -- '- private_vault: `%s`\n' "$private_vault_state"
+              } > "$evidence_file"
+              cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
+
+              existing_comments="$(gh issue view "$MEDIA_READINESS_ISSUE" --json comments --jq '.comments[].body')"
+              if ! grep -Fq -- "$blocked_marker" <<<"$existing_comments"; then
+                gh issue comment "$MEDIA_READINESS_ISSUE" --body-file "$evidence_file"
+              fi
+            else
+              unavailable_marker="<!-- grindflow-media-runtime-unavailable-v1 sha=$GITHUB_SHA run=$GITHUB_RUN_ID -->"
+              {
+                echo "$unavailable_marker"
+                echo 'Media web runtime: diagnóstico no disponible'
+                printf 'Exact deployed SHA: `%s`\n' "$GITHUB_SHA"
+                echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+                echo 'Status: `BLOCKED_TARGET_ENV`'
+                printf 'Cause: `%s`\n' "$diagnostic_state"
+                echo 'No remote response body, filesystem path, cookie, header, hash or secret was published.'
+              } > "$evidence_file"
+              cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
+
+              existing_comments="$(gh issue view "$MEDIA_READINESS_ISSUE" --json comments --jq '.comments[].body')"
+              if ! grep -Fq -- "$unavailable_marker" <<<"$existing_comments"; then
+                gh issue comment "$MEDIA_READINESS_ISSUE" --body-file "$evidence_file"
+              fi
+            fi
+
+            {
+              echo
+              echo 'Issue #307 remains open. No remote response body, filesystem path, cookie, header, hash or secret was published.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload short-lived smoke diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        uses: actions/upload-artifact@v6
+        with:
+          name: production-smoke-diagnostics-${{ github.run_id }}
+          path: production-smoke.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish production failure diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            if grep -Eq '^MIGRATIONS_PENDING=[1-9][0-9]*$' production-smoke.log; then
+              pending="$(grep -E '^MIGRATIONS_PENDING=[1-9][0-9]*$' production-smoke.log | tail -1 | cut -d= -f2)"
+              echo "## Production smoke blocked by pending migrations"
+              echo
+              echo "Pending migration count: **$pending**"
+              if grep -Fxq 'VAULT_READ_ONLY=ok' production-smoke.log; then
+                echo "Authenticated read-only Vault check passed despite pending migrations."
+              elif grep -Fxq 'VAULT_READ_ONLY=failed' production-smoke.log; then
+                echo "**Additional defect:** authenticated read-only Vault check failed. Inspect the short-lived diagnostics artifact; do not classify the failure as migrations alone."
+              else
+                echo "Authenticated read-only Vault check was not completed."
+              fi
+              echo "Inspect the exact pending batch in Admin > System and verify an external restorable backup before approving migrations."
+              echo "This workflow never executes migrations."
+            else
+              echo "## Production smoke failed"
+              echo
+              echo "Cause: inspect the short-lived diagnostic artifact."
+            fi
+            echo
+            # Parse only allowlisted local signals; never publish log lines or remote HTML.
+            if python3 scripts/production-smoke-auth-triage.py --markdown < production-smoke.log; then
+              :
+            else
+              echo "Authentication signal summary unavailable; inspect the short-lived artifact."
+            fi
+            echo
+            # Publish only strict allowlisted release metadata; never response HTML.
+            expected_line="$(grep -E '^RELEASE_UI_EXPECTED=v[0-9]+[.][0-9]+[.][0-9]+$' production-smoke.log | tail -n 1 || true)"
+            observed_line="$(grep -E '^RELEASE_UI_OBSERVED=(v[0-9]+[.][0-9]+[.][0-9]+|unknown)$' production-smoke.log | tail -n 1 || true)"
+            if [[ -n "$expected_line" ]]; then
+              echo "Expected human release: ${expected_line#*=}"
+              if [[ -n "$observed_line" ]]; then
+                echo "Observed human release: ${observed_line#*=}"
+              else
+                echo "Observed human release: not reached by read-only smoke"
+              fi
+              echo "Human release label does not establish the deployed Git SHA."
+              echo
+            fi
+            echo "Workflow source SHA (not the verified deployed checkout): $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Artifact: production-smoke-diagnostics-$GITHUB_RUN_ID"
+            echo "Retention: 3 days"
+            echo
+            echo "The diagnostic payload is kept out of the public issue body."
+            echo "Authorized agents can retrieve the short-lived artifact through GitHub."
+          } > /tmp/grindflow-production-failure.md
+
+          cat /tmp/grindflow-production-failure.md >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body-file /tmp/grindflow-production-failure.md
+          else
+            gh issue create --title "$FAILURE_ISSUE_TITLE" --body-file /tmp/grindflow-production-failure.md
+          fi
+
+      - name: Publish production recovery
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "## Production smoke passed"
+            echo
+            echo "Workflow source SHA: $GITHUB_SHA"
+            echo "Target: $BASE_URL"
+            echo "Checked: exact /health, /, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
+            echo "Observed release: $(grep -E '^HEALTH_VERSION=' production-smoke.log | tail -1 | cut -d= -f2)"
+            echo "Exact deployed Git SHA: $(grep -E '^HEALTH_SHA=[0-9a-f]{40}$' production-smoke.log | tail -1 | cut -d= -f2)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          issue_number="$(gh issue list --state open --search "$FAILURE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+
+          if [[ -n "$issue_number" ]]; then
+            gh issue comment "$issue_number" --body "Production smoke recovered on commit $GITHUB_SHA. Closing the automatic incident."
+            gh issue close "$issue_number"
+          fi
+
+      - name: Fail workflow after publishing diagnostics
+        if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+      - name: Fail unconfigured authenticated production smoke
+        if: steps.credentials.outputs.configured == 'false'
+        shell: bash
+        run: |
+          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
+          exit 1 production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]]; then
+              printf 'markers_absent\n'
+              return
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           ready_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=1' production-smoke.log || true)"
           blocked_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=0' production-smoke.log || true)"
           diagnostics_available=false
