@@ -36,17 +36,39 @@ fi
 
 "$php_bin" -r '$v=@parse_ini_file($argv[1], false, INI_SCANNER_RAW); exit(is_array($v) && (($v["APP_PHASE"] ?? null) === "construccion") ? 0 : 9);' "$root/.env" >/dev/null 2>&1   || fail "phase-not-construction"
 
-stage="$symfony_root/.vendor-stage-$$"
-backup="$symfony_root/.vendor-backup-$$"
+stage="$symfony_root/.vendor-stage-$"
+backup="$symfony_root/.vendor-backup-$"
 had_previous=false
+promoted=false
+prepared=false
 
 cleanup() {
   rm -rf "$stage"
-  if [[ -d "$backup" && ! -e "$symfony_root/vendor" ]]; then
+  if [[ "$prepared" == true ]]; then
+    rm -rf "$backup"
+    return
+  fi
+  if [[ "$promoted" == true ]]; then
+    rm -rf "$symfony_root/vendor"
+  fi
+  if [[ "$had_previous" == true && -d "$backup" ]]; then
     mv "$backup" "$symfony_root/vendor" >/dev/null 2>&1 || true
   fi
 }
-trap cleanup EXIT HUP INT TERM
+
+abort_on_signal() {
+  case "$1" in
+    HUP) exit 129 ;;
+    INT) exit 130 ;;
+    TERM) exit 143 ;;
+    *) exit 1 ;;
+  esac
+}
+
+trap cleanup EXIT
+trap 'abort_on_signal HUP' HUP
+trap 'abort_on_signal INT' INT
+trap 'abort_on_signal TERM' TERM
 
 [[ ! -e "$stage" && ! -e "$backup" ]] || fail "temporary-path-collision"
 if [[ -L "$symfony_root/vendor" || ( -e "$symfony_root/vendor" && ! -d "$symfony_root/vendor" ) ]]; then
@@ -74,6 +96,7 @@ if ! mv "$stage" "$symfony_root/vendor"; then
   fi
   fail "vendor-promotion-failed"
 fi
+promoted=true
 
 if ! "$php_bin" -r 'require $argv[1];' "$symfony_root/vendor/autoload.php" >/dev/null 2>&1; then
   rm -rf "$symfony_root/vendor"
@@ -83,6 +106,7 @@ if ! "$php_bin" -r 'require $argv[1];' "$symfony_root/vendor/autoload.php" >/dev
   fail "promoted-autoload-invalid"
 fi
 
+prepared=true
 rm -rf "$backup"
 trap - EXIT HUP INT TERM
 printf 'S4_RUNTIME_PREPARE_OK\n'
