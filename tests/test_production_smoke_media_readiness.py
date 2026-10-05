@@ -21,7 +21,9 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
     def test_smoke_reuses_authenticated_cookie_and_queries_only_web_runtime_readiness_endpoint(self) -> None:
         self.assertEqual(1, SMOKE.count("$BASE_URL/api/admin/schedules/media-readiness"))
         block = self._readiness_function()
-        self.assertIn('curl_common --cookie "$cookie_jar" --output "$media_readiness_body"', block)
+        self.assertIn('readiness_cookie="$cookie_jar"', block)
+        self.assertIn('readiness_cookie="$s4_cookie_jar"', block)
+        self.assertIn('curl_common --cookie "$readiness_cookie" --output "$media_readiness_body"', block)
         self.assertNotIn("GRINDFLOW_SMOKE_PASSWORD", block)
         self.assertNotIn("Authorization:", block)
 
@@ -83,9 +85,10 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn('if [[ "$status" != "200" ]]', block)
         self.assertIn("json.JSONDecodeError", block)
         self.assertNotIn('cat "$media_readiness_body"', SMOKE)
-        self.assertNotIn("facebook", block.lower())
-        self.assertNotIn("publish", block.lower())
-        self.assertNotIn("--request POST", block)
+        read_only_probe = block.split("# Authenticate only after", 1)[0]
+        self.assertNotIn("facebook", read_only_probe.lower())
+        self.assertNotIn("publish", read_only_probe.lower())
+        self.assertNotIn("--request POST", read_only_probe)
 
     def test_ci_equivalent_requires_json_boolean_false_strictly(self) -> None:
         for value, expected_code in ((False, 0), (0, 1), (None, 1), ("false", 1)):
@@ -154,11 +157,123 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 self.assertIn(f"Cause: `{expected_reason}`", proof)
                 self.assertIn("grindflow-media-runtime-unavailable-v1", proof)
 
+    def test_unavailable_diagnostic_includes_only_valid_allowlisted_s4_bridge_state(self) -> None:
+        valid = (
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n"
+            "S4_BRIDGE_STATE=config_missing\n"
+            "MEDIA_WEB_RUNTIME_READY=0\n"
+        )
+        completed, calls, _, proof = self._run_reconcile(valid)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("issue comment 307 --body-file", calls)
+        self.assertIn("S4 bridge state: `config_missing`", proof)
+
+        invalid_cases = (
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nS4_BRIDGE_STATE=leak-me\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nS4_BRIDGE_STATE=config_missing\nS4_BRIDGE_STATE=schema_missing\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nS4_BRIDGE_STATE=config_missing\nS4_BRIDGE_STATE=leak-me\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nMEDIA_WEB_RUNTIME_READY=0\n",
+        )
+        for smoke_log in invalid_cases:
+            with self.subTest(smoke_log=smoke_log):
+                completed, _, _, proof = self._run_reconcile(smoke_log)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("S4 bridge state:", proof)
+                self.assertNotIn("leak-me", proof)
+
+    def test_s4_auth_state_is_optional_unique_and_allowlisted(self) -> None:
+        valid = (
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n"
+            "S4_BRIDGE_STATE=ready_for_web_probe\n"
+            "S4_AUTH_STATE=identity_unavailable\n"
+            "MEDIA_WEB_RUNTIME_READY=0\n"
+        )
+        completed, _, _, proof = self._run_reconcile(valid)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("S4 auth state: `identity_unavailable`", proof)
+
+        invalid_cases = (
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nS4_AUTH_STATE=leak-me\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nS4_AUTH_STATE=ready\nS4_AUTH_STATE=identity_unavailable\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nS4_AUTH_STATE=ready\nS4_AUTH_STATE=leak-me\nMEDIA_WEB_RUNTIME_READY=0\n",
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nMEDIA_WEB_RUNTIME_READY=0\n",
+        )
+        for smoke_log in invalid_cases:
+            with self.subTest(smoke_log=smoke_log):
+                completed, _, _, proof = self._run_reconcile(smoke_log)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("S4 auth state:", proof)
+                self.assertNotIn("leak-me", proof)
+
+    def test_s4_states_are_published_only_for_http_non_200(self) -> None:
+        for diagnostic_state in ("endpoint_unreachable", "contract_invalid", "markers_absent"):
+            with self.subTest(diagnostic_state=diagnostic_state):
+                smoke_log = (
+                    f"MEDIA_WEB_RUNTIME_DIAGNOSTIC={diagnostic_state}\n"
+                    "S4_BRIDGE_STATE=config_missing\n"
+                    "S4_AUTH_STATE=identity_unavailable\n"
+                    "MEDIA_WEB_RUNTIME_READY=0\n"
+                )
+                completed, _, _, proof = self._run_reconcile(smoke_log)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("S4 bridge state:", proof)
+                self.assertNotIn("S4 auth state:", proof)
+
+        completed, _, _, proof = self._run_reconcile(
+            "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n"
+            "S4_BRIDGE_STATE=config_missing\n"
+            "S4_AUTH_STATE=identity_unavailable\n"
+            "MEDIA_WEB_RUNTIME_READY=0\n"
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("S4 bridge state: `config_missing`", proof)
+        self.assertIn("S4 auth state: `identity_unavailable`", proof)
+
+    def test_s4_diagnostic_comment_never_exposes_remote_or_secret_material(self) -> None:
+        smoke_log = "\n".join(
+            (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200",
+                "S4_BRIDGE_STATE=schema_missing",
+                "S4_AUTH_STATE=identity_unavailable",
+                "REMOTE_BODY={secret}",
+                "HEADER=Authorization: Bearer secret",
+                "PATH=/home/private",
+                "COOKIE=session=secret",
+                "HASH=" + "f" * 64,
+                "MEDIA_WEB_RUNTIME_READY=0",
+                "",
+            )
+        )
+        completed, _, _, proof = self._run_reconcile(smoke_log)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("S4 bridge state: `schema_missing`", proof)
+        self.assertIn("S4 auth state: `identity_unavailable`", proof)
+        for leaked in ("{secret}", "Bearer secret", "/home/private", "session=secret", "f" * 64):
+            self.assertNotIn(leaked, proof)
+
+    def test_s4_bridge_states_have_safe_target_env_guidance(self) -> None:
+        docs = (ROOT / "docs/PILOT-MEDIA-READINESS.md").read_text(encoding="utf-8")
+        for state in (
+            "runtime_unavailable",
+            "config_missing",
+            "schema_missing",
+            "identity_unavailable",
+            "ready_for_web_probe",
+        ):
+            self.assertIn(f"`{state}`", docs)
+        for state in ("identity_unavailable", "ready"):
+            self.assertIn(f"`{state}`", docs)
+        self.assertIn("No autoriza migraciones automáticas", docs)
+        self.assertIn("No autoriza crear identidades automáticamente", docs)
+        self.assertIn("no autoriza publicación externa", docs)
+
     def test_workflow_dispatch_emits_same_markers_as_push(self) -> None:
         self.assertIn("  push:\n    branches: [main]\n  workflow_dispatch:", WORKFLOW)
         self.assertEqual(1, WORKFLOW.count("run: bash scripts/production-smoke.sh >production-smoke.log 2>&1"))
         reconcile = self._reconcile_script()
         self.assertNotIn("github.event_name", reconcile)
+        self.assertIn("^S4_BRIDGE_STATE=", reconcile)
+        self.assertIn("^S4_AUTH_STATE=", reconcile)
 
         completed = self._run_parser(self._payload())
         self.assertEqual(0, completed.returncode, completed.stderr)
@@ -289,12 +404,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn("grindflow-media-web-runtime.md", first_path)
         self.assertIn("grindflow-media-web-runtime.md", second_path)
 
-    def test_v0195_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
-        self.assertIn("'number' => '0.1.195'", VERSION)
-        self.assertEqual("0.1.195", PACKAGE["version"])
-        self.assertEqual("0.1.195", LOCK["version"])
-        self.assertEqual("0.1.195", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.195", README)
+    def test_v0197_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
+        self.assertIn("'number' => '0.1.197'", VERSION)
+        self.assertEqual("0.1.197", PACKAGE["version"])
+        self.assertEqual("0.1.197", LOCK["version"])
+        self.assertEqual("0.1.197", LOCK["packages"][""]["version"])
+        self.assertIn("V0.1.197", README)
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod
