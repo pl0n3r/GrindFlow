@@ -2,6 +2,7 @@
 """Contracts for exact-SHA Symfony runtime preparation on the hPanel Git path."""
 from __future__ import annotations
 
+import json
 import os
 import stat
 import subprocess
@@ -11,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "prepare-s4-runtime.sh"
+MEDIA_READINESS = ROOT / "scripts" / "media-pilot-readiness.php"
 WORKFLOW = ROOT / ".github" / "workflows" / "s4-runtime-prepare.yml"
 DEPLOY_DOC = ROOT / "docs" / "DEPLOY-HOSTINGER.md"
 
@@ -62,6 +64,7 @@ class S4RuntimePrepareTests(unittest.TestCase):
             composer,
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
+            'if [[ -n "${FAKE_COMPOSER_ERROR:-}" ]]; then printf "%s\\n" "$FAKE_COMPOSER_ERROR" >&2; exit 42; fi\n'
             '[[ "${FAKE_COMPOSER_FAIL:-0}" != 1 ]] || exit 42\n'
             'mkdir -p "$COMPOSER_VENDOR_DIR"\n'
             "printf '%s\\n' '<?php return true;' > "
@@ -76,6 +79,18 @@ class S4RuntimePrepareTests(unittest.TestCase):
             php,
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
+            'if [[ "${1:-}" == "-r" && "${2:-}" == *parse_ini_file* ]]; then\n'
+            '  [[ "${FAKE_PHP_PHASE_MISSING:-0}" != 1 ]] || exit 10\n'
+            '  [[ "${FAKE_PHP_PHASE_OTHER:-0}" != 1 ]] || exit 11\n'
+            '  exit 0\n'
+            'fi\n'
+            'if [[ -n "${FAKE_COMPOSER_PATH:-}" && "${1:-}" == "$FAKE_COMPOSER_PATH" ]]; then\n'
+            '  [[ -z "${FAKE_PHP_COMPOSER_MARKER:-}" ]] || printf "%s\\n" "$0" > "$FAKE_PHP_COMPOSER_MARKER"\n'
+            '  if [[ -n "${FAKE_COMPOSER_ERROR:-}" ]]; then printf "%s\\n" "$FAKE_COMPOSER_ERROR" >&2; exit 42; fi\n'
+            '  mkdir -p "$COMPOSER_VENDOR_DIR"\n'
+            '  printf "%s\\n" "<?php return true;" > "$COMPOSER_VENDOR_DIR/autoload.php"\n'
+            '  exit 0\n'
+            'fi\n'
             'if [[ "$*" == *\'/symfony/vendor/autoload.php\'* ]]; then\n'
             '  if [[ "${FAKE_PHP_SIGNAL_PARENT:-}" == TERM ]]; then kill -TERM "$PPID"; exit 0; fi\n'
             '  if [[ "${FAKE_PHP_FAIL_FINAL:-0}" == 1 ]]; then exit 5; fi\n'
@@ -93,6 +108,7 @@ class S4RuntimePrepareTests(unittest.TestCase):
                 "EXPECTED_SHA": sha,
                 "COMPOSER_BIN": str(composer),
                 "PHP_BIN": str(php),
+                "S4_RUNTIME_LOG_DIR": str(repo / "private-logs"),
                 **extra,
             }
         )
@@ -105,6 +121,87 @@ class S4RuntimePrepareTests(unittest.TestCase):
             timeout=30,
             check=False,
         )
+
+    def test_composer_runs_with_the_configured_php_binary(self) -> None:
+        tmp, repo, sha, composer, php = self._fixture()
+        try:
+            composer.write_text("#!/usr/bin/env php\n<?php exit(99);\n", encoding="utf-8")
+            composer.chmod(composer.stat().st_mode | stat.S_IXUSR)
+            marker = repo / "php-used-for-composer.txt"
+            result = self._run(
+                repo,
+                sha,
+                composer,
+                php,
+                FAKE_COMPOSER_PATH=str(composer),
+                FAKE_PHP_COMPOSER_MARKER=str(marker),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(marker.read_text(encoding="utf-8").strip(), str(php))
+            self.assertIn('composer_command=("$php_bin" "$composer_path")', self.script)
+        finally:
+            tmp.cleanup()
+
+    def test_composer_failures_are_classified_with_allowlisted_codes_and_private_log(self) -> None:
+        cases = {
+            "Root package requires php >=8.5 but your php version does not satisfy": "composer-php-version-unsatisfied",
+            "The lock file is not up to date with the latest changes": "composer-lock-incompatible",
+            "curl error 6 while downloading: Could not resolve host": "composer-network-unavailable",
+            "Allowed memory size of 134217728 bytes exhausted": "composer-memory-exhausted",
+            "unexpected composer failure": "composer-install-failed",
+        }
+        for message, expected in cases.items():
+            with self.subTest(expected=expected):
+                tmp, repo, sha, composer, php = self._fixture()
+                try:
+                    result = self._run(
+                        repo, sha, composer, php, FAKE_COMPOSER_ERROR=message
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f"S4_RUNTIME_PREPARE_ERROR:{expected}", result.stderr)
+                    self.assertNotIn(message, result.stderr)
+                    log = repo / "private-logs" / "s4-runtime-composer.log"
+                    self.assertIn(message, log.read_text(encoding="utf-8"))
+                    self.assertEqual(stat.S_IMODE(log.stat().st_mode), 0o600)
+                    self.assertEqual(stat.S_IMODE(log.parent.stat().st_mode), 0o700)
+                finally:
+                    tmp.cleanup()
+
+    def test_missing_app_phase_reports_phase_missing_with_minimal_action(self) -> None:
+        tmp, repo, sha, composer, php = self._fixture()
+        try:
+            result = self._run(
+                repo, sha, composer, php, FAKE_PHP_PHASE_MISSING="1"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("S4_RUNTIME_PREPARE_ERROR:phase-missing", result.stderr)
+            self.assertIn('S4_RUNTIME_PREPARE_ACTION:add APP_PHASE="construccion" to .env', result.stderr)
+            self.assertNotIn("S4_RUNTIME_PREPARE_OK", result.stdout)
+        finally:
+            tmp.cleanup()
+
+    def test_private_vault_wrong_mode_is_reported_as_mode_not_private(self) -> None:
+        vault = ROOT / "symfony" / "var" / "vault"
+        vault.mkdir(parents=True, exist_ok=True)
+        previous_mode = stat.S_IMODE(vault.stat().st_mode)
+        try:
+            vault.chmod(0o755)
+            result = subprocess.run(
+                ["php", str(MEDIA_READINESS)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["checks"]["private_vault"], "not_ready")
+            self.assertEqual(payload["reasons"]["private_vault"], "mode_not_private")
+            self.assertEqual(payload["actions"]["private_vault"], "set_private_vault_mode_0700")
+            serialized = json.dumps(payload, sort_keys=True)
+            self.assertNotIn(str(vault), serialized)
+        finally:
+            vault.chmod(previous_mode)
 
     def test_prepare_is_exact_sha_locked_and_installs_only_locked_symfony_dependencies(
         self,
