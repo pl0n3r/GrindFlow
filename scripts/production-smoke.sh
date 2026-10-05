@@ -39,6 +39,10 @@ diagnostics_json="$workdir/diagnostics.json"
 health_body="$workdir/health.json"
 health_headers="$workdir/health.headers"
 media_readiness_body="$workdir/media-readiness.json"
+organizations_html="$workdir/organizations.html"
+organization_select_headers="$workdir/organization-select.headers"
+organization_select_csrf="$workdir/organization-select-csrf"
+organization_id_file="$workdir/organization-id"
 home_body="$workdir/home.html"
 home_headers="$workdir/home.headers"
 login_headers="$workdir/login.headers"
@@ -345,6 +349,90 @@ check_workspace_modules() {
   printf 'MODULE_READ_ONLY=%s:ok\n' "traffic-csv"
 }
 
+# Select only the organization already proven by the Vault link. This mutates
+# the ephemeral authenticated session, never product/domain data.
+select_workspace_tenant() {
+  local vault_path="$1" organization_id organizations_status selection_status redirect_path
+
+  if [[ ! "$vault_path" =~ ^/organizations/([^/]+)/vault$ ]]; then
+    printf 'TENANT_SESSION_SELECTION=invalid_vault_path\n'
+    return 1
+  fi
+  organization_id="${BASH_REMATCH[1]}"
+  printf '%s' "$organization_id" > "$organization_id_file"
+  unset organization_id
+
+  organizations_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --output "$organizations_html" --write-out '%{http_code}' "$BASE_URL/organizations" || true)"
+  if [[ "$organizations_status" != "200" ]]; then
+    printf 'TENANT_SESSION_SELECTION=organizations_unavailable\n'
+    return 1
+  fi
+
+  if ! python3 - "$organizations_html" "$organization_id_file" "$organization_select_csrf" <<'PY'
+from html.parser import HTMLParser
+from urllib.parse import urlparse
+import os
+import sys
+
+with open(sys.argv[2], encoding="utf-8") as handle:
+    target = handle.read()
+if not target or "/" in target or "\\x00" in target:
+    raise SystemExit(2)
+
+class SelectionParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.form = None
+        self.matches = []
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag == "form":
+            action = urlparse(values.get("action", "")).path
+            self.form = {} if action == "/organizations/select" else None
+        elif tag == "input" and self.form is not None:
+            name, value = values.get("name"), values.get("value")
+            if name in {"organization_id", "_csrf_token"} and value:
+                self.form[name] = value
+
+    def handle_endtag(self, tag):
+        if tag != "form":
+            return
+        if self.form and self.form.get("organization_id") == target and self.form.get("_csrf_token"):
+            self.matches.append(self.form["_csrf_token"])
+        self.form = None
+
+parser = SelectionParser()
+with open(sys.argv[1], encoding="utf-8") as handle:
+    parser.feed(handle.read())
+if len(parser.matches) != 1:
+    raise SystemExit(2)
+with open(sys.argv[3], "w", encoding="utf-8") as handle:
+    handle.write(parser.matches[0])
+os.chmod(sys.argv[3], 0o600)
+PY
+  then
+    printf 'TENANT_SESSION_SELECTION=selection_contract_invalid\n'
+    return 1
+  fi
+
+  selection_status="$(curl_common --cookie "$cookie_jar" --cookie-jar "$cookie_jar" --output /dev/null --dump-header "$organization_select_headers" --write-out '%{http_code}' --request POST --data-urlencode "organization_id@$organization_id_file" --data-urlencode "_csrf_token@$organization_select_csrf" "$BASE_URL/organizations/select" || true)"
+  case "$selection_status" in
+    302|303) ;;
+    *)
+      printf 'TENANT_SESSION_SELECTION=selection_rejected\n'
+      return 1
+      ;;
+  esac
+  redirect_path="$(safe_redirect_path "$organization_select_headers")"
+  if [[ "$redirect_path" != "/admin" ]]; then
+    printf 'TENANT_SESSION_SELECTION=unexpected_redirect\n'
+    return 1
+  fi
+
+  printf 'TENANT_SESSION_SELECTION=selected\n'
+}
+
 # Observe only allowlisted media readiness from the authenticated web runtime.
 # The remote JSON body is never printed or copied into GitHub evidence.
 check_media_web_runtime_readiness() {
@@ -586,6 +674,10 @@ run_smoke() {
   fi
 
   check_workspace_modules "$vault_path" || return $?
+  if ! select_workspace_tenant "$vault_path"; then
+    printf 'ERROR: workspace tenant selection failed closed; media readiness probe was not sent.\n' >&2
+    return 8
+  fi
   check_media_web_runtime_readiness
   printf 'PASS production smoke: /health exact-main, /, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
 }
@@ -600,6 +692,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
     5) printf 'ERROR: read-only workspace module check failed; no repeated login requests.\n' >&2; exit 5 ;;
     6) printf 'ERROR: production release inventory failed or differs; no repeated login requests.\n' >&2; exit 6 ;;
     7) printf 'ERROR: authentication failure is deterministic; do not retry credentials.\n' >&2; exit 7 ;;
+    8) printf 'ERROR: workspace tenant selection failed closed; no readiness request or repeated login was sent.\n' >&2; exit 8 ;;
   esac
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then sleep "$WAIT_SECONDS"; fi
 done
