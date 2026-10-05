@@ -373,6 +373,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-8.5-composer-
       - run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
+      - name: S4 production bridge contract
+        run: python3 -m unittest tests/test_s4_production_bridge.py
       - name: Prepare Laravel environment
         shell: bash
         run: |

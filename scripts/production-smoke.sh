@@ -39,6 +39,18 @@ diagnostics_json="$workdir/diagnostics.json"
 health_body="$workdir/health.json"
 health_headers="$workdir/health.headers"
 media_readiness_body="$workdir/media-readiness.json"
+s4_cookie_jar="$workdir/s4-cookies.txt"
+s4_bridge_body="$workdir/s4-bridge-readiness.json"
+s4_bridge_headers="$workdir/s4-bridge-readiness.headers"
+s4_login_html="$workdir/s4-login.html"
+s4_login_headers="$workdir/s4-login.headers"
+s4_login_post_headers="$workdir/s4-login-post.headers"
+s4_login_csrf_file="$workdir/s4-login-csrf"
+s4_organizations_html="$workdir/s4-organizations.html"
+s4_organizations_headers="$workdir/s4-organizations.headers"
+s4_select_headers="$workdir/s4-select.headers"
+s4_select_csrf_file="$workdir/s4-select-csrf"
+s4_organization_id_file="$workdir/s4-organization-id"
 home_body="$workdir/home.html"
 home_headers="$workdir/home.headers"
 login_headers="$workdir/login.headers"
@@ -123,6 +135,45 @@ except (OSError, ValueError):
 PY
 }
 
+safe_s4_redirect_path() {
+  python3 - "$1" "$BASE_URL" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+ALLOWLIST = {"/s4/login", "/s4/organizations", "/s4/admin"}
+
+def effective_port(url):
+    return url.port if url.port is not None else {"http": 80, "https": 443}.get(url.scheme)
+
+try:
+    origin = urlsplit(sys.argv[2])
+    if origin.scheme not in {"http", "https"} or not origin.hostname or origin.username is not None or origin.password is not None:
+        raise ValueError("invalid smoke origin")
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not line.lower().startswith("location:"):
+                continue
+            destination = urlsplit(line.partition(":")[2].strip())
+            if destination.scheme or destination.netloc:
+                allowed_origin = (
+                    destination.scheme == origin.scheme
+                    and destination.hostname == origin.hostname
+                    and effective_port(destination) == effective_port(origin)
+                    and destination.username is None
+                    and destination.password is None
+                )
+                path = destination.path if allowed_origin else None
+            else:
+                path = destination.path
+            print(path if path in ALLOWLIST else "(redacted)")
+            break
+        else:
+            print("(missing)")
+except (OSError, ValueError):
+    print("(redacted)")
+PY
+}
+
 extract_csrf() {
   python3 - "${1:-$login_html}" <<'PY'
 from html.parser import HTMLParser
@@ -138,6 +189,112 @@ parser = TokenParser()
 with open(sys.argv[1], encoding="utf-8") as handle: parser.feed(handle.read())
 if not parser.token: raise SystemExit(2)
 print(parser.token)
+PY
+}
+
+write_s4_login_csrf() {
+  python3 - "$s4_login_html" "$s4_login_csrf_file" <<'PY'
+from html.parser import HTMLParser
+import sys
+
+class TokenParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.token = None
+    def handle_starttag(self, tag, attrs):
+        if tag != "input" or self.token is not None:
+            return
+        values = dict(attrs)
+        if values.get("name") == "_csrf_token" and values.get("value"):
+            self.token = values["value"]
+
+parser = TokenParser()
+with open(sys.argv[1], encoding="utf-8", errors="strict") as handle:
+    parser.feed(handle.read())
+if not parser.token:
+    raise SystemExit(2)
+with open(sys.argv[2], "w", encoding="utf-8") as handle:
+    handle.write(parser.token)
+PY
+}
+
+write_s4_organization_selection() {
+  python3 - "$s4_organizations_html" "$s4_organization_id_file" "$s4_select_csrf_file" <<'PY'
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
+import sys
+
+class SelectionParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_select = False
+        self.organization = None
+        self.token = None
+        self.selection = None
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag == "form":
+            action = values.get("action", "")
+            self.in_select = urlsplit(action).path.endswith("/organizations/select")
+            self.organization = None
+            self.token = None
+            return
+        if tag != "input" or not self.in_select:
+            return
+        name = values.get("name")
+        value = values.get("value")
+        if name == "organization_id" and value:
+            self.organization = value
+        elif name == "_csrf_token" and value:
+            self.token = value
+
+    def handle_endtag(self, tag):
+        if tag != "form" or not self.in_select:
+            return
+        if self.selection is None and self.organization and self.token:
+            self.selection = (self.organization, self.token)
+        self.in_select = False
+
+parser = SelectionParser()
+with open(sys.argv[1], encoding="utf-8", errors="strict") as handle:
+    parser.feed(handle.read())
+if parser.selection is None:
+    raise SystemExit(2)
+organization, token = parser.selection
+with open(sys.argv[2], "w", encoding="utf-8") as handle:
+    handle.write(organization)
+with open(sys.argv[3], "w", encoding="utf-8") as handle:
+    handle.write(token)
+PY
+}
+
+extract_s4_bridge_state() {
+  python3 - "$s4_bridge_body" <<'PY'
+import json
+import sys
+
+allowed = {
+    "runtime_unavailable",
+    "config_missing",
+    "schema_missing",
+    "identity_unavailable",
+    "ready_for_web_probe",
+}
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="strict") as handle:
+        payload = json.load(handle)
+except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    raise SystemExit(2)
+
+if not isinstance(payload, dict) or set(payload) != {"data"}:
+    raise SystemExit(2)
+data = payload["data"]
+if not isinstance(data, dict) or set(data) != {"contract", "state"}:
+    raise SystemExit(2)
+if data.get("contract") != "s4-bridge-readiness-v1" or data.get("state") not in allowed:
+    raise SystemExit(2)
+print(data["state"])
 PY
 }
 
@@ -348,8 +505,21 @@ check_workspace_modules() {
 # Observe only allowlisted media readiness from the authenticated web runtime.
 # The remote JSON body is never printed or copied into GitHub evidence.
 check_media_web_runtime_readiness() {
-  local status parsed
-  status="$(curl_common --cookie "$cookie_jar" --output "$media_readiness_body" --write-out '%{http_code}' "$BASE_URL/api/admin/schedules/media-readiness" || true)"
+  local runtime="${1:-laravel}" status parsed readiness_cookie="$cookie_jar"
+  local readiness_url="$BASE_URL/api/admin/schedules/media-readiness"
+  case "$runtime" in
+    laravel) ;;
+    s4)
+      readiness_cookie="$s4_cookie_jar"
+      readiness_url="$BASE_URL/s4/api/admin/schedules/media-readiness"
+      ;;
+    *)
+      printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
+      printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+      return 0
+      ;;
+  esac
+  status="$(curl_common --cookie "$readiness_cookie" --output "$media_readiness_body" --write-out '%{http_code}' "$readiness_url" || true)"
   if [[ -z "$status" || "$status" == "000" ]]; then
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
@@ -410,6 +580,87 @@ PY
   fi
 }
 
+# Authenticate only after the bridge proves runtime/config/schema/identity readiness.
+# Symfony always uses its own cookie jar and CSRF lifecycle; the Laravel session
+# is never copied or reinterpreted as S4 authority.
+check_s4_media_web_runtime_readiness() {
+  local bridge_status bridge_state login_status login_redirect organizations_status
+  local select_status select_redirect
+
+  bridge_status="$(curl_common --output "$s4_bridge_body" --dump-header "$s4_bridge_headers" --write-out '%{http_code}' "$BASE_URL/s4/_bridge-readiness" || true)"
+  if [[ -z "$bridge_status" || "$bridge_status" == "000" ]]; then
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+  if ! bridge_state="$(extract_s4_bridge_state)"; then
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+  printf 'S4_BRIDGE_STATE=%s\n' "$bridge_state"
+  if [[ "$bridge_status" != "200" || "$bridge_state" != "ready_for_web_probe" ]]; then
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+
+  login_status="$(curl_common --cookie-jar "$s4_cookie_jar" --output "$s4_login_html" --dump-header "$s4_login_headers" --write-out '%{http_code}' "$BASE_URL/s4/login" || true)"
+  if [[ "$login_status" != "200" ]] || ! write_s4_login_csrf; then
+    printf 'S4_AUTH_STATE=identity_unavailable\n'
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+
+  login_status="$(curl_common --cookie "$s4_cookie_jar" --cookie-jar "$s4_cookie_jar" --output /dev/null --dump-header "$s4_login_post_headers" --write-out '%{http_code}' --request POST --data-urlencode "_csrf_token@$s4_login_csrf_file" --data-urlencode "email=$E2E_USER_EMAIL" --data-urlencode "password@$password_file" "$BASE_URL/s4/login" || true)"
+  case "$login_status" in
+    302|303) ;;
+    *)
+      printf 'S4_AUTH_STATE=identity_unavailable\n'
+      printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
+      printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+      return 0
+      ;;
+  esac
+  login_redirect="$(safe_s4_redirect_path "$s4_login_post_headers")"
+  if [[ "$login_redirect" != "/s4/organizations" ]]; then
+    printf 'S4_AUTH_STATE=identity_unavailable\n'
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+
+  organizations_status="$(curl_common --cookie "$s4_cookie_jar" --cookie-jar "$s4_cookie_jar" --output "$s4_organizations_html" --dump-header "$s4_organizations_headers" --write-out '%{http_code}' "$BASE_URL/s4/organizations" || true)"
+  if [[ "$organizations_status" != "200" ]] || ! write_s4_organization_selection; then
+    printf 'S4_AUTH_STATE=identity_unavailable\n'
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+
+  select_status="$(curl_common --cookie "$s4_cookie_jar" --cookie-jar "$s4_cookie_jar" --output /dev/null --dump-header "$s4_select_headers" --write-out '%{http_code}' --request POST --data-urlencode "organization_id@$s4_organization_id_file" --data-urlencode "_csrf_token@$s4_select_csrf_file" "$BASE_URL/s4/organizations/select" || true)"
+  case "$select_status" in
+    302|303) ;;
+    *)
+      printf 'S4_AUTH_STATE=identity_unavailable\n'
+      printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
+      printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+      return 0
+      ;;
+  esac
+  select_redirect="$(safe_s4_redirect_path "$s4_select_headers")"
+  if [[ "$select_redirect" != "/s4/admin" ]]; then
+    printf 'S4_AUTH_STATE=identity_unavailable\n'
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
+
+  printf 'S4_AUTH_STATE=ready\n'
+  check_media_web_runtime_readiness s4
+}
+
 # One anonymous GET after a rejected POST checks if the session/CSRF persisted.
 # Only allowlisted markers leave the private workspace; NEVER re-POST credentials.
 # A changed token is a diagnostic signal, not proof of an invalid password.
@@ -434,7 +685,7 @@ check_failed_login_session() {
 }
 
 run_smoke() {
-  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$health_body" "$health_headers" "$media_readiness_body" "$home_body" "$home_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
+  rm -f "$cookie_jar" "$login_html" "$login_recheck_html" "$login_recheck_headers" "$login_failure_html" "$login_failure_headers" "$dashboard_html" "$system_html" "$vault_html" "$diagnostics_json" "$health_body" "$health_headers" "$media_readiness_body" "$s4_cookie_jar" "$s4_bridge_body" "$s4_bridge_headers" "$s4_login_html" "$s4_login_headers" "$s4_login_post_headers" "$s4_login_csrf_file" "$s4_organizations_html" "$s4_organizations_headers" "$s4_select_headers" "$s4_select_csrf_file" "$s4_organization_id_file" "$home_body" "$home_headers" "$login_headers" "$login_post_headers" "$dashboard_headers" "$module_html" "$csv_body" "$csv_headers" "$csrf_file"
 
   local health_status health_version health_sha
   local -a health_identity=()
@@ -586,7 +837,7 @@ run_smoke() {
   fi
 
   check_workspace_modules "$vault_path" || return $?
-  check_media_web_runtime_readiness
+  check_s4_media_web_runtime_readiness
   printf 'PASS production smoke: /health exact-main, /, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
 }
 

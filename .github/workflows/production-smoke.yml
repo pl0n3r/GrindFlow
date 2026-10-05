@@ -260,7 +260,7 @@ jobs:
         run: bash -n scripts/production-smoke.sh
 
       - id: smoke
-        name: Authenticated production smoke
+        name: Authenticated production smoke · Symfony /s4 readiness
         if: steps.credentials.outputs.configured == 'true'
         continue-on-error: true
         shell: bash
@@ -520,7 +520,7 @@ jobs:
             echo
             echo "Workflow source SHA: $GITHUB_SHA"
             echo "Target: $BASE_URL"
-            echo "Checked: exact /health, /, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET"
+            echo "Checked: exact /health, /, /login, authenticated /dashboard, /admin/system, organization Vault, Scheduler, Distribution, Traffic, Finance, CSV GET, Symfony /s4 media readiness"
             echo "Observed release: $(grep -E '^HEALTH_VERSION=' production-smoke.log | tail -1 | cut -d= -f2)"
             echo "Exact deployed Git SHA: $(grep -E '^HEALTH_SHA=[0-9a-f]{40}$' production-smoke.log | tail -1 | cut -d= -f2)"
           } >> "$GITHUB_STEP_SUMMARY"
