@@ -53,42 +53,53 @@ function temporaryStorageReady(): bool
     }
 }
 
-function privateVaultReady(): bool
+/** @return array{ready: bool, reason: ?string, action: ?string} */
+function privateVaultReadiness(): array
 {
+    $notReady = static fn (?string $reason = null, ?string $action = null): array => [
+        'ready' => false,
+        'reason' => $reason,
+        'action' => $action,
+    ];
+
     $projectDir = realpath(__DIR__.'/../symfony');
     if ($projectDir === false) {
-        return false;
+        return $notReady();
     }
 
     $override = trim((string) getenv('GRINDFLOW_VAULT_ROOT'));
     $root = $override === '' ? $projectDir.'/var/vault' : rtrim($override, '/');
     if ($root === '' || ! str_starts_with($root, '/') || str_contains($root, "\0")
         || str_contains($root, '\\') || preg_match('#(?:^|/)\.{1,2}(?:/|$)#D', $root) === 1) {
-        return false;
+        return $notReady();
     }
     if ($override !== '') {
         $releaseRoot = realpath(dirname($projectDir));
         $resolved = realpath($root);
         if ($releaseRoot === false || $resolved === false || $resolved === $releaseRoot
             || str_starts_with($resolved, rtrim($releaseRoot, '/').'/')) {
-            return false;
+            return $notReady();
         }
     }
     if (! is_dir($root) || is_link($root) || ! is_readable($root)) {
-        return false;
+        return $notReady();
     }
     $mode = @fileperms($root);
-    if ($mode === false || ($mode & 0077) !== 0) {
-        return false;
+    if ($mode === false) {
+        return $notReady();
+    }
+    if (($mode & 0077) !== 0) {
+        return $notReady('mode_not_private', 'set_private_vault_mode_0700');
     }
 
-    return true;
+    return ['ready' => true, 'reason' => null, 'action' => null];
 }
 
+$vault = privateVaultReadiness();
 $checks = [
     'decoder' => decoderReady(),
     'temporary_storage' => temporaryStorageReady(),
-    'private_vault' => privateVaultReady(),
+    'private_vault' => $vault['ready'],
 ];
 $ready = ! in_array(false, $checks, true);
 $payload = [
@@ -98,6 +109,12 @@ $payload = [
     'evidence_scope' => 'cli_diagnostic',
     'ci_equivalent' => false,
 ];
+if (is_string($vault['reason'])) {
+    $payload['reasons'] = ['private_vault' => $vault['reason']];
+}
+if (is_string($vault['action'])) {
+    $payload['actions'] = ['private_vault' => $vault['action']];
+}
 
 echo json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).PHP_EOL;
 exit($ready ? 0 : 2);
