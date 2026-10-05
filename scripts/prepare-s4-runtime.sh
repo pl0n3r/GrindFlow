@@ -39,7 +39,7 @@ fi
 stage="$symfony_root/.vendor-stage-$$"
 backup="$symfony_root/.vendor-backup-$$"
 had_previous=false
-promoted=false
+promotion_started=false
 prepared=false
 
 cleanup() {
@@ -49,11 +49,11 @@ cleanup() {
     return
   fi
 
-  if [[ "$promoted" == true ]]; then
+  if [[ "$promotion_started" == true ]]; then
     rm -rf "$symfony_root/vendor"
   fi
 
-  if [[ "$had_previous" == true && -d "$backup" && ! -e "$symfony_root/vendor" ]]; then
+  if [[ "$had_previous" == true && -d "$backup" ]]; then
     mv "$backup" "$symfony_root/vendor" >/dev/null 2>&1 || true
   fi
 }
@@ -88,17 +88,14 @@ current_sha_after_prepare="$(git -C "$root" rev-parse HEAD 2>/dev/null || true)"
 [[ "$current_sha_after_prepare" == "$expected_sha" ]] || fail "checkout-sha-changed-during-prepare"
 
 if [[ -d "$symfony_root/vendor" ]]; then
-  mv "$symfony_root/vendor" "$backup" || fail "vendor-backup-failed"
   had_previous=true
+  mv "$symfony_root/vendor" "$backup" || fail "vendor-backup-failed"
 fi
 
+promotion_started=true
 if ! mv "$stage" "$symfony_root/vendor"; then
-  if [[ "$had_previous" == true && -d "$backup" ]]; then
-    mv "$backup" "$symfony_root/vendor" >/dev/null 2>&1 || true
-  fi
   fail "vendor-promotion-failed"
 fi
-promoted=true
 
 if ! "$php_bin" -r 'require $argv[1];' "$symfony_root/vendor/autoload.php" >/dev/null 2>&1; then
   fail "promoted-autoload-invalid"
