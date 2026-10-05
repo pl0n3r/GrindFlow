@@ -48,10 +48,12 @@ cleanup() {
     rm -rf "$backup"
     return
   fi
+
   if [[ "$promoted" == true ]]; then
     rm -rf "$symfony_root/vendor"
   fi
-  if [[ "$had_previous" == true && -d "$backup" ]]; then
+
+  if [[ "$had_previous" == true && -d "$backup" && ! -e "$symfony_root/vendor" ]]; then
     mv "$backup" "$symfony_root/vendor" >/dev/null 2>&1 || true
   fi
 }
