@@ -40,7 +40,6 @@ class S4ProductionBridgeTests(unittest.TestCase):
                 f"""\
                 <?php
                 require {json.dumps(str(autoload))};
-                use Symfony\\Component\\HttpFoundation\\Request;
 
                 $_SERVER['REQUEST_URI'] = '/s4/login';
                 $_SERVER['SCRIPT_FILENAME'] = {json.dumps(str(ROOT / "public/s4.php"))};
@@ -51,7 +50,7 @@ class S4ProductionBridgeTests(unittest.TestCase):
                 $_SERVER['PHP_SELF'] = '/s4/index.php';
                 $_SERVER['SCRIPT_FILENAME'] = {json.dumps(str(ROOT / "public/s4/index.php"))};
 
-                $request = Request::createFromGlobals();
+                $request = \\Symfony\\Component\\HttpFoundation\\Request::createFromGlobals();
                 if ($request->getBaseUrl() !== '/s4') {{
                     fwrite(STDERR, 'unexpected baseUrl: '.$request->getBaseUrl());
                     exit(2);
