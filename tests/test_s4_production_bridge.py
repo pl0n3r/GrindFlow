@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import subprocess
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,8 +30,48 @@ class S4ProductionBridgeTests(unittest.TestCase):
         self.assertIn("$path !== '/s4' && ! str_starts_with($path, '/s4/')", BRIDGE)
         self.assertIn("$_SERVER['SCRIPT_NAME'] = '/s4/index.php';", BRIDGE)
         self.assertIn("$_SERVER['PHP_SELF'] = '/s4/index.php';", BRIDGE)
+        self.assertIn("$_SERVER['SCRIPT_FILENAME'] = __DIR__.'/s4/index.php';", BRIDGE)
         self.assertIn("new Kernel(", BRIDGE)
         self.assertNotIn("require dirname(__DIR__).'/bootstrap/app.php'", BRIDGE)
+
+        autoload = ROOT / "vendor/autoload.php"
+        if autoload.is_file():
+            php = textwrap.dedent(
+                f"""\
+                <?php
+                require {json.dumps(str(autoload))};
+                use Symfony\\Component\\HttpFoundation\\Request;
+
+                $_SERVER['REQUEST_URI'] = '/s4/login';
+                $_SERVER['SCRIPT_FILENAME'] = {json.dumps(str(ROOT / "public/s4.php"))};
+                $_SERVER['SCRIPT_NAME'] = '/s4.php';
+                $_SERVER['PHP_SELF'] = '/s4.php';
+
+                $_SERVER['SCRIPT_NAME'] = '/s4/index.php';
+                $_SERVER['PHP_SELF'] = '/s4/index.php';
+                $_SERVER['SCRIPT_FILENAME'] = {json.dumps(str(ROOT / "public/s4/index.php"))};
+
+                $request = Request::createFromGlobals();
+                if ($request->getBaseUrl() !== '/s4') {{
+                    fwrite(STDERR, 'unexpected baseUrl: '.$request->getBaseUrl());
+                    exit(2);
+                }}
+                if ($request->getPathInfo() !== '/login') {{
+                    fwrite(STDERR, 'unexpected pathInfo: '.$request->getPathInfo());
+                    exit(3);
+                }}
+                """
+            )
+            completed = subprocess.run(
+                ["php"],
+                input=php,
+                text=True,
+                capture_output=True,
+                cwd=ROOT,
+                timeout=15,
+                check=False,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
 
     def test_deploy_prepares_symfony_without_automatic_migrations_or_secret_logging(self) -> None:
         self.assertIn('[[ -f symfony/composer.lock ]]', DEPLOY)
@@ -79,6 +121,7 @@ class S4ProductionBridgeTests(unittest.TestCase):
         self.assertLess(prefix_guard, kernel_boot)
         self.assertIn("http_response_code(404)", BRIDGE)
         self.assertIn("! is_file($bootstrap) || ! is_file($autoload)", BRIDGE)
+        self.assertIn("try {\n    require $bootstrap;\n} catch (Throwable) {\n    s4State('runtime_unavailable', 503);\n}", BRIDGE)
         self.assertIn("catch (Throwable)", BRIDGE)
 
         lowered = BRIDGE.lower()
