@@ -99,10 +99,6 @@ fi
 promoted=true
 
 if ! "$php_bin" -r 'require $argv[1];' "$symfony_root/vendor/autoload.php" >/dev/null 2>&1; then
-  rm -rf "$symfony_root/vendor"
-  if [[ "$had_previous" == true && -d "$backup" ]]; then
-    mv "$backup" "$symfony_root/vendor" || fail "vendor-rollback-failed"
-  fi
   fail "promoted-autoload-invalid"
 fi
 
