@@ -25,7 +25,7 @@ class S4ProductionBridgeTests(unittest.TestCase):
         self.assertIn(laravel_rule, HTACCESS)
         self.assertLess(HTACCESS.index(s4_rule), HTACCESS.index(laravel_rule))
 
-        self.assertIn("$path !== '/s4' && !str_starts_with($path, '/s4/')", BRIDGE)
+        self.assertIn("$path !== '/s4' && ! str_starts_with($path, '/s4/')", BRIDGE)
         self.assertIn("$_SERVER['SCRIPT_NAME'] = '/s4/index.php';", BRIDGE)
         self.assertIn("$_SERVER['PHP_SELF'] = '/s4/index.php';", BRIDGE)
         self.assertIn("new Kernel(", BRIDGE)
@@ -78,7 +78,7 @@ class S4ProductionBridgeTests(unittest.TestCase):
         kernel_boot = BRIDGE.index("new Kernel(")
         self.assertLess(prefix_guard, kernel_boot)
         self.assertIn("http_response_code(404)", BRIDGE)
-        self.assertIn("!is_file($bootstrap) || !is_file($autoload)", BRIDGE)
+        self.assertIn("! is_file($bootstrap) || ! is_file($autoload)", BRIDGE)
         self.assertIn("catch (Throwable)", BRIDGE)
 
         lowered = BRIDGE.lower()
