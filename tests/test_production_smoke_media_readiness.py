@@ -18,6 +18,40 @@ README = (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 class ProductionSmokeMediaReadinessTests(unittest.TestCase):
+    def test_smoke_selects_vault_tenant_before_media_readiness_probe(self) -> None:
+        run_smoke = SMOKE[SMOKE.index("run_smoke() {"):]
+        selection = run_smoke.index('select_workspace_tenant "$vault_path"')
+        readiness = run_smoke.index("check_media_web_runtime_readiness", selection)
+        self.assertLess(selection, readiness)
+
+        block = self._tenant_selection_function()
+        self.assertIn('$BASE_URL/organizations"', block)
+        self.assertIn('$BASE_URL/organizations/select"', block)
+        self.assertIn('organization_id@$organization_id_file', block)
+        self.assertIn('_csrf_token@$organization_select_csrf', block)
+        self.assertIn('redirect_path" != "/admin"', block)
+        self.assertIn("TENANT_SESSION_SELECTION=selected", block)
+        self.assertNotIn('echo "$organization_id"', block)
+        self.assertNotIn('cat "$organization_select_csrf"', block)
+
+    def test_tenant_selection_failure_is_fail_closed_and_safe(self) -> None:
+        block = self._tenant_selection_function()
+        for marker in (
+            "TENANT_SESSION_SELECTION=invalid_vault_path",
+            "TENANT_SESSION_SELECTION=organizations_unavailable",
+            "TENANT_SESSION_SELECTION=selection_contract_invalid",
+            "TENANT_SESSION_SELECTION=selection_rejected",
+            "TENANT_SESSION_SELECTION=unexpected_redirect",
+        ):
+            self.assertIn(marker, block)
+        run_smoke = SMOKE[SMOKE.index("run_smoke() {"):]
+        self.assertIn("workspace tenant selection failed closed; media readiness probe was not sent", run_smoke)
+        self.assertIn("return 8", run_smoke)
+        self.assertNotIn('cat "$organizations_html"', block)
+        self.assertNotIn('cat "$organization_id_file"', block)
+        self.assertNotIn('cat "$organization_select_csrf"', block)
+        self.assertNotIn("E2E_USER_PASSWORD", block)
+
     def test_smoke_reuses_authenticated_cookie_and_queries_only_web_runtime_readiness_endpoint(self) -> None:
         self.assertEqual(1, SMOKE.count("$BASE_URL/api/admin/schedules/media-readiness"))
         block = self._readiness_function()
@@ -289,12 +323,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn("grindflow-media-web-runtime.md", first_path)
         self.assertIn("grindflow-media-web-runtime.md", second_path)
 
-    def test_v0195_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
-        self.assertIn("'number' => '0.1.195'", VERSION)
-        self.assertEqual("0.1.195", PACKAGE["version"])
-        self.assertEqual("0.1.195", LOCK["version"])
-        self.assertEqual("0.1.195", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.195", README)
+    def test_v0196_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
+        self.assertIn("'number' => '0.1.196'", VERSION)
+        self.assertEqual("0.1.196", PACKAGE["version"])
+        self.assertEqual("0.1.196", LOCK["version"])
+        self.assertEqual("0.1.196", LOCK["packages"][""]["version"])
+        self.assertIn("V0.1.196", README)
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod
@@ -326,6 +360,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
+
+    @staticmethod
+    def _tenant_selection_function() -> str:
+        start = SMOKE.index("select_workspace_tenant() {")
+        end = SMOKE.index("# Observe only allowlisted media readiness", start)
+        return SMOKE[start:end]
 
     @staticmethod
     def _readiness_function() -> str:
