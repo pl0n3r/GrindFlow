@@ -89,6 +89,8 @@ Ausencia del endpoint, autenticación inválida, estado `not_ready`, error o evi
 
 El Production Smoke emite una causa allowlisted: `observed`, `endpoint_unreachable`, `http_non_200` o `contract_invalid`; si el marcador o los sub-checks esperados faltan, la reconciliación clasifica `markers_absent`. Cuando no existe diagnóstico web válido, publica **una sola vez por SHA+run** un comentario «Media web runtime: diagnóstico no disponible» con el run, SHA y causa clasificada. Nunca copia body remoto, paths, cookies, headers, hashes ni secretos. Los eventos `push` y `workflow_dispatch` usan el mismo smoke y los mismos marcadores.
 
+Antes del probe multimedia, Production Smoke toma únicamente el organization id del `vault_path` ya validado, carga `/organizations` con la misma cookie jar, extrae el CSRF del formulario exacto y ejecuta un único `POST /organizations/select`. Esa transición modifica solo la sesión efímera; no escribe datos de dominio. El organization id y el CSRF se guardan en archivos privados, nunca se imprimen, y cualquier status/redirect inesperado falla cerrado **antes** de enviar el readiness request.
+
 ## Autoridad y límites
 
 Este build-ahead no autoriza:
