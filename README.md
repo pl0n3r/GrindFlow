@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.195 · esta etiqueta no prueba despliegue ni salud de producción.
+**Versión de código declarada:** V0.1.196 · esta etiqueta no prueba despliegue ni salud de producción.
 <!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
@@ -76,7 +76,7 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 ### Distribution Symfony · provider pilot
 
-En el código candidato **V0.1.195**, Symfony S4 implementa la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages** mediante intención durable, lock previo al I/O externo y ledger tenant-safe de idempotencia. Esta capacidad **no se considera desplegada** hasta verificar que el SHA del checkout productivo incluye este cambio. La ruta oficial admite JPEG/PNG verificado desde el Vault privado; **CI no ejecuta publicación live** y usa transporte fake. La validación externa con credenciales de piloto permanece separada y posterior al deploy autorizado. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
+En el código candidato **V0.1.196**, Symfony S4 implementa la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages** mediante intención durable, lock previo al I/O externo y ledger tenant-safe de idempotencia. Esta capacidad **no se considera desplegada** hasta verificar que el SHA del checkout productivo incluye este cambio. La ruta oficial admite JPEG/PNG verificado desde el Vault privado; **CI no ejecuta publicación live** y usa transporte fake. La validación externa con credenciales de piloto permanece separada y posterior al deploy autorizado. Timeouts, 5xx y estados inciertos se conservan como ambiguos para impedir reenvíos ciegos.
 
 ## Stack e infraestructura
 
