@@ -350,7 +350,13 @@ check_workspace_modules() {
 check_media_web_runtime_readiness() {
   local status parsed
   status="$(curl_common --cookie "$cookie_jar" --output "$media_readiness_body" --write-out '%{http_code}' "$BASE_URL/api/admin/schedules/media-readiness" || true)"
+  if [[ -z "$status" || "$status" == "000" ]]; then
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
+    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
+    return 0
+  fi
   if [[ "$status" != "200" ]]; then
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
   fi
@@ -396,8 +402,10 @@ for key in ORDER:
 print(f"MEDIA_WEB_RUNTIME_READY={1 if all_ready else 0}")
 PY
   )"; then
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed\n'
     printf '%s\n' "$parsed"
   else
+    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
   fi
 }
