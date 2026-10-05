@@ -131,6 +131,14 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             "http_non_200": "MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\nMEDIA_WEB_RUNTIME_READY=0\n",
             "contract_invalid": "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\nMEDIA_WEB_RUNTIME_READY=0\n",
             "markers_absent": "MEDIA_WEB_RUNTIME_READY=0\n",
+            "markers_absent_duplicate": (
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed\n"
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=invalid\n"
+                "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready\n"
+                "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready\n"
+                "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready\n"
+                "MEDIA_WEB_RUNTIME_READY=1\n"
+            ),
         }
         for reason, smoke_log in cases.items():
             with self.subTest(reason=reason):
@@ -142,7 +150,8 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 self.assertNotIn("issue close 307", first_calls)
                 self.assertNotIn("issue comment 307", second_calls)
                 self.assertIn("Media web runtime: diagnóstico no disponible", proof)
-                self.assertIn(f"Cause: `{reason}`", proof)
+                expected_reason = "markers_absent" if reason == "markers_absent_duplicate" else reason
+                self.assertIn(f"Cause: `{expected_reason}`", proof)
                 self.assertIn("grindflow-media-runtime-unavailable-v1", proof)
 
     def test_workflow_dispatch_emits_same_markers_as_push(self) -> None:
@@ -161,6 +170,28 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             "MEDIA_WEB_RUNTIME_READY=1",
         ):
             self.assertIn(marker, emitted)
+
+    def test_smoke_emits_allowlisted_diagnostic_classifications_from_mocked_curl(self) -> None:
+        valid_body = json.dumps(self._payload())
+        cases = (
+            ("000", "", "endpoint_unreachable"),
+            ("503", "upstream unavailable", "http_non_200"),
+            ("200", "not-json", "contract_invalid"),
+            ("200", valid_body, "observed"),
+        )
+        for status, body, expected in cases:
+            with self.subTest(status=status, expected=expected):
+                completed = self._run_readiness_function(status, body)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                lines = completed.stdout.splitlines()
+                self.assertEqual(
+                    1,
+                    sum(
+                        line.startswith("MEDIA_WEB_RUNTIME_DIAGNOSTIC=")
+                        for line in lines
+                    ),
+                )
+                self.assertIn(f"MEDIA_WEB_RUNTIME_DIAGNOSTIC={expected}", lines)
 
     def test_blocked_evidence_is_idempotent_per_sha_and_run(self) -> None:
         smoke_log = "\n".join(
@@ -309,6 +340,41 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         start = block.index(marker) + len(marker)
         end = block.index("\nPY\n", start)
         return textwrap.dedent(block[start:end])
+
+    @classmethod
+    def _run_readiness_function(
+        cls,
+        status: str,
+        body: str,
+    ) -> subprocess.CompletedProcess[str]:
+        function = cls._readiness_function()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            media_body = root / "media-readiness.json"
+            script = textwrap.dedent(
+                f"""
+                set -euo pipefail
+                cookie_jar={str(root / "cookies.txt")!r}
+                media_readiness_body={str(media_body)!r}
+                BASE_URL='https://example.invalid'
+                MOCK_STATUS={status!r}
+                MOCK_BODY={body!r}
+
+                curl_common() {{
+                  printf '%s' "$MOCK_BODY" > "$media_readiness_body"
+                  printf '%s' "$MOCK_STATUS"
+                }}
+
+                {function}
+                check_media_web_runtime_readiness
+                """
+            )
+            return subprocess.run(
+                ["bash", "-c", script],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
 
     @staticmethod
     def _reconcile_script() -> str:
