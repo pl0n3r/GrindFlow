@@ -331,8 +331,9 @@ jobs:
 
           diagnostic_reason() {
             local matches=()
-            mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=(observed|endpoint_unreachable|http_non_200|contract_invalid)$' production-smoke.log || true)
-            if [[ "${#matches[@]}" != "1" ]]; then
+            mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^MEDIA_WEB_RUNTIME_DIAGNOSTIC=(observed|endpoint_unreachable|http_non_200|contract_invalid)$ ]]; then
               printf 'markers_absent\n'
               return
             fi
