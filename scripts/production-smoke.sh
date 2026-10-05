@@ -342,7 +342,7 @@ check_workspace_modules() {
      ! grep -Fq 'date_utc,label,short_link,channel,campaign,status,clicks' "$csv_body"; then
     module_failure "traffic CSV"; return $?
   fi
-  printf 'MODULE_READ_ONLY=traffic-csv:ok\n'
+  printf 'MODULE_READ_ONLY=%s:ok\n' "traffic-csv"
 }
 
 # Observe only allowlisted media readiness from the authenticated web runtime.
@@ -355,7 +355,7 @@ check_media_web_runtime_readiness() {
     return 0
   fi
 
-  if python3 - "$media_readiness_body" <<'PY'
+  if ! python3 - "$media_readiness_body" <<'PY'
 import json
 import sys
 
@@ -373,25 +373,26 @@ if not isinstance(data, dict) or set(data) != {
 }:
     raise SystemExit(1)
 checks = data.get("checks")
-if not isinstance(checks, dict) or set(checks) != {
-    "decoder", "temporary_storage", "private_vault"
-}:
+ordered_checks = ("decoder", "temporary_storage", "private_vault")
+if not isinstance(checks, dict) or set(checks) != set(ordered_checks):
     raise SystemExit(1)
-expected = {
-    "contract": "media-pilot-readiness-v1",
-    "status": "ready",
-    "evidence_scope": "web_runtime",
-}
-if any(data.get(key) != value for key, value in expected.items()):
+if data.get("contract") != "media-pilot-readiness-v1":
+    raise SystemExit(1)
+if data.get("evidence_scope") != "web_runtime":
     raise SystemExit(1)
 if data.get("ci_equivalent") is not False:
     raise SystemExit(1)
-if any(checks.get(key) != "ready" for key in checks):
+if any(checks.get(key) not in {"ready", "not_ready"} for key in ordered_checks):
     raise SystemExit(1)
+all_ready = all(checks[key] == "ready" for key in ordered_checks)
+expected_status = "ready" if all_ready else "not_ready"
+if data.get("status") != expected_status:
+    raise SystemExit(1)
+for key in ordered_checks:
+    print(f"MEDIA_WEB_RUNTIME_CHECK_{key}={checks[key]}")
+print(f"MEDIA_WEB_RUNTIME_READY={1 if all_ready else 0}")
 PY
   then
-    printf 'MEDIA_WEB_RUNTIME_READY=1\n'
-  else
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
   fi
 }
