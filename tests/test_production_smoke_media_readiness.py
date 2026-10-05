@@ -150,14 +150,17 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertEqual(1, WORKFLOW.count("run: bash scripts/production-smoke.sh >production-smoke.log 2>&1"))
         reconcile = self._reconcile_script()
         self.assertNotIn("github.event_name", reconcile)
+
+        completed = self._run_parser(self._payload())
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        emitted = completed.stdout.splitlines()
         for marker in (
-            "MEDIA_WEB_RUNTIME_DIAGNOSTIC",
-            "MEDIA_WEB_RUNTIME_CHECK_DECODER",
-            "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE",
-            "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT",
-            "MEDIA_WEB_RUNTIME_READY",
+            "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
+            "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
+            "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+            "MEDIA_WEB_RUNTIME_READY=1",
         ):
-            self.assertIn(marker, SMOKE)
+            self.assertIn(marker, emitted)
 
     def test_blocked_evidence_is_idempotent_per_sha_and_run(self) -> None:
         smoke_log = "\n".join(
