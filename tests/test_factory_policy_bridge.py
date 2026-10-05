@@ -4,7 +4,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/politica.yml"
-FACTORY_SHA = "464a06458cfcb749161f0070a46991b780038a60"
+FACTORY_SHA = "74bc1c841567d3431571dab19c42a22c4a76526d"
 
 
 class FactoryPolicyBridgeTests(unittest.TestCase):
