@@ -116,6 +116,8 @@ class S4RuntimePrepareTests(unittest.TestCase):
         for snippet in (
             'git -C "$root" rev-parse HEAD',
             'composer_lock="$root/symfony/composer.lock"',
+            'stage="$symfony_root/.vendor-stage-$$"',
+            'backup="$symfony_root/.vendor-backup-$$"',
             'COMPOSER_VENDOR_DIR="$stage"',
             "--no-dev --prefer-dist --no-interaction --optimize-autoloader",
             "--no-scripts --no-plugins",
