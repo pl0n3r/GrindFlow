@@ -315,7 +315,28 @@ jobs:
           ready_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=1' production-smoke.log || true)"
           blocked_count="$(grep -Fxc 'MEDIA_WEB_RUNTIME_READY=0' production-smoke.log || true)"
 
-          if [[ "$ready_count" == "1" && "$blocked_count" == "0" ]]; then
+          read_subcheck() {
+            local key="$1" ready not_ready
+            ready="$(grep -Fxc "MEDIA_WEB_RUNTIME_CHECK_${key}=ready" production-smoke.log || true)"
+            not_ready="$(grep -Fxc "MEDIA_WEB_RUNTIME_CHECK_${key}=not_ready" production-smoke.log || true)"
+            if [[ "$ready" == "1" && "$not_ready" == "0" ]]; then
+              printf 'ready'
+              return 0
+            fi
+            if [[ "$ready" == "0" && "$not_ready" == "1" ]]; then
+              printf 'not_ready'
+              return 0
+            fi
+            return 1
+          }
+
+          subchecks_complete=true
+          if ! decoder_state="$(read_subcheck decoder)"; then subchecks_complete=false; decoder_state=""; fi
+          if ! temporary_storage_state="$(read_subcheck temporary_storage)"; then subchecks_complete=false; temporary_storage_state=""; fi
+          if ! private_vault_state="$(read_subcheck private_vault)"; then subchecks_complete=false; private_vault_state=""; fi
+
+          if [[ "$ready_count" == "1" && "$blocked_count" == "0" && "$subchecks_complete" == "true" \
+            && "$decoder_state" == "ready" && "$temporary_storage_state" == "ready" && "$private_vault_state" == "ready" ]]; then
             {
               echo '## Media web runtime ready'
               echo
@@ -339,9 +360,18 @@ jobs:
             {
               echo '## Media web runtime remains blocked'
               echo
-              echo 'Authenticated production smoke completed, but the allowlisted web-runtime readiness marker was not uniquely ready.'
+              printf 'Exact deployed SHA: `%s`\\n' "$GITHUB_SHA"
+              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo 'Status: `BLOCKED_TARGET_ENV`'
+              if [[ "$subchecks_complete" == "true" ]]; then
+                echo "- decoder: \`$decoder_state\`"
+                echo "- temporary_storage: \`$temporary_storage_state\`"
+                echo "- private_vault: \`$private_vault_state\`"
+              else
+                echo 'Subcheck markers were not uniquely available; no remote values were published.'
+              fi
               echo 'Issue #307 remains open as BLOCKED_TARGET_ENV.'
-              echo 'No remote response body or sensitive runtime detail was published.'
+              echo 'No remote response body, filesystem path, cookie, header, hash or secret was published.'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
