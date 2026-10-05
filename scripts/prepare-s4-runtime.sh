@@ -45,19 +45,27 @@ case "$phase_rc" in
     printf 'S4_RUNTIME_PREPARE_ACTION:add APP_PHASE="construccion" to .env\n' >&2
     fail "phase-missing"
     ;;
-  *) fail "phase-not-construction" ;;
+  11) fail "phase-not-construction" ;;
+  *) fail "phase-check-failed" ;;
 esac
 
+composer_log_error="composer-log-unavailable"
 composer_log_dir="${S4_RUNTIME_LOG_DIR:-${HOME:-$root}/.grindflow/logs}"
-mkdir -p "$composer_log_dir" || fail "composer-log-unavailable"
-chmod 0700 "$composer_log_dir" || fail "composer-log-unavailable"
+mkdir -p "$composer_log_dir" || fail "$composer_log_error"
+chmod 0700 "$composer_log_dir" || fail "$composer_log_error"
 composer_log="$composer_log_dir/s4-runtime-composer.log"
-: > "$composer_log" || fail "composer-log-unavailable"
-chmod 0600 "$composer_log" || fail "composer-log-unavailable"
+: > "$composer_log" || fail "$composer_log_error"
+chmod 0600 "$composer_log" || fail "$composer_log_error"
 
 composer_command=("$composer_path")
 composer_first_line="$(head -n 1 "$composer_path" 2>/dev/null || true)"
-if [[ "$composer_path" == *.phar || "$composer_first_line" == '#!'*php* || "$composer_first_line" == '<?php'* ]]; then
+composer_is_php=false
+if [[ "$composer_first_line" == '<?php'* ]] \
+  || [[ "$composer_first_line" =~ ^#!.*/php([0-9.]*)?([[:space:]].*)?$ ]] \
+  || [[ "$composer_first_line" =~ ^#!/usr/bin/env[[:space:]]+php([0-9.]*)?([[:space:]].*)?$ ]]; then
+  composer_is_php=true
+fi
+if [[ "$composer_path" == *.phar || "$composer_is_php" == true ]]; then
   composer_command=("$php_bin" "$composer_path")
 fi
 
