@@ -76,8 +76,10 @@ class S4RuntimePrepareTests(unittest.TestCase):
             php,
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
-            'if [[ "${FAKE_PHP_FAIL_FINAL:-0}" == 1 '
-            '&& "$*" == *\'/symfony/vendor/autoload.php\'* ]]; then exit 5; fi\n'
+            'if [[ "$*" == *\'/symfony/vendor/autoload.php\'* ]]; then\n'
+            '  if [[ "${FAKE_PHP_SIGNAL_PARENT:-}" == TERM ]]; then kill -TERM "$PPID"; exit 0; fi\n'
+            '  if [[ "${FAKE_PHP_FAIL_FINAL:-0}" == 1 ]]; then exit 5; fi\n'
+            'fi\n'
             "exit 0\n",
         )
         return tmp, repo, sha, composer, php
@@ -144,6 +146,25 @@ class S4RuntimePrepareTests(unittest.TestCase):
                 repo, sha, composer, php, FAKE_PHP_FAIL_FINAL="1"
             )
             self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(
+                (repo / "symfony/vendor/autoload.php").read_text(encoding="utf-8"),
+                "old-runtime\n",
+            )
+            self.assertEqual(list((repo / "symfony").glob(".vendor-stage-*")), [])
+            self.assertEqual(list((repo / "symfony").glob(".vendor-backup-*")), [])
+        finally:
+            tmp.cleanup()
+
+    def test_signal_during_promoted_runtime_rolls_back_and_never_reports_success(
+        self,
+    ) -> None:
+        tmp, repo, sha, composer, php = self._fixture(previous_vendor=True)
+        try:
+            result = self._run(
+                repo, sha, composer, php, FAKE_PHP_SIGNAL_PARENT="TERM"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("S4_RUNTIME_PREPARE_OK", result.stdout)
             self.assertEqual(
                 (repo / "symfony/vendor/autoload.php").read_text(encoding="utf-8"),
                 "old-runtime\n",
