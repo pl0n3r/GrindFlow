@@ -8,6 +8,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _factory_policy_job(text: str) -> str:
+    """Extrae únicamente el job caller de Policy para validar sus inputs efectivos."""
+    match = re.search(
+        r"(?ms)^  factory-policy:\n(?P<body>(?:(?!^  [A-Za-z0-9_-]+:\n).)*)",
+        text,
+    )
+    if match is None:
+        raise ValueError("caller Factory no define el job factory-policy")
+    return match.group(0)
+
+
 def validate_factory_caller(text: str) -> None:
     """Falla si el caller amplía eventos/permisos o deja de usar Factory v1."""
     expected_prefix = """name: Política Factory v1
@@ -31,9 +42,12 @@ jobs:
         raise ValueError("caller Factory debe limitarse a pull_request y pull_request_review")
     if "secrets: inherit" in text or "issues:" in text or "contents: write" in text:
         raise ValueError("caller Factory excede permisos mínimos")
+
+    job = _factory_policy_job(text)
     refs = re.findall(
-        r"pl0n3r/factory/\.github/workflows/politica\.yml@([^\s]+)",
-        text,
+        r"^    uses: pl0n3r/factory/\.github/workflows/politica\.yml@([^\s]+)\s*$",
+        job,
+        re.MULTILINE,
     )
     if len(refs) != 1:
         raise ValueError("caller Factory debe fijar exactamente un reusable Policy")
@@ -41,15 +55,21 @@ jobs:
     if ref == "v1":
         pass
     elif re.fullmatch(r"[0-9a-f]{40}", ref):
-        factory_refs = re.findall(r"(?m)^\s+factory_ref:\s*([^\s]+)\s*$", text)
+        factory_refs = re.findall(
+            r"^      factory_ref:\s*([^\s]+)\s*$",
+            job,
+            re.MULTILINE,
+        )
         if factory_refs != [ref]:
             raise ValueError("caller Factory por SHA exige factory_ref idéntico")
     else:
         raise ValueError("ref Factory debe ser @v1 o SHA lowercase exacto de 40 hex")
-    if re.search(r"politica\.yml@(main|master|HEAD|v\d+\.\d+\.\d+)", text):
+    if re.search(r"politica\.yml@(main|master|HEAD|v\d+\.\d+\.\d+)", job):
         raise ValueError("ref Factory no corresponde a un canal aprobado")
     if not re.search(
-        r"pr_number:\s*\$\{\{ github\.event\.pull_request\.number \}\}", text
+        r"^      pr_number:\s*\$\{\{ github\.event\.pull_request\.number \}\}\s*$",
+        job,
+        re.MULTILINE,
     ):
         raise ValueError("pr_number no proviene del PR exacto")
 
@@ -93,9 +113,11 @@ class FactoryPolicyAdoptionTests(unittest.TestCase):
                     validate_factory_caller(candidate)
 
     def test_exact_sha_caller_rejects_mismatched_factory_ref(self):
+        job = _factory_policy_job(self.workflow)
         match = re.search(
-            r"pl0n3r/factory/\.github/workflows/politica\.yml@([0-9a-f]{40})",
-            self.workflow,
+            r"^    uses: pl0n3r/factory/\.github/workflows/politica\.yml@([0-9a-f]{40})\s*$",
+            job,
+            re.MULTILINE,
         )
         if match is None:
             self.skipTest("caller actual usa el canal estable @v1")
