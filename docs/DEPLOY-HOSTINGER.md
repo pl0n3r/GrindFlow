@@ -201,6 +201,191 @@ Contrato de seguridad:
 Si falta configuración SSH o `HOSTINGER_GIT_ROOT`, el resultado correcto es fail-closed.
 No adivines una ruta del hosting ni sustituyas el cutover Factory por un segundo deploy.
 
+### Camino manual del dueño en hPanel
+
+Cuando GitHub no tiene credenciales SSH, esta preparación se ejecuta manualmente en el checkout hPanel. No copies secretos al chat ni al repositorio.
+
+1. **Comprobar prerrequisitos y fase**, desde el checkout real:
+
+   ```bash
+   cd "$HOME/domains/grindflow.com.co/public_html"
+   EXPECTED_SHA="$(git rev-parse HEAD)"
+   /opt/alt/php85/usr/bin/php -v
+   test -f .env
+   grep -qE '^APP_PHASE="?construccion"?
+
+Hostinger Web/Cloud usa MariaDB. GrindFlow se conecta mediante el driver Laravel
+`mysql` y el puerto habitual 3306.
+
+Variables esperadas:
+
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=...
+DB_PORT=3306
+DB_DATABASE=...
+DB_USERNAME=...
+DB_PASSWORD=...
+DB_CHARSET=utf8mb4
+DB_COLLATION=utf8mb4_unicode_ci
+```
+
+Las migraciones se mantienen fuera del deploy automatico. El camino operativo
+preferido no requiere SSH:
+
+1. iniciar sesion como administrador de plataforma;
+2. abrir `Admin > System`;
+3. revisar el contador **Pending migrations** y su fingerprint;
+4. crear un backup DB real `.sql.gz` en almacenamiento privado y registrar
+   su evidencia con `operations:record-db-backup` para ese fingerprint;
+5. introducir únicamente la confirmacion `MIGRAR`;
+6. pulsar **Run pending migrations** una sola vez;
+7. confirmar que el contador vuelve a cero y dejar que Production Smoke valide
+   las rutas autenticadas.
+
+La accion usa CSRF, requiere `platform_role=admin`, resuelve server-side el
+receipt más reciente desde el puntero privado del fingerprint exacto, vuelve a
+validar archivo/checksum/fingerprint/TTL y toma un lock local exclusivo antes de
+ejecutar. El receipt no se copia al navegador ni se envía como input del
+workflow de migración. GitHub Actions y Production Smoke nunca ejecutan
+migraciones de produccion por si mismos.
+
+SSH queda como ruta de diagnostico/recuperacion si la interfaz administrativa
+no puede arrancar. No ejecutar `artisan migrate --force` directamente: ese
+comando saltaria `VerifiedBackupEvidence` y `ProductionWritePolicy`. Primero
+restaurar el control plane o usar un procedimiento de recuperacion expresamente
+autorizado que mantenga backup verificable y lock equivalente.
+
+GF-MIG-002 no se considera VALIDATED IN PRODUCTION hasta comprobar el flujo real
+contra la MariaDB de Hostinger.
+
+## Rollback de codigo
+
+Si un despliegue rompe el arranque, vuelve al ultimo commit validado en GitHub,
+redepliega y ejecuta de nuevo `scripts/deploy-hostinger.sh`.
+
+No uses `migrate:fresh`, resets de base, deletes masivos ni restauraciones como
+parte de un rollback automatico.
+
+## Comprobaciones rapidas
+
+```bash
+/opt/alt/php85/usr/bin/php -v
+/opt/alt/php85/usr/bin/php artisan about
+curl -f https://www.grindflow.com.co/up
+```
+
+El endpoint `/up` prueba que Laravel puede arrancar. No prueba por si solo
+autenticacion, MariaDB ni comportamiento multi-tenant.
+
+## Observación exacta del deploy
+
+GET `/health` es la señal canónica del checkout desplegado. El observer exige
+HTTP 200, `status=ok`, la versión de `config/version.php`, `exact=true` y
+`commit` igual al SHA exacto de `main` que disparó el workflow.
+
+`GrindFlow Deploy Observer` consulta `/health` después de cada push a main
+hasta observar ese SHA o agotar el timeout. No escribe en producción ni usa
+credenciales. Si Hostinger aún sirve otro checkout, el workflow falla cerrado.
+
+`/_deployment` puede seguir devolviendo información release-only sin SHA para
+diagnóstico mientras exista, pero ya no participa en la decisión de deploy.
+Production Smoke permanece como señal autenticada separada de validación
+funcional después de confirmar el checkout exacto.
+
+## Entrega diferida de correos de recuperación Symfony
+
+La solicitud pública de recuperación no ejecuta SMTP ni `mail()` dentro del
+request HTTP. Guarda únicamente un handoff local en
+`gf_password_recovery_outbox`; el token real se genera después, en memoria,
+cuando un worker procesa la cola. La tabla de outbox no almacena token, correo
+ni cuerpo del mensaje.
+
+Después de desplegar la migración que crea
+`gf_password_recovery_outbox`, configurar en hPanel un Cron Job
+**personalizado** que ejecute periódicamente el comando Symfony desde el
+release activo, por ejemplo cada 5 minutos:
+
+```bash
+cd /ruta/real/al/release/symfony && php bin/console grindflow:password-recovery:deliver --limit=20
+```
+
+La ruta es específica del hosting y no se versiona. Los horarios de Cron en
+hPanel se interpretan en UTC. Probar el comando manualmente en el checkout
+correcto antes de habilitar la tarea periódica y verificar que no imprime
+correos, tokens, nombres, IDs ni excepciones de transporte.
+
+Reglas operativas:
+
+- no habilitar el Cron antes de que la migración aditiva esté aplicada;
+- no ejecutar dos Crons con el mismo propósito; el claim DB tolera concurrencia,
+  pero duplicar schedulers solo consume recursos;
+- una entrega fallida conserva el job para reintento y elimina únicamente el
+  `token_hash` generado por ese intento;
+- una nueva solicitud invalida inmediatamente el token anterior y reemplaza el
+  handoff pendiente;
+- el worker genera el token solo en memoria, persiste únicamente SHA-256 y no
+  lo escribe en logs;
+- `GRINDFLOW_MAIL_FROM` y cualquier configuración real del transporte siguen
+  siendo secretos/configuración del entorno, nunca del repositorio;
+- Production Smoke no debe solicitar recuperaciones reales ni consumir tokens.
+
+## Escrituras productivas por fase y backup DB verificable
+
+`APP_PHASE` admite únicamente `construccion` o `live`. En construcción, operaciones no destructivas/versionadas pueden automatizarse. En live, la automatización de escrituras falla cerrado.
+
+Las migraciones de base de datos son un caso reforzado: el POST de Admin System y `.github/workflows/production-migration.yml` no aceptan `backup_confirmed=1`, `backup_verified` ni un `backup_receipt` aportado por cliente. `VerifiedBackupEvidence` registra server-side un receipt privado sobre un archivo `operations/database-backups/*.sql.gz` real y publica un puntero privado 0600 ligado al fingerprint exacto. El receipt conserva checksum, fingerprint y timestamp; vence a los 15 minutos y se vuelve inválido si cambia el archivo o el lote.
+
+El adaptador Factory `ops/factory/backup` conserva rollback de **release**, no hace dump de MariaDB. No confundirlo con backup DB. Hasta que un paso de backup de base produzca el archivo y su recibo verificable, el flujo de migración debe permanecer bloqueado. Nunca recrear el bypass mediante checkbox, comentario o input booleano.
+
+Después de crear un dump real en el almacenamiento local privado, registrar la evidencia sin imprimir credenciales:
+
+```bash
+php artisan operations:record-db-backup \
+  operations/database-backups/<archivo>.sql.gz \
+  <fingerprint-de-migraciones>
+```
+
+El comando registra el receipt y actualiza el puntero privado del fingerprint. El ID puede aparecer como salida diagnóstica del comando, pero **no** se copia ni se entrega como input a Production Migration o al controlador. La migración resuelve el puntero en el servidor y vuelve a comprobar receipt, archivo, checksum, fingerprint y TTL antes de ejecutar.
+ .env
+   ```
+
+   Si el último comando falla porque falta la variable, edita el `.env` privado en hPanel y añade exactamente `APP_PHASE="construccion"`. No imprimas el archivo completo. La aplicación y el preparador usan construcción como default fail-closed; `live` siempre requiere configuración explícita.
+
+2. **Preparar `symfony/vendor` con PHP 8.5**:
+
+   ```bash
+   EXPECTED_SHA="$EXPECTED_SHA" \
+   PHP_BIN=/opt/alt/php85/usr/bin/php \
+   COMPOSER_BIN=/usr/local/bin/composer2 \
+   bash scripts/prepare-s4-runtime.sh
+   ```
+
+   El script detecta launchers PHP/phar y ejecuta Composer mediante `PHP_BIN`. Si ese launcher concreto del hosting no es un archivo PHP legible, puede usarse temporalmente el wrapper privado ya preparado por el dueño mediante `COMPOSER_BIN="$HOME/bin/composer2-php85"`. Ante un error de Composer, revisa localmente `$HOME/.grindflow/logs/s4-runtime-composer.log`; no pegues ese log en Issues o chats.
+
+3. **Comprobar el bridge de solo lectura**:
+
+   ```bash
+   curl -sS \
+     -D /tmp/grindflow-s4-headers.txt \
+     -o /tmp/grindflow-s4-body.json \
+     -w '%{http_code}\n' \
+     https://www.grindflow.com.co/s4/_bridge-readiness
+   cat /tmp/grindflow-s4-body.json
+   ```
+
+   `runtime_unavailable` indica que esta preparación no quedó lista. `config_missing`, `schema_missing` o `identity_unavailable` son bloqueos válidos de las siguientes capas y no autorizan migraciones ni provisioning desde CI. `ready_for_web_probe` es la señal para continuar con la validación web prevista.
+
+Si un Redeploy Git/hPanel elimina `symfony/vendor`, repite el paso 2 sobre el SHA exacto. Si elimina `symfony/var/vault`, recréalo sin contenido sensible y restaura permisos privados antes del readiness:
+
+```bash
+umask 077
+mkdir -p symfony/var/vault
+chmod 700 symfony/var/vault
+```
+
+No reconstruyas secretos desde el repositorio. Si desaparecen archivos de entorno privados, restáuralos por el canal privado/backup de hPanel antes de ejecutar cualquier preparación.
+
 ## Base de datos
 
 Hostinger Web/Cloud usa MariaDB. GrindFlow se conecta mediante el driver Laravel
