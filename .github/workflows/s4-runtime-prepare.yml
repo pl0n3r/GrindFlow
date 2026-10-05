@@ -144,7 +144,7 @@ jobs:
             --output "$body" --write-out '%{http_code}' \
             -H 'Cache-Control: no-cache' \
             "$PRODUCTION_URL/s4/_bridge-readiness?probe=$GITHUB_RUN_ID")"
-          state="$(jq -r 'if type == "object" and (.state | type) == "string" then .state else "invalid" end' "$body" 2>/dev/null || printf invalid)"
+          state="$(jq -r 'if type == "object" and (.data | type) == "object" and (.data.state | type) == "string" then .data.state else "invalid" end' "$body" 2>/dev/null || printf invalid)"
           case "$status:$state" in
             200:ready_for_web_probe)
               echo 'S4 runtime dependencies prepared; bridge is ready for the web probe.' >> "$GITHUB_STEP_SUMMARY"
