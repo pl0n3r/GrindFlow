@@ -87,6 +87,26 @@ La respuesta solo expone `ready/not_ready`; **no imprime paths, secretos, hashes
 
 Ausencia del endpoint, autenticación inválida, estado `not_ready`, error o evidencia stale ⇒ `BLOCKED_TARGET_ENV`. El cierre operativo de #307 requiere una observación `web_runtime` después del deploy autorizado; CI y el diagnóstico CLI solo pueden demostrar `BUILD_AHEAD_READY`.
 
+
+### Diagnóstico allowlisted del bridge S4
+
+Cuando el Production Smoke no alcanza el endpoint multimedia y clasifica `MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200`, la reconciliación puede publicar **solo** un estado S4 si existe exactamente un marker válido y único en el log local del workflow. La ausencia, duplicidad o un valor fuera de allowlist conserva únicamente la causa genérica.
+
+Estados del bridge y siguiente acción segura:
+
+- `runtime_unavailable`: verificar que el runtime/dependencias Symfony del checkout desplegado estén disponibles. No autoriza cambiar el front controller global ni degradar a Laravel.
+- `config_missing`: completar la configuración requerida fuera de Git y volver a ejecutar el smoke exact-deploy. No autoriza copiar secretos a Issues/logs.
+- `schema_missing`: aplicar el procedimiento gobernado de schema/Doctrine correspondiente y después revalidar. **No autoriza migraciones automáticas** desde este smoke.
+- `identity_unavailable`: reconciliar la identidad/membership sintética por el mecanismo gobernado existente. **No autoriza crear identidades automáticamente** desde este reconciliador.
+- `ready_for_web_probe`: el bridge superó su preflight y puede continuar la autenticación Symfony y el probe multimedia; no equivale por sí solo a readiness multimedia.
+
+Estado de autenticación S4, cuando existe exactamente un marker válido y único:
+
+- `identity_unavailable`: el flujo Symfony no pudo acreditar login/membership/selección de organización; corregir esa frontera y revalidar.
+- `ready`: autenticación y selección Symfony quedaron listas para continuar al endpoint de readiness; tampoco demuestra que decoder/temp/Vault estén `ready`.
+
+Estos markers son diagnóstico read-only. No exponen body remoto, headers, redirects completos, paths, cookies, hashes, credenciales ni secretos; **no autoriza publicación externa** ni provider I/O.
+
 El Production Smoke emite una causa allowlisted: `observed`, `endpoint_unreachable`, `http_non_200` o `contract_invalid`; si el marcador o los sub-checks esperados faltan, la reconciliación clasifica `markers_absent`. Cuando no existe diagnóstico web válido, publica **una sola vez por SHA+run** un comentario «Media web runtime: diagnóstico no disponible» con el run, SHA y causa clasificada. Nunca copia body remoto, paths, cookies, headers, hashes ni secretos. Los eventos `push` y `workflow_dispatch` usan el mismo smoke y los mismos marcadores.
 
 ## Autoridad y límites

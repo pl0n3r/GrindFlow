@@ -156,12 +156,12 @@ class S4ProductionBridgeTests(unittest.TestCase):
         self.assertIn("check_media_web_runtime_readiness s4", SMOKE)
         self.assertIn("Symfony /s4", WORKFLOW)
 
-    def test_v0196_manifests_and_readme_are_synchronized(self) -> None:
-        self.assertIn("'number' => '0.1.196'", VERSION)
-        self.assertEqual("0.1.196", PACKAGE["version"])
-        self.assertEqual("0.1.196", LOCK["version"])
-        self.assertEqual("0.1.196", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.196", README)
+    def test_v0197_manifests_and_readme_are_synchronized(self) -> None:
+        self.assertIn("'number' => '0.1.197'", VERSION)
+        self.assertEqual("0.1.197", PACKAGE["version"])
+        self.assertEqual("0.1.197", LOCK["version"])
+        self.assertEqual("0.1.197", LOCK["packages"][""]["version"])
+        self.assertIn("V0.1.197", README)
 
 
 if __name__ == "__main__":

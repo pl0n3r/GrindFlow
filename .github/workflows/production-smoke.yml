@@ -329,6 +329,26 @@ jobs:
             printf '%s\n' "${matches[0]#*=}"
           }
 
+          s4_bridge_state_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_BRIDGE_STATE=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_BRIDGE_STATE=(runtime_unavailable|config_missing|schema_missing|identity_unavailable|ready_for_web_probe)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
+          s4_auth_state_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_AUTH_STATE=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_AUTH_STATE=(identity_unavailable|ready)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           diagnostic_reason() {
             local matches=()
             mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=' production-smoke.log || true)
@@ -347,6 +367,11 @@ jobs:
           decoder_state=''
           temporary_storage_state=''
           private_vault_state=''
+          s4_bridge_state=''
+          s4_auth_state=''
+
+          s4_bridge_state="$(s4_bridge_state_marker || true)"
+          s4_auth_state="$(s4_auth_state_marker || true)"
 
           if [[ "$diagnostic_state" == "observed" ]] \
             && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
@@ -417,6 +442,12 @@ jobs:
                 echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
                 echo 'Status: `BLOCKED_TARGET_ENV`'
                 printf 'Cause: `%s`\n' "$diagnostic_state"
+                if [[ "$diagnostic_state" == "http_non_200" && -n "$s4_bridge_state" ]]; then
+                  printf 'S4 bridge state: `%s`\n' "$s4_bridge_state"
+                fi
+                if [[ "$diagnostic_state" == "http_non_200" && -n "$s4_auth_state" ]]; then
+                  printf 'S4 auth state: `%s`\n' "$s4_auth_state"
+                fi
                 echo 'No remote response body, filesystem path, cookie, header, hash or secret was published.'
               } > "$evidence_file"
               cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
