@@ -174,6 +174,16 @@ except (OSError, ValueError):
 PY
 }
 
+safe_s4_login_redirect_class() {
+  case "${1:-}" in
+    /s4/login) printf '%s\n' 'returned_to_login' ;;
+    /s4/organizations) printf '%s\n' 'organizations' ;;
+    /s4/admin) printf '%s\n' 'admin' ;;
+    '(missing)') printf '%s\n' 'missing' ;;
+    *) printf '%s\n' 'redacted' ;;
+  esac
+}
+
 extract_csrf() {
   python3 - "${1:-$login_html}" <<'PY'
 from html.parser import HTMLParser
@@ -671,6 +681,7 @@ check_s4_media_web_runtime_readiness() {
   if [[ "$login_redirect" != "/s4/organizations" ]]; then
     printf 'S4_AUTH_STATE=identity_unavailable\n'
     printf 'S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect\n'
+    printf 'S4_LOGIN_REDIRECT_CLASS=%s\n' "$(safe_s4_login_redirect_class "$login_redirect")"
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
