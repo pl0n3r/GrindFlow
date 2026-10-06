@@ -109,6 +109,23 @@ Estos markers son diagnóstico read-only. No exponen body remoto, headers, redir
 
 El Production Smoke emite una causa allowlisted: `observed`, `endpoint_unreachable`, `http_non_200` o `contract_invalid`; si el marcador o los sub-checks esperados faltan, la reconciliación clasifica `markers_absent`. Cuando no existe diagnóstico web válido, publica **una sola vez por SHA+run** un comentario «Media web runtime: diagnóstico no disponible» con el run, SHA y causa clasificada. Nunca copia body remoto, paths, cookies, headers, hashes ni secretos. Los eventos `push` y `workflow_dispatch` usan el mismo smoke y los mismos marcadores.
 
+
+### Diagnóstico allowlisted de Private Vault
+
+Cuando el runtime S4 alcanza el endpoint multimedia y el check principal devuelve `private_vault=not_ready`, el diagnóstico puede publicar **solo** un estado allowlisted, sin exponer la ruta física ni metadata del filesystem:
+
+- `root_unavailable`: la raíz configurada está vacía o no es resoluble de forma segura; revisar configuración fuera de Git.
+- `missing`: la raíz esperada no existe en el runtime web desplegado.
+- `unreadable`: la raíz existe pero el proceso web no puede leerla.
+- `permissions_unavailable`: el runtime no pudo inspeccionar permisos de forma fiable.
+- `permissions_not_private`: group/other conservan bits de acceso; el Vault no cumple privacidad mínima.
+- `ready`: la raíz existe, es legible, no es symlink y sus permisos son privados.
+
+El marker operativo es `S4_PRIVATE_VAULT_STATE=<estado>`. Debe aparecer una sola vez y pertenecer exactamente a la allowlist; ausencia, duplicidad o un valor fuera de dominio mantienen el contrato en fail-closed. La evidencia publicada en #307 contiene únicamente SHA/run, los sub-checks `ready/not_ready` y este estado allowlisted. Nunca copia path, mode numérico, UID/GID, nombres de archivo, body remoto, cookies, hashes ni secretos.
+
+Estos estados son **solo diagnóstico read-only**: ninguno autoriza escritura automática, creación de directorios, `chmod`, movimiento de Vault, cambio de owner/group ni configuración SSH/Hostinger. La reparación correspondiente debe ejecutarse por un mecanismo gobernado separado y volver a acreditarse con Production Smoke exact-main.
+
+
 ## Autoridad y límites
 
 Este build-ahead no autoriza:
