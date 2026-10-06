@@ -320,14 +320,14 @@ class S4PostBridgeContractDiagnosticsTests(unittest.TestCase):
             self.assertNotIn("Remote response body:", rendered)
             self.assertNotIn("Location:", rendered)
 
-    def test_release_v0208_is_synchronized_and_suite_is_canonical(self) -> None:
+    def test_release_identity_is_synchronized_and_suite_is_canonical(self) -> None:
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.208", match.group(1))
-        self.assertEqual("0.1.208", PACKAGE["version"])
-        self.assertEqual("0.1.208", LOCK["version"])
-        self.assertEqual("0.1.208", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.208", README)
+        release = match.group(1)
+        self.assertEqual(release, PACKAGE["version"])
+        self.assertEqual(release, LOCK["version"])
+        self.assertEqual(release, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{release}", README)
         self.assertIn(
             "tests/test_s4_post_bridge_contract_diagnostics.py",
             PACKAGE["scripts"]["test"],
