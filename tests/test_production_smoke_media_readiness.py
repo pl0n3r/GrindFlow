@@ -404,12 +404,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn("grindflow-media-web-runtime.md", first_path)
         self.assertIn("grindflow-media-web-runtime.md", second_path)
 
-    def test_v0200_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
-        self.assertIn("'number' => '0.1.200'", VERSION)
-        self.assertEqual("0.1.200", PACKAGE["version"])
-        self.assertEqual("0.1.200", LOCK["version"])
-        self.assertEqual("0.1.200", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.200", README)
+    def test_release_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:
+        release = PACKAGE["version"]
+        self.assertIn(f"'number' => '{release}'", VERSION)
+        self.assertEqual(release, LOCK["version"])
+        self.assertEqual(release, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{release}", README)
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod
