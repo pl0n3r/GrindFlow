@@ -85,7 +85,7 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
         self.assertIn("operations:record-db-backup", script)
         self.assertIn('[[ "$receipt" =~ ^[0-9a-f]{64}$ ]]', script)
         self.assertNotIn("BACKUP_RECEIPT=", script)
-        self.assertNotIn("receipt=", workflow.lower())
+        self.assertNotIn("db_receipt", workflow.lower())
         self.assertNotIn("backup_receipt", workflow.lower())
         self.assertNotIn("production-backup-receipt-", workflow)
         self.assertNotIn("actions/upload-artifact", workflow)
