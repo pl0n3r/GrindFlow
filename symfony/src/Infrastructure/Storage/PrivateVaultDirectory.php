@@ -53,6 +53,56 @@ final class PrivateVaultDirectory
         return $root;
     }
 
+    /**
+     * Tighten only an already configured external Vault root.
+     *
+     * @return 'tightened'|'already_private'|'root_unavailable'|'missing'|'unreadable'|'permissions_unavailable'|'permissions_repair_failed'
+     */
+    public function tightenPrivatePermissions(): string
+    {
+        if ($this->rootOverride === '') {
+            return 'root_unavailable';
+        }
+
+        try {
+            $root = $this->root();
+        } catch (\Throwable) {
+            return 'root_unavailable';
+        }
+
+        if (!is_dir($root)) {
+            return 'missing';
+        }
+        if (is_link($root) || !is_readable($root) || !is_executable($root)) {
+            return 'unreadable';
+        }
+
+        $mode = @fileperms($root);
+        if (!is_int($mode)) {
+            return 'permissions_unavailable';
+        }
+        if (($mode & 0077) === 0) {
+            return 'already_private';
+        }
+
+        if (!@chmod($root, 0700)) {
+            return 'permissions_repair_failed';
+        }
+
+        clearstatcache(true, $root);
+        $verified = @fileperms($root);
+        if (
+            !is_int($verified)
+            || ($verified & 0077) !== 0
+            || !is_readable($root)
+            || !is_executable($root)
+        ) {
+            return 'permissions_repair_failed';
+        }
+
+        return 'tightened';
+    }
+
     /** Create only the final private directory; its parent must already exist. */
     public function ensureWritable(): string
     {
