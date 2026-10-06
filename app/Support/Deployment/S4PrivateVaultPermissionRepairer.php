@@ -16,17 +16,20 @@ class S4PrivateVaultPermissionRepairer
         'permissions_repair_failed',
     ];
 
+    private readonly S4SymfonyCommandRunner $runner;
+
     public function __construct(
-        private readonly ?string $symfonyRoot = null,
-        private readonly ?string $phpBinary = null,
-    ) {}
+        ?string $symfonyRoot = null,
+        ?string $phpBinary = null,
+        ?S4SymfonyCommandRunner $runner = null,
+    ) {
+        $this->runner = $runner ?? new S4SymfonyCommandRunner($symfonyRoot, $phpBinary);
+    }
 
     /** @return array{ok:bool,code:string} */
     public function repair(): array
     {
-        $result = (new S4SymfonyCommandRunner($this->symfonyRoot, $this->phpBinary))->run(
-            'grindflow:s4:repair-private-vault-permissions',
-        );
+        $result = $this->runner->run('grindflow:s4:repair-private-vault-permissions');
 
         if ($result['ok'] !== true) {
             return $this->failure($result['code']);

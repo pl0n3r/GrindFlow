@@ -22,6 +22,12 @@ COMMAND_TEST = (
 REPAIRER = (
     ROOT / "app/Support/Deployment/S4PrivateVaultPermissionRepairer.php"
 ).read_text(encoding="utf-8")
+RUNNER = (
+    ROOT / "app/Support/Deployment/S4SymfonyCommandRunner.php"
+).read_text(encoding="utf-8")
+RUNNER_TEST = (
+    ROOT / "tests/Unit/S4SymfonyCommandRunnerTest.php"
+).read_text(encoding="utf-8")
 CONTROLLER = (
     ROOT / "app/Http/Controllers/Operations/ProductionSmokeBootstrapController.php"
 ).read_text(encoding="utf-8")
@@ -111,14 +117,15 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
         self.assertNotIn("GRINDFLOW_VAULT_ROOT", CONTROLLER)
 
     def test_child_process_transport_is_shell_free_and_output_allowlisted(self) -> None:
-        start = REPAIRER.index("new Process(")
-        end = REPAIRER.index(");", start)
-        constructor = REPAIRER[start:end]
+        start = RUNNER.index("new Process(")
+        end = RUNNER.index(");", start)
+        constructor = RUNNER[start:end]
 
-        self.assertIn("grindflow.s4_smoke.php_cli_binary", REPAIRER)
-        self.assertIn("! is_file($php)", REPAIRER)
-        self.assertIn("! is_executable($php)", REPAIRER)
-        self.assertIn("'grindflow:s4:repair-private-vault-permissions'", constructor)
+        self.assertIn("$this->runner->run(", REPAIRER)
+        self.assertIn("'grindflow:s4:repair-private-vault-permissions'", REPAIRER)
+        self.assertIn("grindflow.s4_smoke.php_cli_binary", RUNNER)
+        self.assertIn("! is_file($php)", RUNNER)
+        self.assertIn("! is_executable($php)", RUNNER)
         self.assertIn("'--env=prod'", constructor)
         self.assertIn("'--no-interaction'", constructor)
         self.assertIn("'--no-ansi'", constructor)
@@ -127,12 +134,13 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
         self.assertIn("SUCCESS_CODES", REPAIRER)
         self.assertIn("PUBLIC_FAILURE_CODES", REPAIRER)
         self.assertIn("'output_invalid'", REPAIRER)
-        self.assertNotIn("getErrorOutput()", REPAIRER)
+        self.assertIn("getErrorOutput()", RUNNER)
         self.assertIn(
             "test_child_process_is_shell_free_and_returns_only_allowlisted_code",
             REPAIRER_TEST,
         )
         self.assertIn("self::assertCount(5, $argv)", REPAIRER_TEST)
+        self.assertIn("S4SymfonyCommandRunnerTest", RUNNER_TEST)
 
     def test_release_v0215_is_synchronized_and_validate_is_canonical(self) -> None:
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)

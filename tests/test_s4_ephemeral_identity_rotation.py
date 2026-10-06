@@ -13,6 +13,12 @@ CONTROLLER = (
 PROVISIONER = (
     ROOT / "app/Support/Deployment/S4SmokeIdentityProvisioner.php"
 ).read_text(encoding="utf-8")
+RUNNER = (
+    ROOT / "app/Support/Deployment/S4SymfonyCommandRunner.php"
+).read_text(encoding="utf-8")
+RUNNER_TEST = (
+    ROOT / "tests/Unit/S4SymfonyCommandRunnerTest.php"
+).read_text(encoding="utf-8")
 COMMAND = (
     ROOT / "symfony/src/Identity/Application/ProvisionSmokeIdentityCommand.php"
 ).read_text(encoding="utf-8")
@@ -51,34 +57,38 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertIn("'X-GrindFlow-Smoke-Failure-Code'", CONTROLLER)
 
     def test_s4_provisioner_never_places_secret_in_argv_or_public_output(self) -> None:
-        start = PROVISIONER.index("new Process(")
-        end = PROVISIONER.index(");", start)
-        process_ctor = PROVISIONER[start:end]
-        command_part = process_ctor.split("$root,", 1)[0]
-        self.assertNotIn("$password", command_part)
+        start = RUNNER.index("new Process(")
+        end = RUNNER.index(");", start)
+        process_ctor = RUNNER[start:end]
+
+        self.assertIn("$this->runner->run(", PROVISIONER)
+        self.assertIn("'grindflow:s4:provision-smoke-identity'", PROVISIONER)
         self.assertIn(
             "['GRINDFLOW_S4_SMOKE_PASSWORD' => $password]",
-            process_ctor,
+            PROVISIONER,
         )
-        self.assertNotIn("PHP_BINARY", PROVISIONER)
-        self.assertIn("'grindflow.s4_smoke.php_cli_binary'", PROVISIONER)
+        self.assertIn("[$password]", PROVISIONER)
+        self.assertNotIn("$password", process_ctor)
+        self.assertNotIn("PHP_BINARY", RUNNER)
+        self.assertIn("'grindflow.s4_smoke.php_cli_binary'", RUNNER)
         self.assertIn("'/opt/alt/php85/usr/bin/php'", GRINDFLOW_CONFIG)
         self.assertIn(
             'GRINDFLOW_S4_PHP_CLI_BINARY="/opt/alt/php85/usr/bin/php"',
             ENV_EXAMPLE,
         )
-        self.assertIn("! is_executable($php)", PROVISIONER)
+        self.assertIn("! is_executable($php)", RUNNER)
         self.assertIn(
             "test_configured_php_cli_binary_is_used_without_constructor_override",
             PROVISIONER_TEST,
         )
-        self.assertIn("'--env=prod'", PROVISIONER)
+        self.assertIn("'--env=prod'", RUNNER)
         self.assertIn("'s4-output-invalid'", PROVISIONER)
         self.assertNotIn("Log::", PROVISIONER)
         self.assertIn(
             "test_secret_travels_only_in_child_environment_and_public_result_is_allowlisted",
             PROVISIONER_TEST,
         )
+        self.assertIn("S4SymfonyCommandRunnerTest", RUNNER_TEST)
 
     def test_reserved_identity_rotates_only_password_hash(self) -> None:
         start = COMMAND.index("if ($rotateSecret) {")

@@ -19,70 +19,93 @@ class S4SymfonyCommandRunnerTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_runner_uses_governed_cli_without_shell_and_returns_strict_json_envelope(): void
+    public function test_command_is_shell_free_and_secret_stays_in_child_environment(): void
     {
         $root = $this->fakeSymfonyRoot(
             <<<'PHP'
 <?php
 file_put_contents(dirname(__DIR__).'/argv.json', json_encode($argv, JSON_THROW_ON_ERROR));
+file_put_contents(dirname(__DIR__).'/secret.txt', (string) getenv('RUNNER_TEST_SECRET'));
 echo json_encode(['status' => 'ok', 'code' => 'ready'], JSON_THROW_ON_ERROR), PHP_EOL;
 PHP,
         );
-        config(['grindflow.s4_smoke.php_cli_binary' => PHP_BINARY]);
+        $secret = 'runner-secret-'.Str::random(24);
 
-        $result = (new S4SymfonyCommandRunner($root))
-            ->run('grindflow:s4:test-runner');
+        $result = (new S4SymfonyCommandRunner($root, PHP_BINARY))->run(
+            'grindflow:s4:test-command',
+            ['RUNNER_TEST_SECRET' => $secret],
+            [$secret],
+        );
 
-        self::assertSame([
-            'ok' => true,
-            'successful' => true,
-            'status' => 'ok',
-            'code' => 'ready',
-        ], $result);
-
+        self::assertSame(
+            ['ok' => true, 'successful' => true, 'status' => 'ok', 'code' => 'ready'],
+            $result,
+        );
         $argv = json_decode(
             (string) file_get_contents($root.'/argv.json'),
             true,
             16,
             JSON_THROW_ON_ERROR,
         );
-        self::assertSame([
-            $root.'/bin/console',
-            'grindflow:s4:test-runner',
-            '--env=prod',
-            '--no-interaction',
-            '--no-ansi',
-        ], $argv);
+        self::assertSame(
+            [
+                $root.'/bin/console',
+                'grindflow:s4:test-command',
+                '--env=prod',
+                '--no-interaction',
+                '--no-ansi',
+            ],
+            $argv,
+        );
+        self::assertSame($secret, file_get_contents($root.'/secret.txt'));
+        self::assertNotContains($secret, $argv, true);
     }
 
-    public function test_runner_fails_closed_on_missing_runtime_invalid_output_or_secret_echo(): void
+    public function test_valid_error_payload_remains_structured_for_the_caller(): void
     {
-        $root = $this->fakeSymfonyRoot("<?php echo 'not-json';");
-        $runner = new S4SymfonyCommandRunner($root, $root.'/missing-php');
-        self::assertSame(
-            ['ok' => false, 'code' => 'runtime_unavailable'],
-            $runner->run('grindflow:s4:test-runner'),
+        $root = $this->fakeSymfonyRoot(
+            <<<'PHP'
+<?php
+echo json_encode(['status' => 'error', 'code' => 'known_failure'], JSON_THROW_ON_ERROR), PHP_EOL;
+exit(1);
+PHP,
         );
 
-        $invalid = new S4SymfonyCommandRunner($root, PHP_BINARY);
-        self::assertSame(
-            ['ok' => false, 'code' => 'output_invalid'],
-            $invalid->run('grindflow:s4:test-runner'),
-        );
+        $result = (new S4SymfonyCommandRunner($root, PHP_BINARY))
+            ->run('grindflow:s4:test-command');
 
-        file_put_contents(
-            $root.'/bin/console',
-            "<?php fwrite(STDERR, (string) getenv('RUNNER_SECRET')); echo json_encode(['status'=>'ok','code'=>'ready']);",
-        );
-        $secret = 'runner-secret-'.Str::random(24);
         self::assertSame(
-            ['ok' => false, 'code' => 'output_invalid'],
-            $invalid->run(
-                'grindflow:s4:test-runner',
-                ['RUNNER_SECRET' => $secret],
-                [$secret],
-            ),
+            [
+                'ok' => true,
+                'successful' => false,
+                'status' => 'error',
+                'code' => 'known_failure',
+            ],
+            $result,
         );
+    }
+
+    public function test_secret_reflection_and_missing_runtime_fail_closed(): void
+    {
+        $root = $this->fakeSymfonyRoot(
+            <<<'PHP'
+<?php
+fwrite(STDERR, (string) getenv('RUNNER_TEST_SECRET'));
+echo json_encode(['status' => 'ok', 'code' => 'ready'], JSON_THROW_ON_ERROR), PHP_EOL;
+PHP,
+        );
+        $secret = 'runner-private-'.Str::random(24);
+
+        $reflected = (new S4SymfonyCommandRunner($root, PHP_BINARY))->run(
+            'grindflow:s4:test-command',
+            ['RUNNER_TEST_SECRET' => $secret],
+            [$secret],
+        );
+        self::assertSame(['ok' => false, 'code' => 'output_invalid'], $reflected);
+
+        $missing = (new S4SymfonyCommandRunner($root, $root.'/missing-php'))
+            ->run('grindflow:s4:test-command');
+        self::assertSame(['ok' => false, 'code' => 'runtime_unavailable'], $missing);
     }
 
     private function fakeSymfonyRoot(string $console): string

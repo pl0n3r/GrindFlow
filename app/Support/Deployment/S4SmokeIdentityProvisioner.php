@@ -25,10 +25,15 @@ class S4SmokeIdentityProvisioner
         's4-transaction-failed',
     ];
 
+    private readonly S4SymfonyCommandRunner $runner;
+
     public function __construct(
-        private readonly ?string $symfonyRoot = null,
-        private readonly ?string $phpBinary = null,
-    ) {}
+        ?string $symfonyRoot = null,
+        ?string $phpBinary = null,
+        ?S4SymfonyCommandRunner $runner = null,
+    ) {
+        $this->runner = $runner ?? new S4SymfonyCommandRunner($symfonyRoot, $phpBinary);
+    }
 
     /** @return array{ok:bool,code:string} */
     public function reconcile(string $password): array
@@ -41,18 +46,21 @@ class S4SmokeIdentityProvisioner
             return ['ok' => false, 'code' => 's4-password-invalid'];
         }
 
-        $result = (new S4SymfonyCommandRunner($this->symfonyRoot, $this->phpBinary))->run(
+        $result = $this->runner->run(
             'grindflow:s4:provision-smoke-identity',
             ['GRINDFLOW_S4_SMOKE_PASSWORD' => $password],
             [$password],
         );
 
         if ($result['ok'] !== true) {
-            return ['ok' => false, 'code' => match ($result['code']) {
-                'runtime_unavailable' => 's4-runtime-unavailable',
-                'process_failed' => 's4-process-failed',
-                default => 's4-output-invalid',
-            }];
+            return [
+                'ok' => false,
+                'code' => match ($result['code']) {
+                    'runtime_unavailable' => 's4-runtime-unavailable',
+                    'process_failed' => 's4-process-failed',
+                    default => 's4-output-invalid',
+                },
+            ];
         }
 
         $code = $result['code'];
