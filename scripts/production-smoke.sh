@@ -269,6 +269,39 @@ with open(sys.argv[3], "w", encoding="utf-8") as handle:
 PY
 }
 
+safe_s4_bridge_header_state() {
+  python3 - "$s4_bridge_headers" <<'PY'
+import sys
+
+allowed = {
+    "runtime_unavailable",
+    "config_missing",
+    "schema_missing",
+    "identity_unavailable",
+    "ready_for_web_probe",
+}
+values = []
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="strict") as handle:
+        for raw in handle:
+            line = raw.rstrip("\r\n")
+            if ":" not in line:
+                continue
+            name, value = line.split(":", 1)
+            if name.strip().lower() != "x-grindflow-s4-state":
+                continue
+            values.append(value.strip())
+except (OSError, UnicodeError):
+    print("unknown")
+    raise SystemExit(0)
+
+if len(values) == 1 and values[0] in allowed:
+    print(values[0])
+else:
+    print("unknown")
+PY
+}
+
 extract_s4_bridge_state() {
   python3 - "$s4_bridge_body" <<'PY'
 import json
@@ -584,20 +617,28 @@ PY
 # Symfony always uses its own cookie jar and CSRF lifecycle; the Laravel session
 # is never copied or reinterpreted as S4 authority.
 check_s4_media_web_runtime_readiness() {
-  local bridge_status bridge_state login_status login_redirect organizations_status
+  local bridge_status bridge_state bridge_header_state login_status login_redirect organizations_status
   local select_status select_redirect
 
   bridge_status="$(curl_common --output "$s4_bridge_body" --dump-header "$s4_bridge_headers" --write-out '%{http_code}' "$BASE_URL/s4/_bridge-readiness" || true)"
-  if [[ -z "$bridge_status" || "$bridge_status" == "000" ]]; then
-    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
-    printf 'MEDIA_WEB_RUNTIME_READY=0\n'
-    return 0
+  if [[ ! "$bridge_status" =~ ^[0-9]{3}$ ]]; then
+    bridge_status="000"
   fi
+  bridge_header_state="$(safe_s4_bridge_header_state)"
+  printf 'S4_BRIDGE_HTTP_STATUS=%s\n' "$bridge_status"
+  printf 'S4_BRIDGE_HEADER_STATE=%s\n' "$bridge_header_state"
+
   if ! bridge_state="$(extract_s4_bridge_state)"; then
-    printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
+    printf 'S4_BRIDGE_BODY_CONTRACT=invalid\n'
+    if [[ "$bridge_status" == "000" ]]; then
+      printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
+    else
+      printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
+    fi
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
   fi
+  printf 'S4_BRIDGE_BODY_CONTRACT=valid\n'
   printf 'S4_BRIDGE_STATE=%s\n' "$bridge_state"
   if [[ "$bridge_status" != "200" || "$bridge_state" != "ready_for_web_probe" ]]; then
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
