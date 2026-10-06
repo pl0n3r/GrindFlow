@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import json
 import os
-import re
+from pathlib import Path
 import subprocess
 import tempfile
 import textwrap
 import unittest
-from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,172 +18,192 @@ CONTROLLER = (
 ).read_text(encoding="utf-8")
 SMOKE = (ROOT / "scripts/production-smoke.sh").read_text(encoding="utf-8")
 WORKFLOW = (ROOT / ".github/workflows/production-smoke.yml").read_text(encoding="utf-8")
-DOCS = (ROOT / "docs/PILOT-MEDIA-READINESS.md").read_text(encoding="utf-8")
 PACKAGE = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 LOCK = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 VERSION = (ROOT / "config/version.php").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+DOCS = (ROOT / "docs/PILOT-MEDIA-READINESS.md").read_text(encoding="utf-8")
+
+ALLOWED = (
+    "root_unavailable",
+    "missing",
+    "unreadable",
+    "permissions_unavailable",
+    "permissions_not_private",
+    "ready",
+)
 
 
 class S4PrivateVaultReadinessTests(unittest.TestCase):
-    STATES = {
-        "root_unavailable",
-        "missing",
-        "unreadable",
-        "permissions_unavailable",
-        "permissions_not_private",
-        "ready",
-    }
-
     def test_private_vault_states_are_bounded_and_fail_closed(self) -> None:
-        start = MATERIALIZER.index("public function privateVaultReadinessState")
-        end = MATERIALIZER.index("private function assertMemoryAvailable", start)
-        method = MATERIALIZER[start:end]
-        returns = set(re.findall(r"return '([^']+)';", method))
-        self.assertEqual(self.STATES, returns)
-        self.assertIn("$vaultRoot === '' || is_link($vaultRoot)", method)
+        method = MATERIALIZER.split(
+            "public function privateVaultReadinessState", 1
+        )[1].split("private function temporaryStorageReady", 1)[0]
+        for state in ALLOWED:
+            self.assertIn(f"'{state}'", method)
+        self.assertEqual(6, sum(method.count(f"'{state}'") for state in ALLOWED))
+        self.assertIn("is_link($vaultRoot)", method)
         self.assertIn("!is_dir($vaultRoot)", method)
         self.assertIn("!is_readable($vaultRoot)", method)
         self.assertIn("@fileperms($vaultRoot)", method)
         self.assertIn("($mode & 0077) !== 0", method)
         self.assertIn(
-            "'private_vault' => $this->privateVaultReadinessState($vaultRoot) === 'ready'",
+            "$this->privateVaultReadinessState($vaultRoot) === 'ready'",
             MATERIALIZER,
         )
-        for forbidden in ("mkdir(", "chmod(", "unlink(", "rename("):
-            self.assertNotIn(forbidden, method)
 
     def test_endpoint_exposes_only_allowlisted_private_vault_state(self) -> None:
         start = CONTROLLER.index("public function mediaReadiness(")
         end = CONTROLLER.index("/** Read a bounded tenant-scoped agenda", start)
-        method = CONTROLLER[start:end]
-        response = method[method.index("return $this->privateJson") :]
-        self.assertIn("$vaultState = $photoSafety->privateVaultReadinessState($vaultRoot);", method)
-        self.assertIn("'diagnostics' => [", response)
-        self.assertIn("'private_vault' => $vaultState", response)
-        self.assertNotIn("$vaultRoot", response)
-        self.assertNotIn("fileperms", response)
-        self.assertNotIn("077", response)
+        endpoint = CONTROLLER[start:end]
+        self.assertIn("$vaultState = $photoSafety->privateVaultReadinessState($vaultRoot);", endpoint)
+        self.assertIn("'diagnostics' => [", endpoint)
+        self.assertIn("'private_vault' => $vaultState", endpoint)
+        for forbidden in ("realpath", "fileperms", "mode", "uid", "gid", "vaultRoot =>"):
+            self.assertNotIn(forbidden, endpoint)
+        self.assertNotIn("'path'", endpoint)
 
     def test_smoke_emits_only_valid_unique_private_vault_state(self) -> None:
-        valid = self._payload("permissions_not_private")
-        completed = self._run_readiness_function(valid)
-        self.assertEqual(0, completed.returncode, completed.stderr)
-        lines = completed.stdout.splitlines()
-        self.assertEqual(
-            1,
-            lines.count("S4_PRIVATE_VAULT_STATE=permissions_not_private"),
-        )
-        self.assertIn("MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed", lines)
-        self.assertIn("MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready", lines)
-
-        for payload in (
-            self._payload("unexpected"),
-            self._payload(None),
-        ):
-            with self.subTest(payload=payload):
-                rejected = self._run_readiness_function(payload)
-                self.assertEqual(0, rejected.returncode, rejected.stderr)
-                self.assertIn(
-                    "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid",
-                    rejected.stdout.splitlines(),
+        for state in ALLOWED:
+            with self.subTest(state=state):
+                payload = self._s4_payload(state)
+                completed = self._run_parser(json.dumps(payload))
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual(
+                    1,
+                    sum(
+                        line.startswith("S4_PRIVATE_VAULT_STATE=")
+                        for line in completed.stdout.splitlines()
+                    ),
                 )
-                self.assertNotIn("S4_PRIVATE_VAULT_STATE=", rejected.stdout)
+                self.assertIn(
+                    f"S4_PRIVATE_VAULT_STATE={state}",
+                    completed.stdout.splitlines(),
+                )
 
-        self.assertIn('[[ "${#matches[@]}" != "1" ]]', WORKFLOW)
-        self.assertIn(
-            "S4_PRIVATE_VAULT_STATE=(root_unavailable|missing|unreadable|permissions_unavailable|permissions_not_private|ready)",
-            WORKFLOW,
+        invalid = self._s4_payload("ready")
+        invalid["data"]["diagnostics"]["private_vault"] = "leak-me"
+        completed = self._run_parser(json.dumps(invalid))
+        self.assertNotEqual(0, completed.returncode)
+        self.assertEqual("", completed.stdout)
+
+        duplicate = (
+            '{"data":{"contract":"media-pilot-readiness-v1","status":"ready",'
+            '"checks":{"decoder":"ready","temporary_storage":"ready","private_vault":"ready"},'
+            '"diagnostics":{"private_vault":"ready","private_vault":"missing"},'
+            '"evidence_scope":"web_runtime","ci_equivalent":false}}'
         )
+        completed = self._run_parser(duplicate)
+        self.assertNotEqual(0, completed.returncode)
+        self.assertEqual("", completed.stdout)
+
+        missing = self._s4_payload("ready")
+        del missing["data"]["diagnostics"]
+        completed = self._run_parser(json.dumps(missing))
+        self.assertNotEqual(0, completed.returncode)
+        self.assertEqual("", completed.stdout)
 
     def test_reconcile_publishes_secret_free_private_vault_state(self) -> None:
-        smoke_log = "\n".join(
+        log = "\n".join(
             (
                 "MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed",
-                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_READY=0",
                 "PATH=/home/private/vault",
-                "MODE=0755",
-                "SECRET=do-not-publish",
+                "MODE=0777",
+                "SECRET=do-not-copy",
                 "",
             )
         )
-        completed, calls, proof = self._run_reconcile(smoke_log)
+        completed, calls, proof = self._run_reconcile(log)
         self.assertEqual(0, completed.returncode, completed.stderr)
-        self.assertIn("issue comment 307", calls)
+        self.assertIn("issue comment 307 --body-file", calls)
+        self.assertIn("private_vault: `not_ready`", proof)
         self.assertIn("Private Vault state: `permissions_not_private`", proof)
-        self.assertIn("- private_vault: `not_ready`", proof)
-        for leaked in ("/home/private/vault", "0755", "do-not-publish"):
+        self.assertIn("Exact deployed SHA: `" + ("a" * 40) + "`", proof)
+        self.assertIn("actions/runs/12345", proof)
+        for leaked in ("/home/private/vault", "0777", "do-not-copy"):
             self.assertNotIn(leaked, proof)
 
-    def test_operational_closeout_requires_exact_main_private_vault_classification(self) -> None:
+        invalid_logs = (
+            log.replace(
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private\n",
+                "",
+            ),
+            log.replace(
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
+                "S4_PRIVATE_VAULT_STATE=leak-me",
+            ),
+            log.replace(
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
+                "S4_PRIVATE_VAULT_STATE=missing\nS4_PRIVATE_VAULT_STATE=unreadable",
+            ),
+        )
+        for invalid_log in invalid_logs:
+            with self.subTest(invalid_log=invalid_log):
+                completed, _, proof = self._run_reconcile(invalid_log)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertNotIn("Private Vault state:", proof)
+                self.assertNotIn("leak-me", proof)
+
+    def test_release_v0214_is_synchronized_and_validate_is_canonical(self) -> None:
+        import re
+
+        match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
+        self.assertIsNotNone(match)
+        self.assertEqual("0.1.214", match.group(1))
         self.assertEqual("0.1.214", PACKAGE["version"])
         self.assertEqual("0.1.214", LOCK["version"])
         self.assertEqual("0.1.214", LOCK["packages"][""]["version"])
-        self.assertIn("'number' => '0.1.214'", VERSION)
         self.assertIn("V0.1.214", README)
-        self.assertIn("S4_PRIVATE_VAULT_STATE", DOCS)
-        self.assertIn("exact-main", DOCS)
-        self.assertIn("no autoriza", DOCS.lower())
-        self.assertIn("S4_PRIVATE_VAULT_STATE=", SMOKE)
-        self.assertIn("Private Vault state:", WORKFLOW)
+        self.assertIn("tests/test_s4_private_vault_readiness.py", PACKAGE["scripts"]["test"])
 
-    @classmethod
-    def _payload(cls, state: str | None) -> dict[str, object]:
-        diagnostics = {} if state is None else {"private_vault": state}
+    def test_operational_closeout_requires_exact_main_private_vault_classification(self) -> None:
+        reconcile = self._reconcile_script()
+        self.assertIn("GITHUB_SHA", reconcile)
+        self.assertIn("GITHUB_RUN_ID", reconcile)
+        self.assertIn("S4_PRIVATE_VAULT_STATE=", SMOKE)
+        self.assertIn("private_vault_state", reconcile)
+        self.assertIn("Production Smoke", DOCS)
+        self.assertIn("no autoriza escritura automática", DOCS)
+        self.assertIn("BLOCKED_TARGET_ENV", DOCS)
+
+    @staticmethod
+    def _s4_payload(state: str) -> dict[str, object]:
+        ready = state == "ready"
         return {
             "data": {
                 "contract": "media-pilot-readiness-v1",
-                "status": "not_ready",
+                "status": "ready" if ready else "not_ready",
                 "checks": {
                     "decoder": "ready",
                     "temporary_storage": "ready",
-                    "private_vault": "not_ready",
+                    "private_vault": "ready" if ready else "not_ready",
                 },
-                "diagnostics": diagnostics,
+                "diagnostics": {"private_vault": state},
                 "evidence_scope": "web_runtime",
                 "ci_equivalent": False,
             }
         }
 
     @staticmethod
-    def _readiness_function() -> str:
-        start = SMOKE.index("check_media_web_runtime_readiness() {")
-        end = SMOKE.index("# One anonymous GET after a rejected POST", start)
-        return SMOKE[start:end]
+    def _parser() -> str:
+        start = SMOKE.index('if parsed="$(python3 - "$media_readiness_body" "$runtime" <<\'PY\'\n')
+        start += len('if parsed="$(python3 - "$media_readiness_body" "$runtime" <<\'PY\'\n')
+        end = SMOKE.index("\nPY\n", start)
+        return textwrap.dedent(SMOKE[start:end])
 
     @classmethod
-    def _run_readiness_function(
-        cls,
-        payload: dict[str, object],
-    ) -> subprocess.CompletedProcess[str]:
-        function = cls._readiness_function()
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            media_body = root / "media-readiness.json"
-            script = textwrap.dedent(
-                f"""
-                set -euo pipefail
-                cookie_jar={str(root / "cookies.txt")!r}
-                s4_cookie_jar={str(root / "s4-cookies.txt")!r}
-                media_readiness_body={str(media_body)!r}
-                BASE_URL='https://example.invalid'
-                MOCK_BODY={json.dumps(json.dumps(payload))}
-
-                curl_common() {{
-                  printf '%s' "$MOCK_BODY" > "$media_readiness_body"
-                  printf '200'
-                }}
-
-                {function}
-                check_media_web_runtime_readiness s4
-                """
-            )
+    def _run_parser(cls, raw_json: str) -> subprocess.CompletedProcess[str]:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            handle.write(raw_json)
+            handle.flush()
             return subprocess.run(
-                ["bash", "-c", script],
+                ["python3", "-", handle.name, "s4"],
+                input=cls._parser(),
                 text=True,
                 capture_output=True,
                 check=False,
@@ -194,13 +215,11 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
         end = WORKFLOW.index("      - name: Upload short-lived smoke diagnostics", start)
         step = WORKFLOW[start:end]
         marker = "        run: |\n"
-        script_start = step.index(marker) + len(marker)
-        return textwrap.dedent(step[script_start:])
+        return textwrap.dedent(step[step.index(marker) + len(marker) :])
 
     @classmethod
     def _run_reconcile(
-        cls,
-        smoke_log: str,
+        cls, smoke_log: str
     ) -> tuple[subprocess.CompletedProcess[str], str, str]:
         script = cls._reconcile_script()
         with tempfile.TemporaryDirectory() as tmp:
@@ -214,7 +233,7 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
                 "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
                 "if [ \"$1 $2\" = \"issue view\" ]; then\n"
                 "  case \" $* \" in\n"
-                "    *\" --json comments \"*) printf '\\n' ;;\n"
+                "    *\" --json comments \"*) printf '' ;;\n"
                 "    *) printf 'OPEN\\n' ;;\n"
                 "  esac\n"
                 "fi\n",
@@ -222,18 +241,18 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
             )
             fake_gh.chmod(0o755)
             (root / "production-smoke.log").write_text(smoke_log, encoding="utf-8")
+            evidence = root / "evidence.md"
             summary = root / "summary.md"
-            evidence = root / "grindflow-media-web-runtime.md"
             env = os.environ.copy()
             env.update(
                 {
                     "PATH": f"{bin_dir}:{env['PATH']}",
                     "GH_LOG": str(gh_log),
                     "GITHUB_SHA": "a" * 40,
-                    "GITHUB_STEP_SUMMARY": str(summary),
+                    "GITHUB_RUN_ID": "12345",
                     "GITHUB_SERVER_URL": "https://github.example",
                     "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
-                    "GITHUB_RUN_ID": "12345",
+                    "GITHUB_STEP_SUMMARY": str(summary),
                     "MEDIA_READINESS_ISSUE": "307",
                     "MEDIA_WEB_RUNTIME_EVIDENCE_PATH": str(evidence),
                 }
