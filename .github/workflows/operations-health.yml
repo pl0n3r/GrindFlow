@@ -1,0 +1,183 @@
+name: GrindFlow Operations Health
+run-name: "Operations Health #${{ github.run_number }} · ${{ github.ref_name }}"
+
+on:
+  schedule:
+    - cron: '35 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-operations-health
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: observe-read-only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      report: ${{ steps.evaluate.outputs.report }}
+    steps:
+      - name: Validate event and exact main before checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            schedule|workflow_dispatch) ;;
+            *) echo "::error::Unsupported event"; exit 1 ;;
+          esac
+          [[ "$EVENT_REF" == "refs/heads/main" ]] || {
+            echo "::error::Operations Health only runs from main"
+            exit 1
+          }
+          current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha')"
+          [[ "$current_main" == "$EVENT_SHA" ]] || {
+            echo "::error::Stale or non-main workflow execution"
+            exit 1
+          }
+
+      - name: Checkout exact main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Collect allowlisted workflow metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha')"
+          printf '%s\n' "$main_sha" > /tmp/grindflow-operations-main-sha
+          : > /tmp/grindflow-operations-signals.jsonl
+
+          collect_signal() {
+            source="$1"
+            workflow="$2"
+            if payload="$(gh api "repos/$REPOSITORY/actions/workflows/$workflow/runs?branch=main&per_page=1")"; then
+              jq -c --arg source "$source" '
+                if (.workflow_runs | length) == 0 then
+                  {
+                    source: $source,
+                    status: "missing",
+                    conclusion: null,
+                    head_sha: null,
+                    run_id: null,
+                    url: null,
+                    updated_at: null
+                  }
+                else
+                  .workflow_runs[0] | {
+                    source: $source,
+                    status: .status,
+                    conclusion: .conclusion,
+                    head_sha: .head_sha,
+                    run_id: .id,
+                    url: .html_url,
+                    updated_at: .updated_at
+                  }
+                end
+              ' <<<"$payload" >> /tmp/grindflow-operations-signals.jsonl
+            else
+              jq -nc --arg source "$source" '{
+                source: $source,
+                status: "missing",
+                conclusion: null,
+                head_sha: null,
+                run_id: null,
+                url: null,
+                updated_at: null
+              }' >> /tmp/grindflow-operations-signals.jsonl
+            fi
+          }
+
+          collect_signal ci_health ci-health.yml
+          collect_signal deploy_observer production-deploy-observer.yml
+          collect_signal production_smoke production-smoke.yml
+
+          jq -s '{version: 1, signals: .}' /tmp/grindflow-operations-signals.jsonl > /tmp/grindflow-operations-signals.json
+
+      - id: evaluate
+        name: Evaluate operational health
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(cat /tmp/grindflow-operations-main-sha)"
+          python3 scripts/operations-health.py evaluate             --input /tmp/grindflow-operations-signals.json             --main-sha "$main_sha"             --output /tmp/grindflow-operations-health.json
+          report="$(jq -c . /tmp/grindflow-operations-health.json)"
+          printf 'report=%s\n' "$report" >> "$GITHUB_OUTPUT"
+          {
+            echo '## GrindFlow Operations Health'
+            echo
+            printf -- '- State: **%s**\n' "$(jq -r '.state' /tmp/grindflow-operations-health.json)"
+            printf -- '- Main SHA: `%s`\n' "$(jq -r '.main_sha' /tmp/grindflow-operations-health.json)"
+            printf -- '- Fingerprint: `%s`\n' "$(jq -r '.fingerprint' /tmp/grindflow-operations-health.json)"
+            echo '- Evidence: allowlisted GitHub Actions metadata only.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  reconcile-alert:
+    name: reconcile-single-alert
+    needs: observe
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ALERT_TITLE: "[AUTO] GrindFlow Operations Health"
+      REPORT_JSON: ${{ needs.observe.outputs.report }}
+    steps:
+      - name: Reconcile one sanitized automatic Issue
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_file="$RUNNER_TEMP/grindflow-operations-health.json"
+          body_file="$RUNNER_TEMP/grindflow-operations-health.md"
+          printf '%s' "$REPORT_JSON" > "$report_file"
+          jq -e '.state == "HEALTHY" or .state == "DEGRADED" or .state == "UNKNOWN"' "$report_file" >/dev/null
+          jq -r '.alert.body' "$report_file" > "$body_file"
+
+          all_issues="$(gh issue list             --state all             --search "$ALERT_TITLE in:title"             --limit 100             --json number,state,title)"
+          matches="$(jq -c --arg title "$ALERT_TITLE"             '[.[] | select(.title == $title)]' <<<"$all_issues")"
+          count="$(jq 'length' <<<"$matches")"
+          (( count <= 1 )) || {
+            echo "::error::More than one canonical Operations Health Issue exists."
+            exit 1
+          }
+
+          issue_number="$(jq -r '.[0].number // empty' <<<"$matches")"
+          issue_state="$(jq -r '.[0].state // empty' <<<"$matches")"
+          state="$(jq -r '.state' "$report_file")"
+
+          if [[ "$state" == "HEALTHY" ]]; then
+            if [[ -n "$issue_number" && "$issue_state" == "OPEN" ]]; then
+              gh issue edit "$issue_number" --body-file "$body_file"
+              gh issue close "$issue_number" --reason completed
+            fi
+            cat "$body_file" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ -z "$issue_number" ]]; then
+            gh issue create               --title "$ALERT_TITLE"               --body-file "$body_file"               --label "tipo: calidad"               --label "prioridad: alta"               --label "estado: disponible"               --label "rol: sre"
+          else
+            if [[ "$issue_state" == "CLOSED" ]]; then
+              gh issue reopen "$issue_number"
+            fi
+            gh issue edit "$issue_number" --body-file "$body_file"
+          fi
+
+          cat "$body_file" >> "$GITHUB_STEP_SUMMARY"
