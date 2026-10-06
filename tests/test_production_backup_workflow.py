@@ -240,6 +240,49 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             script.index('artisan up --no-interaction', script.index('recovery_committed=1')),
         )
 
+    def test_recovery_rejects_standard_worker_before_snapshot(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
+
+        start = remote.index("assert_recovery_quiescence() {")
+        end = remote.index("\n}\n\nroot=", start) + len("\n}")
+        guard = remote[start:end]
+
+        self.assertLess(
+            remote.index("assert_recovery_quiescence || exit 28"),
+            remote.index('"$dump_bin" \\\\'),
+        )
+        self.assertLess(
+            remote.index("assert_recovery_quiescence || exit 28"),
+            remote.index("grindflow:vault:stage"),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            fake_pgrep = fake_bin / "pgrep"
+            fake_pgrep.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' '123 php artisan queue:work redis'\nexit 0\n",
+                encoding="utf-8",
+            )
+            fake_pgrep.chmod(0o755)
+            completed = subprocess.run(
+                ["/bin/bash", "-c", guard + "\nassert_recovery_quiescence"],
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn(
+            "write-capable artisan process remains active during recovery write freeze",
+            completed.stderr,
+        )
+
     def test_receipt_uses_canonical_verified_backup_command_without_leaving_host(self):
         script = SCRIPT.read_text(encoding="utf-8")
 
