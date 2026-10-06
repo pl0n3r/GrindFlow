@@ -83,6 +83,7 @@ def run_s4_fixture(stage: str) -> str:
         )
 
         paths = {
+            "cookie_jar": root / "laravel-cookie.txt",
             "s4_bridge_body": root / "bridge.json",
             "s4_bridge_headers": root / "bridge.headers",
             "s4_cookie_jar": root / "s4-cookie.txt",
