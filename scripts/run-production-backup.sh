@@ -78,11 +78,26 @@ fi
 "${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$RECOVERY_WRITES_STOPPED_CONFIRMED" "$EXPECTED_SHA" "$remote_key_file" "/opt/alt/php85/usr/bin/php" <<'REMOTE'
 set -euo pipefail
 
-assert_recovery_quiescence() {
-  if pgrep -af '[p]hp .*artisan ((queue:(work|listen))|(schedule:(work|run)))( |$)' >/dev/null 2>&1; then
-    echo "write-capable artisan process remains active during recovery write freeze" >&2
-    return 1
-  fi
+wait_for_recovery_quiescence() {
+  local max_attempts="$1"
+  local delay_seconds="$2"
+  local attempt
+
+  [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] || return 2
+  [[ "$delay_seconds" =~ ^[0-9]+$ ]] || return 2
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    if ! pgrep -af '[p]hp .*artisan ((queue:(work|listen))|(schedule:(work|run)))( |$)' >/dev/null 2>&1; then
+      return 0
+    fi
+    if (( attempt == max_attempts )); then
+      echo "write-capable artisan process did not quiesce before recovery snapshot" >&2
+      return 1
+    fi
+    sleep "$delay_seconds"
+  done
+
+  return 1
 }
 
 root="$1"
@@ -216,7 +231,7 @@ if [[ "$recovery_enabled" == "true" ]]; then
     echo "production pre-rendered maintenance is unavailable" >&2
     exit 28
   }
-  assert_recovery_quiescence || exit 28
+  wait_for_recovery_quiescence 12 5 || exit 28
 fi
 
 "$php_bin" -r '
