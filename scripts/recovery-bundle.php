@@ -100,7 +100,7 @@ function buildMetadata(array $args): array
         fail('invalid_release_sha');
     }
     $parsed = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $timestamp, new DateTimeZone('UTC'));
-    if (!$parsed || $parsed->format('Y-m-d\TH:i:s\Z') !== $timestamp) {
+    if (! $parsed || $parsed->format('Y-m-d\TH:i:s\Z') !== $timestamp) {
         fail('invalid_timestamp');
     }
     foreach ([$organizations, $assets] as $count) {
