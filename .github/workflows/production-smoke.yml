@@ -422,7 +422,7 @@ jobs:
               || [[ "$private_vault_state" == "not_ready" && "$s4_private_vault_state" != "ready" ]]; }; then
             diagnostics_available=true
           elif [[ "$diagnostic_state" == "observed" ]]; then
-            diagnostic_state='markers_absent'
+            diagnostic_state='contract_invalid'
           fi
 
           if [[ "$ready_count" == "1" && "$blocked_count" == "0" \
