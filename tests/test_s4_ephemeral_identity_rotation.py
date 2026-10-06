@@ -110,14 +110,18 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
             PACKAGE["scripts"]["test"],
         )
 
-    def test_release_v0210_is_synchronized_and_suite_is_canonical(self) -> None:
+    def test_release_identity_is_synchronized_and_suite_is_canonical(self) -> None:
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.210", match.group(1))
-        self.assertEqual("0.1.210", PACKAGE["version"])
-        self.assertEqual("0.1.210", LOCK["version"])
-        self.assertEqual("0.1.210", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.210", README)
+        release = match.group(1)
+        self.assertGreaterEqual(
+            tuple(int(part) for part in release.split(".")),
+            (0, 1, 210),
+        )
+        self.assertEqual(release, PACKAGE["version"])
+        self.assertEqual(release, LOCK["version"])
+        self.assertEqual(release, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{release}", README)
 
     def test_operational_closeout_requires_exact_main_past_login_redirect(self) -> None:
         self.assertIn("/internal/production-smoke/bootstrap", WORKFLOW)

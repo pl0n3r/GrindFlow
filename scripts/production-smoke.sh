@@ -545,6 +545,18 @@ check_workspace_modules() {
   printf 'MODULE_READ_ONLY=%s:ok\n' "traffic-csv"
 }
 
+# Reduce the authenticated S4 readiness HTTP status to a fixed, secret-free class.
+safe_s4_media_readiness_http_class() {
+  case "${1:-}" in
+    3??) printf 'redirect\n' ;;
+    401) printf 'unauthorized\n' ;;
+    403) printf 'forbidden\n' ;;
+    404) printf 'not_found\n' ;;
+    5??) printf 'server_error\n' ;;
+    *) printf 'other_non_200\n' ;;
+  esac
+}
+
 # Observe only allowlisted media readiness from the authenticated web runtime.
 # The remote JSON body is never printed or copied into GitHub evidence.
 check_media_web_runtime_readiness() {
@@ -569,6 +581,9 @@ check_media_web_runtime_readiness() {
     return 0
   fi
   if [[ "$status" != "200" ]]; then
+    if [[ "$runtime" == "s4" ]]; then
+      printf 'S4_MEDIA_READINESS_HTTP_CLASS=%s\n' "$(safe_s4_media_readiness_http_class "$status")"
+    fi
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
