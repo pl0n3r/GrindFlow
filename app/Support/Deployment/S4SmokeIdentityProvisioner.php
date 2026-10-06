@@ -45,11 +45,10 @@ class S4SmokeIdentityProvisioner
 
         $root = $this->symfonyRoot ?? base_path('symfony');
         $console = $root.'/bin/console';
-        $php = $this->phpBinary ?? (
-            PHP_SAPI === 'cli'
-                ? PHP_BINARY
-                : '/opt/alt/php85/usr/bin/php'
-        );
+        $php = $this->phpBinary ?? trim((string) config(
+            'grindflow.s4_smoke.php_cli_binary',
+            '',
+        ));
 
         if (
             $php === ''
