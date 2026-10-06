@@ -222,7 +222,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
         self.assertIn('artisan up --no-interaction', script)
         self.assertIn("storage/framework/maintenance.php", script)
-        self.assertIn("assert_recovery_quiescence", script)
+        self.assertIn("wait_for_recovery_quiescence", script)
         self.assertIn(
             "write-capable artisan process did not quiesce before recovery snapshot",
             script,
@@ -251,7 +251,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         call = "wait_for_recovery_quiescence 12 5 || exit 28"
         self.assertLess(
             remote.index(call),
-            remote.index('"$dump_bin"'),
+            remote.index('\n"$dump_bin" \\\n'),
         )
         self.assertLess(
             remote.index(call),
@@ -280,7 +280,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
 
         self.assertNotEqual(0, completed.returncode)
         self.assertIn(
-            "write-capable artisan process remains active during recovery write freeze",
+            "write-capable artisan process did not quiesce before recovery snapshot",
             completed.stderr,
         )
 
