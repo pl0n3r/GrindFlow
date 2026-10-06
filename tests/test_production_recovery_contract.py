@@ -250,49 +250,54 @@ class ProductionRecoveryContractTests(unittest.TestCase):
 
     def test_recovery_rejects_standard_worker_before_snapshot(self) -> None:
         backup = BACKUP.read_text(encoding="utf-8")
-        start = backup.index("assert_recovery_quiescence() {")
+        start = backup.index("wait_for_recovery_quiescence() {")
         end = backup.index("\n}\n", start) + len("\n}\n")
         guard = backup[start:end]
 
         down = '"$php_bin" artisan down --render=errors::503 --retry=60 --no-interaction'
-        call = "assert_recovery_quiescence || exit 28"
+        call = "wait_for_recovery_quiescence 12 5 || exit 28"
         dump = '"$dump_bin" \\\n'
         stage = '"$php_bin" symfony/bin/console grindflow:vault:stage'
         self.assertLess(backup.index(down), backup.index(call))
         self.assertLess(backup.index(call), backup.index(dump))
         self.assertLess(backup.index(call), backup.index(stage))
 
-        active_worker = (
+        drains = (
             "set -euo pipefail\n"
-            "pgrep() { printf '%s\\n' '123 php artisan queue:work'; return 0; }\n"
+            "attempts=0\n"
+            "pgrep() { attempts=$((attempts + 1)); "
+            "if (( attempts < 3 )); then return 0; fi; return 1; }\n"
+            "sleep() { :; }\n"
             + guard
-            + "\nif assert_recovery_quiescence; then exit 9; fi\n"
+            + "\nwait_for_recovery_quiescence 4 0\n"
+            + '[[ "$attempts" == "3" ]]\n'
         )
         completed = subprocess.run(
-            ["bash", "-c", active_worker],
+            ["bash", "-c", drains],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+        never_drains = (
+            "set -euo pipefail\n"
+            "pgrep() { return 0; }\n"
+            "sleep() { :; }\n"
+            + guard
+            + "\nif wait_for_recovery_quiescence 2 0; then exit 9; fi\n"
+        )
+        completed = subprocess.run(
+            ["bash", "-c", never_drains],
             text=True,
             capture_output=True,
             check=False,
         )
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn(
-            "write-capable artisan process remains active during recovery write freeze",
+            "write-capable artisan process did not quiesce before recovery snapshot",
             completed.stderr,
         )
-
-        idle = (
-            "set -euo pipefail\n"
-            "pgrep() { return 1; }\n"
-            + guard
-            + "\nassert_recovery_quiescence\n"
-        )
-        completed = subprocess.run(
-            ["bash", "-c", idle],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(0, completed.returncode, completed.stderr)
 
     def test_recovery_runbook_preserves_authority_and_safe_evidence(self) -> None:
         text = RUNBOOK.read_text(encoding="utf-8") if RUNBOOK.exists() else ""
