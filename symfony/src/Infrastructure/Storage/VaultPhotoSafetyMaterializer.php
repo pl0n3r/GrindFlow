@@ -174,6 +174,9 @@ final class VaultPhotoSafetyMaterializer
         if (!is_int($mode)) {
             return 'permissions_unavailable';
         }
+        if (($mode & 0100) === 0) {
+            return 'unreadable';
+        }
         if (($mode & 0077) !== 0) {
             return 'permissions_not_private';
         }
