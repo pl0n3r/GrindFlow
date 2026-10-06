@@ -46,7 +46,7 @@ final class PrivateVaultDirectoryTest extends TestCase
         }
     }
 
-    public function testTightenPrivatePermissionsOnlyNarrowsExistingExternalRoot(): void
+    public function testTightenPrivatePermissionsNarrowsExistingDefaultAndExternalRoots(): void
     {
         $base = sys_get_temp_dir().'/gf-vault-permissions-'.bin2hex(random_bytes(6));
         $project = $base.'/checkout/symfony';
