@@ -100,7 +100,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
             )
             self.assertEqual(2, result.returncode)
             self.assertEqual(b"", result.stdout)
-            self.assertEqual(b"cannot encode fingerprint payload\\n", result.stderr)
+            self.assertEqual(b"cannot encode fingerprint payload\n", result.stderr)
             self.assertNotIn(tmp.encode(), result.stderr)
 
     def test_runbook_preserves_lock_backup_receipt_and_recheck_order(self) -> None:
