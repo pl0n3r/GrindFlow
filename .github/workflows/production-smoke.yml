@@ -335,6 +335,16 @@ jobs:
             printf '%s\n' "${matches[0]#*=}"
           }
 
+          s4_post_bridge_contract_stage_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_POST_BRIDGE_CONTRACT_STAGE=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_POST_BRIDGE_CONTRACT_STAGE=(login_redirect|organization_select_redirect|media_readiness_contract)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           diagnostic_reason() {
             local matches=()
             mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=' production-smoke.log || true)
@@ -358,12 +368,14 @@ jobs:
           s4_bridge_http_status=''
           s4_bridge_header_state=''
           s4_bridge_body_contract=''
+          s4_post_bridge_contract_stage=''
 
           s4_bridge_state="$(s4_bridge_state_marker || true)"
           s4_auth_state="$(s4_auth_state_marker || true)"
           s4_bridge_http_status="$(s4_bridge_http_status_marker || true)"
           s4_bridge_header_state="$(s4_bridge_header_state_marker || true)"
           s4_bridge_body_contract="$(s4_bridge_body_contract_marker || true)"
+          s4_post_bridge_contract_stage="$(s4_post_bridge_contract_stage_marker || true)"
 
           if [[ "$diagnostic_state" == "observed" ]] \
             && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
@@ -441,6 +453,11 @@ jobs:
                     printf 'S4 bridge body contract: `%s`\n' "$s4_bridge_body_contract"
                   else
                     echo 'S4 bridge safe classification: `unavailable`'
+                  fi
+                  if [[ -n "$s4_post_bridge_contract_stage" ]]; then
+                    printf 'S4 post-bridge contract stage: `%s`\n' "$s4_post_bridge_contract_stage"
+                  else
+                    echo 'S4 post-bridge contract stage: `unavailable`'
                   fi
                 fi
                 if [[ "$diagnostic_state" == "http_non_200" && -n "$s4_bridge_state" ]]; then
