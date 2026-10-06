@@ -9,6 +9,13 @@ return [
         'name' => env('SMOKE_USER_NAME', 'GrindFlow Production Smoke'),
     ],
 
+    's4_smoke' => [
+        'php_cli_binary' => env(
+            'GRINDFLOW_S4_PHP_CLI_BINARY',
+            '/opt/alt/php85/usr/bin/php',
+        ),
+    ],
+
     'security' => [
         'encryption_master_key' => env('ENCRYPTION_MASTER_KEY'),
     ],
