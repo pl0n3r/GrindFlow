@@ -10,13 +10,19 @@ set -euo pipefail
 : "${EXPECTED_PENDING:?EXPECTED_PENDING is required}"
 
 RECOVERY_BACKUP_ENABLED="${RECOVERY_BACKUP_ENABLED:-false}"
+RECOVERY_WRITES_STOPPED_CONFIRMED="${RECOVERY_WRITES_STOPPED_CONFIRMED:-false}"
 EXPECTED_SHA="${EXPECTED_SHA:-}"
 PRODUCTION_RECOVERY_KEY_B64="${PRODUCTION_RECOVERY_KEY_B64:-}"
 [[ "$RECOVERY_BACKUP_ENABLED" == "true" || "$RECOVERY_BACKUP_ENABLED" == "false" ]] || {
   echo "invalid recovery backup flag" >&2
   exit 2
 }
+[[ "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "true" || "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "false" ]] || {
+  echo "invalid recovery write-freeze confirmation" >&2
+  exit 2
+}
 if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
+  [[ "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "true" ]] || { echo "recovery write freeze was not explicitly confirmed" >&2; exit 2; }
     [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || { echo "recovery key is unavailable" >&2; exit 2; }
 fi
 
@@ -69,18 +75,20 @@ if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
   }
 fi
 
-"${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$EXPECTED_SHA" "$remote_key_file" <<'REMOTE'
+"${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$RECOVERY_WRITES_STOPPED_CONFIRMED" "$EXPECTED_SHA" "$remote_key_file" "/opt/alt/php85/usr/bin/php" <<'REMOTE'
 set -euo pipefail
 
 root="$1"
 expected_pending="$2"
 recovery_enabled="$3"
-expected_sha="$4"
-key_file="$5"
-php_bin="/opt/alt/php85/usr/bin/php"
+writes_stopped_confirmed="$4"
+expected_sha="$5"
+key_file="$6"
+php_bin="$7"
 current="$root/current"
 
 [[ "$recovery_enabled" == "true" || "$recovery_enabled" == "false" ]] || { echo "invalid recovery backup flag" >&2; exit 18; }
+[[ "$writes_stopped_confirmed" == "true" || "$writes_stopped_confirmed" == "false" ]] || { echo "invalid recovery write-freeze confirmation" >&2; exit 18; }
 [[ -x "$php_bin" ]] || { echo "production PHP 8.5 CLI is unavailable" >&2; exit 19; }
 [[ -L "$current" ]] || { echo "production current release is unavailable" >&2; exit 20; }
 release="$(readlink -f "$current")"
@@ -92,6 +100,7 @@ esac
 
 recovery_key=""
 if [[ "$recovery_enabled" == "true" ]]; then
+  [[ "$writes_stopped_confirmed" == "true" ]] || { echo "recovery write freeze was not explicitly confirmed" >&2; exit 22; }
   [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid expected SHA" >&2; exit 22; }
   [[ "$release" == "$root/releases/$expected_sha" ]] || { echo "production checkout does not match expected SHA" >&2; exit 22; }
   [[ -f "$release/.release-sha" && ! -L "$release/.release-sha" ]] || { echo "production release identity is unavailable" >&2; exit 22; }
@@ -332,6 +341,36 @@ if [[ -n "$organizations" ]]; then
   done <<< "$organizations"
 fi
 
+if [[ -n "$organizations" ]]; then
+  while IFS= read -r organization_id; do
+    [[ -n "$organization_id" ]] || continue
+    stage="$vault_dir/$organization_id"
+    manifest_sha="$(
+      "$php_bin" -r '
+        $payload = json_decode(file_get_contents($argv[1]), true, 64, JSON_THROW_ON_ERROR);
+        $sha = is_array($payload) ? ($payload["manifest_sha256"] ?? null) : null;
+        if (!is_string($sha) || preg_match("/\\A[0-9a-f]{64}\\z/D", $sha) !== 1) {
+            exit(2);
+        }
+        echo $sha;
+      ' "$stage/manifest.json"
+    )" || { echo "Vault staged manifest is invalid" >&2; exit 33; }
+    audit_json="$(
+      "$php_bin" symfony/bin/console grindflow:vault:audit \
+        --organization="$organization_id" \
+        --expect="$manifest_sha" \
+        --no-interaction
+    )" || { echo "Vault source changed after staging" >&2; exit 33; }
+    printf '%s' "$audit_json" | "$php_bin" -r '
+      $payload = json_decode(stream_get_contents(STDIN), true, 64, JSON_THROW_ON_ERROR);
+      if (($payload["status"] ?? null) !== "verified"
+          || ($payload["expected_manifest_matches"] ?? null) !== true) {
+          exit(2);
+      }
+    ' || { echo "Vault source changed after staging" >&2; exit 33; }
+  done <<< "$organizations"
+fi
+
 "$php_bin" scripts/recovery-bundle.php vault-index "$vault_dir" > "$bundle_dir/vault-index.json"
 chmod 600 "$bundle_dir/vault-index.json"
 vault_counts="$(
@@ -401,6 +440,10 @@ chmod 600 "$recovery_cipher"
 cipher_sha="$(sha256sum "$recovery_cipher" | awk '{print $1}')"
 [[ "$cipher_sha" =~ ^[0-9a-f]{64}$ ]] || { echo "recovery ciphertext hash is invalid" >&2; exit 37; }
 
+rm -rf -- "$recovery_workspace"
+recovery_workspace=""
+recovery_tar=""
+
 recovery_receipt="$(
   "$php_bin" -r '
     require "vendor/autoload.php";
@@ -419,9 +462,6 @@ recovery_receipt="$(
 )" || { echo "verified recovery receipt was not created" >&2; exit 38; }
 [[ "$recovery_receipt" =~ ^[0-9a-f]{64}$ ]] || { echo "verified recovery receipt was not created" >&2; exit 38; }
 
-rm -rf -- "$recovery_workspace"
-recovery_workspace=""
-recovery_tar=""
 recovery_committed=1
 "$php_bin" artisan up --no-interaction >/dev/null 2>&1 || { echo "production write freeze could not be released" >&2; exit 39; }
 maintenance_enabled=0
