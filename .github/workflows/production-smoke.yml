@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      repair_private_vault_permissions:
+        description: 'Autoriza únicamente endurecer a 0700 el Private Vault externo ya configurado'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: grindflow-production-smoke
@@ -60,6 +66,7 @@ jobs:
     env:
       BASE_URL: https://www.grindflow.com.co
       E2E_USER_EMAIL: e2e-oidc-smoke@grindflow.test
+      REPAIR_PRIVATE_VAULT_PERMISSIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_private_vault_permissions && 'true' || 'false' }}
       EXPECTED_SHA: ${{ github.sha }}
       ATTEMPTS: '15'
       WAIT_SECONDS: '20'
@@ -126,7 +133,14 @@ jobs:
           import sys
 
           with open(sys.argv[1], "w", encoding="utf-8") as handle:
-              json.dump({"password": os.environ["GRINDFLOW_SMOKE_PASSWORD"]}, handle)
+              json.dump(
+                  {
+                      "password": os.environ["GRINDFLOW_SMOKE_PASSWORD"],
+                      "repair_private_vault_permissions":
+                          os.environ.get("REPAIR_PRIVATE_VAULT_PERMISSIONS") == "true",
+                  },
+                  handle,
+              )
           PY
 
           bootstrap_status=0
@@ -159,9 +173,12 @@ jobs:
             if [[ "$bootstrap_status" == "503" ]]; then
               failure_stage="$(awk -F ': *' 'tolower($1) == "x-grindflow-smoke-failure-stage" {gsub(/\r/, "", $2); print $2; exit}' "$response_headers")"
               failure_code="$(awk -F ': *' 'tolower($1) == "x-grindflow-smoke-failure-code" {gsub(/\r/, "", $2); print $2; exit}' "$response_headers")"
-              case "$failure_stage" in environment|config-clear|provision-user) ;; *) failure_stage="unknown";; esac
+              case "$failure_stage" in
+                environment|config-clear|provision-user|provision-s4|repair-s4-vault-permissions) ;;
+                *) failure_stage="unknown";;
+              esac
               case "$failure_code" in
-                password-invalid|provision-phase-disabled|provision-password-missing|provision-email-invalid|provision-name-invalid|provision-lock-directory-failed|provision-lock-open-failed|provision-lock-timeout|provision-membership-conflict|provision-backup-write-failed|provision-backup-permission-failed|provision-database-failed|env-unavailable|lock-unavailable|lock-failed|env-read-failed|backup-write-failed|backup-permission-failed|stage-unavailable|stage-write-failed|stage-permission-failed|env-publish-failed|config-clear-failed|provision-failed)
+                password-invalid|provision-phase-disabled|provision-password-missing|provision-email-invalid|provision-name-invalid|provision-lock-directory-failed|provision-lock-open-failed|provision-lock-timeout|provision-membership-conflict|provision-backup-write-failed|provision-backup-permission-failed|provision-database-failed|env-unavailable|lock-unavailable|lock-failed|env-read-failed|backup-write-failed|backup-permission-failed|stage-unavailable|stage-write-failed|stage-permission-failed|env-publish-failed|config-clear-failed|provision-failed|s4-password-invalid|s4-runtime-unavailable|s4-process-failed|s4-output-invalid|s4-secret-missing|s4-schema-missing|s4-identity-conflict|s4-transaction-failed|provision-s4-failed|root_unavailable|missing|unreadable|permissions_unavailable|permissions_repair_failed|repair-s4-vault-permissions-failed)
                   ;;
                 *) failure_code="unexpected";;
               esac
