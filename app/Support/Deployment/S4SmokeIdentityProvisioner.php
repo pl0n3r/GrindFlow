@@ -45,10 +45,16 @@ class S4SmokeIdentityProvisioner
 
         $root = $this->symfonyRoot ?? base_path('symfony');
         $console = $root.'/bin/console';
-        $php = $this->phpBinary ?? PHP_BINARY;
+        $php = $this->phpBinary ?? (
+            PHP_SAPI === 'cli'
+                ? PHP_BINARY
+                : '/opt/alt/php85/usr/bin/php'
+        );
 
         if (
             $php === ''
+            || ! is_file($php)
+            || ! is_executable($php)
             || ! is_file($console)
             || ! is_readable($console)
             || ! is_dir($root)
