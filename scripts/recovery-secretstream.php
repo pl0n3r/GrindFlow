@@ -143,7 +143,7 @@ function encryptBundle(string $inputPath, string $outputPath, string $key): void
             }
 
             $current = $next;
-        } while (!$final);
+        } while (! $final);
 
         if (! fflush($output)) {
             reject('encrypted recovery bundle could not be flushed.');
@@ -153,7 +153,7 @@ function encryptBundle(string $inputPath, string $outputPath, string $key): void
     } finally {
         fclose($input);
         fclose($output);
-        if (!$success) {
+        if (! $success) {
             @unlink($outputPath);
         }
     }
@@ -233,7 +233,7 @@ function decryptBundle(string $inputPath, string $outputPath, string $key): void
             }
         }
 
-        if (!$sawFinal) {
+        if (! $sawFinal) {
             reject('encrypted recovery bundle final authentication tag is missing.');
         }
 
@@ -245,7 +245,7 @@ function decryptBundle(string $inputPath, string $outputPath, string $key): void
     } finally {
         fclose($input);
         fclose($output);
-        if (!$success) {
+        if (! $success) {
             @unlink($outputPath);
         }
     }
