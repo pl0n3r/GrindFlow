@@ -224,7 +224,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn("storage/framework/maintenance.php", script)
         self.assertIn("assert_recovery_quiescence", script)
         self.assertIn(
-            "write-capable artisan process remains active during recovery write freeze",
+            "write-capable artisan process did not quiesce before recovery snapshot",
             script,
         )
         self.assertIn("queue:(work|listen)", script)
@@ -244,16 +244,17 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         script = SCRIPT.read_text(encoding="utf-8")
         remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
 
-        start = remote.index("assert_recovery_quiescence() {")
+        start = remote.index("wait_for_recovery_quiescence() {")
         end = remote.index("\n}\n\nroot=", start) + len("\n}")
         guard = remote[start:end]
 
+        call = "wait_for_recovery_quiescence 12 5 || exit 28"
         self.assertLess(
-            remote.index("assert_recovery_quiescence || exit 28"),
+            remote.index(call),
             remote.index('"$dump_bin"'),
         )
         self.assertLess(
-            remote.index("assert_recovery_quiescence || exit 28"),
+            remote.index(call),
             remote.index("grindflow:vault:stage"),
         )
 
@@ -267,7 +268,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             )
             fake_pgrep.chmod(0o755)
             completed = subprocess.run(
-                ["/bin/bash", "-c", guard + "\nassert_recovery_quiescence"],
+                ["/bin/bash", "-c", guard + "\nwait_for_recovery_quiescence 1 0"],
                 env={
                     **os.environ,
                     "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
