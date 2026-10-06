@@ -165,6 +165,48 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
         self::assertTrue(password_verify($rotatedSecret, $afterBoth['password_hash']));
     }
 
+    public function testRoleUpgradeRollsBackWhenPasswordRotationFails(): void
+    {
+        $created = $this->tester();
+        self::assertSame(Command::SUCCESS, $created->execute([]));
+        $baseline = $this->snapshot();
+
+        self::assertSame(1, $this->db->update(
+            'gf_identity_memberships',
+            ['role' => 'model'],
+            [
+                'user_id' => $baseline['user_id'],
+                'organization_id' => $baseline['organization_id'],
+                'role' => 'editor',
+            ],
+        ));
+        $legacy = $this->snapshot();
+        self::assertSame('model', $legacy['membership_role']);
+
+        $trigger = 'gf_test_s4_reject_password_rotation';
+        $this->db->executeStatement('DROP TRIGGER IF EXISTS '.$trigger);
+        $this->db->executeStatement(
+            'CREATE TRIGGER '.$trigger
+            .' BEFORE UPDATE ON gf_identity_users FOR EACH ROW '
+            ."SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'synthetic rotation rejected'",
+        );
+
+        $this->setSecret('rollback-synthetic-s4-smoke-password-2026');
+        try {
+            $failed = $this->tester();
+            self::assertSame(Command::FAILURE, $failed->execute([]));
+            self::assertSame('transaction_failed', $this->payload($failed)['code']);
+        } finally {
+            $this->db->executeStatement('DROP TRIGGER IF EXISTS '.$trigger);
+        }
+
+        $after = $this->snapshot();
+        self::assertSame($legacy, $after);
+        self::assertSame('model', $after['membership_role']);
+        self::assertSame($legacy['password_hash'], $after['password_hash']);
+        self::assertTrue(password_verify(self::SECRET, $after['password_hash']));
+    }
+
     public function testMissingSecretIncompleteSchemaOrConflictFailsClosedWithoutPartialMutation(): void
     {
         $this->clearSecret();
