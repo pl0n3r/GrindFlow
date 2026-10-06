@@ -63,8 +63,15 @@ final class PrivateVaultDirectoryTest extends TestCase
             self::assertSame('unchanged', file_get_contents($external.'/sentinel.txt'));
             self::assertSame('already_private', $vault->tightenPrivatePermissions());
 
+            $defaultRoot = $project.'/var/vault';
+            self::assertTrue(mkdir($defaultRoot, 0755, true));
+            self::assertNotFalse(file_put_contents($defaultRoot.'/sentinel.txt', 'default-unchanged'));
             $default = new PrivateVaultDirectory($project);
-            self::assertSame('root_unavailable', $default->tightenPrivatePermissions());
+            self::assertSame('tightened', $default->tightenPrivatePermissions());
+            clearstatcache(true, $defaultRoot);
+            self::assertSame(0, ((int) fileperms($defaultRoot)) & 0077);
+            self::assertSame('default-unchanged', file_get_contents($defaultRoot.'/sentinel.txt'));
+            self::assertSame('already_private', $default->tightenPrivatePermissions());
 
             self::assertTrue(chmod($external, 0700));
             self::assertTrue(symlink($external, $base.'/alias'));
@@ -74,6 +81,9 @@ final class PrivateVaultDirectoryTest extends TestCase
         } finally {
             @unlink($base.'/alias');
             @unlink($external.'/sentinel.txt');
+            @unlink($project.'/var/vault/sentinel.txt');
+            @rmdir($project.'/var/vault');
+            @rmdir($project.'/var');
             @rmdir($external);
             @rmdir($project.'/public');
             @rmdir($project);
