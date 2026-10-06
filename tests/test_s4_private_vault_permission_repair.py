@@ -78,7 +78,7 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
         repair = CONTROLLER.index("$vaultRepairer->repair()")
         self.assertLess(provision, stage)
         self.assertLess(stage, repair)
-        self.assertIn("S4PrivateVaultPermissionRepairer::FAILURE_CODES", CONTROLLER)
+        self.assertIn("S4PrivateVaultPermissionRepairer::PUBLIC_FAILURE_CODES", CONTROLLER)
         self.assertIn(
             "test_verified_bootstrap_repairs_private_vault_after_s4_identity",
             BOOTSTRAP_TEST,
@@ -94,13 +94,13 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
         end = REPAIRER.index(");", start)
         constructor = REPAIRER[start:end]
 
-        self.assertIn("PHP_BINARY", REPAIRER)
+        self.assertIn("grindflow.s4_smoke.php_cli_binary", REPAIRER)
         self.assertIn("'grindflow:s4:repair-private-vault-permissions'", constructor)
         self.assertIn("'--env=prod'", constructor)
         self.assertNotIn("GRINDFLOW_VAULT_ROOT", constructor)
         self.assertNotIn("shell", constructor.lower())
         self.assertIn("SUCCESS_CODES", REPAIRER)
-        self.assertIn("FAILURE_CODES", REPAIRER)
+        self.assertIn("PUBLIC_FAILURE_CODES", REPAIRER)
         self.assertIn("'output_invalid'", REPAIRER)
         self.assertNotIn("getErrorOutput()", REPAIRER)
         self.assertIn(
@@ -128,6 +128,10 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
         self.assertIn("Wait for exact deployed checkout before production write", WORKFLOW)
         self.assertIn("X-GrindFlow-Expected-Sha", WORKFLOW)
         self.assertIn("repair-s4-vault-permissions", CONTROLLER)
+        self.assertIn("repair_private_vault_permissions:", WORKFLOW)
+        self.assertIn("default: false", WORKFLOW)
+        self.assertIn('"repair_private_vault_permissions":', WORKFLOW)
+        self.assertIn("github.event_name == 'workflow_dispatch'", WORKFLOW)
 
 
 if __name__ == "__main__":
