@@ -82,7 +82,7 @@ El endpoint es read-only respecto del producto y providers: no crea assets, no m
 La respuesta solo expone `ready/not_ready`; **no imprime paths, secretos, hashes ni metadata de archivos**. Forma esperada:
 
 ```json
-{"data":{"contract":"media-pilot-readiness-v1","status":"ready","checks":{"decoder":"ready","temporary_storage":"ready","private_vault":"ready"},"evidence_scope":"web_runtime","ci_equivalent":false}}
+{"data":{"contract":"media-pilot-readiness-v1","status":"ready","checks":{"decoder":"ready","temporary_storage":"ready","private_vault":"ready"},"diagnostics":{"private_vault":"ready"},"evidence_scope":"web_runtime","ci_equivalent":false}}
 ```
 
 Ausencia del endpoint, autenticación inválida, estado `not_ready`, error o evidencia stale ⇒ `BLOCKED_TARGET_ENV`. El cierre operativo de #307 requiere una observación `web_runtime` después del deploy autorizado; CI y el diagnóstico CLI solo pueden demostrar `BUILD_AHEAD_READY`.
