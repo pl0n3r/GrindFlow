@@ -231,7 +231,8 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             "recovery write freeze was not explicitly confirmed",
             script,
         )
-        self.assertIn('artisan down --retry=60 --no-interaction', script)
+        self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
+        self.assertIn("storage/framework/maintenance.php", script)
         self.assertIn('artisan up --no-interaction', script)
         self.assertIn('grindflow:vault:audit', script)
         self.assertIn('--expect="$manifest_sha"', script)
