@@ -127,7 +127,6 @@ class S4SmokeIdentityProvisioner
             ! $process->isSuccessful()
             && $payload['status'] === 'error'
             && is_string($mapped)
-            && in_array($mapped, self::FAILURE_CODES, true)
         ) {
             return ['ok' => false, 'code' => $mapped];
         }
