@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SECRETSTREAM = ROOT / "scripts/recovery-secretstream.php"
 WORKFLOW = ROOT / ".github/workflows/production-backup.yml"
+CI = ROOT / ".github/workflows/grindflow-ci.yml"
 BACKUP = ROOT / "scripts/run-production-backup.sh"
 RESTORE = ROOT / "scripts/symfony-disposable-restore-drill.sh"
 EVIDENCE = ROOT / "app/Support/Operations/VerifiedBackupEvidence.php"
@@ -137,6 +138,8 @@ class ProductionRecoveryContractTests(unittest.TestCase):
         self.assertIn("decrypt", restore)
         self.assertIn("verify-restore", restore)
         self.assertIn("data-schema-structure-parity.py", restore)
+        ci = CI.read_text(encoding="utf-8")
+        self.assertIn("symfony-post-restore-tenant-guard.sh", ci)
 
     def test_backup_workflow_never_migrates_or_publishes_real_backup_artifacts(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
