@@ -55,6 +55,7 @@ final class ScheduleDraftController extends AbstractController
             // Empty root keeps the private-vault check fail-closed without exposing paths.
         }
         $checks = $photoSafety->runtimeReadiness($vaultRoot);
+        $vaultState = $photoSafety->privateVaultReadinessState($vaultRoot);
         $ready = !in_array(false, $checks, true);
 
         return $this->privateJson(['data' => [
@@ -64,6 +65,9 @@ final class ScheduleDraftController extends AbstractController
                 static fn (bool $ok): string => $ok ? 'ready' : 'not_ready',
                 $checks,
             ),
+            'diagnostics' => [
+                'private_vault' => $vaultState,
+            ],
             'evidence_scope' => 'web_runtime',
             'ci_equivalent' => false,
         ]]);
