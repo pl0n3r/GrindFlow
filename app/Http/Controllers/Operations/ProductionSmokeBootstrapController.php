@@ -8,6 +8,7 @@ use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
 use App\Support\Deployment\S4PrivateVaultPermissionRepairer;
 use App\Support\Deployment\S4SmokeIdentityProvisioner;
+use App\Support\Operations\ProductionWritePolicy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
@@ -23,6 +24,7 @@ class ProductionSmokeBootstrapController extends Controller
         ProductionEnvironmentWriter $environment,
         S4SmokeIdentityProvisioner $s4Provisioner,
         S4PrivateVaultPermissionRepairer $vaultRepairer,
+        ProductionWritePolicy $writePolicy,
         CheckoutIdentity $identity,
     ): Response {
         if (
@@ -35,12 +37,14 @@ class ProductionSmokeBootstrapController extends Controller
         $expectedSha = trim((string) $request->header('X-GrindFlow-Expected-Sha'));
         $token = (string) $request->bearerToken();
         $password = $request->json('password');
+        $repairRequested = $request->json('repair_private_vault_permissions', false);
 
         if (
             $token === ''
             || preg_match('/^[0-9a-f]{40}$/', $expectedSha) !== 1
             || ! is_string($password)
             || $password === ''
+            || ! is_bool($repairRequested)
         ) {
             abort(403);
         }
@@ -50,7 +54,7 @@ class ProductionSmokeBootstrapController extends Controller
         }
 
         try {
-            $verifier->verify($token, $expectedSha);
+            $claims = $verifier->verify($token, $expectedSha);
         } catch (Throwable $exception) {
             // Only fixed context and class: exception messages can contain secrets.
             Log::warning('Production smoke bootstrap OIDC verification failed.', [
@@ -59,6 +63,33 @@ class ProductionSmokeBootstrapController extends Controller
             ]);
 
             abort(403);
+        }
+
+        if ($repairRequested) {
+            if (
+                ($claims['event_name'] ?? null) !== 'workflow_dispatch'
+                || (string) ($claims['actor_id'] ?? '') !== '64439547'
+            ) {
+                abort(403);
+            }
+
+            try {
+                $writePolicy->assertAutonomousWriteAllowed(
+                    operation: 'private-vault-permissions',
+                    destructive: false,
+                    bulk: false,
+                    versioned: true,
+                    backupVerified: false,
+                    lockHeld: false,
+                );
+            } catch (Throwable $exception) {
+                Log::warning('Private Vault permission repair policy rejected.', [
+                    'stage' => 'private_vault_permission_policy',
+                    'exception_class' => $exception::class,
+                ]);
+
+                abort(403);
+            }
         }
 
         $failureStage = 'environment';
@@ -70,6 +101,7 @@ class ProductionSmokeBootstrapController extends Controller
                     $password,
                     $s4Provisioner,
                     $vaultRepairer,
+                    $repairRequested,
                     &$failureStage,
                 ): void {
                     $failureStage = 'config-clear';
@@ -101,15 +133,17 @@ class ProductionSmokeBootstrapController extends Controller
                         throw new RuntimeException('S4 synthetic smoke identity reconciliation failed.');
                     }
 
-                    $failureStage = 'repair-s4-vault-permissions';
-                    config(['grindflow.s4_vault_repair_failure_code' => null]);
-                    $vaultResult = $vaultRepairer->repair();
+                    if ($repairRequested) {
+                        $failureStage = 'repair-s4-vault-permissions';
+                        config(['grindflow.s4_vault_repair_failure_code' => null]);
+                        $vaultResult = $vaultRepairer->repair();
 
-                    if ($vaultResult['ok'] !== true) {
-                        config([
-                            'grindflow.s4_vault_repair_failure_code' => $vaultResult['code'],
-                        ]);
-                        throw new RuntimeException('S4 Private Vault permission repair failed.');
+                        if ($vaultResult['ok'] !== true) {
+                            config([
+                                'grindflow.s4_vault_repair_failure_code' => $vaultResult['code'],
+                            ]);
+                            throw new RuntimeException('S4 Private Vault permission repair failed.');
+                        }
                     }
                 },
             );
@@ -170,7 +204,7 @@ class ProductionSmokeBootstrapController extends Controller
                 $repairCode = (string) config('grindflow.s4_vault_repair_failure_code', '');
                 $failureCode = in_array(
                     $repairCode,
-                    S4PrivateVaultPermissionRepairer::FAILURE_CODES,
+                    S4PrivateVaultPermissionRepairer::PUBLIC_FAILURE_CODES,
                     true,
                 ) ? $repairCode : 'repair-s4-vault-permissions-failed';
             }
