@@ -109,6 +109,7 @@ def run_s4_fixture(stage: str) -> str:
             {assignments}
             BASE_URL='https://example.invalid'
             E2E_USER_EMAIL='synthetic@example.invalid'
+            cookie_jar="$s4_cookie_jar"
             LOGIN_REDIRECT={json.dumps(login_redirect)}
             SELECT_REDIRECT={json.dumps(select_redirect)}
 
