@@ -100,21 +100,26 @@ class S4MigrationFingerprintTests(unittest.TestCase):
     def test_nul_in_applied_version_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             migrations, versions = self.fixture(Path(tmp))
-            versions.write_bytes(
-                rb"GrindFlow\Migrations\Version20261001000000"
-                + bytes([0])
-                + b"suffix\n"
+            prefix = rb"GrindFlow\Migrations\Version20261001000000"
+            payloads = (
+                prefix + bytes([0]) + b"suffix\n",
+                prefix + bytes([0]) + b"\n",
             )
-            result = subprocess.run(
-                ["php", str(HELPER), SHA, str(migrations)],
-                cwd=ROOT,
-                check=False,
-                input=versions.read_bytes(),
-                capture_output=True,
-            )
-            self.assertEqual(2, result.returncode)
-            self.assertEqual(b"", result.stdout)
-            self.assertEqual(b"invalid applied migration version\n", result.stderr)
+            for payload in payloads:
+                with self.subTest(payload=payload):
+                    versions.write_bytes(payload)
+                    result = subprocess.run(
+                        ["php", str(HELPER), SHA, str(migrations)],
+                        cwd=ROOT,
+                        check=False,
+                        input=versions.read_bytes(),
+                        capture_output=True,
+                    )
+                    self.assertEqual(2, result.returncode)
+                    self.assertEqual(b"", result.stdout)
+                    self.assertEqual(
+                        b"invalid applied migration version\n", result.stderr
+                    )
 
     def test_invalid_utf8_fails_closed_without_leaking_paths(self) -> None:
         with tempfile.TemporaryDirectory(prefix="private-fingerprint-path-") as tmp:
