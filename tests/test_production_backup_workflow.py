@@ -149,7 +149,6 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
                         "false",
                         "false",
                         "false",
-                        "false",
                         "",
                         "",
                         str(fake_php),
