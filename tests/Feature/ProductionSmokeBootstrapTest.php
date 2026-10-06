@@ -105,6 +105,41 @@ class ProductionSmokeBootstrapTest extends TestCase
         self::assertStringNotContainsString($password, (string) $response->getContent());
     }
 
+    public function test_verified_bootstrap_does_not_repair_private_vault_by_default(): void
+    {
+        $sha = str_repeat('a', 40);
+        $password = 'workflow-no-vault-repair-secret';
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)
+            ->andReturn(['sha' => $sha, 'event_name' => 'push']);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')->once()
+            ->with($password, Mockery::type(Closure::class))
+            ->andReturnUsing(static function (string $secret, Closure $afterPersist): void {
+                $afterPersist();
+            });
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $s4 = Mockery::mock(S4SmokeIdentityProvisioner::class);
+        $s4->shouldReceive('reconcile')->once()
+            ->with($password)
+            ->andReturn(['ok' => true, 'code' => 'already_ready']);
+        $this->app->instance(S4SmokeIdentityProvisioner::class, $s4);
+
+        $vaultRepairer = Mockery::mock(S4PrivateVaultPermissionRepairer::class);
+        $vaultRepairer->shouldNotReceive('repair');
+        $this->app->instance(S4PrivateVaultPermissionRepairer::class, $vaultRepairer);
+
+        $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => $password])
+            ->assertNoContent();
+    }
+
     public function test_verified_bootstrap_repairs_private_vault_after_s4_identity(): void
     {
         $sha = str_repeat('a', 40);
