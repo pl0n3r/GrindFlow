@@ -589,13 +589,11 @@ check_s4_media_web_runtime_readiness() {
 
   bridge_status="$(curl_common --output "$s4_bridge_body" --dump-header "$s4_bridge_headers" --write-out '%{http_code}' "$BASE_URL/s4/_bridge-readiness" || true)"
   if [[ -z "$bridge_status" || "$bridge_status" == "000" ]]; then
-    printf 'S4_BRIDGE_STATE=runtime_unavailable\n'
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 8
   fi
   if ! bridge_state="$(extract_s4_bridge_state)"; then
-    printf 'S4_BRIDGE_STATE=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 8
