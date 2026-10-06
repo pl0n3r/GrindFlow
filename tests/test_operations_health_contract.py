@@ -96,7 +96,7 @@ class OperationsHealthContractTests(unittest.TestCase):
         second = OPERATIONS.evaluate(reordered, main_sha=self.MAIN_SHA)
         self.assertEqual(first["fingerprint"], second["fingerprint"])
         self.assertEqual(first["alert"], second["alert"])
-        self.assertEqual("[AUTO] GrindFlow Operations Health", first["alert"]["title"])
+        self.assertEqual("[AUTO] GrindFlow Operations Status", first["alert"]["title"])
 
         degraded = payload()
         degraded["signals"][2]["conclusion"] = "failure"

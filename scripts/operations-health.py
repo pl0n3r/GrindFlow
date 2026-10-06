@@ -85,7 +85,7 @@ def evaluate(payload: Mapping[str, Any], *, main_sha: str) -> dict[str, Any]:
         "fingerprint": fingerprint,
         "signals": normalized,
         "alert": {
-            "title": "[AUTO] GrindFlow Operations Health",
+            "title": "[AUTO] GrindFlow Operations Status",
             "body": _render_alert(overall, main_sha, fingerprint, normalized),
         },
     }
@@ -167,8 +167,8 @@ def _render_alert(
     signals: list[dict[str, Any]],
 ) -> str:
     lines = [
-        "<!-- grindflow-operations-health-v1 -->",
-        "## GrindFlow Operations Health",
+        "<!-- grindflow-operations-status-v1 -->",
+        "## GrindFlow Operations Status",
         "",
         f"State: **{state}**",
         f"Main SHA: `{main_sha}`",
@@ -225,7 +225,7 @@ def main() -> int:
     try:
         result = evaluate(_read_json(Path(args.input)), main_sha=args.main_sha)
     except OperationsHealthError as exc:
-        print(f"operations health: {exc}", file=__import__("sys").stderr)
+        print(f"operations status: {exc}", file=__import__("sys").stderr)
         return 2
 
     rendered = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

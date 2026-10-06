@@ -137,7 +137,7 @@ jobs:
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
-      ALERT_TITLE: "[AUTO] GrindFlow Operations Health"
+      ALERT_TITLE: "[AUTO] GrindFlow Operations Status"
       REPORT_JSON: ${{ needs.observe.outputs.report }}
     steps:
       - name: Reconcile one sanitized automatic Issue

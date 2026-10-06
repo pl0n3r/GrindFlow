@@ -19,7 +19,7 @@ otro SHA es STALE; evidencia ausente es UNKNOWN. Una conclusión terminal no-suc
 sobre el SHA exacto es DEGRADED. No se inventa GREEN desde silencio, un badge o una
 versión visible.
 
-La alerta automática usa un único título estable: [AUTO] GrindFlow Operations Health.
+La alerta automática usa un único título estable: [AUTO] GrindFlow Operations Status.
 Mientras el problema persiste se actualiza ese mismo Issue; si reaparece después de un
 cierre, se reabre el mismo Issue. Cuando todas las fuentes requeridas son
 HEALTHY/CURRENT, se cierra. Retries equivalentes no crean una tormenta de Issues.
