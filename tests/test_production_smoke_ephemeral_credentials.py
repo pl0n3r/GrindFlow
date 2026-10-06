@@ -28,6 +28,7 @@ class ProductionSmokeEphemeralCredentialsTests(unittest.TestCase):
         self.assertIn('[[ "$password" =~ ^[0-9a-f]{64}$ ]] || {', block)
         self.assertIn('echo "::add-mask::$password"', block)
         self.assertIn('echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"', block)
+        # Masking must precede GITHUB_ENV so even later shell tracing cannot reveal the value.
         self.assertLess(
             block.index('echo "::add-mask::$password"'),
             block.index('echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"'),
