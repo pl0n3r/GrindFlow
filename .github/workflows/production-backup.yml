@@ -12,6 +12,11 @@ on:
         required: true
         default: false
         type: boolean
+      confirm_recovery_write_freeze:
+        description: 'I explicitly authorize the controlled production write freeze required for the recovery snapshot'
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: grindflow-production-backup
@@ -34,6 +39,7 @@ jobs:
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
       EXPECTED_SHA: ${{ github.sha }}
       RECOVERY_BACKUP_ENABLED: ${{ inputs.include_recovery_bundle && 'true' || 'false' }}
+      RECOVERY_WRITES_STOPPED_CONFIRMED: ${{ inputs.confirm_recovery_write_freeze && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -66,6 +72,11 @@ jobs:
           php -l scripts/recovery-secretstream.php
           php -l scripts/recovery-bundle.php
           [[ "$RECOVERY_BACKUP_ENABLED" == "true" || "$RECOVERY_BACKUP_ENABLED" == "false" ]]
+          [[ "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "true" || "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "false" ]]
+          if [[ "$RECOVERY_BACKUP_ENABLED" == "true" && "$RECOVERY_WRITES_STOPPED_CONFIRMED" != "true" ]]; then
+            echo "::error::Encrypted recovery requires explicit write-freeze confirmation"
+            exit 1
+          fi
 
       - id: backup
         name: Create verified production database backup
@@ -136,6 +147,7 @@ jobs:
             if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
               echo
               echo "## Encrypted recovery evidence"
+              echo "Controlled write freeze: **explicitly confirmed**"
               printf 'Ciphertext SHA-256: `%s`\n' "$RECOVERY_CIPHERTEXT_SHA256"
               printf 'Vault index SHA-256: `%s`\n' "$RECOVERY_VAULT_INDEX_SHA256"
               printf 'Recovery receipt: `%s`\n' "$RECOVERY_RECEIPT"
