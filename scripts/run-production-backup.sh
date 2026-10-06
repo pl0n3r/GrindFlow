@@ -468,6 +468,13 @@ recovery_receipt="$(
     require "vendor/autoload.php";
     $app = require "bootstrap/app.php";
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $snapshot = $app->make(App\Support\Operations\MigrationReadiness::class)->snapshot();
+    $expectedPending = (int) $argv[8];
+    if (count($snapshot["names"]) !== $expectedPending
+        || ! hash_equals(strtolower($argv[2]), strtolower((string) $snapshot["fingerprint"]))) {
+        fwrite(STDERR, "recovery migration state changed\n");
+        exit(3);
+    }
     echo $app->make(App\Support\Operations\VerifiedRecoveryEvidence::class)->record(
         $argv[1],
         $argv[2],
@@ -477,7 +484,7 @@ recovery_receipt="$(
         (int) $argv[6],
         (int) $argv[7],
     );
-  ' "$cipher_relative" "$fingerprint" "$vault_index_sha" "$release_version" "$expected_sha" "$organization_count" "$asset_count"
+  ' "$cipher_relative" "$fingerprint" "$vault_index_sha" "$release_version" "$expected_sha" "$organization_count" "$asset_count" "$pending_count"
 )" || { echo "verified recovery receipt was not created" >&2; exit 38; }
 [[ "$recovery_receipt" =~ ^[0-9a-f]{64}$ ]] || { echo "verified recovery receipt was not created" >&2; exit 38; }
 
