@@ -81,18 +81,19 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         )
 
     def test_reserved_identity_rotates_only_password_hash(self) -> None:
-        marker = "$db->update("
-        start = COMMAND.index(marker)
-        end = COMMAND.index("return 'rotated';", start)
+        start = COMMAND.index("if ($rotateSecret) {")
+        end = COMMAND.index("if ($upgradeRole && $rotateSecret)", start)
         rotation = COMMAND[start:end]
         self.assertIn("'gf_identity_users'", rotation)
         self.assertIn("['password_hash' => $hasher->hash($secret)]", rotation)
         self.assertIn("$affected !== 1", rotation)
+        self.assertNotIn("'gf_identity_memberships'", rotation)
         self.assertNotIn("'name' =>", rotation)
         self.assertNotIn("'platform_role' =>", rotation)
         self.assertNotIn("'is_active' =>", rotation)
         self.assertNotIn("'updated_at' =>", rotation)
         self.assertIn("existingMembership", COMMAND)
+        self.assertIn("ReservedIdentityConflict", COMMAND)
         self.assertIn("'identity_conflict'", COMMAND)
         self.assertIn("'rotated'", COMMAND_TEST)
         self.assertIn("password_verify($rotatedSecret", COMMAND_TEST)
