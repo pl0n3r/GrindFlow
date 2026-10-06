@@ -51,7 +51,7 @@ PHP);
         );
         self::assertTrue($capturePayload['secret_matches']);
         self::assertNotContains('unit-ephemeral-secret', $capturePayload['argv']);
-        self::assertSame(PHP_BINARY, $capturePayload['argv'][0] ?? PHP_BINARY);
+        self::assertSame($this->console, $capturePayload['argv'][0] ?? null);
         self::assertContains('grindflow:s4:provision-smoke-identity', $capturePayload['argv']);
     }
 
