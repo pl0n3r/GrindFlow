@@ -197,7 +197,7 @@ class S4OwnerRunbookTests(unittest.TestCase):
             r"APP_SECRET=[0-9a-fA-F]{32,}",
             r"PRODUCTION_E2E_PASSWORD=[^$<{\s][^\s]*",
             r"GRINDFLOW_S4_SMOKE_PASSWORD=[^$<{\s][^\s]*",
-            r"mysql://[^\s:$<{]+:[^\s@$<{]+@",
+            r"mysql://(?!%s:%s@)[^\s:$<{]+:[^\s@$<{]+@",
         )
         for pattern in secret_patterns:
             with self.subTest(pattern=pattern):
