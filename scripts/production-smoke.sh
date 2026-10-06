@@ -589,20 +589,22 @@ check_s4_media_web_runtime_readiness() {
 
   bridge_status="$(curl_common --output "$s4_bridge_body" --dump-header "$s4_bridge_headers" --write-out '%{http_code}' "$BASE_URL/s4/_bridge-readiness" || true)"
   if [[ -z "$bridge_status" || "$bridge_status" == "000" ]]; then
+    printf 'S4_BRIDGE_STATE=runtime_unavailable\n'
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
-    return 0
+    return 8
   fi
   if ! bridge_state="$(extract_s4_bridge_state)"; then
+    printf 'S4_BRIDGE_STATE=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
-    return 0
+    return 8
   fi
   printf 'S4_BRIDGE_STATE=%s\n' "$bridge_state"
   if [[ "$bridge_status" != "200" || "$bridge_state" != "ready_for_web_probe" ]]; then
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
-    return 0
+    return 8
   fi
 
   login_status="$(curl_common --cookie-jar "$s4_cookie_jar" --output "$s4_login_html" --dump-header "$s4_login_headers" --write-out '%{http_code}' "$BASE_URL/s4/login" || true)"
@@ -837,8 +839,12 @@ run_smoke() {
   fi
 
   check_workspace_modules "$vault_path" || return $?
-  check_s4_media_web_runtime_readiness
-  printf 'PASS production smoke: /health exact-main, /, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV\n' "$vault_path"
+  local s4_bridge_status=0
+  check_s4_media_web_runtime_readiness || s4_bridge_status=$?
+  if [[ "$s4_bridge_status" -ne 0 ]]; then
+    return "$s4_bridge_status"
+  fi
+  printf 'PASS production smoke: /health exact-main, /, /login, /dashboard, /admin/system, %s + workspace GETs + Traffic CSV + S4 bridge readiness\n' "$vault_path"
 }
 
 for attempt in $(seq 1 "$ATTEMPTS"); do
@@ -851,6 +857,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
     5) printf 'ERROR: read-only workspace module check failed; no repeated login requests.\n' >&2; exit 5 ;;
     6) printf 'ERROR: production release inventory failed or differs; no repeated login requests.\n' >&2; exit 6 ;;
     7) printf 'ERROR: authentication failure is deterministic; do not retry credentials.\n' >&2; exit 7 ;;
+    8) printf 'ERROR: S4 bridge readiness is not HTTP 200 ready_for_web_probe; do not infer readiness from the global smoke.\n' >&2; exit 8 ;;
   esac
   if [[ "$attempt" -lt "$ATTEMPTS" ]]; then sleep "$WAIT_SECONDS"; fi
 done
