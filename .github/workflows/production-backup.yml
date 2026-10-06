@@ -27,6 +27,8 @@ jobs:
       HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
       HOSTINGER_RELEASE_ROOT: ${{ vars.HOSTINGER_RELEASE_ROOT }}
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
+      EXPECTED_SHA: ${{ github.sha }}
+      PRODUCTION_RECOVERY_KEY_B64: ${{ secrets.PRODUCTION_RECOVERY_KEY_B64 }}
 
     steps:
       - uses: actions/checkout@v5
@@ -51,8 +53,17 @@ jobs:
           printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$KNOWN_HOSTS_PATH"
           chmod 0600 "$SSH_KEY_PATH" "$KNOWN_HOSTS_PATH"
 
-      - name: Validate backup script
-        run: bash -n scripts/run-production-backup.sh
+      - name: Validate backup and recovery scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/run-production-backup.sh
+          php -l scripts/recovery-secretstream.php
+          php -l scripts/recovery-bundle.php
+          [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || {
+            echo "::error::PRODUCTION_RECOVERY_KEY_B64 is not configured"
+            exit 1
+          }
 
       - id: backup
         name: Create verified production database backup
@@ -66,19 +77,38 @@ jobs:
 
           fingerprint="$(sed -n 's/^MIGRATION_FINGERPRINT=//p' "$safe_output")"
           archive="$(sed -n 's/^BACKUP_ARCHIVE=//p' "$safe_output")"
+          recovery_sha="$(sed -n 's/^RECOVERY_CIPHERTEXT_SHA256=//p' "$safe_output")"
+          vault_index_sha="$(sed -n 's/^RECOVERY_VAULT_INDEX_SHA256=//p' "$safe_output")"
+          recovery_receipt="$(sed -n 's/^RECOVERY_RECEIPT=//p' "$safe_output")"
+          recovery_orgs="$(sed -n 's/^RECOVERY_ORGANIZATIONS=//p' "$safe_output")"
+          recovery_assets="$(sed -n 's/^RECOVERY_ASSETS=//p' "$safe_output")"
 
           [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]
           [[ "$archive" =~ ^operations/database-backups/[A-Za-z0-9._-]+\.sql\.gz$ ]]
-          [[ "$(wc -l < "$safe_output")" -eq 2 ]]
+          [[ "$recovery_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$vault_index_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$recovery_receipt" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$recovery_orgs" =~ ^[0-9]+$ ]]
+          [[ "$recovery_assets" =~ ^[0-9]+$ ]]
+          [[ "$(wc -l < "$safe_output")" -eq 7 ]]
 
           printf 'fingerprint=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
           printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+          printf 'recovery_sha=%s\n' "$recovery_sha" >> "$GITHUB_OUTPUT"
+          printf 'vault_index_sha=%s\n' "$vault_index_sha" >> "$GITHUB_OUTPUT"
+          printf 'recovery_receipt=%s\n' "$recovery_receipt" >> "$GITHUB_OUTPUT"
+          printf 'recovery_orgs=%s\n' "$recovery_orgs" >> "$GITHUB_OUTPUT"
+          printf 'recovery_assets=%s\n' "$recovery_assets" >> "$GITHUB_OUTPUT"
 
       - name: Publish safe summary
         shell: bash
         env:
           BACKUP_FINGERPRINT: ${{ steps.backup.outputs.fingerprint }}
-          BACKUP_ARCHIVE: ${{ steps.backup.outputs.archive }}
+          RECOVERY_CIPHERTEXT_SHA256: ${{ steps.backup.outputs.recovery_sha }}
+          RECOVERY_VAULT_INDEX_SHA256: ${{ steps.backup.outputs.vault_index_sha }}
+          RECOVERY_RECEIPT: ${{ steps.backup.outputs.recovery_receipt }}
+          RECOVERY_ORGANIZATIONS: ${{ steps.backup.outputs.recovery_orgs }}
+          RECOVERY_ASSETS: ${{ steps.backup.outputs.recovery_assets }}
         run: |
           {
             echo "## Production database backup"
@@ -87,7 +117,13 @@ jobs:
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
             printf 'Expected pending migrations: **%s**\n' "$EXPECTED_PENDING"
             printf 'Migration fingerprint: `%s`\n' "$BACKUP_FINGERPRINT"
-            printf 'Server-local archive: `%s`\n' "$BACKUP_ARCHIVE"
-            echo "Backup evidence remains private on the production host and is resolved server-side by Migration."
-            echo "This workflow does not run migrations."
+            echo "Database backup evidence remains private on the production host and is resolved server-side by Migration."
+            echo
+            echo "## Encrypted recovery evidence"
+            printf 'Ciphertext SHA-256: `%s`\n' "$RECOVERY_CIPHERTEXT_SHA256"
+            printf 'Vault index SHA-256: `%s`\n' "$RECOVERY_VAULT_INDEX_SHA256"
+            printf 'Recovery receipt: `%s`\n' "$RECOVERY_RECEIPT"
+            printf 'Organizations: **%s** · assets: **%s**\n' "$RECOVERY_ORGANIZATIONS" "$RECOVERY_ASSETS"
+            echo "No recovery key, remote path, Vault filename, manifest body or backup payload is published."
+            echo "This workflow does not run migrations or restore production."
           } >> "$GITHUB_STEP_SUMMARY"
