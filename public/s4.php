@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
 use GrindFlow\Kernel;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -78,27 +79,48 @@ if ($path === '/s4/_bridge-readiness') {
         s4State('config_missing', 503);
     }
 
+    $connection = null;
+    $databaseReady = false;
+    $schemaReady = false;
+    $identityCount = 0;
+
     try {
-        $connection = DriverManager::getConnection(['url' => $databaseUrl]);
+        $params = (new DsnParser([
+            'mysql' => 'pdo_mysql',
+            'mariadb' => 'pdo_mysql',
+        ]))->parse($databaseUrl);
+        $connection = DriverManager::getConnection($params);
+        $databaseReady = true;
         $schema = $connection->createSchemaManager();
-        if (! $schema->tablesExist([
+        $schemaReady = $schema->tablesExist([
             'gf_identity_users',
             'gf_identity_organizations',
             'gf_identity_memberships',
-        ])) {
-            s4State('schema_missing', 503);
+        ]);
+        if ($schemaReady) {
+            $identityCount = (int) $connection->fetchOne(
+                <<<'SQL'
+                    SELECT COUNT(*)
+                    FROM gf_identity_users actor
+                    INNER JOIN gf_identity_memberships membership ON membership.user_id = actor.id
+                    WHERE actor.email = :email AND actor.is_active = 1
+                    SQL,
+                ['email' => S4_SYNTHETIC_IDENTITY],
+            );
         }
-        $identityCount = (int) $connection->fetchOne(
-            <<<'SQL'
-                SELECT COUNT(*)
-                FROM gf_identity_users actor
-                INNER JOIN gf_identity_memberships membership ON membership.user_id = actor.id
-                WHERE actor.email = :email AND actor.is_active = 1
-                SQL,
-            ['email' => S4_SYNTHETIC_IDENTITY],
-        );
-        $connection->close();
     } catch (Throwable) {
+        $databaseReady = false;
+    } finally {
+        if ($connection !== null) {
+            try {
+                $connection->close();
+            } catch (Throwable) {
+                // Readiness remains fail-closed without exposing runtime details.
+            }
+        }
+    }
+
+    if (! $databaseReady || ! $schemaReady) {
         s4State('schema_missing', 503);
     }
 
