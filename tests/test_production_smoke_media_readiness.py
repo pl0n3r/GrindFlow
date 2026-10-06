@@ -441,7 +441,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
             json.dump(payload, handle)
             handle.flush()
             return subprocess.run(
-                ["python3", "-", handle.name],
+                ["python3", "-", handle.name, "laravel"],
                 input=parser,
                 text=True,
                 capture_output=True,
@@ -457,7 +457,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
     @classmethod
     def _parser(cls) -> str:
         block = cls._readiness_function()
-        marker = 'if parsed="$(python3 - "$media_readiness_body" <<\'PY\'\n'
+        marker = 'if parsed="$(python3 - "$media_readiness_body" "$runtime" <<\'PY\'\n'
         start = block.index(marker) + len(marker)
         end = block.index("\nPY\n", start)
         return textwrap.dedent(block[start:end])
