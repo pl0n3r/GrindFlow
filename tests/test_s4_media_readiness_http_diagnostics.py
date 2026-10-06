@@ -117,16 +117,16 @@ class S4MediaReadinessHttpDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("S4 media readiness Location:", WORKFLOW)
         self.assertNotIn("S4 media readiness body:", WORKFLOW)
 
-    def test_release_v0211_is_synchronized_and_suite_is_canonical(self) -> None:
+    def test_release_is_synchronized_and_suite_is_canonical(self) -> None:
         import re
 
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.211", match.group(1))
-        self.assertEqual("0.1.211", PACKAGE["version"])
-        self.assertEqual("0.1.211", LOCK["version"])
-        self.assertEqual("0.1.211", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.211", README)
+        expected = match.group(1)
+        self.assertEqual(expected, PACKAGE["version"])
+        self.assertEqual(expected, LOCK["version"])
+        self.assertEqual(expected, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{expected}", README)
         self.assertIn(
             "tests/test_s4_media_readiness_http_diagnostics.py",
             PACKAGE["scripts"]["test"],
