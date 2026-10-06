@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/run-production-backup.sh"
 WORKFLOW = ROOT / ".github/workflows/production-backup.yml"
 CI = ROOT / ".github/workflows/grindflow-ci.yml"
+S4 = ROOT / "public/s4.php"
+CONSOLE = ROOT / "routes/console.php"
 
 
 class ProductionBackupWorkflowTests(unittest.TestCase):
@@ -207,6 +209,31 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertNotIn("set -x", script)
         self.assertNotIn('return """', script)
         self.assertNotIn("cat .env", script)
+
+    def test_recovery_mode_uses_cross_runtime_maintenance_gate(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        s4 = S4.read_text(encoding="utf-8")
+        console = CONSOLE.read_text(encoding="utf-8")
+
+        self.assertIn("include_recovery_bundle:", workflow)
+        self.assertIn("confirm_recovery_write_freeze:", workflow)
+        self.assertIn("PRODUCTION_RECOVERY_KEY_B64", workflow)
+        self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
+        self.assertIn('artisan up --no-interaction', script)
+        self.assertIn("storage/framework/maintenance.php", script)
+        self.assertIn("forced queue worker would bypass maintenance mode", script)
+        self.assertIn("[p]hp .*artisan (queue:work|queue:listen).*--force", script)
+        self.assertIn("storage/framework/maintenance.php", s4)
+        self.assertNotIn("evenInMaintenanceMode", console)
+        self.assertLess(
+            script.index('artisan down --render=errors::503'),
+            script.index('grindflow:vault:stage'),
+        )
+        self.assertLess(
+            script.index('grindflow:vault:verify-stage'),
+            script.index('artisan up --no-interaction', script.index('recovery_committed=1')),
+        )
 
     def test_receipt_uses_canonical_verified_backup_command_without_leaving_host(self):
         script = SCRIPT.read_text(encoding="utf-8")
