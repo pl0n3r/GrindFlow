@@ -228,14 +228,14 @@ class S4BridgeContractDiagnosticsTests(unittest.TestCase):
             self.assertIn("MEDIA_WEB_RUNTIME_READY=0", output)
             self.assertNotIn("S4_BRIDGE_STATE=", output)
 
-    def test_release_v0207_is_synchronized_and_suite_is_canonical(self) -> None:
+    def test_release_identity_is_synchronized_and_suite_is_canonical(self) -> None:
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.207", match.group(1))
-        self.assertEqual("0.1.207", PACKAGE["version"])
-        self.assertEqual("0.1.207", LOCK["version"])
-        self.assertEqual("0.1.207", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.207", README)
+        release = match.group(1)
+        self.assertEqual(release, PACKAGE["version"])
+        self.assertEqual(release, LOCK["version"])
+        self.assertEqual(release, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{release}", README)
         self.assertIn("tests/test_s4_bridge_contract_diagnostics.py", PACKAGE["scripts"]["test"])
 
     def test_operational_closeout_requires_exact_main_diagnostic_evidence(self) -> None:

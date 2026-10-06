@@ -608,6 +608,9 @@ PY
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=observed\n'
     printf '%s\n' "$parsed"
   else
+    if [[ "$runtime" == "s4" ]]; then
+      printf 'S4_POST_BRIDGE_CONTRACT_STAGE=media_readiness_contract\n'
+    fi
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
   fi
@@ -667,6 +670,7 @@ check_s4_media_web_runtime_readiness() {
   login_redirect="$(safe_s4_redirect_path "$s4_login_post_headers")"
   if [[ "$login_redirect" != "/s4/organizations" ]]; then
     printf 'S4_AUTH_STATE=identity_unavailable\n'
+    printf 'S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect\n'
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
@@ -693,6 +697,7 @@ check_s4_media_web_runtime_readiness() {
   select_redirect="$(safe_s4_redirect_path "$s4_select_headers")"
   if [[ "$select_redirect" != "/s4/admin" ]]; then
     printf 'S4_AUTH_STATE=identity_unavailable\n'
+    printf 'S4_POST_BRIDGE_CONTRACT_STAGE=organization_select_redirect\n'
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n'
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
