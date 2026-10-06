@@ -30,6 +30,8 @@ WORKFLOW = (ROOT / ".github/workflows/production-smoke.yml").read_text(encoding=
 PACKAGE = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 LOCK = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 VERSION = (ROOT / "config/version.php").read_text(encoding="utf-8")
+GRINDFLOW_CONFIG = (ROOT / "config/grindflow.php").read_text(encoding="utf-8")
+ENV_EXAMPLE = (ROOT / ".env.example").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
 
 
@@ -55,10 +57,18 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
             "['GRINDFLOW_S4_SMOKE_PASSWORD' => $password]",
             process_ctor,
         )
-        self.assertIn("PHP_BINARY", PROVISIONER)
-        self.assertIn("PHP_SAPI === 'cli'", PROVISIONER)
-        self.assertIn("'/opt/alt/php85/usr/bin/php'", PROVISIONER)
+        self.assertNotIn("PHP_BINARY", PROVISIONER)
+        self.assertIn("'grindflow.s4_smoke.php_cli_binary'", PROVISIONER)
+        self.assertIn("'/opt/alt/php85/usr/bin/php'", GRINDFLOW_CONFIG)
+        self.assertIn(
+            'GRINDFLOW_S4_PHP_CLI_BINARY="/opt/alt/php85/usr/bin/php"',
+            ENV_EXAMPLE,
+        )
         self.assertIn("! is_executable($php)", PROVISIONER)
+        self.assertIn(
+            "test_configured_php_cli_binary_is_used_without_constructor_override",
+            PROVISIONER_TEST,
+        )
         self.assertIn("'--env=prod'", PROVISIONER)
         self.assertIn("'s4-output-invalid'", PROVISIONER)
         self.assertNotIn("Log::", PROVISIONER)
