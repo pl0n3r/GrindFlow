@@ -1,66 +1,80 @@
-# Production Recovery · DB + Private Vault
+# Recovery productivo pre-piloto
 
-This runbook covers the pre-pilot recovery contract. It does **not** authorize a destructive production restore.
+Este procedimiento acredita **backup cifrado + evidencia + restore drill** para GrindFlow antes del piloto. No autoriza un restore destructivo sobre producción y no sustituye una decisión humana de incidente.
 
-## Authority and preconditions
+## Autoridad y precondiciones
 
-Production Backup remains a manual, repository-owner-only workflow. Before starting it, the operator must confirm the current release and migration batch are the intended ones and that the application is in a controlled write window. The workflow never runs migrations and never uploads a real backup to GitHub Actions artifacts.
+El workflow `GrindFlow Production Backup` es owner-only y se ejecuta por `workflow_dispatch`. Antes de cualquier I/O valida el SHA exacto del release productivo mediante `.release-sha`, el fingerprint de migraciones, SSH estricto, PHP 8.5, MariaDB tooling, Vault staging y libsodium secretstream.
 
-The recovery key is `GF_RECOVERY_KEY_B64`. It must contain exactly 32 random bytes encoded as base64 and must live only in protected production configuration / secret storage. Never paste the key into GitHub, Issues, logs, summaries or artifacts. Missing libsodium, missing secretstream functions, a missing/invalid key, an unsafe Vault root, or failed integrity checks must stop the backup.
+La key de recuperación se entrega como GitHub Actions secret `PRODUCTION_RECOVERY_KEY_B64` y existe dentro del runtime de cifrado únicamente como `GF_RECOVERY_KEY_B64`. Debe decodificar exactamente 32 bytes. Nunca se pasa como argumento CLI, se escribe en Issues, summaries, artifacts o repo, ni se conserva junto al ciphertext.
 
-## Encrypted bundle
+La evidencia del propietario confirmó libsodium secretstream en el CLI PHP 8.5 del host. El workflow vuelve a comprobar extensión y funciones en cada ejecución y falla cerrado si dejan de estar disponibles.
 
-The server builds a private plaintext staging directory containing:
+## Formato de recuperación
 
-- `database.sql.gz` — verified MariaDB dump;
-- `vault/` — a snapshot of the Private Vault originals;
-- `vault-manifest.json` — sorted SHA-256/size index of the staged Vault;
-- `metadata.json` — release version/SHA, migration fingerprint, Vault index hash and UTC creation time.
+El formato `grindflow-recovery-v1` contiene, antes del cifrado:
 
-The plaintext tar is ephemeral. `scripts/recovery-secretstream.php` encrypts it with libsodium secretstream XChaCha20-Poly1305 into a `.gfrec` ciphertext. The plaintext tar and Vault staging copy are deleted on success and error. The existing database archive remains governed by `VerifiedBackupEvidence`; the joint recovery bundle has separate `VerifiedRecoveryEvidence`.
+- `database.sql.gz`: dump MariaDB consistente;
+- `vault/<organization UUID>/`: stages privados producidos por `grindflow:vault:stage`;
+- `vault-index.json`: índice canónico por organización con `manifest_sha256` y conteos;
+- `metadata.json`: versión/SHA exactos, timestamp UTC, fingerprint DB y `vault_index_sha256`.
 
-The private receipt binds:
+El tar plaintext es temporal, privado y se elimina inmediatamente después de promover el ciphertext autenticado. El ciphertext `.gfrec` usa libsodium secretstream XChaCha20-Poly1305 con frames autenticados y `TAG_FINAL` obligatorio. Truncado, modificación, key incorrecta, tag inesperado o runtime criptográfico ausente fallan cerrado.
 
-- `ciphertext_sha256`;
-- `migration_fingerprint`;
-- `vault_index_sha256`;
-- `release_version`;
-- `release_sha`;
-- UTC creation time.
+`VerifiedBackupEvidence` conserva su responsabilidad original para el gate de migraciones. `VerifiedRecoveryEvidence` es independiente y liga ciphertext SHA-256, fingerprint DB, Vault index SHA-256, release version/SHA, timestamp y conteos. No contiene nombres originales, notas privadas, storage keys, paths absolutos ni secretos.
 
-Only hashes and release identity are safe evidence. Filesystem paths, Vault filenames, database credentials, the key and backup contents are not copied to GitHub.
+## Evidencia segura
 
-## Disposable restore drill
+El summary de GitHub puede publicar únicamente:
 
-CI uses synthetic data and a synthetic test key. The drill must use the same `recovery-secretstream.php` format:
+- migration fingerprint;
+- ciphertext SHA-256;
+- Vault index SHA-256;
+- recovery receipt id;
+- número de organizaciones y assets;
+- estado del workflow/run.
 
-1. create synthetic MariaDB + Vault state;
-2. build the bundle and encrypt it;
-3. delete the plaintext bundle/stage used as the recovery source;
-4. decrypt into a fresh private directory;
-5. verify bundle metadata and Vault manifest;
-6. restore MariaDB;
-7. restore Vault originals;
-8. run `grindflow:vault:verify-restore`;
-9. verify schema parity plus tenant/IDOR guards.
+No publicar rutas del host, manifests, contenido del backup, `.env`, credenciales MariaDB, `GF_RECOVERY_KEY_B64`, nombres de archivos Vault ni PII.
 
-The drill is valid only with `APP_ENV=test`, `CI=true` and `GF_RESTORE_DRILL_APPROVED=1`.
+Los backups reales permanecen server-side. El workflow no usa `actions/upload-artifact` para material de recovery.
 
-## Restore destructivo
+## Restore drill
 
-A restore destructivo on production is human-only. Do not automate or infer authorization from a passing backup, CI run or receipt.
+El restore automatizado permitido es solo un **entorno descartable** de CI con datos sintéticos:
 
-Before any production restore:
+1. crear DB + Vault sintéticos;
+2. stage/verify del Vault;
+3. crear el mismo `grindflow-recovery-v1`;
+4. cifrar con `scripts/recovery-secretstream.php`;
+5. probar rechazo de ciphertext alterado, truncado y key incorrecta sin plaintext residual;
+6. eliminar fuente plaintext;
+7. descifrar el ciphertext válido;
+8. verificar bundle e índice Vault;
+9. restaurar MariaDB;
+10. restaurar blobs y ejecutar `grindflow:vault:verify-restore`;
+11. validar schema parity;
+12. ejecutar guardas tenant/IDOR existentes.
 
-1. escalate to the owner and obtain explicit authorization for the exact release/receipt;
-2. preserve the current production state and stop writes;
-3. verify the ciphertext receipt and checksum server-side;
-4. decrypt only into a private isolated staging area;
-5. perform a disposable/isolated restore first and compare MariaDB schema + Vault manifest;
-6. document the rollback target and success criteria without copying PII or secrets.
+Un drill verde prueba el procedimiento y el formato; no autoriza restauración productiva.
 
-If any checksum, manifest, schema parity, tenant/IDOR guard or release identity fails, stop and escalate. Do not partially restore production.
+## Restore productivo
 
-## Evidence and rollback
+Un restore destructivo requiere incidente confirmado, aprobación explícita del propietario y una ventana operativa. Antes de tocar producción:
 
-Successful backup evidence is a private server-side receipt. A failed bundle build must remove temporary plaintext and incomplete ciphertext. A failed disposable restore leaves production untouched. Code changes are reversible by Git revert; already-created encrypted backups are never deleted automatically by a code rollback.
+1. identificar un receipt/ciphertext cuyo SHA, release SHA y fingerprints sean coherentes;
+2. verificar disponibilidad de la key fuera de GitHub Issues/logs;
+3. restaurar primero en entorno descartable o aislado y completar todas las verificaciones;
+4. detener escrituras de aplicación;
+5. conservar evidencia previa y plan de rollback;
+6. solo entonces ejecutar el procedimiento aprobado para DB y Vault;
+7. comprobar schema, manifests, tenant isolation, health y smoke exact-SHA antes de reabrir escrituras.
+
+No se automatiza restore productivo desde este repositorio.
+
+## Fallo, rollback y escalamiento
+
+Si falla staging, checksum, cifrado, receipt, decrypt, manifest, schema parity o aislamiento tenant, no promover el backup como evidencia válida. Eliminar temporales plaintext; conservar únicamente ciphertext previamente verificado cuando exista receipt válido.
+
+Si un restore descartable falla, no reintentar sobre producción. Registrar solo códigos/hashes allowlisted, corregir la causa y repetir el drill.
+
+Escalar al propietario antes de cualquier acción destructiva, cambio de key, cambio de proveedor/almacenamiento, gasto, pérdida de evidencia o decisión de retención. Un merge, una versión o un ciphertext existente por sí solos no significan recovery readiness.
