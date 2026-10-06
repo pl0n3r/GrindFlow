@@ -151,16 +151,16 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
                 self.assertNotIn("Private Vault state:", proof)
                 self.assertNotIn("leak-me", proof)
 
-    def test_release_v0214_is_synchronized_and_validate_is_canonical(self) -> None:
+    def test_release_identity_is_synchronized_and_validate_is_canonical(self) -> None:
         import re
 
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.214", match.group(1))
-        self.assertEqual("0.1.214", PACKAGE["version"])
-        self.assertEqual("0.1.214", LOCK["version"])
-        self.assertEqual("0.1.214", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.214", README)
+        release = match.group(1)
+        self.assertEqual(release, PACKAGE["version"])
+        self.assertEqual(release, LOCK["version"])
+        self.assertEqual(release, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{release}", README)
         self.assertIn("tests/test_s4_private_vault_readiness.py", PACKAGE["scripts"]["test"])
 
     def test_operational_closeout_requires_exact_main_private_vault_classification(self) -> None:
