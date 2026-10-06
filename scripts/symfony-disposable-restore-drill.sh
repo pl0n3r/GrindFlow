@@ -62,8 +62,13 @@ base="$(mktemp -d /tmp/grindflow-restore-drill.XXXXXX)"
 chmod 0700 "$base"
 source_vault="$base/source-vault"
 restored_vault="$base/restored-vault"
-stage="$base/stage"
+bundle_source="$base/recovery-source"
+stage="$bundle_source/vault/018f0000-0000-7000-8000-000000000002"
 dump="$base/database.sql"
+bundle_tar="$base/recovery.tar"
+encrypted_bundle="$base/recovery.gfrec"
+decrypted_tar="$base/recovery-decrypted.tar"
+extracted_bundle="$base/recovery-extracted"
 source_structure="$base/source-structure.json"
 restored_structure="$base/restored-structure.json"
 envelope="$base/structure-envelope.json"
@@ -74,6 +79,7 @@ cleanup() {
 trap cleanup EXIT
 
 install -d -m 0700 "$source_vault"
+install -d -m 0700 "$bundle_source" "$bundle_source/vault"
 
 user_id="018f0000-0000-7000-8000-000000000001"
 org_id="018f0000-0000-7000-8000-000000000002"
@@ -137,6 +143,146 @@ docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb-dump  
 chmod 0600 "$dump"
 [[ -s "$dump" ]] || fail "database dump is empty."
 
+gzip -9 -c "$dump" > "$bundle_source/database.sql.gz"
+chmod 0600 "$bundle_source/database.sql.gz"
+
+php scripts/recovery-bundle.php vault-index "$bundle_source/vault" > "$bundle_source/vault-index.json"
+chmod 0600 "$bundle_source/vault-index.json"
+vault_index_sha="$(
+  php -r '
+    $value = json_decode(file_get_contents($argv[1]), true, 64, JSON_THROW_ON_ERROR);
+    $sha = is_array($value) ? ($value["vault_index_sha256"] ?? null) : null;
+    if (!is_string($sha) || preg_match("/\A[0-9a-f]{64}\z/D", $sha) !== 1) {
+        exit(2);
+    }
+    echo $sha;
+  ' "$bundle_source/vault-index.json"
+)" || fail "Vault recovery index is invalid."
+
+db_fingerprint="$(sha256sum "$source_structure" | awk '{print $1}')"
+release_version="$(php -r '$v=require "config/version.php"; echo $v["number"] ?? "";')"
+release_sha="$(git rev-parse HEAD)"
+created_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+php scripts/recovery-bundle.php metadata \
+  "$db_fingerprint" \
+  "$vault_index_sha" \
+  "$release_version" \
+  "$release_sha" \
+  "$created_iso" \
+  "1" \
+  "1" > "$bundle_source/metadata.json"
+chmod 0600 "$bundle_source/metadata.json"
+php scripts/recovery-bundle.php verify "$bundle_source" >/dev/null
+
+tar -C "$bundle_source" -cf "$bundle_tar" metadata.json vault-index.json database.sql.gz vault
+chmod 0600 "$bundle_tar"
+
+export GF_RECOVERY_KEY_B64
+GF_RECOVERY_KEY_B64="$(php -r 'echo base64_encode(random_bytes(32));')"
+php scripts/recovery-secretstream.php encrypt "$bundle_tar" "$encrypted_bundle" >/dev/null
+chmod 0600 "$encrypted_bundle"
+
+tampered="$base/recovery-tampered.gfrec"
+cp "$encrypted_bundle" "$tampered"
+php -r '
+  $path=$argv[1];
+  $h=fopen($path,"r+b");
+  fseek($h,-8,SEEK_END);
+  $b=fread($h,1);
+  fseek($h,-1,SEEK_CUR);
+  fwrite($h, chr(ord($b) ^ 1));
+  fclose($h);
+' "$tampered"
+if php scripts/recovery-secretstream.php decrypt "$tampered" "$base/tampered.tar" >/dev/null 2>&1; then
+  fail "tampered recovery ciphertext was accepted."
+fi
+[[ ! -e "$base/tampered.tar" ]] || fail "tampered decrypt retained plaintext."
+
+truncated="$base/recovery-truncated.gfrec"
+size="$(wc -c < "$encrypted_bundle" | tr -d ' ')"
+(( size > 16 )) || fail "encrypted recovery fixture is unexpectedly small."
+head -c "$((size - 12))" "$encrypted_bundle" > "$truncated"
+chmod 0600 "$truncated"
+if php scripts/recovery-secretstream.php decrypt "$truncated" "$base/truncated.tar" >/dev/null 2>&1; then
+  fail "truncated recovery ciphertext was accepted."
+fi
+[[ ! -e "$base/truncated.tar" ]] || fail "truncated decrypt retained plaintext."
+
+wrong_key="$(php -r 'echo base64_encode(random_bytes(32));')"
+if GF_RECOVERY_KEY_B64="$wrong_key" php scripts/recovery-secretstream.php decrypt \
+  "$encrypted_bundle" "$base/wrong-key.tar" >/dev/null 2>&1; then
+  fail "recovery ciphertext accepted a wrong key."
+fi
+unset wrong_key
+[[ ! -e "$base/wrong-key.tar" ]] || fail "wrong-key decrypt retained plaintext."
+
+rm -rf "$bundle_source" "$source_vault"
+rm -f "$bundle_tar" "$dump"
+
+php scripts/recovery-secretstream.php decrypt "$encrypted_bundle" "$decrypted_tar" >/dev/null
+
+python3 - "$decrypted_tar" <<'PY'
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+archive = sys.argv[1]
+required = {"metadata.json", "vault-index.json", "database.sql.gz", "vault"}
+seen = set()
+
+try:
+    with tarfile.open(archive, mode="r:") as bundle:
+        members = bundle.getmembers()
+        if not members:
+            raise ValueError("empty recovery archive")
+
+        for member in members:
+            name = member.name
+            path = PurePosixPath(name)
+            parts = path.parts
+
+            if (
+                not name
+                or name.startswith("/")
+                or "\\" in name
+                or not parts
+                or any(part in {"", ".", ".."} for part in parts)
+            ):
+                raise ValueError("unsafe recovery archive path")
+
+            top = parts[0]
+            if top not in required:
+                raise ValueError("unexpected recovery archive entry")
+
+            if member.issym() or member.islnk() or member.isdev():
+                raise ValueError("unsafe recovery archive entry type")
+            if not (member.isfile() or member.isdir()):
+                raise ValueError("unsupported recovery archive entry type")
+
+            if top != "vault":
+                if len(parts) != 1 or not member.isfile():
+                    raise ValueError("invalid recovery archive root entry")
+                seen.add(top)
+                continue
+
+            if len(parts) == 1:
+                if not member.isdir():
+                    raise ValueError("vault root must be a directory")
+                seen.add("vault")
+
+        if seen != required:
+            raise ValueError("recovery archive is missing required entries")
+except (OSError, tarfile.TarError, ValueError):
+    raise SystemExit(3)
+PY
+
+install -d -m 0700 "$extracted_bundle"
+tar --extract --file="$decrypted_tar" --directory="$extracted_bundle" \
+  --no-same-owner --no-same-permissions --delay-directory-restore
+php scripts/recovery-bundle.php verify "$extracted_bundle" >/dev/null
+rm -f "$decrypted_tar"
+unset GF_RECOVERY_KEY_B64
+
 tables="$(docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name"     --batch --skip-column-names     --execute='SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;')"
 {
   printf 'SET FOREIGN_KEY_CHECKS=0;\n'
@@ -151,13 +297,25 @@ tables="$(docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mari
 remaining="$(docker run --rm --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name"     --batch --skip-column-names     --execute='SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();' | tr -d '\r\n')"
 [[ "$remaining" == "0" ]] || fail "disposable database was not fully cleared before restore."
 
-rm -rf "$source_vault"
-docker run --rm --interactive --network host --env MYSQL_PWD "$MARIADB_IMAGE"   mariadb     --protocol=TCP     --host="$db_host"     --port="$db_port"     --user="$db_user"     --database="$db_name" < "$dump"
+gzip -dc "$extracted_bundle/database.sql.gz" |
+  docker run --rm --interactive --network host --env MYSQL_PWD "$MARIADB_IMAGE" \
+    mariadb \
+      --protocol=TCP \
+      --host="$db_host" \
+      --port="$db_port" \
+      --user="$db_user" \
+      --database="$db_name" >/dev/null
 install -d -m 0700 "$restored_vault"
-find "$stage/blobs" -maxdepth 1 -type f -name '*.blob' -exec install -m 0600 {} "$restored_vault/" \;
+restored_stage="$extracted_bundle/vault/$org_id"
+find "$restored_stage/blobs" -maxdepth 1 -type f -name '*.blob' -exec install -m 0600 {} "$restored_vault/" \;
 
 cd "$SYMFONY_DIR"
-GRINDFLOW_VAULT_ROOT="$restored_vault"   php bin/console grindflow:vault:verify-restore     --organization="$org_id"     --directory="$stage"     --expect="$manifest_sha"     --confirm-writes-stopped >/dev/null
+GRINDFLOW_VAULT_ROOT="$restored_vault" \
+  php bin/console grindflow:vault:verify-restore \
+    --organization="$org_id" \
+    --directory="$restored_stage" \
+    --expect="$manifest_sha" \
+    --confirm-writes-stopped >/dev/null
 
 php bin/console doctrine:schema:validate --skip-sync >/dev/null
 
@@ -185,4 +343,4 @@ php bin/console doctrine:query:sql "DELETE FROM gf_vault_assets WHERE id = '$ass
 php bin/console doctrine:query:sql "DELETE FROM gf_identity_organizations WHERE id = '$org_id'" >/dev/null
 php bin/console doctrine:query:sql "DELETE FROM gf_identity_users WHERE id = '$user_id'" >/dev/null
 
-printf 'GF-ARCH-002 disposable MariaDB + Vault restore drill: OK\n'
+printf 'GF-ARCH-002 encrypted production-format MariaDB + Vault restore drill: OK\n'

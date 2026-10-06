@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (file_exists($maintenance = dirname(__DIR__).'/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use GrindFlow\Kernel;

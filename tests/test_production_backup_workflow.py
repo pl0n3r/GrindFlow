@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/run-production-backup.sh"
 WORKFLOW = ROOT / ".github/workflows/production-backup.yml"
 CI = ROOT / ".github/workflows/grindflow-ci.yml"
+S4 = ROOT / "public/s4.php"
+CONSOLE = ROOT / "routes/console.php"
 
 
 class ProductionBackupWorkflowTests(unittest.TestCase):
@@ -23,7 +25,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             '[[ -L "$current" ]]',
             'case "$release" in',
             'release="$(readlink -f "$current")"',
-            'php_bin="${3:-/opt/alt/php85/usr/bin/php}"',
+            'php_bin="$8"',
             '-f vendor/autoload.php',
             "database dump utility is unavailable",
             "pending migration count changed",
@@ -32,7 +34,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         ):
             self.assertIn(signal, script)
 
-        self.assertEqual(script.count('require "vendor/autoload.php";'), 2)
+        self.assertGreaterEqual(script.count('require "vendor/autoload.php";'), 2)
 
         base_env = {
             **os.environ,
@@ -138,7 +140,19 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             def run_remote(*, fail_receipt: bool = False):
                 attempt_env = {**env, "FAKE_RECEIPT_FAIL": "1" if fail_receipt else "0"}
                 return subprocess.run(
-                    ["/bin/bash", "-s", "--", str(root), "1", str(fake_php)],
+                    [
+                        "/bin/bash",
+                        "-s",
+                        "--",
+                        str(root),
+                        "1",
+                        "false",
+                        "false",
+                        "false",
+                        "",
+                        "",
+                        str(fake_php),
+                    ],
                     input=remote,
                     env=attempt_env,
                     text=True,
@@ -197,6 +211,168 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertNotIn('return """', script)
         self.assertNotIn("cat .env", script)
 
+    def test_recovery_mode_uses_cross_runtime_maintenance_gate(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        s4 = S4.read_text(encoding="utf-8")
+        console = CONSOLE.read_text(encoding="utf-8")
+
+        self.assertIn("include_recovery_bundle:", workflow)
+        self.assertIn("confirm_recovery_write_freeze:", workflow)
+        self.assertIn("confirm_recovery_symfony_cron_disabled:", workflow)
+        self.assertIn("PRODUCTION_RECOVERY_KEY_B64", workflow)
+        self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
+        self.assertIn('artisan up --no-interaction', script)
+        self.assertIn("storage/framework/maintenance.php", script)
+        self.assertIn("wait_for_recovery_quiescence", script)
+        self.assertIn(
+            "write-capable process did not quiesce before recovery snapshot",
+            script,
+        )
+        self.assertIn("recovery quiescence could not be verified", script)
+        self.assertIn("pgrep is unavailable; recovery quiescence cannot be verified", script)
+        self.assertIn("queue:(work|listen)", script)
+        self.assertIn("schedule:(work|run)", script)
+        self.assertIn("grindflow:password-recovery:deliver", script)
+        self.assertIn("RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED", script)
+        self.assertIn("storage/framework/maintenance.php", s4)
+        self.assertNotIn("evenInMaintenanceMode", console)
+        self.assertLess(
+            script.index('artisan down --render=errors::503'),
+            script.index('grindflow:vault:stage'),
+        )
+        self.assertLess(
+            script.index('grindflow:vault:verify-stage'),
+            script.index('artisan up --no-interaction', script.index('recovery_committed=1')),
+        )
+
+    def test_recovery_rejects_standard_worker_before_snapshot(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
+
+        start = remote.index("wait_for_recovery_quiescence() {")
+        end = remote.index("\n}\n\nroot=", start) + len("\n}")
+        guard = remote[start:end]
+
+        call = "wait_for_recovery_quiescence 12 5 || exit 28"
+        self.assertLess(
+            remote.index(call),
+            remote.index('\n"$dump_bin" \\\n'),
+        )
+        self.assertLess(
+            remote.index(call),
+            remote.index("grindflow:vault:stage"),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            fake_pgrep = fake_bin / "pgrep"
+            fake_pgrep.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' '123 php artisan queue:work redis'\nexit 0\n",
+                encoding="utf-8",
+            )
+            fake_pgrep.chmod(0o755)
+            completed = subprocess.run(
+                ["/bin/bash", "-c", guard + "\nwait_for_recovery_quiescence 1 0"],
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn(
+            "write-capable process did not quiesce before recovery snapshot",
+            completed.stderr,
+        )
+
+        pgrep_error = (
+            "set -euo pipefail\n"
+            "pgrep() { return 2; }\n"
+            "sleep() { :; }\n"
+            + guard
+            + "\nif wait_for_recovery_quiescence 1 0; then exit 9; fi\n"
+        )
+        completed = subprocess.run(
+            ["bash", "-c", pgrep_error],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("recovery quiescence could not be verified", completed.stderr)
+
+        symfony_cron_active = (
+            "set -euo pipefail\n"
+            "pgrep() { "
+            "case \"$*\" in *grindflow:password-recovery:deliver*) return 0 ;; "
+            "*) return 2 ;; esac; }\n"
+            "sleep() { :; }\n"
+            + guard
+            + "\nif wait_for_recovery_quiescence 1 0; then exit 9; fi\n"
+        )
+        completed = subprocess.run(
+            ["bash", "-c", symfony_cron_active],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn(
+            "write-capable process did not quiesce before recovery snapshot",
+            completed.stderr,
+        )
+
+    def test_recovery_quiescence_fails_closed_when_pgrep_errors(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
+
+        start = remote.index("wait_for_recovery_quiescence() {")
+        end = remote.index("\n}\n\nroot=", start) + len("\n}")
+        guard = remote[start:end]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            fake_pgrep = fake_bin / "pgrep"
+            fake_pgrep.write_text(
+                "#!/usr/bin/env bash\nexit 2\n",
+                encoding="utf-8",
+            )
+            fake_pgrep.chmod(0o755)
+            completed = subprocess.run(
+                ["/bin/bash", "-c", guard + "\nwait_for_recovery_quiescence 1 0"],
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn(
+            "recovery quiescence could not be verified",
+            completed.stderr,
+        )
+
+    def test_recovery_quiescence_covers_symfony_password_recovery_cron(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("grindflow:password-recovery:deliver", script)
+        self.assertIn("RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED", script)
+        self.assertIn("confirm_recovery_symfony_cron_disabled:", workflow)
+        self.assertIn(
+            "Symfony password-recovery cron disablement was not explicitly confirmed",
+            script,
+        )
+
     def test_receipt_uses_canonical_verified_backup_command_without_leaving_host(self):
         script = SCRIPT.read_text(encoding="utf-8")
 
@@ -205,6 +381,26 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertNotIn("BACKUP_RECEIPT=", script)
         self.assertIn("MIGRATION_FINGERPRINT=", script)
         self.assertIn("BACKUP_ARCHIVE=", script)
+
+    def test_recovery_requires_explicit_write_freeze_confirmation(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        script = SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("confirm_recovery_write_freeze:", workflow)
+        self.assertIn("RECOVERY_WRITES_STOPPED_CONFIRMED", workflow)
+        self.assertIn(
+            "Encrypted recovery requires explicit write-freeze confirmation",
+            workflow,
+        )
+        self.assertIn(
+            "recovery write freeze was not explicitly confirmed",
+            script,
+        )
+        self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
+        self.assertIn("storage/framework/maintenance.php", script)
+        self.assertIn('artisan up --no-interaction', script)
+        self.assertIn('grindflow:vault:audit', script)
+        self.assertIn('--expect="$manifest_sha"', script)
 
     def test_workflow_is_manual_owner_only_and_never_runs_migrations(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")

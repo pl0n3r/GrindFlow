@@ -7,6 +7,21 @@ on:
         description: 'Exact pending migration count expected in production'
         required: true
         type: string
+      include_recovery_bundle:
+        description: 'Create encrypted DB + Vault recovery evidence in addition to the DB migration backup'
+        required: true
+        default: false
+        type: boolean
+      confirm_recovery_write_freeze:
+        description: 'I explicitly authorize the controlled production write freeze required for the recovery snapshot'
+        required: true
+        default: false
+        type: boolean
+      confirm_recovery_symfony_cron_disabled:
+        description: 'I confirm the hPanel Symfony password-recovery Cron is disabled and drained for the entire recovery window'
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: grindflow-production-backup
@@ -27,6 +42,10 @@ jobs:
       HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
       HOSTINGER_RELEASE_ROOT: ${{ vars.HOSTINGER_RELEASE_ROOT }}
       EXPECTED_PENDING: ${{ inputs.expected_pending }}
+      EXPECTED_SHA: ${{ github.sha }}
+      RECOVERY_BACKUP_ENABLED: ${{ inputs.include_recovery_bundle && 'true' || 'false' }}
+      RECOVERY_WRITES_STOPPED_CONFIRMED: ${{ inputs.confirm_recovery_write_freeze && 'true' || 'false' }}
+      RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED: ${{ inputs.confirm_recovery_symfony_cron_disabled && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -51,12 +70,30 @@ jobs:
           printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$KNOWN_HOSTS_PATH"
           chmod 0600 "$SSH_KEY_PATH" "$KNOWN_HOSTS_PATH"
 
-      - name: Validate backup script
-        run: bash -n scripts/run-production-backup.sh
+      - name: Validate backup and recovery scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/run-production-backup.sh
+          php -l scripts/recovery-secretstream.php
+          php -l scripts/recovery-bundle.php
+          [[ "$RECOVERY_BACKUP_ENABLED" == "true" || "$RECOVERY_BACKUP_ENABLED" == "false" ]]
+          [[ "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "true" || "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "false" ]]
+          [[ "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" == "true" || "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" == "false" ]]
+          if [[ "$RECOVERY_BACKUP_ENABLED" == "true" && "$RECOVERY_WRITES_STOPPED_CONFIRMED" != "true" ]]; then
+            echo "::error::Encrypted recovery requires explicit write-freeze confirmation"
+            exit 1
+          fi
+          if [[ "$RECOVERY_BACKUP_ENABLED" == "true" && "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" != "true" ]]; then
+            echo "::error::Encrypted recovery requires the Symfony password-recovery Cron to be disabled and drained"
+            exit 1
+          fi
 
       - id: backup
         name: Create verified production database backup
         shell: bash
+        env:
+          PRODUCTION_RECOVERY_KEY_B64: ${{ secrets.PRODUCTION_RECOVERY_KEY_B64 }}
         run: |
           set -euo pipefail
           safe_output="$(mktemp)"
@@ -66,19 +103,49 @@ jobs:
 
           fingerprint="$(sed -n 's/^MIGRATION_FINGERPRINT=//p' "$safe_output")"
           archive="$(sed -n 's/^BACKUP_ARCHIVE=//p' "$safe_output")"
+          recovery_sha="$(sed -n 's/^RECOVERY_CIPHERTEXT_SHA256=//p' "$safe_output")"
+          vault_index_sha="$(sed -n 's/^RECOVERY_VAULT_INDEX_SHA256=//p' "$safe_output")"
+          recovery_receipt="$(sed -n 's/^RECOVERY_RECEIPT=//p' "$safe_output")"
+          recovery_orgs="$(sed -n 's/^RECOVERY_ORGANIZATIONS=//p' "$safe_output")"
+          recovery_assets="$(sed -n 's/^RECOVERY_ASSETS=//p' "$safe_output")"
 
           [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]
           [[ "$archive" =~ ^operations/database-backups/[A-Za-z0-9._-]+\.sql\.gz$ ]]
-          [[ "$(wc -l < "$safe_output")" -eq 2 ]]
+
+          if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
+            [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || {
+              echo "::error::PRODUCTION_RECOVERY_KEY_B64 is not configured"
+              exit 1
+            }
+            [[ "$recovery_sha" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$vault_index_sha" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$recovery_receipt" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$recovery_orgs" =~ ^[0-9]+$ ]]
+            [[ "$recovery_assets" =~ ^[0-9]+$ ]]
+            [[ "$(wc -l < "$safe_output")" -eq 7 ]]
+          else
+            [[ -z "$recovery_sha" && -z "$vault_index_sha" && -z "$recovery_receipt" ]]
+            [[ -z "$recovery_orgs" && -z "$recovery_assets" ]]
+            [[ "$(wc -l < "$safe_output")" -eq 2 ]]
+          fi
 
           printf 'fingerprint=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
           printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+          printf 'recovery_sha=%s\n' "$recovery_sha" >> "$GITHUB_OUTPUT"
+          printf 'vault_index_sha=%s\n' "$vault_index_sha" >> "$GITHUB_OUTPUT"
+          printf 'recovery_receipt=%s\n' "$recovery_receipt" >> "$GITHUB_OUTPUT"
+          printf 'recovery_orgs=%s\n' "$recovery_orgs" >> "$GITHUB_OUTPUT"
+          printf 'recovery_assets=%s\n' "$recovery_assets" >> "$GITHUB_OUTPUT"
 
       - name: Publish safe summary
         shell: bash
         env:
           BACKUP_FINGERPRINT: ${{ steps.backup.outputs.fingerprint }}
-          BACKUP_ARCHIVE: ${{ steps.backup.outputs.archive }}
+          RECOVERY_CIPHERTEXT_SHA256: ${{ steps.backup.outputs.recovery_sha }}
+          RECOVERY_VAULT_INDEX_SHA256: ${{ steps.backup.outputs.vault_index_sha }}
+          RECOVERY_RECEIPT: ${{ steps.backup.outputs.recovery_receipt }}
+          RECOVERY_ORGANIZATIONS: ${{ steps.backup.outputs.recovery_orgs }}
+          RECOVERY_ASSETS: ${{ steps.backup.outputs.recovery_assets }}
         run: |
           {
             echo "## Production database backup"
@@ -87,7 +154,21 @@ jobs:
             printf 'Run ID: `%s`\n' "$GITHUB_RUN_ID"
             printf 'Expected pending migrations: **%s**\n' "$EXPECTED_PENDING"
             printf 'Migration fingerprint: `%s`\n' "$BACKUP_FINGERPRINT"
-            printf 'Server-local archive: `%s`\n' "$BACKUP_ARCHIVE"
-            echo "Backup evidence remains private on the production host and is resolved server-side by Migration."
+            echo "Database backup evidence remains private on the production host and is resolved server-side by Migration."
+            if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
+              echo
+              echo "## Encrypted recovery evidence"
+              echo "Controlled write freeze: **explicitly confirmed**"
+              echo "Symfony password-recovery Cron disabled/drained: **explicitly confirmed**"
+              printf 'Ciphertext SHA-256: `%s`\n' "$RECOVERY_CIPHERTEXT_SHA256"
+              printf 'Vault index SHA-256: `%s`\n' "$RECOVERY_VAULT_INDEX_SHA256"
+              printf 'Recovery receipt: `%s`\n' "$RECOVERY_RECEIPT"
+              printf 'Organizations: **%s** · assets: **%s**\n' "$RECOVERY_ORGANIZATIONS" "$RECOVERY_ASSETS"
+              echo "No recovery key, remote path, Vault filename, manifest body or backup payload is published."
+            else
+              echo
+              echo "Encrypted recovery bundle: **not requested**"
+            fi
             echo "This workflow does not run migrations."
+            echo "This workflow does not restore production."
           } >> "$GITHUB_STEP_SUMMARY"

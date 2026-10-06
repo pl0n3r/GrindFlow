@@ -39,10 +39,22 @@ class ProductionPendingCountDispatchTests(unittest.TestCase):
         self.assertIn("bash scripts/run-production-migrations.sh", self.migration)
 
     def test_backup_script_fails_closed_on_count_mismatch(self):
-        self.assertIn(
-            '[[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]]',
-            self.backup_script,
+        recovery_guard = self.backup_script.index(
+            'if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then'
         )
+        zero_allowed = self.backup_script.index(
+            '[[ "$EXPECTED_PENDING" =~ ^[0-9]+$ ]]',
+            recovery_guard,
+        )
+        db_only = self.backup_script.index("else", zero_allowed)
+        positive_only = self.backup_script.index(
+            '[[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]]',
+            db_only,
+        )
+        self.assertLess(recovery_guard, zero_allowed)
+        self.assertLess(zero_allowed, db_only)
+        self.assertLess(db_only, positive_only)
+
         readiness = self.backup_script.index("MigrationReadiness::class")
         mismatch = self.backup_script.index(
             '[[ "$pending_count" == "$expected_pending" ]]'
