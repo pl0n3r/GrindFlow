@@ -42,9 +42,9 @@ foreach ($files as $file) {
         fwrite(STDERR, "cannot hash migration file\n");
         exit(2);
     }
-    $migrations[] = [basename($file), $hash];
+    $migrations[basename($file)] = $hash;
 }
-usort($migrations, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+ksort($migrations, SORT_STRING);
 
 $rawVersions = file($appliedVersionsFile, FILE_IGNORE_NEW_LINES);
 if ($rawVersions === false) {
