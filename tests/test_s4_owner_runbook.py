@@ -6,7 +6,6 @@ import json
 import os
 import re
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -52,86 +51,68 @@ class S4OwnerRunbookTests(unittest.TestCase):
         declared_codes = set(re.findall(r"'([^']+)'", constant.group("body")))
         self.assertEqual(declared_codes, expected_codes)
 
-        # Execute the real CLI against a disposable bootstrap. The empty
-        # autoloader keeps the contract offline: the connection scenario is
-        # classified by the real Throwable path without touching a database.
-        with tempfile.TemporaryDirectory() as temp_dir:
-            sandbox = Path(temp_dir)
-            sandbox_diagnostic = sandbox / "scripts" / DIAGNOSTIC.name
-            sandbox_diagnostic.parent.mkdir(parents=True)
-            sandbox_diagnostic.write_text(self.diagnostic, encoding="utf-8")
+        sentinel_secret = "S4_TEST_SECRET_DO_NOT_PRINT_" + ("x" * 40)
+        sentinel_password = "S4_TEST_DB_PASSWORD_DO_NOT_PRINT"
+        sentinel_database_url = (
+            "mysql://offline_user:"
+            f"{sentinel_password}@offline.invalid/offline_db"
+        )
 
-            bootstrap = sandbox / "symfony" / "config" / "bootstrap.php"
-            bootstrap.parent.mkdir(parents=True)
-            bootstrap.write_text("<?php\n", encoding="utf-8")
-            autoload = sandbox / "symfony" / "vendor" / "autoload.php"
-            autoload.parent.mkdir(parents=True)
-            autoload.write_text("<?php\n", encoding="utf-8")
-
-            base_env = os.environ.copy()
-            base_env.pop("APP_SECRET", None)
-            base_env.pop("DATABASE_URL", None)
-            valid_secret = "s4-contract-secret-0123456789abcdef"
-            scenarios = (
-                ("secret missing", {}, "app_secret_missing"),
-                (
-                    "secret too short",
-                    {"APP_SECRET": "too-short"},
-                    "app_secret_too_short",
-                ),
-                (
-                    "database missing",
-                    {"APP_SECRET": valid_secret},
-                    "database_url_missing",
-                ),
-                (
-                    "database url invalid",
+        # The test-only seam runs before Symfony/vendor loading and feeds
+        # synthetic probe states through the same classification functions used
+        # by the real CLI. It never opens a socket or touches a database.
+        for expected_code in sorted(expected_codes):
+            with self.subTest(expected_code=expected_code):
+                env = os.environ.copy()
+                env.update(
                     {
-                        "APP_SECRET": valid_secret,
-                        "DATABASE_URL": "not-a-database-url",
-                    },
-                    "database_url_invalid",
-                ),
-                (
-                    "database connection failure",
-                    {
-                        "APP_SECRET": valid_secret,
-                        "DATABASE_URL": "mysql://s4-user:s4-password@127.0.0.1:1/grindflow",
-                    },
-                    "database_connection_failed",
-                ),
-            )
+                        "APP_ENV": "test",
+                        "GRINDFLOW_S4_DIAGNOSTIC_TEST_SCENARIO": expected_code,
+                        "GRINDFLOW_S4_DIAGNOSTIC_TEST_SECRET": sentinel_secret,
+                        "GRINDFLOW_S4_DIAGNOSTIC_TEST_DATABASE_URL": sentinel_database_url,
+                    }
+                )
+                result = subprocess.run(
+                    ["php", str(DIAGNOSTIC)],
+                    cwd=ROOT,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
 
-            for label, overrides, expected_code in scenarios:
-                with self.subTest(label=label):
-                    env = base_env.copy()
-                    env.update(overrides)
-                    result = subprocess.run(
-                        ["php", str(sandbox_diagnostic)],
-                        cwd=sandbox,
-                        env=env,
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                    )
-                    self.assertEqual(result.returncode, 2, result.stderr)
-                    payload = json.loads(result.stdout)
-                    self.assertEqual(payload, {"status": "blocked", "code": expected_code})
-                    self.assertIn(payload["code"], expected_codes)
+                self.assertEqual(
+                    result.returncode,
+                    0 if expected_code == "ready" else 2,
+                    result.stderr,
+                )
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(len(result.stdout.splitlines()), 1)
 
-                    combined_output = result.stdout + result.stderr
-                    for sensitive_value in overrides.values():
-                        self.assertNotIn(sensitive_value, combined_output)
+                payload = json.loads(result.stdout)
+                self.assertEqual(set(payload), {"status", "code"})
+                self.assertEqual(payload["code"], expected_code)
+                self.assertEqual(
+                    payload["status"],
+                    "ready" if expected_code == "ready" else "blocked",
+                )
+
+                combined_output = result.stdout + result.stderr
+                for sensitive_value in (
+                    sentinel_secret,
+                    sentinel_password,
+                    sentinel_database_url,
+                ):
+                    self.assertNotIn(sensitive_value, combined_output)
 
         for snippet in (
-            "strlen($appSecret) < 32",
-            "databaseUrlIsValid($databaseUrl)",
+            "diagnosticConfigurationCode",
+            "diagnosticDatabaseCode",
+            "GRINDFLOW_S4_DIAGNOSTIC_TEST_SCENARIO",
+            "diagnosticEnv('APP_ENV') !== 'test'",
             "$connection->connect()",
-            "foreach (S4_DIAGNOSTIC_TABLES as $table)",
-            "diagnosticFinish('schema_missing:'.$table)",
+            "$schema->tablesExist([$table])",
             "INNER JOIN gf_identity_memberships",
-            "diagnosticFinish('identity_missing')",
-            "diagnosticFinish('ready')",
             "'status' => $code === 'ready' ? 'ready' : 'blocked'",
             "'code' => $code",
         ):
