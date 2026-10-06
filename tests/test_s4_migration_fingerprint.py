@@ -88,7 +88,9 @@ class S4MigrationFingerprintTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="private-fingerprint-path-") as tmp:
             migrations, versions = self.fixture(Path(tmp))
             versions.write_bytes(
-                b"GrindFlow\\\\Migrations\\\\Version20261001000000\\xff\\n"
+                rb"GrindFlow\Migrations\Version20261001000000"
+                + bytes([0xFF])
+                + b"\n"
             )
             result = subprocess.run(
                 ["php", str(HELPER), SHA, str(migrations), str(versions)],
