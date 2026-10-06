@@ -26,7 +26,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
             input=applied_versions.read_text(encoding="utf-8"),
             capture_output=True,
         )
-        self.assertEqual(result.stderr, "")
+        self.assertEqual("", result.stderr)
         value = result.stdout.strip()
         self.assertRegex(value, r"^[0-9a-f]{64}$")
         return value
@@ -49,10 +49,9 @@ class S4MigrationFingerprintTests(unittest.TestCase):
     def test_identical_inputs_are_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             migrations, versions = self.fixture(Path(tmp))
-            self.assertEqual(
-                self.fingerprint(migrations, versions),
-                self.fingerprint(migrations, versions),
-            )
+            expected = self.fingerprint(migrations, versions)
+            actual = self.fingerprint(migrations, versions)
+            self.assertEqual(expected, actual)
 
     def test_migration_content_change_changes_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -167,10 +166,9 @@ class S4MigrationFingerprintTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp:
             migrations, versions = self.fixture(Path(tmp))
-            self.assertEqual(
-                self.fingerprint(migrations, versions),
-                self.fingerprint(migrations, versions),
-            )
+            expected = self.fingerprint(migrations, versions)
+            actual = self.fingerprint(migrations, versions)
+            self.assertEqual(expected, actual)
 
 
 if __name__ == "__main__":
