@@ -142,6 +142,10 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
             self::assertTrue(mkdir($ready, 0700));
             self::assertSame('ready', $materializer->privateVaultReadinessState($ready));
 
+            self::assertTrue(chmod($ready, 0600));
+            self::assertSame('unreadable', $materializer->privateVaultReadinessState($ready));
+            self::assertFalse($materializer->runtimeReadiness($ready)['private_vault']);
+
             self::assertTrue(chmod($ready, 0755));
             self::assertSame(
                 'permissions_not_private',
