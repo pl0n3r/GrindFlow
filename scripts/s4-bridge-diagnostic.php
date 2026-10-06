@@ -88,7 +88,7 @@ function diagnosticConfigurationCode(string $appSecret, string $databaseUrl): ?s
 }
 
 /**
- * @param array<string, bool> $tables
+ * @param  array<string, bool>  $tables
  */
 function diagnosticDatabaseCode(bool $connected, array $tables, int $identityCount): string
 {
