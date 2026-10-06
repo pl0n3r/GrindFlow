@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import re
 import subprocess
 import textwrap
 import unittest
@@ -156,12 +157,14 @@ class S4ProductionBridgeTests(unittest.TestCase):
         self.assertIn("check_media_web_runtime_readiness s4", SMOKE)
         self.assertIn("Symfony /s4", WORKFLOW)
 
-    def test_v0199_manifests_and_readme_are_synchronized(self) -> None:
-        self.assertIn("'number' => '0.1.199'", VERSION)
-        self.assertEqual("0.1.199", PACKAGE["version"])
-        self.assertEqual("0.1.199", LOCK["version"])
-        self.assertEqual("0.1.199", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.199", README)
+    def test_release_manifests_and_readme_are_synchronized(self) -> None:
+        match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
+        self.assertIsNotNone(match)
+        expected = match.group(1)
+        self.assertEqual(expected, PACKAGE["version"])
+        self.assertEqual(expected, LOCK["version"])
+        self.assertEqual(expected, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{expected}", README)
 
 
 if __name__ == "__main__":
