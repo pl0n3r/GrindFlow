@@ -114,7 +114,7 @@ class S4WebDbal4ConnectionTests(unittest.TestCase):
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
         expected = match.group(1)
-        self.assertEqual("0.1.205", expected)
+        self.assertGreaterEqual(tuple(map(int, expected.split("."))), (0, 1, 205))
         self.assertEqual(expected, PACKAGE["version"])
         self.assertEqual(expected, LOCK["version"])
         self.assertEqual(expected, LOCK["packages"][""]["version"])

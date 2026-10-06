@@ -72,7 +72,8 @@ done
 printf 'PASS production smoke contract: dashboard assertions use stable HTML markers\n'
 
 # A failed exact-SHA wait or OIDC bootstrap must still report the production incident.
-# This contract is run by GrindFlow CI / fast without production credentials.
+# The synthetic credential is generated unconditionally per run, so no legacy
+# configured-output guard may suppress this reporter.
 python3 - "$script_dir/../.github/workflows/production-smoke.yml" <<'PY'
 from pathlib import Path
 import re
@@ -87,7 +88,6 @@ assert workflow.count(start) == 1, "pre-login incident reporter must be unique"
 report = workflow.split(start, 1)[1].split(end, 1)[0]
 for marker in (
     "if: failure()",
-    "steps.credentials.outputs.configured == 'true'",
     "steps.deployed_checkout.outcome == 'failure'",
     "steps.synthetic_bootstrap.outcome == 'failure'",
     "gh issue comment",
@@ -98,6 +98,7 @@ for marker in (
     "GH_TOKEN:",
 ):
     assert marker in report, marker
+assert "steps.credentials.outputs.configured" not in report, "legacy configured guard must be absent"
 for forbidden in ('"$oidc_token"', '"$payload"', "production-smoke.log", "getMessage"):
     assert forbidden not in report, forbidden
 for marker in ("--dump-header", "failure_stage=", "failure_code=", "break", "BOOTSTRAP_FAILURE_STAGE", "BOOTSTRAP_FAILURE_CODE"):
