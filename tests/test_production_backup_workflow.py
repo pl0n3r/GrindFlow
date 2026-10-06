@@ -149,6 +149,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
                         "false",
                         "false",
                         "false",
+                        "false",
                         "",
                         "",
                         str(fake_php),
@@ -367,7 +368,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
 
         self.assertIn("grindflow:password-recovery:deliver", script)
         self.assertIn("RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED", script)
-        self.assertIn("confirm_symfony_password_recovery_cron_disabled:", workflow)
+        self.assertIn("confirm_recovery_symfony_cron_disabled:", workflow)
         self.assertIn(
             "Symfony password-recovery cron disablement was not explicitly confirmed",
             script,
