@@ -27,7 +27,7 @@ function assertHash(string $value, string $code): string
 
 function buildVaultIndex(string $root): array
 {
-    if ($root === '' || !str_starts_with($root, '/') || is_link($root) || !is_dir($root)) {
+    if ($root === '' || ! str_starts_with($root, '/') || is_link($root) || ! is_dir($root)) {
         fail('invalid_vault_stage_root');
     }
     $entries = scandir($root);
@@ -46,23 +46,23 @@ function buildVaultIndex(string $root): array
         $manifestPath = $directory.'/manifest.json';
         if (
             is_link($directory)
-            || !is_dir($directory)
+            || ! is_dir($directory)
             || is_link($manifestPath)
-            || !is_file($manifestPath)
-            || !is_readable($manifestPath)
+            || ! is_file($manifestPath)
+            || ! is_readable($manifestPath)
         ) {
             fail('vault_manifest_unavailable');
         }
         $raw = file_get_contents($manifestPath);
         $manifest = is_string($raw) ? json_decode($raw, true) : null;
         if (
-            !is_array($manifest)
+            ! is_array($manifest)
             || ($manifest['schema'] ?? null) !== 'grindflow-vault-stage-v1'
             || ($manifest['organization_id'] ?? null) !== $entry
-            || !is_string($manifest['manifest_sha256'] ?? null)
+            || ! is_string($manifest['manifest_sha256'] ?? null)
             || preg_match('/\A[0-9a-f]{64}\z/D', $manifest['manifest_sha256']) !== 1
-            || !is_array($manifest['assets'] ?? null)
-            || !array_is_list($manifest['assets'])
+            || ! is_array($manifest['assets'] ?? null)
+            || ! array_is_list($manifest['assets'])
         ) {
             fail('invalid_vault_manifest');
         }
@@ -125,7 +125,7 @@ function buildMetadata(array $args): array
 
 function verifyBundle(string $root): array
 {
-    if ($root === '' || !str_starts_with($root, '/') || is_link($root) || !is_dir($root)) {
+    if ($root === '' || ! str_starts_with($root, '/') || is_link($root) || ! is_dir($root)) {
         fail('invalid_bundle_root');
     }
     foreach (['metadata.json', 'vault-index.json', 'database.sql.gz', 'vault'] as $entry) {
@@ -134,14 +134,14 @@ function verifyBundle(string $root): array
             fail('unsafe_bundle_entry');
         }
     }
-    if (!is_file($root.'/metadata.json') || !is_file($root.'/vault-index.json')
-        || !is_file($root.'/database.sql.gz') || filesize($root.'/database.sql.gz') < 1
-        || !is_dir($root.'/vault')) {
+    if (! is_file($root.'/metadata.json') || ! is_file($root.'/vault-index.json')
+        || ! is_file($root.'/database.sql.gz') || filesize($root.'/database.sql.gz') < 1
+        || ! is_dir($root.'/vault')) {
         fail('incomplete_bundle');
     }
     $metadata = json_decode((string) file_get_contents($root.'/metadata.json'), true);
     $storedIndex = json_decode((string) file_get_contents($root.'/vault-index.json'), true);
-    if (!is_array($metadata) || !is_array($storedIndex)
+    if (! is_array($metadata) || ! is_array($storedIndex)
         || array_keys($metadata) !== [
             'schema', 'database_file', 'database_fingerprint', 'vault_index_file',
             'vault_index_sha256', 'release_version', 'release_sha', 'created_at',
@@ -151,7 +151,7 @@ function verifyBundle(string $root): array
         fail('invalid_bundle_metadata');
     }
     $actualIndex = buildVaultIndex($root.'/vault');
-    if (!hash_equals(
+    if (! hash_equals(
         (string) ($metadata['vault_index_sha256'] ?? ''),
         (string) ($actualIndex['vault_index_sha256'] ?? ''),
     ) || canonicalJson($storedIndex) !== canonicalJson($actualIndex)) {
