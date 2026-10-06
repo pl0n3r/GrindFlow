@@ -127,6 +127,15 @@ def run_s4_fixture(stage: str) -> str:
                 printf '%s\\n' "$SELECT_REDIRECT"
               fi
             }}
+            safe_s4_login_redirect_class() {{
+              case "${1:-}" in
+                /s4/login) printf '%s\\n' 'returned_to_login' ;;
+                /s4/organizations) printf '%s\\n' 'organizations' ;;
+                /s4/admin) printf '%s\\n' 'admin' ;;
+                '(missing)') printf '%s\\n' 'missing' ;;
+                *) printf '%s\\n' 'redacted' ;;
+              esac
+            }}
             curl_common() {{
               local rendered=" $* "
               if [[ "$rendered" == *"/s4/_bridge-readiness"* ]]; then
