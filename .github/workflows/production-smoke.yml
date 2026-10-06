@@ -416,7 +416,10 @@ jobs:
           if [[ "$diagnostic_state" == "observed" ]] \
             && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
             && temporary_storage_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE)" \
-            && private_vault_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT)"; then
+            && private_vault_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT)" \
+            && [[ -n "$s4_private_vault_state" ]] \
+            && { [[ "$private_vault_state" == "ready" && "$s4_private_vault_state" == "ready" ]] \
+              || [[ "$private_vault_state" == "not_ready" && "$s4_private_vault_state" != "ready" ]]; }; then
             diagnostics_available=true
           elif [[ "$diagnostic_state" == "observed" ]]; then
             diagnostic_state='markers_absent'
