@@ -284,7 +284,7 @@ Cuando `/health` exponga el SHA exacto de `main` y el bridge esté en `ready_for
 
 ## Restaurar la base aislada desde el backup
 
-La restauración es destructiva y sigue siendo **owner-only**. Ejecútala únicamente después de decidir explícitamente revertir toda la capa Symfony y sobre una base limpia/fresca. Antes de escribir toma el mismo lock exclusivo y crea/verifica un recibo reciente ligado al archivo real; `VerifiedBackupEvidence` conserva el límite de 15 minutos.
+La restauración es destructiva y sigue siendo **owner-only**. Ejecútala únicamente después de decidir explícitamente revertir toda la capa Symfony y sobre una base limpia/fresca. Importar el dump sobre una base ya migrada no elimina por sí solo tablas creadas después del backup y, por tanto, no garantiza rollback exacto. Antes de escribir toma el mismo lock exclusivo y crea/verifica un recibo reciente ligado al archivo real; `VerifiedBackupEvidence` conserva el límite de 15 minutos.
 
 Define `BACKUP_RELATIVE` con la ruta server-side creada en el paso 5 (`operations/database-backups/...sql.gz`).
 
