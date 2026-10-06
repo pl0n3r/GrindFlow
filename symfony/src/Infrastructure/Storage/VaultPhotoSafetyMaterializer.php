@@ -155,8 +155,30 @@ final class VaultPhotoSafetyMaterializer
         return [
             'decoder' => $this->decoderAvailable(),
             'temporary_storage' => $this->temporaryStorageReady(),
-            'private_vault' => $this->privateVaultReady($vaultRoot),
+            'private_vault' => $this->privateVaultReadinessState($vaultRoot) === 'ready',
         ];
+    }
+
+    public function privateVaultReadinessState(string $vaultRoot): string
+    {
+        if ($vaultRoot === '' || is_link($vaultRoot)) {
+            return 'root_unavailable';
+        }
+        if (!is_dir($vaultRoot)) {
+            return 'missing';
+        }
+        if (!is_readable($vaultRoot)) {
+            return 'unreadable';
+        }
+        $mode = @fileperms($vaultRoot);
+        if (!is_int($mode)) {
+            return 'permissions_unavailable';
+        }
+        if (($mode & 0077) !== 0) {
+            return 'permissions_not_private';
+        }
+
+        return 'ready';
     }
 
     private function temporaryStorageReady(): bool
@@ -187,16 +209,6 @@ final class VaultPhotoSafetyMaterializer
                 unlink($probe);
             }
         }
-    }
-
-    private function privateVaultReady(string $vaultRoot): bool
-    {
-        if ($vaultRoot === '' || !is_dir($vaultRoot) || is_link($vaultRoot) || !is_readable($vaultRoot)) {
-            return false;
-        }
-        $mode = fileperms($vaultRoot);
-
-        return is_int($mode) && ($mode & 0077) === 0;
     }
 
     private function assertMemoryAvailable(int $width, int $height, int $inputBytes): void
