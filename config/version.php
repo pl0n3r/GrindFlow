@@ -5,6 +5,6 @@ declare(strict_types=1);
 // Deliberate human-readable GrindFlow product release.
 // This is NOT proof of the Git commit deployed on Hostinger.
 return [
-    'number' => '0.1.202',
-    'released_at' => '2026-10-05',
+    'number' => '0.1.203',
+    'released_at' => '2026-10-06',
 ];

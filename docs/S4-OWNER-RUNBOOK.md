@@ -127,6 +127,8 @@ Desde el checkout, introduce los datos. El bloque rechaza host/nombre/usuario/pa
 chmod 600 symfony/.env.local
 ```
 
+El runtime debe aceptar **contraseñas arbitrarias válidas**, incluidos símbolos reservados. El bloque anterior usa `rawurlencode()` para user/password antes de construir la DSN y Doctrine consume `DATABASE_URL` como variable de entorno runtime directa; no uses `env(resolve:DATABASE_URL)` para una DSN percent-encoded. Una contraseña URL-safe/hexadecimal puede servir como **mitigación temporal** para recuperar una revisión antigua afectada, pero no es requisito de contraseña ni solución permanente.
+
 Si el servidor MariaDB requiere un puerto distinto, detente y ajusta el procedimiento de forma explícita. No adivines el endpoint.
 
 ## 3. Ejecutar el diagnóstico de solo lectura
