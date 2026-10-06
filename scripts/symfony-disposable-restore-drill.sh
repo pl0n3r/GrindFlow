@@ -220,8 +220,65 @@ rm -rf "$bundle_source" "$source_vault"
 rm -f "$bundle_tar" "$dump"
 
 php scripts/recovery-secretstream.php decrypt "$encrypted_bundle" "$decrypted_tar" >/dev/null
+
+python3 - "$decrypted_tar" <<'PY'
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+archive = sys.argv[1]
+required = {"metadata.json", "vault-index.json", "database.sql.gz", "vault"}
+seen = set()
+
+try:
+    with tarfile.open(archive, mode="r:") as bundle:
+        members = bundle.getmembers()
+        if not members:
+            raise ValueError("empty recovery archive")
+
+        for member in members:
+            name = member.name
+            path = PurePosixPath(name)
+            parts = path.parts
+
+            if (
+                not name
+                or name.startswith("/")
+                or "\\" in name
+                or not parts
+                or any(part in {"", ".", ".."} for part in parts)
+            ):
+                raise ValueError("unsafe recovery archive path")
+
+            top = parts[0]
+            if top not in required:
+                raise ValueError("unexpected recovery archive entry")
+
+            if member.issym() or member.islnk() or member.isdev():
+                raise ValueError("unsafe recovery archive entry type")
+            if not (member.isfile() or member.isdir()):
+                raise ValueError("unsupported recovery archive entry type")
+
+            if top != "vault":
+                if len(parts) != 1 or not member.isfile():
+                    raise ValueError("invalid recovery archive root entry")
+                seen.add(top)
+                continue
+
+            if len(parts) == 1:
+                if not member.isdir():
+                    raise ValueError("vault root must be a directory")
+                seen.add("vault")
+
+        if seen != required:
+            raise ValueError("recovery archive is missing required entries")
+except (OSError, tarfile.TarError, ValueError):
+    raise SystemExit(3)
+PY
+
 install -d -m 0700 "$extracted_bundle"
-tar -C "$extracted_bundle" -xf "$decrypted_tar"
+tar --extract --file="$decrypted_tar" --directory="$extracted_bundle" \
+  --no-same-owner --no-same-permissions --delay-directory-restore
 php scripts/recovery-bundle.php verify "$extracted_bundle" >/dev/null
 rm -f "$decrypted_tar"
 unset GF_RECOVERY_KEY_B64
