@@ -25,9 +25,9 @@
 | legacy_supabase_upload_audit | location | upload_link_id, r2_key, bytes, mime_type, ip, occurred_at | upload_security_audit | review_required | review_required | supabase | review_required |
 | media_vault | usage | ingested_by_user_id, profile_id, assigned_at, assigned_by_user_id, original_filename, source_type, source_ref, storage_disk, storage_key, r2_key, sha256, checksum_sha256, byte_size, file_type, mime_type, outfit_tag, session_date, metadata, derivatives | media_management | review_required | review_required | cloudflare_r2, supabase | review_required |
 | organization_membership | identification | user_id, organization_id, role | tenant_authorization | review_required | review_required | supabase | review_required |
-| staff_access_metadata | usage | last_access_at, failed_login_count | staff_security_monitoring | review_required | review_required | ninguno_declarado | review_required |
+| staff_access_metadata | usage | last_access_at, failed_login_count, event_name | staff_security_monitoring | review_required | review_required | ninguno_declarado | review_required |
 | staff_contact | contact | email | staff_invitation_and_recovery | review_required | review_required | ninguno_declarado | review_required |
-| staff_identity | identification | staff_id, name, role, status | staff_administration | review_required | review_required | ninguno_declarado | review_required |
+| staff_identity | identification | staff_id, name, role, status, actor_id | staff_administration | review_required | review_required | ninguno_declarado | review_required |
 | traffic_dedupe | usage | visitor_hash, last_counted_at | traffic_deduplication | review_required | review_required | ninguno_declarado | dedupe_24h |
 | traffic_links | usage | created_by_user_id, profile_id, slug, label, destination_url, channel, campaign, network, status, clicks_count, expires_at | traffic_attribution | review_required | review_required | supabase | review_required |
 | traffic_metrics | usage | metric_date, clicks | traffic_measurement | review_required | review_required | ninguno_declarado | review_required |

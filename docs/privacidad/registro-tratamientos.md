@@ -87,7 +87,7 @@ Producto: `pl0n3r/GrindFlow`
 ## staff_access_metadata
 
 - Categoría: `usage`
-- Campos de software: `last_access_at`, `failed_login_count`
+- Campos de software: `last_access_at`, `failed_login_count`, `event_name`
 - Finalidad: `staff_security_monitoring`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`
@@ -107,7 +107,7 @@ Producto: `pl0n3r/GrindFlow`
 ## staff_identity
 
 - Categoría: `identification`
-- Campos de software: `staff_id`, `name`, `role`, `status`
+- Campos de software: `staff_id`, `name`, `role`, `status`, `actor_id`
 - Finalidad: `staff_administration`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`
