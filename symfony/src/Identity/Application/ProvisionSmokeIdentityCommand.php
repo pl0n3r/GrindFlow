@@ -83,6 +83,8 @@ final class ProvisionSmokeIdentityCommand extends Command
                 return $this->db->transactional(
                     fn (Connection $db): string => $this->reconcile($db, $secret),
                 );
+            } catch (ReservedIdentityConflict) {
+                return 'identity_conflict';
             } catch (UniqueConstraintViolationException $exception) {
                 if (
                     $attempt !== 0
@@ -142,13 +144,14 @@ final class ProvisionSmokeIdentityCommand extends Command
                     'gf_identity_memberships',
                     ['role' => self::MEMBERSHIP_ROLE],
                     [
+                        'id' => (string) $membership['id'],
                         'user_id' => (string) $user['id'],
                         'organization_id' => (string) $organization['id'],
                         'role' => self::LEGACY_MEMBERSHIP_ROLE,
                     ],
                 );
                 if ($affected !== 1) {
-                    return 'identity_conflict';
+                    throw new ReservedIdentityConflict();
                 }
             }
 
@@ -162,7 +165,7 @@ final class ProvisionSmokeIdentityCommand extends Command
                     ],
                 );
                 if ($affected !== 1) {
-                    return 'identity_conflict';
+                    throw new ReservedIdentityConflict();
                 }
             }
 
@@ -215,10 +218,6 @@ final class ProvisionSmokeIdentityCommand extends Command
     /**
      * @param array<string, mixed> $user
      * @param array<string, mixed> $organization
-     */
-    /**
-     * @param array<string, mixed> $user
-     * @param array<string, mixed> $organization
      *
      * @return array<string, mixed>|null
      */
@@ -240,7 +239,7 @@ final class ProvisionSmokeIdentityCommand extends Command
 
         $memberships = $db->fetchAllAssociative(
             <<<'SQL'
-                SELECT user_id, organization_id, role
+                SELECT id, user_id, organization_id, role
                 FROM gf_identity_memberships
                 WHERE user_id = :user_id OR organization_id = :organization_id
                 ORDER BY id
@@ -256,7 +255,8 @@ final class ProvisionSmokeIdentityCommand extends Command
 
         $membership = $memberships[0];
         if (
-            (string) ($membership['user_id'] ?? '') !== (string) $user['id']
+            (string) ($membership['id'] ?? '') === ''
+            || (string) ($membership['user_id'] ?? '') !== (string) $user['id']
             || (string) ($membership['organization_id'] ?? '') !== (string) $organization['id']
         ) {
             return null;
@@ -279,4 +279,9 @@ final class ProvisionSmokeIdentityCommand extends Command
 
         return $ok ? Command::SUCCESS : Command::FAILURE;
     }
+}
+
+
+final class ReservedIdentityConflict extends \RuntimeException
+{
 }
