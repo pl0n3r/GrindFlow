@@ -1,0 +1,48 @@
+name: Temporary issue 336 stale release test patch
+
+on:
+  push:
+    branches:
+      - trabajo/issue-336
+    paths:
+      - .github/workflows/zz-patch-stale-release-test-336.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-stale-release-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: trabajo/issue-336
+          fetch-depth: 0
+
+      - name: Generalize stale V0.1.200 identity contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/test_production_smoke_media_readiness.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''    def test_v0200_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:\n        self.assertIn("'number' => '0.1.200'", VERSION)\n        self.assertEqual("0.1.200", PACKAGE["version"])\n        self.assertEqual("0.1.200", LOCK["version"])\n        self.assertEqual("0.1.200", LOCK["packages"][""]["version"])\n        self.assertIn("V0.1.200", README)\n        self.assertIn("Quick upload remains available.", WORKFLOW)\n'''
+          new = '''    def test_release_identity_is_synchronized_without_making_s3_a_requirement(self) -> None:\n        release = PACKAGE["version"]\n        self.assertIn(f"'number' => '{release}'", VERSION)\n        self.assertEqual(release, LOCK["version"])\n        self.assertEqual(release, LOCK["packages"][""]["version"])\n        self.assertIn(f"V{release}", README)\n        self.assertIn("Quick upload remains available.", WORKFLOW)\n'''
+          if text.count(old) != 1:
+              raise SystemExit('expected exactly one stale V0.1.200 contract block')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          python3 -m unittest tests.test_production_smoke_media_readiness.ProductionSmokeMediaReadinessTests.test_release_identity_is_synchronized_without_making_s3_a_requirement
+          git diff --check -- tests/test_production_smoke_media_readiness.py
+
+      - name: Commit patch and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/zz-patch-stale-release-test-336.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/test_production_smoke_media_readiness.py .github/workflows/zz-patch-stale-release-test-336.yml
+          git commit -m 'test(release): generalizar identidad sincronizada'
+          git push origin HEAD:trabajo/issue-336
