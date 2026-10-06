@@ -5,9 +5,7 @@ declare(strict_types=1);
 const RECOVERY_MAGIC = "GFRCV1\n";
 const RECOVERY_CHUNK_BYTES = 1048576;
 
-final class RecoveryCryptoFailure extends RuntimeException
-{
-}
+final class RecoveryCryptoFailure extends RuntimeException {}
 
 function reject(string $message): never
 {
@@ -23,12 +21,12 @@ function requireSodiumRuntime(): void
         'sodium_crypto_secretstream_xchacha20poly1305_pull',
     ];
 
-    if (!extension_loaded('sodium')) {
+    if (! extension_loaded('sodium')) {
         reject('libsodium extension is unavailable.');
     }
 
     foreach ($required as $function) {
-        if (!function_exists($function)) {
+        if (! function_exists($function)) {
             reject('libsodium secretstream runtime is unavailable.');
         }
     }
@@ -37,13 +35,13 @@ function requireSodiumRuntime(): void
 function recoveryKey(): string
 {
     $encoded = getenv('GF_RECOVERY_KEY_B64');
-    if (!is_string($encoded) || $encoded === '') {
+    if (! is_string($encoded) || $encoded === '') {
         reject('recovery key is unavailable.');
     }
 
     $key = base64_decode($encoded, true);
     if (
-        !is_string($key)
+        ! is_string($key)
         || strlen($key) !== SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES
     ) {
         reject('recovery key is invalid.');
@@ -147,7 +145,7 @@ function encryptBundle(string $inputPath, string $outputPath, string $key): void
             $current = $next;
         } while (!$final);
 
-        if (!fflush($output)) {
+        if (! fflush($output)) {
             reject('encrypted recovery bundle could not be flushed.');
         }
 
@@ -184,7 +182,7 @@ function decryptBundle(string $inputPath, string $outputPath, string $key): void
         $state = sodium_crypto_secretstream_xchacha20poly1305_init_pull($header, $key);
         $sawFinal = false;
 
-        while (!feof($input)) {
+        while (! feof($input)) {
             $prefix = fread($input, 4);
             if ($prefix === false) {
                 reject('encrypted recovery bundle could not be read.');
@@ -199,7 +197,7 @@ function decryptBundle(string $inputPath, string $outputPath, string $key): void
             $length = unpack('Nlength', $prefix)['length'] ?? 0;
             $minimum = SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES;
             $maximum = RECOVERY_CHUNK_BYTES + $minimum;
-            if (!is_int($length) || $length < $minimum || $length > $maximum) {
+            if (! is_int($length) || $length < $minimum || $length > $maximum) {
                 reject('encrypted recovery bundle frame is invalid.');
             }
 
@@ -224,7 +222,7 @@ function decryptBundle(string $inputPath, string $outputPath, string $key): void
                 if ($extra === false) {
                     reject('encrypted recovery bundle could not be read.');
                 }
-                if ($extra !== '' || !feof($input)) {
+                if ($extra !== '' || ! feof($input)) {
                     reject('encrypted recovery bundle has trailing data.');
                 }
                 break;
@@ -239,7 +237,7 @@ function decryptBundle(string $inputPath, string $outputPath, string $key): void
             reject('encrypted recovery bundle final authentication tag is missing.');
         }
 
-        if (!fflush($output)) {
+        if (! fflush($output)) {
             reject('decrypted recovery bundle could not be flushed.');
         }
 
@@ -257,7 +255,7 @@ $key = '';
 try {
     requireSodiumRuntime();
 
-    if ($argc !== 4 || !in_array($argv[1], ['encrypt', 'decrypt'], true)) {
+    if ($argc !== 4 || ! in_array($argv[1], ['encrypt', 'decrypt'], true)) {
         reject('usage: recovery-secretstream.php encrypt|decrypt INPUT OUTPUT.');
     }
 
