@@ -604,10 +604,23 @@ PRIVATE_VAULT_STATES = {
 }
 runtime = sys.argv[2] if len(sys.argv) > 2 else ""
 
+class DuplicateKeyError(ValueError):
+    pass
+
+
+def strict_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateKeyError(key)
+        result[key] = value
+    return result
+
+
 try:
     with open(sys.argv[1], "r", encoding="utf-8") as handle:
-        payload = json.load(handle)
-except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        payload = json.load(handle, object_pairs_hook=strict_object)
+except (OSError, UnicodeDecodeError, json.JSONDecodeError, DuplicateKeyError):
     raise SystemExit(1)
 
 if runtime not in {"laravel", "s4"}:
