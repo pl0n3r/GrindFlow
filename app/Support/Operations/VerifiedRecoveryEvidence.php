@@ -8,8 +8,6 @@ use RuntimeException;
 
 final class VerifiedRecoveryEvidence
 {
-    public const int MAX_AGE_SECONDS = 86400;
-
     private const string DIRECTORY = 'operations/recovery-backups';
 
     public function record(
@@ -36,16 +34,9 @@ final class VerifiedRecoveryEvidence
             throw new RuntimeException('Recovery ciphertext cannot be hashed.');
         }
 
-        $receiptId = hash(
-            'sha256',
-            random_bytes(32)
-            .$ciphertextSha256
-            .$migrationFingerprint
-            .$vaultIndexSha256
-            .$releaseSha,
-        );
-        $payload = json_encode([
+        $receiptPayload = [
             'version' => 1,
+            'nonce' => bin2hex(random_bytes(16)),
             'format' => 'grindflow-recovery-v1',
             'created_at' => now('UTC')->toIso8601String(),
             'ciphertext' => $ciphertextRelativePath,
@@ -56,7 +47,9 @@ final class VerifiedRecoveryEvidence
             'release_sha' => strtolower($releaseSha),
             'organization_count' => $organizationCount,
             'asset_count' => $assetCount,
-        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        ];
+        $payload = json_encode($receiptPayload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $receiptId = hash('sha256', $payload."\n");
 
         $this->writeReceipt($receiptId, $payload);
 
@@ -83,6 +76,7 @@ final class VerifiedRecoveryEvidence
         $payload = is_string($raw) ? json_decode($raw, true) : null;
         $expectedKeys = [
             'version',
+            'nonce',
             'format',
             'created_at',
             'ciphertext',
@@ -99,6 +93,8 @@ final class VerifiedRecoveryEvidence
             ! is_array($payload)
             || array_keys($payload) !== $expectedKeys
             || ($payload['version'] ?? null) !== 1
+            || ! is_string($payload['nonce'] ?? null)
+            || preg_match('/\A[a-f0-9]{32}\z/', $payload['nonce']) !== 1
             || ($payload['format'] ?? null) !== 'grindflow-recovery-v1'
             || ! is_string($payload['created_at'] ?? null)
             || ! is_string($payload['ciphertext'] ?? null)
@@ -129,14 +125,18 @@ final class VerifiedRecoveryEvidence
         }
 
         try {
-            $createdAt = CarbonImmutable::parse($payload['created_at'], 'UTC');
+            CarbonImmutable::parse($payload['created_at'], 'UTC');
         } catch (\Throwable) {
             throw new RuntimeException('Verified recovery receipt timestamp is invalid.');
         }
 
-        $age = $createdAt->diffInSeconds(now('UTC'), false);
-        if ($age < -60 || $age > self::MAX_AGE_SECONDS) {
-            throw new RuntimeException('Verified recovery receipt is not recent enough.');
+        $identityPayload = $payload;
+        $encodedIdentity = json_encode(
+            $identityPayload,
+            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        );
+        if (! hash_equals($receiptId, hash('sha256', $encodedIdentity."\n"))) {
+            throw new RuntimeException('Verified recovery receipt identity does not match payload.');
         }
 
         $ciphertextRelativePath = $this->assertCiphertextPath($payload['ciphertext']);
