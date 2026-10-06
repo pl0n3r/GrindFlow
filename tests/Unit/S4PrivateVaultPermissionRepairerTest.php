@@ -42,7 +42,17 @@ PHP,
         self::assertContains('grindflow:s4:repair-private-vault-permissions', $argv, true);
         self::assertContains('--env=prod', $argv, true);
         self::assertContains('--no-interaction', $argv, true);
-        self::assertCount(6, $argv);
+        self::assertCount(5, $argv);
+        self::assertSame(
+            [
+                $root.'/bin/console',
+                'grindflow:s4:repair-private-vault-permissions',
+                '--env=prod',
+                '--no-interaction',
+                '--no-ansi',
+            ],
+            $argv,
+        );
         self::assertStringNotContainsString('/vault', json_encode($argv, JSON_THROW_ON_ERROR));
     }
 
