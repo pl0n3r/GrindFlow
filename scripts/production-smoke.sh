@@ -589,24 +589,49 @@ check_media_web_runtime_readiness() {
     return 0
   fi
 
-  if parsed="$(python3 - "$media_readiness_body" <<'PY'
+  if parsed="$(python3 - "$media_readiness_body" "$runtime" <<'PY'
 import json
 import sys
 
 ORDER = ("decoder", "temporary_storage", "private_vault")
+PRIVATE_VAULT_STATES = {
+    "root_unavailable",
+    "missing",
+    "unreadable",
+    "permissions_unavailable",
+    "permissions_not_private",
+    "ready",
+}
+runtime = sys.argv[2] if len(sys.argv) > 2 else ""
+
+class DuplicateKeyError(ValueError):
+    pass
+
+
+def strict_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateKeyError(key)
+        result[key] = value
+    return result
+
 
 try:
     with open(sys.argv[1], "r", encoding="utf-8") as handle:
-        payload = json.load(handle)
-except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        payload = json.load(handle, object_pairs_hook=strict_object)
+except (OSError, UnicodeDecodeError, json.JSONDecodeError, DuplicateKeyError):
     raise SystemExit(1)
 
+if runtime not in {"laravel", "s4"}:
+    raise SystemExit(1)
 if not isinstance(payload, dict) or set(payload) != {"data"}:
     raise SystemExit(1)
 data = payload.get("data")
-if not isinstance(data, dict) or set(data) != {
-    "contract", "status", "checks", "evidence_scope", "ci_equivalent"
-}:
+expected_keys = {"contract", "status", "checks", "evidence_scope", "ci_equivalent"}
+if runtime == "s4":
+    expected_keys.add("diagnostics")
+if not isinstance(data, dict) or set(data) != expected_keys:
     raise SystemExit(1)
 checks = data.get("checks")
 if not isinstance(checks, dict) or set(checks) != set(ORDER):
@@ -624,6 +649,17 @@ if any(checks.get(key) not in {"ready", "not_ready"} for key in ORDER):
 all_ready = all(checks[key] == "ready" for key in ORDER)
 if (data["status"] == "ready") != all_ready:
     raise SystemExit(1)
+
+if runtime == "s4":
+    diagnostics = data.get("diagnostics")
+    if not isinstance(diagnostics, dict) or set(diagnostics) != {"private_vault"}:
+        raise SystemExit(1)
+    private_vault_state = diagnostics.get("private_vault")
+    if private_vault_state not in PRIVATE_VAULT_STATES:
+        raise SystemExit(1)
+    if (checks["private_vault"] == "ready") != (private_vault_state == "ready"):
+        raise SystemExit(1)
+    print(f"S4_PRIVATE_VAULT_STATE={private_vault_state}")
 
 for key in ORDER:
     print(f"MEDIA_WEB_RUNTIME_CHECK_{key.upper()}={checks[key]}")

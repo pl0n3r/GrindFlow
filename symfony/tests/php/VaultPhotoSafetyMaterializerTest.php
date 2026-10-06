@@ -127,6 +127,41 @@ final class VaultPhotoSafetyMaterializerTest extends TestCase
         }
     }
 
+    public function testPrivateVaultReadinessClassifiesPrivateFilesystemWithoutExposingPaths(): void
+    {
+        $materializer = new VaultPhotoSafetyMaterializer();
+        self::assertSame('root_unavailable', $materializer->privateVaultReadinessState(''));
+
+        $base = sys_get_temp_dir().'/gf-vault-readiness-'.bin2hex(random_bytes(6));
+        $missing = $base.'/missing';
+        self::assertTrue(mkdir($base, 0700));
+        try {
+            self::assertSame('missing', $materializer->privateVaultReadinessState($missing));
+
+            $ready = $base.'/ready';
+            self::assertTrue(mkdir($ready, 0700));
+            self::assertSame('ready', $materializer->privateVaultReadinessState($ready));
+
+            self::assertTrue(chmod($ready, 0600));
+            self::assertSame('unreadable', $materializer->privateVaultReadinessState($ready));
+            self::assertFalse($materializer->runtimeReadiness($ready)['private_vault']);
+
+            self::assertTrue(chmod($ready, 0755));
+            self::assertSame(
+                'permissions_not_private',
+                $materializer->privateVaultReadinessState($ready),
+            );
+            self::assertFalse($materializer->runtimeReadiness($ready)['private_vault']);
+
+            self::assertTrue(chmod($ready, 0700));
+            self::assertTrue($materializer->runtimeReadiness($ready)['private_vault']);
+        } finally {
+            @chmod($base.'/ready', 0700);
+            @rmdir($base.'/ready');
+            @rmdir($base);
+        }
+    }
+
     private function requireDecoder(VaultPhotoSafetyMaterializer $materializer): void
     {
         if ($materializer->decoderAvailable()) {
