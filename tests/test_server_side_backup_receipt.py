@@ -83,7 +83,16 @@ class ServerSideBackupReceiptTests(unittest.TestCase):
         script = BACKUP_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("operations:record-db-backup", script)
-        self.assertIn('[[ "$receipt" =~ ^[0-9a-f]{64}$ ]]', script)
+        receipt_assignment = re.search(
+            r'(?m)^([a-z_]*receipt)="\\$\\("\\$php_bin" artisan operations:record-db-backup ',
+            script,
+        )
+        self.assertIsNotNone(receipt_assignment)
+        receipt_variable = receipt_assignment.group(1)
+        self.assertIn(
+            f'[[ "${receipt_variable}" =~ ^[0-9a-f]{{64}}$ ]]'.replace("$\$", "$"),
+            script,
+        )
         self.assertNotIn("BACKUP_RECEIPT=", script)
         self.assertNotIn("db_receipt", workflow.lower())
         self.assertNotIn("backup_receipt", workflow.lower())
