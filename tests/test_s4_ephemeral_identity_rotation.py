@@ -33,6 +33,9 @@ VERSION = (ROOT / "config/version.php").read_text(encoding="utf-8")
 GRINDFLOW_CONFIG = (ROOT / "config/grindflow.php").read_text(encoding="utf-8")
 ENV_EXAMPLE = (ROOT / ".env.example").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+MEMBERSHIP_CONTEXT = (
+    ROOT / "symfony/src/Identity/Application/MembershipContext.php"
+).read_text(encoding="utf-8")
 
 
 class S4EphemeralIdentityRotationTests(unittest.TestCase):
@@ -78,21 +81,77 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         )
 
     def test_reserved_identity_rotates_only_password_hash(self) -> None:
-        marker = "$db->update("
-        start = COMMAND.index(marker)
-        end = COMMAND.index("return 'rotated';", start)
+        start = COMMAND.index("if ($rotateSecret) {")
+        end = COMMAND.index("if ($upgradeRole && $rotateSecret)", start)
         rotation = COMMAND[start:end]
         self.assertIn("'gf_identity_users'", rotation)
         self.assertIn("['password_hash' => $hasher->hash($secret)]", rotation)
         self.assertIn("$affected !== 1", rotation)
+        self.assertNotIn("'gf_identity_memberships'", rotation)
         self.assertNotIn("'name' =>", rotation)
         self.assertNotIn("'platform_role' =>", rotation)
         self.assertNotIn("'is_active' =>", rotation)
         self.assertNotIn("'updated_at' =>", rotation)
-        self.assertIn("existingStateHasValidStructure", COMMAND)
+        self.assertIn("existingMembership", COMMAND)
+        self.assertIn("ReservedIdentityConflict", COMMAND)
         self.assertIn("'identity_conflict'", COMMAND)
         self.assertIn("'rotated'", COMMAND_TEST)
         self.assertIn("password_verify($rotatedSecret", COMMAND_TEST)
+
+    def test_synthetic_membership_uses_minimum_content_prepare_role(self) -> None:
+        self.assertIn("private const PLATFORM_ROLE = 'model';", COMMAND)
+        self.assertIn("private const MEMBERSHIP_ROLE = 'editor';", COMMAND)
+        self.assertIn("'platform_role' => self::PLATFORM_ROLE", COMMAND)
+        self.assertIn("'role' => self::MEMBERSHIP_ROLE", COMMAND)
+        self.assertIn("self::assertSame('model', $user['platform_role']);", COMMAND_TEST)
+        self.assertIn("self::assertSame('editor', $membership['role']);", COMMAND_TEST)
+
+    def test_legacy_model_membership_upgrade_is_narrow_and_idempotent(self) -> None:
+        self.assertIn("private const LEGACY_MEMBERSHIP_ROLE = 'model';", COMMAND)
+        self.assertIn("'gf_identity_memberships'", COMMAND)
+        self.assertIn("['role' => self::MEMBERSHIP_ROLE]", COMMAND)
+        self.assertIn("'role' => self::LEGACY_MEMBERSHIP_ROLE", COMMAND)
+        self.assertIn("return 'role_upgraded';", COMMAND)
+        self.assertIn("return 'role_upgraded_rotated';", COMMAND)
+        self.assertIn(
+            "testLegacyReservedModelMembershipIsUpgradedNarrowlyAndIdempotently",
+            COMMAND_TEST,
+        )
+        self.assertIn(
+            "testRoleUpgradeRollsBackWhenPasswordRotationFails",
+            COMMAND_TEST,
+        )
+        self.assertIn("self::assertSame('already_ready'", COMMAND_TEST)
+        self.assertIn("count($memberships) !== 1", COMMAND)
+        self.assertIn("'identity_conflict'", COMMAND)
+        self.assertIn("throw new ReservedIdentityConflict();", COMMAND)
+        self.assertIn("catch (ReservedIdentityConflict)", COMMAND)
+        transaction = COMMAND.split("private function reconcileTransaction", 1)[1].split(
+            "private function reconcile(", 1
+        )[0]
+        self.assertIn("return 'identity_conflict';", transaction)
+
+    def test_wrapper_allowlists_role_upgrade_codes(self) -> None:
+        self.assertIn("'role_upgraded'", PROVISIONER)
+        self.assertIn("'role_upgraded_rotated'", PROVISIONER)
+        self.assertIn(
+            "test_role_upgrade_codes_are_allowlisted_successes",
+            PROVISIONER_TEST,
+        )
+        self.assertIn("self::SUCCESS_CODES", PROVISIONER)
+
+    def test_synthetic_role_upgrade_does_not_broaden_global_model_permissions(self) -> None:
+        self.assertIn(
+            "'content_prepare' => in_array($role, ['admin', 'studio', 'editor'], true)",
+            MEMBERSHIP_CONTEXT,
+        )
+        self.assertNotIn(
+            "'content_prepare' => in_array($role, ['admin', 'studio', 'editor', 'model'], true)",
+            MEMBERSHIP_CONTEXT,
+        )
+        self.assertIn("private const PLATFORM_ROLE = 'model';", COMMAND)
+        self.assertIn("private const MEMBERSHIP_ROLE = 'editor';", COMMAND)
+        self.assertNotIn("MembershipContext", COMMAND)
 
     def test_php_regression_contract_is_executable(self) -> None:
         self.assertIn(
@@ -123,13 +182,16 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertEqual(release, LOCK["packages"][""]["version"])
         self.assertIn(f"V{release}", README)
 
-    def test_operational_closeout_requires_exact_main_past_login_redirect(self) -> None:
+    def test_operational_closeout_requires_exact_main_past_forbidden_readiness(self) -> None:
         self.assertIn("/internal/production-smoke/bootstrap", WORKFLOW)
         self.assertIn("S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect", SMOKE)
         self.assertIn("S4_LOGIN_REDIRECT_CLASS=", SMOKE)
+        self.assertIn("S4_MEDIA_READINESS_HTTP_CLASS=", SMOKE)
         self.assertIn("grindflow:s4:provision-smoke-identity", PROVISIONER)
-        self.assertIn("rotated", PROVISIONER)
+        self.assertIn("'role_upgraded'", PROVISIONER)
+        self.assertIn("'role_upgraded_rotated'", PROVISIONER)
         self.assertIn("name: GrindFlow Production Smoke", WORKFLOW)
+        self.assertIn("forbidden", README)
 
 
 if __name__ == "__main__":

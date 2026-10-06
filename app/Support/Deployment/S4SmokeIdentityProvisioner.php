@@ -13,6 +13,8 @@ class S4SmokeIdentityProvisioner
         'created',
         'already_ready',
         'rotated',
+        'role_upgraded',
+        'role_upgraded_rotated',
     ];
 
     /** @var list<string> */

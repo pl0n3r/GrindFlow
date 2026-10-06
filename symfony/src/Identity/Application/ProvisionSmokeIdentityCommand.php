@@ -24,7 +24,9 @@ final class ProvisionSmokeIdentityCommand extends Command
     private const DISPLAY_NAME = 'S4 Synthetic Smoke';
     private const ORGANIZATION_NAME = 'S4 Synthetic Smoke';
     private const ORGANIZATION_SLUG = 'e2e-oidc-smoke';
-    private const ROLE = 'model';
+    private const PLATFORM_ROLE = 'model';
+    private const MEMBERSHIP_ROLE = 'editor';
+    private const LEGACY_MEMBERSHIP_ROLE = 'model';
     private const SECRET_ENV = 'GRINDFLOW_S4_SMOKE_PASSWORD';
     private const USER_EMAIL_UNIQUE_CONSTRAINT = 'uq_gf_identity_users_email';
     private const TABLES = [
@@ -60,7 +62,7 @@ final class ProvisionSmokeIdentityCommand extends Command
         return $this->finish(
             $output,
             $code,
-            in_array($code, ['created', 'already_ready', 'rotated'], true),
+            in_array($code, ['created', 'already_ready', 'rotated', 'role_upgraded', 'role_upgraded_rotated'], true),
         );
     }
 
@@ -81,6 +83,8 @@ final class ProvisionSmokeIdentityCommand extends Command
                 return $this->db->transactional(
                     fn (Connection $db): string => $this->reconcile($db, $secret),
                 );
+            } catch (ReservedIdentityConflict) {
+                return 'identity_conflict';
             } catch (UniqueConstraintViolationException $exception) {
                 if (
                     $attempt !== 0
@@ -120,29 +124,60 @@ final class ProvisionSmokeIdentityCommand extends Command
         }
 
         if ($user !== false && $organization !== false) {
-            if (!$this->existingStateHasValidStructure($db, $user, $organization)) {
+            $membership = $this->existingMembership($db, $user, $organization);
+            if ($membership === null) {
+                return 'identity_conflict';
+            }
+
+            $membershipRole = (string) ($membership['role'] ?? '');
+            $upgradeRole = $membershipRole === self::LEGACY_MEMBERSHIP_ROLE;
+            if (!$upgradeRole && $membershipRole !== self::MEMBERSHIP_ROLE) {
                 return 'identity_conflict';
             }
 
             $hasher = $this->hashers->getPasswordHasher(IdentityUser::class);
             $hash = (string) ($user['password_hash'] ?? '');
-            if ($hasher->verify($hash, $secret)) {
-                return 'already_ready';
+            $rotateSecret = !$hasher->verify($hash, $secret);
+
+            if ($upgradeRole) {
+                $affected = $db->update(
+                    'gf_identity_memberships',
+                    ['role' => self::MEMBERSHIP_ROLE],
+                    [
+                        'id' => (string) $membership['id'],
+                        'user_id' => (string) $user['id'],
+                        'organization_id' => (string) $organization['id'],
+                        'role' => self::LEGACY_MEMBERSHIP_ROLE,
+                    ],
+                );
+                if ($affected !== 1) {
+                    throw new ReservedIdentityConflict();
+                }
             }
 
-            $affected = $db->update(
-                'gf_identity_users',
-                ['password_hash' => $hasher->hash($secret)],
-                [
-                    'id' => (string) $user['id'],
-                    'email' => self::EMAIL,
-                ],
-            );
-            if ($affected !== 1) {
-                return 'identity_conflict';
+            if ($rotateSecret) {
+                $affected = $db->update(
+                    'gf_identity_users',
+                    ['password_hash' => $hasher->hash($secret)],
+                    [
+                        'id' => (string) $user['id'],
+                        'email' => self::EMAIL,
+                    ],
+                );
+                if ($affected !== 1) {
+                    throw new ReservedIdentityConflict();
+                }
             }
 
-            return 'rotated';
+            if ($upgradeRole && $rotateSecret) {
+                return 'role_upgraded_rotated';
+            }
+
+            if ($upgradeRole) {
+                return 'role_upgraded';
+            }
+
+            return $rotateSecret ? 'rotated' : 'already_ready';
         }
 
         $hasher = $this->hashers->getPasswordHasher(IdentityUser::class);
@@ -155,7 +190,7 @@ final class ProvisionSmokeIdentityCommand extends Command
             'name' => self::DISPLAY_NAME,
             'email' => self::EMAIL,
             'password_hash' => $hasher->hash($secret),
-            'platform_role' => self::ROLE,
+            'platform_role' => self::PLATFORM_ROLE,
             'is_active' => 1,
             'created_at' => $now,
             'updated_at' => $now,
@@ -172,7 +207,7 @@ final class ProvisionSmokeIdentityCommand extends Command
             'id' => Uuid::v7()->toRfc4122(),
             'user_id' => $userId,
             'organization_id' => $organizationId,
-            'role' => self::ROLE,
+            'role' => self::MEMBERSHIP_ROLE,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -183,26 +218,28 @@ final class ProvisionSmokeIdentityCommand extends Command
     /**
      * @param array<string, mixed> $user
      * @param array<string, mixed> $organization
+     *
+     * @return array<string, mixed>|null
      */
-    private function existingStateHasValidStructure(
+    private function existingMembership(
         Connection $db,
         array $user,
         array $organization,
-    ): bool {
+    ): ?array {
         if (
             (string) ($user['name'] ?? '') !== self::DISPLAY_NAME
-            || (string) ($user['platform_role'] ?? '') !== self::ROLE
+            || (string) ($user['platform_role'] ?? '') !== self::PLATFORM_ROLE
             || (int) ($user['is_active'] ?? 0) !== 1
             || (string) ($organization['name'] ?? '') !== self::ORGANIZATION_NAME
             || (string) ($organization['type'] ?? '') !== 'independent'
             || (string) ($user['password_hash'] ?? '') === ''
         ) {
-            return false;
+            return null;
         }
 
         $memberships = $db->fetchAllAssociative(
             <<<'SQL'
-                SELECT user_id, organization_id, role
+                SELECT id, user_id, organization_id, role
                 FROM gf_identity_memberships
                 WHERE user_id = :user_id OR organization_id = :organization_id
                 ORDER BY id
@@ -213,14 +250,24 @@ final class ProvisionSmokeIdentityCommand extends Command
             ],
         );
         if (count($memberships) !== 1) {
-            return false;
+            return null;
         }
 
         $membership = $memberships[0];
+        if (
+            (string) ($membership['id'] ?? '') === ''
+            || (string) ($membership['user_id'] ?? '') !== (string) $user['id']
+            || (string) ($membership['organization_id'] ?? '') !== (string) $organization['id']
+        ) {
+            return null;
+        }
 
-        return (string) ($membership['user_id'] ?? '') === (string) $user['id']
-            && (string) ($membership['organization_id'] ?? '') === (string) $organization['id']
-            && (string) ($membership['role'] ?? '') === self::ROLE;
+        $role = (string) ($membership['role'] ?? '');
+        if (!in_array($role, [self::LEGACY_MEMBERSHIP_ROLE, self::MEMBERSHIP_ROLE], true)) {
+            return null;
+        }
+
+        return $membership;
     }
 
     private function finish(OutputInterface $output, string $code, bool $ok): int
@@ -232,4 +279,9 @@ final class ProvisionSmokeIdentityCommand extends Command
 
         return $ok ? Command::SUCCESS : Command::FAILURE;
     }
+}
+
+
+final class ReservedIdentityConflict extends \RuntimeException
+{
 }

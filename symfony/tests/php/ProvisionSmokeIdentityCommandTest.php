@@ -84,7 +84,7 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
             [(string) $user['id'], (string) $organization['id']],
         );
         self::assertIsArray($membership);
-        self::assertSame('model', $membership['role']);
+        self::assertSame('editor', $membership['role']);
     }
 
     public function testSecondExecutionIsIdempotentWithoutDuplicateOrPrivilegeEscalation(): void
@@ -105,7 +105,106 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
             [$before['user_id'], $before['organization_id']],
         ));
         self::assertSame('model', $before['platform_role']);
-        self::assertSame('model', $before['membership_role']);
+        self::assertSame('editor', $before['membership_role']);
+    }
+
+    public function testLegacyReservedModelMembershipIsUpgradedNarrowlyAndIdempotently(): void
+    {
+        $created = $this->tester();
+        self::assertSame(Command::SUCCESS, $created->execute([]));
+        $baseline = $this->snapshot();
+        self::assertSame('model', $baseline['platform_role']);
+        self::assertSame('editor', $baseline['membership_role']);
+
+        self::assertSame(1, $this->db->update(
+            'gf_identity_memberships',
+            ['role' => 'model'],
+            [
+                'user_id' => $baseline['user_id'],
+                'organization_id' => $baseline['organization_id'],
+                'role' => 'editor',
+            ],
+        ));
+
+        $upgraded = $this->tester();
+        self::assertSame(Command::SUCCESS, $upgraded->execute([]));
+        self::assertSame('role_upgraded', $this->payload($upgraded)['code']);
+        $afterUpgrade = $this->snapshot();
+        self::assertSame('model', $afterUpgrade['platform_role']);
+        self::assertSame('editor', $afterUpgrade['membership_role']);
+        self::assertSame($baseline['password_hash'], $afterUpgrade['password_hash']);
+        self::assertSame($baseline['user_id'], $afterUpgrade['user_id']);
+        self::assertSame($baseline['organization_id'], $afterUpgrade['organization_id']);
+
+        $idempotent = $this->tester();
+        self::assertSame(Command::SUCCESS, $idempotent->execute([]));
+        self::assertSame('already_ready', $this->payload($idempotent)['code']);
+        self::assertSame($afterUpgrade, $this->snapshot());
+
+        self::assertSame(1, $this->db->update(
+            'gf_identity_memberships',
+            ['role' => 'model'],
+            [
+                'user_id' => $baseline['user_id'],
+                'organization_id' => $baseline['organization_id'],
+                'role' => 'editor',
+            ],
+        ));
+        $rotatedSecret = 'role-upgrade-rotated-secret-2026';
+        $this->setSecret($rotatedSecret);
+        $upgradedAndRotated = $this->tester();
+        self::assertSame(Command::SUCCESS, $upgradedAndRotated->execute([]));
+        self::assertSame(
+            'role_upgraded_rotated',
+            $this->payload($upgradedAndRotated)['code'],
+        );
+        $afterBoth = $this->snapshot();
+        self::assertSame('model', $afterBoth['platform_role']);
+        self::assertSame('editor', $afterBoth['membership_role']);
+        self::assertNotSame($baseline['password_hash'], $afterBoth['password_hash']);
+        self::assertTrue(password_verify($rotatedSecret, $afterBoth['password_hash']));
+    }
+
+    public function testRoleUpgradeRollsBackWhenPasswordRotationFails(): void
+    {
+        $created = $this->tester();
+        self::assertSame(Command::SUCCESS, $created->execute([]));
+        $baseline = $this->snapshot();
+
+        self::assertSame(1, $this->db->update(
+            'gf_identity_memberships',
+            ['role' => 'model'],
+            [
+                'user_id' => $baseline['user_id'],
+                'organization_id' => $baseline['organization_id'],
+                'role' => 'editor',
+            ],
+        ));
+        $legacy = $this->snapshot();
+        self::assertSame('model', $legacy['membership_role']);
+
+        $trigger = 'gf_test_s4_reject_password_rotation';
+        $this->db->executeStatement('DROP TRIGGER IF EXISTS '.$trigger);
+        $this->db->executeStatement(
+            'CREATE TRIGGER '.$trigger
+            .' BEFORE UPDATE ON gf_identity_users FOR EACH ROW '
+            ."SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'synthetic rotation rejected'",
+        );
+
+        $this->setSecret('rollback-synthetic-s4-smoke-password-2026');
+        try {
+            $failed = $this->tester();
+            self::assertSame(Command::FAILURE, $failed->execute([]));
+            self::assertSame('transaction_failed', $this->payload($failed)['code']);
+        } finally {
+            $this->db->executeStatement('DROP TRIGGER IF EXISTS '.$trigger);
+        }
+
+        $after = $this->snapshot();
+        self::assertSame($legacy, $after);
+        self::assertSame('model', $after['membership_role']);
+        self::assertSame($legacy['password_hash'], $after['password_hash']);
+        self::assertTrue(password_verify(self::SECRET, $after['password_hash']));
     }
 
     public function testMissingSecretIncompleteSchemaOrConflictFailsClosedWithoutPartialMutation(): void
@@ -210,6 +309,8 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
             'created',
             'already_ready',
             'rotated',
+            'role_upgraded',
+            'role_upgraded_rotated',
             'secret_missing',
             'schema_missing',
             'identity_conflict',
