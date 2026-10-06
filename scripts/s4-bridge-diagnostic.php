@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
 
 const S4_DIAGNOSTIC_TABLES = [
     'gf_identity_users',
@@ -12,6 +13,7 @@ const S4_DIAGNOSTIC_TABLES = [
 ];
 const S4_DIAGNOSTIC_EMAIL = 'e2e-oidc-smoke@grindflow.test';
 const S4_DIAGNOSTIC_CODES = [
+    'runtime_missing',
     'app_secret_missing',
     'app_secret_too_short',
     'database_url_missing',
@@ -127,6 +129,9 @@ function runDiagnosticOfflineScenario(string $scenario): never
     $appSecret = diagnosticEnv('GRINDFLOW_S4_DIAGNOSTIC_TEST_SECRET');
     $databaseUrl = diagnosticEnv('GRINDFLOW_S4_DIAGNOSTIC_TEST_DATABASE_URL');
 
+    if ($scenario === 'runtime_missing') {
+        diagnosticFinish('runtime_missing');
+    }
     if ($scenario === 'app_secret_missing') {
         $appSecret = '';
     } elseif ($scenario === 'app_secret_too_short') {
@@ -167,13 +172,13 @@ $bootstrap = $symfonyRoot.'/config/bootstrap.php';
 $autoload = $symfonyRoot.'/vendor/autoload.php';
 
 if (! is_file($bootstrap) || ! is_file($autoload)) {
-    diagnosticFinish('database_connection_failed');
+    diagnosticFinish('runtime_missing');
 }
 
 try {
     require $bootstrap;
 } catch (Throwable) {
-    diagnosticFinish('database_connection_failed');
+    diagnosticFinish('runtime_missing');
 }
 
 $appSecret = diagnosticEnv('APP_SECRET');
@@ -184,8 +189,12 @@ if ($configurationCode !== null) {
 }
 
 try {
-    $connection = DriverManager::getConnection(['url' => $databaseUrl]);
-    $connection->connect();
+    $params = (new DsnParser([
+        'mysql' => 'pdo_mysql',
+        'mariadb' => 'pdo_mysql',
+    ]))->parse($databaseUrl);
+    $connection = DriverManager::getConnection($params);
+    $connection->executeQuery('SELECT 1');
 } catch (Throwable) {
     diagnosticFinish(diagnosticDatabaseCode(false, [], 0));
 }

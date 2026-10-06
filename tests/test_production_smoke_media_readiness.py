@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -409,7 +410,12 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
         self.assertIn(f"'number' => '{release}'", VERSION)
         self.assertEqual(release, LOCK["version"])
         self.assertEqual(release, LOCK["packages"][""]["version"])
-        self.assertIn(f"V{release}", README)
+        target = re.search(
+            r"\*\*Versión de código declarada:\*\* V(?P<version>[0-9]+\.[0-9]+\.[0-9]+)",
+            README,
+        )
+        self.assertIsNotNone(target)
+        self.assertEqual(release, target.group("version"))
         self.assertIn("Quick upload remains available.", WORKFLOW)
 
     @staticmethod

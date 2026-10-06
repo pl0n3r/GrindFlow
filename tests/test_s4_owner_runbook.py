@@ -31,6 +31,7 @@ class S4OwnerRunbookTests(unittest.TestCase):
         self.assertEqual(syntax.returncode, 0, syntax.stderr)
 
         expected_codes = {
+            "runtime_missing",
             "app_secret_missing",
             "app_secret_too_short",
             "database_url_missing",
@@ -110,7 +111,8 @@ class S4OwnerRunbookTests(unittest.TestCase):
             "diagnosticDatabaseCode",
             "GRINDFLOW_S4_DIAGNOSTIC_TEST_SCENARIO",
             "diagnosticEnv('APP_ENV') !== 'test'",
-            "$connection->connect()",
+            "new DsnParser",
+            "executeQuery('SELECT 1')",
             "$schema->tablesExist([$table])",
             "INNER JOIN gf_identity_memberships",
             "'status' => $code === 'ready' ? 'ready' : 'blocked'",
@@ -149,6 +151,11 @@ class S4OwnerRunbookTests(unittest.TestCase):
             "production-smoke.yml",
             "Vuelta atrás",
             "gunzip -c \"$BACKUP\" | mysql",
+            "grindflow-migrate.lock",
+            "operations:record-db-backup",
+            "assertLatestValidForFingerprint",
+            "ProductionWritePolicy",
+            "flock -n 9",
             "symfony/var/vault",
             "no garantiza un rollback exacto del esquema",
             "base limpia/fresca",
@@ -166,21 +173,28 @@ class S4OwnerRunbookTests(unittest.TestCase):
             self.runbook.index("grindflow:s4:provision-smoke-identity"),
         )
 
-        # Both backup and restore are pipelines. Each must fail closed if either
-        # side fails and must clean the temporary credentials on every exit.
-        self.assertGreaterEqual(self.runbook.count("set -euo pipefail"), 2)
-        self.assertGreaterEqual(
-            self.runbook.count("trap 'rm -f \"$DB_CNF\"' EXIT"),
-            2,
-        )
-        self.assertIn(
-            'mysqldump --defaults-extra-file="$DB_CNF" --single-transaction --routines --triggers "$DB_NAME" | gzip > "$BACKUP"',
-            self.runbook,
-        )
+        # Every database write uses the canonical lock and a fresh server-side receipt.
+        self.assertGreaterEqual(self.runbook.count("set -euo pipefail"), 4)
+        self.assertGreaterEqual(self.runbook.count("flock -n 9"), 2)
+        self.assertGreaterEqual(self.runbook.count("operations:record-db-backup"), 2)
+        self.assertGreaterEqual(self.runbook.count("assertLatestValidForFingerprint"), 2)
+        self.assertIn("ProductionWritePolicy", self.runbook)
+        self.assertIn("storage/framework/grindflow-migrate.lock", self.runbook)
+        self.assertIn("storage/app/private/operations/database-backups", self.runbook)
         self.assertIn(
             'gunzip -c "$BACKUP" | mysql --defaults-extra-file="$DB_CNF" "$DB_NAME"',
             self.runbook,
         )
+        self.assertIn('[[ "$APP_SECRET_VALUE" =~ ^[0-9a-f]{64}$ ]]', self.runbook)
+        self.assertIn('[[ -n "$DB_PASSWORD" ]]', self.runbook)
+        self.assertGreaterEqual(
+            self.runbook.count('tempnam(dirname($file),".tmp-env-")'),
+            2,
+        )
+        evidence = (
+            ROOT / "app" / "Support" / "Operations" / "VerifiedBackupEvidence.php"
+        ).read_text(encoding="utf-8")
+        self.assertIn("MAX_AGE_SECONDS = 900", evidence)
 
     def test_runbook_contains_no_secret_values_and_uses_php85_paths(self) -> None:
         self.assertGreaterEqual(
