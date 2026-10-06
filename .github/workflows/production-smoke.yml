@@ -365,6 +365,16 @@ jobs:
             printf '%s\n' "${matches[0]#*=}"
           }
 
+          s4_private_vault_state_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_PRIVATE_VAULT_STATE=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_PRIVATE_VAULT_STATE=(root_unavailable|missing|unreadable|permissions_unavailable|permissions_not_private|ready)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           diagnostic_reason() {
             local matches=()
             mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=' production-smoke.log || true)
@@ -391,6 +401,7 @@ jobs:
           s4_post_bridge_contract_stage=''
           s4_login_redirect_class=''
           s4_media_readiness_http_class=''
+          s4_private_vault_state=''
 
           s4_bridge_state="$(s4_bridge_state_marker || true)"
           s4_auth_state="$(s4_auth_state_marker || true)"
@@ -400,6 +411,7 @@ jobs:
           s4_post_bridge_contract_stage="$(s4_post_bridge_contract_stage_marker || true)"
           s4_login_redirect_class="$(s4_login_redirect_class_marker || true)"
           s4_media_readiness_http_class="$(s4_media_readiness_http_class_marker || true)"
+          s4_private_vault_state="$(s4_private_vault_state_marker || true)"
 
           if [[ "$diagnostic_state" == "observed" ]] \
             && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
@@ -454,6 +466,9 @@ jobs:
                 printf -- '- decoder: `%s`\n' "$decoder_state"
                 printf -- '- temporary_storage: `%s`\n' "$temporary_storage_state"
                 printf -- '- private_vault: `%s`\n' "$private_vault_state"
+                if [[ "$private_vault_state" == "not_ready" && -n "$s4_private_vault_state" ]]; then
+                  printf 'Private Vault state: `%s`\n' "$s4_private_vault_state"
+                fi
               } > "$evidence_file"
               cat "$evidence_file" >> "$GITHUB_STEP_SUMMARY"
 
