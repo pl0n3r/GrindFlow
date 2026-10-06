@@ -54,16 +54,12 @@ final class PrivateVaultDirectory
     }
 
     /**
-     * Tighten only an already configured external Vault root.
+     * Tighten only an already existing Vault root resolved by this service.
      *
      * @return 'tightened'|'already_private'|'root_unavailable'|'missing'|'unreadable'|'permissions_unavailable'|'permissions_repair_failed'
      */
     public function tightenPrivatePermissions(): string
     {
-        if ($this->rootOverride === '') {
-            return 'root_unavailable';
-        }
-
         try {
             $root = $this->root();
         } catch (\Throwable) {
@@ -76,6 +72,9 @@ final class PrivateVaultDirectory
         if (is_link($root) || !is_readable($root) || !is_executable($root)) {
             return 'unreadable';
         }
+        if (!is_writable($root)) {
+            return 'permissions_repair_failed';
+        }
 
         $mode = @fileperms($root);
         if (!is_int($mode)) {
@@ -85,6 +84,7 @@ final class PrivateVaultDirectory
             return 'already_private';
         }
 
+        $previousPermissions = $mode & 0777;
         if (!@chmod($root, 0700)) {
             return 'permissions_repair_failed';
         }
@@ -95,8 +95,12 @@ final class PrivateVaultDirectory
             !is_int($verified)
             || ($verified & 0077) !== 0
             || !is_readable($root)
+            || !is_writable($root)
             || !is_executable($root)
         ) {
+            @chmod($root, $previousPermissions);
+            clearstatcache(true, $root);
+
             return 'permissions_repair_failed';
         }
 
