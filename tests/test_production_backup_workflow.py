@@ -222,8 +222,13 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
         self.assertIn('artisan up --no-interaction', script)
         self.assertIn("storage/framework/maintenance.php", script)
-        self.assertIn("forced queue worker would bypass maintenance mode", script)
-        self.assertIn("[p]hp .*artisan (queue:work|queue:listen).*--force", script)
+        self.assertIn("assert_recovery_quiescence", script)
+        self.assertIn(
+            "write-capable artisan process remains active during recovery write freeze",
+            script,
+        )
+        self.assertIn("queue:(work|listen)", script)
+        self.assertIn("schedule:(work|run)", script)
         self.assertIn("storage/framework/maintenance.php", s4)
         self.assertNotIn("evenInMaintenanceMode", console)
         self.assertLess(
