@@ -30,8 +30,7 @@ class S4SmokeIdentityProvisioner
     public function __construct(
         private readonly ?string $symfonyRoot = null,
         private readonly ?string $phpBinary = null,
-    ) {
-    }
+    ) {}
 
     /** @return array{ok:bool,code:string} */
     public function reconcile(string $password): array
