@@ -47,8 +47,8 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#376 · diagnóstico seguro del bridge S4](https://github.com/pl0n3r/GrindFlow/issues/376).
-- **NEXT:** [#370 · cierre operativo del bridge S4](https://github.com/pl0n3r/GrindFlow/issues/370), seguido de [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307).
+- **NOW:** [#379 · aislar contract_invalid posterior al bridge](https://github.com/pl0n3r/GrindFlow/issues/379).
+- **NEXT:** [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307) tras cerrar #379.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
