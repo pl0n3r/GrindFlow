@@ -88,7 +88,7 @@ final class PrivateVaultDirectory
             return 'already_private';
         }
 
-        $previousPermissions = $mode & 0777;
+        $previousPermissions = $mode & 07777;
         if (!@chmod($root, 0700)) {
             return 'permissions_repair_failed';
         }
