@@ -8,9 +8,10 @@ if (! is_array($args) || count($args) !== 4) {
     exit(2);
 }
 
-$checkoutSha = strtolower(trim((string) $args[1]));
-$migrationDir = rtrim((string) $args[2], DIRECTORY_SEPARATOR);
-$appliedVersionsFile = (string) $args[3];
+array_shift($args);
+$checkoutSha = strtolower(trim((string) array_shift($args)));
+$migrationDir = rtrim((string) array_shift($args), DIRECTORY_SEPARATOR);
+$appliedVersionsFile = (string) array_shift($args);
 
 if (preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha) !== 1) {
     fwrite(STDERR, "invalid checkout sha\n");
