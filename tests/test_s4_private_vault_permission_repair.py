@@ -75,7 +75,7 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
             COMMAND_TEST,
         )
         self.assertIn("testCommandFailsClosedForMissingOrSymlinkedRoot", COMMAND_TEST)
-        self.assertIn("$previousPermissions = $mode & 0777", VAULT)
+        self.assertIn("$previousPermissions = $mode & 07777", VAULT)
         self.assertIn("@chmod($root, $previousPermissions)", VAULT)
         self.assertIn("'tightened'", COMMAND)
         self.assertIn("'already_private'", COMMAND)
