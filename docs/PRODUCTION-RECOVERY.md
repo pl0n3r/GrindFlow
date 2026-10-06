@@ -4,7 +4,7 @@ Este procedimiento acredita **backup cifrado + evidencia + restore drill** para 
 
 ## Autoridad y precondiciones
 
-El workflow `GrindFlow Production Backup` es owner-only y se ejecuta por `workflow_dispatch`. Antes de cualquier I/O valida el SHA exacto del release productivo mediante `.release-sha`, el fingerprint de migraciones, SSH estricto, PHP 8.5, MariaDB tooling, Vault staging y libsodium secretstream.
+El workflow `GrindFlow Production Backup` es owner-only y se ejecuta por `workflow_dispatch`. El backup DB normal permanece disponible con `include_recovery_bundle=false`. Para recovery conjunto DB + Vault, el operador debe activar `include_recovery_bundle=true` **y** confirmar explícitamente `confirm_recovery_write_freeze=true`; sin ambas señales el workflow falla cerrado antes de stagear Vault. En ese modo valida el SHA exacto del release productivo mediante `.release-sha`, activa maintenance mode con página 503 pre-renderizada para cubrir las entradas Laravel/S4, verifica el freeze y re-audita cada tenant contra su manifest tras el staging.
 
 La key de recuperación se entrega como GitHub Actions secret `PRODUCTION_RECOVERY_KEY_B64` y existe dentro del runtime de cifrado únicamente como `GF_RECOVERY_KEY_B64`. Debe decodificar exactamente 32 bytes. Nunca se pasa como argumento CLI, se escribe en Issues, summaries, artifacts o repo, ni se conserva junto al ciphertext.
 
@@ -23,7 +23,7 @@ El formato `grindflow-recovery-v1` contiene, antes del cifrado:
 - `vault-index.json`: índice canónico por organización con `manifest_sha256` y conteos;
 - `metadata.json`: versión/SHA exactos, timestamp UTC, fingerprint DB y `vault_index_sha256`.
 
-El tar plaintext es temporal, privado y se elimina inmediatamente después de promover el ciphertext autenticado. El ciphertext `.gfrec` usa libsodium secretstream XChaCha20-Poly1305 con frames autenticados y `TAG_FINAL` obligatorio. Truncado, modificación, key incorrecta, tag inesperado o runtime criptográfico ausente fallan cerrado.
+El tar plaintext es temporal, privado y se elimina antes de crear el receipt de recovery. El ciphertext se descifra de inmediato a un temporal privado y se compara byte a byte con el tar fuente antes del cleanup; solo después se registra evidencia. El ciphertext `.gfrec` usa libsodium secretstream XChaCha20-Poly1305 con frames autenticados y `TAG_FINAL` obligatorio. Truncado, modificación, key incorrecta, tag inesperado o runtime criptográfico ausente fallan cerrado.
 
 `VerifiedBackupEvidence` conserva su responsabilidad original para el gate de migraciones. `VerifiedRecoveryEvidence` es independiente y liga ciphertext SHA-256, fingerprint DB, Vault index SHA-256, release version/SHA, timestamp y conteos. No contiene nombres originales, notas privadas, storage keys, paths absolutos ni secretos.
 
