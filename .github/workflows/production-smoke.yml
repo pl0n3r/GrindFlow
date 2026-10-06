@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       repair_private_vault_permissions:
-        description: 'Autoriza únicamente endurecer a 0700 el Private Vault externo ya configurado'
+        description: 'OWNER only: endurecer a 0700 el Private Vault ya configurado (default u override)'
         required: false
         default: false
         type: boolean
