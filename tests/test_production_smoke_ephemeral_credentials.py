@@ -23,7 +23,7 @@ class ProductionSmokeEphemeralCredentialsTests(unittest.TestCase):
         block = WORKFLOW[start:end]
 
         self.assertIn('password="$(openssl rand -hex 32)"', block)
-        self.assertIn('[[ "$password" =~ ^[0-9a-f]{64}$ ]] ', block.replace("|| {", ""))
+        self.assertIn('[[ "$password" =~ ^[0-9a-f]{64}$ ]] || {', block)
         self.assertIn('echo "::add-mask::$password"', block)
         self.assertIn('echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"', block)
         self.assertLess(
