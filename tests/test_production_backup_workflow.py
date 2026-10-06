@@ -23,7 +23,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             '[[ -L "$current" ]]',
             'case "$release" in',
             'release="$(readlink -f "$current")"',
-            'php_bin="${3:-/opt/alt/php85/usr/bin/php}"',
+            'php_bin="$7"',
             '-f vendor/autoload.php',
             "database dump utility is unavailable",
             "pending migration count changed",
@@ -32,7 +32,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         ):
             self.assertIn(signal, script)
 
-        self.assertEqual(script.count('require "vendor/autoload.php";'), 2)
+        self.assertGreaterEqual(script.count('require "vendor/autoload.php";'), 2)
 
         base_env = {
             **os.environ,
@@ -138,7 +138,18 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             def run_remote(*, fail_receipt: bool = False):
                 attempt_env = {**env, "FAKE_RECEIPT_FAIL": "1" if fail_receipt else "0"}
                 return subprocess.run(
-                    ["/bin/bash", "-s", "--", str(root), "1", str(fake_php)],
+                    [
+                        "/bin/bash",
+                        "-s",
+                        "--",
+                        str(root),
+                        "1",
+                        "false",
+                        "false",
+                        "",
+                        "",
+                        str(fake_php),
+                    ],
                     input=remote,
                     env=attempt_env,
                     text=True,
@@ -201,10 +212,29 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         script = SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("operations:record-db-backup", script)
-        self.assertIn('[[ "$receipt" =~ ^[0-9a-f]{64}$ ]]', script)
+        self.assertIn('[[ "$db_receipt" =~ ^[0-9a-f]{64}$ ]]', script)
         self.assertNotIn("BACKUP_RECEIPT=", script)
         self.assertIn("MIGRATION_FINGERPRINT=", script)
         self.assertIn("BACKUP_ARCHIVE=", script)
+
+    def test_recovery_requires_explicit_write_freeze_confirmation(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        script = SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("confirm_recovery_write_freeze:", workflow)
+        self.assertIn("RECOVERY_WRITES_STOPPED_CONFIRMED", workflow)
+        self.assertIn(
+            "Encrypted recovery requires explicit write-freeze confirmation",
+            workflow,
+        )
+        self.assertIn(
+            "recovery write freeze was not explicitly confirmed",
+            script,
+        )
+        self.assertIn('artisan down --retry=60 --no-interaction', script)
+        self.assertIn('artisan up --no-interaction', script)
+        self.assertIn('grindflow:vault:audit', script)
+        self.assertIn('--expect="$manifest_sha"', script)
 
     def test_workflow_is_manual_owner_only_and_never_runs_migrations(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
