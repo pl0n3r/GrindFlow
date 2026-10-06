@@ -59,7 +59,7 @@ foreach ($rawVersions as $version) {
     if ($version === '') {
         continue;
     }
-    if (str_contains($version, "\0") || preg_match('/[\r\n]/', $version) === 1) {
+    if (str_contains($version, "\0")) {
         fwrite(STDERR, "invalid applied migration version\n");
         exit(2);
     }
