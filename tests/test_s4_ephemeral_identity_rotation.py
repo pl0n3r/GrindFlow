@@ -120,6 +120,12 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertIn("self::assertSame('already_ready'", COMMAND_TEST)
         self.assertIn("count($memberships) !== 1", COMMAND)
         self.assertIn("'identity_conflict'", COMMAND)
+        self.assertIn("throw new ReservedIdentityConflict();", COMMAND)
+        self.assertIn("catch (ReservedIdentityConflict)", COMMAND)
+        transaction = COMMAND.split("private function reconcileTransaction", 1)[1].split(
+            "private function reconcile(", 1
+        )[0]
+        self.assertIn("return 'identity_conflict';", transaction)
 
     def test_wrapper_allowlists_role_upgrade_codes(self) -> None:
         self.assertIn("'role_upgraded'", PROVISIONER)
