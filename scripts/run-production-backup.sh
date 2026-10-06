@@ -11,6 +11,7 @@ set -euo pipefail
 
 RECOVERY_BACKUP_ENABLED="${RECOVERY_BACKUP_ENABLED:-false}"
 RECOVERY_WRITES_STOPPED_CONFIRMED="${RECOVERY_WRITES_STOPPED_CONFIRMED:-false}"
+RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED="${RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED:-false}"
 EXPECTED_SHA="${EXPECTED_SHA:-}"
 PRODUCTION_RECOVERY_KEY_B64="${PRODUCTION_RECOVERY_KEY_B64:-}"
 [[ "$RECOVERY_BACKUP_ENABLED" == "true" || "$RECOVERY_BACKUP_ENABLED" == "false" ]] || {
@@ -21,8 +22,13 @@ PRODUCTION_RECOVERY_KEY_B64="${PRODUCTION_RECOVERY_KEY_B64:-}"
   echo "invalid recovery write-freeze confirmation" >&2
   exit 2
 }
+[[ "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" == "true" || "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" == "false" ]] || {
+  echo "invalid Symfony recovery cron confirmation" >&2
+  exit 2
+}
 if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
   [[ "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "true" ]] || { echo "recovery write freeze was not explicitly confirmed" >&2; exit 2; }
+  [[ "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" == "true" ]] || { echo "Symfony password-recovery cron disablement was not explicitly confirmed" >&2; exit 2; }
   [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid expected SHA" >&2; exit 2; }
   [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || { echo "recovery key is unavailable" >&2; exit 2; }
 fi
@@ -79,23 +85,30 @@ if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
   }
 fi
 
-"${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$RECOVERY_WRITES_STOPPED_CONFIRMED" "$EXPECTED_SHA" "$remote_key_file" "/opt/alt/php85/usr/bin/php" <<'REMOTE'
+"${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$RECOVERY_WRITES_STOPPED_CONFIRMED" "$RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED" "$EXPECTED_SHA" "$remote_key_file" "/opt/alt/php85/usr/bin/php" <<'REMOTE'
 set -euo pipefail
 
 wait_for_recovery_quiescence() {
   local max_attempts="$1"
   local delay_seconds="$2"
-  local attempt
+  local attempt status
+  local process_pattern='(([p]hp[^ ]*|[l]sphp[^ ]*) .*artisan ((queue:(work|listen))|(schedule:(work|run)))( |$)|([p]hp[^ ]*|[l]sphp[^ ]*) .*bin/console grindflow:password-recovery:deliver( |$))'
 
   [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] || return 2
   [[ "$delay_seconds" =~ ^[0-9]+$ ]] || return 2
 
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
-    if ! pgrep -af '[p]hp .*artisan ((queue:(work|listen))|(schedule:(work|run)))( |$)' >/dev/null 2>&1; then
+    status=0
+    pgrep -af "$process_pattern" >/dev/null 2>&1 || status=$?
+    if (( status == 1 )); then
       return 0
     fi
+    if (( status != 0 )); then
+      echo "recovery quiescence could not be verified" >&2
+      return 2
+    fi
     if (( attempt == max_attempts )); then
-      echo "write-capable artisan process did not quiesce before recovery snapshot" >&2
+      echo "write-capable process did not quiesce before recovery snapshot" >&2
       return 1
     fi
     sleep "$delay_seconds"
@@ -108,13 +121,15 @@ root="$1"
 expected_pending="$2"
 recovery_enabled="$3"
 writes_stopped_confirmed="$4"
-expected_sha="$5"
-key_file="$6"
-php_bin="$7"
+symfony_cron_disabled_confirmed="$5"
+expected_sha="$6"
+key_file="$7"
+php_bin="$8"
 current="$root/current"
 
 [[ "$recovery_enabled" == "true" || "$recovery_enabled" == "false" ]] || { echo "invalid recovery backup flag" >&2; exit 18; }
 [[ "$writes_stopped_confirmed" == "true" || "$writes_stopped_confirmed" == "false" ]] || { echo "invalid recovery write-freeze confirmation" >&2; exit 18; }
+[[ "$symfony_cron_disabled_confirmed" == "true" || "$symfony_cron_disabled_confirmed" == "false" ]] || { echo "invalid Symfony recovery cron confirmation" >&2; exit 18; }
 [[ -x "$php_bin" ]] || { echo "production PHP 8.5 CLI is unavailable" >&2; exit 19; }
 [[ -L "$current" ]] || { echo "production current release is unavailable" >&2; exit 20; }
 release="$(readlink -f "$current")"
@@ -127,6 +142,7 @@ esac
 recovery_key=""
 if [[ "$recovery_enabled" == "true" ]]; then
   [[ "$writes_stopped_confirmed" == "true" ]] || { echo "recovery write freeze was not explicitly confirmed" >&2; exit 22; }
+  [[ "$symfony_cron_disabled_confirmed" == "true" ]] || { echo "Symfony password-recovery cron disablement was not explicitly confirmed" >&2; exit 22; }
   [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid expected SHA" >&2; exit 22; }
   [[ "$release" == "$root/releases/$expected_sha" ]] || { echo "production checkout does not match expected SHA" >&2; exit 22; }
   [[ -f "$release/.release-sha" && ! -L "$release/.release-sha" ]] || { echo "production release identity is unavailable" >&2; exit 22; }
@@ -214,6 +230,10 @@ trap cleanup_remote EXIT
 chmod 600 "$credentials" "$database_file"
 
 if [[ "$recovery_enabled" == "true" ]]; then
+  command -v pgrep >/dev/null 2>&1 || {
+    echo "pgrep is unavailable; recovery quiescence cannot be verified" >&2
+    exit 28
+  }
   [[ ! -e storage/framework/down && ! -L storage/framework/down ]] || {
     echo "production is already in maintenance mode" >&2
     exit 28
