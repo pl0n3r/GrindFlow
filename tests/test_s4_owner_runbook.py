@@ -2,8 +2,11 @@
 """Contracts for the owner-only S4 configuration, schema and identity runbook."""
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -48,6 +51,77 @@ class S4OwnerRunbookTests(unittest.TestCase):
         self.assertIsNotNone(constant)
         declared_codes = set(re.findall(r"'([^']+)'", constant.group("body")))
         self.assertEqual(declared_codes, expected_codes)
+
+        # Execute the real CLI against a disposable bootstrap. The empty
+        # autoloader keeps the contract offline: the connection scenario is
+        # classified by the real Throwable path without touching a database.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sandbox = Path(temp_dir)
+            sandbox_diagnostic = sandbox / "scripts" / DIAGNOSTIC.name
+            sandbox_diagnostic.parent.mkdir(parents=True)
+            sandbox_diagnostic.write_text(self.diagnostic, encoding="utf-8")
+
+            bootstrap = sandbox / "symfony" / "config" / "bootstrap.php"
+            bootstrap.parent.mkdir(parents=True)
+            bootstrap.write_text("<?php\n", encoding="utf-8")
+            autoload = sandbox / "symfony" / "vendor" / "autoload.php"
+            autoload.parent.mkdir(parents=True)
+            autoload.write_text("<?php\n", encoding="utf-8")
+
+            base_env = os.environ.copy()
+            base_env.pop("APP_SECRET", None)
+            base_env.pop("DATABASE_URL", None)
+            valid_secret = "s4-contract-secret-0123456789abcdef"
+            scenarios = (
+                ("secret missing", {}, "app_secret_missing"),
+                (
+                    "secret too short",
+                    {"APP_SECRET": "too-short"},
+                    "app_secret_too_short",
+                ),
+                (
+                    "database missing",
+                    {"APP_SECRET": valid_secret},
+                    "database_url_missing",
+                ),
+                (
+                    "database url invalid",
+                    {
+                        "APP_SECRET": valid_secret,
+                        "DATABASE_URL": "not-a-database-url",
+                    },
+                    "database_url_invalid",
+                ),
+                (
+                    "database connection failure",
+                    {
+                        "APP_SECRET": valid_secret,
+                        "DATABASE_URL": "mysql://s4-user:s4-password@127.0.0.1:1/grindflow",
+                    },
+                    "database_connection_failed",
+                ),
+            )
+
+            for label, overrides, expected_code in scenarios:
+                with self.subTest(label=label):
+                    env = base_env.copy()
+                    env.update(overrides)
+                    result = subprocess.run(
+                        ["php", str(sandbox_diagnostic)],
+                        cwd=sandbox,
+                        env=env,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(payload, {"status": "blocked", "code": expected_code})
+                    self.assertIn(payload["code"], expected_codes)
+
+                    combined_output = result.stdout + result.stderr
+                    for sensitive_value in overrides.values():
+                        self.assertNotIn(sensitive_value, combined_output)
 
         for snippet in (
             "strlen($appSecret) < 32",
