@@ -21,8 +21,8 @@ final class S4SymfonyCommandRunner
     ) {}
 
     /**
-     * @param array<string, string> $environment
-     * @param list<string> $sensitiveValues
+     * @param  array<string, string>  $environment
+     * @param  list<string>  $sensitiveValues
      * @return array{ok:false,code:string}|array{ok:true,successful:bool,status:string,code:string}
      */
     public function run(
