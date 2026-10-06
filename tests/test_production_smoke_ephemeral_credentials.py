@@ -15,6 +15,8 @@ class ProductionSmokeEphemeralCredentialsTests(unittest.TestCase):
         self.assertNotIn("secrets.PRODUCTION_E2E_PASSWORD", WORKFLOW)
         self.assertNotIn("Repository secret PRODUCTION_E2E_PASSWORD", WORKFLOW)
         self.assertNotIn("Fail unconfigured authenticated production smoke", WORKFLOW)
+        self.assertNotIn("steps.credentials.outputs.configured", WORKFLOW)
+        self.assertNotIn("CONFIG_ISSUE_TITLE", WORKFLOW)
         self.assertIn("Generate ephemeral synthetic credential", WORKFLOW)
 
     def test_ephemeral_password_is_generated_masked_and_kept_job_local(self) -> None:
@@ -31,6 +33,7 @@ class ProductionSmokeEphemeralCredentialsTests(unittest.TestCase):
             block.index('echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"'),
         )
         self.assertNotIn("upload-artifact", block)
+        self.assertNotIn("GITHUB_OUTPUT", block)
 
     def test_oidc_bootstrap_and_smoke_share_ephemeral_password_after_exact_sha_guard(self) -> None:
         exact_guard = WORKFLOW.index("Wait for exact deployed checkout before production write")
@@ -51,10 +54,12 @@ class ProductionSmokeEphemeralCredentialsTests(unittest.TestCase):
 
     def test_operational_closeout_requires_exact_main_smoke_success(self) -> None:
         recovery = WORKFLOW.index("Publish production recovery")
-        close_notice = WORKFLOW.index("Closing the obsolete persistent-secret blocker.")
+        close_notice = WORKFLOW.index("Closing the ephemeral-credential blocker.")
         self.assertLess(recovery, close_notice)
-        self.assertIn("if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'", WORKFLOW)
-        self.assertIn('gh issue close "$config_issue_number"', WORKFLOW)
+        self.assertIn("if: steps.smoke.outcome == 'success'", WORKFLOW)
+        self.assertIn("EPHEMERAL_CREDENTIAL_ISSUE: '369'", WORKFLOW)
+        self.assertIn('gh issue close "$EPHEMERAL_CREDENTIAL_ISSUE"', WORKFLOW)
+        self.assertIn("Production Smoke success on exact-main commit $GITHUB_SHA", WORKFLOW)
         test_command = PACKAGE["scripts"]["test"]
         self.assertIn("tests/test_production_smoke_ephemeral_credentials.py", test_command)
 

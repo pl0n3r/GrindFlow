@@ -95,11 +95,15 @@ smoke_source = File.read(smoke_path, encoding: "UTF-8")
 abort "Production smoke must not depend on persistent PRODUCTION_E2E_PASSWORD secret" if smoke_source.include?("secrets.PRODUCTION_E2E_PASSWORD")
 abort "Production smoke must not retain the obsolete unconfigured-secret failure" if steps.any? { |step| step["name"] == "Fail unconfigured authenticated production smoke" }
 
+abort "Production smoke must not retain legacy configured guards" if smoke_source.include?("steps.credentials.outputs.configured")
+abort "Production smoke must not export credential state through GITHUB_OUTPUT" if credential_script.include?("GITHUB_OUTPUT")
+abort "Production smoke must not retain obsolete config-issue routing" if smoke_source.include?("CONFIG_ISSUE_TITLE")
+
 recovery = steps.find { |step| step["name"] == "Publish production recovery" }
 abort "Production smoke recovery step missing" if recovery.nil?
-abort "Persistent-secret blocker may close only after successful smoke" unless recovery["if"] == "steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'"
+abort "Ephemeral-credential blocker may close only after successful smoke" unless recovery["if"] == "steps.smoke.outcome == 'success'"
 recovery_script = recovery.fetch("run")
-abort "Production smoke recovery must close the obsolete config issue" unless recovery_script.include?('gh issue close "$config_issue_number"')
+abort "Production smoke recovery must close issue 369 explicitly" unless smoke_source.include?("EPHEMERAL_CREDENTIAL_ISSUE: '369'") && recovery_script.include?('gh issue close "$EPHEMERAL_CREDENTIAL_ISSUE"')
 abort "No smoke shell steps checked" if checked.zero?
 puts "PASS production-smoke embedded Bash syntax (#{checked} steps)"
 
