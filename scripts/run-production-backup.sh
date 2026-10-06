@@ -209,6 +209,10 @@ if [[ "$recovery_enabled" == "true" ]]; then
     echo "production pre-rendered maintenance is unavailable" >&2
     exit 28
   }
+  if pgrep -af '[p]hp .*artisan (queue:work|queue:listen).*--force' >/dev/null 2>&1; then
+    echo "forced queue worker would bypass maintenance mode" >&2
+    exit 28
+  fi
 fi
 
 "$php_bin" -r '
@@ -290,8 +294,8 @@ ln -- "$tmp_archive" "$archive_path" || { echo "database backup archive collisio
 promoted_archive="$archive_path"
 [[ -f "$archive_path" && ! -L "$archive_path" ]] || { echo "database backup archive is unsafe" >&2; exit 31; }
 
-db_receipt="$("$php_bin" artisan operations:record-db-backup "$archive_relative" "$fingerprint" --no-interaction 2>/dev/null)"
-[[ "$db_receipt" =~ ^[0-9a-f]{64}$ ]] || { echo "verified backup receipt was not created" >&2; exit 32; }
+receipt="$("$php_bin" artisan operations:record-db-backup "$archive_relative" "$fingerprint" --no-interaction 2>/dev/null)"
+[[ "$receipt" =~ ^[0-9a-f]{64}$ ]] || { echo "verified backup receipt was not created" >&2; exit 32; }
 
 rm -f -- "$tmp_archive"
 tmp_archive=""
