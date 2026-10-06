@@ -89,7 +89,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
         lock = text.index("flock -n 9")
         first = text.index("s4-migration-fingerprint.php")
         backup = text.index("--single-transaction --quick --skip-lock-tables")
-        receipt = text.index("operations:record-db-backup")
+        receipt = text.index("operations:record-db-backup", backup)
         second = text.index("s4-migration-fingerprint.php", first + 1)
         verify = text.index("assertLatestValidForFingerprint")
         migrate = text.index("doctrine:migrations:migrate --no-interaction", verify)
