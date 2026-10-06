@@ -34,6 +34,7 @@ class ProductionSmokeEphemeralCredentialsTests(unittest.TestCase):
             block.index('echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"'),
         )
         self.assertNotIn("upload-artifact", block)
+        self.assertNotIn("GITHUB_OUTPUT=$password", block)
         self.assertNotIn("GITHUB_OUTPUT", block)
 
     def test_oidc_bootstrap_and_smoke_share_ephemeral_password_after_exact_sha_guard(self) -> None:
