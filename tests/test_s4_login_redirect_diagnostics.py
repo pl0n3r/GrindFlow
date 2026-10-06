@@ -25,6 +25,7 @@ def shell_function(name: str, next_name: str) -> str:
     return SMOKE[start:end].rstrip()
 
 
+LOGIN_CLASS_FN = shell_function("safe_s4_login_redirect_class", "extract_csrf")
 MEDIA_FN = shell_function(
     "check_media_web_runtime_readiness",
     "check_s4_media_web_runtime_readiness",
@@ -35,55 +36,46 @@ S4_FN = shell_function(
 )
 
 
-def run_s4_fixture(stage: str) -> str:
-    if stage not in {
-        "login_redirect",
-        "organization_select_redirect",
-        "media_readiness_contract",
-    }:
-        raise ValueError(stage)
+def classify_redirect(value: str) -> str:
+    completed = subprocess.run(
+        [
+            "bash",
+            "-c",
+            LOGIN_CLASS_FN + "\n" + "safe_s4_login_redirect_class \"$1\"",
+            "_",
+            value,
+        ],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return completed.stdout.strip()
 
+
+def run_login_redirect_fixture(safe_path: str) -> str:
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
         media_body = root / "media-readiness.json"
-        if stage == "media_readiness_contract":
-            media_body.write_text(
-                '{"data":{"contract":"wrong","secret":"do-not-leak"}}',
-                encoding="utf-8",
-            )
-        else:
-            media_body.write_text(
-                json.dumps(
-                    {
-                        "data": {
-                            "contract": "media-pilot-readiness-v1",
-                            "status": "ready",
-                            "checks": {
-                                "decoder": "ready",
-                                "temporary_storage": "ready",
-                                "private_vault": "ready",
-                            },
-                            "evidence_scope": "web_runtime",
-                            "ci_equivalent": False,
-                        }
+        media_body.write_text(
+            json.dumps(
+                {
+                    "data": {
+                        "contract": "media-pilot-readiness-v1",
+                        "status": "ready",
+                        "checks": {
+                            "decoder": "ready",
+                            "temporary_storage": "ready",
+                            "private_vault": "ready",
+                        },
+                        "evidence_scope": "web_runtime",
+                        "ci_equivalent": False,
                     }
-                ),
-                encoding="utf-8",
-            )
-
-        login_redirect = (
-            "/private-login-target?token=do-not-leak"
-            if stage == "login_redirect"
-            else "/s4/organizations"
+                }
+            ),
+            encoding="utf-8",
         )
-        select_redirect = (
-            "/private-org-target?token=do-not-leak"
-            if stage == "organization_select_redirect"
-            else "/s4/admin"
-        )
-
         paths = {
-            "cookie_jar": root / "laravel-cookie.txt",
             "s4_bridge_body": root / "bridge.json",
             "s4_bridge_headers": root / "bridge.headers",
             "s4_cookie_jar": root / "s4-cookie.txt",
@@ -99,7 +91,6 @@ def run_s4_fixture(stage: str) -> str:
             "password_file": root / "password.txt",
             "media_readiness_body": media_body,
         }
-
         assignments = "\n".join(
             f"{name}={json.dumps(str(path))}" for name, path in paths.items()
         )
@@ -110,8 +101,7 @@ def run_s4_fixture(stage: str) -> str:
             BASE_URL='https://example.invalid'
             E2E_USER_EMAIL='synthetic@example.invalid'
             cookie_jar="$s4_cookie_jar"
-            LOGIN_REDIRECT={json.dumps(login_redirect)}
-            SELECT_REDIRECT={json.dumps(select_redirect)}
+            SAFE_LOGIN_PATH={json.dumps(safe_path)}
 
             safe_s4_bridge_header_state() {{ printf '%s\\n' 'ready_for_web_probe'; }}
             extract_s4_bridge_state() {{ printf '%s\\n' 'ready_for_web_probe'; }}
@@ -122,20 +112,12 @@ def run_s4_fixture(stage: str) -> str:
             }}
             safe_s4_redirect_path() {{
               if [[ "$1" == "$s4_login_post_headers" ]]; then
-                printf '%s\\n' "$LOGIN_REDIRECT"
+                printf '%s\\n' "$SAFE_LOGIN_PATH"
               else
-                printf '%s\\n' "$SELECT_REDIRECT"
+                printf '%s\\n' '/s4/admin'
               fi
             }}
-            safe_s4_login_redirect_class() {{
-              case "${1:-}" in
-                /s4/login) printf '%s\\n' 'returned_to_login' ;;
-                /s4/organizations) printf '%s\\n' 'organizations' ;;
-                /s4/admin) printf '%s\\n' 'admin' ;;
-                '(missing)') printf '%s\\n' 'missing' ;;
-                *) printf '%s\\n' 'redacted' ;;
-              esac
-            }}
+            {LOGIN_CLASS_FN}
             curl_common() {{
               local rendered=" $* "
               if [[ "$rendered" == *"/s4/_bridge-readiness"* ]]; then
@@ -231,118 +213,123 @@ def run_reconcile_fixture(log: str) -> tuple[str, str]:
         )
 
 
-def contract_invalid_log(stage_lines: str = "") -> str:
+def login_contract_invalid_log(class_lines: str = "") -> str:
     return (
         "S4_BRIDGE_HTTP_STATUS=200\n"
         "S4_BRIDGE_HEADER_STATE=ready_for_web_probe\n"
         "S4_BRIDGE_BODY_CONTRACT=valid\n"
         "S4_BRIDGE_STATE=ready_for_web_probe\n"
         "S4_AUTH_STATE=identity_unavailable\n"
-        f"{stage_lines}"
+        "S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect\n"
+        f"{class_lines}"
         "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n"
         "MEDIA_WEB_RUNTIME_READY=0\n"
     )
 
 
-class S4PostBridgeContractDiagnosticsTests(unittest.TestCase):
-    def test_contract_invalid_emits_one_allowlisted_post_bridge_stage(self) -> None:
-        for stage in (
-            "login_redirect",
-            "organization_select_redirect",
-            "media_readiness_contract",
-        ):
-            with self.subTest(stage=stage):
-                output = run_s4_fixture(stage)
-                marker = f"S4_POST_BRIDGE_CONTRACT_STAGE={stage}"
-                self.assertEqual(1, output.splitlines().count(marker))
-                self.assertIn("MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid", output)
-                self.assertIn("MEDIA_WEB_RUNTIME_READY=0", output)
+class S4LoginRedirectDiagnosticsTests(unittest.TestCase):
+    def test_login_redirect_emits_one_safe_class_without_location(self) -> None:
+        output = run_login_redirect_fixture("/s4/login")
+        self.assertEqual(
+            1,
+            output.splitlines().count(
+                "S4_LOGIN_REDIRECT_CLASS=returned_to_login"
+            ),
+        )
+        self.assertEqual(
+            1,
+            output.splitlines().count(
+                "S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect"
+            ),
+        )
+        self.assertIn("MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid", output)
+        self.assertNotIn("/s4/login", output)
+        self.assertNotIn("Location:", output)
 
-    def test_each_post_bridge_contract_failure_is_distinguishable_and_secret_free(self) -> None:
-        outputs = {
-            stage: run_s4_fixture(stage)
-            for stage in (
-                "login_redirect",
-                "organization_select_redirect",
-                "media_readiness_contract",
-            )
+    def test_redirect_classes_are_deterministic_and_fail_closed(self) -> None:
+        cases = {
+            "/s4/login": "returned_to_login",
+            "/s4/organizations": "organizations",
+            "/s4/admin": "admin",
+            "(missing)": "missing",
+            "(redacted)": "redacted",
+            "/outside-allowlist?token=do-not-leak": "redacted",
         }
-        for stage, output in outputs.items():
-            with self.subTest(stage=stage):
-                self.assertIn(f"S4_POST_BRIDGE_CONTRACT_STAGE={stage}", output)
-                self.assertNotIn("do-not-leak", output)
-                self.assertNotIn("private-login-target", output)
-                self.assertNotIn("private-org-target", output)
-                self.assertNotIn('{"data":', output)
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(expected, classify_redirect(raw))
 
-    def test_reconciler_rejects_missing_duplicate_or_out_of_domain_stage(self) -> None:
+        success_output = run_login_redirect_fixture("/s4/organizations")
+        self.assertNotIn("S4_LOGIN_REDIRECT_CLASS=", success_output)
+        self.assertNotIn("S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect", success_output)
+
+    def test_reconciler_rejects_invalid_redirect_class_markers(self) -> None:
         cases = {
             "missing": "",
             "duplicate": (
-                "S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect\n"
-                "S4_POST_BRIDGE_CONTRACT_STAGE=media_readiness_contract\n"
+                "S4_LOGIN_REDIRECT_CLASS=returned_to_login\n"
+                "S4_LOGIN_REDIRECT_CLASS=admin\n"
             ),
-            "out_of_domain": "S4_POST_BRIDGE_CONTRACT_STAGE=secret_redirect\n",
+            "out_of_domain": "S4_LOGIN_REDIRECT_CLASS=secret_target\n",
         }
-        for label, stage_lines in cases.items():
+        for label, class_lines in cases.items():
             with self.subTest(label=label):
                 evidence, summary = run_reconcile_fixture(
-                    contract_invalid_log(stage_lines)
+                    login_contract_invalid_log(class_lines)
                 )
                 for rendered in (evidence, summary):
                     self.assertIn(
-                        "S4 post-bridge contract stage: `unavailable`",
+                        "S4 login redirect class: `unavailable`",
                         rendered,
                     )
-                    self.assertNotIn("secret_redirect", rendered)
+                    self.assertNotIn("secret_target", rendered)
 
-    def test_contract_invalid_evidence_is_exact_and_safe(self) -> None:
+    def test_login_redirect_evidence_is_exact_and_secret_free(self) -> None:
         evidence, summary = run_reconcile_fixture(
-            contract_invalid_log(
-                "S4_POST_BRIDGE_CONTRACT_STAGE=organization_select_redirect\n"
+            login_contract_invalid_log(
+                "S4_LOGIN_REDIRECT_CLASS=returned_to_login\n"
             )
         )
         for rendered in (evidence, summary):
             self.assertIn("Exact deployed SHA: `" + ("f" * 40) + "`", rendered)
             self.assertIn("actions/runs/424242", rendered)
             self.assertIn("Cause: `contract_invalid`", rendered)
-            self.assertIn("S4 bridge HTTP status: `200`", rendered)
             self.assertIn(
-                "S4 bridge header state: `ready_for_web_probe`",
+                "S4 post-bridge contract stage: `login_redirect`",
                 rendered,
             )
-            self.assertIn("S4 bridge body contract: `valid`", rendered)
             self.assertIn(
-                "S4 post-bridge contract stage: `organization_select_redirect`",
+                "S4 login redirect class: `returned_to_login`",
                 rendered,
             )
             self.assertIn("No remote response body", rendered)
-            self.assertNotIn("Remote response body:", rendered)
             self.assertNotIn("Location:", rendered)
+            self.assertNotIn("do-not-leak", rendered)
+            self.assertNotIn("password", rendered.lower())
 
-    def test_release_identity_is_synchronized_and_suite_is_canonical(self) -> None:
+    def test_release_v0209_is_synchronized_and_suite_is_canonical(self) -> None:
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        release = match.group(1)
-        self.assertEqual(release, PACKAGE["version"])
-        self.assertEqual(release, LOCK["version"])
-        self.assertEqual(release, LOCK["packages"][""]["version"])
-        self.assertIn(f"V{release}", README)
+        self.assertEqual("0.1.209", match.group(1))
+        self.assertEqual("0.1.209", PACKAGE["version"])
+        self.assertEqual("0.1.209", LOCK["version"])
+        self.assertEqual("0.1.209", LOCK["packages"][""]["version"])
+        self.assertIn("V0.1.209", README)
         self.assertIn(
-            "tests/test_s4_post_bridge_contract_diagnostics.py",
+            "tests/test_s4_login_redirect_diagnostics.py",
             PACKAGE["scripts"]["test"],
         )
 
-    def test_operational_closeout_requires_exact_main_stage_evidence(self) -> None:
+    def test_operational_closeout_requires_exact_main_redirect_class(self) -> None:
         evidence, _ = run_reconcile_fixture(
-            contract_invalid_log(
-                "S4_POST_BRIDGE_CONTRACT_STAGE=media_readiness_contract\n"
+            login_contract_invalid_log(
+                "S4_LOGIN_REDIRECT_CLASS=returned_to_login\n"
             )
         )
         self.assertIn("Exact deployed SHA: `" + ("f" * 40) + "`", evidence)
         self.assertIn("actions/runs/424242", evidence)
         self.assertIn(
-            "S4 post-bridge contract stage: `media_readiness_contract`",
+            "S4 login redirect class: `returned_to_login`",
             evidence,
         )
         self.assertIn("Status: `BLOCKED_TARGET_ENV`", evidence)
