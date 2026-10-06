@@ -19,10 +19,11 @@ SHA = "0" * 40
 class S4MigrationFingerprintTests(unittest.TestCase):
     def fingerprint(self, migration_dir: Path, applied_versions: Path, checkout_sha: str = SHA) -> str:
         result = subprocess.run(
-            ["php", str(HELPER), checkout_sha, str(migration_dir), str(applied_versions)],
+            ["php", str(HELPER), checkout_sha, str(migration_dir)],
             cwd=ROOT,
             check=True,
             text=True,
+            input=applied_versions.read_text(encoding="utf-8"),
             capture_output=True,
         )
         self.assertEqual(result.stderr, "")
@@ -94,6 +95,8 @@ class S4MigrationFingerprintTests(unittest.TestCase):
             self.assertNotIn("DATABASE_URL", source)
             self.assertNotIn("getenv(", source)
             self.assertNotIn("dry-run", source)
+            self.assertIn("stream_get_contents(STDIN)", source)
+            self.assertNotIn("applied-versions-file", source)
 
     def test_invalid_utf8_fails_closed_without_leaking_paths(self) -> None:
         with tempfile.TemporaryDirectory(prefix="private-fingerprint-path-") as tmp:
@@ -104,9 +107,10 @@ class S4MigrationFingerprintTests(unittest.TestCase):
                 + b"\n"
             )
             result = subprocess.run(
-                ["php", str(HELPER), SHA, str(migrations), str(versions)],
+                ["php", str(HELPER), SHA, str(migrations)],
                 cwd=ROOT,
                 check=False,
+                input=versions.read_bytes(),
                 capture_output=True,
             )
             self.assertEqual(2, result.returncode)
