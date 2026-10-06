@@ -92,7 +92,7 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertNotIn("'platform_role' =>", rotation)
         self.assertNotIn("'is_active' =>", rotation)
         self.assertNotIn("'updated_at' =>", rotation)
-        self.assertIn("existingStateHasValidStructure", COMMAND)
+        self.assertIn("existingMembership", COMMAND)
         self.assertIn("'identity_conflict'", COMMAND)
         self.assertIn("'rotated'", COMMAND_TEST)
         self.assertIn("password_verify($rotatedSecret", COMMAND_TEST)
