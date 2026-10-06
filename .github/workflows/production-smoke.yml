@@ -305,6 +305,36 @@ jobs:
             printf '%s\n' "${matches[0]#*=}"
           }
 
+          s4_bridge_http_status_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_BRIDGE_HTTP_STATUS=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_BRIDGE_HTTP_STATUS=(000|[1-5][0-9]{2})$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
+          s4_bridge_header_state_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_BRIDGE_HEADER_STATE=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_BRIDGE_HEADER_STATE=(unknown|runtime_unavailable|config_missing|schema_missing|identity_unavailable|ready_for_web_probe)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
+          s4_bridge_body_contract_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_BRIDGE_BODY_CONTRACT=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_BRIDGE_BODY_CONTRACT=(valid|invalid)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           diagnostic_reason() {
             local matches=()
             mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=' production-smoke.log || true)
@@ -325,9 +355,15 @@ jobs:
           private_vault_state=''
           s4_bridge_state=''
           s4_auth_state=''
+          s4_bridge_http_status=''
+          s4_bridge_header_state=''
+          s4_bridge_body_contract=''
 
           s4_bridge_state="$(s4_bridge_state_marker || true)"
           s4_auth_state="$(s4_auth_state_marker || true)"
+          s4_bridge_http_status="$(s4_bridge_http_status_marker || true)"
+          s4_bridge_header_state="$(s4_bridge_header_state_marker || true)"
+          s4_bridge_body_contract="$(s4_bridge_body_contract_marker || true)"
 
           if [[ "$diagnostic_state" == "observed" ]] \
             && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
@@ -398,6 +434,15 @@ jobs:
                 echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
                 echo 'Status: `BLOCKED_TARGET_ENV`'
                 printf 'Cause: `%s`\n' "$diagnostic_state"
+                if [[ "$diagnostic_state" == "contract_invalid" ]]; then
+                  if [[ -n "$s4_bridge_http_status" && -n "$s4_bridge_header_state" && -n "$s4_bridge_body_contract" ]]; then
+                    printf 'S4 bridge HTTP status: `%s`\n' "$s4_bridge_http_status"
+                    printf 'S4 bridge header state: `%s`\n' "$s4_bridge_header_state"
+                    printf 'S4 bridge body contract: `%s`\n' "$s4_bridge_body_contract"
+                  else
+                    echo 'S4 bridge safe classification: `unavailable`'
+                  fi
+                fi
                 if [[ "$diagnostic_state" == "http_non_200" && -n "$s4_bridge_state" ]]; then
                   printf 'S4 bridge state: `%s`\n' "$s4_bridge_state"
                 fi
