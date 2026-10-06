@@ -130,7 +130,7 @@ final class ProvisionSmokeIdentityCommand extends Command
                 return 'already_ready';
             }
 
-            $db->update(
+            $affected = $db->update(
                 'gf_identity_users',
                 ['password_hash' => $hasher->hash($secret)],
                 [
@@ -138,6 +138,9 @@ final class ProvisionSmokeIdentityCommand extends Command
                     'email' => self::EMAIL,
                 ],
             );
+            if ($affected !== 1) {
+                return 'identity_conflict';
+            }
 
             return 'rotated';
         }
