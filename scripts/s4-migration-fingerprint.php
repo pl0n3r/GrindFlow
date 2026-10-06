@@ -82,5 +82,9 @@ try {
     fwrite(STDERR, "cannot encode fingerprint payload\n");
     exit(2);
 }
+if (! is_string($payload)) {
+    fwrite(STDERR, "cannot encode fingerprint payload\n");
+    exit(2);
+}
 
 fwrite(STDOUT, hash('sha256', $payload).PHP_EOL);
