@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-if ($argc !== 4) {
+$args = $_SERVER['argv'] ?? null;
+if (! is_array($args) || count($args) !== 4) {
     fwrite(STDERR, "usage: s4-migration-fingerprint.php <checkout-sha> <migration-dir> <applied-versions-file>\n");
     exit(2);
 }
 
-$checkoutSha = strtolower(trim((string) $argv[1]));
-$migrationDir = rtrim((string) $argv[2], DIRECTORY_SEPARATOR);
-$appliedVersionsFile = (string) $argv[3];
+$checkoutSha = strtolower(trim((string) $args[1]));
+$migrationDir = rtrim((string) $args[2], DIRECTORY_SEPARATOR);
+$appliedVersionsFile = (string) $args[3];
 
-if (! preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha)) {
+if (preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha) !== 1) {
     fwrite(STDERR, "invalid checkout sha\n");
     exit(2);
 }
@@ -57,7 +58,7 @@ foreach ($rawVersions as $version) {
     if ($version === '') {
         continue;
     }
-    if (str_contains($version, "\0") || preg_match('/[\r\n]/', $version)) {
+    if (str_contains($version, "\0") || preg_match('/[\r\n]/', $version) === 1) {
         fwrite(STDERR, "invalid applied migration version\n");
         exit(2);
     }
@@ -66,16 +67,17 @@ foreach ($rawVersions as $version) {
 $versions = array_keys($versions);
 sort($versions, SORT_STRING);
 
-$payload = json_encode(
-    [
-        'version' => 1,
-        'checkout_sha' => $checkoutSha,
-        'migrations' => $migrations,
-        'applied_versions' => $versions,
-    ],
-    JSON_UNESCAPED_SLASHES
-);
-if ($payload === false) {
+try {
+    $payload = json_encode(
+        [
+            'version' => 1,
+            'checkout_sha' => $checkoutSha,
+            'migrations' => $migrations,
+            'applied_versions' => $versions,
+        ],
+        JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+    );
+} catch (JsonException) {
     fwrite(STDERR, "cannot encode fingerprint payload\n");
     exit(2);
 }

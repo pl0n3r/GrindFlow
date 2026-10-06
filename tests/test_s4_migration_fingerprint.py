@@ -45,7 +45,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
         )
         return migrations, versions
 
-    def test_consecutive_unchanged_inputs_produce_same_fingerprint(self) -> None:
+    def test_identical_inputs_are_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             migrations, versions = self.fixture(Path(tmp))
             self.assertEqual(
@@ -53,7 +53,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
                 self.fingerprint(migrations, versions),
             )
 
-    def test_migration_file_content_change_changes_fingerprint(self) -> None:
+    def test_migration_content_change_changes_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             migrations, versions = self.fixture(Path(tmp))
             before = self.fingerprint(migrations, versions)
@@ -62,7 +62,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
             )
             self.assertNotEqual(before, self.fingerprint(migrations, versions))
 
-    def test_applied_versions_change_changes_fingerprint(self) -> None:
+    def test_applied_version_set_change_changes_fingerprint_and_input_order_does_not(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             migrations, versions = self.fixture(Path(tmp))
             before = self.fingerprint(migrations, versions)
@@ -71,9 +71,20 @@ class S4MigrationFingerprintTests(unittest.TestCase):
                 "GrindFlow\\Migrations\\Version20261002000000\n",
                 encoding="utf-8",
             )
-            self.assertNotEqual(before, self.fingerprint(migrations, versions))
+            with_two_versions = self.fingerprint(migrations, versions)
+            self.assertNotEqual(before, with_two_versions)
 
-    def test_fingerprint_input_and_output_are_secret_and_path_free(self) -> None:
+            versions.write_text(
+                "GrindFlow\\Migrations\\Version20261002000000\n"
+                "GrindFlow\\Migrations\\Version20261001000000\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                with_two_versions,
+                self.fingerprint(migrations, versions),
+            )
+
+    def test_output_is_single_secret_free_sha256(self) -> None:
         with tempfile.TemporaryDirectory(prefix="dsn-secret-password-") as tmp:
             migrations, versions = self.fixture(Path(tmp))
             value = self.fingerprint(migrations, versions)
@@ -103,7 +114,7 @@ class S4MigrationFingerprintTests(unittest.TestCase):
             self.assertEqual(b"cannot encode fingerprint payload\n", result.stderr)
             self.assertNotIn(tmp.encode(), result.stderr)
 
-    def test_runbook_preserves_lock_backup_receipt_and_recheck_order(self) -> None:
+    def test_runbook_uses_canonical_fingerprint_before_and_after_backup(self) -> None:
         text = RUNBOOK.read_text(encoding="utf-8")
         lock = text.index("flock -n 9")
         first = text.index("s4-migration-fingerprint.php")
