@@ -60,7 +60,6 @@ jobs:
     env:
       BASE_URL: https://www.grindflow.com.co
       E2E_USER_EMAIL: e2e-oidc-smoke@grindflow.test
-      E2E_USER_PASSWORD: ${{ secrets.PRODUCTION_E2E_PASSWORD }}
       EXPECTED_SHA: ${{ github.sha }}
       ATTEMPTS: '15'
       WAIT_SECONDS: '20'
@@ -73,58 +72,20 @@ jobs:
           persist-credentials: false
 
       - id: credentials
-        name: Check synthetic credentials
+        name: Generate ephemeral synthetic credential
         shell: bash
         run: |
-          if [[ -n "$E2E_USER_PASSWORD" ]]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "Production E2E credentials are configured." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            {
-              echo "## Production smoke skipped"
-              echo
-              echo "Repository secret PRODUCTION_E2E_PASSWORD is not configured."
-              echo "Configure it once in GitHub repository Actions secrets; no SSH is required."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Report missing smoke credentials
-        if: steps.credentials.outputs.configured == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          issue_number="$(gh issue list --state open --search "$CONFIG_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -z "$issue_number" ]]; then
-            cat > /tmp/grindflow-config-issue.md <<'EOF'
-          The authenticated production smoke cannot run because the repository
-          secret `PRODUCTION_E2E_PASSWORD` is not configured.
-
-          This is a one-time GitHub configuration task. No SSH is required.
-
-          Until it is configured, GrindFlow cannot automatically verify the
-          authenticated Dashboard/System routes or publish application diagnostics
-          from production failures.
-          EOF
-
-            gh issue create --title "$CONFIG_ISSUE_TITLE" --body-file /tmp/grindflow-config-issue.md
-          fi
-
-      - name: Close missing-credentials notice
-        if: steps.credentials.outputs.configured == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          issue_number="$(gh issue list --state open --search "$CONFIG_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
-
-          if [[ -n "$issue_number" ]]; then
-            gh issue comment "$issue_number" --body "Production E2E credentials are now configured. Closing this automatic notice."
-            gh issue close "$issue_number"
-          fi
-
+          set -euo pipefail
+          password="$(openssl rand -hex 32)"
+          [[ "$password" =~ ^[0-9a-f]{64}$ ]] || {
+            echo '::error::Unable to generate a valid ephemeral production smoke credential.'
+            exit 1
+          }
+          echo "::add-mask::$password"
+          echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "Ephemeral production smoke credential generated for this run." >> "$GITHUB_STEP_SUMMARY"
+          unset password
       - id: deployed_checkout
         name: Wait for exact deployed checkout before production write
         if: steps.credentials.outputs.configured == 'true'
@@ -563,14 +524,13 @@ jobs:
             gh issue close "$issue_number"
           fi
 
+          config_issue_number="$(gh issue list --state open --search "$CONFIG_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+          if [[ -n "$config_issue_number" ]]; then
+            gh issue comment "$config_issue_number" --body "Ephemeral OIDC smoke credentials verified on exact main commit $GITHUB_SHA. Closing the obsolete persistent-secret blocker."
+            gh issue close "$config_issue_number"
+          fi
+
       - name: Fail workflow after publishing diagnostics
         if: steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'failure'
         shell: bash
         run: exit 1
-
-      - name: Fail unconfigured authenticated production smoke
-        if: steps.credentials.outputs.configured == 'false'
-        shell: bash
-        run: |
-          echo '::error::Authenticated production smoke was not executed: PRODUCTION_E2E_PASSWORD is missing.'
-          exit 1
