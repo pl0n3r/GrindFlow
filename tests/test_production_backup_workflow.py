@@ -239,7 +239,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         script = SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("operations:record-db-backup", script)
-        self.assertIn('[[ "$db_receipt" =~ ^[0-9a-f]{64}$ ]]', script)
+        self.assertIn('[[ "$receipt" =~ ^[0-9a-f]{64}$ ]]', script)
         self.assertNotIn("BACKUP_RECEIPT=", script)
         self.assertIn("MIGRATION_FINGERPRINT=", script)
         self.assertIn("BACKUP_ARCHIVE=", script)
