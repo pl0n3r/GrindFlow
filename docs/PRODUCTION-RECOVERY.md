@@ -10,6 +10,10 @@ La key de recuperación se entrega como GitHub Actions secret `PRODUCTION_RECOVE
 
 La evidencia del propietario confirmó libsodium secretstream en el CLI PHP 8.5 del host. El workflow vuelve a comprobar extensión y funciones en cada ejecución y falla cerrado si dejan de estar disponibles.
 
+Cuando `include_recovery_bundle=false`, el workflow conserva el backup DB-only existente: no exige key de recovery ni abre una ventana de maintenance.
+
+Cuando `include_recovery_bundle=true`, el workflow exige confirmación owner-only y además establece una quiescencia verificable antes del dump DB: rechaza un maintenance preexistente, ejecuta `artisan down --render=errors::503`, comprueba los markers `storage/framework/down` y `storage/framework/maintenance.php`, y mantiene esa ventana durante dump + inventario/stage/verify del Vault. `public/s4.php` honra el mismo maintenance pre-renderizado para que Laravel y S4 queden cerrados a tráfico durante la captura coherente. El cleanup ejecuta `artisan up` únicamente si el propio run abrió la ventana; si no puede liberarla, el run falla cerrado y requiere intervención operativa.
+
 ## Formato de recuperación
 
 El formato `grindflow-recovery-v1` contiene, antes del cifrado:
