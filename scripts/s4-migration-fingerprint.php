@@ -3,15 +3,14 @@
 declare(strict_types=1);
 
 $args = $_SERVER['argv'] ?? null;
-if (! is_array($args) || count($args) !== 4) {
-    fwrite(STDERR, "usage: s4-migration-fingerprint.php <checkout-sha> <migration-dir> <applied-versions-file>\n");
+if (! is_array($args) || count($args) !== 3) {
+    fwrite(STDERR, "usage: s4-migration-fingerprint.php <checkout-sha> <migration-dir>\n");
     exit(2);
 }
 
 array_shift($args);
 $checkoutSha = strtolower(trim((string) array_shift($args)));
 $migrationDir = rtrim((string) array_shift($args), DIRECTORY_SEPARATOR);
-$appliedVersionsFile = (string) array_shift($args);
 
 if (preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha) !== 1) {
     fwrite(STDERR, "invalid checkout sha\n");
@@ -19,10 +18,6 @@ if (preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha) !== 1) {
 }
 if ($migrationDir === '' || ! is_dir($migrationDir) || is_link($migrationDir)) {
     fwrite(STDERR, "invalid migration directory\n");
-    exit(2);
-}
-if (! is_file($appliedVersionsFile) || is_link($appliedVersionsFile)) {
-    fwrite(STDERR, "invalid applied versions file\n");
     exit(2);
 }
 
@@ -47,9 +42,14 @@ foreach ($files as $file) {
 }
 ksort($migrations, SORT_STRING);
 
-$rawVersions = file($appliedVersionsFile, FILE_IGNORE_NEW_LINES);
+$rawVersions = stream_get_contents(STDIN);
 if ($rawVersions === false) {
     fwrite(STDERR, "cannot read applied versions\n");
+    exit(2);
+}
+$rawVersions = preg_split('/\R/u', $rawVersions);
+if ($rawVersions === false) {
+    fwrite(STDERR, "cannot encode fingerprint payload\n");
     exit(2);
 }
 
