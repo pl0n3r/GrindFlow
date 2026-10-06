@@ -2,10 +2,6 @@
 
 namespace App\Support\Deployment;
 
-use JsonException;
-use Symfony\Component\Process\Process;
-use Throwable;
-
 class S4SmokeIdentityProvisioner
 {
     /** @var list<string> */
@@ -45,78 +41,24 @@ class S4SmokeIdentityProvisioner
             return ['ok' => false, 'code' => 's4-password-invalid'];
         }
 
-        $root = $this->symfonyRoot ?? base_path('symfony');
-        $console = $root.'/bin/console';
-        $php = $this->phpBinary ?? trim((string) config(
-            'grindflow.s4_smoke.php_cli_binary',
-            '',
-        ));
-
-        if (
-            $php === ''
-            || ! is_file($php)
-            || ! is_executable($php)
-            || ! is_file($console)
-            || ! is_readable($console)
-            || ! is_dir($root)
-        ) {
-            return ['ok' => false, 'code' => 's4-runtime-unavailable'];
-        }
-
-        $process = new Process(
-            [
-                $php,
-                $console,
-                'grindflow:s4:provision-smoke-identity',
-                '--env=prod',
-                '--no-interaction',
-                '--no-ansi',
-            ],
-            $root,
+        $result = (new S4SymfonyCommandRunner($this->symfonyRoot, $this->phpBinary))->run(
+            'grindflow:s4:provision-smoke-identity',
             ['GRINDFLOW_S4_SMOKE_PASSWORD' => $password],
+            [$password],
         );
-        $process->setTimeout(30.0);
 
-        try {
-            $process->run();
-        } catch (Throwable) {
-            return ['ok' => false, 'code' => 's4-process-failed'];
+        if ($result['ok'] !== true) {
+            return ['ok' => false, 'code' => match ($result['code']) {
+                'runtime_unavailable' => 's4-runtime-unavailable',
+                'process_failed' => 's4-process-failed',
+                default => 's4-output-invalid',
+            }];
         }
 
-        $stdout = trim($process->getOutput());
-        $stderr = $process->getErrorOutput();
-
-        // Child output is untrusted and never leaves this class. A secret echo
-        // invalidates the result without reflecting the payload to logs/HTTP.
+        $code = $result['code'];
         if (
-            $stdout === ''
-            || str_contains($stdout, $password)
-            || str_contains($stderr, $password)
-        ) {
-            return ['ok' => false, 'code' => 's4-output-invalid'];
-        }
-
-        try {
-            $payload = json_decode($stdout, true, 8, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return ['ok' => false, 'code' => 's4-output-invalid'];
-        }
-
-        if (
-            ! is_array($payload)
-            || count($payload) !== 2
-            || ! array_key_exists('status', $payload)
-            || ! array_key_exists('code', $payload)
-            || ! is_string($payload['status'])
-            || ! is_string($payload['code'])
-        ) {
-            return ['ok' => false, 'code' => 's4-output-invalid'];
-        }
-
-        $code = $payload['code'];
-        if (
-            $process->isSuccessful()
-            && $payload['status'] === 'ok'
+            $result['successful']
+            && $result['status'] === 'ok'
             && in_array($code, self::SUCCESS_CODES, true)
         ) {
             return ['ok' => true, 'code' => $code];
@@ -131,8 +73,8 @@ class S4SmokeIdentityProvisioner
         $mapped = $failureMap[$code] ?? null;
 
         if (
-            ! $process->isSuccessful()
-            && $payload['status'] === 'error'
+            ! $result['successful']
+            && $result['status'] === 'error'
             && is_string($mapped)
         ) {
             return ['ok' => false, 'code' => $mapped];
