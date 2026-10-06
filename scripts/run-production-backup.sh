@@ -78,6 +78,13 @@ fi
 "${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$RECOVERY_WRITES_STOPPED_CONFIRMED" "$EXPECTED_SHA" "$remote_key_file" "/opt/alt/php85/usr/bin/php" <<'REMOTE'
 set -euo pipefail
 
+assert_recovery_quiescence() {
+  if pgrep -af '[p]hp .*artisan ((queue:(work|listen))|(schedule:(work|run)))( |$)' >/dev/null 2>&1; then
+    echo "write-capable artisan process remains active during recovery write freeze" >&2
+    return 1
+  fi
+}
+
 root="$1"
 expected_pending="$2"
 recovery_enabled="$3"
@@ -209,10 +216,7 @@ if [[ "$recovery_enabled" == "true" ]]; then
     echo "production pre-rendered maintenance is unavailable" >&2
     exit 28
   }
-  if pgrep -af '[p]hp .*artisan (queue:work|queue:listen).*--force' >/dev/null 2>&1; then
-    echo "forced queue worker would bypass maintenance mode" >&2
-    exit 28
-  fi
+  assert_recovery_quiescence || exit 28
 fi
 
 "$php_bin" -r '
