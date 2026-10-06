@@ -126,6 +126,36 @@ El marker operativo es `S4_PRIVATE_VAULT_STATE=<estado>`. Debe aparecer una sola
 Estos estados son **solo diagnóstico read-only**: ninguno autoriza escritura automática, creación de directorios, `chmod`, movimiento de Vault, cambio de owner/group ni configuración SSH/Hostinger. La reparación correspondiente debe ejecutarse por un mecanismo gobernado separado y volver a acreditarse con Production Smoke exact-main.
 
 
+### Repair gobernado de permisos Private Vault (V0.1.215)
+
+V0.1.215 prepara una capacidad acotada para endurecer a `0700` el directorio
+Private Vault **ya existente** que resuelve `PrivateVaultDirectory`, tanto el
+root default `symfony/var/vault` como un override externo válido. El repair no
+crea directorios, no cambia ruta, owner/group ni contenido, no sigue symlinks y
+no recibe el path desde GitHub Actions.
+
+La capacidad queda desactivada por defecto. `push` y
+`workflow_dispatch` sin selección explícita transportan
+`repair_private_vault_permissions=false`; por tanto un deploy o Production
+Smoke normal no ejecuta `chmod`. Activarla requiere **autorización específica
+del propietario** y un dispatch manual con el input booleano en `true`.
+El servidor vuelve a exigir claims OIDC firmados del workflow exacto,
+`event_name=workflow_dispatch`, `actor_id=64439547`, SHA exacto desplegado,
+fase `construccion` y `ProductionWritePolicy` antes del child process.
+
+El comando solo admite el no-op `already_private` o el estrechamiento desde un
+root existente con permisos no privados. Guarda los permisos previos, aplica
+`0700`, verifica que el directorio siga siendo legible, escribible,
+atravesable y privado; si el post-check falla intenta restaurar el mode previo
+antes de devolver un código fijo. Ningún path, mode numérico, UID/GID, stderr o
+excepción cruza el boundary HTTP.
+
+**Merge/deploy de V0.1.215 no constituye autorización para ejecutar el repair.**
+El cierre de #307 exige, en una operación separada, autorización específica +
+dispatch manual `true` + Production Smoke **exact-main** posterior que observe
+`private_vault=ready` o una causa allowlisted nueva.
+
+
 ## Autoridad y límites
 
 Este build-ahead no autoriza:
