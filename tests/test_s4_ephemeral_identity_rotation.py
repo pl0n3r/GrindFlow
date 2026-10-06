@@ -201,7 +201,8 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertIn("'role_upgraded'", PROVISIONER)
         self.assertIn("'role_upgraded_rotated'", PROVISIONER)
         self.assertIn("name: GrindFlow Production Smoke", WORKFLOW)
-        self.assertIn("forbidden", README)
+        self.assertIn("permissions_not_private", README)
+        self.assertIn("private_vault=ready", README)
 
 
 if __name__ == "__main__":
