@@ -73,7 +73,11 @@ $payload = json_encode(
         'migrations' => $migrations,
         'applied_versions' => $versions,
     ],
-    JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+    JSON_UNESCAPED_SLASHES
 );
+if ($payload === false) {
+    fwrite(STDERR, "cannot encode fingerprint payload\n");
+    exit(2);
+}
 
 fwrite(STDOUT, hash('sha256', $payload).PHP_EOL);

@@ -84,6 +84,23 @@ class S4MigrationFingerprintTests(unittest.TestCase):
             self.assertNotIn("getenv(", source)
             self.assertNotIn("dry-run", source)
 
+    def test_invalid_utf8_fails_closed_without_leaking_paths(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="private-fingerprint-path-") as tmp:
+            migrations, versions = self.fixture(Path(tmp))
+            versions.write_bytes(
+                b"GrindFlow\\\\Migrations\\\\Version20261001000000\\xff\\n"
+            )
+            result = subprocess.run(
+                ["php", str(HELPER), SHA, str(migrations), str(versions)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual(b"", result.stdout)
+            self.assertEqual(b"cannot encode fingerprint payload\\n", result.stderr)
+            self.assertNotIn(tmp.encode(), result.stderr)
+
     def test_runbook_preserves_lock_backup_receipt_and_recheck_order(self) -> None:
         text = RUNBOOK.read_text(encoding="utf-8")
         lock = text.index("flock -n 9")
