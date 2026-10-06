@@ -37,6 +37,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+                "S4_PRIVATE_VAULT_STATE=ready",
                 "MEDIA_WEB_RUNTIME_READY=1",
             ],
             completed.stdout.splitlines(),
@@ -52,6 +53,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_READY=0",
             ],
             completed.stdout.splitlines(),
@@ -106,6 +108,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_CHECK_EVIL=leak-me",
                 "MEDIA_WEB_RUNTIME_READY=0",
                 "SECRET=do-not-copy",
@@ -316,6 +319,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_READY=0",
                 "",
             )
@@ -338,6 +342,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+                "S4_PRIVATE_VAULT_STATE=ready",
                 "MEDIA_WEB_RUNTIME_READY=1",
                 "",
             )
@@ -348,6 +353,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_READY=0",
                 "",
             )
@@ -380,6 +386,7 @@ class ProductionSmokeMediaReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=ready",
+                "S4_PRIVATE_VAULT_STATE=ready",
                 "MEDIA_WEB_RUNTIME_READY=1",
                 "",
             )
