@@ -167,7 +167,7 @@ final class VaultPhotoSafetyMaterializer
         if (!is_dir($vaultRoot)) {
             return 'missing';
         }
-        if (!is_readable($vaultRoot)) {
+        if (!is_readable($vaultRoot) || !is_executable($vaultRoot)) {
             return 'unreadable';
         }
         $mode = @fileperms($vaultRoot);
