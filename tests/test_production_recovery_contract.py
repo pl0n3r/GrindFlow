@@ -42,7 +42,8 @@ class ProductionRecoveryContractTests(unittest.TestCase):
     def test_backup_binds_database_and_vault_evidence(self) -> None:
         script = BACKUP.read_text(encoding="utf-8")
         self.assertIn("operations/database-backups", script)
-        self.assertIn("MigrationReadiness::class", script)
+        self.assertGreaterEqual(script.count("MigrationReadiness::class"), 2)
+        self.assertIn("recovery migration state changed", script)
         self.assertIn("operations:record-db-backup", script)
         self.assertIn("grindflow:vault:", RESTORE.read_text(encoding="utf-8"))
         self.assertIn("migration_fingerprint", EVIDENCE.read_text(encoding="utf-8"))
