@@ -9,7 +9,6 @@ use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
 use App\Support\Deployment\S4PrivateVaultPermissionRepairer;
 use App\Support\Deployment\S4SmokeIdentityProvisioner;
-use App\Support\Operations\ProductionWritePolicy;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -274,18 +273,7 @@ class ProductionSmokeBootstrapTest extends TestCase
             ]);
         $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
 
-        $policy = Mockery::mock(ProductionWritePolicy::class);
-        $policy->shouldReceive('assertAutonomousWriteAllowed')->once()
-            ->with(
-                'private-vault-permissions',
-                false,
-                false,
-                true,
-                false,
-                false,
-            )
-            ->andThrow(new \RuntimeException('policy rejected'));
-        $this->app->instance(ProductionWritePolicy::class, $policy);
+        config(['app.phase' => 'live']);
 
         $writer = Mockery::mock(ProductionEnvironmentWriter::class);
         $writer->shouldNotReceive('withSmokePassword');
