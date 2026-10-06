@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -39,9 +40,8 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
         method = MATERIALIZER.split(
             "public function privateVaultReadinessState", 1
         )[1].split("private function temporaryStorageReady", 1)[0]
-        for state in ALLOWED:
-            self.assertIn(f"'{state}'", method)
-        self.assertEqual(6, sum(method.count(f"'{state}'") for state in ALLOWED))
+        returned_states = set(re.findall(r"return '([^']+)'", method))
+        self.assertEqual(set(ALLOWED), returned_states)
         self.assertIn("is_link($vaultRoot)", method)
         self.assertIn("!is_dir($vaultRoot)", method)
         self.assertIn("!is_readable($vaultRoot)", method)
@@ -110,6 +110,7 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
                 "MEDIA_WEB_RUNTIME_CHECK_DECODER=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_TEMPORARY_STORAGE=ready",
                 "MEDIA_WEB_RUNTIME_CHECK_PRIVATE_VAULT=not_ready",
+                "S4_AUTH_STATE=ready",
                 "S4_PRIVATE_VAULT_STATE=permissions_not_private",
                 "MEDIA_WEB_RUNTIME_READY=0",
                 "PATH=/home/private/vault",
