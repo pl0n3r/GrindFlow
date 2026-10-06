@@ -188,12 +188,27 @@ trap cleanup_remote EXIT
 chmod 600 "$credentials" "$database_file"
 
 if [[ "$recovery_enabled" == "true" ]]; then
-  [[ ! -f storage/framework/down ]] || { echo "production is already in maintenance mode" >&2; exit 28; }
-  "$php_bin" artisan down --retry=60 --no-interaction >/dev/null 2>&1 || {
+  [[ ! -e storage/framework/down && ! -L storage/framework/down ]] || {
+    echo "production is already in maintenance mode" >&2
+    exit 28
+  }
+  [[ ! -e storage/framework/maintenance.php && ! -L storage/framework/maintenance.php ]] || {
+    echo "production pre-rendered maintenance already exists" >&2
+    exit 28
+  }
+  "$php_bin" artisan down --render=errors::503 --retry=60 --no-interaction >/dev/null 2>&1 || {
     echo "production write freeze could not be enabled" >&2
     exit 28
   }
   maintenance_enabled=1
+  [[ -f storage/framework/down && ! -L storage/framework/down ]] || {
+    echo "production maintenance marker is unavailable" >&2
+    exit 28
+  }
+  [[ -f storage/framework/maintenance.php && ! -L storage/framework/maintenance.php ]] || {
+    echo "production pre-rendered maintenance is unavailable" >&2
+    exit 28
+  }
 fi
 
 "$php_bin" -r '
@@ -464,6 +479,8 @@ recovery_receipt="$(
 
 recovery_committed=1
 "$php_bin" artisan up --no-interaction >/dev/null 2>&1 || { echo "production write freeze could not be released" >&2; exit 39; }
+[[ ! -e storage/framework/down && ! -L storage/framework/down ]] || { echo "production maintenance marker remains" >&2; exit 39; }
+[[ ! -e storage/framework/maintenance.php && ! -L storage/framework/maintenance.php ]] || { echo "production pre-rendered maintenance remains" >&2; exit 39; }
 maintenance_enabled=0
 fi
 
