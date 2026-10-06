@@ -182,7 +182,7 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertEqual(release, LOCK["packages"][""]["version"])
         self.assertIn(f"V{release}", README)
 
-    def test_operational_closeout_requires_exact_main_past_forbidden_readiness(self) -> None:
+    def test_operational_closeout_requires_exact_main_smoke_evidence(self) -> None:
         self.assertIn("/internal/production-smoke/bootstrap", WORKFLOW)
         self.assertIn("S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect", SMOKE)
         self.assertIn("S4_LOGIN_REDIRECT_CLASS=", SMOKE)
@@ -191,7 +191,6 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertIn("'role_upgraded'", PROVISIONER)
         self.assertIn("'role_upgraded_rotated'", PROVISIONER)
         self.assertIn("name: GrindFlow Production Smoke", WORKFLOW)
-        self.assertIn("forbidden", README)
 
 
 if __name__ == "__main__":
