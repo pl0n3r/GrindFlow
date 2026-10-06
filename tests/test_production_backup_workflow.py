@@ -218,17 +218,22 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
 
         self.assertIn("include_recovery_bundle:", workflow)
         self.assertIn("confirm_recovery_write_freeze:", workflow)
+        self.assertIn("confirm_recovery_symfony_cron_disabled:", workflow)
         self.assertIn("PRODUCTION_RECOVERY_KEY_B64", workflow)
         self.assertIn('artisan down --render=errors::503 --retry=60 --no-interaction', script)
         self.assertIn('artisan up --no-interaction', script)
         self.assertIn("storage/framework/maintenance.php", script)
         self.assertIn("wait_for_recovery_quiescence", script)
         self.assertIn(
-            "write-capable artisan process did not quiesce before recovery snapshot",
+            "write-capable process did not quiesce before recovery snapshot",
             script,
         )
+        self.assertIn("recovery quiescence could not be verified", script)
+        self.assertIn("pgrep is unavailable; recovery quiescence cannot be verified", script)
         self.assertIn("queue:(work|listen)", script)
         self.assertIn("schedule:(work|run)", script)
+        self.assertIn("grindflow:password-recovery:deliver", script)
+        self.assertIn("RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED", script)
         self.assertIn("storage/framework/maintenance.php", s4)
         self.assertNotIn("evenInMaintenanceMode", console)
         self.assertLess(
@@ -280,7 +285,44 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
 
         self.assertNotEqual(0, completed.returncode)
         self.assertIn(
-            "write-capable artisan process did not quiesce before recovery snapshot",
+            "write-capable process did not quiesce before recovery snapshot",
+            completed.stderr,
+        )
+
+        pgrep_error = (
+            "set -euo pipefail\n"
+            "pgrep() { return 2; }\n"
+            "sleep() { :; }\n"
+            + guard
+            + "\nif wait_for_recovery_quiescence 1 0; then exit 9; fi\n"
+        )
+        completed = subprocess.run(
+            ["bash", "-c", pgrep_error],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("recovery quiescence could not be verified", completed.stderr)
+
+        symfony_cron_active = (
+            "set -euo pipefail\n"
+            "pgrep() { "
+            "case \"$*\" in *grindflow:password-recovery:deliver*) return 0 ;; "
+            "*) return 2 ;; esac; }\n"
+            "sleep() { :; }\n"
+            + guard
+            + "\nif wait_for_recovery_quiescence 1 0; then exit 9; fi\n"
+        )
+        completed = subprocess.run(
+            ["bash", "-c", symfony_cron_active],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn(
+            "write-capable process did not quiesce before recovery snapshot",
             completed.stderr,
         )
 
