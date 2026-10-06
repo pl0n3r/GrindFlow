@@ -628,9 +628,7 @@ check_s4_media_web_runtime_readiness() {
   printf 'S4_BRIDGE_HTTP_STATUS=%s\n' "$bridge_status"
   printf 'S4_BRIDGE_HEADER_STATE=%s\n' "$bridge_header_state"
 
-  if bridge_state="$(extract_s4_bridge_state)"; then
-    printf 'S4_BRIDGE_BODY_CONTRACT=valid\n'
-  else
+  if ! bridge_state="$(extract_s4_bridge_state)"; then
     printf 'S4_BRIDGE_BODY_CONTRACT=invalid\n'
     if [[ "$bridge_status" == "000" ]]; then
       printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=endpoint_unreachable\n'
@@ -640,7 +638,7 @@ check_s4_media_web_runtime_readiness() {
     printf 'MEDIA_WEB_RUNTIME_READY=0\n'
     return 0
   fi
-
+  printf 'S4_BRIDGE_BODY_CONTRACT=valid\n'
   printf 'S4_BRIDGE_STATE=%s\n' "$bridge_state"
   if [[ "$bridge_status" != "200" || "$bridge_state" != "ready_for_web_probe" ]]; then
     printf 'MEDIA_WEB_RUNTIME_DIAGNOSTIC=http_non_200\n'
