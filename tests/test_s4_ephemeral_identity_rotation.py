@@ -100,10 +100,14 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         ]
         self.assertIn("existingStateHasValidStructure", existing)
 
-        rotation = COMMAND[
-            COMMAND.index("$hasher = $this->hashers", COMMAND.index("if ($user !== false")):
-            COMMAND.index("$hasher = $this->hashers", COMMAND.index("if ($user !== false")) + 1400
-        ]
+        rotation_start = COMMAND.index(
+            "$hasher = $this->hashers",
+            COMMAND.index("if ($user !== false"),
+        )
+        rotation_end = COMMAND.index("return 'rotated';", rotation_start) + len(
+            "return 'rotated';"
+        )
+        rotation = COMMAND[rotation_start:rotation_end]
         self.assertIn(
             "['password_hash' => $hasher->hash($secret)]",
             rotation,
