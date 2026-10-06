@@ -100,6 +100,10 @@ class S4ProductionBridgeTests(unittest.TestCase):
 
         self.assertIn("'/s4/_bridge-readiness'", BRIDGE)
         self.assertIn("createSchemaManager()", BRIDGE)
+        self.assertIn("use Doctrine\\DBAL\\Tools\\DsnParser;", BRIDGE)
+        self.assertIn("'mysql' => 'pdo_mysql'", BRIDGE)
+        self.assertIn("'mariadb' => 'pdo_mysql'", BRIDGE)
+        self.assertNotIn("DriverManager::getConnection(['url' => $databaseUrl])", BRIDGE)
         self.assertIn("gf_identity_users", BRIDGE)
         self.assertIn("gf_identity_memberships", BRIDGE)
         self.assertIn("actor.is_active = 1", BRIDGE)
