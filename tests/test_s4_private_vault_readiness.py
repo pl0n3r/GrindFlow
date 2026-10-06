@@ -146,6 +146,7 @@ class S4PrivateVaultReadinessTests(unittest.TestCase):
             with self.subTest(invalid_log=invalid_log):
                 completed, _, proof = self._run_reconcile(invalid_log)
                 self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn("Cause: `contract_invalid`", proof)
                 self.assertNotIn("Private Vault state:", proof)
                 self.assertNotIn("leak-me", proof)
 
