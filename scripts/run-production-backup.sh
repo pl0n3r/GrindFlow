@@ -8,8 +8,17 @@ set -euo pipefail
 : "${SSH_KEY_PATH:?SSH_KEY_PATH is required}"
 : "${KNOWN_HOSTS_PATH:?KNOWN_HOSTS_PATH is required}"
 : "${EXPECTED_PENDING:?EXPECTED_PENDING is required}"
-: "${EXPECTED_SHA:?EXPECTED_SHA is required}"
-: "${PRODUCTION_RECOVERY_KEY_B64:?PRODUCTION_RECOVERY_KEY_B64 is required}"
+
+RECOVERY_BACKUP_ENABLED="${RECOVERY_BACKUP_ENABLED:-false}"
+EXPECTED_SHA="${EXPECTED_SHA:-}"
+PRODUCTION_RECOVERY_KEY_B64="${PRODUCTION_RECOVERY_KEY_B64:-}"
+[[ "$RECOVERY_BACKUP_ENABLED" == "true" || "$RECOVERY_BACKUP_ENABLED" == "false" ]] || {
+  echo "invalid recovery backup flag" >&2
+  exit 2
+}
+if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
+    [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || { echo "recovery key is unavailable" >&2; exit 2; }
+fi
 
 [[ "$HOSTINGER_SSH_HOST" =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { echo "invalid SSH host" >&2; exit 2; }
 [[ "$HOSTINGER_SSH_USER" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || { echo "invalid SSH user" >&2; exit 2; }
@@ -42,73 +51,85 @@ cleanup_local() {
 }
 trap cleanup_local EXIT
 
-remote_key_file="$(
-  printf '%s' "$PRODUCTION_RECOVERY_KEY_B64" |
-    "${ssh_args[@]}" sh -c '
-      set -eu
-      umask 077
-      key_file="$(mktemp /tmp/grindflow-recovery-key.XXXXXXXX)"
-      cat > "$key_file"
-      chmod 600 "$key_file"
-      printf "%s\n" "$key_file"
-    ' grindflow-recovery-key
-)"
-[[ "$remote_key_file" =~ ^/tmp/grindflow-recovery-key\.[A-Za-z0-9]+$ ]] || {
-  echo "remote recovery key staging failed" >&2
-  exit 2
-}
+if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
+  remote_key_file="$(
+    printf '%s' "$PRODUCTION_RECOVERY_KEY_B64" |
+      "${ssh_args[@]}" sh -c '
+        set -eu
+        umask 077
+        key_file="$(mktemp /tmp/grindflow-recovery-key.XXXXXXXX)"
+        cat > "$key_file"
+        chmod 600 "$key_file"
+        printf "%s\\n" "$key_file"
+      ' grindflow-recovery-key
+  )"
+  [[ "$remote_key_file" =~ ^/tmp/grindflow-recovery-key\.[A-Za-z0-9]+$ ]] || {
+    echo "remote recovery key staging failed" >&2
+    exit 2
+  }
+fi
 
-"${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$EXPECTED_SHA" "$remote_key_file" <<'REMOTE'
+"${ssh_args[@]}" bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_PENDING" "$RECOVERY_BACKUP_ENABLED" "$EXPECTED_SHA" "$remote_key_file" <<'REMOTE'
 set -euo pipefail
 
 root="$1"
 expected_pending="$2"
-expected_sha="$3"
-key_file="$4"
+recovery_enabled="$3"
+expected_sha="$4"
+key_file="$5"
 php_bin="/opt/alt/php85/usr/bin/php"
 current="$root/current"
 
+[[ "$recovery_enabled" == "true" || "$recovery_enabled" == "false" ]] || { echo "invalid recovery backup flag" >&2; exit 18; }
 [[ -x "$php_bin" ]] || { echo "production PHP 8.5 CLI is unavailable" >&2; exit 19; }
 [[ -L "$current" ]] || { echo "production current release is unavailable" >&2; exit 20; }
 release="$(readlink -f "$current")"
-[[ "$release" == "$root/releases/$expected_sha" ]] || { echo "production checkout does not match expected SHA" >&2; exit 21; }
+case "$release" in
+  "$root"/releases/*) ;;
+  *) echo "production current release is outside the release root" >&2; exit 21 ;;
+esac
 [[ -d "$release" && ! -L "$release" ]] || { echo "production release is unsafe" >&2; exit 22; }
-[[ -f "$release/.release-sha" && ! -L "$release/.release-sha" ]] || { echo "production release identity is unavailable" >&2; exit 22; }
-[[ "$(cat "$release/.release-sha")" == "$expected_sha" ]] || { echo "production release identity does not match" >&2; exit 22; }
 
-key_meta="$(stat -c '%a:%F' "$key_file" 2>/dev/null || true)"
-[[ "$key_meta" == "600:regular file" ]] || { rm -f -- "$key_file"; echo "recovery key staging is unsafe" >&2; exit 22; }
-recovery_key="$(cat "$key_file")"
-rm -f -- "$key_file"
-key_file=""
+recovery_key=""
+if [[ "$recovery_enabled" == "true" ]]; then
+  [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid expected SHA" >&2; exit 22; }
+  [[ "$release" == "$root/releases/$expected_sha" ]] || { echo "production checkout does not match expected SHA" >&2; exit 22; }
+  [[ -f "$release/.release-sha" && ! -L "$release/.release-sha" ]] || { echo "production release identity is unavailable" >&2; exit 22; }
+  [[ "$(cat "$release/.release-sha")" == "$expected_sha" ]] || { echo "production release identity does not match" >&2; exit 22; }
+  key_meta="$(stat -c '%a:%F' "$key_file" 2>/dev/null || true)"
+  [[ "$key_meta" == "600:regular file" ]] || { rm -f -- "$key_file"; echo "recovery key staging is unsafe" >&2; exit 22; }
+  recovery_key="$(cat "$key_file")"
+  rm -f -- "$key_file"
+  key_file=""
+fi
 
 cd "$release"
 [[ -f artisan && -f bootstrap/app.php && -f vendor/autoload.php ]] || { echo "Laravel runtime is unavailable" >&2; exit 23; }
-[[ -f symfony/bin/console && -f scripts/recovery-secretstream.php && -f scripts/recovery-bundle.php ]] || {
-  echo "recovery runtime is unavailable" >&2
-  exit 23
-}
+if [[ "$recovery_enabled" == "true" ]]; then
+  [[ -f symfony/bin/console && -f scripts/recovery-secretstream.php && -f scripts/recovery-bundle.php ]] || {
+    echo "recovery runtime is unavailable" >&2
+    exit 23
+  }
 
-GF_RECOVERY_KEY_B64="$recovery_key" "$php_bin" -r '
-  $raw = getenv("GF_RECOVERY_KEY_B64");
-  $key = is_string($raw) ? base64_decode($raw, true) : false;
-  $functions = [
-      "sodium_crypto_secretstream_xchacha20poly1305_init_push",
-      "sodium_crypto_secretstream_xchacha20poly1305_push",
-      "sodium_crypto_secretstream_xchacha20poly1305_init_pull",
-      "sodium_crypto_secretstream_xchacha20poly1305_pull",
-  ];
-  if (!extension_loaded("sodium")
-      || !is_string($key)
-      || strlen($key) !== SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES) {
-      exit(2);
-  }
-  foreach ($functions as $function) {
-      if (!function_exists($function)) {
-          exit(2);
-      }
-  }
-' || { echo "recovery encryption readiness is unavailable" >&2; exit 23; }
+  GF_RECOVERY_KEY_B64="$recovery_key" "$php_bin" -r '
+    $raw = getenv("GF_RECOVERY_KEY_B64");
+    $key = is_string($raw) ? base64_decode($raw, true) : false;
+    $functions = [
+        "sodium_crypto_secretstream_xchacha20poly1305_init_push",
+        "sodium_crypto_secretstream_xchacha20poly1305_push",
+        "sodium_crypto_secretstream_xchacha20poly1305_init_pull",
+        "sodium_crypto_secretstream_xchacha20poly1305_pull",
+    ];
+    if (!extension_loaded("sodium")
+        || !is_string($key)
+        || strlen($key) !== SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES) {
+        exit(2);
+    }
+    foreach ($functions as $function) {
+        if (!function_exists($function)) exit(2);
+    }
+  ' || { echo "recovery encryption readiness is unavailable" >&2; exit 23; }
+fi
 
 snapshot="$(
   "$php_bin" -r '
@@ -127,7 +148,9 @@ IFS='|' read -r pending_count fingerprint <<< "$snapshot"
 dump_bin="$(command -v mariadb-dump || command -v mysqldump || true)"
 [[ -n "$dump_bin" ]] || { echo "database dump utility is unavailable" >&2; exit 27; }
 command -v gzip >/dev/null || { echo "gzip is unavailable" >&2; exit 28; }
-command -v tar >/dev/null || { echo "tar is unavailable" >&2; exit 28; }
+if [[ "$recovery_enabled" == "true" ]]; then
+  command -v tar >/dev/null || { echo "tar is unavailable" >&2; exit 28; }
+fi
 
 credentials="$(mktemp)"
 database_file="$(mktemp)"
@@ -137,7 +160,11 @@ recovery_workspace=""
 recovery_tar=""
 recovery_cipher=""
 recovery_committed=0
+maintenance_enabled=0
 cleanup_remote() {
+  if [[ "$maintenance_enabled" == "1" ]]; then
+    "$php_bin" artisan up --no-interaction >/dev/null 2>&1 || true
+  fi
   rm -f -- "$credentials" "$database_file"
   [[ -z "$tmp_archive" ]] || rm -f -- "$tmp_archive"
   [[ -z "$promoted_archive" ]] || rm -f -- "$promoted_archive"
@@ -150,6 +177,15 @@ cleanup_remote() {
 }
 trap cleanup_remote EXIT
 chmod 600 "$credentials" "$database_file"
+
+if [[ "$recovery_enabled" == "true" ]]; then
+  [[ ! -f storage/framework/down ]] || { echo "production is already in maintenance mode" >&2; exit 28; }
+  "$php_bin" artisan down --retry=60 --no-interaction >/dev/null 2>&1 || {
+    echo "production write freeze could not be enabled" >&2
+    exit 28
+  }
+  maintenance_enabled=1
+fi
 
 "$php_bin" -r '
   require "vendor/autoload.php";
@@ -237,6 +273,7 @@ rm -f -- "$tmp_archive"
 tmp_archive=""
 promoted_archive=""
 
+if [[ "$recovery_enabled" == "true" ]]; then
 recovery_workspace="$(mktemp -d /tmp/grindflow-recovery-workspace.XXXXXXXX)"
 chmod 700 "$recovery_workspace"
 bundle_dir="$recovery_workspace/bundle"
@@ -354,6 +391,11 @@ recovery_cipher="storage/app/private/$cipher_relative"
 
 GF_RECOVERY_KEY_B64="$recovery_key" "$php_bin" scripts/recovery-secretstream.php \
   encrypt "$recovery_tar" "$recovery_cipher" >/dev/null
+verified_tar="$recovery_workspace/verified.tar"
+GF_RECOVERY_KEY_B64="$recovery_key" "$php_bin" scripts/recovery-secretstream.php \
+  decrypt "$recovery_cipher" "$verified_tar" >/dev/null
+cmp -s "$recovery_tar" "$verified_tar" || { echo "recovery ciphertext verification failed" >&2; exit 37; }
+rm -f -- "$verified_tar"
 unset recovery_key
 chmod 600 "$recovery_cipher"
 cipher_sha="$(sha256sum "$recovery_cipher" | awk '{print $1}')"
@@ -381,14 +423,19 @@ rm -rf -- "$recovery_workspace"
 recovery_workspace=""
 recovery_tar=""
 recovery_committed=1
+"$php_bin" artisan up --no-interaction >/dev/null 2>&1 || { echo "production write freeze could not be released" >&2; exit 39; }
+maintenance_enabled=0
+fi
 
 printf 'MIGRATION_FINGERPRINT=%s\n' "$fingerprint"
 printf 'BACKUP_ARCHIVE=%s\n' "$archive_relative"
-printf 'RECOVERY_CIPHERTEXT_SHA256=%s\n' "$cipher_sha"
-printf 'RECOVERY_VAULT_INDEX_SHA256=%s\n' "$vault_index_sha"
-printf 'RECOVERY_RECEIPT=%s\n' "$recovery_receipt"
-printf 'RECOVERY_ORGANIZATIONS=%s\n' "$organization_count"
-printf 'RECOVERY_ASSETS=%s\n' "$asset_count"
+if [[ "$recovery_enabled" == "true" ]]; then
+  printf 'RECOVERY_CIPHERTEXT_SHA256=%s\n' "$cipher_sha"
+  printf 'RECOVERY_VAULT_INDEX_SHA256=%s\n' "$vault_index_sha"
+  printf 'RECOVERY_RECEIPT=%s\n' "$recovery_receipt"
+  printf 'RECOVERY_ORGANIZATIONS=%s\n' "$organization_count"
+  printf 'RECOVERY_ASSETS=%s\n' "$asset_count"
+fi
 REMOTE
 
 remote_key_file=""
