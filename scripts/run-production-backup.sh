@@ -23,7 +23,8 @@ PRODUCTION_RECOVERY_KEY_B64="${PRODUCTION_RECOVERY_KEY_B64:-}"
 }
 if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
   [[ "$RECOVERY_WRITES_STOPPED_CONFIRMED" == "true" ]] || { echo "recovery write freeze was not explicitly confirmed" >&2; exit 2; }
-    [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || { echo "recovery key is unavailable" >&2; exit 2; }
+  [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid expected SHA" >&2; exit 2; }
+  [[ -n "$PRODUCTION_RECOVERY_KEY_B64" ]] || { echo "recovery key is unavailable" >&2; exit 2; }
 fi
 
 [[ "$HOSTINGER_SSH_HOST" =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { echo "invalid SSH host" >&2; exit 2; }
@@ -31,7 +32,6 @@ fi
 [[ "$HOSTINGER_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "invalid SSH port" >&2; exit 2; }
 (( HOSTINGER_SSH_PORT >= 1 && HOSTINGER_SSH_PORT <= 65535 )) || { echo "invalid SSH port" >&2; exit 2; }
 [[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]] || { echo "invalid expected pending count" >&2; exit 2; }
-[[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid expected SHA" >&2; exit 2; }
 [[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]] || { echo "invalid release root" >&2; exit 2; }
 [[ "$HOSTINGER_RELEASE_ROOT" != *".."* ]] || { echo "invalid release root" >&2; exit 2; }
 
