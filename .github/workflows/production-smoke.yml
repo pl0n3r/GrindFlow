@@ -355,6 +355,16 @@ jobs:
             printf '%s\n' "${matches[0]#*=}"
           }
 
+          s4_media_readiness_http_class_marker() {
+            local matches=()
+            mapfile -t matches < <(grep -E '^S4_MEDIA_READINESS_HTTP_CLASS=' production-smoke.log || true)
+            if [[ "${#matches[@]}" != "1" ]] \
+              || [[ ! "${matches[0]}" =~ ^S4_MEDIA_READINESS_HTTP_CLASS=(redirect|unauthorized|forbidden|not_found|server_error|other_non_200)$ ]]; then
+              return 1
+            fi
+            printf '%s\n' "${matches[0]#*=}"
+          }
+
           diagnostic_reason() {
             local matches=()
             mapfile -t matches < <(grep -E '^MEDIA_WEB_RUNTIME_DIAGNOSTIC=' production-smoke.log || true)
@@ -380,6 +390,7 @@ jobs:
           s4_bridge_body_contract=''
           s4_post_bridge_contract_stage=''
           s4_login_redirect_class=''
+          s4_media_readiness_http_class=''
 
           s4_bridge_state="$(s4_bridge_state_marker || true)"
           s4_auth_state="$(s4_auth_state_marker || true)"
@@ -388,6 +399,7 @@ jobs:
           s4_bridge_body_contract="$(s4_bridge_body_contract_marker || true)"
           s4_post_bridge_contract_stage="$(s4_post_bridge_contract_stage_marker || true)"
           s4_login_redirect_class="$(s4_login_redirect_class_marker || true)"
+          s4_media_readiness_http_class="$(s4_media_readiness_http_class_marker || true)"
 
           if [[ "$diagnostic_state" == "observed" ]] \
             && decoder_state="$(marker_value MEDIA_WEB_RUNTIME_CHECK_DECODER)" \
@@ -484,6 +496,13 @@ jobs:
                 fi
                 if [[ "$diagnostic_state" == "http_non_200" && -n "$s4_auth_state" ]]; then
                   printf 'S4 auth state: `%s`\n' "$s4_auth_state"
+                fi
+                if [[ "$diagnostic_state" == "http_non_200" && "$s4_auth_state" == "ready" ]]; then
+                  if [[ -n "$s4_media_readiness_http_class" ]]; then
+                    printf 'S4 media readiness HTTP class: `%s`\n' "$s4_media_readiness_http_class"
+                  else
+                    echo 'S4 media readiness HTTP class: `unavailable`'
+                  fi
                 fi
                 echo 'No remote response body, filesystem path, cookie, header, hash or secret was published.'
               } > "$evidence_file"
