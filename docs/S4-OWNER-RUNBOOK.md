@@ -197,7 +197,7 @@ PHP=/opt/alt/php85/usr/bin/php
   [[ -n "$MYSQL_BIN" ]] || exit 2
   CHECKOUT_SHA="$(git -C "$ROOT" rev-parse HEAD)"
   MIGRATION_FINGERPRINT="$(
-    "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -- "$DB_NAME" -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' |
+    "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' -- "$DB_NAME" |
       "$PHP" "$ROOT/scripts/s4-migration-fingerprint.php" "$CHECKOUT_SHA" "$ROOT/symfony/migrations"
   )"
   [[ "$MIGRATION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || exit 2
@@ -216,7 +216,7 @@ PHP=/opt/alt/php85/usr/bin/php
 
   CURRENT_CHECKOUT_SHA="$(git -C "$ROOT" rev-parse HEAD)"
   CURRENT_FINGERPRINT="$(
-    "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -- "$DB_NAME" -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' |
+    "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' -- "$DB_NAME" |
       "$PHP" "$ROOT/scripts/s4-migration-fingerprint.php" "$CURRENT_CHECKOUT_SHA" "$ROOT/symfony/migrations"
   )"
   [[ "$CURRENT_FINGERPRINT" == "$MIGRATION_FINGERPRINT" ]] || { echo 'El lote cambió; repite backup' >&2; exit 2; }
