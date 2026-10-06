@@ -152,7 +152,7 @@ class S4PrivateVaultPermissionRepairTests(unittest.TestCase):
         self.assertIn("repair_private_vault_permissions:", WORKFLOW)
         self.assertIn("type: boolean", WORKFLOW)
         self.assertIn("default: false", WORKFLOW)
-        self.assertIn("GRINDFLOW_REPAIR_PRIVATE_VAULT_PERMISSIONS", WORKFLOW)
+        self.assertIn("REPAIR_PRIVATE_VAULT_PERMISSIONS", WORKFLOW)
         self.assertIn('"repair_private_vault_permissions"', WORKFLOW)
         self.assertIn("event_name", CONTROLLER)
         self.assertIn("actor_id", CONTROLLER)
