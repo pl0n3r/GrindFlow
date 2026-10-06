@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -80,6 +81,66 @@ def run_probe_fixture(*, status: str, headers: str, body: str) -> str:
         return completed.stdout
 
 
+def workflow_run_step(name: str, next_name: str) -> str:
+    start = WORKFLOW.index(f"      - name: {name}")
+    run_start = WORKFLOW.index("        run: |\n", start) + len("        run: |\n")
+    end = WORKFLOW.index(f"      - name: {next_name}", run_start)
+    return textwrap.dedent(WORKFLOW[run_start:end]).rstrip()
+
+
+RECONCILE_STEP = workflow_run_step(
+    "Reconcile media web-runtime readiness",
+    "Upload short-lived smoke diagnostics",
+)
+
+
+def run_reconcile_fixture(log: str) -> tuple[str, str]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        (root / "production-smoke.log").write_text(log, encoding="utf-8")
+        evidence = root / "evidence.md"
+        summary = root / "summary.md"
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        fake_gh = bin_dir / "gh"
+        fake_gh.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "if [[ \"$1\" == issue && \"$2\" == view ]]; then exit 0; fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(0o755)
+
+        env = os.environ.copy()
+        env.update(
+            {
+                "PATH": f"{bin_dir}:{env['PATH']}",
+                "GH_TOKEN": "fixture-token",
+                "MEDIA_READINESS_ISSUE": "307",
+                "MEDIA_WEB_RUNTIME_EVIDENCE_PATH": str(evidence),
+                "GITHUB_STEP_SUMMARY": str(summary),
+                "GITHUB_SHA": "f" * 40,
+                "GITHUB_RUN_ID": "424242",
+                "GITHUB_SERVER_URL": "https://github.com",
+                "GITHUB_REPOSITORY": "pl0n3r/GrindFlow",
+                "RUNNER_TEMP": str(root),
+            }
+        )
+        subprocess.run(
+            ["bash", "-c", RECONCILE_STEP],
+            cwd=root,
+            env=env,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        return (
+            evidence.read_text(encoding="utf-8"),
+            summary.read_text(encoding="utf-8"),
+        )
+
+
 class S4BridgeContractDiagnosticsTests(unittest.TestCase):
     def test_probe_emits_only_allowlisted_status_header_and_body_contract(self) -> None:
         self.assertIn("safe_s4_bridge_header_state()", SMOKE)
@@ -117,13 +178,28 @@ class S4BridgeContractDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("S4_BRIDGE_STATE=ready_for_web_probe", output)
 
     def test_contract_invalid_comment_is_safe_and_actionable(self) -> None:
-        self.assertIn('if [[ "$diagnostic_state" == "contract_invalid" ]]; then', WORKFLOW)
-        self.assertIn("S4 bridge HTTP status:", WORKFLOW)
-        self.assertIn("S4 bridge header state:", WORKFLOW)
-        self.assertIn("S4 bridge body contract:", WORKFLOW)
-        self.assertIn("No remote response body", WORKFLOW)
-        self.assertNotIn("Remote response body:", WORKFLOW)
-        self.assertNotIn("S4 bridge headers:", WORKFLOW)
+        evidence, summary = run_reconcile_fixture(
+            "\n".join(
+                (
+                    "S4_BRIDGE_HTTP_STATUS=200",
+                    "S4_BRIDGE_HEADER_STATE=ready_for_web_probe",
+                    "S4_BRIDGE_BODY_CONTRACT=invalid",
+                    "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid",
+                    "MEDIA_WEB_RUNTIME_READY=0",
+                    "",
+                )
+            )
+        )
+        for rendered in (evidence, summary):
+            self.assertIn("Exact deployed SHA: `" + ("f" * 40) + "`", rendered)
+            self.assertIn("actions/runs/424242", rendered)
+            self.assertIn("Cause: `contract_invalid`", rendered)
+            self.assertIn("S4 bridge HTTP status: `200`", rendered)
+            self.assertIn("S4 bridge header state: `ready_for_web_probe`", rendered)
+            self.assertIn("S4 bridge body contract: `invalid`", rendered)
+            self.assertIn("No remote response body", rendered)
+            self.assertNotIn("Remote response body:", rendered)
+            self.assertNotIn("S4 bridge headers:", rendered)
 
     def test_missing_or_invalid_header_remains_unknown_and_fail_closed(self) -> None:
         missing = run_probe_fixture(
@@ -163,11 +239,40 @@ class S4BridgeContractDiagnosticsTests(unittest.TestCase):
         self.assertIn("tests/test_s4_bridge_contract_diagnostics.py", PACKAGE["scripts"]["test"])
 
     def test_operational_closeout_requires_exact_main_diagnostic_evidence(self) -> None:
-        self.assertIn("Exact deployed SHA:", WORKFLOW)
-        self.assertIn("S4 bridge HTTP status:", WORKFLOW)
-        self.assertIn("S4 bridge header state:", WORKFLOW)
-        self.assertIn("S4 bridge body contract:", WORKFLOW)
-        self.assertIn('diagnostic_state" == "contract_invalid"', WORKFLOW)
+        cases = {
+            "missing": (
+                "S4_BRIDGE_HTTP_STATUS=200\n"
+                "S4_BRIDGE_HEADER_STATE=ready_for_web_probe\n"
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n"
+                "MEDIA_WEB_RUNTIME_READY=0\n"
+            ),
+            "duplicate": (
+                "S4_BRIDGE_HTTP_STATUS=200\n"
+                "S4_BRIDGE_HEADER_STATE=ready_for_web_probe\n"
+                "S4_BRIDGE_HEADER_STATE=schema_missing\n"
+                "S4_BRIDGE_BODY_CONTRACT=invalid\n"
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n"
+                "MEDIA_WEB_RUNTIME_READY=0\n"
+            ),
+            "out_of_domain": (
+                "S4_BRIDGE_HTTP_STATUS=200\n"
+                "S4_BRIDGE_HEADER_STATE=definitely-not-allowed\n"
+                "S4_BRIDGE_BODY_CONTRACT=invalid\n"
+                "MEDIA_WEB_RUNTIME_DIAGNOSTIC=contract_invalid\n"
+                "MEDIA_WEB_RUNTIME_READY=0\n"
+            ),
+        }
+        for label, log in cases.items():
+            with self.subTest(label=label):
+                evidence, _ = run_reconcile_fixture(log)
+                self.assertIn("Exact deployed SHA: `" + ("f" * 40) + "`", evidence)
+                self.assertIn("actions/runs/424242", evidence)
+                self.assertIn("Cause: `contract_invalid`", evidence)
+                self.assertIn("S4 bridge safe classification: `unavailable`", evidence)
+                self.assertNotIn("S4 bridge HTTP status:", evidence)
+                self.assertNotIn("S4 bridge header state:", evidence)
+                self.assertNotIn("S4 bridge body contract:", evidence)
+                self.assertNotIn("definitely-not-allowed", evidence)
 
 
 if __name__ == "__main__":
