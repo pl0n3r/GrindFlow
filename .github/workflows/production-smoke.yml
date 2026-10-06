@@ -178,7 +178,7 @@ jobs:
           fi
 
       - name: Publish pre-login production failure
-        if: failure() && (steps.deployed_checkout.outcome == 'failure' || steps.synthetic_bootstrap.outcome == 'failure')
+        if: failure() && steps.credentials.outputs.configured == 'true' && (steps.deployed_checkout.outcome == 'failure' || steps.synthetic_bootstrap.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
           DEPLOY_CHECK_OUTCOME: ${{ steps.deployed_checkout.outcome }}
