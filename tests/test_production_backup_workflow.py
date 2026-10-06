@@ -250,7 +250,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
 
         self.assertLess(
             remote.index("assert_recovery_quiescence || exit 28"),
-            remote.index('"$dump_bin" \\\\'),
+            remote.index('"$dump_bin"'),
         )
         self.assertLess(
             remote.index("assert_recovery_quiescence || exit 28"),
