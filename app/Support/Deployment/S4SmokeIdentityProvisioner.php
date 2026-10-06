@@ -6,7 +6,7 @@ use JsonException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-final class S4SmokeIdentityProvisioner
+class S4SmokeIdentityProvisioner
 {
     /** @var list<string> */
     public const SUCCESS_CODES = [
