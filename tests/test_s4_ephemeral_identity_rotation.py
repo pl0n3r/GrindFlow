@@ -117,6 +117,10 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
             "testLegacyReservedModelMembershipIsUpgradedNarrowlyAndIdempotently",
             COMMAND_TEST,
         )
+        self.assertIn(
+            "testRoleUpgradeRollsBackWhenPasswordRotationFails",
+            COMMAND_TEST,
+        )
         self.assertIn("self::assertSame('already_ready'", COMMAND_TEST)
         self.assertIn("count($memberships) !== 1", COMMAND)
         self.assertIn("'identity_conflict'", COMMAND)
