@@ -254,6 +254,7 @@ jobs:
           [[ -f tests/test_mobile_upload_ingest.py ]] && python3 -m unittest tests/test_mobile_upload_ingest.py
           [[ -f tests/test_mobile_upload_ux.py ]] && python3 -m unittest tests/test_mobile_upload_ux.py
           [[ -f tests/test_media_pilot_readiness_contract.py ]] && python3 -m unittest tests/test_media_pilot_readiness_contract.py
+          python3 -m unittest tests/test_s4_database_url_percent_encoding.py
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
@@ -714,12 +715,64 @@ jobs:
         run: |
           composer validate --working-dir=symfony --strict
           python3 scripts/ci_retry.py --label "Symfony Composer dependencies" -- composer install --working-dir=symfony --prefer-dist --no-progress --no-interaction
+      - name: Exercise percent-encoded DATABASE_URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_PASSWORD="$(php -r 'echo bin2hex(random_bytes(16)).":@%/";')"
+          printf '::add-mask::%s\n' "$DB_PASSWORD"
+          export DB_PASSWORD
+          php <<'PHP'
+          <?php
+          declare(strict_types=1);
+
+          $password = getenv('DB_PASSWORD');
+          if (!is_string($password) || $password === '') {
+              exit(2);
+          }
+
+          $encoded = rawurlencode($password);
+          if (substr_count($encoded, '%') < 4) {
+              exit(2);
+          }
+
+          $pdo = new PDO(
+              'mysql:host=127.0.0.1;port=3306;dbname=grindflow_symfony_ci',
+              'root',
+              'root',
+              [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+          );
+          $pdo->exec("ALTER USER 'grindflow'@'%' IDENTIFIED BY ".$pdo->quote($password));
+
+          $url = sprintf(
+              'mysql://grindflow:%s@127.0.0.1:3306/grindflow_symfony_ci?serverVersion=mariadb-11.4.0&charset=utf8mb4',
+              $encoded,
+          );
+          $envFile = getenv('GITHUB_ENV');
+          if (!is_string($envFile) || $envFile === '') {
+              exit(2);
+          }
+
+          fwrite(STDOUT, '::add-mask::'.$encoded.PHP_EOL);
+          fwrite(STDOUT, '::add-mask::'.$url.PHP_EOL);
+          if (file_put_contents(
+              $envFile,
+              'DATABASE_URL='.$url.PHP_EOL,
+              FILE_APPEND | LOCK_EX,
+          ) === false) {
+              exit(2);
+          }
+          PHP
+          unset DB_PASSWORD
+
       - name: PHP syntax and isolated MariaDB connectivity
         shell: bash
         run: |
           set -euo pipefail
           find symfony/src symfony/config symfony/public symfony/tests/php symfony/bin -type f -name '*.php' -print0 | xargs -0 -r -P 4 -n1 php -l
           cd symfony
+          php bin/console doctrine:migrations:status --no-interaction
+          php bin/console doctrine:migrations:migrate --dry-run --no-interaction --no-ansi
           php bin/console doctrine:query:sql 'SELECT 1'
           php bin/console doctrine:migrations:migrate --no-interaction
           php bin/console doctrine:schema:validate --skip-sync
