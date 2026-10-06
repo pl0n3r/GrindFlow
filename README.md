@@ -47,8 +47,8 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#379 · aislar contract_invalid posterior al bridge](https://github.com/pl0n3r/GrindFlow/issues/379).
-- **NEXT:** [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307) tras cerrar #379.
+- **NOW:** [#381 · clasificar redirect seguro del login S4](https://github.com/pl0n3r/GrindFlow/issues/381).
+- **NEXT:** [#382 · rotar identidad S4 con credencial efímera](https://github.com/pl0n3r/GrindFlow/issues/382), seguido de [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307).
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
