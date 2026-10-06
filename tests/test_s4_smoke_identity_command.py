@@ -36,9 +36,12 @@ class S4SmokeIdentityCommandTests(unittest.TestCase):
 
     def test_second_execution_is_idempotent_without_duplicate_or_privilege_escalation(self) -> None:
         self.assertIn("'already_ready'", self.source)
-        self.assertIn("existingStateIsReady", self.source)
+        self.assertIn("existingStateHasValidStructure", self.source)
         self.assertIn("count($memberships) !== 1", self.source)
-        self.assertNotIn("$db->update('gf_identity_users'", self.source)
+        self.assertIn("$db->update(", self.source)
+        self.assertIn("'gf_identity_users'", self.source)
+        self.assertIn("['password_hash' => $hasher->hash($secret)]", self.source)
+        self.assertIn("return 'rotated';", self.source)
         self.assertNotIn("$db->update('gf_identity_organizations'", self.source)
         self.assertNotIn("$db->update('gf_identity_memberships'", self.source)
         self.assertIn(

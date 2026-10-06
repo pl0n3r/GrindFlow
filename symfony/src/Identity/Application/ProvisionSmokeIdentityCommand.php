@@ -60,7 +60,7 @@ final class ProvisionSmokeIdentityCommand extends Command
         return $this->finish(
             $output,
             $code,
-            in_array($code, ['created', 'already_ready'], true),
+            in_array($code, ['created', 'already_ready', 'rotated'], true),
         );
     }
 
@@ -98,7 +98,7 @@ final class ProvisionSmokeIdentityCommand extends Command
     {
         $user = $db->fetchAssociative(
             <<<'SQL'
-                SELECT id, password_hash, platform_role, is_active
+                SELECT id, name, password_hash, platform_role, is_active
                 FROM gf_identity_users
                 WHERE email = :email
                 LIMIT 1
@@ -107,7 +107,7 @@ final class ProvisionSmokeIdentityCommand extends Command
         );
         $organization = $db->fetchAssociative(
             <<<'SQL'
-                SELECT id, type
+                SELECT id, name, type
                 FROM gf_identity_organizations
                 WHERE slug = :slug
                 LIMIT 1
@@ -120,9 +120,29 @@ final class ProvisionSmokeIdentityCommand extends Command
         }
 
         if ($user !== false && $organization !== false) {
-            return $this->existingStateIsReady($db, $user, $organization, $secret)
-                ? 'already_ready'
-                : 'identity_conflict';
+            if (!$this->existingStateHasValidStructure($db, $user, $organization)) {
+                return 'identity_conflict';
+            }
+
+            $hasher = $this->hashers->getPasswordHasher(IdentityUser::class);
+            $hash = (string) ($user['password_hash'] ?? '');
+            if ($hasher->verify($hash, $secret)) {
+                return 'already_ready';
+            }
+
+            $affected = $db->update(
+                'gf_identity_users',
+                ['password_hash' => $hasher->hash($secret)],
+                [
+                    'id' => (string) $user['id'],
+                    'email' => self::EMAIL,
+                ],
+            );
+            if ($affected !== 1) {
+                return 'identity_conflict';
+            }
+
+            return 'rotated';
         }
 
         $hasher = $this->hashers->getPasswordHasher(IdentityUser::class);
@@ -164,16 +184,18 @@ final class ProvisionSmokeIdentityCommand extends Command
      * @param array<string, mixed> $user
      * @param array<string, mixed> $organization
      */
-    private function existingStateIsReady(
+    private function existingStateHasValidStructure(
         Connection $db,
         array $user,
         array $organization,
-        string $secret,
     ): bool {
         if (
-            (string) ($user['platform_role'] ?? '') !== self::ROLE
+            (string) ($user['name'] ?? '') !== self::DISPLAY_NAME
+            || (string) ($user['platform_role'] ?? '') !== self::ROLE
             || (int) ($user['is_active'] ?? 0) !== 1
+            || (string) ($organization['name'] ?? '') !== self::ORGANIZATION_NAME
             || (string) ($organization['type'] ?? '') !== 'independent'
+            || (string) ($user['password_hash'] ?? '') === ''
         ) {
             return false;
         }
@@ -195,22 +217,10 @@ final class ProvisionSmokeIdentityCommand extends Command
         }
 
         $membership = $memberships[0];
-        if (
-            (string) ($membership['user_id'] ?? '') !== (string) $user['id']
-            || (string) ($membership['organization_id'] ?? '') !== (string) $organization['id']
-            || (string) ($membership['role'] ?? '') !== self::ROLE
-        ) {
-            return false;
-        }
 
-        $hash = (string) ($user['password_hash'] ?? '');
-        if ($hash === '') {
-            return false;
-        }
-
-        return $this->hashers
-            ->getPasswordHasher(IdentityUser::class)
-            ->verify($hash, $secret);
+        return (string) ($membership['user_id'] ?? '') === (string) $user['id']
+            && (string) ($membership['organization_id'] ?? '') === (string) $organization['id']
+            && (string) ($membership['role'] ?? '') === self::ROLE;
     }
 
     private function finish(OutputInterface $output, string $code, bool $ok): int

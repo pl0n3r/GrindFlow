@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.209 · esta etiqueta no prueba despliegue ni salud de producción.
+**Versión de código declarada:** V0.1.210 · esta etiqueta no prueba despliegue ni salud de producción.
 <!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
@@ -47,8 +47,8 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#381 · clasificar redirect seguro del login S4](https://github.com/pl0n3r/GrindFlow/issues/381).
-- **NEXT:** [#382 · rotar identidad S4 con credencial efímera](https://github.com/pl0n3r/GrindFlow/issues/382), seguido de [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307).
+- **NOW:** [#382 · rotar identidad S4 con credencial efímera](https://github.com/pl0n3r/GrindFlow/issues/382).
+- **NEXT:** [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307).
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
@@ -76,7 +76,7 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 ### Distribution Symfony · provider pilot
 
-En el código candidato **V0.1.209**, Symfony S4 añade un fingerprint determinista de migraciones para el gate backup→recheck y conserva el consumo robusto de `DATABASE_URL` para credenciales percent-encoded y conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta.
+En el código candidato **V0.1.210**, Symfony S4 añade un fingerprint determinista de migraciones para el gate backup→recheck y conserva el consumo robusto de `DATABASE_URL` para credenciales percent-encoded y conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta.
 
 ## Stack e infraestructura
 

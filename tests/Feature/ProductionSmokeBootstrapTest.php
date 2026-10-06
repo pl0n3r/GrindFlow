@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Deployment\CheckoutIdentity;
 use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
+use App\Support\Deployment\S4SmokeIdentityProvisioner;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -29,6 +30,12 @@ class ProductionSmokeBootstrapTest extends TestCase
         $identity = Mockery::mock(CheckoutIdentity::class);
         $identity->shouldReceive('commit')->andReturn(str_repeat('a', 40));
         $this->app->instance(CheckoutIdentity::class, $identity);
+
+        $s4 = Mockery::mock(S4SmokeIdentityProvisioner::class);
+        $s4->shouldReceive('reconcile')
+            ->byDefault()
+            ->andReturn(['ok' => true, 'code' => 'already_ready']);
+        $this->app->instance(S4SmokeIdentityProvisioner::class, $s4);
 
         config([
             'grindflow.phase' => 'construccion',
@@ -59,6 +66,13 @@ class ProductionSmokeBootstrapTest extends TestCase
                 $afterPersist();
             });
         $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        $s4 = Mockery::mock(S4SmokeIdentityProvisioner::class);
+        $s4->shouldReceive('reconcile')
+            ->once()
+            ->with($password)
+            ->andReturn(['ok' => true, 'code' => 'rotated']);
+        $this->app->instance(S4SmokeIdentityProvisioner::class, $s4);
 
         $this->artisan('config:clear')->assertSuccessful();
 
@@ -138,6 +152,46 @@ class ProductionSmokeBootstrapTest extends TestCase
         $response->assertStatus(503);
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_verified_bootstrap_reports_allowlisted_s4_failure_without_reflecting_child_output(): void
+    {
+        $sha = str_repeat('a', 40);
+        $password = 'ephemeral-shared-secret';
+
+        $verifier = Mockery::mock(GitHubActionsOidcVerifier::class);
+        $verifier->shouldReceive('verify')->once()
+            ->with('signed-oidc-token', $sha)->andReturn(['sha' => $sha]);
+        $this->app->instance(GitHubActionsOidcVerifier::class, $verifier);
+
+        $writer = Mockery::mock(ProductionEnvironmentWriter::class);
+        $writer->shouldReceive('withSmokePassword')->once()
+            ->with($password, Mockery::type(Closure::class))
+            ->andReturnUsing(static function (string $secret, Closure $afterPersist): void {
+                $afterPersist();
+            });
+        $this->app->instance(ProductionEnvironmentWriter::class, $writer);
+
+        Artisan::shouldReceive('call')->once()->with('config:clear')->andReturn(0);
+        Artisan::shouldReceive('call')->once()
+            ->with('grindflow:provision-smoke-user')->andReturn(0);
+
+        $s4 = Mockery::mock(S4SmokeIdentityProvisioner::class);
+        $s4->shouldReceive('reconcile')
+            ->once()
+            ->with($password)
+            ->andReturn(['ok' => false, 'code' => 's4-identity-conflict']);
+        $this->app->instance(S4SmokeIdentityProvisioner::class, $s4);
+
+        $response = $this->withHeader('Authorization', 'Bearer signed-oidc-token')
+            ->withHeader('X-GrindFlow-Expected-Sha', $sha)
+            ->postJson('/internal/production-smoke/bootstrap', ['password' => $password]);
+
+        $response->assertStatus(503)
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Stage', 'provision-s4')
+            ->assertHeader('X-GrindFlow-Smoke-Failure-Code', 's4-identity-conflict');
+        self::assertSame('', $response->getContent());
+        self::assertStringNotContainsString($password, (string) $response->headers);
     }
 
     #[DataProvider('safeReconciliationCodes')]

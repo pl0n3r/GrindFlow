@@ -149,15 +149,27 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
         $this->setSecret(self::SECRET);
         $created = $this->tester();
         self::assertSame(Command::SUCCESS, $created->execute([]));
-        $before = $this->snapshot();
+        $beforeRotation = $this->snapshot();
 
-        $this->setSecret('different-synthetic-s4-smoke-password-2026');
-        $wrongSecret = $this->tester();
-        self::assertSame(Command::FAILURE, $wrongSecret->execute([]));
-        self::assertSame('identity_conflict', $this->payload($wrongSecret)['code']);
-        self::assertSame($before, $this->snapshot());
+        $rotatedSecret = 'different-synthetic-s4-smoke-password-2026';
+        $this->setSecret($rotatedSecret);
+        $rotated = $this->tester();
+        self::assertSame(Command::SUCCESS, $rotated->execute([]));
+        self::assertSame('rotated', $this->payload($rotated)['code']);
+        $afterRotation = $this->snapshot();
 
-        $this->setSecret(self::SECRET);
+        foreach (['user_id', 'organization_id', 'platform_role', 'membership_role'] as $key) {
+            self::assertSame($beforeRotation[$key], $afterRotation[$key]);
+        }
+        self::assertNotSame($beforeRotation['password_hash'], $afterRotation['password_hash']);
+        self::assertTrue(password_verify($rotatedSecret, $afterRotation['password_hash']));
+        self::assertFalse(password_verify(self::SECRET, $afterRotation['password_hash']));
+
+        $sameSecret = $this->tester();
+        self::assertSame(Command::SUCCESS, $sameSecret->execute([]));
+        self::assertSame('already_ready', $this->payload($sameSecret)['code']);
+        self::assertSame($afterRotation, $this->snapshot());
+
         $this->db->insert('gf_identity_users', [
             'id' => self::FOREIGN_USER_ID,
             'name' => 'Foreign synthetic actor',
@@ -171,19 +183,20 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
         $this->db->insert('gf_identity_memberships', [
             'id' => self::FOREIGN_MEMBERSHIP_ID,
             'user_id' => self::FOREIGN_USER_ID,
-            'organization_id' => $before['organization_id'],
+            'organization_id' => $afterRotation['organization_id'],
             'role' => 'model',
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
+        $this->setSecret('third-synthetic-s4-smoke-password-2026');
         $foreignMembership = $this->tester();
         self::assertSame(Command::FAILURE, $foreignMembership->execute([]));
         self::assertSame('identity_conflict', $this->payload($foreignMembership)['code']);
-        self::assertSame($before, $this->snapshot());
+        self::assertSame($afterRotation, $this->snapshot());
         self::assertSame(2, (int) $this->db->fetchOne(
             'SELECT COUNT(*) FROM gf_identity_memberships WHERE organization_id = ?',
-            [$before['organization_id']],
+            [$afterRotation['organization_id']],
         ));
     }
 
@@ -196,6 +209,7 @@ final class ProvisionSmokeIdentityCommandTest extends KernelTestCase
         self::assertContains($payload['code'], [
             'created',
             'already_ready',
+            'rotated',
             'secret_missing',
             'schema_missing',
             'identity_conflict',

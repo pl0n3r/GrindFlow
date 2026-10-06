@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\Deployment\CheckoutIdentity;
 use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
+use App\Support\Deployment\S4SmokeIdentityProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
@@ -19,6 +20,7 @@ class ProductionSmokeBootstrapController extends Controller
         Request $request,
         GitHubActionsOidcVerifier $verifier,
         ProductionEnvironmentWriter $environment,
+        S4SmokeIdentityProvisioner $s4Provisioner,
         CheckoutIdentity $identity,
     ): Response {
         if (
@@ -62,7 +64,7 @@ class ProductionSmokeBootstrapController extends Controller
         try {
             $environment->withSmokePassword(
                 $password,
-                static function () use ($password, &$failureStage): void {
+                static function () use ($password, $s4Provisioner, &$failureStage): void {
                     $failureStage = 'config-clear';
 
                     if (Artisan::call('config:clear') !== 0) {
@@ -79,6 +81,17 @@ class ProductionSmokeBootstrapController extends Controller
 
                     if (Artisan::call('grindflow:provision-smoke-user') !== 0) {
                         throw new RuntimeException('Synthetic smoke identity reconciliation failed.');
+                    }
+
+                    $failureStage = 'provision-s4';
+                    config(['grindflow.s4_smoke_provision_failure_code' => null]);
+                    $s4Result = $s4Provisioner->reconcile($password);
+
+                    if ($s4Result['ok'] !== true) {
+                        config([
+                            'grindflow.s4_smoke_provision_failure_code' => $s4Result['code'],
+                        ]);
+                        throw new RuntimeException('S4 synthetic smoke identity reconciliation failed.');
                     }
                 },
             );
@@ -98,6 +111,7 @@ class ProductionSmokeBootstrapController extends Controller
                 'Unable to publish production environment update.' => 'env-publish-failed',
                 'Configuration cache could not be invalidated.' => 'config-clear-failed',
                 'Synthetic smoke identity reconciliation failed.' => 'provision-failed',
+                'S4 synthetic smoke identity reconciliation failed.' => 'provision-s4-failed',
                 default => 'unexpected',
             };
 
@@ -117,6 +131,17 @@ class ProductionSmokeBootstrapController extends Controller
                     'provision-backup-permission-failed',
                     'provision-database-failed',
                 ], true) ? $provisionCode : 'provision-failed';
+            }
+
+            if ($failureStage === 'provision-s4' && $failureCode === 'provision-s4-failed') {
+                // The child process output never reaches HTTP/logs. Only the
+                // provisioner's fixed in-process code may cross this boundary.
+                $provisionCode = (string) config('grindflow.s4_smoke_provision_failure_code', '');
+                $failureCode = in_array(
+                    $provisionCode,
+                    S4SmokeIdentityProvisioner::FAILURE_CODES,
+                    true,
+                ) ? $provisionCode : 'provision-s4-failed';
             }
 
             Log::error('Production smoke bootstrap reconciliation failed.', [
