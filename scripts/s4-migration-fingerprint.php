@@ -11,20 +11,20 @@ $checkoutSha = strtolower(trim((string) $argv[1]));
 $migrationDir = rtrim((string) $argv[2], DIRECTORY_SEPARATOR);
 $appliedVersionsFile = (string) $argv[3];
 
-if (!preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha)) {
+if (! preg_match('/^[0-9a-f]{40,64}$/', $checkoutSha)) {
     fwrite(STDERR, "invalid checkout sha\n");
     exit(2);
 }
-if ($migrationDir === '' || !is_dir($migrationDir) || is_link($migrationDir)) {
+if ($migrationDir === '' || ! is_dir($migrationDir) || is_link($migrationDir)) {
     fwrite(STDERR, "invalid migration directory\n");
     exit(2);
 }
-if (!is_file($appliedVersionsFile) || is_link($appliedVersionsFile)) {
+if (! is_file($appliedVersionsFile) || is_link($appliedVersionsFile)) {
     fwrite(STDERR, "invalid applied versions file\n");
     exit(2);
 }
 
-$files = glob($migrationDir . DIRECTORY_SEPARATOR . '*.php');
+$files = glob($migrationDir.DIRECTORY_SEPARATOR.'*.php');
 if ($files === false) {
     fwrite(STDERR, "cannot enumerate migrations\n");
     exit(2);
@@ -32,7 +32,7 @@ if ($files === false) {
 
 $migrations = [];
 foreach ($files as $file) {
-    if (!is_file($file) || is_link($file)) {
+    if (! is_file($file) || is_link($file)) {
         fwrite(STDERR, "invalid migration file\n");
         exit(2);
     }
@@ -43,7 +43,7 @@ foreach ($files as $file) {
     }
     $migrations[] = [basename($file), $hash];
 }
-usort($migrations, static fn(array $a, array $b): int => $a[0] <=> $b[0]);
+usort($migrations, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
 
 $rawVersions = file($appliedVersionsFile, FILE_IGNORE_NEW_LINES);
 if ($rawVersions === false) {
@@ -76,4 +76,4 @@ $payload = json_encode(
     JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
 );
 
-fwrite(STDOUT, hash('sha256', $payload) . PHP_EOL);
+fwrite(STDOUT, hash('sha256', $payload).PHP_EOL);
