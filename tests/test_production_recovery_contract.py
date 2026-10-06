@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import base64
+import io
 import os
 from pathlib import Path
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -140,6 +142,73 @@ class ProductionRecoveryContractTests(unittest.TestCase):
         self.assertIn("data-schema-structure-parity.py", restore)
         ci = CI.read_text(encoding="utf-8")
         self.assertIn("symfony-post-restore-tenant-guard.sh", ci)
+
+    def test_restore_rejects_unsafe_archive_members_before_extraction(self) -> None:
+        restore = RESTORE.read_text(encoding="utf-8")
+        marker = 'python3 - "$decrypted_tar" <<\'PY\'\n'
+        start = restore.index(marker) + len(marker)
+        end = restore.index("\nPY\n", start)
+        validator = restore[start:end]
+
+        validation_pos = restore.index(marker)
+        extraction_pos = restore.index(
+            'tar --extract --file="$decrypted_tar" --directory="$extracted_bundle"'
+        )
+        self.assertLess(validation_pos, extraction_pos)
+        self.assertIn("--no-same-owner", restore)
+        self.assertIn("--no-same-permissions", restore)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside = root / "escape"
+
+            def build_archive(path: Path, malicious: tarfile.TarInfo) -> None:
+                with tarfile.open(path, "w") as bundle:
+                    for name, payload in (
+                        ("metadata.json", b"{}"),
+                        ("vault-index.json", b"{}"),
+                        ("database.sql.gz", b"db"),
+                    ):
+                        info = tarfile.TarInfo(name)
+                        info.size = len(payload)
+                        bundle.addfile(info, io.BytesIO(payload))
+                    vault = tarfile.TarInfo("vault")
+                    vault.type = tarfile.DIRTYPE
+                    bundle.addfile(vault)
+                    if malicious.isreg():
+                        malicious.size = 4
+                        bundle.addfile(malicious, io.BytesIO(b"evil"))
+                    else:
+                        bundle.addfile(malicious)
+
+            traversal = tarfile.TarInfo("../escape")
+            traversal.type = tarfile.REGTYPE
+            traversal_tar = root / "traversal.tar"
+            build_archive(traversal_tar, traversal)
+            completed = subprocess.run(
+                ["python3", "-", str(traversal_tar)],
+                input=validator,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(0, completed.returncode)
+            self.assertFalse(outside.exists())
+
+            symlink = tarfile.TarInfo("vault/link")
+            symlink.type = tarfile.SYMTYPE
+            symlink.linkname = str(outside)
+            symlink_tar = root / "symlink.tar"
+            build_archive(symlink_tar, symlink)
+            completed = subprocess.run(
+                ["python3", "-", str(symlink_tar)],
+                input=validator,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(0, completed.returncode)
+            self.assertFalse(outside.exists())
 
     def test_backup_workflow_never_migrates_or_publishes_real_backup_artifacts(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
