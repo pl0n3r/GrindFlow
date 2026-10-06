@@ -128,6 +128,23 @@ class S4WebDbal4ConnectionTests(unittest.TestCase):
         self.assertIn("Production Smoke", SMOKE_WORKFLOW)
         self.assertNotIn("VALIDATED_IN_PRODUCTION", BRIDGE)
 
+        start = PRODUCTION_SMOKE.index("check_s4_media_web_runtime_readiness()")
+        end = PRODUCTION_SMOKE.index("# One anonymous GET", start)
+        bridge_probe = PRODUCTION_SMOKE[start:end]
+        self.assertEqual(3, bridge_probe.count("return 8"))
+        self.assertIn(
+            'check_s4_media_web_runtime_readiness || s4_bridge_status=$?',
+            PRODUCTION_SMOKE,
+        )
+        self.assertIn(
+            'if [[ "$s4_bridge_status" -ne 0 ]]; then',
+            PRODUCTION_SMOKE,
+        )
+        self.assertIn(
+            "8) printf 'ERROR: S4 bridge readiness is not HTTP 200 ready_for_web_probe",
+            PRODUCTION_SMOKE,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
