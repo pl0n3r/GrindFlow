@@ -284,6 +284,52 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             completed.stderr,
         )
 
+    def test_recovery_quiescence_fails_closed_when_pgrep_errors(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
+
+        start = remote.index("wait_for_recovery_quiescence() {")
+        end = remote.index("\n}\n\nroot=", start) + len("\n}")
+        guard = remote[start:end]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            fake_pgrep = fake_bin / "pgrep"
+            fake_pgrep.write_text(
+                "#!/usr/bin/env bash\nexit 2\n",
+                encoding="utf-8",
+            )
+            fake_pgrep.chmod(0o755)
+            completed = subprocess.run(
+                ["/bin/bash", "-c", guard + "\nwait_for_recovery_quiescence 1 0"],
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn(
+            "recovery quiescence could not be verified",
+            completed.stderr,
+        )
+
+    def test_recovery_quiescence_covers_symfony_password_recovery_cron(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("grindflow:password-recovery:deliver", script)
+        self.assertIn("RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED", script)
+        self.assertIn("confirm_symfony_password_recovery_cron_disabled:", workflow)
+        self.assertIn(
+            "Symfony password-recovery cron disablement was not explicitly confirmed",
+            script,
+        )
+
     def test_receipt_uses_canonical_verified_backup_command_without_leaving_host(self):
         script = SCRIPT.read_text(encoding="utf-8")
 
