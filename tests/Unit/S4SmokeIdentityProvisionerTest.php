@@ -51,6 +51,40 @@ PHP,
         self::assertStringNotContainsString($secret, json_encode($result, JSON_THROW_ON_ERROR));
     }
 
+    public function test_configured_php_cli_binary_is_used_without_constructor_override(): void
+    {
+        $root = $this->fakeSymfonyRoot(
+            <<<'PHP'
+<?php
+file_put_contents(dirname(__DIR__).'/php-binary.txt', PHP_BINARY);
+echo json_encode(['status' => 'ok', 'code' => 'already_ready'], JSON_THROW_ON_ERROR), PHP_EOL;
+PHP,
+        );
+        config(['grindflow.s4_smoke.php_cli_binary' => PHP_BINARY]);
+
+        $result = (new S4SmokeIdentityProvisioner($root))
+            ->reconcile('configured-cli-secret');
+
+        self::assertSame(['ok' => true, 'code' => 'already_ready'], $result);
+        self::assertSame(PHP_BINARY, file_get_contents($root.'/php-binary.txt'));
+    }
+
+    public function test_missing_configured_php_cli_binary_fails_closed(): void
+    {
+        $root = $this->fakeSymfonyRoot(
+            <<<'PHP'
+<?php
+echo json_encode(['status' => 'ok', 'code' => 'already_ready'], JSON_THROW_ON_ERROR), PHP_EOL;
+PHP,
+        );
+        config(['grindflow.s4_smoke.php_cli_binary' => $root.'/missing-php']);
+
+        $result = (new S4SmokeIdentityProvisioner($root))
+            ->reconcile('configured-cli-secret');
+
+        self::assertSame(['ok' => false, 'code' => 's4-runtime-unavailable'], $result);
+    }
+
     public function test_untrusted_child_output_fails_closed_without_reflecting_secret(): void
     {
         $root = $this->fakeSymfonyRoot(
