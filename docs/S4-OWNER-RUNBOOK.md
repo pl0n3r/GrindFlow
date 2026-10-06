@@ -182,9 +182,8 @@ PHP=/opt/alt/php85/usr/bin/php
   BACKUP_DIR="$ROOT/storage/app/private/operations/database-backups"
   mkdir -p "$BACKUP_DIR" && chmod 700 "$BACKUP_DIR"
   DB_CNF="$(mktemp "$HOME/.grindflow-db.XXXXXX")"
-  APPLIED_VERSIONS="$(mktemp "$HOME/.grindflow-migrations.XXXXXX")"
-  trap 'rm -f "$DB_CNF" "$APPLIED_VERSIONS"' EXIT
-  chmod 600 "$DB_CNF" "$APPLIED_VERSIONS"
+  trap 'rm -f "$DB_CNF"' EXIT
+  chmod 600 "$DB_CNF"
 
   DB_NAME="$($PHP -r '
   require "symfony/config/bootstrap.php"; $url=(string)getenv("DATABASE_URL"); $p=parse_url($url);
@@ -196,10 +195,11 @@ PHP=/opt/alt/php85/usr/bin/php
   [[ -n "$DB_NAME" ]] || exit 2
   MYSQL_BIN="$(command -v mariadb || command -v mysql || true)"
   [[ -n "$MYSQL_BIN" ]] || exit 2
-  "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -- "$DB_NAME" -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' > "$APPLIED_VERSIONS"
-
   CHECKOUT_SHA="$(git -C "$ROOT" rev-parse HEAD)"
-  MIGRATION_FINGERPRINT="$("$PHP" "$ROOT/scripts/s4-migration-fingerprint.php" "$CHECKOUT_SHA" "$ROOT/symfony/migrations" "$APPLIED_VERSIONS")"
+  MIGRATION_FINGERPRINT="$(
+    "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -- "$DB_NAME" -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' |
+      "$PHP" "$ROOT/scripts/s4-migration-fingerprint.php" "$CHECKOUT_SHA" "$ROOT/symfony/migrations"
+  )"
   [[ "$MIGRATION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || exit 2
 
   BACKUP_NAME="s4-before-migrate-$(date -u +%Y%m%dT%H%M%SZ)-${MIGRATION_FINGERPRINT:0:12}.sql.gz"
@@ -214,9 +214,11 @@ PHP=/opt/alt/php85/usr/bin/php
   [[ "$RECEIPT" =~ ^[0-9a-f]{64}$ ]] || exit 2
   unset RECEIPT
 
-  "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -- "$DB_NAME" -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' > "$APPLIED_VERSIONS"
   CURRENT_CHECKOUT_SHA="$(git -C "$ROOT" rev-parse HEAD)"
-  CURRENT_FINGERPRINT="$("$PHP" "$ROOT/scripts/s4-migration-fingerprint.php" "$CURRENT_CHECKOUT_SHA" "$ROOT/symfony/migrations" "$APPLIED_VERSIONS")"
+  CURRENT_FINGERPRINT="$(
+    "$MYSQL_BIN" --defaults-extra-file="$DB_CNF" --batch --skip-column-names --raw -- "$DB_NAME" -e 'SELECT version FROM doctrine_migration_versions ORDER BY version' |
+      "$PHP" "$ROOT/scripts/s4-migration-fingerprint.php" "$CURRENT_CHECKOUT_SHA" "$ROOT/symfony/migrations"
+  )"
   [[ "$CURRENT_FINGERPRINT" == "$MIGRATION_FINGERPRINT" ]] || { echo 'El lote cambió; repite backup' >&2; exit 2; }
 
   cd "$ROOT"
