@@ -310,11 +310,15 @@ class S4LoginRedirectDiagnosticsTests(unittest.TestCase):
     def test_release_v0209_is_synchronized_and_suite_is_canonical(self) -> None:
         match = re.search(r"'number'\s*=>\s*'(\d+\.\d+\.\d+)'", VERSION)
         self.assertIsNotNone(match)
-        self.assertEqual("0.1.209", match.group(1))
-        self.assertEqual("0.1.209", PACKAGE["version"])
-        self.assertEqual("0.1.209", LOCK["version"])
-        self.assertEqual("0.1.209", LOCK["packages"][""]["version"])
-        self.assertIn("V0.1.209", README)
+        release = match.group(1)
+        self.assertGreaterEqual(
+            tuple(int(part) for part in release.split(".")),
+            (0, 1, 209),
+        )
+        self.assertEqual(release, PACKAGE["version"])
+        self.assertEqual(release, LOCK["version"])
+        self.assertEqual(release, LOCK["packages"][""]["version"])
+        self.assertIn(f"V{release}", README)
         self.assertIn(
             "tests/test_s4_login_redirect_diagnostics.py",
             PACKAGE["scripts"]["test"],
