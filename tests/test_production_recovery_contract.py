@@ -15,6 +15,7 @@ BACKUP = ROOT / "scripts/run-production-backup.sh"
 RESTORE = ROOT / "scripts/symfony-disposable-restore-drill.sh"
 EVIDENCE = ROOT / "app/Support/Operations/VerifiedBackupEvidence.php"
 RUNBOOK = ROOT / "docs/PRODUCTION-RECOVERY.md"
+S4 = ROOT / "public/s4.php"
 
 
 class ProductionRecoveryContractTests(unittest.TestCase):
@@ -147,6 +148,32 @@ class ProductionRecoveryContractTests(unittest.TestCase):
             "github.actor == github.repository_owner && github.triggering_actor == github.repository_owner",
             workflow,
         )
+
+    def test_recovery_bundle_requires_cross_runtime_quiescence(self) -> None:
+        backup = BACKUP.read_text(encoding="utf-8")
+        s4 = S4.read_text(encoding="utf-8")
+
+        down = '"$php_bin" artisan down --render=errors::503 --retry=60 --no-interaction'
+        dump = '"$dump_bin" \\\n'
+        stage = '"$php_bin" symfony/bin/console grindflow:vault:stage'
+
+        self.assertIn('RECOVERY_BACKUP_ENABLED="${RECOVERY_BACKUP_ENABLED:-false}"', backup)
+        self.assertIn('if [[ "$recovery_enabled" == "true" ]]; then', backup)
+        self.assertIn("storage/framework/down", backup)
+        self.assertIn("storage/framework/maintenance.php", backup)
+        self.assertIn(down, backup)
+        self.assertIn('maintenance_enabled=1', backup)
+        self.assertIn('if [[ "$maintenance_enabled" == "1" ]]; then', backup)
+        self.assertIn('"$php_bin" artisan up --no-interaction', backup)
+        self.assertIn("--confirm-writes-stopped", backup)
+        self.assertLess(backup.index(down), backup.index(dump))
+        self.assertLess(backup.index(down), backup.index(stage))
+
+        self.assertIn(
+            "$maintenance = dirname(__DIR__).'/storage/framework/maintenance.php'",
+            s4,
+        )
+        self.assertIn("require $maintenance;", s4)
 
     def test_recovery_runbook_preserves_authority_and_safe_evidence(self) -> None:
         text = RUNBOOK.read_text(encoding="utf-8") if RUNBOOK.exists() else ""
