@@ -111,7 +111,7 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertIn("S4_LOGIN_REDIRECT_CLASS=", SMOKE)
         self.assertIn("grindflow:s4:provision-smoke-identity", PROVISIONER)
         self.assertIn("rotated", PROVISIONER)
-        self.assertIn("Production Smoke", README)
+        self.assertIn("name: GrindFlow Production Smoke", WORKFLOW)
 
 
 if __name__ == "__main__":
