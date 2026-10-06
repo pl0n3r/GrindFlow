@@ -60,6 +60,10 @@ final class PrivateVaultDirectory
      */
     public function tightenPrivatePermissions(): string
     {
+        if ($this->rootOverride === '') {
+            return 'root_unavailable';
+        }
+
         try {
             $root = $this->root();
         } catch (\Throwable) {
