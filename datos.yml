@@ -247,7 +247,8 @@
         "staff_id",
         "name",
         "role",
-        "status"
+        "status",
+        "actor_id"
       ],
       "purpose": "staff_administration",
       "basis": "review_required",
@@ -272,7 +273,8 @@
       "category": "usage",
       "fields": [
         "last_access_at",
-        "failed_login_count"
+        "failed_login_count",
+        "event_name"
       ],
       "purpose": "staff_security_monitoring",
       "basis": "review_required",
