@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      # Solo permite aplicar las dimensiones canónicas calculadas al PR.
       pull-requests: write
     steps:
       - name: Leer planner de la base confiable
