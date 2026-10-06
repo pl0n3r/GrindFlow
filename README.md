@@ -48,7 +48,7 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 ## Work Queue
 
 - **NOW:** [#395 · clasificar Private Vault web-runtime](https://github.com/pl0n3r/GrindFlow/issues/395).
-- **NEXT:** [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307), tras observar la causa exact-main de `private_vault=not_ready` o readiness completa.
+- **NEXT:** [#307 · readiness multimedia](https://github.com/pl0n3r/GrindFlow/issues/307), tras observar la causa exact-main de `private_vault=not_ready` o readiness completa. El bloqueo histórico `forbidden` quedó resuelto por V0.1.213; no es el blocker vigente.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
