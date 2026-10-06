@@ -26,6 +26,7 @@ PROVISIONER_TEST = (
     ROOT / "tests/Unit/S4SmokeIdentityProvisionerTest.php"
 ).read_text(encoding="utf-8")
 SMOKE = (ROOT / "scripts/production-smoke.sh").read_text(encoding="utf-8")
+WORKFLOW = (ROOT / ".github/workflows/production-smoke.yml").read_text(encoding="utf-8")
 PACKAGE = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 LOCK = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
 VERSION = (ROOT / "config/version.php").read_text(encoding="utf-8")
@@ -105,7 +106,7 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         self.assertIn("V0.1.210", README)
 
     def test_operational_closeout_requires_exact_main_past_login_redirect(self) -> None:
-        self.assertIn("/internal/production-smoke/bootstrap", SMOKE)
+        self.assertIn("/internal/production-smoke/bootstrap", WORKFLOW)
         self.assertIn("S4_POST_BRIDGE_CONTRACT_STAGE=login_redirect", SMOKE)
         self.assertIn("S4_LOGIN_REDIRECT_CLASS=", SMOKE)
         self.assertIn("grindflow:s4:provision-smoke-identity", PROVISIONER)
