@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\Deployment\CheckoutIdentity;
 use App\Support\Deployment\GitHubActionsOidcVerifier;
 use App\Support\Deployment\ProductionEnvironmentWriter;
+use App\Support\Deployment\S4PrivateVaultPermissionRepairer;
 use App\Support\Deployment\S4SmokeIdentityProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -21,6 +22,7 @@ class ProductionSmokeBootstrapController extends Controller
         GitHubActionsOidcVerifier $verifier,
         ProductionEnvironmentWriter $environment,
         S4SmokeIdentityProvisioner $s4Provisioner,
+        S4PrivateVaultPermissionRepairer $vaultRepairer,
         CheckoutIdentity $identity,
     ): Response {
         if (
@@ -64,7 +66,12 @@ class ProductionSmokeBootstrapController extends Controller
         try {
             $environment->withSmokePassword(
                 $password,
-                static function () use ($password, $s4Provisioner, &$failureStage): void {
+                static function () use (
+                    $password,
+                    $s4Provisioner,
+                    $vaultRepairer,
+                    &$failureStage,
+                ): void {
                     $failureStage = 'config-clear';
 
                     if (Artisan::call('config:clear') !== 0) {
@@ -93,6 +100,17 @@ class ProductionSmokeBootstrapController extends Controller
                         ]);
                         throw new RuntimeException('S4 synthetic smoke identity reconciliation failed.');
                     }
+
+                    $failureStage = 'repair-s4-vault-permissions';
+                    config(['grindflow.s4_vault_repair_failure_code' => null]);
+                    $vaultResult = $vaultRepairer->repair();
+
+                    if ($vaultResult['ok'] !== true) {
+                        config([
+                            'grindflow.s4_vault_repair_failure_code' => $vaultResult['code'],
+                        ]);
+                        throw new RuntimeException('S4 Private Vault permission repair failed.');
+                    }
                 },
             );
         } catch (Throwable $exception) {
@@ -112,6 +130,7 @@ class ProductionSmokeBootstrapController extends Controller
                 'Configuration cache could not be invalidated.' => 'config-clear-failed',
                 'Synthetic smoke identity reconciliation failed.' => 'provision-failed',
                 'S4 synthetic smoke identity reconciliation failed.' => 'provision-s4-failed',
+                'S4 Private Vault permission repair failed.' => 'repair-s4-vault-permissions-failed',
                 default => 'unexpected',
             };
 
@@ -142,6 +161,18 @@ class ProductionSmokeBootstrapController extends Controller
                     S4SmokeIdentityProvisioner::FAILURE_CODES,
                     true,
                 ) ? $provisionCode : 'provision-s4-failed';
+            }
+
+            if (
+                $failureStage === 'repair-s4-vault-permissions'
+                && $failureCode === 'repair-s4-vault-permissions-failed'
+            ) {
+                $repairCode = (string) config('grindflow.s4_vault_repair_failure_code', '');
+                $failureCode = in_array(
+                    $repairCode,
+                    S4PrivateVaultPermissionRepairer::FAILURE_CODES,
+                    true,
+                ) ? $repairCode : 'repair-s4-vault-permissions-failed';
             }
 
             Log::error('Production smoke bootstrap reconciliation failed.', [
