@@ -15,12 +15,16 @@ class S4PrivateVaultPermissionRepairer
     ];
 
     /** @var list<string> */
-    public const FAILURE_CODES = [
+    public const PUBLIC_FAILURE_CODES = [
         'root_unavailable',
         'missing',
         'unreadable',
         'permissions_unavailable',
         'permissions_repair_failed',
+    ];
+
+    /** @var list<string> */
+    private const TRANSPORT_FAILURE_CODES = [
         'runtime_unavailable',
         'process_failed',
         'output_invalid',
@@ -106,7 +110,7 @@ class S4PrivateVaultPermissionRepairer
         if (
             ! $process->isSuccessful()
             && $payload['status'] === 'error'
-            && in_array($code, array_slice(self::FAILURE_CODES, 0, 5), true)
+            && in_array($code, self::PUBLIC_FAILURE_CODES, true)
         ) {
             return ['ok' => false, 'code' => $code];
         }
