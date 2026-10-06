@@ -157,5 +157,6 @@ jobs:
               echo
               echo "Encrypted recovery bundle: **not requested**"
             fi
-            echo "This workflow does not run migrations or restore production."
+            echo "This workflow does not run migrations."
+            echo "This workflow does not restore production."
           } >> "$GITHUB_STEP_SUMMARY"
