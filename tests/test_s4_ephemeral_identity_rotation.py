@@ -56,6 +56,9 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
             process_ctor,
         )
         self.assertIn("PHP_BINARY", PROVISIONER)
+        self.assertIn("PHP_SAPI === 'cli'", PROVISIONER)
+        self.assertIn("'/opt/alt/php85/usr/bin/php'", PROVISIONER)
+        self.assertIn("! is_executable($php)", PROVISIONER)
         self.assertIn("'--env=prod'", PROVISIONER)
         self.assertIn("'s4-output-invalid'", PROVISIONER)
         self.assertNotIn("Log::", PROVISIONER)
@@ -71,6 +74,7 @@ class S4EphemeralIdentityRotationTests(unittest.TestCase):
         rotation = COMMAND[start:end]
         self.assertIn("'gf_identity_users'", rotation)
         self.assertIn("['password_hash' => $hasher->hash($secret)]", rotation)
+        self.assertIn("$affected !== 1", rotation)
         self.assertNotIn("'name' =>", rotation)
         self.assertNotIn("'platform_role' =>", rotation)
         self.assertNotIn("'is_active' =>", rotation)
