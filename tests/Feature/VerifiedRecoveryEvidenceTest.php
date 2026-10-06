@@ -38,6 +38,7 @@ class VerifiedRecoveryEvidenceTest extends TestCase
 
         $payload = json_decode((string) file_get_contents($receiptPath), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('grindflow-recovery-v1', $payload['format']);
+        $this->assertMatchesRegularExpression('/\\A[a-f0-9]{32}\\z/', $payload['nonce']);
         $this->assertSame(hash('sha256', 'authenticated-ciphertext'), $payload['ciphertext_sha256']);
         $this->assertSame($migration, $payload['migration_fingerprint']);
         $this->assertSame($vault, $payload['vault_index_sha256']);
@@ -95,6 +96,30 @@ class VerifiedRecoveryEvidenceTest extends TestCase
             ),
             'checksum does not match',
         );
+
+        $disk->put($ciphertext, 'ciphertext');
+        chmod($disk->path($ciphertext), 0600);
+        $receiptPath = "operations/recovery-backups/{$receipt}.receipt.json";
+        $receiptPayload = json_decode((string) $disk->get($receiptPath), true, 512, JSON_THROW_ON_ERROR);
+        $receiptPayload['asset_count'] = 99;
+        $disk->put($receiptPath, json_encode($receiptPayload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        chmod($disk->path($receiptPath), 0600);
+        $this->assertFailure(
+            fn () => $evidence->assertValid(
+                $receipt,
+                $migration,
+                $vault,
+                '0.1.215',
+                $releaseSha,
+            ),
+            'identity does not match payload',
+        );
+
+        $disk->put($receiptPath, json_encode([
+            ...$receiptPayload,
+            'asset_count' => 1,
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        chmod($disk->path($receiptPath), 0600);
 
         $disk->put($ciphertext, 'ciphertext');
         chmod($disk->path($ciphertext), 0644);
