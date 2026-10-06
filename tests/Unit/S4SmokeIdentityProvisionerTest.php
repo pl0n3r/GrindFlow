@@ -85,6 +85,22 @@ PHP,
         self::assertSame(['ok' => false, 'code' => 's4-runtime-unavailable'], $result);
     }
 
+    public function test_role_upgrade_codes_are_allowlisted_successes(): void
+    {
+        foreach (['role_upgraded', 'role_upgraded_rotated'] as $code) {
+            $root = $this->fakeSymfonyRoot(
+                "<?php echo json_encode(['status' => 'ok', 'code' => '".$code."'], JSON_THROW_ON_ERROR), PHP_EOL;",
+            );
+
+            $result = (new S4SmokeIdentityProvisioner($root, PHP_BINARY))
+                ->reconcile('configured-cli-secret');
+
+            self::assertSame(['ok' => true, 'code' => $code], $result);
+            $this->removeDirectory($root);
+            $this->sandbox = null;
+        }
+    }
+
     public function test_untrusted_child_output_fails_closed_without_reflecting_secret(): void
     {
         $root = $this->fakeSymfonyRoot(
