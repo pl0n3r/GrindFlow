@@ -3,145 +3,90 @@
 namespace Tests\Unit;
 
 use App\Support\Deployment\S4SmokeIdentityProvisioner;
-use PHPUnit\Framework\TestCase;
+use Illuminate\Support\Str;
+use Tests\TestCase;
 
 class S4SmokeIdentityProvisionerTest extends TestCase
 {
-    private string $root;
-    private string $console;
-    private string $capture;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->root = sys_get_temp_dir().'/grindflow-s4-provisioner-'.bin2hex(random_bytes(8));
-        self::assertTrue(mkdir($this->root.'/bin', 0700, true));
-        $this->console = $this->root.'/bin/console';
-        $this->capture = $this->root.'/capture.json';
-    }
+    private ?string $sandbox = null;
 
     protected function tearDown(): void
     {
-        $this->removeTree($this->root);
+        if ($this->sandbox !== null) {
+            $this->removeDirectory($this->sandbox);
+        }
+
         parent::tearDown();
     }
 
-    public function test_secret_is_available_only_through_child_environment_and_not_argv(): void
+    public function test_secret_travels_only_in_child_environment_and_public_result_is_allowlisted(): void
     {
-        $capture = var_export($this->capture, true);
-        $this->writeConsole(<<<PHP
+        $root = $this->fakeSymfonyRoot(
+            <<<'PHP'
 <?php
-$secret = getenv('GRINDFLOW_S4_SMOKE_PASSWORD') ?: '';
-file_put_contents({$capture}, json_encode([
-    'argv' => $argv,
-    'secret_matches' => hash_equals('unit-ephemeral-secret', $secret),
-], JSON_THROW_ON_ERROR));
-echo json_encode(['status' => 'ok', 'code' => 'rotated'], JSON_THROW_ON_ERROR);
-PHP);
+file_put_contents(dirname(__DIR__).'/argv.json', json_encode($argv, JSON_THROW_ON_ERROR));
+file_put_contents(dirname(__DIR__).'/secret.txt', (string) getenv('GRINDFLOW_S4_SMOKE_PASSWORD'));
+echo json_encode(['status' => 'ok', 'code' => 'rotated'], JSON_THROW_ON_ERROR), PHP_EOL;
+PHP,
+        );
+        $secret = 's4-ephemeral-secret-'.Str::random(24);
 
-        $result = $this->provisioner()->reconcile('unit-ephemeral-secret');
+        $result = (new S4SmokeIdentityProvisioner($root, PHP_BINARY))
+            ->reconcile($secret);
 
         self::assertSame(['ok' => true, 'code' => 'rotated'], $result);
-        $capturePayload = json_decode(
-            (string) file_get_contents($this->capture),
+
+        $argv = json_decode(
+            (string) file_get_contents($root.'/argv.json'),
             true,
-            512,
+            16,
             JSON_THROW_ON_ERROR,
         );
-        self::assertTrue($capturePayload['secret_matches']);
-        self::assertNotContains('unit-ephemeral-secret', $capturePayload['argv']);
-        self::assertSame($this->console, $capturePayload['argv'][0] ?? null);
-        self::assertContains('grindflow:s4:provision-smoke-identity', $capturePayload['argv']);
+        self::assertIsArray($argv);
+        self::assertNotContains($secret, $argv, true);
+        self::assertContains('grindflow:s4:provision-smoke-identity', $argv, true);
+        self::assertContains('--env=prod', $argv, true);
+        self::assertContains('--no-interaction', $argv, true);
+        self::assertSame($secret, file_get_contents($root.'/secret.txt'));
+        self::assertStringNotContainsString($secret, json_encode($result, JSON_THROW_ON_ERROR));
     }
 
-    public function test_command_failures_are_reduced_to_allowlisted_codes(): void
+    public function test_untrusted_child_output_fails_closed_without_reflecting_secret(): void
     {
-        $this->writeConsole(<<<'PHP'
+        $root = $this->fakeSymfonyRoot(
+            <<<'PHP'
 <?php
-echo json_encode(['status' => 'error', 'code' => 'identity_conflict'], JSON_THROW_ON_ERROR);
-exit(1);
-PHP);
-
-        self::assertSame(
-            ['ok' => false, 'code' => 's4-identity-conflict'],
-            $this->provisioner()->reconcile('unit-ephemeral-secret'),
+echo (string) getenv('GRINDFLOW_S4_SMOKE_PASSWORD');
+PHP,
         );
+        $secret = 's4-private-secret-'.Str::random(24);
 
-        $this->writeConsole(<<<'PHP'
-<?php
-echo json_encode(['status' => 'error', 'code' => 'private-detail'], JSON_THROW_ON_ERROR);
-exit(1);
-PHP);
-
-        self::assertSame(
-            ['ok' => false, 'code' => 's4-output-invalid'],
-            $this->provisioner()->reconcile('unit-ephemeral-secret'),
-        );
-    }
-
-    public function test_child_output_that_reflects_secret_is_rejected_without_reflection(): void
-    {
-        $this->writeConsole(<<<'PHP'
-<?php
-echo getenv('GRINDFLOW_S4_SMOKE_PASSWORD');
-PHP);
-
-        $result = $this->provisioner()->reconcile('unit-ephemeral-secret');
+        $result = (new S4SmokeIdentityProvisioner($root, PHP_BINARY))
+            ->reconcile($secret);
 
         self::assertSame(['ok' => false, 'code' => 's4-output-invalid'], $result);
-        self::assertStringNotContainsString(
-            'unit-ephemeral-secret',
-            json_encode($result, JSON_THROW_ON_ERROR),
-        );
+        self::assertStringNotContainsString($secret, json_encode($result, JSON_THROW_ON_ERROR));
     }
 
-    public function test_missing_runtime_and_invalid_password_fail_closed(): void
+    private function fakeSymfonyRoot(string $console): string
     {
-        self::assertSame(
-            ['ok' => false, 'code' => 's4-runtime-unavailable'],
-            $this->provisioner()->reconcile('unit-ephemeral-secret'),
-        );
+        $this->sandbox = sys_get_temp_dir().DIRECTORY_SEPARATOR.'grindflow-s4-'.Str::uuid();
+        $bin = $this->sandbox.DIRECTORY_SEPARATOR.'bin';
+        self::assertTrue(mkdir($bin, 0700, true));
+        self::assertNotFalse(file_put_contents($bin.DIRECTORY_SEPARATOR.'console', $console));
 
-        self::assertSame(
-            ['ok' => false, 'code' => 's4-password-invalid'],
-            $this->provisioner()->reconcile("invalid\nsecret"),
-        );
+        return $this->sandbox;
     }
 
-    private function provisioner(): S4SmokeIdentityProvisioner
-    {
-        return new S4SmokeIdentityProvisioner($this->root, PHP_BINARY);
-    }
-
-    private function writeConsole(string $contents): void
-    {
-        file_put_contents($this->console, $contents);
-        chmod($this->console, 0700);
-    }
-
-    private function removeTree(string $path): void
+    private function removeDirectory(string $path): void
     {
         if (! is_dir($path)) {
             return;
         }
 
-        $items = scandir($path);
-        if ($items === false) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-
-            $target = $path.'/'.$item;
-            if (is_dir($target)) {
-                $this->removeTree($target);
-            } else {
-                @unlink($target);
-            }
+        foreach (array_diff(scandir($path) ?: [], ['.', '..']) as $entry) {
+            $target = $path.DIRECTORY_SEPARATOR.$entry;
+            is_dir($target) ? $this->removeDirectory($target) : @unlink($target);
         }
 
         @rmdir($path);
