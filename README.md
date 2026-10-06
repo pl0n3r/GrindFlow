@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.200 · esta etiqueta no prueba despliegue ni salud de producción.
+**Versión de código declarada:** V0.1.201 · esta etiqueta no prueba despliegue ni salud de producción.
 <!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
@@ -47,10 +47,10 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#341 · provisionamiento sintético Symfony para el smoke S4](https://github.com/pl0n3r/GrindFlow/issues/341).
-- **NEXT:** seleccionar el siguiente trabajo `ready` desde el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2) después de cerrar el trabajo activo.
+- **NOW:** [#336 · configuración owner-only, esquema e identidad Symfony para S4](https://github.com/pl0n3r/GrindFlow/issues/336).
+- **NEXT:** [#307 · readiness multimedia en entorno objetivo](https://github.com/pl0n3r/GrindFlow/issues/307), después de cerrar y validar #336.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
-- **BLOCKED:** [#307 · readiness multimedia en entorno objetivo](https://github.com/pl0n3r/GrindFlow/issues/307), [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
+- **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
 Esta vista resume el trabajo; no sustituye el roadmap, los Issues ni las Releases.
 
@@ -76,7 +76,7 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 ### Distribution Symfony · provider pilot
 
-En el código candidato **V0.1.200**, Symfony S4 conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages** y añade el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4. El comando no se ejecuta desde CI ni implica despliegue: exige secreto privado, schema ya migrado y falla cerrado ante estado parcial o incompatible. La capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo; la preparación exact-SHA de `symfony/vendor`, las migraciones y el provisionamiento siguen siendo pasos separados y explícitos.
+En el código candidato **V0.1.201**, Symfony S4 conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta.
 
 ## Stack e infraestructura
 
