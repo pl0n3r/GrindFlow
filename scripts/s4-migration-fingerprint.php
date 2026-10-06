@@ -33,7 +33,7 @@ foreach ($files as $file) {
         fwrite(STDERR, "invalid migration file\n");
         exit(2);
     }
-    $hash = hash_file('sha256', $file);
+    $hash = @hash_file('sha256', $file);
     if ($hash === false) {
         fwrite(STDERR, "cannot hash migration file\n");
         exit(2);
@@ -55,13 +55,13 @@ if ($rawVersions === false) {
 
 $versions = [];
 foreach ($rawVersions as $version) {
-    $version = trim($version);
-    if ($version === '') {
-        continue;
-    }
     if (str_contains($version, "\0")) {
         fwrite(STDERR, "invalid applied migration version\n");
         exit(2);
+    }
+    $version = trim($version);
+    if ($version === '') {
+        continue;
     }
     $versions[$version] = true;
 }
