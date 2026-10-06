@@ -46,6 +46,42 @@ final class PrivateVaultDirectoryTest extends TestCase
         }
     }
 
+    public function testTightenPrivatePermissionsOnlyNarrowsExistingExternalRoot(): void
+    {
+        $base = sys_get_temp_dir().'/gf-vault-permissions-'.bin2hex(random_bytes(6));
+        $project = $base.'/checkout/symfony';
+        $external = $base.'/media';
+        self::assertTrue(mkdir($project.'/public', 0700, true));
+        self::assertTrue(mkdir($external, 0755));
+        self::assertNotFalse(file_put_contents($external.'/sentinel.txt', 'unchanged'));
+
+        try {
+            $vault = new PrivateVaultDirectory($project, $external);
+            self::assertSame('tightened', $vault->tightenPrivatePermissions());
+            clearstatcache(true, $external);
+            self::assertSame(0, ((int) fileperms($external)) & 0077);
+            self::assertSame('unchanged', file_get_contents($external.'/sentinel.txt'));
+            self::assertSame('already_private', $vault->tightenPrivatePermissions());
+
+            $default = new PrivateVaultDirectory($project);
+            self::assertSame('root_unavailable', $default->tightenPrivatePermissions());
+
+            self::assertTrue(chmod($external, 0700));
+            self::assertTrue(symlink($external, $base.'/alias'));
+            $symlinked = new PrivateVaultDirectory($project, $base.'/alias');
+            self::assertSame('root_unavailable', $symlinked->tightenPrivatePermissions());
+            self::assertSame('unchanged', file_get_contents($external.'/sentinel.txt'));
+        } finally {
+            @unlink($base.'/alias');
+            @unlink($external.'/sentinel.txt');
+            @rmdir($external);
+            @rmdir($project.'/public');
+            @rmdir($project);
+            @rmdir($base.'/checkout');
+            @rmdir($base);
+        }
+    }
+
     public function testRejectsTraversalWebRootAndSymlinkInsteadOfOpeningPublicMedia(): void
     {
         $base = sys_get_temp_dir().'/gf-vault-root-'.bin2hex(random_bytes(6));
