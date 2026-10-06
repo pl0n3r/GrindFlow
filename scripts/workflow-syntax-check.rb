@@ -79,16 +79,27 @@ steps.each do |step|
   checked += 1
 end
 
-# A missing production test secret is not a passing production smoke.
-# Keep incident reporting before the final failure step and check this contract in CI.
-missing_notice = steps.find_index { |step| step["name"] == "Report missing smoke credentials" }
-missing_failure = steps.find_index { |step| step["name"] == "Fail unconfigured authenticated production smoke" }
-abort "Production smoke must report missing credentials before failing" if missing_notice.nil? || missing_failure.nil? || missing_notice >= missing_failure
-abort "Unconfigured smoke must be the final step" unless missing_failure == steps.length - 1
-guard = steps.fetch(missing_failure)
-abort "Unconfigured smoke is missing its exact credentials guard" unless guard["if"] == "steps.credentials.outputs.configured == 'false'"
-abort "Unconfigured smoke must exit nonzero" unless guard["run"].match?(/(?:^|\n)\s*exit [1-9][0-9]*\s*(?:\n|\z)/)
+# Production Smoke provisions its dedicated synthetic identity through verified
+# GitHub OIDC. Keep the credential run-scoped: generate it with a CSPRNG, mask
+# it before exporting to GITHUB_ENV, and never depend on a persistent repo secret.
+credentials_step = steps.find { |step| step["name"] == "Generate ephemeral synthetic credential" }
+abort "Production smoke must generate an ephemeral synthetic credential" if credentials_step.nil?
+credential_script = credentials_step.fetch("run")
+abort "Production smoke must use openssl CSPRNG for the ephemeral credential" unless credential_script.include?('password="$(openssl rand -hex 32)"')
+abort "Production smoke must validate the generated credential shape" unless credential_script.include?('[[ "$password" =~ ^[0-9a-f]{64}$ ]] || {')
+mask_line = credential_script.index('echo "::add-mask::$password"')
+env_line = credential_script.index('echo "E2E_USER_PASSWORD=$password" >> "$GITHUB_ENV"')
+abort "Production smoke must mask the ephemeral credential before exporting it" if mask_line.nil? || env_line.nil? || mask_line >= env_line
 
+smoke_source = File.read(smoke_path, encoding: "UTF-8")
+abort "Production smoke must not depend on persistent PRODUCTION_E2E_PASSWORD secret" if smoke_source.include?("secrets.PRODUCTION_E2E_PASSWORD")
+abort "Production smoke must not retain the obsolete unconfigured-secret failure" if steps.any? { |step| step["name"] == "Fail unconfigured authenticated production smoke" }
+
+recovery = steps.find { |step| step["name"] == "Publish production recovery" }
+abort "Production smoke recovery step missing" if recovery.nil?
+abort "Persistent-secret blocker may close only after successful smoke" unless recovery["if"] == "steps.credentials.outputs.configured == 'true' && steps.smoke.outcome == 'success'"
+recovery_script = recovery.fetch("run")
+abort "Production smoke recovery must close the obsolete config issue" unless recovery_script.include?('gh issue close "$config_issue_number"')
 abort "No smoke shell steps checked" if checked.zero?
 puts "PASS production-smoke embedded Bash syntax (#{checked} steps)"
 
