@@ -176,6 +176,14 @@ class OperationsHealthContractTests(unittest.TestCase):
         self.assertIn("gh api", workflow)
         self.assertIn("gh issue edit", workflow)
         self.assertIn("gh issue close", workflow)
+        self.assertIn("RUNNER_TEMP", workflow)
+        self.assertIn("umask 077", workflow)
+        self.assertNotIn("/tmp/grindflow-", workflow)
+
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn("sys.stdin.read()", script)
+        self.assertNotIn("--input", script)
+        self.assertNotIn("--output", script)
 
         for forbidden in (
             "curl ",
