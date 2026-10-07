@@ -10,7 +10,7 @@ import argparse
 import hashlib
 import json
 import re
-from pathlib import Path
+import sys
 from typing import Any, Mapping
 
 VERSION = 1
@@ -207,32 +207,27 @@ def _is_utc_timestamp(value: str) -> bool:
     )
 
 
-def _read_json(path: Path) -> Any:
+def _read_json_from_stdin() -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        return json.loads(sys.stdin.read())
+    except json.JSONDecodeError as exc:
         raise OperationsHealthError("input JSON inválido.") from exc
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("evaluate",))
-    parser.add_argument("--input", required=True)
     parser.add_argument("--main-sha", required=True)
-    parser.add_argument("--output")
     args = parser.parse_args()
 
     try:
-        result = evaluate(_read_json(Path(args.input)), main_sha=args.main_sha)
+        result = evaluate(_read_json_from_stdin(), main_sha=args.main_sha)
     except OperationsHealthError as exc:
-        print(f"operations status: {exc}", file=__import__("sys").stderr)
+        print(f"operations status: {exc}", file=sys.stderr)
         return 2
 
     rendered = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    if args.output:
-        Path(args.output).write_text(rendered + "\n", encoding="utf-8")
-    else:
-        print(rendered)
+    print(rendered)
     return 0
 
 
