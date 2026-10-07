@@ -60,9 +60,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
+          state_dir="$RUNNER_TEMP/grindflow-operations-health"
+          mkdir -p "$state_dir"
+          main_sha_file="$state_dir/main-sha"
+          signals_jsonl="$state_dir/signals.jsonl"
+          signals_json="$state_dir/signals.json"
+
           main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha')"
-          printf '%s\n' "$main_sha" > /tmp/grindflow-operations-main-sha
-          : > /tmp/grindflow-operations-signals.jsonl
+          printf '%s\n' "$main_sha" > "$main_sha_file"
+          : > "$signals_jsonl"
 
           collect_signal() {
             source="$1"
@@ -90,7 +97,7 @@ jobs:
                     updated_at: .updated_at
                   }
                 end
-              ' <<<"$payload" >> /tmp/grindflow-operations-signals.jsonl
+              ' <<<"$payload" >> "$signals_jsonl"
             else
               jq -nc --arg source "$source" '{
                 source: $source,
@@ -100,7 +107,7 @@ jobs:
                 run_id: null,
                 url: null,
                 updated_at: null
-              }' >> /tmp/grindflow-operations-signals.jsonl
+              }' >> "$signals_jsonl"
             fi
           }
 
@@ -108,23 +115,29 @@ jobs:
           collect_signal deploy_observer production-deploy-observer.yml
           collect_signal production_smoke production-smoke.yml
 
-          jq -s '{version: 1, signals: .}' /tmp/grindflow-operations-signals.jsonl > /tmp/grindflow-operations-signals.json
+          jq -s '{version: 1, signals: .}' "$signals_jsonl" > "$signals_json"
 
       - id: evaluate
         name: Evaluate operational health
         shell: bash
         run: |
           set -euo pipefail
-          main_sha="$(cat /tmp/grindflow-operations-main-sha)"
-          python3 scripts/operations-health.py evaluate             --input /tmp/grindflow-operations-signals.json             --main-sha "$main_sha"             --output /tmp/grindflow-operations-health.json
-          report="$(jq -c . /tmp/grindflow-operations-health.json)"
+          umask 077
+          state_dir="$RUNNER_TEMP/grindflow-operations-health"
+          main_sha="$(cat "$state_dir/main-sha")"
+          signals_json="$state_dir/signals.json"
+          health_json="$state_dir/report.json"
+          python3 scripts/operations-health.py evaluate \
+            --main-sha "$main_sha" \
+            < "$signals_json" > "$health_json"
+          report="$(jq -c . "$health_json")"
           printf 'report=%s\n' "$report" >> "$GITHUB_OUTPUT"
           {
             echo '## GrindFlow Operations Health'
             echo
-            printf -- '- State: **%s**\n' "$(jq -r '.state' /tmp/grindflow-operations-health.json)"
-            printf -- '- Main SHA: `%s`\n' "$(jq -r '.main_sha' /tmp/grindflow-operations-health.json)"
-            printf -- '- Fingerprint: `%s`\n' "$(jq -r '.fingerprint' /tmp/grindflow-operations-health.json)"
+            printf -- '- State: **%s**\n' "$(jq -r '.state' "$health_json")"
+            printf -- '- Main SHA: `%s`\n' "$(jq -r '.main_sha' "$health_json")"
+            printf -- '- Fingerprint: `%s`\n' "$(jq -r '.fingerprint' "$health_json")"
             echo '- Evidence: allowlisted GitHub Actions metadata only.'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -144,6 +157,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
           report_file="$RUNNER_TEMP/grindflow-operations-health.json"
           body_file="$RUNNER_TEMP/grindflow-operations-health.md"
           printf '%s' "$REPORT_JSON" > "$report_file"
