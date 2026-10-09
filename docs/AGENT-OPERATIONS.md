@@ -6,6 +6,19 @@
 > PLAN-AGENTES.md global solo puede imponer un límite menor de agentes cuando
 > así lo establezca AGENTS.md.
 
+### Operations Health y runbook de producción
+
+- Para operación rutinaria, señales, severidad/freshness, deduplicación de alertas,
+  handoff y límites de mantenimiento, leer primero
+  [`docs/PRODUCTION-OPERATIONS.md`](PRODUCTION-OPERATIONS.md).
+- `.github/workflows/operations-health.yml` compone únicamente metadata allowlisted
+  de CI Health, Deploy Observer y Production Smoke; `scripts/operations-health.py`
+  evalúa el contrato sin red ni I/O productivo.
+- Recovery conserva autoridad exclusiva en `docs/PRODUCTION-RECOVERY.md` / #311;
+  Distribution y Vault/Media conservan sus fuentes especializadas.
+- `UNKNOWN` o evidencia `STALE` falla cerrado. Operations Health no autoriza
+  migraciones, restore productivo, gasto, secretos, datos reales ni go-live.
+
 ### Regla de eficiencia CI
 
 - `GrindFlow CI / validate` conserva su nombre estable como unica compuerta
