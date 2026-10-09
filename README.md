@@ -1,142 +1,95 @@
-# GrindFlow
+# GrindFlow — Último deploy
 
-> SaaS multi-tenant para gestionar contenido, distribución programada, atribución de tráfico y operaciones de ingresos.
+[![GrindFlow CI](https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg)](https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml)
+[![Sonar](https://sonarcloud.io/api/project_badges/measure?project=pl0n3r_GrindFlow&metric=alert_status)](https://sonarcloud.io/dashboard?id=pl0n3r_GrindFlow)
+[![Production Smoke](https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml/badge.svg)](https://github.com/pl0n3r/GrindFlow/actions/workflows/production-smoke.yml)
 
-**Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
+## Progress convention
 
-**Versión de código declarada:** V0.1.216 · esta etiqueta no prueba despliegue ni salud de producción.
-<!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
+- ✅ ~~Completado~~: integrado y verificado con evidencia propia.
+- 🚧 Pendiente: código candidato, verificación o integración todavía incompleta.
+- ⛔ Bloqueado: falta una condición comprobable; no significa despliegue exitoso.
 
-GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
+## Fuentes de verdad
 
-## Operational Cockpit
+- [AGENTS.md](AGENTS.md), [gobernanza](docs/GOVERNANCE.md), [especificación](docs/GRINDFLOW-SPEC.md) y [requisitos](docs/REQUIREMENTS.md).
+- El histórico acumulativo, las dependencias y las decisiones de producto viven en [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Este README es solo el snapshot de entrega.
 
-<!-- factory:status:start -->
-| Señal | Estado |
+## Estado del deploy
+
+- Version **v0.1.217**: candidata de código; no equivale a versión desplegada en Hostinger.
+- Fase: construcción. Integración y publicación: 🚧 pendiente.
+- Base de la propuesta: `main@0760bc1cfab2d388ac7a614256c8f98ef2d5d02f` (V0.1.216).
+- Trabajo: seguridad Next.js 15.5.27, [Issue #411](https://github.com/pl0n3r/GrindFlow/issues/411), rama `trabajo/issue-411`.
+- CI del SHA exacto de main: no equivale al CI de un PR; verificar tras merge.
+- Salud, checkout productivo, /health y smoke posterior de esta versión: UNKNOWN (no inferidos desde el código).
+
+## Huella del cambio
+
+<!-- grindflow:git-delta -->
+| Archivos | Inserciones | Eliminaciones | Neto |
+| ---: | ---: | ---: | ---: |
+| **5** | **+0** | **−0** | **+0** |
+
+## Calidad y entrega
+
+<!-- grindflow:gate-plan -->
+| Control | Estado / contrato |
 | --- | --- |
-| main SHA | UNKNOWN |
-| versión | UNKNOWN |
-| CI | UNKNOWN |
-| release | UNKNOWN |
-| health | UNKNOWN |
-| smoke/observer | UNKNOWN |
-| quality/security | UNKNOWN |
-| Issue activo | UNKNOWN |
-| PR activo | UNKNOWN |
-| último release | UNKNOWN |
-<!-- factory:status:end -->
+| Gates seleccionados | **preflight · fast[operational contracts + automation syntax + README dashboard] · php-quality · PHPUnit · legacy** |
+| CI | 🚧 Gate exact-HEAD obligatorio antes de merge |
+| CodeRabbit | 🚧 Review sustantiva/cobertura final exact-HEAD obligatoria |
+| Sonar | 🚧 Verificar por HEAD exacto, sin inferir de badges |
+| Seguridad | Dependabot #410: pin e integridad verificables en test de contrato |
 
-### Progress + Readiness
-
-<!-- factory:progress-readiness:start -->
-| Señal | Estado |
-| --- | --- |
-| Target | UNKNOWN |
-| Progress | UNKNOWN |
-| Readiness | UNKNOWN |
-| Evidence freshness | UNKNOWN |
-| Critical blockers | UNKNOWN |
-| Trend | UNKNOWN |
-
-| Dimensión | Progress | Readiness |
-| --- | --- | --- |
-| UNKNOWN | UNKNOWN | UNKNOWN |
-<!-- factory:progress-readiness:end -->
-
-> Los bloques anteriores son derivados. `UNKNOWN` o `PENDING` significa que falta evidencia canónica; nunca se promueve a `GREEN` o `DEGRADED` sin evidencia.
-
-## Work Queue
-
-- **NOW:** [#349 · monitoreo, alertas y runbooks operativos](https://github.com/pl0n3r/GrindFlow/issues/349).
-- **NEXT:** [#271 · go/no-go del piloto](https://github.com/pl0n3r/GrindFlow/issues/271), después de cerrar la capa operativa pre-piloto y los blockers que ese Issue mantenga vigentes.
-- **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
-- **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
-
-Esta vista resume el trabajo; no sustituye el roadmap, los Issues ni las Releases.
-
-## Qué hace el producto
-
-GrindFlow gestiona el ciclo de vida de contenido multimedia para equipos y creadores: biblioteca y organización de recursos, programación, distribución a destinos configurados, enlaces rastreables, atribución de tráfico y soporte a operaciones de ingresos. La especificación durable está en [`docs/GRINDFLOW-SPEC.md`](docs/GRINDFLOW-SPEC.md) y los requisitos verificables en [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
-
-## Arquitectura en 60 segundos
+## Flujo de entrega
 
 ```mermaid
 flowchart LR
-    U[Creadores y equipos] --> G[GrindFlow]
-    G --> C[Biblioteca y reglas]
-    C --> S[Scheduling]
-    S --> D[Distribution]
-    D --> T[Traffic attribution]
-    G --> A[Administración]
-    G --> P[Superficie pública]
-    F[Factory governance] --> G
+ A[Issue y reserva] --> B[PR + snapshot exacto]
+ B --> C[preflight]
+ C --> D[fast]
+ C --> E[php-quality y PHPUnit]
+ C --> F[legacy]
+ D --> G[validate]
+ E --> G
+ F --> G
+ G --> H[CodeRabbit y Sonar]
+ H --> I[Merge gobernado]
+ I --> J[CI del SHA exacto de main]
+ J --> K[Deploy y smoke independientes]
 ```
 
-La arquitectura objetivo es un monolito modular API-first. La transición tecnológica conserva el runtime existente hasta demostrar paridad y cutover; el README no convierte un objetivo arquitectónico en estado desplegado.
+## Qué se hizo
 
-### Distribution Symfony · provider pilot
+- Preparación del patch de seguridad para Next.js legacy en `package.json` y `package-lock.json`, con integridades originales de Dependabot #410.
+- Identidad candidata V0.1.217 sincronizada y test de regresión para impedir volver a 15.5.25.
+- Sin activar proveedores, mutar bases de datos ni afirmar cambios productivos.
 
-En el código candidato **V0.1.216**, Symfony S4 añade un fingerprint determinista de migraciones para el gate backup→recheck y conserva el consumo robusto de `DATABASE_URL` para credenciales percent-encoded y conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta. La readiness `forbidden` de S4 es un estado transitorio de seguridad y solo se considera superada cuando Production Smoke demuestra el contrato posterior sobre el `main` exacto desplegado.
+## Archivos modificados en esta entrega candidata
 
-## Stack e infraestructura
+Inventario verificable por `scripts/readme-dashboard.py`:
+<!-- grindflow:changed-files -->
+- `README.md`
+- `config/version.php`
+- `package-lock.json`
+- `package.json`
+- `tests/test_next_security_lock_contract.py`
 
-- **Objetivo backend:** PHP 8.5 + Symfony 7.4 LTS + Doctrine ORM/DBAL/Migrations.
-- **Datos:** MariaDB.
-- **Administración objetivo:** React + TypeScript + Vite.
-- **Público objetivo:** Twig/SSR.
-- **Transición:** Laravel y el legado Next.js continúan operativos hasta paridad y cutover verificados.
-- **Hosting inicial:** Hostinger, con portabilidad prevista por la arquitectura.
-- **CI/gobernanza:** GitHub Actions consumiendo contratos reutilizables de Factory.
+## Validación
 
-La fuente técnica de la transición es [`docs/STACK-TRANSITION-SYMFONY.md`](docs/STACK-TRANSITION-SYMFONY.md); no se infiere estado de producción desde esta sección.
+- En revisión: se requiere `GrindFlow CI / validate`, QA, Sonar, CodeRabbit y comprobación del SHA exacto.
+- Reversión: revert del PR; sin migración, compras, secretos ni operación productiva.
 
-## Ciclo de entrega
+## Qué sigue
 
-Issue → reserva canónica → rama enfocada → PR → gates de GrindFlow/Factory → revisión → squash merge serial → verificación exact-main → release/deploy cuando aplique → smoke/observer → estado operativo basado en evidencia.
+Consultar el [Roadmap canónico #2](https://github.com/pl0n3r/GrindFlow/issues/2) para dependencias y prioridad real.
 
-Las reglas ejecutables del ciclo están en [`AGENTS.md`](AGENTS.md) y la gobernanza durable en [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md).
+## Panorama general pendiente
 
-## Calidad y seguridad
-
-- `GrindFlow CI / validate` agrega los gates seleccionados por alcance; Sonar y CodeRabbit aportan revisión adicional.
-- Los secretos y credenciales viven fuera del repositorio y no se publican en README, Issues ni logs.
-- Cambios de datos, despliegue y producción respetan migraciones, backup/restore, rollback y smoke definidos por la documentación operativa.
-- La salud operativa agregada y el handoff seguro se definen en [`docs/PRODUCTION-OPERATIONS.md`](docs/PRODUCTION-OPERATIONS.md); recovery conserva su fuente en [`docs/PRODUCTION-RECOVERY.md`](docs/PRODUCTION-RECOVERY.md).
-- Estado desconocido falla cerrado: un badge, una versión o un merge no demuestran por sí solos salud ni despliegue.
-
-Consulta [`AGENTS.md`](AGENTS.md), [`decisiones.yml`](decisiones.yml) y [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md) para las reglas vigentes.
-
-## Roadmap y fuentes de verdad
-
-- **Roadmap canónico:** [Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2).
-- **Especificación:** [`docs/GRINDFLOW-SPEC.md`](docs/GRINDFLOW-SPEC.md).
-- **Requisitos:** [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
-- **Modelo de desarrollo:** [`docs/DEVELOPMENT-MODEL.md`](docs/DEVELOPMENT-MODEL.md).
-- **Decisiones vigentes:** [`decisiones.yml`](decisiones.yml).
-- **Contrato operativo para agentes:** [`AGENTS.md`](AGENTS.md).
-- **Documentación profunda:** [`docs/`](docs/).
-
-El README enlaza estas fuentes; no las duplica ni funciona como changelog.
-
-## Desarrollo local
-
-Para el frontend/legado Node declarado actualmente en `package.json`:
-
-```bash
-npm ci
-npm run validate
-```
-
-Los comandos y gates PHP/Symfony vigentes se mantienen en [`AGENTS.md`](AGENTS.md) y en la documentación de transición. Ejecuta solo los gates correspondientes al área modificada; no uses una ejecución local como evidencia de producción.
-
-## Mapa de la fábrica
-
-- **Factory:** governance/kit y contratos reutilizables.
-- **ControlBot:** control plane privado de proyectos, trabajo, decisiones e incidentes.
-- **FactoryRunner:** execution plane.
-- **Condor:** producto.
-- **GrindFlow:** **producto actual**, enfocado en contenido, distribución y tráfico.
-- **BRVTAL:** producto.
-- **AutoFactory:** herramienta local/manual.
-
-Cada repositorio conserva su responsabilidad; GrindFlow consume gobernanza de Factory sin convertirse en un segundo control plane.
+| Lane | Frente | Estado |
+| --- | --- | --- |
+| **NOW** | 🚧 Seguridad Next.js 15.5.27 | 🚧 CI / revisión |
+| **NEXT** | 🚧 Library: vigencia UTC de assets | 🚧 contrato y nueva versión tras #411 |
+| **BLOCKED / EXTERNAL** | ⛔ Evidencia de despliegue y Smoke del candidato | ⛔ no ejecutados |
+| **LATER** | 🚧 Resto del MVP y transición completa a Symfony | 🚧 secuenciado |
