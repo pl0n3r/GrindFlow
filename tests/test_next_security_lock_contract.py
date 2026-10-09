@@ -42,6 +42,18 @@ class NextSecurityLockContractTests(unittest.TestCase):
         self.assertEqual(self.lock["lockfileVersion"], 3)
         self.assertEqual(self.lock["packages"][""]["dependencies"], dependencies)
         self.assertEqual(self.lock["packages"][""]["devDependencies"], dev)
+        # npm ci exige este peer opcional de SWC: el bot #410 lo omitía,
+        # aunque @swc/core declara >=0.5.17 y el helper raíz es 0.5.15.
+        core = self.lock["packages"]["node_modules/next-intl/node_modules/@swc/core"]
+        self.assertEqual(core["peerDependencies"]["@swc/helpers"], ">=0.5.17")
+        self.assertTrue(core["peerDependenciesMeta"]["@swc/helpers"]["optional"])
+        helper = self.lock["packages"]["node_modules/next-intl/node_modules/@swc/helpers"]
+        self.assertEqual(helper["version"], "0.5.23")
+        self.assertEqual(
+            helper["integrity"],
+            "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==",
+        )
+        self.assertEqual(self.lock["packages"]["node_modules/@swc/helpers"]["version"], "0.5.15")
 
     def test_release_identity_is_synced_to_patch_0_1_217(self):
         self.assertEqual(self.package["version"], "0.1.217")

@@ -18,6 +18,7 @@
 ## Estado del deploy
 
 - Version **v0.1.217**: candidata de código; no equivale a versión desplegada en Hostinger.
+- **Versión de código declarada:** V0.1.217 · no equivale a validación productiva.
 - Fase: construcción. Integración y publicación: 🚧 pendiente.
 - Base de la propuesta: `main@0760bc1cfab2d388ac7a614256c8f98ef2d5d02f` (V0.1.216).
 - Trabajo: seguridad Next.js 15.5.27, [Issue #411](https://github.com/pl0n3r/GrindFlow/issues/411), rama `trabajo/issue-411`.
