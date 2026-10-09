@@ -11,7 +11,8 @@
 # divergiendo en silencio. Ademas esto es E/S pura y no necesita FFmpeg, asi que
 # la imagen es mucho mas ligera que la de medios.
 
-FROM node:22-alpine
+# Misma imagen oficial Docker, via ECR Public para evitar throttling de Docker Hub.
+FROM public.ecr.aws/docker/library/node:22-alpine
 WORKDIR /app
 
 # Las dependencias antes que el codigo: cambiar el worker no reinstala todo.

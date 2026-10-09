@@ -6,6 +6,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkerSupplyChainHardeningTests(unittest.TestCase):
+    def test_worker_base_registry_uses_verified_docker_official_ecr_mirror(self) -> None:
+        """El registry alternativo es Docker Official en ECR Public, sin cambiar variantes ni installer."""
+        python = (ROOT / "workers" / "Dockerfile").read_text(encoding="utf-8")
+        node = (ROOT / "workers" / "node.Dockerfile").read_text(encoding="utf-8")
+        bases = lambda content: [line.strip() for line in content.splitlines()
+                                 if line.strip().startswith("FROM ")]
+        self.assertEqual(bases(python), ["FROM public.ecr.aws/docker/library/python:3.11-slim"])
+        self.assertEqual(bases(node), ["FROM public.ecr.aws/docker/library/node:22-alpine"])
+        self.assertIn("pip install --no-cache-dir --require-hashes --only-binary=:all:", python)
+        self.assertIn("npm ci --ignore-scripts", node)
+        self.assertIn("USER worker", python)
+        self.assertIn("USER node", node)
+        self.assertNotIn("docker.io/", python + node)
+
     def test_worker_installers_are_hardened(self) -> None:
         docker = (ROOT / "workers" / "Dockerfile").read_text()
         requirements = (ROOT / "workers" / "requirements.txt").read_text().splitlines()
