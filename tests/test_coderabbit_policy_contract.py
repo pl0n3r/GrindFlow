@@ -71,6 +71,25 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
             with self.subTest(expected=expected):
                 self.assertIn(expected, self.docs)
 
+    def test_documented_factory_959_fallback_is_scoped_to_construction_only(self) -> None:
+        """La excepción global de capacidad no convierte rate-limit en review."""
+        for expected in (
+            "Factory #959",
+            "phase=construccion",
+            "datos.yml",
+            "retry OWNER",
+            "rate-limit exact-HEAD",
+            "Política Factory v1",
+            "hallazgos bloqueantes",
+            "CHANGES_REQUESTED",
+            "live",
+            "fase desconocida",
+            "revisión externa",
+            "un solo",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, self.docs)
+
     def test_owner_decision_b_is_recorded_without_changing_round_limit(self) -> None:
         self.assertEqual(self.decisions["review_round_limit"], 3)
         decision = next(item for item in self.decisions["decisions"] if item["id"] == "D-062")
