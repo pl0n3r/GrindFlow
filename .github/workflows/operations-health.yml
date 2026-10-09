@@ -176,7 +176,7 @@ jobs:
           state="$(jq -r '.state' "$report_file")"
 
           if [[ "$state" == "HEALTHY" ]]; then
-            if [[ -n "$issue_number" && "$issue_state" == "OPEN" ]]; then
+            if [[ -n "$issue_number" && "$issue_state" == "open" ]]; then
               gh issue edit "$issue_number" --body-file "$body_file"
               gh issue close "$issue_number" --reason completed
             fi
@@ -187,7 +187,7 @@ jobs:
           if [[ -z "$issue_number" ]]; then
             gh issue create               --title "$ALERT_TITLE"               --body-file "$body_file"               --label "tipo: calidad"               --label "prioridad: alta"               --label "estado: disponible"               --label "rol: sre"
           else
-            if [[ "$issue_state" == "CLOSED" ]]; then
+            if [[ "$issue_state" == "closed" ]]; then
               gh issue reopen "$issue_number"
             fi
             gh issue edit "$issue_number" --body-file "$body_file"

@@ -133,6 +133,10 @@ class OperationsHealthContractTests(unittest.TestCase):
         self.assertNotIn('--search "$ALERT_TITLE in:title"', workflow)
         self.assertIn("count <= 1", workflow)
         self.assertIn("gh issue reopen", workflow)
+        self.assertIn('"$issue_state" == "open"', workflow)
+        self.assertIn('"$issue_state" == "closed"', workflow)
+        self.assertNotIn('"$issue_state" == "OPEN"', workflow)
+        self.assertNotIn('"$issue_state" == "CLOSED"', workflow)
         self.assertNotIn("gh issue comment", workflow)
 
     def test_runbook_covers_health_publication_storage_incidents_and_recovery(self) -> None:
