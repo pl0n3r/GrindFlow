@@ -572,3 +572,9 @@ productivas, proveedores externos ni escrituras en producción.
 - CI verifies both synthetic incompatible cases and the real isolated
   Symfony/MariaDB preview path before merge.
 
+
+### Library — relaciones lógicas de colecciones y variantes (hoja #414, en preparación)
+
+La decisión de producto #42 permite asociar una identidad de Vault a múltiples colecciones, conservando exactamente **una copia física** del asset/una \`storage_key\`. La decisión #43 vincula variantes **ya existentes** a un maestro de la misma organización por tipo \`format\`, \`network\` o \`campaign\`, sin duplicar medios, autorizar distribución ni crear flujos paralelos de importación. Los vínculos llevan referencias tenant-bound obligatorias; un recurso ajeno, eliminado o no autorizado falla cerrado.
+
+Este slice se prepara **solo en construcción**. Hasta que finalicen los gates del release/versionado y la revisión de CI + seguridad, es build-ahead sin merge, deploy, cambio de estado productivo ni datos reales. Véase \`docs/AGENT-LIBRARY-COLLECTIONS.md\` y GrindFlow #414.

@@ -1,0 +1,165 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GrindFlow\Tests;
+
+use Doctrine\DBAL\Connection;
+use GrindFlow\Library\AssetCollectionApplication;
+use GrindFlow\Kernel;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Uid\Uuid;
+
+final class LibraryCollectionsTest extends KernelTestCase
+{
+    protected static function getKernelClass(): string
+    {
+        return Kernel::class;
+    }
+
+    public function testAssetInMultipleCollectionsKeepsOnePhysicalBlob(): void
+    {
+        self::bootKernel();
+        [$db, $library, $owner, $organization, , $asset] = $this->fixture();
+        $first = $library->createCollection($organization, $owner);
+        $second = $library->createCollection($organization, $owner);
+        self::assertSame('ok', $first['status']);
+        self::assertSame('ok', $second['status']);
+        self::assertNotSame($first['id'], $second['id']);
+
+        self::assertSame(['status' => 'ok', 'changed' => true],
+            $library->attachAsset($organization, $owner, $first['id'], $asset));
+        self::assertSame(['status' => 'ok', 'changed' => true],
+            $library->attachAsset($organization, $owner, $second['id'], $asset));
+        self::assertSame(['status' => 'ok', 'changed' => false],
+            $library->attachAsset($organization, $owner, $first['id'], $asset));
+
+        self::assertSame([$asset], $library->assetsForCollection(
+            $organization, $owner, $first['id'],
+        )['assets']);
+        self::assertCount(2, $library->collectionsForAsset(
+            $organization, $owner, $asset,
+        )['collections']);
+        self::assertSame(1, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_assets WHERE id = :asset AND organization_id = :org',
+            ['asset' => $asset, 'org' => $organization],
+        ));
+        self::assertSame(2, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_collection_assets WHERE asset_id = :asset AND organization_id = :org',
+            ['asset' => $asset, 'org' => $organization],
+        ));
+        self::assertSame(1, (int) $db->fetchOne(
+            'SELECT COUNT(DISTINCT storage_key) FROM gf_vault_assets WHERE id = :asset',
+            ['asset' => $asset],
+        ));
+    }
+
+    public function testVariantsHaveTypedMasterAndCanBeListedWithoutMutation(): void
+    {
+        self::bootKernel();
+        [$db, $library, $actor, $org, , $master] = $this->fixture();
+        $variant = $this->addAsset($db, $org, $actor);
+        self::assertSame(['status' => 'ok', 'changed' => true],
+            $library->linkVariant($org, $actor, $master, $variant, 'format'));
+        self::assertSame(['status' => 'ok', 'changed' => false],
+            $library->linkVariant($org, $actor, $master, $variant, 'format'));
+        self::assertSame([['asset_id' => $variant, 'type' => 'format']],
+            $library->variantsForMaster($org, $actor, $master)['variants']);
+        self::assertSame('invalid',
+            $library->linkVariant($org, $actor, $master, $master, 'format')['status']);
+        self::assertSame('invalid',
+            $library->linkVariant($org, $actor, $master, $variant, 'unknown')['status']);
+        $otherMaster = $this->addAsset($db, $org, $actor);
+        self::assertSame('conflict',
+            $library->linkVariant($org, $actor, $otherMaster, $variant, 'network')['status']);
+        self::assertSame('conflict',
+            $library->linkVariant($org, $actor, $variant, $otherMaster, 'campaign')['status']);
+        self::assertSame('conflict',
+            $library->linkVariant($org, $actor, $variant, $master, 'campaign')['status']);
+    }
+
+    public function testCrossTenantMembershipAndReferencesFailClosed(): void
+    {
+        self::bootKernel();
+        [$db, $library, $actor, $org, $foreignOrg, $ownAsset, $foreignAsset] = $this->fixture();
+        $collection = $library->createCollection($org, $actor)['id'];
+
+        self::assertSame('missing',
+            $library->attachAsset($org, $actor, $collection, $foreignAsset)['status']);
+        self::assertSame('missing',
+            $library->linkVariant($org, $actor, $ownAsset, $foreignAsset, 'network')['status']);
+        self::assertSame('forbidden',
+            $library->createCollection($foreignOrg, $actor)['status']);
+        self::assertSame('missing',
+            $library->assetsForCollection($foreignOrg, $actor, $collection)['status']);
+        self::assertSame('missing',
+            $library->variantsForMaster($org, $actor, $foreignAsset)['status']);
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_collection_assets WHERE collection_id = :collection',
+            ['collection' => $collection],
+        ));
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_asset_variants WHERE organization_id = :org',
+            ['org' => $org],
+        ));
+    }
+
+    /** @return array{Connection,AssetCollectionApplication,string,string,string,string,string} */
+    private function fixture(): array
+    {
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $actor = Uuid::v7()->toRfc4122();
+        $organization = Uuid::v7()->toRfc4122();
+        $foreign = Uuid::v7()->toRfc4122();
+        $at = gmdate('Y-m-d H:i:s');
+        $db->insert('gf_identity_users', [
+            'id' => $actor,
+            'name' => 'Library fixture',
+            'email' => $actor.'@example.test',
+            'password_hash' => password_hash('synthetic-only-fixture-secret', PASSWORD_BCRYPT),
+            'platform_role' => 'model',
+            'is_active' => 1,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+        foreach ([$organization, $foreign] as $org) {
+            $db->insert('gf_identity_organizations', [
+                'id' => $org,
+                'name' => 'Library fixture',
+                'slug' => 'lib-'.substr($org, 0, 32),
+                'type' => 'independent',
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+        }
+        $db->insert('gf_identity_memberships', [
+            'id' => Uuid::v7()->toRfc4122(),
+            'user_id' => $actor,
+            'organization_id' => $organization,
+            'role' => 'editor',
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+        $ownAsset = $this->addAsset($db, $organization, $actor);
+        $foreignAsset = $this->addAsset($db, $foreign, $actor);
+        return [$db, new AssetCollectionApplication($db), $actor, $organization, $foreign, $ownAsset, $foreignAsset];
+    }
+
+    private function addAsset(Connection $db, string $org, string $user): string
+    {
+        $id = Uuid::v7()->toRfc4122();
+        $db->insert('gf_vault_assets', [
+            'id' => $id,
+            'organization_id' => $org,
+            'uploaded_by' => $user,
+            'original_name' => 'synthetic.png',
+            'mime_type' => 'image/png',
+            'size_bytes' => 10,
+            'sha256' => hash('sha256', $id),
+            'storage_key' => Uuid::v7()->toRfc4122(),
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        return $id;
+    }
+}
