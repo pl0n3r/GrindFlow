@@ -82,7 +82,8 @@ class NextSecurityLockContractTests(unittest.TestCase):
         self.assertEqual(dev, APPROVED_DEV_DEPENDENCIES)
         self.assertEqual(self.lock["packages"][""]["devDependencies"], APPROVED_DEV_DEPENDENCIES)
         self.assertEqual(self.package["overrides"], APPROVED_OVERRIDES)
-        self.assertEqual(self.lock["packages"][""]["overrides"], APPROVED_OVERRIDES)
+        # npm lockfile v3 no almacena overrides en packages[""]:
+        # el manifiesto autorizado conserva esa fuente de verdad.
         self.assertEqual(self.lock["lockfileVersion"], 3)
         self.assertEqual(self.lock["packages"][""]["dependencies"], dependencies)
         self.assertEqual(self.lock["packages"][""]["devDependencies"], dev)
