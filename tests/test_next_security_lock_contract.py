@@ -11,6 +11,40 @@ NEXT_HASH = "sha512-F82CrlPZ8GRxBH9RIIoR3qU1t5RT3dv1K8moe8SjlDEquiFipvEI13R1Om90
 ENV_HASH = "sha512-WC5hvVqiuFOcRyz6gKPeJkiVvSMf3scNeAV49CdWtVqxmUlzh8UKR6YHt9yiNkh8LngtzqSlVz07/Ma3ZAzchA=="
 
 
+# Referencia independiente: manifiesto de main@0760bc1c previo al parche Next.js.
+# No se calcula desde el mismo package.json/package-lock que se está validando.
+APPROVED_NON_NEXT_DEPENDENCIES = {
+    "@aws-sdk/client-s3": "^3.708.0",
+    "@aws-sdk/s3-request-presigner": "^3.708.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.47.10",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "next-intl": "^4.9.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.6.0",
+    "tsx": "^4.23.13",
+    "zod": "^3.24.1",
+}
+APPROVED_DEV_DEPENDENCIES = {
+    "@eslint/eslintrc": "^3.2.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.1.3",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.11",
+}
+APPROVED_OVERRIDES = {
+    "postcss": "8.5.28",
+}
+
+
 class NextSecurityLockContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -35,10 +69,20 @@ class NextSecurityLockContractTests(unittest.TestCase):
             self.assertFalse((ROOT / name).is_symlink(), name)
         dependencies = self.package["dependencies"]
         dev = self.package["devDependencies"]
-        self.assertEqual(dependencies["react"], "^19.0.0")
-        self.assertEqual(dependencies["react-dom"], "^19.0.0")
-        self.assertEqual(dev["typescript"], "^5.7.2")
-        self.assertEqual(dev["eslint-config-next"], "^15.1.3")
+        # Una edición coincidente en manifest y lock ya no pasa: la baseline
+        # independiente incluye TODAS las dependencias fuera del bump Next.
+        non_next = {name: version for name, version in dependencies.items() if name != "next"}
+        lock_non_next = {
+            name: version
+            for name, version in self.lock["packages"][""]["dependencies"].items()
+            if name != "next"
+        }
+        self.assertEqual(non_next, APPROVED_NON_NEXT_DEPENDENCIES)
+        self.assertEqual(lock_non_next, APPROVED_NON_NEXT_DEPENDENCIES)
+        self.assertEqual(dev, APPROVED_DEV_DEPENDENCIES)
+        self.assertEqual(self.lock["packages"][""]["devDependencies"], APPROVED_DEV_DEPENDENCIES)
+        self.assertEqual(self.package["overrides"], APPROVED_OVERRIDES)
+        self.assertEqual(self.lock["packages"][""]["overrides"], APPROVED_OVERRIDES)
         self.assertEqual(self.lock["lockfileVersion"], 3)
         self.assertEqual(self.lock["packages"][""]["dependencies"], dependencies)
         self.assertEqual(self.lock["packages"][""]["devDependencies"], dev)

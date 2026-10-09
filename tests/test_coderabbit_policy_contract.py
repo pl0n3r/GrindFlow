@@ -25,6 +25,7 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
         cls.policy = json.loads((ROOT / ".github/factory-policy.json").read_text(encoding="utf-8"))
         cls.workflow = (ROOT / ".github/workflows/politica.yml").read_text(encoding="utf-8")
         cls.docs = (ROOT / "docs/AGENT-OPERATIONS.md").read_text(encoding="utf-8")
+        cls.governance = (ROOT / "docs/GOVERNANCE.md").read_text(encoding="utf-8")
         cls.decisions = json.loads((ROOT / "decisiones.yml").read_text(encoding="utf-8"))
 
     def test_factory_policy_requires_coderabbit(self) -> None:
@@ -72,23 +73,43 @@ class CodeRabbitPolicyContractTests(unittest.TestCase):
                 self.assertIn(expected, self.docs)
 
     def test_documented_factory_959_fallback_is_scoped_to_construction_only(self) -> None:
-        """La excepción global de capacidad no convierte rate-limit en review."""
-        for expected in (
-            "Factory #959",
-            "phase=construccion",
-            "datos.yml",
-            "retry OWNER",
-            "rate-limit exact-HEAD",
-            "Política Factory v1",
-            "hallazgos bloqueantes",
-            "CHANGES_REQUESTED",
-            "live",
-            "fase desconocida",
-            "revisión externa",
-            "un solo",
+        """Comprueba relaciones y mutaciones negativas dentro de la cláusula real."""
+        self.assertEqual(self.docs.count("5. Si CodeRabbit"), 1)
+        section = self.docs.split("5. Si CodeRabbit", 1)[1].split("6. No reinterpretar", 1)[0]
+        normalized = " ".join(section.split())
+        required = (
+            "**Factory #959**, exclusiva de `phase=construccion`",
+            "`datos.yml` de la BASE exacta",
+            "requiere rate-limit exact-HEAD del bot",
+            "fallo previo de `Política Factory v1`",
+            "un **retry OWNER**",
+            "todos los demás checks obligatorios terminales y verdes",
+            "cero `CHANGES_REQUESTED`, hilos abiertos o **hallazgos bloqueantes**",
+            "El check `Política Factory v1` debe terminar SUCCESS",
+            "En `live`, fase desconocida o cualquier otra fase el fallback está prohibido",
+        )
+
+        def policy_is_scoped(value: str) -> bool:
+            return all(fragment in value for fragment in required)
+
+        self.assertTrue(policy_is_scoped(normalized))
+        # Un test meramente lexical pasaría si se invirtiera la regla de live,
+        # se quitara el reintento o se ampliara la excepción a otra fase.
+        for changed in (
+            normalized.replace("exclusiva de `phase=construccion`", "aplicable en `live`", 1),
+            normalized.replace("un **retry OWNER**", "sin reintento", 1),
+            normalized.replace("el fallback está prohibido", "el fallback está permitido", 1),
+            normalized.replace("cero `CHANGES_REQUESTED`, hilos abiertos", "se toleran hilos abiertos", 1),
         ):
-            with self.subTest(expected=expected):
-                self.assertIn(expected, self.docs)
+            with self.subTest(changed=changed[-100:]):
+                self.assertFalse(policy_is_scoped(changed))
+
+        # La norma local histórica ya no debe exigir un permiso owner por PR
+        # adicional al fallback global posterior aprobado en Factory #959.
+        self.assertIn("Factory #959 no exige una autorización individual por PR", self.governance)
+        self.assertIn("En `live`, fase desconocida o cualquier fase distinta", self.governance)
+        self.assertIn("todos los demás", self.governance)
+        self.assertNotIn("Únicamente una autorización expresa del propietario para una PR concreta", self.governance)
 
     def test_owner_decision_b_is_recorded_without_changing_round_limit(self) -> None:
         self.assertEqual(self.decisions["review_round_limit"], 3)
