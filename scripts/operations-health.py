@@ -138,7 +138,12 @@ def _signal(raw: Any, *, main_sha: str) -> dict[str, Any]:
         raise OperationsHealthError("updated_at inválido.")
 
     if head_sha != main_sha:
-        state, freshness, reason = "UNKNOWN", "STALE", "head_sha_mismatch"
+        reason = (
+            "head_sha_mismatch_terminal_non_success"
+            if status == "completed" and conclusion != "success"
+            else "head_sha_mismatch"
+        )
+        state, freshness = "UNKNOWN", "STALE"
     elif status != "completed":
         state, freshness, reason = "UNKNOWN", "CURRENT", "run_not_terminal"
     elif conclusion == "success":

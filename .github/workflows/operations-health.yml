@@ -99,15 +99,8 @@ jobs:
                 end
               ' <<<"$payload" >> "$signals_jsonl"
             else
-              jq -nc --arg source "$source" '{
-                source: $source,
-                status: "missing",
-                conclusion: null,
-                head_sha: null,
-                run_id: null,
-                url: null,
-                updated_at: null
-              }' >> "$signals_jsonl"
+              echo "::error::Unable to query workflow $workflow ($source)" >&2
+              return 1
             fi
           }
 
@@ -150,6 +143,8 @@ jobs:
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      REPOSITORY: ${{ github.repository }}
       ALERT_TITLE: "[AUTO] GrindFlow Operations Status"
       REPORT_JSON: ${{ needs.observe.outputs.report }}
     steps:
@@ -164,8 +159,12 @@ jobs:
           jq -e '.state == "HEALTHY" or .state == "DEGRADED" or .state == "UNKNOWN"' "$report_file" >/dev/null
           jq -r '.alert.body' "$report_file" > "$body_file"
 
-          all_issues="$(gh issue list             --state all             --search "$ALERT_TITLE in:title"             --limit 100             --json number,state,title)"
-          matches="$(jq -c --arg title "$ALERT_TITLE"             '[.[] | select(.title == $title)]' <<<"$all_issues")"
+          all_issues="$(
+            gh api --paginate "repos/$REPOSITORY/issues?state=all&per_page=100" \
+              --jq '.[] | select(.pull_request == null) | {number, state, title}' |
+              jq -sc '.'
+          )"
+          matches="$(jq -c --arg title "$ALERT_TITLE" '[.[] | select(.title == $title)]' <<<"$all_issues")"
           count="$(jq 'length' <<<"$matches")"
           (( count <= 1 )) || {
             echo "::error::More than one canonical Operations Health Issue exists."

@@ -70,6 +70,17 @@ class OperationsHealthContractTests(unittest.TestCase):
         self.assertEqual(("UNKNOWN", "STALE"), (smoke["state"], smoke["freshness"]))
         self.assertEqual("UNKNOWN", stale_result["state"])
 
+        stale_failure = payload()
+        stale_failure["signals"][0]["head_sha"] = "b" * 40
+        stale_failure["signals"][0]["conclusion"] = "failure"
+        stale_failure_result = OPERATIONS.evaluate(stale_failure, main_sha=self.MAIN_SHA)
+        stale_smoke = next(
+            row for row in stale_failure_result["signals"]
+            if row["source"] == "production_smoke"
+        )
+        self.assertEqual(("UNKNOWN", "STALE"), (stale_smoke["state"], stale_smoke["freshness"]))
+        self.assertEqual("head_sha_mismatch_terminal_non_success", stale_smoke["reason"])
+
         missing = payload()
         missing["signals"][1] = {
             "source": "ci_health",
@@ -117,7 +128,9 @@ class OperationsHealthContractTests(unittest.TestCase):
         self.assertNotIn(secret, body)
 
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
-        self.assertIn("--state all", workflow)
+        self.assertIn('state=all&per_page=100', workflow)
+        self.assertIn("--paginate", workflow)
+        self.assertNotIn('--search "$ALERT_TITLE in:title"', workflow)
         self.assertIn("count <= 1", workflow)
         self.assertIn("gh issue reopen", workflow)
         self.assertNotIn("gh issue comment", workflow)
@@ -174,6 +187,9 @@ class OperationsHealthContractTests(unittest.TestCase):
         self.assertIn("schedule|workflow_dispatch", workflow)
         self.assertIn("scripts/operations-health.py evaluate", workflow)
         self.assertIn("gh api", workflow)
+        self.assertIn("Unable to query workflow", workflow)
+        self.assertIn("GH_REPO:", workflow)
+        self.assertIn("REPOSITORY:", workflow)
         self.assertIn("gh issue edit", workflow)
         self.assertIn("gh issue close", workflow)
         self.assertIn("RUNNER_TEMP", workflow)
