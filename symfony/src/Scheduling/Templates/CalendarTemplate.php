@@ -47,15 +47,19 @@ final class CalendarTemplate
             || preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $pattern['local_time']) !== 1
             || !is_array($pattern['weekdays']) || !array_is_list($pattern['weekdays'])
             || count($pattern['weekdays']) < 1 || count($pattern['weekdays']) > 7
-            || count(array_unique($pattern['weekdays'], SORT_REGULAR)) !== count($pattern['weekdays'])
             || !is_int($pattern['frequency_days']) || $pattern['frequency_days'] < 1
             || $pattern['frequency_days'] > 90) {
             throw new InvalidArgumentException('invalid_template_schedule');
         }
         foreach ($pattern['weekdays'] as $day) {
+            // Reject wrong types before numeric comparisons; array_unique on
+            // objects can emit PHP warnings instead of a controlled exception.
             if (!is_int($day) || $day < 1 || $day > 7) {
                 throw new InvalidArgumentException('invalid_template_weekdays');
             }
+        }
+        if (count(array_unique($pattern['weekdays'], SORT_NUMERIC)) !== count($pattern['weekdays'])) {
+            throw new InvalidArgumentException('invalid_template_weekdays');
         }
         if (!self::date($pattern['start_date'])
             || ($pattern['end_date'] !== null && (!self::date($pattern['end_date'])

@@ -83,6 +83,21 @@ $cases = [
             $bad[$field] = $invalid;
             rejects(static fn () => $template->apply($bad, ['tenant_id' => 't1', 'account_id' => 'a']));
         }
+        // Malformed weekday elements fail closed without PHP warning leakage.
+        set_error_handler(static function (int $severity, string $message): never {
+            throw new ErrorException($message, 0, $severity);
+        });
+        try {
+            foreach ([new stdClass(), [], false, '1', 1.0, null] as $invalidDay) {
+                $bad = pattern('account', 'a');
+                $bad['weekdays'] = [$invalidDay, 2];
+                rejects(static fn () => $template->apply($bad, [
+                    'tenant_id' => 't1', 'account_id' => 'a',
+                ]));
+            }
+        } finally {
+            restore_error_handler();
+        }
         $bad = pattern('account', 'a');
         $bad['timezone'] = 'Not/AZone';
         rejects(static fn () => $template->apply($bad, ['tenant_id' => 't1', 'account_id' => 'a']));
