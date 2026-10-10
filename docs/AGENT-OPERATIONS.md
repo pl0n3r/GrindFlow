@@ -125,7 +125,7 @@ Sonar verdes, por sí solos, NO sustituyen esa evidencia.
 
 1. Estabilizar el SHA final del PR y comprobar CI `GrindFlow CI / validate` y
    Sonar satisfactorios para ese SHA.
-2. Antes de ejecutar squash/merge, verificar una de estas dos evidencias sobre
+2. Antes de ejecutar squash/merge, verificar una de estas dos evidencias preferentes sobre
    el **HEAD exacto**:
    - una review formal sustantiva de `coderabbitai[bot]` registrada sobre ese
      SHA y sin `CHANGES_REQUESTED`; o
@@ -141,13 +141,24 @@ Sonar verdes, por sí solos, NO sustituyen esa evidencia.
    fusionar con hilos accionables abiertos ni cambios solicitados.
 4. Si cambia el HEAD, toda review/cobertura del SHA anterior deja de valer:
    volver a verificar CI/Sonar y obtener review formal o cobertura terminal
-   válida sobre el NUEVO SHA antes de fusionar. Verificar base/head de nuevo
+   válida sobre el NUEVO SHA, o satisfacer el fallback acotado de Factory #959
+   según el punto 5, antes de fusionar. Verificar base/head de nuevo
    para evitar carreras.
-5. Si CodeRabbit demora indefinidamente, falla, cancela o no entrega ninguna de
-   las dos evidencias finales válidas, **mantener el PR abierto y bloquear el
-   merge**; registrar el bloqueo y avanzar únicamente en trabajo independiente
-   seguro. No hay excepción automática por timeout, rate-limit, CI verde,
-   ausencia de findings ni presión de entrega.
+5. Si CodeRabbit demora indefinidamente, falla o cancela sin evidencia
+   suficiente, **mantener el PR abierto**. La única excepción de capacidad
+   es **Factory #959**, exclusiva de `phase=construccion` comprobada en
+   `datos.yml` de la BASE exacta: requiere rate-limit exact-HEAD del bot,
+   fallo previo de `Política Factory v1` sobre ese HEAD, un **retry OWNER**
+   posterior y verificable (o segundo comentario rate-limited posterior
+   conforme al contrato canónico), todos los demás checks obligatorios
+   terminales y verdes, y cero `CHANGES_REQUESTED`, hilos abiertos o
+   **hallazgos bloqueantes**. El check `Política Factory v1` debe terminar
+   SUCCESS con evidencia auditable del fallback exact-HEAD; un solo
+   rate-limit, timeout, CI verde o ausencia de findings nunca bastan.
+   En `live`, fase desconocida o cualquier otra fase el fallback está
+   prohibido: la revisión externa real vuelve a ser obligatoria antes de
+   fusionar. Nunca fabricar markers, forzar rondas cambiando HEAD ni
+   tratar una limitación de capacidad como review formal.
 6. No reinterpretar `mergeable=true` de GitHub como evidencia del gate de
    CodeRabbit. No registrar `CodeRabbit aprobado` ni `review completada` sin
    prueba explícita. Las demás puertas humanas, CI, Sonar y resolución de
@@ -162,10 +173,12 @@ genéricos en evidencia ni amplía autoridad.
 canónica del consumidor y exige `required_review_bot=coderabbitai[bot]`. El
 caller `.github/workflows/politica.yml` pasa explícitamente el mismo reviewer.
 Factory v1 valida una review sustantiva exact-head **o** la cobertura canónica
-`final_review_risk_coverage` exact-head del reviewer-bot requerido. Una review
-de otro SHA, `CHANGES_REQUESTED`, rate-limit, un check sin evidencia del bot o
-un comentario genérico no satisfacen la compuerta. `Política Factory v1` debe
-terminar en SUCCESS sobre el mismo SHA usado como evidencia.
+`final_review_risk_coverage` exact-head del reviewer-bot requerido, además del
+fallback excepcional de Factory #959 en `construccion` y bajo todas las guardas
+del punto 5. Una review de otro SHA, `CHANGES_REQUESTED`, un rate-limit
+aislado, un check sin evidencia suficiente o un comentario genérico no
+satisfacen la compuerta. `Política Factory v1` debe terminar en SUCCESS sobre
+el mismo SHA usado como evidencia; en `live` no aplica el fallback.
 
 ### Factory deploy paralelo y reversible
 

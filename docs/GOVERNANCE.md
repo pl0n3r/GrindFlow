@@ -53,20 +53,32 @@ El preflight valida el título PR; fast ejecuta comprobación de archivos, plant
 
 ## Compuerta de revisión CodeRabbit antes del merge
 
-**Obligatoria por decisión del propietario del 21/09/2026.** Un PR solo puede
-fusionarse después de contar, para su **head SHA final**, con CI agregado y
-Sonar aprobados **y** con evidencia de revisión CodeRabbit terminada. Revisar
-comentarios e hilos accionables; corregirlos y resolverlos. Una modificación
-de la rama reinicia las comprobaciones de ese head, incluida una nueva revisión
-final de CodeRabbit.
+**Obligatoria por decisión del propietario del 21/09/2026 y actualizada por
+GrindFlow #219 y Factory #959.** Para fusionar, cada PR debe tener CI agregado,
+Sonar y demás controles obligatorios terminales/verdes sobre el HEAD exacto,
+sin hallazgos CodeRabbit accionables abiertos. El camino preferente es una
+review formal sustantiva exact-HEAD de `coderabbitai[bot]` o el marker terminal
+`final_review_risk_coverage` de ese mismo bot y SHA; un cambio de HEAD invalida
+la evidencia previa.
 
-«Currently processing», una revisión pendiente/fallida o la ausencia de
-comentarios no habilitan el merge. Si el servicio no finaliza, dejar el PR
-abierto y documentar el bloqueo, sin convertir el timeout en excepción. No
-confundir una política en documentos con una protección automática de rama:
-un ruleset de GitHub solo se considera activo si se verifica en GitHub.
-Únicamente una autorización expresa del propietario para una PR concreta
-puede tratarse como excepción documentada.
+«Currently processing», silencio, un timeout o un único rate-limit no habilitan
+el merge. La única excepción de capacidad posterior es **Factory #959**, ya
+autorizada de forma general por el propietario y limitada a
+`phase=construccion` según `datos.yml` de la base exacta: exige rate-limit
+CodeRabbit sobre el HEAD exacto, fallo previo de la política y `retry OWNER`
+verificable (o segundo rate-limit posterior conforme al kit), todos los demás
+checks obligatorios en SUCCESS y cero `CHANGES_REQUESTED`, hallazgos o hilos
+accionables abiertos. También exige `Política Factory v1` terminal SUCCESS
+sobre ese HEAD y constancia auditable de que la revisión externa no estuvo
+disponible. Factory #959 no exige una autorización individual por PR cuando
+estas condiciones estrictas están satisfechas; para cualquier otra excepción
+se conserva la autorización expresa del propietario para el PR concreto.
+
+En `live`, fase desconocida o cualquier fase distinta de `construccion`, el
+fallback de Factory #959 está prohibido: se exige revisión externa real.
+Ningún workflow o documentación sustituye la comprobación real de un ruleset
+GitHub. La regla operacional detallada está en
+[AGENT-OPERATIONS.md](AGENT-OPERATIONS.md).
 
 Caso que motivó el cambio: PR #72 se fusionó mientras CodeRabbit continuaba
 procesando. Véase el procedimiento operativo en [AGENTS.md](../AGENTS.md).
