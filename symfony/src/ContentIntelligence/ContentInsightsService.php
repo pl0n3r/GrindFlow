@@ -212,7 +212,7 @@ final class ContentInsightsService
         int $restHours = 0,
     ): array {
         $this->assertTenant($tenantId, $asset);
-        if (preg_match('/\A[a-z][a-z0-9_-]{1,31}\z/D', $network) !== 1) {
+        if (preg_match('/\A[a-z][a-z0-9_-]{0,31}\z/D', $network) !== 1) {
             throw new \InvalidArgumentException('Red inválida.');
         }
         if ($recentUses < 0 || $restHours < 0) {
@@ -280,7 +280,7 @@ final class ContentInsightsService
     /** @return list<string> */
     private function normalizeTags(mixed $input): array
     {
-        if (!is_array($input) || count($input) > 16) {
+        if (!is_array($input) || !array_is_list($input) || count($input) > 16) {
             throw new \InvalidArgumentException('Etiquetas inválidas.');
         }
         $tags = [];

@@ -31,6 +31,8 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertNotIn("$tags[$tag] = true;", SERVICE)
         self.assertIn("public function testNumericTagsRetainStringsAfterConfirmation", PHP_TEST)
         self.assertIn("JSON_UNESCAPED_UNICODE", PHP_TEST)
+        self.assertIn("!array_is_list($input)", SERVICE)
+        self.assertIn("testTagListsRejectAssociativeShapeAndKeepStringIds", PHP_TEST)
         self.test_real_php_cli_offline_classification_score_and_fatigue()
 
     def test_search_intersects_text_tags_and_metadata_tenant_safely(self) -> None:
@@ -56,6 +58,7 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("public function testSearchIntersectsTextTagsMetadataAndTenant", PHP_TEST)
         self.assertIn("self::assertNotContains('private-foreign', $result)", PHP_TEST)
         # AC-02 debe ejecutar el servicio PHP real, no aceptar solo grep del código.
+        self.assertIn("testTagListsRejectAssociativeShapeAndKeepStringIds", PHP_TEST)
         self.test_real_php_cli_offline_smoke_for_numeric_tags_and_paginated_search()
 
     def test_score_components_deterministic_explainable_per_network(self) -> None:
@@ -67,6 +70,8 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("'base_score' => $base", SERVICE)
         self.assertIn("public function testScoreIsDeterministicExplainablePerNetwork", PHP_TEST)
         self.assertIn("self::assertSame($first, $second);", PHP_TEST)
+        self.assertIn("{0,31}", SERVICE)
+        self.assertIn("testNetworkSlugXAndInvalidIdentifiers", PHP_TEST)
         self.test_real_php_cli_offline_classification_score_and_fatigue()
 
     def test_fatigue_reduces_priority_without_expiry_and_recovers(self) -> None:
@@ -96,6 +101,16 @@ $confirmed = $service->confirmSuggestion('tenant-a', $asset, [
 ], true);
 $signals = ['performance' => 80, 'fit' => 70, 'freshness' => 90, 'saturation' => 30];
 $normal = $service->score('tenant-a', $asset, 'instagram', $signals);
+$x = $service->score('tenant-a', $asset, 'x', $signals);
+$invalidNetworkDenied = 0;
+foreach (['', 'X', 'x/', str_repeat('z', 33)] as $badNetwork) {
+    try {
+        $service->score('tenant-a', $asset, $badNetwork, $signals);
+    } catch (\InvalidArgumentException $exception) {
+        ++$invalidNetworkDenied;
+    }
+}
+
 $same = $service->score('tenant-a', $asset, 'instagram', $signals);
 $tired = $service->score('tenant-a', $asset, 'instagram', $signals, 3, 0);
 $rested = $service->score('tenant-a', $asset, 'instagram', $signals, 3, 72);
@@ -129,6 +144,9 @@ echo json_encode([
     'confirmed_tags' => $confirmed['content_tags'],
     'original_tags' => $asset['content_tags'],
     'confirmed_expired' => $confirmed['expired'],
+    'single_network' => $x['network'],
+    'single_network_score' => $x['base_score'],
+    'invalid_network_count' => $invalidNetworkDenied,
     'score_deterministic' => $normal === $same,
     'base_score' => $normal['base_score'],
     'network' => $normal['network'],
@@ -164,6 +182,9 @@ echo json_encode([
         self.assertEqual(data["original_tags"], ["Original"])
         self.assertTrue(data["confirmed_expired"])
         self.assertTrue(data["score_deterministic"])
+        self.assertEqual(data["single_network"], "x")
+        self.assertEqual(data["single_network_score"], 77)
+        self.assertEqual(data["invalid_network_count"], 4)
         self.assertEqual(data["network"], "instagram")
         self.assertEqual(data["components"], {
             "performance": 80, "fit": 70, "freshness": 90, "saturation": 30,
@@ -214,6 +235,28 @@ try {
 } catch (\InvalidArgumentException $e) {
     $invalidCursorDenied = true;
 }
+$associativeConfirmationDenied = false;
+try {
+    $service->confirmSuggestion('tenant-a', $asset, [
+        'category' => 'image', 'tags' => ['unexpected' => 'marca'],
+    ], true);
+} catch (\InvalidArgumentException $e) {
+    $associativeConfirmationDenied = true;
+}
+$associativeSearchDenied = false;
+try {
+    $service->searchPage('tenant-a', [$asset], '', ['unexpected' => 'marca']);
+} catch (\InvalidArgumentException $e) {
+    $associativeSearchDenied = true;
+}
+$associativeAssetDenied = false;
+try {
+    $badAsset = $asset;
+    $badAsset['content_tags'] = ['unexpected' => 'marca'];
+    $service->searchPage('tenant-a', [$badAsset]);
+} catch (\InvalidArgumentException $e) {
+    $associativeAssetDenied = true;
+}
 $intTagDenied = false;
 try {
     $service->confirmSuggestion('tenant-a', $asset, ['category' => 'image', 'tags' => [2026]], true);
@@ -232,6 +275,9 @@ echo json_encode([
     'legacy_count' => count($service->search('tenant-a', $assets, 'campaña', ['2026'], ['campaign' => 'música'])),
     'numeric_ids' => $service->searchPage('tenant-a', [$asset], '', ['MÚSICA'])['ids'],
     'foreign_cursor_denied' => $invalidCursorDenied,
+    'associative_confirmation_denied' => $associativeConfirmationDenied,
+    'associative_search_denied' => $associativeSearchDenied,
+    'associative_asset_denied' => $associativeAssetDenied,
     'integer_tag_denied' => $intTagDenied,
 ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 '''
@@ -255,6 +301,9 @@ echo json_encode([
         self.assertEqual(data["numeric_ids"], ["42"])
         self.assertTrue(data["foreign_cursor_denied"])
         self.assertTrue(data["integer_tag_denied"])
+        self.assertTrue(data["associative_confirmation_denied"])
+        self.assertTrue(data["associative_search_denied"])
+        self.assertTrue(data["associative_asset_denied"])
 
     def test_fake_is_offline_and_does_not_publish(self) -> None:
         for forbidden in ("HttpClient", "curl_", "file_get_contents(", "shell_exec(", "proc_open(", "publish(", "https://", "http://"):

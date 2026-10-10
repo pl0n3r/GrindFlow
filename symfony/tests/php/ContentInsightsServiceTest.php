@@ -75,6 +75,58 @@ final class ContentInsightsServiceTest extends TestCase
         }
     }
 
+    public function testTagListsRejectAssociativeShapeAndKeepStringIds(): void
+    {
+        $asset = self::asset();
+        $baseline = $asset;
+        $valid = $this->service->confirmSuggestion('tenant-a', $asset, [
+            'category' => 'image', 'tags' => ['2026', '42'],
+        ], true);
+        self::assertSame(['2026', '42'], $valid['content_tags']);
+        $empty = $this->service->confirmSuggestion('tenant-a', $asset, [
+            'category' => 'image', 'tags' => [],
+        ], true);
+        self::assertSame([], $empty['content_tags']);
+        self::assertSame($baseline, $asset, 'La confirmación no muta el original.');
+
+        foreach ([
+            fn () => $this->service->confirmSuggestion('tenant-a', $asset, [
+                'category' => 'image', 'tags' => ['unexpected' => 'marca'],
+            ], true),
+            fn () => $this->service->searchPage('tenant-a', [$asset], '', [
+                'unexpected' => 'marca',
+            ]),
+            fn () => $this->service->searchPage('tenant-a', [
+                [...$asset, 'content_tags' => ['unexpected' => 'marca']],
+            ]),
+        ] as $case) {
+            try {
+                $case();
+                self::fail('La lista asociativa no puede pasar el contrato.');
+            } catch (\InvalidArgumentException $expected) {
+                self::assertSame('Etiquetas inválidas.', $expected->getMessage());
+            }
+        }
+    }
+
+    public function testNetworkSlugXAndInvalidIdentifiers(): void
+    {
+        $signals = ['performance' => 80, 'fit' => 70, 'freshness' => 90, 'saturation' => 30];
+        $asset = self::asset();
+        $x = $this->service->score('tenant-a', $asset, 'x', $signals);
+        self::assertSame('x', $x['network']);
+        self::assertSame(77, $x['base_score']);
+        self::assertFalse($x['publication_authorized']);
+        foreach (['', 'X', 'x/', str_repeat('z', 33)] as $invalid) {
+            try {
+                $this->service->score('tenant-a', $asset, $invalid, $signals);
+                self::fail('El slug inválido no puede puntuarse.');
+            } catch (\InvalidArgumentException $expected) {
+                self::assertSame('Red inválida.', $expected->getMessage());
+            }
+        }
+    }
+
     public function testSearchIntersectsTextTagsMetadataAndTenant(): void
     {
         $a = self::asset();
