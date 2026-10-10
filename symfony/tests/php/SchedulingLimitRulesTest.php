@@ -22,6 +22,11 @@ $cases = [
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z')], 30)->reason === 'min_separation', 'same account');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z', account: 'account-2')], 30)->permitted, 'different account');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z', tenant: 'tenant-2')], 30)->permitted, 'different tenant');
+        check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z', network: 'instagram')], 30)->permitted, 'different network');
+        $cancelled = slot('2026-10-10T11:45:00Z'); $cancelled['status'] = 'cancelled';
+        check($rule->evaluate(slot($time), [$cancelled], 30)->permitted, 'cancelled does not block');
+        $invalid = slot('2026-10-10T11:45:00Z'); $invalid['status'] = 'unknown';
+        check($rule->evaluate(slot($time), [$invalid], 30)->reason === 'invalid_input', 'unrecognized status fails closed');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:30:00Z')], 30)->permitted, 'exact boundary');
         check($rule->evaluate(slot($time), [slot('invalid')], 30)->reason === 'invalid_input', 'invalid existing slot');
     },

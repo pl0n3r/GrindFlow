@@ -24,10 +24,12 @@ final class MinimumSeparationRule
             }
             $otherScope = LimitDecision::scope($row);
             $other = LimitDecision::instant($row['scheduled_at_utc'] ?? null);
-            if ($otherScope === null || $other === null) {
+            $status = $row['status'] ?? 'scheduled';
+            if ($otherScope === null || $other === null || !in_array($status, ['scheduled', 'queued', 'draft', 'cancelled'], true)) {
                 return LimitDecision::deny('invalid_input');
             }
-            if ($scope === $otherScope && abs($at->getTimestamp() - $other->getTimestamp()) < $minimumMinutes * 60) {
+            if ($scope === $otherScope && $status !== 'cancelled'
+                && abs($at->getTimestamp() - $other->getTimestamp()) < $minimumMinutes * 60) {
                 return LimitDecision::deny('min_separation');
             }
         }
