@@ -69,6 +69,24 @@ final class PreviewPauseScenario
             self::check(GlobalPauseState::canRun($initial));
             $paused = GlobalPauseState::transition($initial, 'pause', 'maintenance', 100);
             self::check(!GlobalPauseState::canRun($paused) && GlobalPauseState::canRun($initial));
+            // JSON object key order is not authoritative: both levels of a
+            // validated state can be reserialized without granting a resume.
+            $orderedDifferently = array_reverse($paused, true);
+            $orderedDifferently['audit'][0] = array_reverse($paused['audit'][0], true);
+            self::check(!GlobalPauseState::canRun($orderedDifferently));
+            $reorderedInitial = array_reverse($initial, true);
+            self::check(GlobalPauseState::canRun($reorderedInitial));
+            $reorderedResumed = GlobalPauseState::transition(
+                $orderedDifferently, 'resume', 'recovered', 101
+            );
+            self::check(GlobalPauseState::canRun($reorderedResumed)
+                && $reorderedResumed['revision'] === 2);
+            $unexpectedState = $orderedDifferently;
+            $unexpectedState['authority'] = true;
+            self::denies(static fn() => GlobalPauseState::canRun($unexpectedState));
+            $missingState = $orderedDifferently;
+            unset($missingState['agenda_sha256']);
+            self::denies(static fn() => GlobalPauseState::canRun($missingState));
             $resumed = GlobalPauseState::transition($paused, 'resume', 'recovered', 101);
             self::check(GlobalPauseState::canRun($resumed) && $resumed['revision'] === 2);
             self::check(GlobalPauseState::agendaUnchanged($resumed, $base));

@@ -58,7 +58,7 @@ final class GlobalPauseState
     private static function validate(array $state): void
     {
         $fields = ['version', 'paused', 'revision', 'agenda_sha256', 'audit'];
-        if (array_keys($state) !== $fields || $state['version'] !== 1
+        if (!self::hasExactKeys($state, $fields) || $state['version'] !== 1
             || !is_bool($state['paused']) || !is_int($state['revision'])
             || $state['revision'] < 0 || !is_string($state['agenda_sha256'])
             || preg_match('/^[a-f0-9]{64}$/D', $state['agenda_sha256']) !== 1
@@ -70,7 +70,7 @@ final class GlobalPauseState
         $last = 0;
         foreach ($state['audit'] as $index => $event) {
             if (!is_array($event)
-                || array_keys($event) !== ['revision', 'action', 'reason_code', 'at']
+                || !self::hasExactKeys($event, ['revision', 'action', 'reason_code', 'at'])
                 || $event['revision'] !== $index + 1
                 || $event['action'] !== ($index % 2 === 0 ? 'pause' : 'resume')
                 || !in_array($event['action'], ['pause', 'resume'], true)
@@ -83,6 +83,13 @@ final class GlobalPauseState
         if ($state['audit'] !== [] && $state['paused'] !== (end($state['audit'])['action'] === 'pause')) {
             throw new InvalidArgumentException('invalid_pause_state');
         }
+    }
+
+    /** Associative JSON objects have no canonical field order; unknown keys still deny. */
+    private static function hasExactKeys(array $value, array $expected): bool
+    {
+        return count($value) === count($expected)
+            && array_diff_key($value, array_fill_keys($expected, true)) === [];
     }
 
     private static function digest(array $agenda): string
