@@ -162,6 +162,12 @@ final class LibraryCollectionsTest extends KernelTestCase
             $library->attachAsset($org, $actor, $collection, $foreignAsset)['status']);
         self::assertSame('missing',
             $library->linkVariant($org, $actor, $ownAsset, $foreignAsset, 'network')['status']);
+
+        // Mixed-case UUID aliases must not bypass tenant-scoped asset checks.
+        self::assertSame('missing',
+            $library->attachAsset($org, $actor, strtoupper($collection), strtoupper($foreignAsset))['status']);
+        self::assertSame('missing',
+            $library->linkVariant($org, $actor, strtoupper($ownAsset), strtoupper($foreignAsset), 'network')['status']);
         self::assertSame('forbidden',
             $library->createCollection($foreignOrg, $actor)['status']);
         self::assertSame('missing',
