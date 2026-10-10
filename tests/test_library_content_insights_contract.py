@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import re
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,6 +74,80 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("self::assertTrue($expiredAsset['expired']", PHP_TEST)
         self.assertIn("public function testFatigueDropsPriorityWithoutExpiryAndRecovers", PHP_TEST)
         self.assertIn("self::assertSame($normal['priority'], $rested['priority']);", PHP_TEST)
+
+    def test_real_php_cli_offline_smoke_for_numeric_tags_and_paginated_search(self) -> None:
+        """Ejecuta el servicio real con PHP, sin Composer, red ni base de datos."""
+        php = r'''require 'symfony/src/ContentIntelligence/ContentInsightsService.php';
+$service = new \GrindFlow\ContentIntelligence\ContentInsightsService();
+$asset = [
+    'id' => '42', 'tenant_id' => 'tenant-a',
+    'original_name' => 'CAMPAÑA.JPG', 'title' => 'MÚSICA',
+    'description' => 'Prueba sintética', 'content_tags' => ['MÚSICA'],
+    'mime_type' => 'image/jpeg', 'usage_scope' => 'internal_only',
+    'campaign' => 'MÚSICA',
+];
+$copy = $service->confirmSuggestion('tenant-a', $asset, [
+    'category' => 'image', 'tags' => ['2026', '42', '0', '2026', 'MÚSICA'],
+], true);
+$assets = [];
+for ($i = 101; $i >= 1; --$i) {
+    $entry = $copy;
+    $entry['id'] = sprintf('asset-%03d', $i);
+    $assets[] = $entry;
+}
+$foreign = $copy;
+$foreign['tenant_id'] = 'tenant-b';
+$foreign['id'] = 'private-foreign';
+$assets[] = $foreign;
+$first = $service->searchPage('tenant-a', $assets, 'campaña', ['2026'], ['campaign' => 'música']);
+$second = $service->searchPage('tenant-a', $assets, 'campaña', ['2026'], ['campaign' => 'música'], $first['next_cursor']);
+$invalidCursorDenied = false;
+try {
+    $service->searchPage('tenant-a', $assets, 'campaña', ['2026'], ['campaign' => 'música'], 'private-foreign');
+} catch (\InvalidArgumentException $e) {
+    $invalidCursorDenied = true;
+}
+$intTagDenied = false;
+try {
+    $service->confirmSuggestion('tenant-a', $asset, ['category' => 'image', 'tags' => [2026]], true);
+} catch (\InvalidArgumentException $e) {
+    $intTagDenied = true;
+}
+echo json_encode([
+    'tags' => $copy['content_tags'],
+    'original_tags' => $asset['content_tags'],
+    'first_count' => count($first['ids']),
+    'first_initial' => $first['ids'][0] ?? null,
+    'first_last' => $first['ids'][99] ?? null,
+    'has_more' => $first['has_more'],
+    'cursor' => $first['next_cursor'],
+    'second' => $second,
+    'legacy_count' => count($service->search('tenant-a', $assets, 'campaña', ['2026'], ['campaign' => 'música'])),
+    'numeric_ids' => $service->searchPage('tenant-a', [$asset], '', ['MÚSICA'])['ids'],
+    'foreign_cursor_denied' => $invalidCursorDenied,
+    'integer_tag_denied' => $intTagDenied,
+], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+'''
+        result = subprocess.run(
+            ["php", "-r", php], cwd=ROOT, capture_output=True,
+            text=True, timeout=10, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertEqual(data["tags"], ["2026", "42", "0", "música"])
+        self.assertEqual(data["original_tags"], ["MÚSICA"])
+        self.assertEqual(data["first_count"], 100)
+        self.assertEqual(data["first_initial"], "asset-001")
+        self.assertEqual(data["first_last"], "asset-100")
+        self.assertTrue(data["has_more"])
+        self.assertEqual(data["cursor"], "asset-100")
+        self.assertEqual(data["second"], {
+            "ids": ["asset-101"], "has_more": False, "next_cursor": None,
+        })
+        self.assertEqual(data["legacy_count"], 100)
+        self.assertEqual(data["numeric_ids"], ["42"])
+        self.assertTrue(data["foreign_cursor_denied"])
+        self.assertTrue(data["integer_tag_denied"])
 
     def test_fake_is_offline_and_does_not_publish(self) -> None:
         for forbidden in ("HttpClient", "curl_", "file_get_contents(", "shell_exec(", "proc_open(", "publish(", "https://", "http://"):
