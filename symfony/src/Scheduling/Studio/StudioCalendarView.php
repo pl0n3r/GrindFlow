@@ -43,6 +43,16 @@ final class StudioCalendarView
             $items[] = ['creator_id' => $slot['creator_id'], 'slot_id' => $slot['slot_id'],
                 'day' => $slot['day'], 'state' => $slot['state']];
         }
+        // Stable global calendar independent of provider result ordering.
+        usort($items, static function (array $left, array $right): int {
+            foreach (['day', 'creator_id', 'slot_id'] as $field) {
+                $comparison = strcmp($left[$field], $right[$field]);
+                if ($comparison !== 0) {
+                    return $comparison;
+                }
+            }
+            return 0;
+        });
         return ['status' => 'ok', 'total' => count($items), 'by_creator' => $visible,
             'slots' => $items, 'execution_performed' => false];
     }

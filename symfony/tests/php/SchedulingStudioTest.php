@@ -73,6 +73,20 @@ $tests = [
             'authorized_aggregation');
         check($v->aggregate('tenant_1', ['creator_1'], [array_reverse(slot('s6'), true)])['status']
             === 'ok', 'reordered_slot_fields');
+        // The global view must not depend on query row order, including IDs
+        // such as "01" and "1" that PHP might compare as equal numerically.
+        $late = slot('slot_b', 'creator_2');
+        $late['day'] = '2026-10-13';
+        $unsorted = [$late, slot('1', 'creator_2'), slot('slot_c'),
+            slot('01', 'creator_2'), slot('slot_a')];
+        $global = $v->aggregate('tenant_1', ['creator_1', 'creator_2'], $unsorted);
+        $reverse = $v->aggregate('tenant_1', ['creator_1', 'creator_2'], array_reverse($unsorted));
+        check($global['status'] === 'ok' && $global['total'] === 5
+            && $global['slots'] === $reverse['slots']
+            && $global['by_creator'] === $reverse['by_creator']
+            && array_column($global['slots'], 'slot_id')
+                === ['slot_a', 'slot_c', '01', '1', 'slot_b'],
+            'calendar_order_is_deterministic_by_day_creator_and_id');
         $foreign = slot('s3'); $foreign['tenant_id'] = 'tenant_2';
         check($v->aggregate('tenant_1', ['creator_1'], [$foreign])['status'] === 'blocked', 'foreign_tenant');
         check($v->aggregate('tenant_1', ['creator_1'], [slot('s4', 'creator_2')])['status'] === 'blocked', 'foreign_creator');

@@ -10,8 +10,10 @@ independiente puede aportar sus tres reglas sin tener equipo/Studio.
 
 `StudioCalendarView` recibe de un futuro adaptador autorizado una allowlist de
 creadores y sus slots. Rechaza evidencias incompletas, identidades ajenas,
-slots duplicados, estados y fechas inválidos. Solo devuelve IDs, estados y
-conteos; no entrega PII. `TeamCapacityAnalyzer` agrupa trabajo por persona y
+slots duplicados, estados y fechas inválidos. Los slots globales se ordenan
+establemente por día, creador y ID de slot, independientemente del orden de
+consulta (comparación lexicográfica literal de IDs, incluidos `01` y `1`).
+Solo devuelve IDs, estados y conteos; no entrega PII. `TeamCapacityAnalyzer` agrupa trabajo por persona y
 día, conserva separación entre preparación/aprobación, desglosa los cuellos de
 botella por IDs de creador y señala exceso sobre capacidad. El desglose se
 ordena de forma estable y no identifica personas fuera de la evidencia autorizada. Sin miembros ni tareas devuelve un resumen independiente válido.
