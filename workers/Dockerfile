@@ -5,7 +5,8 @@
 # serverless: transcodificar un video de media hora excede cualquier limite de
 # ejecucion de ese modelo.
 
-FROM python:3.11-slim
+# Docker Official Image publicada por Docker via ECR Public; evita cuota/auth de Docker Hub en CI.
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 # ffmpeg para video; las libs de imagen las necesita Pillow para JPEG y WEBP.
 # --no-install-recommends evita arrastrar medio escritorio como dependencia.
