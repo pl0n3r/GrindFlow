@@ -38,21 +38,67 @@ final class MinimalReschedulePlanner
         });
 
         $windows = new FlexibleWindow();
+        // Winners and already-unique slots are immutable. Compute all loser
+        // options first so a flexible loser cannot steal another's only slot.
+        $locked = array_fill_keys($occupied, true);
+        $choices = [];
         foreach ($losers as $id) {
             $item = $byId[$id];
-            $candidate = $windows->choose(
-                $item['window'], $item['scheduled_at_utc'], $occupied
-            );
-            if ($candidate === null) {
+            $choices[$id] = array_values(array_filter(
+                $windows->candidates($item['window'], $item['scheduled_at_utc']),
+                static fn (string $instant): bool => !isset($locked[$instant])
+            ));
+            if ($choices[$id] === []) {
                 throw new DomainException('no_safe_slot');
             }
-            $occupied[] = $candidate;
+        }
+        // Maximum bipartite matching via bounded augmenting paths. Each
+        // loser moves once; no winner or initially unique slot is modified.
+        $slotOwners = [];
+        $assignments = [];
+        foreach ($losers as $id) {
+            $seen = [];
+            if (!self::assignSlot($id, $choices, $slotOwners, $assignments, $seen)) {
+                throw new DomainException('no_safe_slot');
+            }
+        }
+        foreach ($losers as $id) {
             $output[$id] = [
-                'id' => $id, 'scheduled_at_utc' => $candidate, 'moved' => true
+                'id' => $id, 'scheduled_at_utc' => $assignments[$id], 'moved' => true
             ];
         }
 
         ksort($output, SORT_STRING);
         return array_values($output);
+    }
+
+    /**
+     * Bounded augmenting path: if a candidate is owned by an earlier loser,
+     * move that loser to another allowed slot before declaring no_safe_slot.
+     * @param array<string, list<string>> $choices
+     * @param array<string, string> $slotOwners
+     * @param array<string, string> $assignments
+     * @param array<string, bool> $seen
+     */
+    private static function assignSlot(
+        string $id,
+        array $choices,
+        array &$slotOwners,
+        array &$assignments,
+        array &$seen
+    ): bool {
+        foreach ($choices[$id] as $instant) {
+            if (isset($seen[$instant])) {
+                continue;
+            }
+            $seen[$instant] = true;
+            if (!isset($slotOwners[$instant])
+                || self::assignSlot($slotOwners[$instant], $choices, $slotOwners, $assignments, $seen)) {
+                $slotOwners[$instant] = $id;
+                $assignments[$id] = $instant;
+                return true;
+            }
+        }
+        return false;
     }
 }
