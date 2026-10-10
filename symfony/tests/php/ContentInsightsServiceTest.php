@@ -222,6 +222,20 @@ final class ContentInsightsServiceTest extends TestCase
         self::assertSame($signals, $first['components']);
         self::assertSame(77, $first['base_score']);
         self::assertFalse($first['publication_authorized']);
+        // Un metric desconocido no puede ser ignorado silenciosamente.
+        $shuffled = array_reverse($signals, true);
+        self::assertSame($first, $this->service->score('tenant-a', $a, 'instagram', $shuffled));
+        foreach ([
+            [...$signals, 'extra_metric' => 100],
+            ['performance' => 80, 'fit' => 70, 'freshness' => 90],
+        ] as $invalidSignals) {
+            try {
+                $this->service->score('tenant-a', $a, 'instagram', $invalidSignals);
+                self::fail('Score debe rechazar métricas adicionales o ausentes.');
+            } catch (\InvalidArgumentException $expected) {
+                self::assertSame('Componentes de score inválidos.', $expected->getMessage());
+            }
+        }
         $other = $this->service->score('tenant-a', $a, 'facebook', [
             'performance' => 0, 'fit' => 0, 'freshness' => 0, 'saturation' => 100,
         ]);

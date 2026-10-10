@@ -218,8 +218,13 @@ final class ContentInsightsService
         if ($recentUses < 0 || $restHours < 0) {
             throw new \InvalidArgumentException('Métricas de uso inválidas.');
         }
+        $allowedSignals = ['performance', 'fit', 'freshness', 'saturation'];
+        if (count($signals) !== count($allowedSignals)
+            || array_diff(array_keys($signals), $allowedSignals) !== []) {
+            throw new \InvalidArgumentException('Componentes de score inválidos.');
+        }
         $components = [];
-        foreach (['performance', 'fit', 'freshness', 'saturation'] as $key) {
+        foreach ($allowedSignals as $key) {
             $value = $signals[$key] ?? null;
             if (!is_int($value) || $value < 0 || $value > 100) {
                 throw new \InvalidArgumentException('Componente de score inválido: '.$key);

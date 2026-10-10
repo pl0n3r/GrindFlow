@@ -305,6 +305,37 @@ echo json_encode([
         self.assertTrue(data["associative_search_denied"])
         self.assertTrue(data["associative_asset_denied"])
 
+    def test_unknown_score_signals_fail_closed_in_real_php(self) -> None:
+        """AC-03: no aceptar una métrica desconocida como si se hubiera puntuado."""
+        php = r'''require 'symfony/src/ContentIntelligence/ContentInsightsService.php';
+$service = new \GrindFlow\ContentIntelligence\ContentInsightsService();
+$asset = ['id' => 'asset-1', 'tenant_id' => 'tenant-a'];
+$signals = ['performance' => 80, 'fit' => 70, 'freshness' => 90, 'saturation' => 30];
+$baseline = $service->score('tenant-a', $asset, 'instagram', $signals);
+$reordered = $service->score('tenant-a', $asset, 'instagram', array_reverse($signals, true));
+$bad = [];
+foreach ([array_merge($signals, ['extra_metric' => 100]),
+    ['performance' => 80, 'fit' => 70, 'freshness' => 90]] as $candidate) {
+    try {
+        $service->score('tenant-a', $asset, 'instagram', $candidate);
+        $bad[] = false;
+    } catch (\InvalidArgumentException $e) {
+        $bad[] = $e->getMessage() === 'Componentes de score inválidos.';
+    }
+}
+echo json_encode(['reordered_same' => $baseline === $reordered,
+    'rejected' => $bad, 'publication' => $baseline['publication_authorized']],
+    JSON_THROW_ON_ERROR);
+'''
+        result = subprocess.run(["php", "-r", php], cwd=ROOT,
+                                text=True, capture_output=True,
+                                check=False, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertTrue(data["reordered_same"])
+        self.assertEqual([True, True], data["rejected"])
+        self.assertFalse(data["publication"])
+
     def test_fake_is_offline_and_does_not_publish(self) -> None:
         for forbidden in ("HttpClient", "curl_", "file_get_contents(", "shell_exec(", "proc_open(", "publish(", "https://", "http://"):
             self.assertNotIn(forbidden, SERVICE)
