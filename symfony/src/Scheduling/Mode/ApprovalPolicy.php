@@ -26,6 +26,13 @@ final class ApprovalPolicy
             return self::result('invalid');
         }
         $roles = $request['required_roles'];
+        // Reject untrusted nested/non-string roles before array_diff string casts.
+        // An array/object role must fail closed without PHP warnings or TypeErrors.
+        foreach ($roles as $role) {
+            if (!is_string($role) || !in_array($role, self::ROLES, true)) {
+                return self::result('invalid');
+            }
+        }
         if (count(array_unique($roles, SORT_REGULAR)) !== count($roles)
             || array_diff($roles, self::ROLES) !== []
             || ($request['profile'] === 'individual' && ($roles !== [] && $roles !== ['owner']))

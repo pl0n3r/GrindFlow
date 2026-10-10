@@ -14,7 +14,7 @@ confirmed es una afirmación del llamador: la función no valida sesión, CSRF, 
 
 ## Aprobación individual y Studio
 
-ApprovalPolicy::decide(request, responses, now) devuelve approved, status (invalid, expired, not_required, pending, rejected, approved), roles pendientes y auditoría mínima de **rol, decisión y timestamp**, sin IDs de personas ni texto externo. La petición y cada respuesta deben pertenecer al mismo tenant y creador. La evaluación es fail-closed con entradas inesperadas, miembros duplicados, roles fuera de alcance, expiración o rol sin prueba de autorización. Una denegación vence incluso con otros roles aprobados.
+ApprovalPolicy::decide(request, responses, now) devuelve approved, status (invalid, expired, not_required, pending, rejected, approved), roles pendientes y auditoría mínima de **rol, decisión y timestamp**, sin IDs de personas ni texto externo. La petición y cada respuesta deben pertenecer al mismo tenant y creador. La evaluación es fail-closed con entradas inesperadas, miembros duplicados, roles fuera de alcance, expiración o rol sin prueba de autorización. Los roles anidados/no-string se rechazan antes de las comparaciones PHP de conjuntos, sin avisos ni excepciones por conversión de tipos. Una denegación vence incluso con otros roles aprobados.
 
 - **Independiente:** aprobación propia opcional; cuando se exige, únicamente rol owner verificado.
 - **Studio:** siempre necesita al menos un rol configurado y **todos** sus roles exigidos (owner, editor, producer, reviewer) deben aprobar antes de approved.

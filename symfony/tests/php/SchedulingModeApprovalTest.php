@@ -87,6 +87,22 @@ $tests = [
             'foreign_tenant');
         $dup = $p->decide($req, [response(), response()], $now);
         check($dup['status'] === 'invalid', 'duplicate_role');
+        // Malformed nested roles must fail without warnings or runtime errors.
+        $oldHandler = set_error_handler(static function (int $severity, string $message): never {
+            throw new \ErrorException($message, 0, $severity);
+        });
+        try {
+            foreach ([['editor'], new \stdClass(), true] as $malformedRole) {
+                $malformed = request();
+                $malformed['required_roles'] = [$malformedRole];
+                $out = $p->decide($malformed, [], $now);
+                check($out['status'] === 'invalid' && !$out['approved']
+                    && $out['audit'] === [], 'nested_role_fails_cleanly');
+            }
+        } finally {
+            restore_error_handler();
+        }
+
         $deny = response('reviewer');
         $deny['decision'] = 'reject';
         check($p->decide($req, [response(), $deny], $now)['status'] ===
