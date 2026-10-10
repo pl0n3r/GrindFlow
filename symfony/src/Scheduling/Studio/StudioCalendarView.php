@@ -26,8 +26,8 @@ final class StudioCalendarView
         $seen = [];
         $items = [];
         foreach ($slots as $slot) {
-            if (!is_array($slot) || array_keys($slot) !==
-                ['tenant_id', 'creator_id', 'slot_id', 'day', 'state']
+            if (!is_array($slot) || !self::hasExactKeys($slot,
+                ['tenant_id', 'creator_id', 'slot_id', 'day', 'state'])
                 || $slot['tenant_id'] !== $tenantId
                 || !self::identifier($slot['creator_id'])
                 || !array_key_exists($slot['creator_id'], $visible)
@@ -54,6 +54,13 @@ final class StudioCalendarView
         }
         $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $day, new \DateTimeZone('UTC'));
         return $parsed !== false && $parsed->format('Y-m-d') === $day;
+    }
+
+    /** Accept an associative record regardless of serialization field order. */
+    private static function hasExactKeys(array $value, array $expected): bool
+    {
+        return count($value) === count($expected)
+            && array_diff_key($value, array_fill_keys($expected, true)) === [];
     }
 
     private static function identifier(mixed $v): bool

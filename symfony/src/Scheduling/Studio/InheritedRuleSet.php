@@ -17,7 +17,7 @@ final class InheritedRuleSet
         $rules = [];
         $source = 'independent';
         if ($studio !== null) {
-            if (array_keys($studio) !== ['tenant_id', 'studio_id', 'rules']
+            if (!self::hasExactKeys($studio, ['tenant_id', 'studio_id', 'rules'])
                 || $studio['tenant_id'] !== $tenantId
                 || !self::identifier($studio['studio_id'])
                 || !self::validRules($studio['rules'])) {
@@ -27,7 +27,7 @@ final class InheritedRuleSet
             $source = 'studio';
         }
         if ($override !== null) {
-            if (array_keys($override) !== ['tenant_id', 'creator_id', 'changes']
+            if (!self::hasExactKeys($override, ['tenant_id', 'creator_id', 'changes'])
                 || $override['tenant_id'] !== $tenantId
                 || $override['creator_id'] !== $creatorId
                 || !is_array($override['changes']) || array_is_list($override['changes'])
@@ -57,6 +57,13 @@ final class InheritedRuleSet
             && is_int($rules['minimum_gap_minutes'])
             && $rules['minimum_gap_minutes'] >= 0 && $rules['minimum_gap_minutes'] <= 1440
             && is_bool($rules['approval_required']);
+    }
+
+    /** Accept an associative record regardless of serialization field order. */
+    private static function hasExactKeys(array $value, array $expected): bool
+    {
+        return count($value) === count($expected)
+            && array_diff_key($value, array_fill_keys($expected, true)) === [];
     }
 
     private static function identifier(mixed $value): bool

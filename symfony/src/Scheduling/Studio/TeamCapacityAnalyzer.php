@@ -15,7 +15,7 @@ final class TeamCapacityAnalyzer
         }
         $capacity = [];
         foreach ($members as $member) {
-            if (!is_array($member) || array_keys($member) !== ['tenant_id', 'member_id', 'daily_capacity']
+            if (!is_array($member) || !self::hasExactKeys($member, ['tenant_id', 'member_id', 'daily_capacity'])
                 || $member['tenant_id'] !== $tenantId || !self::identifier($member['member_id'])
                 || isset($capacity[$member['member_id']])
                 || !is_int($member['daily_capacity'])
@@ -26,8 +26,8 @@ final class TeamCapacityAnalyzer
         }
         $daily = [];
         foreach ($tasks as $task) {
-            if (!is_array($task) || array_keys($task) !==
-                ['tenant_id', 'creator_id', 'member_id', 'stage', 'day']
+            if (!is_array($task) || !self::hasExactKeys($task,
+                ['tenant_id', 'creator_id', 'member_id', 'stage', 'day'])
                 || $task['tenant_id'] !== $tenantId || !self::identifier($task['creator_id'])
                 || !self::identifier($task['member_id'])
                 || !array_key_exists($task['member_id'], $capacity)
@@ -60,6 +60,13 @@ final class TeamCapacityAnalyzer
         }
         $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $day, new \DateTimeZone('UTC'));
         return $parsed !== false && $parsed->format('Y-m-d') === $day;
+    }
+
+    /** Accept an associative record regardless of serialization field order. */
+    private static function hasExactKeys(array $value, array $expected): bool
+    {
+        return count($value) === count($expected)
+            && array_diff_key($value, array_fill_keys($expected, true)) === [];
     }
 
     private static function identifier(mixed $v): bool

@@ -48,6 +48,14 @@ $tests = [
             && $new['rules']['daily_cap'] === 2 && $new['rules']['approval_required'] === true,
             'explicit_override');
         check($original['rules'] === rules(), 'studio_unmodified');
+        // Associative input maps may have any field order without losing validation.
+        $shuffledStudio = array_reverse(studio(), true);
+        $shuffledOverride = array_reverse(override(['daily_cap' => 2]), true);
+        check($r->resolve('tenant_1', 'creator_1', $shuffledStudio, $shuffledOverride)['status']
+            === 'resolved', 'reordered_studio_and_override');
+        $extraStudio = studio(); $extraStudio['unexpected'] = true;
+        check($r->resolve('tenant_1', 'creator_1', $extraStudio)['status'] === 'blocked',
+            'additional_studio_key_rejected');
         $wrong = override(['daily_cap' => 2]); $wrong['creator_id'] = 'creator_2';
         check($r->resolve('tenant_1', 'creator_1', studio(), $wrong)['status'] === 'blocked', 'creator_scope');
         $wrong = override(['daily_cap' => 2]); $wrong['tenant_id'] = 'tenant_2';
@@ -63,6 +71,8 @@ $tests = [
             && $ok['by_creator']['creator_1']['awaiting_approval'] === 1
             && $ok['by_creator']['creator_2']['awaiting_approval'] === 1,
             'authorized_aggregation');
+        check($v->aggregate('tenant_1', ['creator_1'], [array_reverse(slot('s6'), true)])['status']
+            === 'ok', 'reordered_slot_fields');
         $foreign = slot('s3'); $foreign['tenant_id'] = 'tenant_2';
         check($v->aggregate('tenant_1', ['creator_1'], [$foreign])['status'] === 'blocked', 'foreign_tenant');
         check($v->aggregate('tenant_1', ['creator_1'], [slot('s4', 'creator_2')])['status'] === 'blocked', 'foreign_creator');
@@ -79,6 +89,9 @@ $tests = [
             && $v['bottlenecks'][0]['approval'] === 2
             && $v['bottlenecks'][0]['total'] === 3, 'stage_specific_bottleneck');
         check($a->analyze('tenant_1', $members, array_slice($tasks, 0, 2))['bottlenecks'] === [], 'within_capacity');
+        check($a->analyze('tenant_1', [array_reverse($members[0], true)],
+            [array_reverse(task('editor_1', 'approval'), true)])['status'] === 'ok',
+            'reordered_member_and_task');
         $bad = task('editor_1', 'approval'); $bad['tenant_id'] = 'tenant_2';
         check($a->analyze('tenant_1', $members, [$bad])['status'] === 'blocked', 'tenant_scoped');
         check($a->analyze('tenant_1', [], [task('editor_1', 'preparation')])['status'] === 'blocked', 'unknown_assignment');
