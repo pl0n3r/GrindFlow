@@ -88,6 +88,25 @@ $tests = [
             && count($v['bottlenecks']) === 1 && $v['bottlenecks'][0]['preparation'] === 1
             && $v['bottlenecks'][0]['approval'] === 2
             && $v['bottlenecks'][0]['total'] === 3, 'stage_specific_bottleneck');
+        // AC-03: the editor/day total must also identify per-creator pressure.
+        $mixed = [task('editor_1', 'preparation'), task('editor_1', 'approval'),
+            task('editor_1', 'approval')];
+        $mixed[1]['creator_id'] = 'creator_2';
+        $mixed[2]['creator_id'] = 'creator_2';
+        $multi = $a->analyze('tenant_1', $members, $mixed);
+        $overload = $multi['bottlenecks'][0] ?? [];
+        check($multi['status'] === 'ok'
+            && isset($overload['by_creator']['creator_1'], $overload['by_creator']['creator_2'])
+            && $overload['by_creator']['creator_1'] === ['preparation' => 1, 'approval' => 0]
+            && $overload['by_creator']['creator_2'] === ['preparation' => 0, 'approval' => 2]
+            && $overload['total'] === 3, 'creator_breakdown_of_daily_bottleneck');
+        $reversed = $a->analyze('tenant_1', $members, array_reverse($mixed));
+        check($reversed['bottlenecks'] === $multi['bottlenecks'],
+            'stable_breakdown_for_reordered_tasks');
+        $tomorrow = task('editor_1', 'approval');
+        $tomorrow['day'] = '2026-10-13';
+        check($a->analyze('tenant_1', $members, [$mixed[0], $mixed[1], $tomorrow])['bottlenecks'] === [],
+            'daily_capacity_not_combined_across_days');
         check($a->analyze('tenant_1', $members, array_slice($tasks, 0, 2))['bottlenecks'] === [], 'within_capacity');
         check($a->analyze('tenant_1', [array_reverse($members[0], true)],
             [array_reverse(task('editor_1', 'approval'), true)])['status'] === 'ok',

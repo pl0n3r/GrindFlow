@@ -38,12 +38,20 @@ final class TeamCapacityAnalyzer
             $key = $task['member_id'] . ':' . $task['day'];
             if (!isset($daily[$key])) {
                 $daily[$key] = ['member_id' => $task['member_id'], 'day' => $task['day'],
-                    'capacity' => $capacity[$task['member_id']], 'preparation' => 0, 'approval' => 0];
+                    'capacity' => $capacity[$task['member_id']], 'preparation' => 0, 'approval' => 0,
+                    'by_creator' => []];
             }
             $daily[$key][$task['stage']]++;
+            $creator = $task['creator_id'];
+            if (!isset($daily[$key]['by_creator'][$creator])) {
+                $daily[$key]['by_creator'][$creator] = ['preparation' => 0, 'approval' => 0];
+            }
+            $daily[$key]['by_creator'][$creator][$task['stage']]++;
         }
         $bottlenecks = [];
+        ksort($daily, SORT_STRING);
         foreach ($daily as $load) {
+            ksort($load['by_creator'], SORT_STRING);
             $total = $load['preparation'] + $load['approval'];
             if ($total > $load['capacity']) {
                 $bottlenecks[] = $load + ['total' => $total, 'reason' => 'daily_capacity_exceeded'];

@@ -12,8 +12,9 @@ independiente puede aportar sus tres reglas sin tener equipo/Studio.
 creadores y sus slots. Rechaza evidencias incompletas, identidades ajenas,
 slots duplicados, estados y fechas inválidos. Solo devuelve IDs, estados y
 conteos; no entrega PII. `TeamCapacityAnalyzer` agrupa trabajo por persona y
-día, conserva separación entre preparación/aprobación y señala exceso sobre
-capacidad. Sin miembros ni tareas devuelve un resumen independiente válido.
+día, conserva separación entre preparación/aprobación, desglosa los cuellos de
+botella por IDs de creador y señala exceso sobre capacidad. El desglose se
+ordena de forma estable y no identifica personas fuera de la evidencia autorizada. Sin miembros ni tareas devuelve un resumen independiente válido.
 
 **Fronteras de confianza:** los métodos puros **no autentican** permisos,
 miembros, usuarios ni actúan sobre el Scheduler/Distribution. El consumidor
