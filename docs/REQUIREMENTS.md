@@ -576,3 +576,13 @@ PHP fast/quality/test/MariaDB and Sonar PR gates as applicable.
 - Página posterior al final explica el estado y enlaza a la primera, sin filtrar IDs de otra organización.
 
 **Verificación:** test de integración con 106 entregas locales y otra ajena, enlaces de página, historial profundo, filtros combinados, orden estable y página inválida.
+
+
+### Library — relaciones #42/#43 (hoja GrindFlow #414, no activada)
+
+- **GF-LIB-042:** un asset Symfony del Vault puede figurar en varias colecciones de la misma organización mediante una tabla de relación lógica. Una colección jamás duplica ni cambia `gf_vault_assets.storage_key`. Una solicitud repetida es idempotente y la lectura está acotada.
+- **GF-LIB-043:** una variante, identificada como asset existente del mismo tenant, tiene un maestro explícito único y un tipo restringido a formato, red o campaña. Quedan prohibidos autoservicio entre organizaciones, enlaces a papelera, ciclos y cadenas maestro/variante.
+- **GF-LIB-042-SEC:** todas las relaciones tienen claves foráneas compuestas `(organization_id, id)`; escritura exige sesión autenticada, membresía activa, permiso `content_prepare` y CSRF; ninguna ruta admite un organization_id del request como autoridad.
+- **GF-LIB-042-DELIVERY:** implementación provisional, aditiva y reversible en CI desechable; sin autorización para merge, producción, publicación, proveedores o migración real. Validación: AC-01..AC-04 del Issue #414 más suite Symfony/MariaDB, seguridad y release secuencial.
+
+Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.

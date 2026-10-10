@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.218 · no equivale a despliegue ni a salud de producción. La versión candidata `v0.1.218` corrige source-map-js de Symfony (#412).
+**Versión de código declarada:** V0.1.219 · no equivale a despliegue ni a salud de producción. Candidato de colecciones y variantes (#414); `main` previo integró V0.1.218.
 <!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
@@ -47,8 +47,8 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#412 · parche source-map-js Symfony](https://github.com/pl0n3r/GrindFlow/issues/412), pendiente de CI/revisión exact-HEAD.
-- **NEXT:** [#407 · vigencia UTC Library](https://github.com/pl0n3r/GrindFlow/issues/407), después de cerrar #412; #414 continúa en PR independiente.
+- **NOW:** [#414 · colecciones y variantes Library](https://github.com/pl0n3r/GrindFlow/issues/414), candidato V0.1.219 en PR #419 pendiente de revisión y gates del HEAD final.
+- **NEXT:** [#407 · vigencia UTC Library](https://github.com/pl0n3r/GrindFlow/issues/407), después del merge de #414 y de liberar los claims compartidos.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
@@ -76,7 +76,7 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 ### Distribution Symfony · provider pilot
 
-En el código candidato **V0.1.218**, Symfony S4 conserva un fingerprint determinista de migraciones para el gate backup→recheck y conserva el consumo robusto de `DATABASE_URL` para credenciales percent-encoded y conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta. La readiness `forbidden` de S4 es un estado transitorio de seguridad y solo se considera superada cuando Production Smoke demuestra el contrato posterior sobre el `main` exacto desplegado.
+En el código candidato **V0.1.219**, Symfony S4 conserva un fingerprint determinista de migraciones para el gate backup→recheck y conserva el consumo robusto de `DATABASE_URL` para credenciales percent-encoded y conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta. La readiness `forbidden` de S4 es un estado transitorio de seguridad y solo se considera superada cuando Production Smoke demuestra el contrato posterior sobre el `main` exacto desplegado.
 
 ## Stack e infraestructura
 
