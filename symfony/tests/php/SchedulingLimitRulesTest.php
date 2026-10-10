@@ -37,6 +37,10 @@ $cases = [
         $decision = $rule->evaluate($candidate, $windows, []);
         check(!$decision->permitted && $decision->reason === 'blocked_window', 'blocked');
         check($decision->suggestedAtUtc === '2026-10-12T12:30:00Z', 'minimal relocation');
+        $seconds = $rule->evaluate(slot('2026-10-12T12:15:59Z'), $windows, []);
+        check($seconds->reason === 'blocked_window'
+            && $seconds->suggestedAtUtc === '2026-10-12T12:30:00Z',
+            'earliest exact minute regardless of candidate seconds');
         check($rule->evaluate($candidate, [], ['2026-10-12'])->suggestedAtUtc === '2026-10-13T00:00:00Z', 'blocked date');
         check($rule->evaluate($candidate, [['weekday' => 8, 'start' => '12:00', 'end' => '13:00']], [])->reason === 'invalid_input', 'invalid window');
     },
@@ -55,6 +59,10 @@ $cases = [
         $windows = [['weekday' => 7, 'start' => '01:00', 'end' => '02:00']];
         $spring = $rule->evaluate(slot('2026-03-08T06:30:00Z', tz: 'America/New_York'), $windows, []);
         check($spring->suggestedAtUtc === '2026-03-08T07:00:00Z', 'spring gap jumps from 01:59 to 03:00');
+        $springSeconds = $rule->evaluate(
+            slot('2026-03-08T06:30:59Z', tz: 'America/New_York'), $windows, []);
+        check($springSeconds->suggestedAtUtc === '2026-03-08T07:00:00Z',
+            'spring gap relocation rounds to exact first valid UTC minute');
         foreach (['2026-11-01T05:30:00Z', '2026-11-01T06:30:00Z'] as $utc) {
             check($rule->evaluate(slot($utc, tz: 'America/New_York'), $windows, [])->reason === 'blocked_window', 'fall fold');
         }

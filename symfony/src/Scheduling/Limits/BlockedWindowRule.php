@@ -36,9 +36,11 @@ final class BlockedWindowRule
         if (!$this->isBlocked($at, $tz, $windows, $blockedDates)) {
             return LimitDecision::allow();
         }
-        // Finite, monotonically increasing UTC search: works through DST gaps/folds.
+        // Start at the next exact UTC minute, never preserve input seconds.
+        // The UTC walk remains monotonic across local DST gaps and folds.
+        $minuteFloor = $at->setTimestamp($at->getTimestamp() - (int) $at->format('s'));
         for ($minutes = 1; $minutes <= $lookaheadDays * 1440; ++$minutes) {
-            $next = $at->modify('+' . $minutes . ' minutes');
+            $next = $minuteFloor->modify('+' . $minutes . ' minutes');
             if (!$this->isBlocked($next, $tz, $windows, $blockedDates)) {
                 return LimitDecision::deny('blocked_window', $next->format('Y-m-d\TH:i:s\Z'));
             }

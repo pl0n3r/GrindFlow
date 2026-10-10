@@ -6,7 +6,7 @@ Entrada de cada regla: tenant_id, network_id, account_id, scheduled_at_utc estri
 
 - MinimumSeparationRule::evaluate(candidate, scheduled, minimumMinutes) compara instantes UTC por tenant/red/cuenta; separación exactamente igual al mínimo sí es permitida. Una programación cancelada no consume separación; estados de programación desconocidos se rechazan (fail-closed).
 - DailyCapRule::evaluate(candidate, scheduled, maximumPerDay) cuenta **todas** las campañas por la fecha local de la cuenta; solo cancelled se excluye explícitamente.
-- BlockedWindowRule::evaluate(candidate, windows, blockedDates) prohíbe fechas y ventanas locales [inicio, fin) con weekday ISO 1–7. Busca hacia delante en UTC al minuto, máximo 14 días; devuelve suggested_at_utc si existe reubicación. No acepta rangos que crucen medianoche: dividirlos en dos ventanas.
+- BlockedWindowRule::evaluate(candidate, windows, blockedDates) prohíbe fechas y ventanas locales [inicio, fin) con weekday ISO 1–7. Busca hacia delante en UTC al minuto exacto (segundos = 00, sin conservar los segundos del candidato), máximo 14 días; devuelve suggested_at_utc si existe reubicación. No acepta rangos que crucen medianoche: dividirlos en dos ventanas.
 
 El resultado común LimitDecision::toArray() tiene status=permitido|rechazado, reason y suggested_at_utc opcional. Una sugerencia **no constituye una reserva** y debe volver a validarse al confirmar. El Scheduler canónico debe verificar autorización, permisos, elegibilidad, locks, cupos y estado externos por separado antes de persistir. No usar este componente como bypass de ese flujo.
 
