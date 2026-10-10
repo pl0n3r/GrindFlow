@@ -75,52 +75,70 @@ final readonly class AssetCollectionApplication
         });
     }
 
-    /** @return array{status:string,assets?:list<string>} */
-    public function assetsForCollection(string $organization, string $actor, string $collection): array
+    /** @return array{status:string,assets?:list<string>,has_more?:bool,next_cursor?:?string} */
+    public function assetsForCollection(string $organization, string $actor, string $collection, ?string $after = null): array
     {
-        if (!Uuid::isValid($collection) || !$this->member($this->db, $organization, $actor, false)
+        if (($after !== null && !Uuid::isValid($after))
+            || !Uuid::isValid($collection) || !$this->member($this->db, $organization, $actor, false)
             || !$this->collection($this->db, $organization, $collection, false)) {
             return ['status' => 'missing'];
         }
 
+        $params = ['organization' => $organization, 'collection' => $collection];
+        $cursorFilter = '';
+        if ($after !== null) {
+            $params['after'] = strtolower($after);
+            $cursorFilter = ' AND link.asset_id > :after';
+        }
+        $rows = $this->db->fetchFirstColumn(
+            'SELECT link.asset_id FROM gf_vault_collection_assets link
+             INNER JOIN gf_vault_assets asset
+               ON asset.organization_id = link.organization_id
+              AND asset.id = link.asset_id AND asset.deleted_at IS NULL
+             WHERE link.organization_id = :organization AND link.collection_id = :collection'
+            .$cursorFilter.' ORDER BY link.asset_id LIMIT 101',
+            $params,
+        );
+        $page = array_slice($rows, 0, 100);
+        $more = count($rows) > 100;
+
         return [
             'status' => 'ok',
-            'assets' => $this->db->fetchFirstColumn(
-                <<<'SQL'
-                    SELECT link.asset_id
-                    FROM gf_vault_collection_assets link
-                    INNER JOIN gf_vault_assets asset
-                      ON asset.organization_id = link.organization_id
-                     AND asset.id = link.asset_id AND asset.deleted_at IS NULL
-                    WHERE link.organization_id = :organization
-                      AND link.collection_id = :collection
-                    ORDER BY link.created_at, link.asset_id
-                    LIMIT 100
-                    SQL,
-                ['organization' => $organization, 'collection' => $collection],
-            ),
+            'assets' => $page,
+            'has_more' => $more,
+            'next_cursor' => $more ? (string) end($page) : null,
         ];
     }
 
-    /** @return array{status:string,collections?:list<string>} */
-    public function collectionsForAsset(string $organization, string $actor, string $asset): array
+    /** @return array{status:string,collections?:list<string>,has_more?:bool,next_cursor?:?string} */
+    public function collectionsForAsset(string $organization, string $actor, string $asset, ?string $after = null): array
     {
-        if (!Uuid::isValid($asset) || !$this->member($this->db, $organization, $actor, false)
+        if (($after !== null && !Uuid::isValid($after))
+            || !Uuid::isValid($asset) || !$this->member($this->db, $organization, $actor, false)
             || !$this->asset($this->db, $organization, $asset, false)) {
             return ['status' => 'missing'];
         }
 
+        $params = ['organization' => $organization, 'asset' => $asset];
+        $cursorFilter = '';
+        if ($after !== null) {
+            $params['after'] = strtolower($after);
+            $cursorFilter = ' AND link.collection_id > :after';
+        }
+        $rows = $this->db->fetchFirstColumn(
+            'SELECT link.collection_id FROM gf_vault_collection_assets link
+             WHERE link.organization_id = :organization AND link.asset_id = :asset'
+            .$cursorFilter.' ORDER BY link.collection_id LIMIT 101',
+            $params,
+        );
+        $page = array_slice($rows, 0, 100);
+        $more = count($rows) > 100;
+
         return [
             'status' => 'ok',
-            'collections' => $this->db->fetchFirstColumn(
-                <<<'SQL'
-                    SELECT link.collection_id
-                    FROM gf_vault_collection_assets link
-                    WHERE link.organization_id = :organization AND link.asset_id = :asset
-                    ORDER BY link.created_at, link.collection_id LIMIT 100
-                    SQL,
-                ['organization' => $organization, 'asset' => $asset],
-            ),
+            'collections' => $page,
+            'has_more' => $more,
+            'next_cursor' => $more ? (string) end($page) : null,
         ];
     }
 
@@ -188,25 +206,32 @@ final readonly class AssetCollectionApplication
         });
     }
 
-    /** @return array{status:string,variants?:list<array{asset_id:string,type:string}>} */
-    public function variantsForMaster(string $organization, string $actor, string $master): array
+    /** @return array{status:string,variants?:list<array{asset_id:string,type:string}>,has_more?:bool,next_cursor?:?string} */
+    public function variantsForMaster(string $organization, string $actor, string $master, ?string $after = null): array
     {
-        if (!Uuid::isValid($master) || !$this->member($this->db, $organization, $actor, false)
+        if (($after !== null && !Uuid::isValid($after))
+            || !Uuid::isValid($master) || !$this->member($this->db, $organization, $actor, false)
             || !$this->asset($this->db, $organization, $master, false)) {
             return ['status' => 'missing'];
         }
 
+        $params = ['organization' => $organization, 'master' => $master];
+        $cursorFilter = '';
+        if ($after !== null) {
+            $params['after'] = strtolower($after);
+            $cursorFilter = ' AND link.variant_asset_id > :after';
+        }
         $rows = $this->db->fetchAllAssociative(
-            <<<'SQL'
-                SELECT link.variant_asset_id, link.variant_type
-                FROM gf_vault_asset_variants link
-                INNER JOIN gf_vault_assets asset ON asset.id = link.variant_asset_id
-                    AND asset.organization_id = link.organization_id AND asset.deleted_at IS NULL
-                WHERE link.organization_id = :organization AND link.master_asset_id = :master
-                ORDER BY link.created_at, link.variant_asset_id LIMIT 100
-                SQL,
-            ['organization' => $organization, 'master' => $master],
+            'SELECT link.variant_asset_id, link.variant_type
+             FROM gf_vault_asset_variants link
+             INNER JOIN gf_vault_assets asset ON asset.id = link.variant_asset_id
+               AND asset.organization_id = link.organization_id AND asset.deleted_at IS NULL
+             WHERE link.organization_id = :organization AND link.master_asset_id = :master'
+            .$cursorFilter.' ORDER BY link.variant_asset_id LIMIT 101',
+            $params,
         );
+        $page = array_slice($rows, 0, 100);
+        $more = count($rows) > 100;
 
         return [
             'status' => 'ok',
@@ -215,8 +240,10 @@ final readonly class AssetCollectionApplication
                     'asset_id' => (string) $row['variant_asset_id'],
                     'type' => (string) $row['variant_type'],
                 ],
-                $rows,
+                $page,
             ),
+            'has_more' => $more,
+            'next_cursor' => $more ? (string) end($page)['variant_asset_id'] : null,
         ];
     }
 

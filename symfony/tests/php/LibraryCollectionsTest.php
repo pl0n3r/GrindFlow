@@ -78,6 +78,56 @@ final class LibraryCollectionsTest extends KernelTestCase
             $library->linkVariant($org, $actor, $variant, $master, 'campaign')['status']);
     }
 
+    public function testAllRelationsRemainDiscoverableBeyondHundredRows(): void
+    {
+        self::bootKernel();
+        [$db, $library, $actor, $org, , $master] = $this->fixture();
+        $bucket = $library->createCollection($org, $actor)['id'];
+
+        // 101 links of each type: the last row must remain reachable.
+        for ($index = 0; $index < 101; ++$index) {
+            $collection = $library->createCollection($org, $actor);
+            self::assertSame('ok', $collection['status']);
+            self::assertSame('ok', $library->attachAsset(
+                $org, $actor, $collection['id'], $master,
+            )['status']);
+
+            $variant = $this->addAsset($db, $org, $actor);
+            self::assertSame('ok', $library->attachAsset(
+                $org, $actor, $bucket, $variant,
+            )['status']);
+            self::assertSame('ok', $library->linkVariant(
+                $org, $actor, $master, $variant, 'format',
+            )['status']);
+        }
+
+        foreach ([
+            ['method' => 'collectionsForAsset', 'id' => $master, 'field' => 'collections'],
+            ['method' => 'assetsForCollection', 'id' => $bucket, 'field' => 'assets'],
+            ['method' => 'variantsForMaster', 'id' => $master, 'field' => 'variants'],
+        ] as $case) {
+            $first = $library->{$case['method']}($org, $actor, $case['id']);
+            self::assertSame('ok', $first['status']);
+            self::assertCount(100, $first[$case['field']]);
+            self::assertTrue($first['has_more']);
+            self::assertNotNull($first['next_cursor']);
+            $second = $library->{$case['method']}(
+                $org, $actor, $case['id'], $first['next_cursor'],
+            );
+            self::assertSame('ok', $second['status']);
+            self::assertCount(1, $second[$case['field']]);
+            self::assertFalse($second['has_more']);
+            self::assertNull($second['next_cursor']);
+            self::assertSame('missing', $library->{$case['method']}(
+                $org, $actor, $case['id'], 'not-a-uuid',
+            )['status']);
+        }
+        self::assertSame(102, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_collections WHERE organization_id = :org',
+            ['org' => $org],
+        ));
+    }
+
     public function testCrossTenantMembershipAndReferencesFailClosed(): void
     {
         self::bootKernel();

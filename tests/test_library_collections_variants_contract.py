@@ -66,6 +66,21 @@ class LibraryCollectionsVariantsContractTests(unittest.TestCase):
         self.assertIn("isCsrfTokenValid", self.controller)
         self.assertIn("testCrossTenantMembershipAndReferencesFailClosed", self.integration)
 
+    def test_pagination_after_100_preserves_tenant_scope_and_cursor(self):
+        self.assertIn("testAllRelationsRemainDiscoverableBeyondHundredRows", self.integration)
+        for sql_key in ("link.asset_id", "link.collection_id", "link.variant_asset_id"):
+            self.assertIn(sql_key + " > :after", self.service)
+            self.assertIn("ORDER BY " + sql_key + " LIMIT 101", self.service)
+        self.assertIn("ORDER BY id LIMIT 101", self.controller)
+        self.assertIn("organization_id = :organization", self.controller)
+        self.assertIn("organization_id = :organization", self.service)
+        self.assertIn("next_cursor", self.service)
+        self.assertIn("has_more", self.service)
+        self.assertIn("next_cursor", self.controller)
+        self.assertIn("isValid($after)", self.controller)
+        self.assertNotIn("OFFSET", self.service + self.controller)
+        self.assertIn("101", self.integration)
+
     def test_additive_migration_and_reversible_build_ahead(self):
         up = self.migration.split("public function up(", 1)[1].split("public function down(", 1)[0]
         self.assertNotRegex(up, r"\b(?:DROP|TRUNCATE|DELETE FROM|ALTER TABLE)\b")

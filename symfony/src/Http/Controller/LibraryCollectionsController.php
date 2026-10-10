@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Uid\Uuid;
 
 final class LibraryCollectionsController extends AbstractController
 {
@@ -26,12 +27,27 @@ final class LibraryCollectionsController extends AbstractController
             return $context;
         }
 
+        $after = $this->cursor($request);
+        if ($after instanceof JsonResponse) {
+            return $after;
+        }
+        $params = ['organization' => $context['organization']['id']];
+        $cursorFilter = '';
+        if ($after !== null) {
+            $params['after'] = $after;
+            $cursorFilter = ' AND id > :after';
+        }
         $rows = $db->fetchFirstColumn(
-            'SELECT id FROM gf_vault_collections WHERE organization_id = :organization ORDER BY created_at, id LIMIT 100',
-            ['organization' => $context['organization']['id']],
+            'SELECT id FROM gf_vault_collections WHERE organization_id = :organization'
+            .$cursorFilter.' ORDER BY id LIMIT 101',
+            $params,
         );
+        $page = array_slice($rows, 0, 100);
+        $more = count($rows) > 100;
         return $this->privateJson(['data' => [
-            'collections' => $rows,
+            'collections' => $page,
+            'has_more' => $more,
+            'next_cursor' => $more ? (string) end($page) : null,
             'csrf' => (string) $csrf->getToken(self::CSRF),
             'publishes' => false,
         ]]);
@@ -61,8 +77,12 @@ final class LibraryCollectionsController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
+        $after = $this->cursor($request);
+        if ($after instanceof JsonResponse) {
+            return $after;
+        }
         return $this->result($library->assetsForCollection(
-            $context['organization']['id'], $context['user']->id(), $collectionId,
+            $context['organization']['id'], $context['user']->id(), $collectionId, $after,
         ));
     }
 
@@ -91,8 +111,12 @@ final class LibraryCollectionsController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
+        $after = $this->cursor($request);
+        if ($after instanceof JsonResponse) {
+            return $after;
+        }
         return $this->result($library->collectionsForAsset(
-            $context['organization']['id'], $context['user']->id(), $assetId,
+            $context['organization']['id'], $context['user']->id(), $assetId, $after,
         ));
     }
 
@@ -103,8 +127,12 @@ final class LibraryCollectionsController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
+        $after = $this->cursor($request);
+        if ($after instanceof JsonResponse) {
+            return $after;
+        }
         return $this->result($library->variantsForMaster(
-            $context['organization']['id'], $context['user']->id(), $masterId,
+            $context['organization']['id'], $context['user']->id(), $masterId, $after,
         ));
     }
 
@@ -125,6 +153,18 @@ final class LibraryCollectionsController extends AbstractController
         return $this->result($library->linkVariant(
             $context['organization']['id'], $context['user']->id(), $masterId, $variantId, $body['type'],
         ));
+    }
+
+    private function cursor(Request $request): string|JsonResponse|null
+    {
+        $after = $request->query->all()['after'] ?? null;
+        if ($after === null) {
+            return null;
+        }
+        if (!is_string($after) || !Uuid::isValid($after)) {
+            return $this->error(422, 'invalid_cursor', 'Cursor de página inválido.');
+        }
+        return strtolower($after);
     }
 
     private function writeGate(Request $request, MembershipContext $memberships, array $context): ?JsonResponse
