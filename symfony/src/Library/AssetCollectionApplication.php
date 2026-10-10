@@ -44,6 +44,9 @@ final readonly class AssetCollectionApplication
         if (!Uuid::isValid($collection) || !Uuid::isValid($asset)) {
             return ['status' => 'missing'];
         }
+        // Persist one canonical identity regardless of route UUID casing.
+        $collection = strtolower($collection);
+        $asset = strtolower($asset);
 
         return $this->db->transactional(function (Connection $db) use ($organization, $actor, $collection, $asset): array {
             if (!$this->member($db, $organization, $actor, true)) {

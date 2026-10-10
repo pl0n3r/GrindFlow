@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GrindFlow\Tests;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use GrindFlow\Library\AssetCollectionApplication;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -51,6 +52,33 @@ final class LibraryCollectionsTest extends KernelTestCase
         self::assertSame(1, (int) $db->fetchOne(
             'SELECT COUNT(DISTINCT storage_key) FROM gf_vault_assets WHERE id = :asset',
             ['asset' => $asset],
+        ));
+    }
+
+    public function testAttachAssetUuidCasingIsCanonicalAndIdempotent(): void
+    {
+        self::bootKernel();
+        [$db, $library, $actor, $org, , $asset] = $this->fixture();
+        $collection = $library->createCollection($org, $actor)['id'];
+
+        self::assertSame(['status' => 'ok', 'changed' => true],
+            $library->attachAsset($org, $actor, strtoupper($collection), strtoupper($asset)));
+        self::assertSame(['status' => 'ok', 'changed' => false],
+            $library->attachAsset($org, $actor, $collection, $asset));
+
+        // Stable lower-case IDs also feed the keyset next_cursor.
+        self::assertSame([$asset], $library->assetsForCollection($org, $actor, $collection)['assets']);
+        self::assertSame([$collection], $library->collectionsForAsset($org, $actor, $asset)['collections']);
+        $persisted = $db->fetchAssociative(
+            'SELECT collection_id, asset_id FROM gf_vault_collection_assets WHERE organization_id = :org',
+            ['org' => $org],
+        );
+        self::assertIsArray($persisted);
+        self::assertSame($collection, $persisted['collection_id']);
+        self::assertSame($asset, $persisted['asset_id']);
+        self::assertSame(1, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_collection_assets WHERE organization_id = :org',
+            ['org' => $org],
         ));
     }
 
@@ -177,6 +205,65 @@ final class LibraryCollectionsTest extends KernelTestCase
         self::assertSame(0, (int) $db->fetchOne(
             'SELECT COUNT(*) FROM gf_vault_collection_assets WHERE collection_id = :collection',
             ['collection' => $collection],
+        ));
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_asset_variants WHERE organization_id = :org',
+            ['org' => $org],
+        ));
+    }
+
+    public function testCompositeForeignKeysRejectAllFourCrossTenantInserts(): void
+    {
+        self::bootKernel();
+        [$db, , $actor, $org, $foreignOrg, $ownAsset, $foreignAsset] = $this->fixture();
+        $ownCollection = Uuid::v7()->toRfc4122();
+        $foreignCollection = Uuid::v7()->toRfc4122();
+        $createdAt = gmdate('Y-m-d H:i:s');
+
+        foreach ([
+            ['id' => $ownCollection, 'organization_id' => $org, 'created_at' => $createdAt],
+            ['id' => $foreignCollection, 'organization_id' => $foreignOrg, 'created_at' => $createdAt],
+        ] as $row) {
+            $db->insert('gf_vault_collections', $row);
+        }
+
+        // Direct SQL bypasses application authorization. Each attempt violates
+        // exactly one of the four composite tenant FKs of the migration.
+        $invalidInserts = [
+            'collection-assets: foreign asset' => [
+                'gf_vault_collection_assets',
+                ['organization_id' => $org, 'collection_id' => $ownCollection,
+                 'asset_id' => $foreignAsset, 'created_at' => $createdAt],
+            ],
+            'collection-assets: foreign collection' => [
+                'gf_vault_collection_assets',
+                ['organization_id' => $org, 'collection_id' => $foreignCollection,
+                 'asset_id' => $ownAsset, 'created_at' => $createdAt],
+            ],
+            'asset-variants: foreign variant' => [
+                'gf_vault_asset_variants',
+                ['organization_id' => $org, 'master_asset_id' => $ownAsset,
+                 'variant_asset_id' => $foreignAsset, 'variant_type' => 'format',
+                 'created_at' => $createdAt],
+            ],
+            'asset-variants: foreign master' => [
+                'gf_vault_asset_variants',
+                ['organization_id' => $org, 'master_asset_id' => $foreignAsset,
+                 'variant_asset_id' => $ownAsset, 'variant_type' => 'network',
+                 'created_at' => $createdAt],
+            ],
+        ];
+        foreach ($invalidInserts as $name => [$table, $row]) {
+            try {
+                $db->insert($table, $row);
+                self::fail('Cross-tenant insert unexpectedly succeeded: '.$name);
+            } catch (ForeignKeyConstraintViolationException $exception) {
+                self::assertNotSame('', $exception->getMessage(), $name);
+            }
+        }
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_collection_assets WHERE organization_id = :org',
+            ['org' => $org],
         ));
         self::assertSame(0, (int) $db->fetchOne(
             'SELECT COUNT(*) FROM gf_vault_asset_variants WHERE organization_id = :org',

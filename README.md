@@ -47,8 +47,8 @@ GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, p
 
 ## Work Queue
 
-- **NOW:** [#414 · colecciones y variantes Library](https://github.com/pl0n3r/GrindFlow/issues/414), candidato en PR #419 con validación DB pendiente.
-- **NEXT:** [#407 · vigencia UTC Library](https://github.com/pl0n3r/GrindFlow/issues/407), después de cerrar #412; #414 continúa en PR independiente.
+- **NOW:** [#414 · colecciones y variantes Library](https://github.com/pl0n3r/GrindFlow/issues/414), candidato V0.1.219 en PR #419 pendiente de revisión y gates del HEAD final.
+- **NEXT:** [#407 · vigencia UTC Library](https://github.com/pl0n3r/GrindFlow/issues/407), después del merge de #414 y de liberar los claims compartidos.
 - **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
 - **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
 
