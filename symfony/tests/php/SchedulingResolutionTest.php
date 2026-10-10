@@ -114,6 +114,21 @@ switch ($scenario) {
             ['id' => 'c-stable', 'scheduled_at_utc' => '2026-10-12T12:00:00Z', 'moved' => false],
             ['id' => 'd-stable', 'scheduled_at_utc' => $after, 'moved' => false]
         ], 'minimum_changes');
+
+        // The high-priority loser prefers 09:00, but the normal loser can
+        // use ONLY 09:00. A safe complete assignment exists at 11:00/09:00.
+        $constrained = [
+            item('a-flexible', 'alta', $at, rangeWindow($before, $after)),
+            item('b-restricted', 'normal', $at, rangeWindow($before, $at)),
+            item('c-winner', 'urgente', $at, exact($at))
+        ];
+        $matched = [
+            ['id' => 'a-flexible', 'scheduled_at_utc' => $after, 'moved' => true],
+            ['id' => 'b-restricted', 'scheduled_at_utc' => $before, 'moved' => true],
+            ['id' => 'c-winner', 'scheduled_at_utc' => $at, 'moved' => false]
+        ];
+        verify($planner->plan($constrained) === $matched, 'matching_finds_safe_slot');
+        verify($planner->plan(array_reverse($constrained)) === $matched, 'matching_deterministic');
         break;
 
     case 'AC-04':
@@ -138,6 +153,15 @@ switch ($scenario) {
             item('a', 'normal', $at, exact($at)),
             item('b', 'urgente', $at, exact($at))
         ])), 'no_safe_slot');
+
+        // All losers have only the same remaining slot; true infeasibility
+        // must still fail closed, even with the augmenting-path matcher.
+        $impossible = [
+            item('a-first', 'normal', $at, rangeWindow($before, $at)),
+            item('b-second', 'normal', $at, rangeWindow($before, $at)),
+            item('c-winner', 'urgente', $at, exact($at))
+        ];
+        verify(rejected(fn () => $planner->plan($impossible)), 'matching_true_exhaustion');
         verify(rejected(fn () => $resolver->resolve(array_fill(
             0, 101, item('a', 'normal', $at, exact($at))
         ))), 'bounded');
