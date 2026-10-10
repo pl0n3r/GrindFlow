@@ -103,7 +103,31 @@ final class ContentInsightsService
         array $requiredTags = [],
         array $requiredMetadata = [],
     ): array {
+        // API legacy: primera página, nunca usarla como inventario exhaustivo.
+        return $this->searchPage($tenantId, $assets, $text, $requiredTags, $requiredMetadata)['ids'];
+    }
+
+    /**
+     * Página determinista de hasta 100 IDs. El cursor debe pertenecer a
+     * los resultados del mismo tenant y filtros; no acepta IDs ajenos.
+     * El caller aporta un conjunto estable de assets durante la iteración.
+     * @param list<array<string,mixed>> $assets
+     * @param list<string> $requiredTags
+     * @param array<string,string> $requiredMetadata
+     * @return array{ids:list<string>,has_more:bool,next_cursor:?string}
+     */
+    public function searchPage(
+        string $tenantId,
+        array $assets,
+        string $text = '',
+        array $requiredTags = [],
+        array $requiredMetadata = [],
+        ?string $afterId = null,
+    ): array {
         $this->assertTenantId($tenantId);
+        if ($afterId !== null && ($afterId === '' || strlen($afterId) > 128)) {
+            throw new \InvalidArgumentException('Cursor inválido.');
+        }
         $text = $this->foldSearchText(trim($text));
         if (strlen($text) > 80) {
             throw new \InvalidArgumentException('Búsqueda demasiado larga.');
@@ -151,12 +175,27 @@ final class ContentInsightsService
                 }
             }
             if ($matches) {
-                $ids[$id] = true;
+                // Prefijar evita que PHP convierta IDs numéricos-string a int.
+                $ids['id:' . $id] = $id;
             }
         }
-        $result = array_keys($ids);
+        $result = array_values($ids);
         sort($result, SORT_STRING);
-        return array_slice($result, 0, 100);
+        $offset = 0;
+        if ($afterId !== null) {
+            $index = array_search($afterId, $result, true);
+            if ($index === false) {
+                throw new \InvalidArgumentException('Cursor fuera de resultados autorizados.');
+            }
+            $offset = $index + 1;
+        }
+        $page = array_slice($result, $offset, 100);
+        $hasMore = count($result) > $offset + count($page);
+        return [
+            'ids' => $page,
+            'has_more' => $hasMore,
+            'next_cursor' => $hasMore ? $page[count($page) - 1] : null,
+        ];
     }
 
     /**

@@ -115,6 +115,50 @@ final class ContentInsightsServiceTest extends TestCase
         ));
     }
 
+    public function testSearchPagesBeyondOneHundredAndRejectsUnrelatedCursor(): void
+    {
+        $assets = [];
+        for ($number = 101; $number >= 1; --$number) {
+            $asset = self::asset();
+            $asset['id'] = sprintf('asset-%03d', $number);
+            $assets[] = $asset;
+        }
+        $foreign = self::asset('tenant-b');
+        $foreign['id'] = 'foreign-999';
+        $assets[] = $foreign;
+
+        $first = $this->service->searchPage('tenant-a', $assets, 'otoño', ['marca']);
+        self::assertCount(100, $first['ids']);
+        self::assertSame('asset-001', $first['ids'][0]);
+        self::assertSame('asset-100', $first['ids'][99]);
+        self::assertTrue($first['has_more']);
+        self::assertSame('asset-100', $first['next_cursor']);
+        self::assertSame($first['ids'], $this->service->search('tenant-a', $assets, 'otoño', ['marca']));
+
+        $second = $this->service->searchPage(
+            'tenant-a', $assets, 'otoño', ['marca'], [], $first['next_cursor']
+        );
+        self::assertSame(['asset-101'], $second['ids']);
+        self::assertFalse($second['has_more']);
+        self::assertNull($second['next_cursor']);
+        self::assertCount(101, array_unique([...$first['ids'], ...$second['ids']]));
+        self::assertNotContains('foreign-999', [...$first['ids'], ...$second['ids']]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->searchPage('tenant-a', $assets, 'otoño', ['marca'], [], 'foreign-999');
+    }
+
+    public function testNumericAssetIdsRemainStringsInSearchPage(): void
+    {
+        $asset = self::asset();
+        $asset['id'] = '42';
+        $page = $this->service->searchPage('tenant-a', [$asset], '', ['marca']);
+        self::assertSame(['42'], $page['ids']);
+        self::assertSame('["42"]', json_encode($page['ids'], JSON_THROW_ON_ERROR));
+        self::assertFalse($page['has_more']);
+        self::assertNull($page['next_cursor']);
+    }
+
     public function testScoreIsDeterministicExplainablePerNetwork(): void
     {
         $a = self::asset();
