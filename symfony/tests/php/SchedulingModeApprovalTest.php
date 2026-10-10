@@ -99,6 +99,11 @@ $tests = [
                 check($out['status'] === 'invalid' && !$out['approved']
                     && $out['audit'] === [], 'nested_role_fails_cleanly');
             }
+            foreach ([null, false, 17, 'untrusted', new \stdClass()] as $badResponse) {
+                $out = $p->decide(request(), [$badResponse], $now);
+                check($out['status'] === 'invalid' && !$out['approved']
+                    && $out['audit'] === [], 'non_array_response_fails_closed');
+            }
         } finally {
             restore_error_handler();
         }

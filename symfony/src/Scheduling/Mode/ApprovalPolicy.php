@@ -53,7 +53,7 @@ final class ApprovalPolicy
         $seen = [];
         $audit = [];
         foreach ($responses as $response) {
-            if (!self::shape($response, ['tenant_id', 'creator_id', 'role',
+            if (!is_array($response) || !self::shape($response, ['tenant_id', 'creator_id', 'role',
                     'decision', 'role_verified', 'at'])
                 || $response['tenant_id'] !== $request['tenant_id']
                 || $response['creator_id'] !== $request['creator_id']
