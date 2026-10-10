@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace GrindFlow\Tests;
+
+use DomainException;
+use InvalidArgumentException;
+use RuntimeException;
 use GrindFlow\Scheduling\Resolution\FlexibleWindow;
 use GrindFlow\Scheduling\Resolution\PriorityConflictResolver;
 use GrindFlow\Scheduling\Resolution\MinimalReschedulePlanner;
@@ -51,7 +56,8 @@ function rejected(callable $operation): bool
     return false;
 }
 
-$scenario = $argv[1] ?? '';
+function runSchedulingScenario(string $scenario): void
+{
 $at = '2026-10-12T10:00:00Z';
 $before = '2026-10-12T09:00:00Z';
 $after = '2026-10-12T11:00:00Z';
@@ -142,3 +148,28 @@ switch ($scenario) {
 }
 
 echo $scenario . " PASS\n";
+}
+
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    runSchedulingScenario($argv[1] ?? '');
+}
+
+if (class_exists(\PHPUnit\Framework\TestCase::class)) {
+    final class SchedulingResolutionTest extends \PHPUnit\Framework\TestCase
+    {
+        public function testSyntheticScenariosArePureDeterministicAndFailClosed(): void
+        {
+            foreach (['AC-01', 'AC-02', 'AC-03', 'AC-04'] as $criterion) {
+                ob_start();
+                try {
+                    runSchedulingScenario($criterion);
+                    $output = ob_get_clean();
+                } catch (\Throwable $error) {
+                    ob_end_clean();
+                    throw $error;
+                }
+                self::assertSame($criterion . " PASS\n", $output);
+            }
+        }
+    }
+}
