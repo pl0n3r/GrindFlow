@@ -78,6 +78,30 @@ final class LibraryCollectionsTest extends KernelTestCase
             $library->linkVariant($org, $actor, $variant, $master, 'campaign')['status']);
     }
 
+    public function testVariantUuidCaseIsIdempotentAndSelfLinkStillInvalid(): void
+    {
+        self::bootKernel();
+        [$db, $library, $actor, $org, , $master] = $this->fixture();
+        $variant = $this->addAsset($db, $org, $actor);
+        self::assertSame(['status' => 'ok', 'changed' => true],
+            $library->linkVariant($org, $actor, $master, $variant, 'format'));
+
+        self::assertSame(['status' => 'ok', 'changed' => false],
+            $library->linkVariant($org, $actor, strtoupper($master), strtoupper($variant), 'format'));
+        self::assertSame(['status' => 'ok', 'changed' => false],
+            $library->linkVariant($org, $actor, $master, strtoupper($variant), 'format'));
+
+        self::assertSame('invalid',
+            $library->linkVariant($org, $actor, strtoupper($master), $master, 'network')['status']);
+        self::assertSame('invalid',
+            $library->linkVariant($org, $actor, $variant, strtoupper($variant), 'campaign')['status']);
+
+        self::assertSame(1, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_vault_asset_variants WHERE organization_id = :org AND variant_asset_id = :variant',
+            ['org' => $org, 'variant' => $variant],
+        ));
+    }
+
     public function testAllRelationsRemainDiscoverableBeyondHundredRows(): void
     {
         self::bootKernel();

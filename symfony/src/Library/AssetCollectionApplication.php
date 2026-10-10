@@ -146,7 +146,15 @@ final readonly class AssetCollectionApplication
     public function linkVariant(string $organization, string $actor, string $master, string $variant, string $type): array
     {
         if (!Uuid::isValid($master) || !Uuid::isValid($variant)
-            || $master === $variant || !in_array($type, self::VARIANT_TYPES, true)) {
+            || !in_array($type, self::VARIANT_TYPES, true)) {
+            return ['status' => 'invalid'];
+        }
+
+        // Tenant UUID columns have case-insensitive collation. Normalize once
+        // so idempotency and self-link checks use the same identity semantics.
+        $master = strtolower($master);
+        $variant = strtolower($variant);
+        if ($master === $variant) {
             return ['status' => 'invalid'];
         }
 
