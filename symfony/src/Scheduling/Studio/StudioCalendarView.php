@@ -53,6 +53,8 @@ final class StudioCalendarView
             }
             return 0;
         });
+        // A different authorized creator allowlist order must not change JSON output.
+        ksort($visible, SORT_STRING);
         return ['status' => 'ok', 'total' => count($items), 'by_creator' => $visible,
             'slots' => $items, 'execution_performed' => false];
     }

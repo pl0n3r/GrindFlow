@@ -12,7 +12,9 @@ independiente puede aportar sus tres reglas sin tener equipo/Studio.
 creadores y sus slots. Rechaza evidencias incompletas, identidades ajenas,
 slots duplicados, estados y fechas inválidos. Los slots globales se ordenan
 establemente por día, creador y ID de slot, independientemente del orden de
-consulta (comparación lexicográfica literal de IDs, incluidos `01` y `1`).
+consulta o del orden de la lista autorizada de creadores. El mapa `by_creator`
+también se ordena por ID de creador, y la comparación de IDs de slot es
+lexicográfica literal (incluidos `01` y `1`).
 Solo devuelve IDs, estados y conteos; no entrega PII. `TeamCapacityAnalyzer` agrupa trabajo por persona y
 día, conserva separación entre preparación/aprobación, desglosa los cuellos de
 botella por IDs de creador y señala exceso sobre capacidad. El desglose se

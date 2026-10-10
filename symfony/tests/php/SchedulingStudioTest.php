@@ -71,6 +71,15 @@ $tests = [
             && $ok['by_creator']['creator_1']['awaiting_approval'] === 1
             && $ok['by_creator']['creator_2']['awaiting_approval'] === 1,
             'authorized_aggregation');
+        $creatorPermutation = $v->aggregate(
+            'tenant_1', ['creator_2', 'creator_1'], [slot('s2', 'creator_2'), slot('s1')],
+        );
+        $creatorCanonical = $v->aggregate(
+            'tenant_1', ['creator_1', 'creator_2'], [slot('s1'), slot('s2', 'creator_2')],
+        );
+        check($creatorPermutation === $creatorCanonical
+            && array_keys($creatorPermutation['by_creator']) === ['creator_1', 'creator_2'],
+            'global_view_stable_for_permuted_creator_allowlist');
         check($v->aggregate('tenant_1', ['creator_1'], [array_reverse(slot('s6'), true)])['status']
             === 'ok', 'reordered_slot_fields');
         // The global view must not depend on query row order, including IDs
