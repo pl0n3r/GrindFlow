@@ -104,7 +104,7 @@ class NextSecurityLockContractTests(unittest.TestCase):
         # Regresión release-agnostic: #411 garantiza Next.js seguro,
         # mientras cada PR deploy-bound legítimo avanza el patch.
         php = (ROOT / "config/version.php").read_text(encoding="utf-8")
-        versions = re.findall(r"'number'\\s*=>\\s*'([0-9]+\\.[0-9]+\\.[0-9]+)'", php)
+        versions = re.findall(r"'number'\s*=>\s*'([0-9]+\.[0-9]+\.[0-9]+)'", php)
         self.assertEqual(len(versions), 1)
         current = versions[0]
         self.assertEqual(self.package["version"], current)
