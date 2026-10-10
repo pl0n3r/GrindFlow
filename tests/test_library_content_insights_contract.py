@@ -54,6 +54,8 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("public function testNumericAssetIdsRemainStringsInSearchPage", PHP_TEST)
         self.assertIn("public function testSearchIntersectsTextTagsMetadataAndTenant", PHP_TEST)
         self.assertIn("self::assertNotContains('private-foreign', $result)", PHP_TEST)
+        # AC-02 debe ejecutar el servicio PHP real, no aceptar solo grep del código.
+        self.test_real_php_cli_offline_smoke_for_numeric_tags_and_paginated_search()
 
     def test_score_components_deterministic_explainable_per_network(self) -> None:
         self.assertIn("public function score(", SERVICE)
