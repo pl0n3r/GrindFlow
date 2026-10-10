@@ -31,6 +31,7 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertNotIn("$tags[$tag] = true;", SERVICE)
         self.assertIn("public function testNumericTagsRetainStringsAfterConfirmation", PHP_TEST)
         self.assertIn("JSON_UNESCAPED_UNICODE", PHP_TEST)
+        self.test_real_php_cli_offline_classification_score_and_fatigue()
 
     def test_search_intersects_text_tags_and_metadata_tenant_safely(self) -> None:
         self.assertIn("public function search(", SERVICE)
@@ -66,6 +67,7 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("'base_score' => $base", SERVICE)
         self.assertIn("public function testScoreIsDeterministicExplainablePerNetwork", PHP_TEST)
         self.assertIn("self::assertSame($first, $second);", PHP_TEST)
+        self.test_real_php_cli_offline_classification_score_and_fatigue()
 
     def test_fatigue_reduces_priority_without_expiry_and_recovers(self) -> None:
         self.assertIn("$fatigue = max(0,", SERVICE)
@@ -76,6 +78,109 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("self::assertTrue($expiredAsset['expired']", PHP_TEST)
         self.assertIn("public function testFatigueDropsPriorityWithoutExpiryAndRecovers", PHP_TEST)
         self.assertIn("self::assertSame($normal['priority'], $rested['priority']);", PHP_TEST)
+        self.test_real_php_cli_offline_classification_score_and_fatigue()
+
+    def test_real_php_cli_offline_classification_score_and_fatigue(self) -> None:
+        """Clasificación, confirmación, score, vigencia y denegaciones con PHP real."""
+        php = r'''require 'symfony/src/ContentIntelligence/ContentInsightsService.php';
+$service = new \GrindFlow\ContentIntelligence\ContentInsightsService();
+$asset = [
+    'id' => 'asset-1', 'tenant_id' => 'tenant-a',
+    'original_name' => 'TRACK.MP4', 'content_tags' => ['Original'],
+    'expired' => true,
+];
+$suggestion = $service->suggestClassification('tenant-a', $asset);
+$notConfirmed = $service->confirmSuggestion('tenant-a', $asset, $suggestion, false);
+$confirmed = $service->confirmSuggestion('tenant-a', $asset, [
+    'category' => 'video', 'tags' => ['Demo', 'demo'],
+], true);
+$signals = ['performance' => 80, 'fit' => 70, 'freshness' => 90, 'saturation' => 30];
+$normal = $service->score('tenant-a', $asset, 'instagram', $signals);
+$same = $service->score('tenant-a', $asset, 'instagram', $signals);
+$tired = $service->score('tenant-a', $asset, 'instagram', $signals, 3, 0);
+$rested = $service->score('tenant-a', $asset, 'instagram', $signals, 3, 72);
+$other = $service->score('tenant-a', $asset, 'facebook', [
+    'performance' => 0, 'fit' => 0, 'freshness' => 0, 'saturation' => 100,
+]);
+$foreignDenied = false;
+try {
+    $service->suggestClassification('tenant-b', $asset);
+} catch (\DomainException $exception) {
+    $foreignDenied = true;
+}
+$scoreForeignDenied = false;
+try {
+    $service->score('tenant-b', $asset, 'instagram', $signals);
+} catch (\DomainException $exception) {
+    $scoreForeignDenied = true;
+}
+$invalidSignalsDenied = false;
+try {
+    $service->score('tenant-a', $asset, 'instagram', [
+        'performance' => 101, 'fit' => 70, 'freshness' => 90, 'saturation' => 30,
+    ]);
+} catch (\InvalidArgumentException $exception) {
+    $invalidSignalsDenied = true;
+}
+echo json_encode([
+    'suggestion' => $suggestion,
+    'not_confirmed_same' => $notConfirmed === $asset,
+    'confirmed_category' => $confirmed['content_category'],
+    'confirmed_tags' => $confirmed['content_tags'],
+    'original_tags' => $asset['content_tags'],
+    'confirmed_expired' => $confirmed['expired'],
+    'score_deterministic' => $normal === $same,
+    'base_score' => $normal['base_score'],
+    'network' => $normal['network'],
+    'components' => $normal['components'],
+    'normal_priority' => $normal['priority'],
+    'tired_priority' => $tired['priority'],
+    'rested_priority' => $rested['priority'],
+    'tired_recommends_rest' => $tired['rest_recommended'],
+    'rested_recommends_rest' => $rested['rest_recommended'],
+    'fatigue_penalty' => $tired['fatigue_penalty'],
+    'score_no_expired' => !array_key_exists('expired', $normal),
+    'no_publication' => !$normal['publication_authorized'],
+    'other_priority' => $other['priority'],
+    'foreign_denied' => $foreignDenied,
+    'score_foreign_denied' => $scoreForeignDenied,
+    'invalid_signals_denied' => $invalidSignalsDenied,
+], JSON_THROW_ON_ERROR);
+'''
+        process = subprocess.run(
+            ["php", "-r", php], cwd=ROOT, capture_output=True,
+            text=True, timeout=10, check=False,
+        )
+        self.assertEqual(process.returncode, 0, process.stderr)
+        data = json.loads(process.stdout)
+        self.assertEqual(data["suggestion"]["category"], "video")
+        self.assertEqual(data["suggestion"]["tags"], ["video"])
+        self.assertTrue(data["suggestion"]["requires_confirmation"])
+        self.assertFalse(data["suggestion"]["applied"])
+        self.assertFalse(data["suggestion"]["publication_authorized"])
+        self.assertTrue(data["not_confirmed_same"])
+        self.assertEqual(data["confirmed_category"], "video")
+        self.assertEqual(data["confirmed_tags"], ["demo"])
+        self.assertEqual(data["original_tags"], ["Original"])
+        self.assertTrue(data["confirmed_expired"])
+        self.assertTrue(data["score_deterministic"])
+        self.assertEqual(data["network"], "instagram")
+        self.assertEqual(data["components"], {
+            "performance": 80, "fit": 70, "freshness": 90, "saturation": 30,
+        })
+        self.assertEqual(data["base_score"], 77)
+        self.assertEqual(data["normal_priority"], 77)
+        self.assertEqual(data["tired_priority"], 17)
+        self.assertEqual(data["fatigue_penalty"], 60)
+        self.assertEqual(data["rested_priority"], 77)
+        self.assertTrue(data["tired_recommends_rest"])
+        self.assertFalse(data["rested_recommends_rest"])
+        self.assertTrue(data["score_no_expired"])
+        self.assertTrue(data["no_publication"])
+        self.assertEqual(data["other_priority"], 0)
+        self.assertTrue(data["foreign_denied"])
+        self.assertTrue(data["score_foreign_denied"])
+        self.assertTrue(data["invalid_signals_denied"])
 
     def test_real_php_cli_offline_smoke_for_numeric_tags_and_paginated_search(self) -> None:
         """Ejecuta el servicio real con PHP, sin Composer, red ni base de datos."""
