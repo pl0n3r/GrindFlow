@@ -30,7 +30,7 @@ function exact(string $at): array
     return ['kind' => 'exact', 'at_utc' => $at];
 }
 
-function range(string $start, string $end, string $kind = 'range'): array
+function rangeWindow(string $start, string $end, string $kind = 'range'): array
 {
     return [
         'kind' => $kind, 'start_utc' => $start, 'end_utc' => $end,
@@ -62,7 +62,7 @@ $planner = new MinimalReschedulePlanner();
 switch ($scenario) {
     case 'AC-01':
         $items = [
-            item('normal-1', 'normal', $at, range($before, $after)),
+            item('normal-1', 'normal', $at, rangeWindow($before, $after)),
             item('urgent-1', 'urgente', $at, exact($at)),
             item('high-1', 'alta', $after, exact($after))
         ];
@@ -70,8 +70,8 @@ switch ($scenario) {
             'kept' => ['high-1', 'urgent-1'], 'move' => ['normal-1']
         ], 'priority');
         $ties = [
-            item('z-last', 'alta', $at, range($before, $after)),
-            item('a-first', 'alta', $at, range($before, $after))
+            item('z-last', 'alta', $at, rangeWindow($before, $after)),
+            item('a-first', 'alta', $at, rangeWindow($before, $after))
         ];
         verify($resolver->resolve($ties) === [
             'kept' => ['a-first'], 'move' => ['z-last']
@@ -79,25 +79,25 @@ switch ($scenario) {
         break;
 
     case 'AC-02':
-        $window = range($before, $after);
+        $window = rangeWindow($before, $after);
         verify($selector->choose($window, $at, []) === $at, 'prefer_original');
         verify($selector->choose($window, $at, [$at]) === $before, 'nearest_slot');
-        verify($selector->choose(range($before, $after, 'suggested'), $at, [$at, $before]) ===
+        verify($selector->choose(rangeWindow($before, $after, 'suggested'), $at, [$at, $before]) ===
             $after, 'suggested');
         verify($selector->choose(exact($at), $at, []) === $at, 'exact');
         verify($selector->choose(exact($at), $at, [$at]) === null, 'exact_busy');
         verify(rejected(fn () => $selector->candidates(exact($at), $before)), 'exact_mismatch');
         verify(rejected(fn () => $selector->candidates(
-            range('2026-02-31T09:00:00Z', $after), $at
+            rangeWindow('2026-02-31T09:00:00Z', $after), $at
         )), 'reject_normalized_date');
         verify(rejected(fn () => $selector->candidates(
-            range($before, '2026-10-14T11:00:00Z'), $at
+            rangeWindow($before, '2026-10-14T11:00:00Z'), $at
         )), 'reject_unbounded');
         break;
 
     case 'AC-03':
         $items = [
-            item('a-to-move', 'normal', $at, range($before, $after)),
+            item('a-to-move', 'normal', $at, rangeWindow($before, $after)),
             item('b-winner', 'urgente', $at, exact($at)),
             item('c-stable', 'normal', '2026-10-12T12:00:00Z', exact('2026-10-12T12:00:00Z')),
             item('d-stable', 'alta', $after, exact($after))
@@ -112,7 +112,7 @@ switch ($scenario) {
 
     case 'AC-04':
         $items = [
-            item('a', 'normal', $at, range($before, $after)),
+            item('a', 'normal', $at, rangeWindow($before, $after)),
             item('b', 'urgente', $at, exact($at)),
             item('c', 'alta', $after, exact($after))
         ];
