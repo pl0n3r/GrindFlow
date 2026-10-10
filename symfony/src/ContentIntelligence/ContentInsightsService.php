@@ -253,8 +253,11 @@ final class ContentInsightsService
             if ($tag === '') {
                 throw new \InvalidArgumentException('Etiqueta vacía.');
             }
-            $tags[$tag] = true;
+            // No usar claves asociativas: PHP convierte "2026"/"42" a int.
+            if (!in_array($tag, $tags, true)) {
+                $tags[] = $tag;
+            }
         }
-        return array_keys($tags);
+        return $tags;
     }
 }

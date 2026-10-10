@@ -24,6 +24,11 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("return $asset;", SERVICE)
         self.assertIn("public function testSuggestionsRequireExplicitConfirmationAndStayEditable", PHP_TEST)
         self.assertIn("self::assertSame($original, $asset", PHP_TEST)
+        self.assertIn("if (!in_array($tag, $tags, true))", SERVICE)
+        self.assertIn("return $tags;", SERVICE)
+        self.assertNotIn("$tags[$tag] = true;", SERVICE)
+        self.assertIn("public function testNumericTagsRetainStringsAfterConfirmation", PHP_TEST)
+        self.assertIn("JSON_UNESCAPED_UNICODE", PHP_TEST)
 
     def test_search_intersects_text_tags_and_metadata_tenant_safely(self) -> None:
         self.assertIn("public function search(", SERVICE)

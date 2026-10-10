@@ -52,6 +52,29 @@ final class ContentInsightsServiceTest extends TestCase
         self::assertArrayNotHasKey('publication_authorized', $updated);
     }
 
+    public function testNumericTagsRetainStringsAfterConfirmation(): void
+    {
+        $asset = self::asset();
+        $proposal = ['category' => 'image', 'tags' => ['2026', '42', '0', '2026', 'MÚSICA']];
+        $confirmed = $this->service->confirmSuggestion('tenant-a', $asset, $proposal, true);
+        self::assertSame(['2026', '42', '0', 'música'], $confirmed['content_tags']);
+        self::assertSame(
+            '["2026","42","0","música"]',
+            json_encode($confirmed['content_tags'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+        );
+        self::assertSame(['Marca', 'Otoño'], $asset['content_tags'], 'No mutar el original.');
+        self::assertSame(['asset-1'], $this->service->search('tenant-a', [$confirmed], '', ['2026']));
+
+        try {
+            $this->service->confirmSuggestion('tenant-a', $asset, [
+                'category' => 'image', 'tags' => [2026],
+            ], true);
+            self::fail('No se admiten etiquetas numéricas sin tipo string.');
+        } catch (\InvalidArgumentException $expected) {
+            self::assertSame('Etiqueta inválida.', $expected->getMessage());
+        }
+    }
+
     public function testSearchIntersectsTextTagsMetadataAndTenant(): void
     {
         $a = self::asset();
