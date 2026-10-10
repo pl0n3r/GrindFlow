@@ -31,6 +31,13 @@ final class LibraryCollectionsController extends AbstractController
         if ($after instanceof JsonResponse) {
             return $after;
         }
+        if ($after !== null && $db->fetchOne(
+            'SELECT id FROM gf_vault_collections WHERE organization_id = :organization AND id = :after LIMIT 1',
+            ['organization' => $context['organization']['id'], 'after' => $after],
+        ) === false) {
+            return $this->error(422, 'invalid_cursor', 'Cursor de página inválido.');
+        }
+
         $params = ['organization' => $context['organization']['id']];
         $cursorFilter = '';
         if ($after !== null) {
@@ -202,6 +209,7 @@ final class LibraryCollectionsController extends AbstractController
         return match ($result['status'] ?? null) {
             'ok' => $this->privateJson(['data' => $result + ['publishes' => false]], $status),
             'forbidden' => $this->error(403, 'library_access_changed', 'El acceso fue revocado.'),
+            'invalid_cursor' => $this->error(422, 'invalid_cursor', 'Cursor de página inválido.'),
             'missing' => $this->error(404, 'asset_not_found', 'No disponible en esta organización.'),
             'conflict' => $this->error(409, 'variant_conflict', 'La relación no puede crearse.'),
             default => $this->error(422, 'invalid_variant', 'Relación de contenido inválida.'),

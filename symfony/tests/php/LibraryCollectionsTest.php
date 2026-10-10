@@ -180,6 +180,53 @@ final class LibraryCollectionsTest extends KernelTestCase
         ));
     }
 
+    public function testPaginationRejectsForeignOrUnrelatedCursors(): void
+    {
+        self::bootKernel();
+        [$db, $library, $actor, $org, , $master, $foreignAsset] = $this->fixture();
+        $firstCollection = $library->createCollection($org, $actor)['id'];
+        $secondCollection = $library->createCollection($org, $actor)['id'];
+        $variantA = $this->addAsset($db, $org, $actor);
+        $variantB = $this->addAsset($db, $org, $actor);
+        $unrelated = $this->addAsset($db, $org, $actor);
+
+        foreach ([$master, $variantA, $variantB] as $asset) {
+            self::assertSame('ok',
+                $library->attachAsset($org, $actor, $firstCollection, $asset)['status']);
+        }
+        self::assertSame('ok',
+            $library->attachAsset($org, $actor, $secondCollection, $master)['status']);
+        foreach ([$variantA, $variantB] as $variant) {
+            self::assertSame('ok',
+                $library->linkVariant($org, $actor, $master, $variant, 'format')['status']);
+        }
+
+        foreach ([
+            ['method' => 'assetsForCollection', 'subject' => $firstCollection, 'field' => 'assets'],
+            ['method' => 'collectionsForAsset', 'subject' => $master, 'field' => 'collections'],
+            ['method' => 'variantsForMaster', 'subject' => $master, 'field' => 'variants'],
+        ] as $case) {
+            $first = $library->{$case['method']}($org, $actor, $case['subject']);
+            self::assertSame('ok', $first['status']);
+            $items = $first[$case['field']];
+            self::assertGreaterThanOrEqual(2, count($items));
+            $cursor = is_array($items[0]) ? $items[0]['asset_id'] : $items[0];
+            $next = $library->{$case['method']}(
+                $org, $actor, $case['subject'], strtoupper($cursor),
+            );
+            self::assertSame('ok', $next['status']);
+            self::assertSame(array_slice($items, 1), $next[$case['field']]);
+
+            // UUID válidos de un asset ajeno a la relación o a la organización.
+            foreach ([$unrelated, $foreignAsset] as $badCursor) {
+                $result = $library->{$case['method']}(
+                    $org, $actor, $case['subject'], $badCursor,
+                );
+                self::assertSame('invalid_cursor', $result['status'], $case['method']);
+            }
+        }
+    }
+
     public function testCrossTenantMembershipAndReferencesFailClosed(): void
     {
         self::bootKernel();

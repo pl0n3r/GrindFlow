@@ -87,6 +87,18 @@ final readonly class AssetCollectionApplication
             return ['status' => 'missing'];
         }
 
+        // El cursor debe pertenecer a este conjunto y continuar visible.
+        if ($after !== null && $this->db->fetchOne(
+            'SELECT link.asset_id FROM gf_vault_collection_assets link '
+            .'INNER JOIN gf_vault_assets asset ON asset.organization_id = link.organization_id '
+            .'AND asset.id = link.asset_id AND asset.deleted_at IS NULL '
+            .'WHERE link.organization_id = :organization AND link.collection_id = :collection '
+            .'AND link.asset_id = :after LIMIT 1',
+            ['organization' => $organization, 'collection' => $collection, 'after' => strtolower($after)],
+        ) === false) {
+            return ['status' => 'invalid_cursor'];
+        }
+
         $params = ['organization' => $organization, 'collection' => $collection];
         $cursorFilter = '';
         if ($after !== null) {
@@ -120,6 +132,16 @@ final readonly class AssetCollectionApplication
             || !Uuid::isValid($asset) || !$this->member($this->db, $organization, $actor, false)
             || !$this->asset($this->db, $organization, $asset, false)) {
             return ['status' => 'missing'];
+        }
+
+        // Un UUID no relacionado no autoriza saltar elementos del listado.
+        if ($after !== null && $this->db->fetchOne(
+            'SELECT link.collection_id FROM gf_vault_collection_assets link '
+            .'WHERE link.organization_id = :organization AND link.asset_id = :asset '
+            .'AND link.collection_id = :after LIMIT 1',
+            ['organization' => $organization, 'asset' => $asset, 'after' => strtolower($after)],
+        ) === false) {
+            return ['status' => 'invalid_cursor'];
         }
 
         $params = ['organization' => $organization, 'asset' => $asset];
@@ -224,6 +246,18 @@ final readonly class AssetCollectionApplication
             || !Uuid::isValid($master) || !$this->member($this->db, $organization, $actor, false)
             || !$this->asset($this->db, $organization, $master, false)) {
             return ['status' => 'missing'];
+        }
+
+        // Un cursor de otro maestro no es un límite de esta lista.
+        if ($after !== null && $this->db->fetchOne(
+            'SELECT link.variant_asset_id FROM gf_vault_asset_variants link '
+            .'INNER JOIN gf_vault_assets asset ON asset.organization_id = link.organization_id '
+            .'AND asset.id = link.variant_asset_id AND asset.deleted_at IS NULL '
+            .'WHERE link.organization_id = :organization AND link.master_asset_id = :master '
+            .'AND link.variant_asset_id = :after LIMIT 1',
+            ['organization' => $organization, 'master' => $master, 'after' => strtolower($after)],
+        ) === false) {
+            return ['status' => 'invalid_cursor'];
         }
 
         $params = ['organization' => $organization, 'master' => $master];

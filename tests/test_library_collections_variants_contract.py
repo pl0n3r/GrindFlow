@@ -66,6 +66,25 @@ class LibraryCollectionsVariantsContractTests(unittest.TestCase):
         self.assertIn("isCsrfTokenValid", self.controller)
         self.assertIn("testCrossTenantMembershipAndReferencesFailClosed", self.integration)
 
+    def test_cursor_must_belong_to_authorized_relation(self):
+        self.assertEqual(
+            3, self.service.count("return ['status' => 'invalid_cursor'];")
+        )
+        self.assertIn("AND link.asset_id = :after LIMIT 1", self.service)
+        self.assertIn("AND link.collection_id = :after LIMIT 1", self.service)
+        self.assertIn("AND link.variant_asset_id = :after LIMIT 1", self.service)
+        self.assertIn(
+            "SELECT id FROM gf_vault_collections WHERE organization_id = :organization AND id = :after LIMIT 1",
+            self.controller,
+        )
+        self.assertIn(
+            "'invalid_cursor' => $this->error(422, 'invalid_cursor'",
+            self.controller,
+        )
+        self.assertIn(
+            "testPaginationRejectsForeignOrUnrelatedCursors", self.integration
+        )
+
     def test_pagination_after_100_preserves_tenant_scope_and_cursor(self):
         self.assertIn("testAllRelationsRemainDiscoverableBeyondHundredRows", self.integration)
         for sql_key in ("link.asset_id", "link.collection_id", "link.variant_asset_id"):
