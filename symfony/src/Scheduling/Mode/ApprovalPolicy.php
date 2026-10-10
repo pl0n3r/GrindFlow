@@ -41,11 +41,13 @@ final class ApprovalPolicy
             || (!$request['approval_required'] && ($roles !== [] || $responses !== []))) {
             return self::result('invalid');
         }
-        if ($request['expires_at'] <= $now) {
-            return self::result('expired');
-        }
+        // No approval request exists when approval is optional; its old
+        // expiry timestamp cannot veto an otherwise valid individual profile.
         if (!$request['approval_required']) {
             return self::result('not_required', true);
+        }
+        if ($request['expires_at'] <= $now) {
+            return self::result('expired');
         }
 
         $seen = [];

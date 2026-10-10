@@ -125,6 +125,18 @@ $tests = [
         $req['required_roles'] = [];
         check($p->decide($req, [], $now)['status'] === 'not_required',
             'optional_personal');
+        // An expired timestamp applies to an actual required approval only.
+        $req['expires_at'] = $now;
+        $optionalExpired = $p->decide($req, [], $now);
+        check($optionalExpired['status'] === 'not_required'
+            && $optionalExpired['approved'] && $optionalExpired['audit'] === [],
+            'optional_personal_no_expiry_veto');
+        check($p->decide($req, [response('owner')], $now)['status'] === 'invalid',
+            'optional_personal_rejects_spurious_approval');
+        $req['approval_required'] = true;
+        $req['required_roles'] = ['owner'];
+        check($p->decide($req, [response('owner')], $now)['status'] === 'expired',
+            'required_personal_still_expires');
         $req = request();
         $out = $p->decide($req, [['secret' => 'untrusted']], $now);
         check($out['status'] === 'invalid' && !str_contains(json_encode($out),

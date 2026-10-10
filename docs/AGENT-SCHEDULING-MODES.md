@@ -16,7 +16,7 @@ confirmed es una afirmación del llamador: la función no valida sesión, CSRF, 
 
 ApprovalPolicy::decide(request, responses, now) devuelve approved, status (invalid, expired, not_required, pending, rejected, approved), roles pendientes y auditoría mínima de **rol, decisión y timestamp**, sin IDs de personas ni texto externo. La petición y cada respuesta deben pertenecer al mismo tenant y creador. La evaluación es fail-closed con entradas inesperadas, miembros duplicados, roles fuera de alcance, expiración o rol sin prueba de autorización. Los roles anidados/no-string se rechazan antes de las comparaciones PHP de conjuntos, sin avisos ni excepciones por conversión de tipos. Una denegación vence incluso con otros roles aprobados.
 
-- **Independiente:** aprobación propia opcional; cuando se exige, únicamente rol owner verificado.
+- **Independiente:** aprobación propia opcional; cuando se exige, únicamente rol owner verificado. Sin aprobación requerida, devuelve `not_required` incluso si un timestamp de vencimiento anterior ya pasó, siempre que el esquema sea válido y no lleguen respuestas. Si se exige aprobación, sigue aplicándose `expires_at` y vence cerrado.
 - **Studio:** siempre necesita al menos un rol configurado y **todos** sus roles exigidos (owner, editor, producer, reviewer) deben aprobar antes de approved.
 - role_verified=true solo puede venir de un contexto servidor previamente autenticado y verificado. **Este módulo no comprueba membresía** ni persiste decisiones o registros; el llamador debe autenticar, fijar un audit log real e impedir replays/reentradas con identificadores/versión/locks. La auditoría de salida es una proyección de pruebas, no comprobante legal ni autorización de ejecución.
 
