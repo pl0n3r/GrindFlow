@@ -145,6 +145,7 @@ final class ContentInsightsService
         }
 
         $ids = [];
+        $seenAssets = [];
         foreach ($assets as $asset) {
             if (!is_array($asset) || ($asset['tenant_id'] ?? null) !== $tenantId) {
                 continue;
@@ -152,6 +153,14 @@ final class ContentInsightsService
             $id = $asset['id'] ?? null;
             if (!is_string($id) || $id === '' || strlen($id) > 128) {
                 continue;
+            }
+            $identity = 'id:' . $id;
+            if (array_key_exists($identity, $seenAssets)) {
+                if ($seenAssets[$identity] !== $asset) {
+                    throw new \InvalidArgumentException('Asset duplicado inconsistente.');
+                }
+            } else {
+                $seenAssets[$identity] = $asset;
             }
             $originalTags = $this->normalizeTags($asset['content_tags'] ?? []);
             if (array_diff($tags, $originalTags) !== []) {
@@ -176,7 +185,7 @@ final class ContentInsightsService
             }
             if ($matches) {
                 // Prefijar evita que PHP convierta IDs numéricos-string a int.
-                $ids['id:' . $id] = $id;
+                $ids[$identity] = $id;
             }
         }
         $result = array_values($ids);

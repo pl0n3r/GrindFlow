@@ -60,6 +60,7 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         # AC-02 debe ejecutar el servicio PHP real, no aceptar solo grep del código.
         self.assertIn("testTagListsRejectAssociativeShapeAndKeepStringIds", PHP_TEST)
         self.test_real_php_cli_offline_smoke_for_numeric_tags_and_paginated_search()
+        self.test_real_php_rejects_conflicting_duplicate_asset_ids()
 
     def test_score_components_deterministic_explainable_per_network(self) -> None:
         self.assertIn("public function score(", SERVICE)
@@ -304,6 +305,45 @@ echo json_encode([
         self.assertTrue(data["associative_confirmation_denied"])
         self.assertTrue(data["associative_search_denied"])
         self.assertTrue(data["associative_asset_denied"])
+
+    def test_real_php_rejects_conflicting_duplicate_asset_ids(self) -> None:
+        """Two records sharing an ID must not give contradictory filtered results."""
+        php = r'''require 'symfony/src/ContentIntelligence/ContentInsightsService.php';
+$service = new \GrindFlow\ContentIntelligence\ContentInsightsService();
+$first = [
+    'id' => 'asset-7', 'tenant_id' => 'tenant-a', 'content_tags' => ['fashion'],
+    'original_name' => 'asset.jpg', 'title' => 'demo', 'campaign' => 'A',
+];
+$other = $first;
+$other['content_tags'] = ['home'];
+$changedMetadata = $first;
+$changedMetadata['campaign'] = 'B';
+$rejected = [];
+foreach ([[$first, $other], [$other, $first], [$first, $changedMetadata]] as $assets) {
+    foreach (['fashion', 'home'] as $tag) {
+        try {
+            $service->searchPage('tenant-a', $assets, '', [$tag]);
+            $rejected[] = false;
+        } catch (\InvalidArgumentException $e) {
+            $rejected[] = $e->getMessage() === 'Asset duplicado inconsistente.';
+        }
+    }
+}
+$foreign = $other;
+$foreign['tenant_id'] = 'tenant-b';
+echo json_encode([
+    'rejected' => $rejected,
+    'same' => $service->searchPage('tenant-a', [$first, $first], '', ['fashion'])['ids'],
+    'foreign' => $service->searchPage('tenant-a', [$first, $foreign], '', ['fashion'])['ids'],
+], JSON_THROW_ON_ERROR);
+'''
+        result = subprocess.run(["php", "-r", php], cwd=ROOT, capture_output=True,
+                                text=True, timeout=10, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertEqual(data["rejected"], [True] * 6)
+        self.assertEqual(data["same"], ["asset-7"])
+        self.assertEqual(data["foreign"], ["asset-7"])
 
     def test_unknown_score_signals_fail_closed_in_real_php(self) -> None:
         """AC-03: no aceptar una métrica desconocida como si se hubiera puntuado."""

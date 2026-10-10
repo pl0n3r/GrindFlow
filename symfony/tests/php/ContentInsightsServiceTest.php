@@ -200,6 +200,34 @@ final class ContentInsightsServiceTest extends TestCase
         $this->service->searchPage('tenant-a', $assets, 'otoño', ['marca'], [], 'foreign-999');
     }
 
+    public function testConflictingDuplicateIdsFailClosedRegardlessOfFilter(): void
+    {
+        $first = self::asset();
+        $second = $first;
+        $second['content_tags'] = ['HOME'];
+        $changedMetadata = $first;
+        $changedMetadata['campaign'] = 'different';
+        self::assertSame(['asset-1'], $this->service->searchPage(
+            'tenant-a', [$first, $first], '', ['marca']
+        )['ids'], 'An identical replay is harmless.');
+        $foreign = $second;
+        $foreign['tenant_id'] = 'tenant-b';
+        self::assertSame(['asset-1'], $this->service->searchPage(
+            'tenant-a', [$first, $foreign], '', ['marca']
+        )['ids'], 'A foreign tenant must not poison the local identity.');
+
+        foreach ([[$first, $second], [$second, $first], [$first, $changedMetadata]] as $rows) {
+            foreach (['marca', 'home'] as $tag) {
+                try {
+                    $this->service->searchPage('tenant-a', $rows, '', [$tag]);
+                    self::fail('Conflicting duplicate IDs must never yield filter-dependent results.');
+                } catch (\InvalidArgumentException $expected) {
+                    self::assertSame('Asset duplicado inconsistente.', $expected->getMessage());
+                }
+            }
+        }
+    }
+
     public function testNumericAssetIdsRemainStringsInSearchPage(): void
     {
         $asset = self::asset();
