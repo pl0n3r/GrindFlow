@@ -72,6 +72,17 @@ $cases = [
             rejects(static fn () => $template->apply(pattern($scope, 'bound_1'),
                 ['tenant_id' => 't1', $key => 'other']));
         }
+        rejects(static fn () => $template->apply(pattern('account', 'a'),
+            ['tenant_id' => 't1', 'campaign_id' => 'a']));
+        foreach ([
+            ['weekdays', [1, 1]], ['weekdays', [0]], ['weekdays', [8]],
+            ['local_time', '24:00'], ['frequency_days', 0],
+            ['frequency_days', 91], ['end_date', '2026-10-09'],
+        ] as [$field, $invalid]) {
+            $bad = pattern('account', 'a');
+            $bad[$field] = $invalid;
+            rejects(static fn () => $template->apply($bad, ['tenant_id' => 't1', 'account_id' => 'a']));
+        }
         $bad = pattern('account', 'a');
         $bad['timezone'] = 'Not/AZone';
         rejects(static fn () => $template->apply($bad, ['tenant_id' => 't1', 'account_id' => 'a']));
@@ -113,6 +124,7 @@ $cases = [
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), ownership(['one'])));
         $extra = ownership(['one', 'two', 'extra']);
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $extra));
+        rejects(static fn () => $calendar->define($first, pattern('account', 'campaign_A'), ownership(['one', 'two'])));
         $duplicate = $first;
         $duplicate['collection_ids'] = ['one', 'one'];
         rejects(static fn () => $calendar->define($duplicate, pattern('campaign', 'campaign_A'), ownership(['one'])));
@@ -131,6 +143,26 @@ $cases = [
         $case = failure();
         unset($case['delivery_state']);
         ensure($classifier->classify($case)['reason'] === 'invalid_input', 'missing_evidence');
+        $case = failure();
+        $case['delivery_state'] = 'succeeded';
+        ensure($classifier->classify($case) === [
+            'decision' => 'retry_never', 'reason' => 'not_a_confirmed_failure',
+        ], 'succeeded_is_not_failure');
+        $case = failure();
+        $case['failure_code'] = 'permission_denied';
+        ensure($classifier->classify($case) === [
+            'decision' => 'needs_human', 'reason' => 'authorization_required',
+        ], 'permission_needs_human');
+        $case = failure();
+        $case['max_attempts'] = 6;
+        ensure($classifier->classify($case) === [
+            'decision' => 'retry_never', 'reason' => 'invalid_input',
+        ], 'max_attempts_hard_limit');
+        $case = failure();
+        $case['unexpected'] = 'extra';
+        ensure($classifier->classify($case) === [
+            'decision' => 'retry_never', 'reason' => 'invalid_input',
+        ], 'unexpected_keys_fail_closed');
     },
     'idempotent' => static function (): void {
         $classifier = new RetryClassifier();
