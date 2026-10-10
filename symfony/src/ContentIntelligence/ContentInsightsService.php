@@ -202,7 +202,6 @@ final class ContentInsightsService
             'fatigue_penalty' => $fatigue,
             'priority' => max(0, $base - $fatigue),
             'rest_recommended' => $fatigue > 0,
-            'expired' => false,
             'publication_authorized' => false,
         ];
     }

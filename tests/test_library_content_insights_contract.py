@@ -49,7 +49,9 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("$fatigue = max(0,", SERVICE)
         self.assertIn("intdiv($restHours, 24)", SERVICE)
         self.assertIn("'priority' => max(0, $base - $fatigue)", SERVICE)
-        self.assertIn("'expired' => false", SERVICE)
+        self.assertNotIn("'expired' => false", SERVICE)
+        self.assertIn("self::assertArrayNotHasKey('expired', $expiredScore);", PHP_TEST)
+        self.assertIn("self::assertTrue($expiredAsset['expired']", PHP_TEST)
         self.assertIn("public function testFatigueDropsPriorityWithoutExpiryAndRecovers", PHP_TEST)
         self.assertIn("self::assertSame($normal['priority'], $rested['priority']);", PHP_TEST)
 

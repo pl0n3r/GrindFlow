@@ -98,7 +98,12 @@ final class ContentInsightsServiceTest extends TestCase
         self::assertSame($normal['priority'], $rested['priority']);
         self::assertTrue($tired['rest_recommended']);
         self::assertFalse($rested['rest_recommended']);
-        self::assertFalse($tired['expired']);
+        self::assertArrayNotHasKey('expired', $tired);
+        $expiredAsset = self::asset();
+        $expiredAsset['expired'] = true;
+        $expiredScore = $this->service->score('tenant-a', $expiredAsset, 'instagram', $signals, 3, 0);
+        self::assertArrayNotHasKey('expired', $expiredScore);
+        self::assertTrue($expiredAsset['expired'], 'La puntuación no debe alterar la vigencia real.');
     }
 
     public function testOfflineFakeDeniesForeignTenantAndInvalidSignals(): void
