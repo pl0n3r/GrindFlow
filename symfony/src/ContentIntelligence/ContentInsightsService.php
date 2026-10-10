@@ -104,7 +104,7 @@ final class ContentInsightsService
         array $requiredMetadata = [],
     ): array {
         $this->assertTenantId($tenantId);
-        $text = strtolower(trim($text));
+        $text = $this->foldSearchText(trim($text));
         if (strlen($text) > 80) {
             throw new \InvalidArgumentException('Búsqueda demasiado larga.');
         }
@@ -133,7 +133,7 @@ final class ContentInsightsService
             if (array_diff($tags, $originalTags) !== []) {
                 continue;
             }
-            $haystack = strtolower(implode(' ', array_filter([
+            $haystack = $this->foldSearchText(implode(' ', array_filter([
                 is_string($asset['original_name'] ?? null) ? $asset['original_name'] : '',
                 is_string($asset['title'] ?? null) ? $asset['title'] : '',
                 is_string($asset['description'] ?? null) ? $asset['description'] : '',
@@ -145,7 +145,7 @@ final class ContentInsightsService
             $matches = true;
             foreach ($requiredMetadata as $key => $value) {
                 if (!isset($asset[$key]) || !is_string($asset[$key])
-                    || strtolower($asset[$key]) !== strtolower($value)) {
+                    || $this->foldSearchText($asset[$key]) !== $this->foldSearchText($value)) {
                     $matches = false;
                     break;
                 }
@@ -222,6 +222,22 @@ final class ContentInsightsService
         }
     }
 
+    /**
+     * Case-fold acotado para búsqueda Library en castellano y latín habitual.
+     * No requiere ext-mbstring; no cambia tildes ni normaliza grafías distintas.
+     * Mantener consulta, tags, campos y filtros con exactamente la misma función.
+     */
+    private function foldSearchText(string $value): string
+    {
+        return strtolower(strtr($value, [
+            'Á' => 'á', 'É' => 'é', 'Í' => 'í', 'Ó' => 'ó', 'Ú' => 'ú',
+            'Ü' => 'ü', 'Ñ' => 'ñ', 'À' => 'à', 'È' => 'è', 'Ì' => 'ì',
+            'Ò' => 'ò', 'Ù' => 'ù', 'Â' => 'â', 'Ê' => 'ê', 'Î' => 'î',
+            'Ô' => 'ô', 'Û' => 'û', 'Ä' => 'ä', 'Ë' => 'ë', 'Ï' => 'ï',
+            'Ö' => 'ö', 'Ÿ' => 'ÿ', 'Ã' => 'ã', 'Õ' => 'õ', 'Ç' => 'ç',
+        ]));
+    }
+
     /** @return list<string> */
     private function normalizeTags(mixed $input): array
     {
@@ -233,7 +249,7 @@ final class ContentInsightsService
             if (!is_string($value) || strlen($value) > 40 || $value === '') {
                 throw new \InvalidArgumentException('Etiqueta inválida.');
             }
-            $tag = strtolower(trim($value));
+            $tag = $this->foldSearchText(trim($value));
             if ($tag === '') {
                 throw new \InvalidArgumentException('Etiqueta vacía.');
             }

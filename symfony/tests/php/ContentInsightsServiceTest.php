@@ -71,6 +71,27 @@ final class ContentInsightsServiceTest extends TestCase
         self::assertNotContains('private-foreign', $result);
     }
 
+    public function testSearchUnicodeCasefoldPreservesTenantIsolation(): void
+    {
+        $mine = self::asset('tenant-a', 'CAMPAÑA.JPG');
+        $mine['title'] = 'EXHIBICIÓN';
+        $mine['content_tags'] = ['MÚSICA'];
+        $mine['campaign'] = 'MÚSICA';
+        $foreign = $mine;
+        $foreign['id'] = 'private-foreign';
+        $foreign['tenant_id'] = 'tenant-b';
+
+        self::assertSame(['asset-1'], $this->service->search(
+            'tenant-a', [$mine, $foreign], 'campaña', ['música'], ['campaign' => 'música']
+        ));
+        self::assertSame(['asset-1'], $this->service->search(
+            'tenant-a', [self::asset('tenant-a', 'campaña.jpg')], 'CAMPAÑA'
+        ));
+        self::assertSame([], $this->service->search(
+            'tenant-b', [$mine], 'campaña', ['música']
+        ));
+    }
+
     public function testScoreIsDeterministicExplainablePerNetwork(): void
     {
         $a = self::asset();
