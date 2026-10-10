@@ -41,6 +41,7 @@ function pattern(string $scope, string $target, string $tenant = 't1'): array
 function ownership(array $collectionIds): array
 {
     return [
+        'account_id' => 'account_A',
         'account_tenant_id' => 't1',
         'collection_tenant_by_id' => array_fill_keys($collectionIds, 't1'),
     ];
@@ -106,6 +107,9 @@ $cases = [
         $foreignAccount = ownership(['one', 'two']);
         $foreignAccount['account_tenant_id'] = 't2';
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $foreignAccount));
+        $wrongAccount = ownership(['one', 'two']);
+        $wrongAccount['account_id'] = 'account_B';
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $wrongAccount));
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), ownership(['one'])));
         $extra = ownership(['one', 'two', 'extra']);
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $extra));

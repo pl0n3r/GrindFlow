@@ -59,11 +59,12 @@ final class CampaignCalendar
      */
     private function verifyOwnership(array $campaign, array $ownership): void
     {
-        $expected = ['account_tenant_id', 'collection_tenant_by_id'];
+        $expected = ['account_id', 'account_tenant_id', 'collection_tenant_by_id'];
         $keys = array_keys($ownership);
         sort($keys);
         sort($expected);
         if ($keys !== $expected
+            || $ownership['account_id'] !== $campaign['account_id']
             || $ownership['account_tenant_id'] !== $campaign['tenant_id']
             || !is_array($ownership['collection_tenant_by_id'])
             || count($ownership['collection_tenant_by_id']) !== count($campaign['collection_ids'])) {
