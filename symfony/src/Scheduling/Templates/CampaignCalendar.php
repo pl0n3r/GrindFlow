@@ -9,7 +9,7 @@ use InvalidArgumentException;
 /** Immutable campaign-level calendar description. Never writes or publishes. */
 final class CampaignCalendar
 {
-    public function define(array $campaign, array $pattern): array
+    public function define(array $campaign, array $pattern, array $ownership = []): array
     {
         $expected = ['tenant_id', 'campaign_id', 'account_id', 'collection_ids'];
         $keys = array_keys($campaign);
@@ -34,6 +34,8 @@ final class CampaignCalendar
             throw new InvalidArgumentException('duplicate_campaign_collection');
         }
 
+        $this->verifyOwnership($campaign, $ownership);
+
         $effective = (new CalendarTemplate())->apply($pattern, [
             'tenant_id' => $campaign['tenant_id'],
             'campaign_id' => $campaign['campaign_id'],
@@ -49,5 +51,29 @@ final class CampaignCalendar
             'rule' => $effective,
             'activation_allowed' => false,
         ];
+    }
+
+    /**
+     * Ownership is a trusted, server-sourced catalog snapshot injected by the
+     * eventual consumer; callers must not synthesize it from campaign input.
+     */
+    private function verifyOwnership(array $campaign, array $ownership): void
+    {
+        $expected = ['account_tenant_id', 'collection_tenant_by_id'];
+        $keys = array_keys($ownership);
+        sort($keys);
+        sort($expected);
+        if ($keys !== $expected
+            || $ownership['account_tenant_id'] !== $campaign['tenant_id']
+            || !is_array($ownership['collection_tenant_by_id'])
+            || count($ownership['collection_tenant_by_id']) !== count($campaign['collection_ids'])) {
+            throw new InvalidArgumentException('invalid_campaign_ownership');
+        }
+        foreach ($campaign['collection_ids'] as $id) {
+            if (!array_key_exists($id, $ownership['collection_tenant_by_id'])
+                || $ownership['collection_tenant_by_id'][$id] !== $campaign['tenant_id']) {
+                throw new InvalidArgumentException('invalid_campaign_ownership');
+            }
+        }
     }
 }

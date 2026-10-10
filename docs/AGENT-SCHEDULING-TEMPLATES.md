@@ -6,7 +6,7 @@ Hoja build-ahead de [GrindFlow #429](https://github.com/pl0n3r/GrindFlow/issues/
 
 `CalendarTemplate::apply(pattern, target)` vincula una plantilla a una sola cuenta, campaña o período del **mismo tenant**. Valida identificadores, zona IANA, hora local, weekdays ISO 1–7, frecuencia y fechas reales. Rechaza ámbito cruzado, tenant distinto, patrón malformado y fechas imposibles; no incluye texto externo ni PII en las excepciones. El resultado es solo una descripción normalizada, no una programación ejecutada.
 
-`CampaignCalendar::define(campaign, pattern)` asocia una regla a la campaña y su colección explícita. Cada resultado es independiente de otras campañas, incluso cuando comparten cuenta. IDs duplicados, colecciones vacías y tenants ajenos se rechazan. `activation_allowed=false` permanece explícito: no programa ni publica.
+`CampaignCalendar::define(campaign, pattern, ownership)` asocia una regla a la campaña y su colección explícita. `ownership` es un snapshot **obligatorio** de catálogo validado en el servidor (`account_tenant_id` y mapa completo `collection_tenant_by_id`), inyectado por el consumidor futuro; nunca se debe construir a partir de IDs enviados por el cliente. Sin ese snapshot o cuando una cuenta/colección pertenezca a otro tenant, el método falla cerrado. Cada resultado es independiente de otras campañas, incluso cuando comparten cuenta. IDs duplicados, colecciones vacías y tenants ajenos se rechazan. `activation_allowed=false` permanece explícito: no programa ni publica.
 
 ## Recuperación
 

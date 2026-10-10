@@ -38,6 +38,14 @@ function pattern(string $scope, string $target, string $tenant = 't1'): array
     ];
 }
 
+function ownership(array $collectionIds): array
+{
+    return [
+        'account_tenant_id' => 't1',
+        'collection_tenant_by_id' => array_fill_keys($collectionIds, 't1'),
+    ];
+}
+
 function failure(): array
 {
     return [
@@ -76,7 +84,7 @@ $cases = [
             'tenant_id' => 't1', 'campaign_id' => 'campaign_A',
             'account_id' => 'account_A', 'collection_ids' => ['one', 'two'],
         ];
-        $a = $calendar->define($first, pattern('campaign', 'campaign_A'));
+        $a = $calendar->define($first, pattern('campaign', 'campaign_A'), ownership(['one', 'two']));
         ensure($a['rule']['scope'] === 'campaign', 'campaign_scope');
         ensure($a['collection_ids'] === ['one', 'two'], 'campaign_collections');
         ensure($a['activation_allowed'] === false, 'activation_denied');
@@ -84,14 +92,26 @@ $cases = [
             'tenant_id' => 't1', 'campaign_id' => 'campaign_B',
             'account_id' => 'account_A', 'collection_ids' => ['three'],
         ];
-        $b = $calendar->define($second, pattern('campaign', 'campaign_B'));
+        $b = $calendar->define($second, pattern('campaign', 'campaign_B'), ownership(['three']));
         $a['rule']['weekdays'][0] = 3;
         ensure($b['rule']['weekdays'] === [1, 5], 'independent_schedule');
         ensure($b['collection_ids'] === ['three'], 'independent_collections');
-        rejects(static fn () => $calendar->define($second, pattern('campaign', 'campaign_B', 't2')));
+        rejects(static fn () => $calendar->define($second, pattern('campaign', 'campaign_B', 't2'), ownership(['three'])));
+        // Client-selected IDs are insufficient: evidence must come from a
+        // trusted server-side catalog for both account and every collection.
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A')));
+        $foreign = ownership(['one', 'two']);
+        $foreign['collection_tenant_by_id']['two'] = 't2';
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $foreign));
+        $foreignAccount = ownership(['one', 'two']);
+        $foreignAccount['account_tenant_id'] = 't2';
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $foreignAccount));
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), ownership(['one'])));
+        $extra = ownership(['one', 'two', 'extra']);
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $extra));
         $duplicate = $first;
         $duplicate['collection_ids'] = ['one', 'one'];
-        rejects(static fn () => $calendar->define($duplicate, pattern('campaign', 'campaign_A')));
+        rejects(static fn () => $calendar->define($duplicate, pattern('campaign', 'campaign_A'), ownership(['one'])));
     },
     'ambiguous' => static function (): void {
         $classifier = new RetryClassifier();
