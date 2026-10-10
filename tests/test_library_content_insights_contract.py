@@ -55,6 +55,7 @@ class LibraryContentInsightsContractTests(unittest.TestCase):
         self.assertIn("$identity = 'id:' . $id;", SERVICE)
         self.assertIn("$ids[$identity] = $id;", SERVICE)
         self.assertIn("Asset duplicado inconsistente.", SERVICE)
+        self.assertIn("ksort($canonical, SORT_STRING);", SERVICE)
         self.assertIn("public function testSearchPagesBeyondOneHundredAndRejectsUnrelatedCursor", PHP_TEST)
         self.assertIn("public function testNumericAssetIdsRemainStringsInSearchPage", PHP_TEST)
         self.assertIn("public function testSearchIntersectsTextTagsMetadataAndTenant", PHP_TEST)
@@ -320,8 +321,11 @@ $other = $first;
 $other['content_tags'] = ['home'];
 $changedMetadata = $first;
 $changedMetadata['campaign'] = 'B';
+$changedType = $first;
+$changedType['campaign'] = 123;
+$reordered = array_reverse($first, true);
 $rejected = [];
-foreach ([[$first, $other], [$other, $first], [$first, $changedMetadata]] as $assets) {
+foreach ([[$first, $other], [$other, $first], [$first, $changedMetadata], [$first, $changedType]] as $assets) {
     foreach (['fashion', 'home'] as $tag) {
         try {
             $service->searchPage('tenant-a', $assets, '', [$tag]);
@@ -336,6 +340,7 @@ $foreign['tenant_id'] = 'tenant-b';
 echo json_encode([
     'rejected' => $rejected,
     'same' => $service->searchPage('tenant-a', [$first, $first], '', ['fashion'])['ids'],
+    'reordered' => $service->searchPage('tenant-a', [$first, $reordered], '', ['fashion'])['ids'],
     'foreign' => $service->searchPage('tenant-a', [$first, $foreign], '', ['fashion'])['ids'],
 ], JSON_THROW_ON_ERROR);
 '''
@@ -343,8 +348,9 @@ echo json_encode([
                                 text=True, timeout=10, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         data = json.loads(result.stdout)
-        self.assertEqual(data["rejected"], [True] * 6)
+        self.assertEqual(data["rejected"], [True] * 8)
         self.assertEqual(data["same"], ["asset-7"])
+        self.assertEqual(data["reordered"], ["asset-7"])
         self.assertEqual(data["foreign"], ["asset-7"])
 
     def test_unknown_score_signals_fail_closed_in_real_php(self) -> None:

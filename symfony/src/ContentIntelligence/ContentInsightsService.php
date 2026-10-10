@@ -155,12 +155,15 @@ final class ContentInsightsService
                 continue;
             }
             $identity = 'id:' . $id;
+            // Key order is not asset identity. Preserve strict type/value comparison.
+            $canonical = $asset;
+            ksort($canonical, SORT_STRING);
             if (array_key_exists($identity, $seenAssets)) {
-                if ($seenAssets[$identity] !== $asset) {
+                if ($seenAssets[$identity] !== $canonical) {
                     throw new \InvalidArgumentException('Asset duplicado inconsistente.');
                 }
             } else {
-                $seenAssets[$identity] = $asset;
+                $seenAssets[$identity] = $canonical;
             }
             $originalTags = $this->normalizeTags($asset['content_tags'] ?? []);
             if (array_diff($tags, $originalTags) !== []) {

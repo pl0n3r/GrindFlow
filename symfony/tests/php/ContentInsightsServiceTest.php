@@ -207,6 +207,12 @@ final class ContentInsightsServiceTest extends TestCase
         $second['content_tags'] = ['HOME'];
         $changedMetadata = $first;
         $changedMetadata['campaign'] = 'different';
+        $changedType = $first;
+        $changedType['campaign'] = 123;
+        $reordered = array_reverse($first, true);
+        self::assertSame(['asset-1'], $this->service->searchPage(
+            'tenant-a', [$first, $reordered], '', ['marca']
+        )['ids'], 'Associative key order must not change asset identity.');
         self::assertSame(['asset-1'], $this->service->searchPage(
             'tenant-a', [$first, $first], '', ['marca']
         )['ids'], 'An identical replay is harmless.');
@@ -216,7 +222,7 @@ final class ContentInsightsServiceTest extends TestCase
             'tenant-a', [$first, $foreign], '', ['marca']
         )['ids'], 'A foreign tenant must not poison the local identity.');
 
-        foreach ([[$first, $second], [$second, $first], [$first, $changedMetadata]] as $rows) {
+        foreach ([[$first, $second], [$second, $first], [$first, $changedMetadata], [$first, $changedType]] as $rows) {
             foreach (['marca', 'home'] as $tag) {
                 try {
                     $this->service->searchPage('tenant-a', $rows, '', [$tag]);
