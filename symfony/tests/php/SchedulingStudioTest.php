@@ -53,6 +53,18 @@ $tests = [
         $shuffledOverride = array_reverse(override(['daily_cap' => 2]), true);
         check($r->resolve('tenant_1', 'creator_1', $shuffledStudio, $shuffledOverride)['status']
             === 'resolved', 'reordered_studio_and_override');
+        // Reordering nested rules or override keys must never change the payload.
+        $nestedPermutation = studio();
+        $nestedPermutation['rules'] = array_reverse(rules(), true);
+        check($r->resolve('tenant_1', 'creator_1', $nestedPermutation) === $base
+            && $nestedPermutation['rules'] === array_reverse(rules(), true),
+            'canonical_studio_rule_order_without_input_mutation');
+        $permutedOverride = override(['approval_required' => false, 'daily_cap' => 2]);
+        $sameOverride = override(['daily_cap' => 2, 'approval_required' => false]);
+        $permutedStudio = $nestedPermutation;
+        check($r->resolve('tenant_1', 'creator_1', $permutedStudio, $permutedOverride)
+            === $r->resolve('tenant_1', 'creator_1', studio(), $sameOverride),
+            'canonical_override_payload_for_equivalent_maps');
         $extraStudio = studio(); $extraStudio['unexpected'] = true;
         check($r->resolve('tenant_1', 'creator_1', $extraStudio)['status'] === 'blocked',
             'additional_studio_key_rejected');
@@ -145,6 +157,8 @@ $tests = [
         $independent = $r->resolve('tenant_1', 'creator_1', null, override(rules()));
         check($independent['status'] === 'resolved' && $independent['source'] === 'independent'
             && $independent['execution_performed'] === false, 'independent_no_studio');
+        check($r->resolve('tenant_1', 'creator_1', null, override(array_reverse(rules(), true)))
+            === $independent, 'independent_rules_have_stable_order');
         $view = (new StudioCalendarView())->aggregate('tenant_1', ['creator_1'], [slot('s1')]);
         check($view['status'] === 'ok' && count($view['by_creator']) === 1, 'independent_calendar');
         $cap = (new TeamCapacityAnalyzer())->analyze('tenant_1', [], []);

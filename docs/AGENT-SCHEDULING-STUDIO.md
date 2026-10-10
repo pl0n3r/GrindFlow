@@ -7,6 +7,9 @@ las tres reglas (`daily_cap`, `minimum_gap_minutes`, `approval_required`).
 Una excepción requiere `changes` explícitos, pertenece al **mismo creador y
 tenant** y solo puede cambiar claves conocidas; no modifica el Studio. Un
 independiente puede aportar sus tres reglas sin tener equipo/Studio.
+Las reglas resueltas devuelven siempre las mismas tres claves en orden
+`daily_cap`, `minimum_gap_minutes`, `approval_required`, sin importar
+el orden de serialización de Studio u override; la entrada no se modifica.
 
 `StudioCalendarView` recibe de un futuro adaptador autorizado una allowlist de
 creadores y sus slots. Rechaza evidencias incompletas, identidades ajenas,

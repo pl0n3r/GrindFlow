@@ -41,7 +41,13 @@ final class InheritedRuleSet
         if (!self::validRules($rules)) {
             return self::blocked();
         }
-        return ['status' => 'resolved', 'source' => $source, 'rules' => $rules,
+        // Normalize output order so equivalent studio/override maps serialize identically.
+        $canonical = [
+            'daily_cap' => $rules['daily_cap'],
+            'minimum_gap_minutes' => $rules['minimum_gap_minutes'],
+            'approval_required' => $rules['approval_required'],
+        ];
+        return ['status' => 'resolved', 'source' => $source, 'rules' => $canonical,
             'execution_performed' => false];
     }
 
