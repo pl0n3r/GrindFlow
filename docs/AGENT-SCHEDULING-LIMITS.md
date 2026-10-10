@@ -8,6 +8,8 @@ Entrada de cada regla: tenant_id, network_id, account_id, scheduled_at_utc estri
 - DailyCapRule::evaluate(candidate, scheduled, maximumPerDay) cuenta **todas** las campañas por la fecha local de la cuenta; solo cancelled se excluye explícitamente.
 - BlockedWindowRule::evaluate(candidate, windows, blockedDates) prohíbe fechas y ventanas locales [inicio, fin) con weekday ISO 1–7. Busca hacia delante en UTC al minuto exacto (segundos = 00, sin conservar los segundos del candidato), máximo 14 días; devuelve suggested_at_utc si existe reubicación. No acepta rangos que crucen medianoche: dividirlos en dos ventanas.
 
+En separación y cupo diario, una fila sin clave `status` conserva el valor histórico `scheduled`. Un `status: null` explícito, vacío o desconocido se rechaza como `invalid_input`; no se interpreta silenciosamente como programado.
+
 El resultado común LimitDecision::toArray() tiene status=permitido|rechazado, reason y suggested_at_utc opcional. Una sugerencia **no constituye una reserva** y debe volver a validarse al confirmar. El Scheduler canónico debe verificar autorización, permisos, elegibilidad, locks, cupos y estado externos por separado antes de persistir. No usar este componente como bypass de ese flujo.
 
 DST: se recibe siempre un instante UTC exacto, nunca una hora local ambigua; el cálculo local con DateTimeZone interpreta ambas ocurrencias del fold y salta los minutos inexistentes del gap. Sin I/O externo ni datos personales en errores.

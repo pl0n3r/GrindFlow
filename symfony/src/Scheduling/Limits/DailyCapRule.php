@@ -24,7 +24,7 @@ final class DailyCapRule
             }
             $otherScope = LimitDecision::scope($row);
             $other = LimitDecision::instant($row['scheduled_at_utc'] ?? null);
-            $status = $row['status'] ?? 'scheduled';
+            $status = array_key_exists('status', $row) ? $row['status'] : 'scheduled';
             if ($otherScope === null || $other === null || !in_array($status, ['scheduled', 'queued', 'draft', 'cancelled'], true)) {
                 return LimitDecision::deny('invalid_input');
             }

@@ -27,6 +27,11 @@ $cases = [
         check($rule->evaluate(slot($time), [$cancelled], 30)->permitted, 'cancelled does not block');
         $invalid = slot('2026-10-10T11:45:00Z'); $invalid['status'] = 'unknown';
         check($rule->evaluate(slot($time), [$invalid], 30)->reason === 'invalid_input', 'unrecognized status fails closed');
+        $nullStatus = slot('2026-10-10T11:45:00Z');
+        $nullStatus['status'] = null;
+        check($rule->evaluate(slot($time), [$nullStatus], 30)->reason === 'invalid_input', 'explicit null separation status denied');
+        unset($nullStatus['status']);
+        check($rule->evaluate(slot($time), [$nullStatus], 30)->reason === 'min_separation', 'missing separation status preserves scheduled default');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:30:00Z')], 30)->permitted, 'exact boundary');
         check($rule->evaluate(slot($time), [slot('invalid')], 30)->reason === 'invalid_input', 'invalid existing slot');
     },
@@ -53,6 +58,11 @@ $cases = [
         check($rule->evaluate($candidate, [slot('2026-10-10T18:00:00Z', tenant: 'other')], 1)->permitted, 'tenant isolated');
         $cancelled = slot('2026-10-10T18:00:00Z'); $cancelled['status'] = 'cancelled';
         check($rule->evaluate($candidate, [$cancelled], 1)->permitted, 'cancelled ignored');
+        $nullStatus = slot('2026-10-10T18:00:00Z');
+        $nullStatus['status'] = null;
+        check($rule->evaluate($candidate, [$nullStatus], 1)->reason === 'invalid_input', 'explicit null daily status denied');
+        unset($nullStatus['status']);
+        check($rule->evaluate($candidate, [$nullStatus], 1)->reason === 'daily_cap', 'missing daily status preserves scheduled default');
     },
     'timezone' => static function (): void {
         $rule = new BlockedWindowRule();
