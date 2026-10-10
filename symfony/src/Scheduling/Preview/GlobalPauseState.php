@@ -63,7 +63,8 @@ final class GlobalPauseState
             || $state['revision'] < 0 || !is_string($state['agenda_sha256'])
             || preg_match('/^[a-f0-9]{64}$/D', $state['agenda_sha256']) !== 1
             || !is_array($state['audit']) || !array_is_list($state['audit'])
-            || count($state['audit']) !== $state['revision'] || count($state['audit']) > 32) {
+            || count($state['audit']) !== $state['revision'] || count($state['audit']) > 32
+            || ($state['revision'] === 0 && $state['paused'])) {
             throw new InvalidArgumentException('invalid_pause_state');
         }
         $last = 0;
@@ -71,6 +72,7 @@ final class GlobalPauseState
             if (!is_array($event)
                 || array_keys($event) !== ['revision', 'action', 'reason_code', 'at']
                 || $event['revision'] !== $index + 1
+                || $event['action'] !== ($index % 2 === 0 ? 'pause' : 'resume')
                 || !in_array($event['action'], ['pause', 'resume'], true)
                 || !in_array($event['reason_code'], ['manual', 'maintenance', 'incident', 'recovered'], true)
                 || !is_int($event['at']) || $event['at'] <= $last) {

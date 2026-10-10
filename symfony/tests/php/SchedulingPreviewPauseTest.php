@@ -84,6 +84,13 @@ final class PreviewPauseScenario
             $forged = $paused;
             $forged['audit'][0]['secret'] = 'private';
             self::denies(static fn() => GlobalPauseState::canRun($forged));
+            $brokenSequence = $paused;
+            $brokenSequence['revision'] = 2;
+            $brokenSequence['audit'][] = ['revision' => 2, 'action' => 'pause', 'reason_code' => 'manual', 'at' => 901];
+            self::denies(static fn() => GlobalPauseState::canRun($brokenSequence));
+            $invalidInitial = GlobalPauseState::initial($base);
+            $invalidInitial['paused'] = true;
+            self::denies(static fn() => GlobalPauseState::canRun($invalidInitial));
             self::check(!str_contains(json_encode($paused, JSON_THROW_ON_ERROR), 'private'));
             return ['case' => $scenario, 'status' => 'pass'];
         }
