@@ -100,14 +100,18 @@ class NextSecurityLockContractTests(unittest.TestCase):
         )
         self.assertEqual(self.lock["packages"]["node_modules/@swc/helpers"]["version"], "0.5.15")
 
-    def test_release_identity_is_synced_to_patch_0_1_217(self):
-        self.assertEqual(self.package["version"], "0.1.217")
-        self.assertEqual(self.lock["version"], "0.1.217")
-        self.assertEqual(self.lock["packages"][""]["version"], "0.1.217")
+    def test_release_identity_matches_current_patch(self):
+        # Regresión release-agnostic: #411 garantiza Next.js seguro,
+        # mientras cada PR deploy-bound legítimo avanza el patch.
         php = (ROOT / "config/version.php").read_text(encoding="utf-8")
-        self.assertIn("'number' => '0.1.217'", php)
+        versions = re.findall(r"'number'\\s*=>\\s*'([0-9]+\\.[0-9]+\\.[0-9]+)'", php)
+        self.assertEqual(len(versions), 1)
+        current = versions[0]
+        self.assertEqual(self.package["version"], current)
+        self.assertEqual(self.lock["version"], current)
+        self.assertEqual(self.lock["packages"][""]["version"], current)
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("v0.1.217", readme)
+        self.assertIn("v" + current, readme)
         self.assertIn("no equivale", readme.lower())
 
     def test_security_provenance_matches_dependabot_patch(self):
