@@ -10,7 +10,6 @@ final class HorizonReplenisher
     public function __construct(private readonly GapDetector $detector = new GapDetector())
     {
     }
-
     /**
      * @param list<array{tenant_id:string,date:string,slot:int,status?:string}> $scheduled
      * @param list<array{id:string,tenant_id:string,eligible:bool}> $assets
@@ -35,7 +34,6 @@ final class HorizonReplenisher
             || !array_is_list($assets) || count($assets) > 10000) {
             return self::rejected('invalid_input');
         }
-
         $inspection = $this->detector->detect(
             $tenantId, $timezone, $startDate, $horizonDays, $slotsPerDay,
             $scheduled, $blockedDates, $blockedSlots, $permitted,
@@ -43,8 +41,8 @@ final class HorizonReplenisher
         if ($inspection['status'] !== 'ok') {
             return self::rejected($inspection['reason']);
         }
-
         $eligible = [];
+        $eligibilityById = [];
         foreach ($assets as $asset) {
             if (!is_array($asset) || !isset($asset['id'], $asset['tenant_id'], $asset['eligible'])
                 || !is_string($asset['id']) || trim($asset['id']) === '' || strlen($asset['id']) > 128
@@ -52,12 +50,17 @@ final class HorizonReplenisher
                 || !is_bool($asset['eligible'])) {
                 return self::rejected('invalid_asset');
             }
-            if ($asset['tenant_id'] === $tenantId && $asset['eligible']) {
-                // A given asset is assigned at most once by this conservative planner.
-                $eligible[$asset['id']] = $asset['id'];
+            if ($asset['tenant_id'] === $tenantId) {
+                if (array_key_exists($asset['id'], $eligibilityById)
+                    && $eligibilityById[$asset['id']] !== $asset['eligible']) {
+                    return self::rejected('conflicting_asset_eligibility');
+                }
+                $eligibilityById[$asset['id']] = $asset['eligible'];
+                if ($asset['eligible']) {
+                    $eligible[$asset['id']] = $asset['id'];
+                }
             }
         }
-
         $missing = count($inspection['gaps']);
         $result = [
             'status' => 'ok', 'reason' => $missing ? 'gaps_detected' : 'horizon_covered',
@@ -70,7 +73,6 @@ final class HorizonReplenisher
         if ($eligible === []) {
             return array_replace($result, ['status' => 'rejected', 'reason' => 'no_eligible_content']);
         }
-
         $assetIds = array_values($eligible);
         $proposals = [];
         foreach ($inspection['gaps'] as $index => $gap) {
@@ -85,7 +87,6 @@ final class HorizonReplenisher
             'unfilled_count' => $missing - count($proposals),
         ]);
     }
-
     /** @return array<string,mixed> */
     private static function rejected(string $reason): array
     {

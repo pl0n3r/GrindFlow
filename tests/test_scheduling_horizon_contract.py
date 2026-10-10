@@ -11,8 +11,6 @@ SOURCES = [
     ROOT / "symfony/src/Scheduling/Horizon/GapDetector.php",
     ROOT / "symfony/src/Scheduling/Horizon/HorizonReplenisher.php",
 ]
-
-
 def execute(method: str, data: dict) -> dict:
     requires = "\n".join(f"require {json.dumps(str(path))};" for path in SOURCES)
     program = (
@@ -33,16 +31,12 @@ def execute(method: str, data: dict) -> dict:
         text=True, capture_output=True, check=True, cwd=ROOT,
     )
     return json.loads(completed.stdout)
-
-
 def fixture(**changes: object) -> dict:
     data = {
         "tenant": "studio-a", "timezone": "America/Bogota", "date": "2026-10-12",
         "days": 3, "capacity": 1, "scheduled": [], "assets": [], "mode": "assisted",
     }
     return data | changes
-
-
 class SchedulingHorizonContractTests(unittest.TestCase):
     def test_detects_gaps_within_horizon(self) -> None:
         result = execute("detect", fixture(
@@ -64,7 +58,6 @@ class SchedulingHorizonContractTests(unittest.TestCase):
         self.assertEqual(execute("detect", fixture(scheduled=[
             {"tenant_id": "studio-a", "date": "2026-10-12", "slot": 1, "status": "ambiguous"}
         ]))["reason"], "uncertain_schedule")
-
     def test_counts_missing_slots_for_standard_and_custom_horizons(self) -> None:
         for horizon in (3, 7, 14, 30, 11):
             with self.subTest(days=horizon):
@@ -78,7 +71,6 @@ class SchedulingHorizonContractTests(unittest.TestCase):
                 self.assertEqual(len(result["gaps"]), horizon - 1)
         self.assertEqual(execute("detect", fixture(days=366))["status"], "rejected")
         self.assertEqual(execute("detect", fixture(date="2026-02-30"))["status"], "rejected")
-
     def test_manual_assisted_and_pilot_modes_do_not_expand_authority(self) -> None:
         assets = [
             {"id": "asset-a", "tenant_id": "studio-a", "eligible": True},
@@ -100,7 +92,6 @@ class SchedulingHorizonContractTests(unittest.TestCase):
             source = path.read_text(encoding="utf-8").lower()
             for forbidden in ("curl_", "file_put_contents", "pdo(", "fetch(", "http://", "https://"):
                 self.assertNotIn(forbidden, source)
-
     def test_no_eligible_content_never_fabricates_fill(self) -> None:
         for assets in ([], [{"id": "x", "tenant_id": "studio-b", "eligible": True}],
                        [{"id": "x", "tenant_id": "studio-a", "eligible": False}]):
@@ -113,9 +104,13 @@ class SchedulingHorizonContractTests(unittest.TestCase):
         result = execute("plan", fixture(days=3, assets=only))
         self.assertEqual(len(result["proposals"]), 1)
         self.assertEqual(result["unfilled_count"], 2)
+        for flags in ((True, False), (False, True)):
+            assets = [{"id": "asset-1", "tenant_id": "studio-a", "eligible": enabled} for enabled in flags]
+            denied = execute("plan", fixture(days=2, assets=assets))
+            self.assertEqual(denied["reason"], "conflicting_asset_eligibility")
+            self.assertEqual(denied["proposals"], [])
         self.assertEqual(execute("plan", fixture(permitted=False, assets=only))["status"], "rejected")
         self.assertEqual(execute("plan", fixture(mode="unsafe", assets=only))["status"], "rejected")
-
 
 if __name__ == "__main__":
     unittest.main()
