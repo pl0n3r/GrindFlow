@@ -97,10 +97,19 @@ final class GlobalPauseState
             throw new InvalidArgumentException('agenda_too_large');
         }
         try {
-            $canonical = static function (array $value, int $depth = 0) use (&$canonical): array {
+            $bytes = 0;
+            $canonical = static function (array $value, int $depth = 0) use (&$canonical, &$bytes): array {
                 if ($depth > 32) throw new InvalidArgumentException('agenda_too_deep');
+                if (($bytes += 8 * count($value)) > 65536) throw new InvalidArgumentException('agenda_too_large');
                 if (!array_is_list($value)) ksort($value, SORT_STRING);
-                foreach ($value as $k => $item) if (is_array($item)) $value[$k] = $canonical($item, $depth + 1);
+                foreach ($value as $k => $item) {
+                    $bytes += is_string($k) ? strlen($k) : 0;
+                    if (is_array($item)) $value[$k] = $canonical($item, $depth + 1);
+                    elseif (is_string($item)) $bytes += strlen($item);
+                    elseif (!is_int($item) && !is_bool($item) && !is_float($item) && $item !== null)
+                        throw new InvalidArgumentException('invalid_agenda');
+                    if ($bytes > 65536) throw new InvalidArgumentException('agenda_too_large');
+                }
                 return $value;
             };
             return hash('sha256', json_encode($canonical($agenda), JSON_THROW_ON_ERROR));

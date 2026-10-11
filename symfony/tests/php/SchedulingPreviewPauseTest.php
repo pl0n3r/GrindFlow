@@ -1,19 +1,15 @@
 <?php
 declare(strict_types=1);
-
 require_once dirname(__DIR__, 2).'/src/Scheduling/Preview/BulkSchedulePreview.php';
 require_once dirname(__DIR__, 2).'/src/Scheduling/Preview/GlobalPauseState.php';
-
 use GrindFlow\Scheduling\Preview\BulkSchedulePreview;
 use GrindFlow\Scheduling\Preview\GlobalPauseState;
-
 final class PreviewPauseScenario
 {
     private static function check(bool $condition): void
     {
         if (!$condition) { throw new RuntimeException('scheduling_preview_contract_failure'); }
     }
-
     private static function denies(callable $operation): void
     {
         try { $operation(); } catch (InvalidArgumentException) { return; }
@@ -105,6 +101,8 @@ final class PreviewPauseScenario
             $invalidInitial['paused'] = true;
             self::denies(static fn() => GlobalPauseState::canRun($invalidInitial));
             self::check(!str_contains(json_encode($paused, JSON_THROW_ON_ERROR), 'private'));
+            self::denies(static fn() => GlobalPauseState::initial([['metadata' => str_repeat('X', 65537)]]));
+            self::denies(static fn() => GlobalPauseState::agendaUnchanged($paused, [['metadata' => str_repeat('X', 65537)]]));
             $full = GlobalPauseState::initial($base);
             for ($i = 1; $i <= 32; ++$i) {
                 $full = GlobalPauseState::transition($full, $i % 2 ? 'pause' : 'resume', 'manual', 1000 + $i);
