@@ -73,11 +73,14 @@ def _status(document: str) -> None:
         # Match equivalent Markdown labels, even with whitespace, casing or
         # enclosing comments; only the exact standalone canonical line passes.
         label_pattern = r"\s+".join(re.escape(word) for word in label.split())
-        declaration = re.compile(r"\*\*\s*" + label_pattern + r"\s*:\s*\*\*", re.IGNORECASE)
+        declaration = re.compile(label_pattern + r"\s*:", re.IGNORECASE)
         declarations = [line.strip() for line in lines if declaration.search(line)]
         if declarations != [f"{prefix} {expected}"]:
             raise ValueError("estado GO/UNKNOWN ambiguo o promoción implícita")
-    if "Estado actual: NO AUTORIZADO" not in document:
+    live_state_lines = [line for line in lines
+                        if re.search(r"estado\s+actual\s*:", line, re.IGNORECASE)]
+    if (len(live_state_lines) != 1
+            or "Estado actual: NO AUTORIZADO" not in live_state_lines[0]):
         raise ValueError("go-live podría inferirse de la documentación")
 
 
@@ -160,6 +163,16 @@ class LaunchReadinessDocsTests(unittest.TestCase):
                     forged = content + "\n" + alternate + "\n"
                     with self.assertRaisesRegex(ValueError, "ambiguo"):
                         _status(forged)
+        # Plain Markdown and headings must not hide a contradictory readiness label.
+        for label in ("Resultado de readiness", "Decisión go/no-go", "Autorización go-live"):
+            for unbolded in (f"{label}: GO", f"### {label}: AUTORIZADO"):
+                with self.subTest(label=label, unbolded=unbolded):
+                    with self.assertRaisesRegex(ValueError, "ambiguo"):
+                        _status(content + "\\n" + unbolded + "\\n")
+        for extra in ("Estado actual: AUTORIZADO", "### ESTADO ACTUAL: GO"):
+            with self.subTest(live_conflict=extra):
+                with self.assertRaisesRegex(ValueError, "go-live"):
+                    _status(content + "\\n" + extra + "\\n")
         invalid_status = content.replace("| UNKNOWN |", "| VALIDADO |", 1)
         with self.assertRaisesRegex(ValueError, "cumplida"):
             _matrix(invalid_status)
