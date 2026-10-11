@@ -18,6 +18,7 @@ use Symfony\Component\Uid\Uuid;
 final class LibraryCollectionsController extends AbstractController
 {
     private const CSRF = 'grindflow_library_collections';
+    private const MAX_BODY_BYTES = 4096; // Endpoints solo admiten {} o {"type": "..."}.
 
     #[Route('/api/admin/library/collections', name: 'grindflow_library_collections_list', methods: ['GET'])]
     public function list(Request $request, MembershipContext $memberships, Connection $db, CsrfTokenManagerInterface $csrf): JsonResponse
@@ -69,6 +70,9 @@ final class LibraryCollectionsController extends AbstractController
         }
         if (($error = $this->writeGate($request, $memberships, $context)) instanceof JsonResponse) {
             return $error;
+        }
+        if (self::bodyTooLarge($request)) {
+            return $this->error(413, 'request_too_large', 'La solicitud supera el límite de tamaño.');
         }
         $body = json_decode($request->getContent());
         if (!is_object($body) || (array) $body !== []) {
@@ -153,6 +157,9 @@ final class LibraryCollectionsController extends AbstractController
         if (($error = $this->writeGate($request, $memberships, $context)) instanceof JsonResponse) {
             return $error;
         }
+        if (self::bodyTooLarge($request)) {
+            return $this->error(413, 'request_too_large', 'La solicitud supera el límite de tamaño.');
+        }
         $body = json_decode($request->getContent(), true);
         if (!is_array($body) || array_keys($body) !== ['type'] || !is_string($body['type'])) {
             return $this->error(422, 'invalid_variant', 'Indica solamente el tipo de variante.');
@@ -160,6 +167,12 @@ final class LibraryCollectionsController extends AbstractController
         return $this->result($library->linkVariant(
             $context['organization']['id'], $context['user']->id(), $masterId, $variantId, $body['type'],
         ));
+    }
+
+    private static function bodyTooLarge(Request $request): bool
+    {
+        // Verificar longitud antes de decodificar; no guardar ni registrar el payload.
+        return strlen($request->getContent()) > self::MAX_BODY_BYTES;
     }
 
     private function cursor(Request $request): string|JsonResponse|null

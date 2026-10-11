@@ -6,9 +6,11 @@ namespace GrindFlow\Tests;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
+use GrindFlow\Http\Controller\LibraryCollectionsController;
 use GrindFlow\Library\AssetCollectionApplication;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Uid\Uuid;
 
 final class LibraryCollectionsTest extends KernelTestCase
@@ -16,6 +18,25 @@ final class LibraryCollectionsTest extends KernelTestCase
     protected static function getKernelClass(): string
     {
         return Kernel::class;
+    }
+
+    public function testWriteJsonBodyBudgetRejectsOversizedPayloadBeforeDecode(): void
+    {
+        // Caso puro: no arranca servidor, no toca base de datos ni datos reales.
+        $validator = new \ReflectionMethod(LibraryCollectionsController::class, 'bodyTooLarge');
+        self::assertFalse($validator->invoke(null, Request::create(
+            '/api/admin/library/collections', 'POST', [], [], [], [], '{}',
+        )));
+        self::assertFalse($validator->invoke(null, Request::create(
+            '/api/admin/library/collections', 'POST', [], [], [], [], str_repeat(' ', 4096),
+        )));
+        self::assertTrue($validator->invoke(null, Request::create(
+            '/api/admin/library/collections', 'POST', [], [], [], [], str_repeat(' ', 4097),
+        )));
+        self::assertTrue($validator->invoke(null, Request::create(
+            '/api/admin/library/masters/master/variants/variant', 'PUT', [], [], [], [],
+            '{"type":"format"}'.str_repeat(' ', 4096),
+        )));
     }
 
     public function testAssetInMultipleCollectionsKeepsOnePhysicalBlob(): void
