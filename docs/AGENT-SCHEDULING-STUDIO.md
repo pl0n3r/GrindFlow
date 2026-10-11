@@ -46,9 +46,10 @@ un modo de autonomía. Los resultados incluyen `execution_performed=false`.
 `python3 -m unittest tests.test_scheduling_studio_contract -v`.
 Cuatro AC ejecutan los escenarios **PHP reales**, incluidos negativos de
 cross-tenant, overrides falsos, capacidad y creador independiente. Reversión:
-retirar estas seis rutas nuevas, sin migración ni datos productivos. `main`
-y `config/version.php` quedan intactos; CI y revisión independientes siguen
-siendo gates obligatorios antes de merge. **NO DEPLOY / NO LIVE**.
+retirar estas seis rutas nuevas, sin migración ni datos productivos. `config/version.php` y `README.md` ahora documentan el candidato de código
+V0.1.220 bajo la reserva V3 renovada; CI y revisión exact-SHA siguen siendo
+gates obligatorios antes del merge. El bump no es release ni despliegue.
+**NO DEPLOY / NO LIVE**.
 
 ## Identidades de slot y tarea (AC-02/03)
 
