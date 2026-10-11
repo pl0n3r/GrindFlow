@@ -11,7 +11,7 @@ final class InheritedRuleSet
 
     public function resolve(string $tenantId, string $creatorId, ?array $studio = null, ?array $override = null): array
     {
-        if (!self::identifier($tenantId) || !self::identifier($creatorId)) {
+        if (!self::identifier($tenantId) || !self::creatorIdentifier($creatorId)) {
             return self::blocked();
         }
         $rules = [];
@@ -33,6 +33,12 @@ final class InheritedRuleSet
                 || !is_array($override['changes']) || array_is_list($override['changes'])
                 || $override['changes'] === []
                 || array_diff(array_keys($override['changes']), self::RULE_KEYS) !== []) {
+                return self::blocked();
+            }
+            // No excepcion puede relajar una aprobacion Studio obligatoria.
+            // Un consumidor futuro debera autenticar cualquier excepcion mas amplia.
+            if ($studio !== null && $studio['rules']['approval_required'] === true
+                && ($override['changes']['approval_required'] ?? true) === false) {
                 return self::blocked();
             }
             $rules = array_replace($rules, $override['changes']);
@@ -75,6 +81,11 @@ final class InheritedRuleSet
     private static function identifier(mixed $value): bool
     {
         return is_string($value) && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/D', $value) === 1;
+    }
+
+    private static function creatorIdentifier(mixed $value): bool
+    {
+        return self::identifier($value) && !ctype_digit($value);
     }
 
     private static function blocked(): array

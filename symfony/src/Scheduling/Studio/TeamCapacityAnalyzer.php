@@ -28,7 +28,7 @@ final class TeamCapacityAnalyzer
         foreach ($tasks as $task) {
             if (!is_array($task) || !self::hasExactKeys($task,
                 ['tenant_id', 'creator_id', 'member_id', 'stage', 'day'])
-                || $task['tenant_id'] !== $tenantId || !self::identifier($task['creator_id'])
+                || $task['tenant_id'] !== $tenantId || !self::creatorIdentifier($task['creator_id'])
                 || !self::identifier($task['member_id'])
                 || !array_key_exists($task['member_id'], $capacity)
                 || !in_array($task['stage'], ['preparation', 'approval'], true)
@@ -80,6 +80,11 @@ final class TeamCapacityAnalyzer
     private static function identifier(mixed $v): bool
     {
         return is_string($v) && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/D', $v) === 1;
+    }
+
+    private static function creatorIdentifier(mixed $v): bool
+    {
+        return self::identifier($v) && !ctype_digit($v);
     }
 
     private static function blocked(): array

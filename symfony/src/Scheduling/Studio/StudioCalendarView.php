@@ -15,7 +15,7 @@ final class StudioCalendarView
         }
         $visible = [];
         foreach ($creatorIds as $creatorId) {
-            if (!self::identifier($creatorId) || isset($visible[$creatorId])) {
+            if (!self::creatorIdentifier($creatorId) || isset($visible[$creatorId])) {
                 return self::blocked();
             }
             $visible[$creatorId] = ['preparing' => 0, 'awaiting_approval' => 0, 'approved' => 0];
@@ -29,7 +29,7 @@ final class StudioCalendarView
             if (!is_array($slot) || !self::hasExactKeys($slot,
                 ['tenant_id', 'creator_id', 'slot_id', 'day', 'state'])
                 || $slot['tenant_id'] !== $tenantId
-                || !self::identifier($slot['creator_id'])
+                || !self::creatorIdentifier($slot['creator_id'])
                 || !array_key_exists($slot['creator_id'], $visible)
                 || !self::identifier($slot['slot_id'])
                 || !self::validDay($slot['day'])
@@ -78,6 +78,13 @@ final class StudioCalendarView
     private static function identifier(mixed $v): bool
     {
         return is_string($v) && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/D', $v) === 1;
+    }
+
+    private static function creatorIdentifier(mixed $v): bool
+    {
+        // PHP convierte claves "0"/"1" a enteros y json_encode crea un array.
+        // Requerir un alias explicito mantiene by_creator como objeto con identidad.
+        return self::identifier($v) && !ctype_digit($v);
     }
 
     private static function blocked(): array

@@ -59,8 +59,8 @@ $tests = [
         check($r->resolve('tenant_1', 'creator_1', $nestedPermutation) === $base
             && $nestedPermutation['rules'] === array_reverse(rules(), true),
             'canonical_studio_rule_order_without_input_mutation');
-        $permutedOverride = override(['approval_required' => false, 'daily_cap' => 2]);
-        $sameOverride = override(['daily_cap' => 2, 'approval_required' => false]);
+        $permutedOverride = override(['approval_required' => true, 'daily_cap' => 2]);
+        $sameOverride = override(['daily_cap' => 2, 'approval_required' => true]);
         $permutedStudio = $nestedPermutation;
         check($r->resolve('tenant_1', 'creator_1', $permutedStudio, $permutedOverride)
             === $r->resolve('tenant_1', 'creator_1', studio(), $sameOverride),
@@ -72,6 +72,14 @@ $tests = [
         check($r->resolve('tenant_1', 'creator_1', studio(), $wrong)['status'] === 'blocked', 'creator_scope');
         $wrong = override(['daily_cap' => 2]); $wrong['tenant_id'] = 'tenant_2';
         check($r->resolve('tenant_1', 'creator_1', studio(), $wrong)['status'] === 'blocked', 'tenant_scope');
+        check($r->resolve('tenant_1', 'creator_1', studio(), override(['approval_required' => false]))['status'] === 'blocked',
+            'studio_approval_cannot_be_relaxed');
+        $lenient = studio(); $lenient['rules']['approval_required'] = false;
+        $stronger = $r->resolve('tenant_1', 'creator_1', $lenient, override(['approval_required' => true]));
+        check($stronger['status'] === 'resolved' && $stronger['rules']['approval_required'] === true,
+            'creator_may_require_approval');
+        check($r->resolve('tenant_1', '0', studio())['status'] === 'blocked',
+            'numeric_creator_id_rejected_by_rule_resolver');
         check($r->resolve('tenant_1', 'creator_1', studio(), override(['secret' => 'x']))['status'] === 'blocked', 'unknown_override');
         check($r->resolve('tenant_1', 'creator_1', studio(), override(['daily_cap' => '2']))['status'] === 'blocked', 'strict_types');
         check($r->resolve('tenant_1', 'creator_1', null)['status'] === 'blocked', 'no_implicit_rules');
@@ -111,6 +119,12 @@ $tests = [
         $foreign = slot('s3'); $foreign['tenant_id'] = 'tenant_2';
         check($v->aggregate('tenant_1', ['creator_1'], [$foreign])['status'] === 'blocked', 'foreign_tenant');
         check($v->aggregate('tenant_1', ['creator_1'], [slot('s4', 'creator_2')])['status'] === 'blocked', 'foreign_creator');
+        check($v->aggregate('tenant_1', ['0', '1'], [slot('s0', '0'), slot('s1', '1')])['status'] === 'blocked',
+            'numeric_creator_ids_cannot_become_json_array');
+        $alias = $v->aggregate('tenant_1', ['creator_0', 'creator_1'], [slot('s0', 'creator_0'), slot('s1', 'creator_1')]);
+        check($alias['status'] === 'ok'
+            && str_contains(json_encode($alias, JSON_THROW_ON_ERROR), '"by_creator":{"creator_0":'),
+            'creator_aliases_remain_json_object_keys');
         check($v->aggregate('tenant_1', ['creator_1'], [slot('same'), slot('same')])['status'] === 'blocked', 'duplicate_slot');
         check($v->aggregate('tenant_1', ['creator_1'], [slot('s5'), ['secret' => 'x']])['status'] === 'blocked', 'unknown_row');
     },
@@ -149,6 +163,9 @@ $tests = [
         $bad = task('editor_1', 'approval'); $bad['tenant_id'] = 'tenant_2';
         check($a->analyze('tenant_1', $members, [$bad])['status'] === 'blocked', 'tenant_scoped');
         check($a->analyze('tenant_1', [], [task('editor_1', 'preparation')])['status'] === 'blocked', 'unknown_assignment');
+        $numericCreator = task('editor_1', 'approval'); $numericCreator['creator_id'] = '0';
+        check($a->analyze('tenant_1', $members, [$numericCreator])['status'] === 'blocked',
+            'numeric_capacity_creator_id_rejected');
         $zero = [['tenant_id' => 'tenant_1', 'member_id' => 'editor_1', 'daily_capacity' => 0]];
         check(count($a->analyze('tenant_1', $zero, [task('editor_1', 'approval')])['bottlenecks']) === 1, 'no_capacity');
     },
