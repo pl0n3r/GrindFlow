@@ -7,7 +7,8 @@ namespace GrindFlow\Scheduling\Mode;
 /** Pure scheduling eligibility. An eligible result never performs publication. */
 final class AutomationMode
 {
-    private const MODES = ['manual', 'assisted', 'pilot'];
+    // Contractual name is autopilot; pilot remains a backwards-compatible alias.
+    private const MODES = ['manual', 'assisted', 'autopilot', 'pilot'];
     private const GATES = [
         'permission_granted', 'content_eligible', 'within_daily_cap',
         'within_time_window', 'minimum_separation_met', 'external_state_known',
@@ -37,7 +38,7 @@ final class AutomationMode
             'assisted' => $confirmed
                 ? self::result('eligible', 'confirmation_verified')
                 : self::result('confirmation_required', 'assisted_mode'),
-            'pilot' => self::result('eligible', 'pilot_rules_verified'),
+            'autopilot', 'pilot' => self::result('eligible', 'pilot_rules_verified'),
         };
     }
 

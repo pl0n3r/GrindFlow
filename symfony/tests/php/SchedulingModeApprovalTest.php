@@ -42,7 +42,7 @@ $tests = [
         $mode = new AutomationMode();
         $hardRules = array_diff(array_keys(context()), ['tenant_id', 'account_id']);
         foreach ($hardRules as $name) {
-            foreach (['manual', 'assisted', 'pilot'] as $value) {
+            foreach (['manual', 'assisted', 'autopilot', 'pilot'] as $value) {
                 $ctx = context();
                 $ctx[$name] = false;
                 $out = $mode->assess($value, $ctx, true);
@@ -65,10 +65,14 @@ $tests = [
             'confirmation_required', 'assisted_requires_confirmation');
         check($mode->assess('assisted', context(), true)['status'] ===
             'eligible', 'explicit_confirmation');
-        check($mode->assess('pilot', context())['status'] === 'eligible', 'pilot');
+        check($mode->assess('pilot', context())['status'] === 'eligible', 'legacy_pilot');
+        check($mode->assess('autopilot', context())['status'] === 'eligible',
+            'contractual_autopilot');
+        check($mode->assess('autopilot', context()) === $mode->assess('pilot', context()),
+            'pilot_alias_same_result');
         check($mode->assess('unknown', context(), true)['status'] === 'blocked',
             'invalid_mode');
-        foreach (['manual','assisted','pilot'] as $value) {
+        foreach (['manual','assisted','autopilot','pilot'] as $value) {
             check($mode->assess($value, context(), true)['execution_performed'] ===
                 false, 'pure_no_execution');
         }

@@ -4,11 +4,11 @@
 
 ## Modo de automatización
 
-AutomationMode::assess(mode, context, confirmed) devuelve status, reason allowlisted y execution_performed=false. Los tres modos (manual, assisted, pilot) aplican los **mismos siete filtros duros**: permisos, contenido elegible, límite diario, ventana horaria, separación mínima, estado externo conocido y aprobación. Contexto requerido: tenant_id y account_id opacos, más siete booleanos estrictos. Campos adicionales, identidad inválida, bandera falsa o tipo incorrecto se rechazan antes de evaluar autonomía.
+AutomationMode::assess(mode, context, confirmed) devuelve status, reason allowlisted y execution_performed=false. Los tres modos canónicos (manual, assisted, autopilot) aplican los **mismos siete filtros duros**; `pilot` se admite únicamente como alias compatible de `autopilot` y devuelve el mismo resultado: permisos, contenido elegible, límite diario, ventana horaria, separación mínima, estado externo conocido y aprobación. Contexto requerido: tenant_id y account_id opacos, más siete booleanos estrictos. Campos adicionales, identidad inválida, bandera falsa o tipo incorrecto se rechazan antes de evaluar autonomía.
 
 - **Manual:** manual_action_required incluso si se confirma; la persona debe programar mediante un flujo ulterior autorizado.
 - **Asistido:** confirmation_required hasta recibir confirmación explícita verificada por el consumidor, después eligible.
-- **Piloto:** eligible solo si superó todos los filtros. Eligible **no implica ejecutar** ni omitir locks, revisiones o autorización productiva.
+- **Piloto (`autopilot`, alias heredado `pilot`):** eligible solo si superó todos los filtros. Eligible **no implica ejecutar** ni omitir locks, revisiones o autorización productiva.
 
 confirmed es una afirmación del llamador: la función no valida sesión, CSRF, permisos ni firma. El consumidor autorizado debe verificarlos y reevaluar gates bajo locking antes de persistir cualquier planificación.
 
