@@ -50,6 +50,13 @@ def table(markdown: str, heading: str) -> list[dict[str, str]]:
     headers = cells(lines[0])
     if len(set(headers)) != len(headers):
         return []
+    # Validate Markdown's separator, rather than silently ignoring any row.
+    # A broken table is not evidence of a valid readiness checklist.
+    separator = cells(lines[1])
+    if len(separator) != len(headers) or not all(
+        re.fullmatch(r":?-{3,}:?", item) for item in separator
+    ):
+        return []
     rows = [cells(line) for line in lines[2:]]
     if not all(len(row) == len(headers) for row in rows):
         return []
@@ -139,6 +146,16 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
         self.assertFalse(valid_readiness(removed), "Un criterio crítico no puede omitirse")
         duplicated = self.content.replace(mandatory_row, mandatory_row + "\n" + mandatory_row, 1)
         self.assertFalse(valid_readiness(duplicated), "Los criterios duplicados no acreditan completitud")
+        # A malformed Markdown separator must not pass as a structured table.
+        canonical_header = "| Criterio | Evidencia | Estado | Owner por rol | Frescura |"
+        separator = "| --- | --- | --- | --- | --- |"
+        self.assertIn(canonical_header + "\n" + separator, self.content)
+        broken_separator = self.content.replace(
+            canonical_header + "\n" + separator,
+            canonical_header + "\n| invalid | invalid | invalid | invalid | invalid |",
+            1,
+        )
+        self.assertFalse(valid_readiness(broken_separator))
 
     def test_live_declaration_is_unique_canonical_and_not_hidden(self):
         self.assertTrue(valid_live_authorization(self.content))
