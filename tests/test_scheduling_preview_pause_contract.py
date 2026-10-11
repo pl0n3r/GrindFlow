@@ -18,7 +18,7 @@ class SchedulingPreviewPauseContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         expected = {"case": name, "status": "pass"}
         if name == "preview":
-            expected["conflicts"] = 1
+            expected["conflicts"] = 2
         self.assertEqual(json.loads(result.stdout), expected)
 
     def test_preview_create_move_conflicts_without_mutation(self):

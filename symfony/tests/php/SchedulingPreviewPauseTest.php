@@ -39,7 +39,10 @@ final class PreviewPauseScenario
             $conflicted = $changes;
             $conflicted[] = ['kind' => 'create', 'tenant_id' => 'tenant_one', 'id' => 'slot_four', 'starts_at_utc' => '2026-10-11T09:00:00Z'];
             $result = BulkSchedulePreview::build('tenant_one', $base, $conflicted);
-            self::check($result['status'] === 'conflict' && count($result['conflicts']) === 1);
+            self::check($result['status'] === 'conflict' && count($result['conflicts']) === 2);
+            $prior = $base;
+            $prior[1]['starts_at_utc'] = $prior[0]['starts_at_utc'];
+            self::check(BulkSchedulePreview::build('tenant_one', $prior, [])['status'] === 'conflict');
             return ['case' => $scenario, 'status' => 'pass', 'conflicts' => count($result['conflicts'])];
         }
         if ($scenario === 'mismatch') {
@@ -55,6 +58,8 @@ final class PreviewPauseScenario
             $foreign = $base;
             $foreign[0]['tenant_id'] = 'tenant_two';
             self::denies(static fn() => BulkSchedulePreview::build('tenant_one', $foreign, $changes));
+            $foreign[0]['tenant_id'] = 'tenant_one'; $foreign[0]['id'] = null;
+            self::denies(static fn() => BulkSchedulePreview::build('tenant_one', $foreign, $changes));
             return ['case' => $scenario, 'status' => 'pass'];
         }
         if ($scenario === 'pause') {
@@ -67,21 +72,17 @@ final class PreviewPauseScenario
             $orderedDifferently = array_reverse($paused, true);
             $orderedDifferently['audit'][0] = array_reverse($paused['audit'][0], true);
             self::check(!GlobalPauseState::canRun($orderedDifferently));
-            $reorderedInitial = array_reverse($initial, true);
-            self::check(GlobalPauseState::canRun($reorderedInitial));
+            self::check(GlobalPauseState::canRun(array_reverse($initial, true)));
             $reorderedResumed = GlobalPauseState::transition($orderedDifferently, 'resume', 'recovered', 101);
-            self::check(GlobalPauseState::canRun($reorderedResumed)
-                && $reorderedResumed['revision'] === 2);
+            self::check(GlobalPauseState::canRun($reorderedResumed) && $reorderedResumed['revision'] === 2);
             $unexpectedState = $orderedDifferently;
             $unexpectedState['authority'] = true;
             self::denies(static fn() => GlobalPauseState::canRun($unexpectedState));
             $missingState = $orderedDifferently;
             unset($missingState['agenda_sha256']);
             self::denies(static fn() => GlobalPauseState::canRun($missingState));
-            $resumed = GlobalPauseState::transition($paused, 'resume', 'recovered', 101);
-            self::check(GlobalPauseState::canRun($resumed) && $resumed['revision'] === 2);
-            self::check(GlobalPauseState::agendaUnchanged($resumed, $base));
-            self::check($resumed['agenda_sha256'] === $initial['agenda_sha256'] && serialize($base) === $original);
+            self::check(GlobalPauseState::agendaUnchanged($reorderedResumed, $base));
+            self::check($reorderedResumed['agenda_sha256'] === $initial['agenda_sha256'] && serialize($base) === $original);
             self::denies(static fn() => GlobalPauseState::transition($paused, 'pause', 'manual', 102));
             return ['case' => $scenario, 'status' => 'pass'];
         }

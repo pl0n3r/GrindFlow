@@ -58,8 +58,8 @@ final class BulkSchedulePreview
             $slots[$instant][] = $id;
         }
         $conflicts = [];
-        foreach (array_keys($touched) as $id) {
-            if (count($slots[$desired[$id]]) > 1) {
+        foreach ($slots as $ids) {
+            foreach (count($ids) > 1 ? $ids : [] as $id) {
                 $conflicts[] = ['id' => $id, 'reason' => 'slot_occupied'];
             }
         }
@@ -88,8 +88,7 @@ final class BulkSchedulePreview
 
     private static function entry(mixed $entry, array $fields, string $tenantId): void
     {
-        if (!is_array($entry) || array_is_list($entry)
-            || count($entry) !== count($fields)
+        if (!is_array($entry)
             || array_diff($fields, array_keys($entry)) !== []
             || array_diff(array_keys($entry), $fields) !== []
             || !is_string($entry['tenant_id']) || $entry['tenant_id'] !== $tenantId) {
@@ -106,9 +105,9 @@ final class BulkSchedulePreview
         }
     }
 
-    private static function identifier(string $value): void
+    private static function identifier(mixed $value): void
     {
-        if (preg_match('/^[a-z][a-z0-9_-]{0,47}$/D', $value) !== 1) {
+        if (!is_string($value) || preg_match('/^[a-z][a-z0-9_-]{0,47}$/D', $value) !== 1) {
             throw new InvalidArgumentException('invalid_schedule_identifier');
         }
     }
