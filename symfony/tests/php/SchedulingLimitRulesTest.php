@@ -22,6 +22,10 @@ $cases = [
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z')], 30)->reason === 'min_separation', 'same account');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z', account: 'account-2')], 30)->permitted, 'different account');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z', tenant: 'tenant-2')], 30)->permitted, 'different tenant');
+        $foreignBad = slot('invalid', tenant: 'tenant-2'); $foreignBad['status'] = 'unknown';
+        check($rule->evaluate(slot($time), [$foreignBad], 30)->permitted, 'foreign tenant bad time/status ignored');
+        $foreignBad['tenant_id'] = '';
+        check($rule->evaluate(slot($time), [$foreignBad], 30)->reason === 'invalid_input', 'unknown foreign scope rejected');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:45:00Z', network: 'instagram')], 30)->permitted, 'different network');
         $cancelled = slot('2026-10-10T11:45:00Z'); $cancelled['status'] = 'cancelled';
         check($rule->evaluate(slot($time), [$cancelled], 30)->permitted, 'cancelled does not block');
@@ -64,6 +68,10 @@ $cases = [
         check($rule->evaluate($candidate, $scheduled, 2)->reason === 'daily_cap', 'all campaigns');
         check($rule->evaluate($candidate, $scheduled, 3)->permitted, 'under cap');
         check($rule->evaluate($candidate, [slot('2026-10-10T18:00:00Z', tenant: 'other')], 1)->permitted, 'tenant isolated');
+        $foreignBad = slot('invalid', tenant: 'other'); $foreignBad['status'] = 'unknown';
+        check($rule->evaluate($candidate, [$foreignBad], 1)->permitted, 'foreign tenant bad time/status ignored');
+        $foreignBad['tenant_id'] = '';
+        check($rule->evaluate($candidate, [$foreignBad], 1)->reason === 'invalid_input', 'unknown foreign scope rejected');
         $cancelled = slot('2026-10-10T18:00:00Z'); $cancelled['status'] = 'cancelled';
         check($rule->evaluate($candidate, [$cancelled], 1)->permitted, 'cancelled ignored');
         $nullStatus = slot('2026-10-10T18:00:00Z');

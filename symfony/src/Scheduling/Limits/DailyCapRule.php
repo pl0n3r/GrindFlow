@@ -23,12 +23,18 @@ final class DailyCapRule
                 return LimitDecision::deny('invalid_input');
             }
             $otherScope = LimitDecision::scope($row);
-            $other = LimitDecision::instant($row['scheduled_at_utc'] ?? null);
-            $status = array_key_exists('status', $row) ? $row['status'] : 'scheduled';
-            if ($otherScope === null || $other === null || !in_array($status, ['scheduled', 'queued', 'draft', 'cancelled'], true)) {
+            if ($otherScope === null) {
                 return LimitDecision::deny('invalid_input');
             }
-            if ($scope === $otherScope && $status !== 'cancelled' && $other->setTimezone($tz)->format('Y-m-d') === $day) {
+            if ($otherScope !== $scope) {
+                continue; // Rows outside this tenant/network/account cannot affect this decision.
+            }
+            $other = LimitDecision::instant($row['scheduled_at_utc'] ?? null);
+            $status = array_key_exists('status', $row) ? $row['status'] : 'scheduled';
+            if ($other === null || !in_array($status, ['scheduled', 'queued', 'draft', 'cancelled'], true)) {
+                return LimitDecision::deny('invalid_input');
+            }
+            if ($status !== 'cancelled' && $other->setTimezone($tz)->format('Y-m-d') === $day) {
                 ++$total;
                 if ($total >= $maximumPerDay) {
                     return LimitDecision::deny('daily_cap');
