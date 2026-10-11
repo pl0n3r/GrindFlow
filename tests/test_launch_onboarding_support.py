@@ -37,12 +37,8 @@ def valid_readiness(markdown: str) -> bool:
     for row in rows:
         if not all(row.get(col) for col in ("Criterio", "Evidencia", "Estado", "Owner por rol", "Frescura")):
             return False
-        if row["Estado"] not in ("UNKNOWN", "NO-GO", "EVIDENCIADO"):
-            return False
-        if row["Estado"] == "EVIDENCIADO" and any(
-            "UNKNOWN" in row[field].upper()
-            for field in ("Evidencia", "Owner por rol", "Frescura")
-        ):
+        # Un parser local no puede autenticar fuentes, fechas ni autoridades.
+        if row["Estado"] not in ("UNKNOWN", "NO-GO"):
             return False
     return True
 
@@ -88,6 +84,12 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
         )
         self.assertNotEqual(missing_owner, self.content)
         self.assertFalse(valid_readiness(missing_owner), "El owner UNKNOWN tampoco es válido")
+        forged = self.content.replace(
+            "| Piloto con resultados verificables #271 | UNKNOWN | UNKNOWN | Producto | UNKNOWN |",
+            "| Piloto con resultados verificables #271 | Acta supuestamente aprobada | EVIDENCIADO | Producto | 2026-10-11T11:00:00Z |",
+        )
+        self.assertNotEqual(forged, self.content)
+        self.assertFalse(valid_readiness(forged), "Una cadena de texto no autentica evidencia")
 
     def test_sla_is_proposed_not_approved(self):
         title = "SLAs iniciales — propuesta, NO aprobación contractual"
