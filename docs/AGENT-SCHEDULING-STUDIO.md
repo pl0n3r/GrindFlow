@@ -49,3 +49,16 @@ cross-tenant, overrides falsos, capacidad y creador independiente. Reversión:
 retirar estas seis rutas nuevas, sin migración ni datos productivos. `main`
 y `config/version.php` quedan intactos; CI y revisión independientes siguen
 siendo gates obligatorios antes de merge. **NO DEPLOY / NO LIVE**.
+
+## Identidades de slot y tarea (AC-02/03)
+
+Un slot pertenece a `(tenant_id, creator_id, slot_id)`. La reutilización del
+mismo `slot_id` entre dos creadores autorizados es válida, pero dos filas
+con el mismo par creador/slot son evidencia ambigua y bloquean la agregación.
+
+Cada tarea de capacidad debe llevar un `task_id` opaco único dentro del tenant,
+provisto por un futuro adaptador autenticado. Identidades repetidas o ausentes
+fallan cerrado y no cuentan como trabajo nuevo; dos tareas con distintos IDs
+pueden tener iguales campos de negocio. El adaptador debe certificar IDs de
+joins/páginas/reintentos, de lo contrario ningún cuello de botella calculado
+acredita capacidad productiva.

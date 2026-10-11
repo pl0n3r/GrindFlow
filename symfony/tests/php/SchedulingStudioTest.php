@@ -33,7 +33,9 @@ function slot(string $id, string $creator = 'creator_1'): array
 }
 function task(string $member, string $stage): array
 {
-    return ['tenant_id' => 'tenant_1', 'creator_id' => 'creator_1',
+    static $nextId = 0;
+    $nextId++;
+    return ['tenant_id' => 'tenant_1', 'task_id' => 'task_' . $nextId, 'creator_id' => 'creator_1',
         'member_id' => $member, 'stage' => $stage, 'day' => '2026-10-12'];
 }
 $tests = [
@@ -116,6 +118,13 @@ $tests = [
             && array_column($global['slots'], 'slot_id')
                 === ['slot_a', 'slot_c', '01', '1', 'slot_b'],
             'calendar_order_is_deterministic_by_day_creator_and_id');
+        $creatorLocal = $v->aggregate('tenant_1', ['creator_1', 'creator_2'],
+            [slot('shared_id'), slot('shared_id', 'creator_2')]);
+        check($creatorLocal['status'] === 'ok' && $creatorLocal['total'] === 2,
+            'same_slot_id_allowed_for_distinct_creators');
+        check($v->aggregate('tenant_1', ['creator_1'],
+            [slot('shared_id'), slot('shared_id')])['status'] === 'blocked',
+            'duplicate_slot_same_creator_denied');
         $foreign = slot('s3'); $foreign['tenant_id'] = 'tenant_2';
         check($v->aggregate('tenant_1', ['creator_1'], [$foreign])['status'] === 'blocked', 'foreign_tenant');
         check($v->aggregate('tenant_1', ['creator_1'], [slot('s4', 'creator_2')])['status'] === 'blocked', 'foreign_creator');
@@ -149,6 +158,19 @@ $tests = [
             && $overload['by_creator']['creator_1'] === ['preparation' => 1, 'approval' => 0]
             && $overload['by_creator']['creator_2'] === ['preparation' => 0, 'approval' => 2]
             && $overload['total'] === 3, 'creator_breakdown_of_daily_bottleneck');
+        $taskOne = task('editor_1', 'approval');
+        check($a->analyze('tenant_1', $members, [$taskOne, $taskOne])['status'] === 'blocked',
+            'duplicate_task_id_denied');
+        $taskTwo = $taskOne;
+        $taskTwo['task_id'] = 'different_task_id';
+        $distinct = $a->analyze('tenant_1', $members, [$taskOne, $taskTwo]);
+        check($distinct['status'] === 'ok' && $distinct['task_count'] === 2
+            && $distinct['bottlenecks'] === [],
+            'distinct_task_ids_same_business_fields_valid');
+        $noId = $taskOne;
+        unset($noId['task_id']);
+        check($a->analyze('tenant_1', $members, [$noId])['status'] === 'blocked',
+            'missing_task_id_denied');
         $reversed = $a->analyze('tenant_1', $members, array_reverse($mixed));
         check($reversed['bottlenecks'] === $multi['bottlenecks'],
             'stable_breakdown_for_reordered_tasks');

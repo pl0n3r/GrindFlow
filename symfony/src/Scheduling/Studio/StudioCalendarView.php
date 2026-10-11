@@ -35,10 +35,15 @@ final class StudioCalendarView
                 || !self::validDay($slot['day'])
                 || !is_string($slot['state'])
                 || !in_array($slot['state'], ['preparing', 'awaiting_approval', 'approved'], true)
-                || isset($seen[$slot['slot_id']])) {
+                ) {
                 return self::blocked();
             }
-            $seen[$slot['slot_id']] = true;
+            // Slot IDs are scoped to each authenticated creator.
+            $slotKey = $slot['creator_id'] . "\0" . $slot['slot_id'];
+            if (isset($seen[$slotKey])) {
+                return self::blocked();
+            }
+            $seen[$slotKey] = true;
             $visible[$slot['creator_id']][$slot['state']]++;
             $items[] = ['creator_id' => $slot['creator_id'], 'slot_id' => $slot['slot_id'],
                 'day' => $slot['day'], 'state' => $slot['state']];

@@ -25,16 +25,21 @@ final class TeamCapacityAnalyzer
             $capacity[$member['member_id']] = $member['daily_capacity'];
         }
         $daily = [];
+        $seenTaskIds = [];
         foreach ($tasks as $task) {
             if (!is_array($task) || !self::hasExactKeys($task,
-                ['tenant_id', 'creator_id', 'member_id', 'stage', 'day'])
-                || $task['tenant_id'] !== $tenantId || !self::creatorIdentifier($task['creator_id'])
+                ['tenant_id', 'task_id', 'creator_id', 'member_id', 'stage', 'day'])
+                || $task['tenant_id'] !== $tenantId
+                || !self::identifier($task['task_id'])
+                || isset($seenTaskIds[$task['task_id']])
+                || !self::creatorIdentifier($task['creator_id'])
                 || !self::identifier($task['member_id'])
                 || !array_key_exists($task['member_id'], $capacity)
                 || !in_array($task['stage'], ['preparation', 'approval'], true)
                 || !self::validDay($task['day'])) {
                 return self::blocked();
             }
+            $seenTaskIds[$task['task_id']] = true;
             $key = $task['member_id'] . ':' . $task['day'];
             if (!isset($daily[$key])) {
                 $daily[$key] = ['member_id' => $task['member_id'], 'day' => $task['day'],
