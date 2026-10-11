@@ -37,9 +37,12 @@ def valid_readiness(markdown: str) -> bool:
     for row in rows:
         if not all(row.get(col) for col in ("Criterio", "Evidencia", "Estado", "Owner por rol", "Frescura")):
             return False
-        if row["Evidencia"] == "UNKNOWN" and row["Estado"] != "UNKNOWN":
-            return False
         if row["Estado"] not in ("UNKNOWN", "NO-GO", "EVIDENCIADO"):
+            return False
+        if row["Estado"] == "EVIDENCIADO" and any(
+            "UNKNOWN" in row[field].upper()
+            for field in ("Evidencia", "Owner por rol", "Frescura")
+        ):
             return False
     return True
 
@@ -73,6 +76,18 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
                                        "| Piloto con resultados verificables #271 | UNKNOWN | EVIDENCIADO |")
         self.assertNotEqual(mutated, self.content)
         self.assertFalse(valid_readiness(mutated))
+        stale = self.content.replace(
+            "| Piloto con resultados verificables #271 | UNKNOWN | UNKNOWN | Producto | UNKNOWN |",
+            "| Piloto con resultados verificables #271 | Evidencia piloto #271 | EVIDENCIADO | Producto | UNKNOWN |",
+        )
+        self.assertNotEqual(stale, self.content)
+        self.assertFalse(valid_readiness(stale), "La frescura UNKNOWN nunca acredita el go")
+        missing_owner = self.content.replace(
+            "| Piloto con resultados verificables #271 | UNKNOWN | UNKNOWN | Producto | UNKNOWN |",
+            "| Piloto con resultados verificables #271 | Evidencia piloto #271 | EVIDENCIADO | UNKNOWN | Verificado el 2026-10-11 |",
+        )
+        self.assertNotEqual(missing_owner, self.content)
+        self.assertFalse(valid_readiness(missing_owner), "El owner UNKNOWN tampoco es válido")
 
     def test_sla_is_proposed_not_approved(self):
         title = "SLAs iniciales — propuesta, NO aprobación contractual"
