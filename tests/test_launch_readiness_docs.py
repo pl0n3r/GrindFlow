@@ -70,7 +70,11 @@ def _status(document: str) -> None:
     lines = document.splitlines()
     for label, expected in required:
         prefix = f"**{label}:**"
-        declarations = [line for line in lines if line.lstrip().startswith(prefix)]
+        # Match equivalent Markdown labels, even with whitespace, casing or
+        # enclosing comments; only the exact standalone canonical line passes.
+        label_pattern = r"\s+".join(re.escape(word) for word in label.split())
+        declaration = re.compile(r"\*\*\s*" + label_pattern + r"\s*:\s*\*\*", re.IGNORECASE)
+        declarations = [line.strip() for line in lines if declaration.search(line)]
         if declarations != [f"{prefix} {expected}"]:
             raise ValueError("estado GO/UNKNOWN ambiguo o promoción implícita")
     if "Estado actual: NO AUTORIZADO" not in document:
@@ -144,6 +148,18 @@ class LaunchReadinessDocsTests(unittest.TestCase):
                 duplicated = content + f"\n**{label}:** {expected}\n"
                 with self.assertRaisesRegex(ValueError, "ambiguo"):
                     _status(duplicated)
+        # Contradictory live/readiness states cannot hide in alternative markup.
+        for label in ("Resultado de readiness", "Decisión go/no-go", "Autorización go-live"):
+            for alternate in (
+                f"**{label.upper()}:** AUTORIZADO.",
+                f"**{label} :** AUTORIZADO.",
+                f"<!-- **{label}:** AUTORIZADO. -->",
+                f"Nota: **{label}:** AUTORIZADO.",
+            ):
+                with self.subTest(label=label, alternate=alternate):
+                    forged = content + "\n" + alternate + "\n"
+                    with self.assertRaisesRegex(ValueError, "ambiguo"):
+                        _status(forged)
         invalid_status = content.replace("| UNKNOWN |", "| VALIDADO |", 1)
         with self.assertRaisesRegex(ValueError, "cumplida"):
             _matrix(invalid_status)
