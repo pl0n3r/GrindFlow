@@ -168,11 +168,11 @@ class LaunchReadinessDocsTests(unittest.TestCase):
             for unbolded in (f"{label}: GO", f"### {label}: AUTORIZADO"):
                 with self.subTest(label=label, unbolded=unbolded):
                     with self.assertRaisesRegex(ValueError, "ambiguo"):
-                        _status(content + "\\n" + unbolded + "\\n")
+                        _status(content + "\n" + unbolded + "\n")
         for extra in ("Estado actual: AUTORIZADO", "### ESTADO ACTUAL: GO"):
             with self.subTest(live_conflict=extra):
                 with self.assertRaisesRegex(ValueError, "go-live"):
-                    _status(content + "\\n" + extra + "\\n")
+                    _status(content + "\n" + extra + "\n")
         invalid_status = content.replace("| UNKNOWN |", "| VALIDADO |", 1)
         with self.assertRaisesRegex(ValueError, "cumplida"):
             _matrix(invalid_status)
