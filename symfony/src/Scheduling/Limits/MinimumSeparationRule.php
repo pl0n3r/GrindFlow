@@ -15,7 +15,7 @@ final class MinimumSeparationRule
     {
         $at = LimitDecision::instant($candidate['scheduled_at_utc'] ?? null);
         $scope = LimitDecision::scope($candidate);
-        if ($at === null || $scope === null || $minimumMinutes < 1 || $minimumMinutes > 10080 || count($scheduled) > 10000) {
+        if ($at === null || $scope === null || $minimumMinutes < 0 || $minimumMinutes > 10080 || count($scheduled) > 10000) {
             return LimitDecision::deny('invalid_input');
         }
         foreach ($scheduled as $row) {

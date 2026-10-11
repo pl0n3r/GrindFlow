@@ -33,6 +33,14 @@ $cases = [
         unset($nullStatus['status']);
         check($rule->evaluate(slot($time), [$nullStatus], 30)->reason === 'min_separation', 'missing separation status preserves scheduled default');
         check($rule->evaluate(slot($time), [slot('2026-10-10T11:30:00Z')], 30)->permitted, 'exact boundary');
+        // Zero turns off separation, never input validation or tenant checks.
+        check($rule->evaluate(slot($time), [slot($time)], 0)->permitted, 'zero separation allows coincident UTC slots');
+        check($rule->evaluate(slot($time), [slot($time)], -1)->reason === 'invalid_input', 'negative minimum rejected');
+        check($rule->evaluate(slot($time), [slot($time)], 10081)->reason === 'invalid_input', 'maximum exceeded');
+        $invalidAtZero = slot('invalid');
+        check($rule->evaluate(slot($time), [$invalidAtZero], 0)->reason === 'invalid_input', 'zero never bypasses bad timestamps');
+        $unknownAtZero = slot($time); $unknownAtZero['status'] = 'unknown';
+        check($rule->evaluate(slot($time), [$unknownAtZero], 0)->reason === 'invalid_input', 'zero never bypasses unknown statuses');
         check($rule->evaluate(slot($time), [slot('invalid')], 30)->reason === 'invalid_input', 'invalid existing slot');
     },
     'windows' => static function (): void {
