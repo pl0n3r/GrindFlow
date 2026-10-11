@@ -11,18 +11,12 @@ final class PreviewPauseScenario
 {
     private static function check(bool $condition): void
     {
-        if (!$condition) {
-            throw new RuntimeException('scheduling_preview_contract_failure');
-        }
+        if (!$condition) { throw new RuntimeException('scheduling_preview_contract_failure'); }
     }
 
     private static function denies(callable $operation): void
     {
-        try {
-            $operation();
-        } catch (InvalidArgumentException) {
-            return;
-        }
+        try { $operation(); } catch (InvalidArgumentException) { return; }
         throw new RuntimeException('unsafe_schedule_operation_accepted');
     }
 
@@ -69,16 +63,13 @@ final class PreviewPauseScenario
             self::check(GlobalPauseState::canRun($initial));
             $paused = GlobalPauseState::transition($initial, 'pause', 'maintenance', 100);
             self::check(!GlobalPauseState::canRun($paused) && GlobalPauseState::canRun($initial));
-            // JSON object key order is not authoritative: both levels of a
-            // validated state can be reserialized without granting a resume.
+            // Reordered JSON keys do not change authority.
             $orderedDifferently = array_reverse($paused, true);
             $orderedDifferently['audit'][0] = array_reverse($paused['audit'][0], true);
             self::check(!GlobalPauseState::canRun($orderedDifferently));
             $reorderedInitial = array_reverse($initial, true);
             self::check(GlobalPauseState::canRun($reorderedInitial));
-            $reorderedResumed = GlobalPauseState::transition(
-                $orderedDifferently, 'resume', 'recovered', 101
-            );
+            $reorderedResumed = GlobalPauseState::transition($orderedDifferently, 'resume', 'recovered', 101);
             self::check(GlobalPauseState::canRun($reorderedResumed)
                 && $reorderedResumed['revision'] === 2);
             $unexpectedState = $orderedDifferently;
@@ -110,6 +101,12 @@ final class PreviewPauseScenario
             $invalidInitial['paused'] = true;
             self::denies(static fn() => GlobalPauseState::canRun($invalidInitial));
             self::check(!str_contains(json_encode($paused, JSON_THROW_ON_ERROR), 'private'));
+            $full = GlobalPauseState::initial($base);
+            for ($i = 1; $i <= 32; ++$i) {
+                $full = GlobalPauseState::transition($full, $i % 2 ? 'pause' : 'resume', 'manual', 1000 + $i);
+            }
+            self::check(!$full['paused'] && !GlobalPauseState::canRun($full));
+            self::denies(static fn() => GlobalPauseState::transition($full, 'pause', 'incident', 1033));
             return ['case' => $scenario, 'status' => 'pass'];
         }
         throw new InvalidArgumentException('unknown_scenario');

@@ -45,7 +45,8 @@ final class GlobalPauseState
     public static function canRun(array $state): bool
     {
         self::validate($state);
-        return !$state['paused'];
+        // A full audit cannot authorize execution while another pause is impossible.
+        return !$state['paused'] && count($state['audit']) < 32;
     }
 
     /** Only verifies equality of snapshots, never authorizes scheduling. */
@@ -73,7 +74,6 @@ final class GlobalPauseState
                 || !self::hasExactKeys($event, ['revision', 'action', 'reason_code', 'at'])
                 || $event['revision'] !== $index + 1
                 || $event['action'] !== ($index % 2 === 0 ? 'pause' : 'resume')
-                || !in_array($event['action'], ['pause', 'resume'], true)
                 || !in_array($event['reason_code'], ['manual', 'maintenance', 'incident', 'recovered'], true)
                 || !is_int($event['at']) || $event['at'] <= $last) {
                 throw new InvalidArgumentException('invalid_pause_audit');
@@ -88,8 +88,7 @@ final class GlobalPauseState
     /** Associative JSON objects have no canonical field order; unknown keys still deny. */
     private static function hasExactKeys(array $value, array $expected): bool
     {
-        return count($value) === count($expected)
-            && array_diff_key($value, array_fill_keys($expected, true)) === [];
+        return count($value) === count($expected) && array_diff_key($value, array_fill_keys($expected, true)) === [];
     }
 
     private static function digest(array $agenda): string
