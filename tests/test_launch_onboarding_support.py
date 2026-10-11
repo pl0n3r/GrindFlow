@@ -4,6 +4,22 @@ import unittest
 from pathlib import Path
 
 DOC = Path(__file__).resolve().parents[1] / "docs/launch/onboarding-support.md"
+
+GO_NO_GO_HEADING = "Puerta go/no-go de preparación (NO es go-live)"
+GO_NO_GO_CANONICAL = "**Resultado go/no-go:** NO-GO mientras cualquiera de los siete criterios obligatorios esté UNKNOWN, falte uno, aparezca duplicado, existan incidentes P0/P1 abiertos o no haya evidencia fresca. UNKNOWN nunca significa cero, listo ni aprobado. El contrato offline rechaza cualquier fila `EVIDENCIADO`: autenticar evidencia, fecha y autoridad requiere una puerta independiente, no editar este documento. Este checklist no dispara publicaciones."
+GO_NO_GO_LABEL = re.compile(
+    r"resultado[ \t]+go[ \t]*/[ \t]*no-go[ \t]*:", re.IGNORECASE
+)
+
+def valid_go_no_go_decision(markdown: str) -> bool:
+    """A negative readiness decision is unique, canonical and not forgeable by text."""
+    gate = section(markdown, GO_NO_GO_HEADING)
+    if not gate or len(GO_NO_GO_LABEL.findall(markdown)) != 1:
+        return False
+    declarations = [line.strip() for line in gate.splitlines()
+                    if GO_NO_GO_LABEL.search(line)]
+    return declarations == [GO_NO_GO_CANONICAL]
+
 MANDATORY = {
     "Piloto con resultados verificables #271",
     "Prueba de recovery/rollback #311",
@@ -50,7 +66,7 @@ def valid_readiness(markdown: str) -> bool:
         # Un parser local no puede autenticar fuentes, fechas ni autoridades.
         if row["Estado"] not in ("UNKNOWN", "NO-GO"):
             return False
-    return True
+    return valid_go_no_go_decision(markdown)
 
 
 LIVE_HEADING = "Autorización de live — decisión humana posterior y separada"
@@ -141,6 +157,25 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
                 candidate = self.content.replace(LIVE_STATUS, invalid, 1)
                 self.assertNotEqual(candidate, self.content)
                 self.assertFalse(valid_live_authorization(candidate))
+
+    def test_go_no_go_decision_rejects_contradictions_and_hidden_aliases(self):
+        self.assertTrue(valid_go_no_go_decision(self.content))
+        self.assertTrue(valid_readiness(self.content))
+        for variant in (
+            "**Resultado go/no-go:** GO.",
+            GO_NO_GO_CANONICAL + "\n**Resultado go/no-go:** GO.",
+            GO_NO_GO_CANONICAL + "\n<!-- **Resultado go/no-go:** GO. -->",
+            GO_NO_GO_CANONICAL + "\nResultado  go/no-go : GO.",
+            GO_NO_GO_CANONICAL + "\nNota: **Resultado go/no-go:** GO.",
+            GO_NO_GO_CANONICAL + "\n" + GO_NO_GO_CANONICAL,
+            GO_NO_GO_CANONICAL.replace("**Resultado", "**RESULTADO", 1),
+            GO_NO_GO_CANONICAL + " AUTORIZADO.",
+        ):
+            with self.subTest(variant=variant):
+                mutated = self.content.replace(GO_NO_GO_CANONICAL, variant, 1)
+                self.assertNotEqual(mutated, self.content)
+                self.assertFalse(valid_go_no_go_decision(mutated))
+                self.assertFalse(valid_readiness(mutated))
 
     def test_sla_is_proposed_not_approved(self):
         title = "SLAs iniciales — propuesta, NO aprobación contractual"
