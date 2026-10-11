@@ -44,5 +44,8 @@ final class SchedulingHorizonTest extends TestCase
         self::assertSame('uncertain_schedule', $detector->detect('tenant-a', 'UTC', '2026-10-12', 1, 1, [
             ['tenant_id' => 'tenant-a', 'date' => '2026-10-12', 'slot' => 1, 'status' => 'ambiguous'],
         ])['reason']);
+        self::assertSame('uncertain_schedule', $detector->detect('tenant-a', 'UTC', '2026-10-12', 1, 1, [
+            ['tenant_id' => 'tenant-a', 'date' => '2026-10-12', 'slot' => 1, 'status' => null],
+        ])['reason']);
     }
 }

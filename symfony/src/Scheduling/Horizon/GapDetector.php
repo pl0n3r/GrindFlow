@@ -73,7 +73,7 @@ final class GapDetector
                 || !is_int($entry['slot']) || $entry['slot'] < 1 || $entry['slot'] > $slotsPerDay) {
                 return self::rejected('invalid_schedule');
             }
-            $status = $entry['status'] ?? 'scheduled';
+            $status = array_key_exists('status', $entry) ? $entry['status'] : 'scheduled';
             if (!in_array($status, ['scheduled', 'draft'], true)) {
                 return self::rejected('uncertain_schedule');
             }
