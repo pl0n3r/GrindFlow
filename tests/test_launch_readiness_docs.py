@@ -16,6 +16,7 @@ COLUMNS = (
     "ID", "Criterio", "Fuente", "Evidencia", "Responsable", "Estado",
     "Frescura", "Condición de cierre",
 )
+REQUIRED_CRITERIA = frozenset(f"GF-C{number:02d}" for number in range(1, 13))
 
 
 def _matrix(document: str) -> list[dict[str, str]]:
@@ -53,8 +54,8 @@ def _matrix(document: str) -> list[dict[str, str]]:
         if not re.search(r"(rol(?:es)? propuesto|decisión no delegada)", row["Responsable"]):
             raise ValueError("responsable sin aclaración de asignación")
         result.append(row)
-    if len(result) < 10:
-        raise ValueError("matriz comercial incompleta")
+    if seen != REQUIRED_CRITERIA:
+        raise ValueError("identidades de criterios requeridos incompletas o ajenas")
     return result
 
 
@@ -96,6 +97,21 @@ class LaunchReadinessDocsTests(unittest.TestCase):
         missing_owner = content.replace("Producto (rol propuesto)", "Producto", 1)
         with self.assertRaisesRegex(ValueError, "responsable|owner"):
             _matrix(missing_owner)
+
+    def test_required_criterion_ids_cannot_be_substituted(self):
+        content = DOCUMENT.read_text(encoding="utf-8")
+        rows = _matrix(content)
+        self.assertEqual({row["ID"] for row in rows}, REQUIRED_CRITERIA)
+        for missing, replacement in (
+            ("GF-C12", "GF-C13"),
+            ("GF-C01", "GF-C00"),
+            ("GF-C09", "GF-C99"),
+        ):
+            with self.subTest(missing=missing):
+                mutated = content.replace(f"| {missing} |", f"| {replacement} |", 1)
+                self.assertNotEqual(mutated, content)
+                with self.assertRaisesRegex(ValueError, "identidades de criterios"):
+                    _matrix(mutated)
 
     def test_unknown_never_counts_as_ready(self):
         content = DOCUMENT.read_text(encoding="utf-8")
