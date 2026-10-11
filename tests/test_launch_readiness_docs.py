@@ -59,19 +59,18 @@ def _matrix(document: str) -> list[dict[str, str]]:
 
 
 def _status(document: str) -> None:
-    # Una declaración segura no permite otra contradictoria o duplicada.
+    # El texto completo es una barrera de gobernanza: aceptar un prefijo seguro
+    # y un sufijo "GO" o "AUTORIZADO" produciría un falso positivo.
     required = (
-        ("Resultado de readiness", "UNKNOWN"),
-        ("Decisión go/no-go", "PENDIENTE"),
-        ("Autorización go-live", "NO AUTORIZADO"),
+        ("Resultado de readiness", "UNKNOWN — **no certifica GO**."),
+        ("Decisión go/no-go", "PENDIENTE, sujeta a comprobación de evidencias por responsables autorizados."),
+        ("Autorización go-live", "NO AUTORIZADO; requiere decisión explícita posterior del propietario y gates técnicos independientes."),
     )
+    lines = document.splitlines()
     for label, expected in required:
-        declarations = re.findall(
-            rf"(?m)^\*\*{re.escape(label)}:\*\*\s*([^\r\n]+)$", document,
-        )
-        if len(declarations) != 1 or not re.match(
-            rf"^{re.escape(expected)}(?:$|[,;.]|\s+[—–-])", declarations[0],
-        ):
+        prefix = f"**{label}:**"
+        declarations = [line for line in lines if line.lstrip().startswith(prefix)]
+        if declarations != [f"{prefix} {expected}"]:
             raise ValueError("estado GO/UNKNOWN ambiguo o promoción implícita")
     if "Estado actual: NO AUTORIZADO" not in document:
         raise ValueError("go-live podría inferirse de la documentación")
@@ -104,6 +103,19 @@ class LaunchReadinessDocsTests(unittest.TestCase):
         _status(content)
         self.assertTrue(all(row["Estado"] == "UNKNOWN" for row in rows))
         self.assertFalse(any(row["Evidencia"].startswith("ADJUNTA") for row in rows))
+        # Un prefijo correcto no permite anexar una segunda decisión contradictoria.
+        for label, expected, forged in (
+            ("Resultado de readiness", "UNKNOWN — **no certifica GO**.", "UNKNOWN, GO"),
+            ("Decisión go/no-go", "PENDIENTE, sujeta a comprobación de evidencias por responsables autorizados.", "PENDIENTE; APROBADO"),
+            ("Autorización go-live", "NO AUTORIZADO; requiere decisión explícita posterior del propietario y gates técnicos independientes.", "NO AUTORIZADO; AUTORIZADO"),
+        ):
+            with self.subTest(inline_conflict=label):
+                genuine = f"**{label}:** {expected}"
+                self.assertIn(genuine, content)
+                forged_document = content.replace(genuine, f"**{label}:** {forged}", 1)
+                with self.assertRaisesRegex(ValueError, "ambiguo"):
+                    _status(forged_document)
+
         for label, expected, conflicting in (
             ("Resultado de readiness", "UNKNOWN", "GO"),
             ("Decisión go/no-go", "PENDIENTE", "APROBADO"),
