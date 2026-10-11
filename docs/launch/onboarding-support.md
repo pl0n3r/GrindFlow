@@ -66,4 +66,5 @@ No existe SLA contractual ni promesa de disponibilidad. Medir capacidad, fijar h
 
 Aunque la preparación alcance go, **solo una instrucción explícita del propietario** puede aprobar versión 1.0.0, cambio de fase, publicación o go-live, bajo #356 y demás puertas aplicables. La decisión debe registrarse con fecha, SHA exacto, responsable, evidencias operativas y verificación independiente del despliegue. Un CI verde o este documento NO autorizan datos reales, gastos, proveedores ni activación.
 
-**Estado actual de live:** NO AUTORIZADO. **Versión y ambiente productivo:** no inferidos desde este documento.
+**Estado actual de live:** NO AUTORIZADO.
+**Versión y ambiente productivo:** no inferidos desde este documento.

@@ -1,4 +1,5 @@
 """AC-01..03: offline structure and fail-closed checks for launch onboarding."""
+import re
 import unittest
 from pathlib import Path
 
@@ -52,6 +53,22 @@ def valid_readiness(markdown: str) -> bool:
     return True
 
 
+LIVE_HEADING = "Autorización de live — decisión humana posterior y separada"
+LIVE_STATUS = "**Estado actual de live:** NO AUTORIZADO."
+LIVE_LABEL = re.compile(r"estado[ \t]+actual[ \t]+de[ \t]+live[ \t]*:", re.IGNORECASE)
+
+
+def valid_live_authorization(markdown: str) -> bool:
+    """One canonical, unauthorised live status; reject aliases and hidden duplicates."""
+    live = section(markdown, LIVE_HEADING)
+    if not live or len(LIVE_LABEL.findall(markdown)) != 1:
+        return False
+    status_lines = [line.strip() for line in live.splitlines() if LIVE_LABEL.search(line)]
+    return (status_lines == [LIVE_STATUS]
+            and "solo una instrucción explícita del propietario" in live
+            and "#356" in live)
+
+
 class LaunchOnboardingSupportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -77,6 +94,7 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
         self.assertIn("solo una instrucción explícita del propietario", live)
         self.assertIn("NO AUTORIZADO", live)
         self.assertIn("#356", live)
+        self.assertTrue(valid_live_authorization(self.content))
         mutated = self.content.replace("| Piloto con resultados verificables #271 | UNKNOWN | UNKNOWN |",
                                        "| Piloto con resultados verificables #271 | UNKNOWN | EVIDENCIADO |")
         self.assertNotEqual(mutated, self.content)
@@ -105,6 +123,24 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
         self.assertFalse(valid_readiness(removed), "Un criterio crítico no puede omitirse")
         duplicated = self.content.replace(mandatory_row, mandatory_row + "\n" + mandatory_row, 1)
         self.assertFalse(valid_readiness(duplicated), "Los criterios duplicados no acreditan completitud")
+
+    def test_live_declaration_is_unique_canonical_and_not_hidden(self):
+        self.assertTrue(valid_live_authorization(self.content))
+        self.assertEqual(self.content.count(LIVE_STATUS), 1)
+        mutations = (
+            LIVE_STATUS + "\n**Estado actual de live:** AUTORIZADO.",
+            "**Estado actual de live:** AUTORIZADO.",
+            LIVE_STATUS + "\n" + LIVE_STATUS,
+            LIVE_STATUS + "\n<!-- **Estado actual de live:** AUTORIZADO. -->",
+            "<!-- " + LIVE_STATUS + " -->",
+            "**ESTADO ACTUAL DE LIVE:** NO AUTORIZADO.",
+            LIVE_STATUS + " AUTORIZADO.",
+        )
+        for invalid in mutations:
+            with self.subTest(status=invalid):
+                candidate = self.content.replace(LIVE_STATUS, invalid, 1)
+                self.assertNotEqual(candidate, self.content)
+                self.assertFalse(valid_live_authorization(candidate))
 
     def test_sla_is_proposed_not_approved(self):
         title = "SLAs iniciales — propuesta, NO aprobación contractual"
