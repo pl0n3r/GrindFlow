@@ -12,13 +12,17 @@ final class ApprovalPolicy
     /** @return array{status: string, approved: bool, pending_roles: array, audit: array} */
     public function decide(array $request, array $responses, int $now): array
     {
-        $shape = ['tenant_id', 'creator_id', 'profile', 'approval_required',
-            'required_roles', 'expires_at'];
+        $shape = ['tenant_id', 'creator_id', 'request_id', 'issued_at',
+            'profile', 'approval_required', 'required_roles', 'expires_at'];
         if (!self::shape($request, $shape)
             || !self::id($request['tenant_id']) || !self::id($request['creator_id'])
+            || !self::id($request['request_id'])
+            || !is_int($request['issued_at']) || $request['issued_at'] < 0
+            || $request['issued_at'] > $now
             || !in_array($request['profile'], ['individual', 'studio'], true)
             || !is_bool($request['approval_required'])
             || !is_int($request['expires_at']) || $request['expires_at'] <= 0
+            || $request['issued_at'] >= $request['expires_at']
             || $now < 0 || !is_array($responses) || !array_is_list($responses)
             || count($responses) > 16 || !is_array($request['required_roles'])
             || !array_is_list($request['required_roles'])
@@ -53,14 +57,17 @@ final class ApprovalPolicy
         $seen = [];
         $audit = [];
         foreach ($responses as $response) {
-            if (!is_array($response) || !self::shape($response, ['tenant_id', 'creator_id', 'role',
+            if (!is_array($response) || !self::shape($response, ['tenant_id', 'creator_id', 'request_id', 'role',
                     'decision', 'role_verified', 'at'])
                 || $response['tenant_id'] !== $request['tenant_id']
                 || $response['creator_id'] !== $request['creator_id']
+                || $response['request_id'] !== $request['request_id']
                 || !in_array($response['role'], $roles, true)
                 || !in_array($response['decision'], ['approve', 'reject'], true)
                 || $response['role_verified'] !== true
-                || !is_int($response['at']) || $response['at'] < 0
+                || !is_int($response['at'])
+                || $response['at'] < $request['issued_at']
+                || $response['at'] >= $request['expires_at']
                 || $response['at'] > $now || isset($seen[$response['role']])) {
                 return self::result('invalid');
             }

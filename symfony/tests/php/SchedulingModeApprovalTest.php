@@ -25,6 +25,7 @@ function context(): array
 function request(bool $studio = true): array
 {
     return ['tenant_id' => 'tenant_1', 'creator_id' => 'creator_1',
+        'request_id' => 'approval_001', 'issued_at' => 1800000000,
         'profile' => $studio ? 'studio' : 'individual', 'approval_required' => true,
         'required_roles' => $studio ? ['editor', 'reviewer'] : ['owner'],
         'expires_at' => 1800000100];
@@ -32,6 +33,7 @@ function request(bool $studio = true): array
 function response(string $role = 'editor'): array
 {
     return ['tenant_id' => 'tenant_1', 'creator_id' => 'creator_1',
+        'request_id' => 'approval_001',
         'role' => $role, 'decision' => 'approve', 'role_verified' => true,
         'at' => 1800000000];
 }
@@ -81,6 +83,34 @@ $tests = [
         $both = $p->decide($req, [response(), response('reviewer')], $now);
         check($both['status'] === 'approved' && $both['approved']
             && count($both['audit']) === 2, 'all_roles_required');
+        // A previous Studio approval must never authorize a new request.
+        $new = $req;
+        $new['request_id'] = 'approval_002';
+        $new['issued_at'] = $now;
+        $oldResponses = [response(), response('reviewer')];
+        check($p->decide($new, $oldResponses, $now)['status'] === 'invalid',
+            'replay_from_other_request_rejected');
+        foreach ($oldResponses as &$oldResponse) {
+            $oldResponse['request_id'] = 'approval_002';
+        }
+        unset($oldResponse);
+        check($p->decide($new, $oldResponses, $now)['status'] === 'invalid',
+            'old_timestamp_rejected_even_with_new_request_id');
+        foreach ($oldResponses as &$currentResponse) {
+            $currentResponse['at'] = $now;
+        }
+        unset($currentResponse);
+        check($p->decide($new, $oldResponses, $now)['approved'],
+            'all_new_request_approvals_valid');
+        $malformedRequest = $new;
+        $malformedRequest['issued_at'] = true;
+        check($p->decide($malformedRequest, [], $now)['status'] === 'invalid',
+            'issued_at_requires_integer');
+        $malformedRequest = $new;
+        $malformedRequest['request_id'] = '';
+        check($p->decide($malformedRequest, [], $now)['status'] === 'invalid',
+            'request_id_required');
+
         $foreign = response('reviewer');
         $foreign['tenant_id'] = 'tenant_2';
         check(!$p->decide($req, [response(), $foreign], $now)['approved'],
