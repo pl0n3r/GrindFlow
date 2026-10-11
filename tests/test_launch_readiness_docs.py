@@ -88,8 +88,9 @@ class LaunchReadinessDocsTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "fuente"):
             _matrix(corrupted)
+        missing_owner = content.replace("Producto (rol propuesto)", "Producto", 1)
         with self.assertRaisesRegex(ValueError, "responsable|owner"):
-            _matrix(content.replace("Producto (rol propuesto)", "Producto", 1))
+            _matrix(missing_owner)
 
     def test_unknown_never_counts_as_ready(self):
         content = DOCUMENT.read_text(encoding="utf-8")
@@ -97,13 +98,15 @@ class LaunchReadinessDocsTests(unittest.TestCase):
         _status(content)
         self.assertTrue(all(row["Estado"] == "UNKNOWN" for row in rows))
         self.assertFalse(any(row["Evidencia"].startswith("ADJUNTA") for row in rows))
+        invalid_status = content.replace("| UNKNOWN |", "| VALIDADO |", 1)
         with self.assertRaisesRegex(ValueError, "cumplida"):
-            _matrix(content.replace("| UNKNOWN |", "| VALIDADO |", 1))
+            _matrix(invalid_status)
+        premature_go = content.replace(
+            "**Resultado de readiness:** UNKNOWN",
+            "**Resultado de readiness:** GO", 1,
+        )
         with self.assertRaisesRegex(ValueError, "GO/UNKNOWN"):
-            _status(content.replace(
-                "**Resultado de readiness:** UNKNOWN",
-                "**Resultado de readiness:** GO", 1,
-            ))
+            _status(premature_go)
 
     def test_no_go_risks_are_explicit_and_live_requires_owner(self):
         content = DOCUMENT.read_text(encoding="utf-8")
@@ -121,11 +124,12 @@ class LaunchReadinessDocsTests(unittest.TestCase):
         self.assertIn("Go/no-go comercial", content)
         self.assertIn("Go-live / despliegue / producción", content)
         _status(content)
+        premature_live = content.replace(
+            "**Autorización go-live:** NO AUTORIZADO",
+            "**Autorización go-live:** AUTORIZADO", 1,
+        )
         with self.assertRaisesRegex(ValueError, "GO/UNKNOWN"):
-            _status(content.replace(
-                "**Autorización go-live:** NO AUTORIZADO",
-                "**Autorización go-live:** AUTORIZADO", 1,
-            ))
+            _status(premature_live)
 
 
 if __name__ == "__main__":
