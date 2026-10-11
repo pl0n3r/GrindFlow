@@ -3,6 +3,15 @@ import unittest
 from pathlib import Path
 
 DOC = Path(__file__).resolve().parents[1] / "docs/launch/onboarding-support.md"
+MANDATORY = {
+    "Piloto con resultados verificables #271",
+    "Prueba de recovery/rollback #311",
+    "Seguridad, permisos y ausencia P0/P1",
+    "Canales y personal de soporte operativos",
+    "SLAs ratificados y cobertura medible",
+    "Costos de storage, colas y operación #351",
+    "Evidencia legal/privacidad y proveedores",
+}
 
 
 def section(markdown: str, title: str) -> str:
@@ -32,7 +41,7 @@ def table(markdown: str, heading: str) -> list[dict[str, str]]:
 
 def valid_readiness(markdown: str) -> bool:
     rows = table(markdown, "Puerta go/no-go de preparación (NO es go-live)")
-    if not rows:
+    if len(rows) != len(MANDATORY) or {row.get("Criterio") for row in rows} != MANDATORY:
         return False
     for row in rows:
         if not all(row.get(col) for col in ("Criterio", "Evidencia", "Estado", "Owner por rol", "Frescura")):
@@ -90,6 +99,12 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
         )
         self.assertNotEqual(forged, self.content)
         self.assertFalse(valid_readiness(forged), "Una cadena de texto no autentica evidencia")
+        mandatory_row = "| Seguridad, permisos y ausencia P0/P1 | UNKNOWN | UNKNOWN | Seguridad | UNKNOWN |"
+        self.assertIn(mandatory_row, self.content)
+        removed = self.content.replace(mandatory_row + "\n", "", 1)
+        self.assertFalse(valid_readiness(removed), "Un criterio crítico no puede omitirse")
+        duplicated = self.content.replace(mandatory_row, mandatory_row + "\n" + mandatory_row, 1)
+        self.assertFalse(valid_readiness(duplicated), "Los criterios duplicados no acreditan completitud")
 
     def test_sla_is_proposed_not_approved(self):
         title = "SLAs iniciales — propuesta, NO aprobación contractual"

@@ -60,7 +60,7 @@ No existe SLA contractual ni promesa de disponibilidad. Medir capacidad, fijar h
 | Costos de storage, colas y operación #351 | UNKNOWN | UNKNOWN | Finanzas/Producto | UNKNOWN |
 | Evidencia legal/privacidad y proveedores | UNKNOWN | UNKNOWN | Legal/Privacidad | UNKNOWN |
 
-**Resultado go/no-go:** NO-GO mientras cualquier requisito obligatorio esté UNKNOWN, existan incidentes P0/P1 abiertos o no haya evidencia fresca. UNKNOWN nunca significa cero, listo ni aprobado. El contrato offline rechaza cualquier fila `EVIDENCIADO`: autenticar evidencia, fecha y autoridad requiere una puerta independiente, no editar este documento. Este checklist no dispara publicaciones.
+**Resultado go/no-go:** NO-GO mientras cualquiera de los siete criterios obligatorios esté UNKNOWN, falte uno, aparezca duplicado, existan incidentes P0/P1 abiertos o no haya evidencia fresca. UNKNOWN nunca significa cero, listo ni aprobado. El contrato offline rechaza cualquier fila `EVIDENCIADO`: autenticar evidencia, fecha y autoridad requiere una puerta independiente, no editar este documento. Este checklist no dispara publicaciones.
 
 ## Autorización de live — decisión humana posterior y separada
 
