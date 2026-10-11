@@ -1,7 +1,6 @@
 <?php
 
 declare(strict_types=1);
-
 namespace GrindFlow\Scheduling\Mode;
 
 /** Pure decision projection. The caller MUST verify approver membership and identity. */
@@ -30,15 +29,12 @@ final class ApprovalPolicy
             return self::result('invalid');
         }
         $roles = $request['required_roles'];
-        // Reject untrusted nested/non-string roles before array_diff string casts.
-        // An array/object role must fail closed without PHP warnings or TypeErrors.
         foreach ($roles as $role) {
             if (!is_string($role) || !in_array($role, self::ROLES, true)) {
                 return self::result('invalid');
             }
         }
         if (count(array_unique($roles, SORT_REGULAR)) !== count($roles)
-            || array_diff($roles, self::ROLES) !== []
             || ($request['profile'] === 'individual' && ($roles !== [] && $roles !== ['owner']))
             || ($request['profile'] === 'studio' && (!$request['approval_required'] || $roles === []))
             || ($request['approval_required'] && $roles === [])
@@ -53,7 +49,6 @@ final class ApprovalPolicy
         if ($request['expires_at'] <= $now) {
             return self::result('expired');
         }
-
         $seen = [];
         $audit = [];
         foreach ($responses as $response) {
@@ -84,7 +79,6 @@ final class ApprovalPolicy
         return self::result($pending === [] ? 'approved' : 'pending',
             $pending === [], $pending, $audit);
     }
-
     private static function shape(array $value, array $keys): bool
     {
         $actual = array_keys($value);
@@ -92,7 +86,6 @@ final class ApprovalPolicy
         sort($keys);
         return $actual === $keys;
     }
-
     private static function id(mixed $value): bool
     {
         return is_string($value)

@@ -1,19 +1,13 @@
 # GrindFlow — Scheduling V1: modos y aprobaciones (hoja #427)
-
 **Estado:** build-ahead offline. Son funciones puras, sin conexión con el Scheduler o Distribution canónicos, sin base de datos, credenciales, publicación ni permiso de go-live.
 
 ## Modo de automatización
-
 AutomationMode::assess(mode, context, confirmed) devuelve status, reason allowlisted y execution_performed=false. Los tres modos canónicos (manual, assisted, autopilot) aplican los **mismos siete filtros duros**; `pilot` se admite únicamente como alias compatible de `autopilot` y devuelve el mismo resultado: permisos, contenido elegible, límite diario, ventana horaria, separación mínima, estado externo conocido y aprobación. Contexto requerido: tenant_id y account_id opacos, más siete booleanos estrictos. Campos adicionales, identidad inválida, bandera falsa o tipo incorrecto se rechazan antes de evaluar autonomía.
-
 - **Manual:** manual_action_required incluso si se confirma; la persona debe programar mediante un flujo ulterior autorizado.
 - **Asistido:** confirmation_required hasta recibir confirmación explícita verificada por el consumidor, después eligible.
 - **Piloto (`autopilot`, alias heredado `pilot`):** eligible solo si superó todos los filtros. Eligible **no implica ejecutar** ni omitir locks, revisiones o autorización productiva.
-
 confirmed es una afirmación del llamador: la función no valida sesión, CSRF, permisos ni firma. El consumidor autorizado debe verificarlos y reevaluar gates bajo locking antes de persistir cualquier planificación.
-
 ## Aprobación individual y Studio
-
 ApprovalPolicy::decide(request, responses, now) devuelve approved, status (invalid, expired, not_required, pending, rejected, approved), roles pendientes y auditoría mínima de **rol, decisión y timestamp**, sin IDs de personas ni texto externo. La petición y cada respuesta deben pertenecer al mismo tenant y creador. Cada solicitud incluye `request_id` único y `issued_at` (epoch segundos) con `0 <= issued_at <= now` y `issued_at < expires_at`. Cada respuesta exige el mismo `request_id` y tiempo `issued_at <= at < expires_at`, sin futuros (`at <= now`); una aprobación anterior no sirve en una solicitud nueva. El backend consumidor debe emitir IDs nuevos no reutilizables, autenticar firmantes y verificar su vínculo, roles y versión con estado confiable y locking: valores enviados por cliente nunca son prueba suficiente. Los IDs no aparecen en el `audit` público. La evaluación es fail-closed con entradas inesperadas, miembros duplicados, roles fuera de alcance, expiración o rol sin prueba de autorización. Respuestas que no sean arrays de datos se rechazan como `invalid`, sin `TypeError` ni eco de información. Los roles anidados/no-string se rechazan antes de las comparaciones PHP de conjuntos, sin avisos ni excepciones por conversión de tipos. Una denegación vence incluso con otros roles aprobados.
 
 - **Independiente:** aprobación propia opcional; cuando se exige, únicamente rol owner verificado. Sin aprobación requerida, devuelve `not_required` incluso si un timestamp de vencimiento anterior ya pasó, siempre que el esquema sea válido y no lleguen respuestas. Si se exige aprobación, sigue aplicándose `expires_at` y vence cerrado.

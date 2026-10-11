@@ -1,13 +1,10 @@
 <?php
-
 declare(strict_types=1);
-
 require dirname(__DIR__, 2) . '/src/Scheduling/Mode/AutomationMode.php';
 require dirname(__DIR__, 2) . '/src/Scheduling/Mode/ApprovalPolicy.php';
 
 use GrindFlow\Scheduling\Mode\AutomationMode;
 use GrindFlow\Scheduling\Mode\ApprovalPolicy;
-
 function check(bool $condition, string $reason): void
 {
     if (!$condition) {
@@ -114,13 +111,16 @@ $tests = [
         $malformedRequest['request_id'] = '';
         check($p->decide($malformedRequest, [], $now)['status'] === 'invalid',
             'request_id_required');
-
         $foreign = response('reviewer');
         $foreign['tenant_id'] = 'tenant_2';
         check(!$p->decide($req, [response(), $foreign], $now)['approved'],
             'foreign_tenant');
         $dup = $p->decide($req, [response(), response()], $now);
         check($dup['status'] === 'invalid', 'duplicate_role');
+        $duproles = request();
+        $duproles['required_roles'] = ['editor', 'editor'];
+        check($p->decide($duproles, [], $now)['status'] === 'invalid',
+            'duplicate_required_role');
         // Malformed nested roles must fail without warnings or runtime errors.
         $oldHandler = set_error_handler(static function (int $severity, string $message): never {
             throw new \ErrorException($message, 0, $severity);
@@ -141,7 +141,6 @@ $tests = [
         } finally {
             restore_error_handler();
         }
-
         $deny = response('reviewer');
         $deny['decision'] = 'reject';
         check($p->decide($req, [response(), $deny], $now)['status'] ===
