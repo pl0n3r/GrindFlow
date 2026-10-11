@@ -5,7 +5,7 @@
 ## Contratos puros
 - `BulkSchedulePreview::build`: valida tenant, IDs y UTC; simula `create|move`, devuelve altas/movimientos/conflictos/digest y siempre `execution=false`, sin mutar inputs.
 - `BulkSchedulePreview::matches`: verifica continuidad, no autoriza ejecución; el futuro caller revalidará identidad, permisos, tenant, locks, límites y estado antes de escribir.
-- `GlobalPauseState::initial/transition/canRun/agendaUnchanged`: conserva digest de agenda, revisión y hasta 32 eventos de auditoría (acción, razón enumerada, timestamp) sin PII; rechaza entradas extrañas, transiciones repetidas y timestamps desordenados.
+- `GlobalPauseState::initial/transition/canRun/agendaUnchanged`: canoniza las claves de objetos JSON anidados sin reordenar listas (profundidad máxima 32), conserva digest de agenda y hasta 32 eventos de auditoría sin PII, y rechaza transiciones repetidas o tiempos desordenados.
 - **Fail-closed ante saturación:** tras 32 eventos, `canRun=false` aunque se haya reanudado; el evento 33 se rechaza, sin truncar auditoría. Se requiere rotación auditada futura para restaurar disponibilidad; no se afirma resuelto el ciclo de retención.
 
 ## Validación offline

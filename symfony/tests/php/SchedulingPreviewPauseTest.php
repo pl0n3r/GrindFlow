@@ -65,7 +65,6 @@ final class PreviewPauseScenario
         if ($scenario === 'pause') {
             $original = serialize($base);
             $initial = GlobalPauseState::initial($base);
-            self::check(GlobalPauseState::canRun($initial));
             $paused = GlobalPauseState::transition($initial, 'pause', 'maintenance', 100);
             self::check(!GlobalPauseState::canRun($paused) && GlobalPauseState::canRun($initial));
             // Reordered JSON keys do not change authority.
@@ -82,6 +81,10 @@ final class PreviewPauseScenario
             unset($missingState['agenda_sha256']);
             self::denies(static fn() => GlobalPauseState::canRun($missingState));
             self::check(GlobalPauseState::agendaUnchanged($reorderedResumed, $base));
+            $reorderedAgenda = array_map(static fn(array $row): array => array_reverse($row, true), $base);
+            self::check(GlobalPauseState::agendaUnchanged($initial, $reorderedAgenda)
+                && !GlobalPauseState::agendaUnchanged($initial, array_reverse($reorderedAgenda)));
+            self::check(GlobalPauseState::agendaUnchanged(GlobalPauseState::initial([['meta' => ['z' => 1, 'a' => 2]]]), [['meta' => ['a' => 2, 'z' => 1]]]));
             self::check($reorderedResumed['agenda_sha256'] === $initial['agenda_sha256'] && serialize($base) === $original);
             self::denies(static fn() => GlobalPauseState::transition($paused, 'pause', 'manual', 102));
             return ['case' => $scenario, 'status' => 'pass'];
