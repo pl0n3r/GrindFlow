@@ -59,13 +59,19 @@ def _matrix(document: str) -> list[dict[str, str]]:
 
 
 def _status(document: str) -> None:
+    # Una declaración segura no permite otra contradictoria o duplicada.
     required = (
-        "**Resultado de readiness:** UNKNOWN",
-        "**Decisión go/no-go:** PENDIENTE",
-        "**Autorización go-live:** NO AUTORIZADO",
+        ("Resultado de readiness", "UNKNOWN"),
+        ("Decisión go/no-go", "PENDIENTE"),
+        ("Autorización go-live", "NO AUTORIZADO"),
     )
-    for line in required:
-        if document.count(line) != 1:
+    for label, expected in required:
+        declarations = re.findall(
+            rf"(?m)^\*\*{re.escape(label)}:\*\*\s*([^\r\n]+)$", document,
+        )
+        if len(declarations) != 1 or not re.match(
+            rf"^{re.escape(expected)}(?:$|[,;.]|\s+[—–-])", declarations[0],
+        ):
             raise ValueError("estado GO/UNKNOWN ambiguo o promoción implícita")
     if "Estado actual: NO AUTORIZADO" not in document:
         raise ValueError("go-live podría inferirse de la documentación")
@@ -98,6 +104,18 @@ class LaunchReadinessDocsTests(unittest.TestCase):
         _status(content)
         self.assertTrue(all(row["Estado"] == "UNKNOWN" for row in rows))
         self.assertFalse(any(row["Evidencia"].startswith("ADJUNTA") for row in rows))
+        for label, expected, conflicting in (
+            ("Resultado de readiness", "UNKNOWN", "GO"),
+            ("Decisión go/no-go", "PENDIENTE", "APROBADO"),
+            ("Autorización go-live", "NO AUTORIZADO", "AUTORIZADO"),
+        ):
+            with self.subTest(label=label):
+                contradictory = content + f"\n**{label}:** {conflicting}\n"
+                with self.assertRaisesRegex(ValueError, "ambiguo"):
+                    _status(contradictory)
+                duplicated = content + f"\n**{label}:** {expected}\n"
+                with self.assertRaisesRegex(ValueError, "ambiguo"):
+                    _status(duplicated)
         invalid_status = content.replace("| UNKNOWN |", "| VALIDADO |", 1)
         with self.assertRaisesRegex(ValueError, "cumplida"):
             _matrix(invalid_status)
