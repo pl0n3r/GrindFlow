@@ -59,6 +59,11 @@ $cases = [
             && $seconds->suggestedAtUtc === '2026-10-12T12:30:00Z',
             'earliest exact minute regardless of candidate seconds');
         check($rule->evaluate($candidate, [], ['2026-10-12'])->suggestedAtUtc === '2026-10-13T00:00:00Z', 'blocked date');
+        $fullDay = [['weekday' => 1, 'start' => '00:00', 'end' => '24:00']];
+        check($rule->evaluate(slot('2026-10-12T23:59:00Z'), $fullDay, [])->suggestedAtUtc === '2026-10-13T00:00:00Z', '23:59 blocked until midnight');
+        check($rule->evaluate($candidate, [['weekday' => 1, 'start' => '24:00', 'end' => '24:00']], [])->reason === 'invalid_input', '24:00 never valid as start');
+        $overflow = $rule->evaluate(slot('9999-12-31T23:59:00Z'), [], ['9999-12-31']);
+        check($overflow->reason === 'blocked_no_safe_relocation' && $overflow->suggestedAtUtc === null, 'rejected year 10000 suggestion');
         check($rule->evaluate($candidate, [['weekday' => 8, 'start' => '12:00', 'end' => '13:00']], [])->reason === 'invalid_input', 'invalid window');
     },
     'daily' => static function (): void {

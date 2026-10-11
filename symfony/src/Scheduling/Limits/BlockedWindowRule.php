@@ -23,7 +23,8 @@ final class BlockedWindowRule
         foreach ($windows as $window) {
             if (!is_array($window) || !isset($window['weekday'], $window['start'], $window['end'])
                 || !is_int($window['weekday']) || $window['weekday'] < 1 || $window['weekday'] > 7
-                || !$this->clock($window['start']) || !$this->clock($window['end']) || $window['start'] >= $window['end']) {
+                || !$this->clock($window['start']) || !($this->clock($window['end']) || $window['end'] === '24:00')
+                || $window['start'] >= $window['end']) {
                 return LimitDecision::deny('invalid_input');
             }
         }
@@ -42,7 +43,11 @@ final class BlockedWindowRule
         for ($minutes = 1; $minutes <= $lookaheadDays * 1440; ++$minutes) {
             $next = $minuteFloor->modify('+' . $minutes . ' minutes');
             if (!$this->isBlocked($next, $tz, $windows, $blockedDates)) {
-                return LimitDecision::deny('blocked_window', $next->format('Y-m-d\TH:i:s\Z'));
+                $suggested = $next->format('Y-m-d\TH:i:s\Z');
+                if (LimitDecision::instant($suggested) === null) {
+                    return LimitDecision::deny('blocked_no_safe_relocation');
+                }
+                return LimitDecision::deny('blocked_window', $suggested);
             }
         }
         return LimitDecision::deny('blocked_no_safe_relocation');
