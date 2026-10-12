@@ -246,7 +246,7 @@ class ReleaseAdoptionTests(unittest.TestCase):
             ("config/version.php",), (".github/workflows/politica.yml", "README.md"),
         ):
             with self.subTest(changed=changed):
-                module.transition((0, 1, 219), (0, 1, 219), changed)
+                self.assertIsNone(module.transition((0, 1, 219), (0, 1, 219), changed))
 
     def test_two_prs_with_same_target_version_do_not_conflict(self):
         module = load_release_version_module()
@@ -256,7 +256,14 @@ class ReleaseAdoptionTests(unittest.TestCase):
             ("tests/Feature/SecondFeatureTest.php", "docs/DEVELOPMENT-MODEL.md"),
         ):
             with self.subTest(parallel_pr=changed):
-                module.transition((0, 1, 219), (0, 1, 219), changed)
+                self.assertIsNone(module.transition((0, 1, 219), (0, 1, 219), changed))
+
+    def test_changed_path_inventory_rejects_malformed_types(self):
+        module = load_release_version_module()
+        for paths in (["README.md"], ("",), ("README.md", None)):
+            with self.subTest(paths=paths):
+                with self.assertRaises(ValueError):
+                    module.transition((0, 1, 219), (0, 1, 219), paths)
 
     def test_release_version_normal_patch_transition_remains_required_outside_policy_bridge(self):
         module = load_release_version_module()

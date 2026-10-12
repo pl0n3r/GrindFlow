@@ -41,6 +41,11 @@ def transition(
     current: tuple[int, int, int],
     changed: tuple[str, ...] = (),
 ) -> None:
+    # El conjunto de rutas es evidencia de Git, no criterio para forzar bumps.
+    if type(changed) is not tuple or any(
+        type(path) is not str or not path for path in changed
+    ):
+        raise ValueError("changed paths must be a tuple of nonempty strings")
     if previous is None:
         if current != BOOTSTRAP:
             raise ValueError("initial GrindFlow release must be 0.1.0")
