@@ -64,6 +64,7 @@ final class PilotWeeklySummaryController extends AbstractController
         $start = $week->format('Y-m-d H:i:s');
         $end = $week->modify('+7 days')->format('Y-m-d H:i:s');
         $ready = $db->createSchemaManager()->tablesExist(['gf_manual_handoff_events']);
+        $mvp = $this->mvpReadModel($db, (string) $organization['id']);
 
         if (!$ready) {
             return $this->privateJson(['data' => [
@@ -75,6 +76,7 @@ final class PilotWeeklySummaryController extends AbstractController
                 'traffic' => ['ready' => false, 'clicks' => null],
                 'external_publications_verified' => null,
                 'provider_calls' => false,
+                'mvp' => $mvp,
             ]]);
         }
 
@@ -128,6 +130,7 @@ final class PilotWeeklySummaryController extends AbstractController
             'traffic' => ['ready' => false, 'clicks' => null],
             'external_publications_verified' => null,
             'provider_calls' => false,
+                'mvp' => $mvp,
         ]]);
     }
 
@@ -161,6 +164,130 @@ final class PilotWeeklySummaryController extends AbstractController
             'Cache-Control' => 'no-store, private',
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+
+    /** Tenant-scoped S5 read model. Missing schema never becomes a false zero. */
+    private function mvpReadModel(Connection $db, string $organizationId): array
+    {
+        $unknown = ['ready' => false, 'reason' => 'schema_unavailable'];
+        $result = [
+            'content' => $unknown + ['available_assets' => null, 'original_blobs' => null, 'used_bytes' => null],
+            'upcoming' => $unknown + ['total' => null, 'items' => []],
+            'deliveries' => $unknown + ['counts' => null, 'recent' => []],
+            'traffic' => ['ready' => false, 'clicks' => null],
+        ];
+        $schema = $db->createSchemaManager();
+        $hasAssets = $schema->tablesExist(['gf_vault_assets']);
+        $hasDrafts = $schema->tablesExist(['gf_schedule_drafts']);
+        $hasAttempts = $schema->tablesExist(['gf_external_publication_attempts']);
+        $params = ['organization' => $organizationId];
+
+        if ($hasAssets) {
+            try {
+                $storage = $db->fetchAssociative(<<<'SQL'
+                    SELECT COUNT(*) AS originals, COALESCE(SUM(original.size_bytes), 0) AS bytes
+                    FROM (
+                        SELECT storage_key, MAX(size_bytes) AS size_bytes
+                        FROM gf_vault_assets
+                        WHERE organization_id = :organization
+                        GROUP BY storage_key
+                    ) original
+                    SQL, $params);
+                $available = (int) $db->fetchOne(
+                    'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL',
+                    $params,
+                );
+                $result['content'] = [
+                    'ready' => true,
+                    'available_assets' => $available,
+                    'original_blobs' => (int) ($storage['originals'] ?? 0),
+                    'used_bytes' => (int) ($storage['bytes'] ?? 0),
+                ];
+            } catch (\Doctrine\DBAL\Exception) {
+                // Partially migrated storage stays unknown, not zero.
+            }
+        }
+
+        if ($hasAssets && $hasDrafts) {
+            try {
+                $upcomingParams = $params + ['now' => gmdate('Y-m-d H:i:s')];
+                $scope = <<<'SQL'
+                    FROM gf_schedule_drafts draft
+                    JOIN gf_vault_assets asset
+                      ON asset.id = draft.asset_id AND asset.organization_id = draft.organization_id
+                    WHERE draft.organization_id = :organization
+                      AND draft.status = 'draft' AND draft.scheduled_at_utc >= :now
+                      AND asset.deleted_at IS NULL
+                    SQL;
+                $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope, $upcomingParams);
+                $rows = $db->fetchAllAssociative(
+                    'SELECT draft.scheduled_at_utc, draft.delivery_provider, draft.delivery_destination_id, '
+                    .'asset.original_name AS asset_name '.$scope
+                    .' ORDER BY draft.scheduled_at_utc, draft.id LIMIT 5',
+                    $upcomingParams,
+                );
+                $result['upcoming'] = [
+                    'ready' => true, 'total' => $total,
+                    'items' => array_map(static fn (array $row): array => [
+                        'scheduled_at_utc' => (string) $row['scheduled_at_utc'],
+                        'provider' => $row['delivery_provider'],
+                        'destination' => $row['delivery_destination_id'],
+                        'asset_name' => (string) $row['asset_name'],
+                    ], $rows),
+                ];
+            } catch (\Doctrine\DBAL\Exception) {
+                // Never represent missing columns as an empty agenda.
+            }
+        }
+
+        if ($hasAssets && $hasDrafts && $hasAttempts) {
+            try {
+                $scope = <<<'SQL'
+                    FROM gf_external_publication_attempts attempt
+                    JOIN gf_schedule_drafts draft ON draft.organization_id = attempt.organization_id
+                      AND attempt.idempotency_key = CONCAT('schedule-draft:', draft.id, ':facebook_page:v1')
+                      AND draft.delivery_provider = 'facebook_page'
+                    JOIN gf_vault_assets asset
+                      ON asset.id = draft.asset_id AND asset.organization_id = draft.organization_id
+                    WHERE attempt.organization_id = :organization AND attempt.provider = 'facebook_page'
+                    SQL;
+                $counts = array_fill_keys([
+                    'published', 'ambiguous', 'rate_limited',
+                    'authentication_failed', 'rejected', 'in_flight',
+                ], 0);
+                foreach ($db->fetchAllAssociative(
+                    'SELECT attempt.status, COUNT(*) AS amount '.$scope.' GROUP BY attempt.status',
+                    $params,
+                ) as $row) {
+                    $state = (string) $row['status'];
+                    if (!array_key_exists($state, $counts)) {
+                        throw new \UnexpectedValueException('Unrecognized publication status');
+                    }
+                    $counts[$state] = (int) $row['amount'];
+                }
+                $rows = $db->fetchAllAssociative(
+                    'SELECT attempt.status, attempt.updated_at, draft.delivery_destination_id, '
+                    .'asset.original_name AS asset_name '.$scope
+                    .' ORDER BY attempt.updated_at DESC, attempt.id DESC LIMIT 6',
+                    $params,
+                );
+                $result['deliveries'] = [
+                    'ready' => true, 'counts' => $counts,
+                    'recent' => array_map(static fn (array $row): array => [
+                        'status' => (string) $row['status'],
+                        'updated_at' => (string) $row['updated_at'],
+                        'provider' => 'facebook_page',
+                        'destination' => (string) $row['delivery_destination_id'],
+                        'asset_name' => (string) $row['asset_name'],
+                    ], $rows),
+                ];
+            } catch (\Doctrine\DBAL\Exception | \UnexpectedValueException) {
+                // Missing/invalid evidence cannot become a published signal.
+            }
+        }
+
+        return $result;
     }
 
     private function invalidWeek(): JsonResponse
