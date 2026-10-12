@@ -44,6 +44,8 @@ final class PilotWeeklySummaryTest extends WebTestCase
         $week = (new DateTimeImmutable('now', $utc))->modify('monday this week')->setTime(0, 0);
         $thisWeek = $week->format('Y-m-d');
         $lastWeek = $week->modify('-7 days')->format('Y-m-d');
+        // Relative future time keeps the upcoming dashboard assertion valid any weekday.
+        $upcomingAt = (new DateTimeImmutable('now', $utc))->modify('+3 days')->setTime(10, 0);
 
         $db->insert('gf_identity_users', [
             'id' => $user,
@@ -95,9 +97,9 @@ final class PilotWeeklySummaryTest extends WebTestCase
                 'organization_id' => $organization,
                 'asset_id' => $asset,
                 'created_by' => $user,
-                'scheduled_at_utc' => $week->format('Y-m-d 10:00:00'),
+                'scheduled_at_utc' => $upcomingAt->format('Y-m-d H:i:s'),
                 'timezone' => 'UTC',
-                'local_date' => $thisWeek,
+                'local_date' => $upcomingAt->format('Y-m-d'),
                 'local_time' => '10:00',
                 'status' => 'draft',
                 'delivery_provider' => 'facebook_page',
@@ -139,6 +141,18 @@ final class PilotWeeklySummaryTest extends WebTestCase
             ]);
         }
 
+        // Own-tenant orphan pointing at a foreign draft must never inflate an outcome.
+        $db->insert('gf_external_publication_attempts', [
+            'id' => Uuid::v7()->toRfc4122(),
+            'organization_id' => $mine,
+            'provider' => 'facebook_page',
+            'idempotency_key' => 'schedule-draft:'.$otherDraft.':facebook_page:v1',
+            'request_fingerprint' => hash('sha256', 'orphan-'.$otherDraft),
+            'status' => 'ambiguous',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
         $login = $client->request('GET', '/login');
         $client->submit($login->filter('form.identity-form')->form([
             'email' => $user.'@example.test',
@@ -167,9 +181,18 @@ final class PilotWeeklySummaryTest extends WebTestCase
         self::assertSame(1, $data['mvp']['content']['available_assets']);
         self::assertSame(1, $data['mvp']['content']['original_blobs']);
         self::assertSame(10, $data['mvp']['content']['used_bytes']);
+        self::assertTrue($data['mvp']['upcoming']['ready']);
+        self::assertSame(1, $data['mvp']['upcoming']['total']);
+        self::assertCount(1, $data['mvp']['upcoming']['items']);
+        self::assertSame('own.png', $data['mvp']['upcoming']['items'][0]['asset_name']);
+        self::assertSame(
+            $upcomingAt->format('Y-m-d H:i:s'),
+            $data['mvp']['upcoming']['items'][0]['scheduled_at_utc'],
+        );
         self::assertTrue($data['mvp']['deliveries']['ready']);
         self::assertSame(1, $data['mvp']['deliveries']['counts']['published']);
         self::assertSame(0, $data['mvp']['deliveries']['counts']['rejected']);
+        self::assertSame(0, $data['mvp']['deliveries']['counts']['ambiguous']);
         self::assertSame('published', $data['mvp']['deliveries']['recent'][0]['status']);
         self::assertSame('facebook_page', $data['mvp']['deliveries']['recent'][0]['provider']);
         self::assertSame('12345678', $data['mvp']['deliveries']['recent'][0]['destination']);

@@ -127,7 +127,7 @@ export function PilotWeeklySummaryPanel() {
             <caption>Métricas del piloto</caption>
             <thead><tr><th scope="col">Originales disponibles (no autoriza publicación)</th>
               <th scope="col">Próximos contenidos</th>
-              <th scope="col">Entregas externas confirmadas</th></tr></thead>
+              <th scope="col">Entregas registradas como publicadas</th></tr></thead>
             <tbody><tr>
               <td>{state.summary.mvp?.content.ready
                 ? state.summary.mvp.content.available_assets : '—'}</td>
@@ -158,6 +158,15 @@ export function PilotWeeklySummaryPanel() {
           && <p role="status">No hay próximas programaciones.</p>}
         {!state.summary.mvp?.upcoming.ready
           && <p role="status">La agenda no está disponible. No se presentan ceros.</p>}
+
+        {state.summary.mvp?.deliveries.ready && <p role="status">
+          Estados del ledger externo: {' '}
+          {['ambiguous', 'rate_limited', 'authentication_failed', 'rejected', 'in_flight']
+            .map((status) => deliveryLabels[status] + ': ' +
+              (state.summary.mvp.deliveries.counts?.[status] ?? 0))
+            .join(' · ')}. «Publicada» refleja exclusivamente el resultado almacenado del proveedor,
+          no un piloto live auditado.
+        </p>}
         <div className="pilot-mvp-scroll" style={{ maxWidth: '100%', overflowX: 'auto' }}>
           <table style={{ minWidth: 440, width: '100%', borderCollapse: 'collapse' }}>
             <caption>Últimas entregas del ledger externo (hasta seis)</caption>
@@ -210,7 +219,8 @@ export function PilotWeeklySummaryPanel() {
         </div>
       </>}
       <p className="pilot-traffic-note">Tráfico y conversiones: aún no integrados en Symfony.
-        No se presentan clics, entregas externas ni ingresos estimados.</p>
+        Las entregas externas visibles proceden del ledger S4; no se infieren clics,
+        ingresos ni evidencia de un piloto live.</p>
     </section>
   );
 }

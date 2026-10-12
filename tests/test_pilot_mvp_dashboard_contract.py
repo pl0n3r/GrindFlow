@@ -26,6 +26,7 @@ class PilotMvpDashboardContractTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, src)
         self.assertIn("Métricas del piloto", self.panel())
+        self.assertIn("self::assertSame(1, $data['mvp']['upcoming']['total'])", self.php())
 
     def test_cross_tenant_rejected_at_api_and_queries(self):
         src = self.controller()
@@ -50,6 +51,7 @@ class PilotMvpDashboardContractTests(unittest.TestCase):
         self.assertNotIn("access_token", src.lower())
         self.assertNotIn("request_fingerprint AS", src)
         self.assertIn("deliveryLabels[item.status]", self.panel())
+        self.assertIn("Estados del ledger externo", self.panel())
 
     def test_storage_unique_blobs_and_real_bytes(self):
         src = self.controller()
@@ -75,6 +77,8 @@ class PilotMvpDashboardContractTests(unittest.TestCase):
         self.assertIn("self::assertSame(1, $data['mvp']['deliveries']['counts']['published'])",
                       self.php())
         self.assertIn("'external_publication_id' => $status === 'published'", self.php())
+        self.assertIn("'idempotency_key' => 'schedule-draft:'.$otherDraft", self.php())
+        self.assertIn("self::assertSame(0, $data['mvp']['deliveries']['counts']['ambiguous'])", self.php())
 
     def test_traffic_not_invented_without_source(self):
         src = self.controller()
