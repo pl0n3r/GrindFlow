@@ -40,7 +40,8 @@ class PasswordRecoveryCsrfContractTests(unittest.TestCase):
     def test_csrf_rejection_is_uniform_and_does_not_enumerate_accounts(self):
         self.assertIn("testForgotCsrfRejectionDoesNotEnumerateAccounts", self.integration)
         self.assertIn("'missing-'.$email", self.integration)
-        self.assertIn("self::assertSame($known, $unknown)", self.integration)
+        self.assertIn("self::assertSame($normalizeCsrf($known), $normalizeCsrf($unknown))", self.integration)
+        self.assertIn("name=\"_csrf_token\" value=\"", self.integration)
         self.assertIn("La respuesta es la misma exista o no una cuenta activa.", self.integration)
         self.assertIn("self::assertSame([], $mailer->messages())", self.integration)
         self.assertGreaterEqual(
