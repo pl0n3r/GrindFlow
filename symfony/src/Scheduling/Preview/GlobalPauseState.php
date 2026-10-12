@@ -93,9 +93,7 @@ final class GlobalPauseState
 
     private static function digest(array $agenda): string
     {
-        if (count($agenda) > 1000) {
-            throw new InvalidArgumentException('agenda_too_large');
-        }
+        if (count($agenda) > 1000) throw new InvalidArgumentException('agenda_too_large');
         try {
             $bytes = 0;
             $canonical = static function (array $value, int $depth = 0) use (&$canonical, &$bytes): array {
@@ -112,7 +110,9 @@ final class GlobalPauseState
                 }
                 return $value;
             };
-            return hash('sha256', json_encode($canonical($agenda), JSON_THROW_ON_ERROR));
+            $json = json_encode($canonical($agenda), JSON_THROW_ON_ERROR);
+            if (strlen($json) > 65536) throw new InvalidArgumentException('agenda_too_large');
+            return hash('sha256', $json);
         } catch (\JsonException) {
             throw new InvalidArgumentException('invalid_agenda');
         }

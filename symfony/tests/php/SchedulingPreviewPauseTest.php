@@ -78,8 +78,7 @@ final class PreviewPauseScenario
             self::denies(static fn() => GlobalPauseState::canRun($missingState));
             self::check(GlobalPauseState::agendaUnchanged($reorderedResumed, $base));
             $reorderedAgenda = array_map(static fn(array $row): array => array_reverse($row, true), $base);
-            self::check(GlobalPauseState::agendaUnchanged($initial, $reorderedAgenda)
-                && !GlobalPauseState::agendaUnchanged($initial, array_reverse($reorderedAgenda)));
+            self::check(GlobalPauseState::agendaUnchanged($initial, $reorderedAgenda) && !GlobalPauseState::agendaUnchanged($initial, array_reverse($reorderedAgenda)));
             self::check(GlobalPauseState::agendaUnchanged(GlobalPauseState::initial([['meta' => ['z' => 1, 'a' => 2]]]), [['meta' => ['a' => 2, 'z' => 1]]]));
             self::check($reorderedResumed['agenda_sha256'] === $initial['agenda_sha256'] && serialize($base) === $original);
             self::denies(static fn() => GlobalPauseState::transition($paused, 'pause', 'manual', 102));
@@ -102,7 +101,9 @@ final class PreviewPauseScenario
             self::denies(static fn() => GlobalPauseState::canRun($invalidInitial));
             self::check(!str_contains(json_encode($paused, JSON_THROW_ON_ERROR), 'private'));
             self::denies(static fn() => GlobalPauseState::initial([['metadata' => str_repeat('X', 65537)]]));
+            self::denies(static fn() => GlobalPauseState::initial([['metadata' => str_repeat("\0", 12000)]]));
             self::denies(static fn() => GlobalPauseState::agendaUnchanged($paused, [['metadata' => str_repeat('X', 65537)]]));
+            $bounded = [['metadata' => str_repeat("\0", 10914)]]; self::check(GlobalPauseState::agendaUnchanged(GlobalPauseState::initial($bounded), $bounded));
             $full = GlobalPauseState::initial($base);
             for ($i = 1; $i <= 32; ++$i) {
                 $full = GlobalPauseState::transition($full, $i % 2 ? 'pause' : 'resume', 'manual', 1000 + $i);
@@ -114,7 +115,6 @@ final class PreviewPauseScenario
         throw new InvalidArgumentException('unknown_scenario');
     }
 }
-
 if (class_exists(\PHPUnit\Framework\TestCase::class)) {
     final class SchedulingPreviewPauseTest extends \PHPUnit\Framework\TestCase
     {
