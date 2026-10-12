@@ -44,7 +44,7 @@ final class WeeklySlotCalculator
             if (isset($seen[$weekday])) {
                 continue;
             }
-            $seen[$weekday] = true;
+            $hasUpcoming = false;
             foreach ($times as $time) {
                 if (!is_string($time)
                     || preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $time) !== 1) {
@@ -57,6 +57,7 @@ final class WeeklySlotCalculator
                 if ($candidate->format('H:i') !== $time || $candidate <= $now) {
                     continue;
                 }
+                $hasUpcoming = true;
                 $slots[] = [
                     'local_date' => $candidate->format('Y-m-d'),
                     'weekday' => $weekday,
@@ -67,6 +68,9 @@ final class WeeklySlotCalculator
                         ->setTimezone(new \DateTimeZone('UTC'))
                         ->format('Y-m-d\TH:i:s\Z'),
                 ];
+            }
+            if ($hasUpcoming) {
+                $seen[$weekday] = true;
             }
         }
 
