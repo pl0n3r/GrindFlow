@@ -30,6 +30,7 @@ final readonly class ScheduleDraftApplicationService
         string $userId,
         string $assetId,
         string $scheduledAtUtc,
+        bool $uniqueAutomationSlot = false,
     ): array {
         return $this->db->transactional(
             function (Connection $db) use (
@@ -37,6 +38,7 @@ final readonly class ScheduleDraftApplicationService
                 $userId,
                 $assetId,
                 $scheduledAtUtc,
+                $uniqueAutomationSlot,
             ): array {
                 // Serialize all draft creation per organization: capacity and
                 // same-asset checks must be atomic across concurrent callers.
@@ -162,6 +164,12 @@ final readonly class ScheduleDraftApplicationService
                         SQL,
                     ['organization' => $organizationId, 'scheduled' => $dateTime],
                 );
+                // Automation never consumes a second draft in an occupied
+                // time slot, even if max_per_day permits manual capacity >1.
+                // Organization lock above makes this decision serializable.
+                if ($uniqueAutomationSlot && $reserved > 0) {
+                    return ['status' => 'occupied'];
+                }
                 if ($reserved >= $slot['capacity']) {
                     return ['status' => 'full'];
                 }
