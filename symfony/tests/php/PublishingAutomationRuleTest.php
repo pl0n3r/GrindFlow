@@ -66,6 +66,40 @@ final class PublishingAutomationRuleTest extends KernelTestCase
         self::assertSame([], (new WeeklySlotCalculator())->upcoming($rule));
     }
 
+    public function testSpringForwardMissingWallClockTimeIsNotSilentlyMoved(): void
+    {
+        // 2026-03-29 02:30 does not exist in Europe/Berlin.
+        $rule = [
+            'timezone' => 'Europe/Berlin',
+            'weekdays' => 'sun',
+            'local_time' => '02:30',
+            'local_times' => ['02:30'],
+            'max_per_day' => 1,
+        ];
+        $clock = new \DateTimeImmutable('2026-03-28T12:00:00Z');
+        self::assertSame([], (new WeeklySlotCalculator())->upcoming($rule, $clock));
+    }
+
+    public function testFallBackRepeatedLocalTimeDoesNotCreateDuplicateDraftSlots(): void
+    {
+        // 2026-10-25 02:30 occurs twice; one configured local time is one slot.
+        $rule = [
+            'timezone' => 'Europe/Berlin',
+            'weekdays' => 'sun',
+            'local_time' => '02:30',
+            'local_times' => ['02:30'],
+            'max_per_day' => 1,
+        ];
+        $clock = new \DateTimeImmutable('2026-10-24T12:00:00Z');
+        $slots = (new WeeklySlotCalculator())->upcoming($rule, $clock);
+        self::assertCount(1, $slots);
+        self::assertSame('02:30', $slots[0]['local_time']);
+        self::assertContains($slots[0]['scheduled_at_utc'], [
+            '2026-10-25T00:30:00Z',
+            '2026-10-25T01:30:00Z',
+        ]);
+    }
+
     protected static function getKernelClass(): string
     {
         return Kernel::class;

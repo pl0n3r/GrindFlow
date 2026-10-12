@@ -90,6 +90,8 @@ class SchedulingAutomationContractTests(unittest.TestCase):
         self.assertIn("testMultipleLocalTimesUseCanonicalUtcSlotsWithoutPublishing", source(PHPTEST))
         self.assertIn("testLegacyReviewOnlyRuleRetainsOneTimePerWeekday", source(PHPTEST))
         self.assertIn("testInvalidLocalTimesFailClosed", source(PHPTEST))
+        self.assertIn("testSpringForwardMissingWallClockTimeIsNotSilentlyMoved", source(PHPTEST))
+        self.assertIn("testFallBackRepeatedLocalTimeDoesNotCreateDuplicateDraftSlots", source(PHPTEST))
         self.assertIn("testMaterializerCannotReserveForUnknownOrUnconfiguredTenant", source(PHPTEST))
         for p in (SERVICE, CONTROLLER, COMMAND, CALCULATOR, RESERVATION, MIGRATION, PHPTEST):
             with self.subTest(path=p):

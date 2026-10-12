@@ -16,7 +16,7 @@ final class WeeklySlotCalculator
      * @param array<string, mixed>|false $rule
      * @return list<array{local_date: string, weekday: string, local_time: string, timezone: string, capacity: int, scheduled_at_utc: string}>
      */
-    public function upcoming(array|false $rule): array
+    public function upcoming(array|false $rule, ?\DateTimeImmutable $clock = null): array
     {
         if ($rule === false) {
             return [];
@@ -24,7 +24,9 @@ final class WeeklySlotCalculator
 
         $timezoneName = (string) $rule['timezone'];
         $timezone = new \DateTimeZone($timezoneName);
-        $now = new \DateTimeImmutable('now', $timezone);
+        $now = $clock === null
+            ? new \DateTimeImmutable('now', $timezone)
+            : $clock->setTimezone($timezone);
         $dayStart = $now->setTime(0, 0);
         $weekdays = $rule['weekdays'] === '' ? [] : explode(',', (string) $rule['weekdays']);
         $times = $rule['local_times'] ?? [(string) $rule['local_time']];
