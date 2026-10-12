@@ -144,7 +144,12 @@ final class PasswordRecoveryCsrfTest extends WebTestCase
                 $client->request('POST', '/forgot-password', ['email' => 'missing-'.$email] + $csrf);
                 self::assertResponseStatusCodeSame(403);
                 $unknown = (string) $client->getResponse()->getContent();
-                self::assertSame($known, $unknown);
+                $normalizeCsrf = static fn (string $html): string => (string) preg_replace(
+                    '/(name="_csrf_token" value=")[^"]*(")/',
+                    '$1[csrf]$2',
+                    $html,
+                );
+                self::assertSame($normalizeCsrf($known), $normalizeCsrf($unknown));
                 self::assertStringContainsString('La respuesta es la misma exista o no una cuenta activa.', $known);
             }
             self::assertSame(0, (int) $db->fetchOne(
