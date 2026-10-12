@@ -41,7 +41,7 @@ final class PasswordRecoveryCsrfTest extends WebTestCase
                 $client->request('POST', '/forgot-password', ['email' => $email] + $csrf);
                 self::assertResponseStatusCodeSame(403);
                 self::assertStringContainsString(
-                    'Si existe una cuenta activa', (string) $client->getResponse()->getContent(),
+                    'La respuesta es la misma exista o no una cuenta activa.', (string) $client->getResponse()->getContent(),
                 );
                 self::assertSame(0, (int) $db->fetchOne(
                     'SELECT COUNT(*) FROM gf_password_recovery_outbox WHERE user_id = ?', [$id],
@@ -145,7 +145,7 @@ final class PasswordRecoveryCsrfTest extends WebTestCase
                 self::assertResponseStatusCodeSame(403);
                 $unknown = (string) $client->getResponse()->getContent();
                 self::assertSame($known, $unknown);
-                self::assertStringContainsString('Si existe una cuenta activa', $known);
+                self::assertStringContainsString('La respuesta es la misma exista o no una cuenta activa.', $known);
             }
             self::assertSame(0, (int) $db->fetchOne(
                 'SELECT COUNT(*) FROM gf_password_recovery_outbox WHERE user_id = ?', [$id],
