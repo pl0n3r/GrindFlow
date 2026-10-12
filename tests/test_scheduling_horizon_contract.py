@@ -5,7 +5,6 @@ import json
 import subprocess
 import unittest
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = [
     ROOT / "symfony/src/Scheduling/Horizon/GapDetector.php",
@@ -111,6 +110,7 @@ class SchedulingHorizonContractTests(unittest.TestCase):
             self.assertEqual(denied["proposals"], [])
         self.assertEqual(execute("plan", fixture(permitted=False, assets=only))["status"], "rejected")
         self.assertEqual(execute("plan", fixture(mode="unsafe", assets=only))["status"], "rejected")
-
+        for unsafe_id in ("person@example.test", "<svg onload=alert(1)>", "unsafe alias"):
+            self.assertEqual(execute("plan", fixture(assets=[{"id": unsafe_id, "tenant_id": "studio-a", "eligible": True}]))["reason"], "invalid_asset")
 if __name__ == "__main__":
     unittest.main()
