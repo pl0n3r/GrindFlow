@@ -54,7 +54,8 @@ class SchedulingAutomationContractTests(unittest.TestCase):
     def test_avoids_immediate_asset_repetition_when_possible(self):
         s = source(SERVICE)
         self.assertIn("SELECT asset_id FROM gf_schedule_drafts", s)
-        self.assertIn("ORDER BY created_at DESC, id DESC", s)
+        self.assertIn("scheduled_at_utc < :scheduled AND status = 'draft' ORDER BY scheduled_at_utc DESC, id DESC", s)
+        self.assertIn("'scheduled' => $stamp", s)
         self.assertIn("usort($candidates", s)
         self.assertIn("count($candidates) > 1", s)
 

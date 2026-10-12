@@ -91,9 +91,11 @@ final readonly class PublishingAutomationRuleScheduler
                 ++$existing;
                 continue;
             }
+            // Anti-repetition concerns the previous scheduled slot, not the
+            // last row created (which could target a later date).
             $last = $this->db->fetchOne(
-                "SELECT asset_id FROM gf_schedule_drafts WHERE organization_id = :organization ORDER BY created_at DESC, id DESC LIMIT 1",
-                ['organization' => $organizationId],
+                "SELECT asset_id FROM gf_schedule_drafts WHERE organization_id = :organization AND scheduled_at_utc < :scheduled AND status = 'draft' ORDER BY scheduled_at_utc DESC, id DESC LIMIT 1",
+                ['organization' => $organizationId, 'scheduled' => $stamp],
             );
             // Explicit tenant, soft-delete, finite pool; each candidate is
             // independently revalidated under lock by reserve().
