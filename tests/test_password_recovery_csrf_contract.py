@@ -18,34 +18,46 @@ class PasswordRecoveryCsrfContractTests(unittest.TestCase):
         cls.integration = PHP_TEST.read_text(encoding="utf-8")
         cls.controller = CONTROLLER.read_text(encoding="utf-8")
 
+    def php_method(self, name: str) -> str:
+        """Extrae únicamente el cuerpo del método solicitado (sin mezclar asserts)."""
+        pattern = (
+            r"(?ms)^    public function " + re.escape(name)
+            + r"\(\): void\n    \{\n(?P<body>.*?)^    \}\n"
+        )
+        matches = list(re.finditer(pattern, self.integration))
+        self.assertEqual(1, len(matches), f"PHPUnit method missing/duplicated: {name}")
+        return matches[0].group("body")
+
     def test_forgot_password_without_valid_csrf_is_403_and_sends_no_mail(self):
-        self.assertIn("testForgotPasswordWithoutValidCsrfReturns403AndDoesNotSendMail", self.integration)
-        self.assertIn("'POST', '/forgot-password'", self.integration)
+        body = self.php_method("testForgotPasswordWithoutValidCsrfReturns403AndDoesNotSendMail")
+        self.assertIn("'POST', '/forgot-password'", body)
         self.assertIn("'grindflow_password_recovery_request'", self.controller)
-        self.assertRegex(self.integration, r"assertResponseStatusCodeSame\(403\)")
-        self.assertIn("SELECT COUNT(*) FROM gf_password_recovery_outbox", self.integration)
-        self.assertIn("SELECT COUNT(*) FROM gf_password_reset_tokens", self.integration)
-        self.assertIn("self::assertSame([], $mailer->messages())", self.integration)
-        self.assertIn("['_csrf_token' => 'synthetic-invalid-csrf-token']", self.integration)
+        self.assertRegex(body, r"assertResponseStatusCodeSame\(403\)")
+        self.assertIn("SELECT COUNT(*) FROM gf_password_recovery_outbox", body)
+        self.assertIn("SELECT COUNT(*) FROM gf_password_reset_tokens", body)
+        self.assertIn("self::assertSame([], $mailer->messages())", body)
+        self.assertIn("['_csrf_token' => 'synthetic-invalid-csrf-token']", body)
 
     def test_recover_password_without_valid_csrf_is_403_and_keeps_password(self):
-        self.assertIn("testRecoverPasswordWithoutValidCsrfReturns403AndKeepsPasswordAndToken", self.integration)
-        self.assertIn("'POST', '/recover-password'", self.integration)
+        body = self.php_method("testRecoverPasswordWithoutValidCsrfReturns403AndKeepsPasswordAndToken")
+        self.assertIn("'POST', '/recover-password'", body)
         self.assertIn("'grindflow_password_recovery_reset'", self.controller)
-        self.assertIn("self::assertSame($initialHash", self.integration)
-        self.assertIn("SELECT token_hash FROM gf_password_reset_tokens", self.integration)
-        self.assertIn("password_verify($originalPassword, $initialHash)", self.integration)
-        self.assertIn("self::assertResponseStatusCodeSame(403)", self.integration)
+        self.assertIn("self::assertSame($initialHash", body)
+        self.assertIn("SELECT token_hash FROM gf_password_reset_tokens", body)
+        self.assertIn("password_verify($originalPassword, $initialHash)", body)
+        self.assertIn("self::assertResponseStatusCodeSame(403)", body)
+        self.assertIn("['_csrf_token' => 'synthetic-invalid-csrf-token']", body)
 
     def test_csrf_rejection_is_uniform_and_does_not_enumerate_accounts(self):
-        self.assertIn("testForgotCsrfRejectionDoesNotEnumerateAccounts", self.integration)
-        self.assertIn("'missing-'.$email", self.integration)
-        self.assertIn("self::assertSame($normalizeCsrf($known), $normalizeCsrf($unknown))", self.integration)
-        self.assertIn("name=\"_csrf_token\" value=\"", self.integration)
-        self.assertIn("La respuesta es la misma exista o no una cuenta activa.", self.integration)
-        self.assertIn("self::assertSame([], $mailer->messages())", self.integration)
+        body = self.php_method("testForgotCsrfRejectionDoesNotEnumerateAccounts")
+        self.assertIn("'missing-'.$email", body)
+        self.assertIn("self::assertSame($normalizeCsrf($known), $normalizeCsrf($unknown))", body)
+        self.assertIn('name="_csrf_token" value="', body)
+        self.assertIn("La respuesta es la misma exista o no una cuenta activa.", body)
+        self.assertIn("self::assertSame([], $mailer->messages())", body)
+        self.assertIn("['_csrf_token' => 'synthetic-invalid-csrf-token']", body)
         self.assertGreaterEqual(
-            len(re.findall(r"assertResponseStatusCodeSame\(403\)", self.integration)), 4,
+            len(re.findall(r"assertResponseStatusCodeSame\(403\)", body)), 2,
         )
 
 
