@@ -250,12 +250,35 @@ final class PilotWeeklySummaryTest extends WebTestCase
         self::assertStringNotContainsString('foreign.png', $csv);
         self::assertStringNotContainsString($other, $csv);
 
+        // A later revocation immediately reduces *current* readiness, but does
+        // not erase stored assets, future drafts or historic provider evidence.
+        $db->insert('gf_distribution_authorization_events', [
+            'id' => Uuid::v7()->toRfc4122(),
+            'organization_id' => $mine,
+            'asset_id' => $mineAsset,
+            'actor_id' => $user,
+            'action' => 'revoke',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $client->request('GET', '/api/admin/pilot/weekly-summary?week='.$thisWeek);
+        self::assertResponseIsSuccessful();
+        $revoked = $this->payload($client)['data']['mvp'];
+        self::assertSame(0, $revoked['content']['ready_to_schedule']);
+        self::assertSame(1, $revoked['content']['available_assets']);
+        self::assertSame(10, $revoked['content']['used_bytes']);
+
+        // Changing the week only filters legacy manual events; the operational
+        // counters and evidence remain scoped by tenant, not by selected week.
         $client->request('GET', '/api/admin/pilot/weekly-summary?week='.$lastWeek);
         self::assertResponseIsSuccessful();
+        $historic = $this->payload($client)['data'];
         self::assertSame(
             ['prepared_attempts' => 0, 'completed_reports' => 0, 'failed_attempts' => 1],
-            $this->payload($client)['data']['totals'],
+            $historic['totals'],
         );
+        self::assertSame(0, $historic['mvp']['content']['ready_to_schedule']);
+        self::assertSame(1, $historic['mvp']['upcoming']['total']);
+        self::assertSame(1, $historic['mvp']['deliveries']['counts']['published']);
 
         $client->request('GET', '/api/admin/pilot/weekly-summary.csv?week=2026-02-30');
         self::assertResponseStatusCodeSame(422);

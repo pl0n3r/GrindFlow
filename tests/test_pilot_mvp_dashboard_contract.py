@@ -28,6 +28,8 @@ class PilotMvpDashboardContractTests(unittest.TestCase):
         self.assertIn("Métricas del piloto", self.panel())
         self.assertIn("ready_to_schedule", src)
         self.assertIn("Contenido listo para programación", self.panel())
+        self.assertIn("La semana seleccionada filtra", self.panel())
+        self.assertIn("Próximos borradores", self.panel())
         self.assertIn("self::assertSame(1, $data['mvp']['upcoming']['total'])", self.php())
 
     def test_cross_tenant_rejected_at_api_and_queries(self):
@@ -64,6 +66,9 @@ class PilotMvpDashboardContractTests(unittest.TestCase):
         self.assertIn("formatBytes", self.panel())
         self.assertIn("self::assertSame(0, $data['mvp']['content']['ready_to_schedule'])", self.php())
         self.assertIn("self::assertSame(1, $authorized['ready_to_schedule'])", self.php())
+        self.assertIn("'action' => 'revoke'", self.php())
+        self.assertIn("self::assertSame(0, $revoked['content']['ready_to_schedule'])", self.php())
+        self.assertIn("self::assertSame(1, $historic['mvp']['deliveries']['counts']['published'])", self.php())
         self.assertIn("event.action FROM gf_content_review_events", src)
         self.assertIn("event.action FROM gf_distribution_authorization_events", src)
         self.assertIn("rule.mode = 'review_only'", src)

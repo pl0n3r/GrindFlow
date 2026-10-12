@@ -122,11 +122,14 @@ export function PilotWeeklySummaryPanel() {
       </nav>
 
       {state.kind === 'ready' && <div aria-label="Resumen de operaciones MVP">
+        <p>Estado operativo actual de la organización: contenido elegible y agenda futura,
+          con entregas externas acumuladas del ledger S4. La semana seleccionada filtra
+          únicamente la actividad manual; un borrador programado no demuestra publicación.</p>
         <div className="pilot-mvp-scroll" style={{ maxWidth: '100%', overflowX: 'auto' }}>
           <table style={{ minWidth: 440, width: '100%', borderCollapse: 'collapse' }}>
             <caption>Métricas del piloto</caption>
             <thead><tr><th scope="col">Contenido listo para programación (no publicación externa)</th>
-              <th scope="col">Próximos contenidos</th>
+              <th scope="col">Próximos borradores</th>
               <th scope="col">Entregas registradas como publicadas</th></tr></thead>
             <tbody><tr>
               <td>{state.summary.mvp?.content.eligibility_ready
