@@ -31,6 +31,7 @@ final readonly class ScheduleDraftApplicationService
         string $assetId,
         string $scheduledAtUtc,
         bool $uniqueAutomationSlot = false,
+        ?string $expectedAutomationDestination = null,
     ): array {
         return $this->db->transactional(
             function (Connection $db) use (
@@ -39,6 +40,7 @@ final readonly class ScheduleDraftApplicationService
                 $assetId,
                 $scheduledAtUtc,
                 $uniqueAutomationSlot,
+                $expectedAutomationDestination,
             ): array {
                 // Serialize all draft creation per organization: capacity and
                 // same-asset checks must be atomic across concurrent callers.
@@ -126,7 +128,14 @@ final readonly class ScheduleDraftApplicationService
                 if ($uniqueAutomationSlot) {
                     // Reconstruct authorized times from the same locked row.
                     // An active->paused race invalidates all further writes.
-                    if (($rule['automation_state'] ?? null) !== 'active') {
+                    if (($rule['automation_state'] ?? null) !== 'active'
+                        || $expectedAutomationDestination === null
+                        || !hash_equals(
+                            (string) ($rule['automation_destination_id'] ?? ''),
+                            $expectedAutomationDestination,
+                        )) {
+                        // An active/paused race or destination reassignment
+                        // invalidates the entire automation run under lock.
                         return ['status' => 'revoked'];
                     }
                     try {

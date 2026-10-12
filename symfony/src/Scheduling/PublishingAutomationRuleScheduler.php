@@ -118,6 +118,7 @@ final readonly class PublishingAutomationRuleScheduler
                 $attempt = $this->drafts->reserve(
                     $organizationId, (string) $rule['updated_by'],
                     (string) $assetId, $slot['scheduled_at_utc'], true,
+                    (string) $rule['automation_destination_id'],
                 );
                 if ($attempt['status'] === 'ok') {
                     if ($attempt['changed']) {

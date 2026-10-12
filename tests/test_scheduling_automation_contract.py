@@ -39,6 +39,9 @@ class SchedulingAutomationContractTests(unittest.TestCase):
     def test_same_rule_slot_is_idempotent_and_concurrency_safe(self):
         self.assertIn("bool $uniqueAutomationSlot = false", source(RESERVATION))
         self.assertIn("if ($uniqueAutomationSlot && $reserved > 0)", source(RESERVATION))
+        self.assertIn("expectedAutomationDestination", source(RESERVATION))
+        self.assertIn("automation_destination_id", source(RESERVATION))
+        self.assertIn("hash_equals(", source(RESERVATION))
         self.assertIn("FOR UPDATE", source(RESERVATION))
         self.assertIn("['status' => 'occupied']", source(RESERVATION))
         self.assertIn("$existing", source(SERVICE))
