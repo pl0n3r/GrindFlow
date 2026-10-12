@@ -75,6 +75,14 @@ class ActionEventLoadTests(unittest.TestCase):
                 self.assertIn(rule, agents)
         self.assertNotIn("No exceder dos agentes simultáneos en GrindFlow", agents)
         self.assertNotIn("Se permiten hasta **4 lineas de trabajo concurrentes**", agents)
+        # Veta variantes de topes locales aun cuando cambie su redacción.
+        for forbidden in (
+            "dos agentes simultáneos",
+            "4 lineas de trabajo concurrentes",
+            "máximo uno por repo",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, agents)
 
 
 if __name__ == "__main__":
