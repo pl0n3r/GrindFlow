@@ -34,7 +34,8 @@ MANDATORY = {
 def section(markdown: str, title: str) -> str:
     header = "## " + title
     lines = markdown.splitlines()
-    if header not in lines:
+    # A duplicate gate heading can hide a contradictory second decision.
+    if lines.count(header) != 1:
         return ""
     index = lines.index(header) + 1
     end = next((i for i in range(index, len(lines)) if lines[i].startswith("## ")), len(lines))
@@ -193,6 +194,18 @@ class LaunchOnboardingSupportTests(unittest.TestCase):
                 self.assertNotEqual(mutated, self.content)
                 self.assertFalse(valid_go_no_go_decision(mutated))
                 self.assertFalse(valid_readiness(mutated))
+
+    def test_duplicate_gate_sections_cannot_hide_contradictory_decisions(self):
+        self.assertTrue(valid_readiness(self.content))
+        self.assertTrue(valid_live_authorization(self.content))
+        for heading, second_decision, validator in (
+            (GO_NO_GO_HEADING, "**Decisión de preparación:** GO.", valid_readiness),
+            (LIVE_HEADING, "**Autorización concedida:** SÍ (go-live).", valid_live_authorization),
+        ):
+            with self.subTest(heading=heading):
+                candidate = self.content + "\n## " + heading + "\n\n" + second_decision + "\n"
+                self.assertEqual(section(candidate, heading), "")
+                self.assertFalse(validator(candidate))
 
     def test_sla_is_proposed_not_approved(self):
         title = "SLAs iniciales — propuesta, NO aprobación contractual"
