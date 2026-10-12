@@ -7,6 +7,7 @@ namespace GrindFlow\Tests;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -62,8 +63,18 @@ final class WeeklyRuleCsrfTest extends WebTestCase
     public function testValidCsrfPassesTheCsrfGate(): void
     {
         $this->forAuthenticatedRole('editor', static function ($client, Connection $db, string $org): void {
-            $tokens = static::getContainer()->get(CsrfTokenManagerInterface::class);
-            $csrf = (string) $tokens->getToken('grindflow_weekly_rule')->getValue();
+            // The test kernel has popped RequestStack after the login response.
+            // Restore the browser's authenticated request while minting the token.
+            $request = $client->getRequest();
+            $stack = static::getContainer()->get(RequestStack::class);
+            $stack->push($request);
+            try {
+                $tokens = static::getContainer()->get(CsrfTokenManagerInterface::class);
+                $csrf = (string) $tokens->getToken('grindflow_weekly_rule')->getValue();
+                $request->getSession()->save();
+            } finally {
+                $stack->pop();
+            }
             self::assertNotSame('', $csrf);
             $client->request('PUT', '/api/admin/rules/weekly', [], [], self::headers($csrf), self::validRule());
             self::assertResponseIsSuccessful();
