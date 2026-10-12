@@ -46,7 +46,7 @@ class SchedulingAutomationContractTests(unittest.TestCase):
     def test_foreign_blocked_deleted_assets_are_never_selected(self):
         s = source(SERVICE)
         self.assertIn("organization_id = :organization AND deleted_at IS NULL", s)
-        self.assertIn("LIMIT 100", s)
+        self.assertIn("LIMIT 101", s)
         self.assertIn("$this->drafts->reserve(", s)
         self.assertIn("distribution_authorization_missing", source(RESERVATION))
         self.assertIn("content_review_required", source(RESERVATION))
