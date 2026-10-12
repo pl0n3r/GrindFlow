@@ -61,6 +61,7 @@ class SchedulingAutomationContractTests(unittest.TestCase):
     def test_paused_rule_preserves_existing_drafts(self):
         s = source(SERVICE)
         self.assertIn("!== 'active'", s)
+        self.assertIn("automation_state = 'paused'", source("symfony/src/Http/Controller/ContentRuleController.php"))
         self.assertIn("'paused'", s)
         self.assertNotIn("DELETE FROM gf_schedule_drafts", s)
         self.assertNotIn("UPDATE gf_external_publication_attempts", s)
@@ -77,6 +78,7 @@ class SchedulingAutomationContractTests(unittest.TestCase):
     def test_exhausted_pool_has_explicit_state(self):
         s = source(SERVICE)
         self.assertIn("'insufficient_content'", s)
+        self.assertIn("'selection_incomplete'", s)
         self.assertIn("$blocked", s)
         self.assertIn("'no_future_slots'", s)
         self.assertNotIn("->publish(", s)

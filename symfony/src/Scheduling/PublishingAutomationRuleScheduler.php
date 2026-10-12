@@ -98,13 +98,15 @@ final readonly class PublishingAutomationRuleScheduler
             // Explicit tenant, soft-delete, finite pool; each candidate is
             // independently revalidated under lock by reserve().
             $candidates = $this->db->fetchFirstColumn(
-                "SELECT id FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL ORDER BY created_at, id LIMIT 100",
+                "SELECT id FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL ORDER BY created_at, id LIMIT 101",
                 ['organization' => $organizationId],
             );
             if ($candidates === []) {
                 ++$blocked;
                 continue;
             }
+            $hasMoreCandidates = count($candidates) > 100;
+            $candidates = array_slice($candidates, 0, 100);
             if (count($candidates) > 1 && is_string($last)) {
                 usort($candidates, static fn (mixed $a, mixed $b): int =>
                     ((string) $a === $last ? 1 : 0) <=> ((string) $b === $last ? 1 : 0));
@@ -134,6 +136,11 @@ final readonly class PublishingAutomationRuleScheduler
                     // cancels this run instead of trying another account.
                     return $result('authorization_changed', $created, $existing, $blocked);
                 }
+            }
+            if (!$success && $hasMoreCandidates) {
+                // A valid resource may exist beyond the bounded scan.
+                // Never advertise an empty pool based on an incomplete page.
+                return $result('selection_incomplete', $created, $existing, $blocked);
             }
             if (!$success) {
                 ++$blocked;
