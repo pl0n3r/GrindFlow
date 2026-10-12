@@ -7,6 +7,29 @@ type Day = {
   failed_attempts: number;
 };
 
+
+type Mvp = {
+  content: { ready: boolean; available_assets: number | null; original_blobs: number | null; used_bytes: number | null };
+  upcoming: { ready: boolean; total: number | null; items: {
+    asset_name: string; scheduled_at_utc: string; provider: string | null; destination: string | null;
+  }[] };
+  deliveries: { ready: boolean; counts: Record<string, number> | null; recent: {
+    asset_name: string; status: string; updated_at: string; provider: string; destination: string;
+  }[] };
+  traffic: { ready: boolean; clicks: null };
+};
+const deliveryLabels: Record<string, string> = {
+  published: 'Publicada', ambiguous: 'Resultado incierto',
+  rate_limited: 'Proveedor limitado', authentication_failed: 'Autenticación requerida',
+  rejected: 'Rechazada', in_flight: 'En curso',
+};
+
+function formatBytes(bytes: number | null): string {
+  if (bytes === null) return 'No disponible';
+  if (bytes < 1048576) return new Intl.NumberFormat('es-CO').format(bytes) + ' bytes';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
 type Summary = {
   ready: boolean;
   week_start_utc: string;
@@ -16,6 +39,7 @@ type Summary = {
   traffic: { ready: boolean; clicks: number | null };
   external_publications_verified: null;
   provider_calls: false;
+  mvp: Mvp;
 };
 
 type SummaryState =
@@ -96,6 +120,56 @@ export function PilotWeeklySummaryPanel() {
         <button type="button" disabled={week >= current}
           onClick={() => setWeek(shiftWeek(week, 7))}>Semana siguiente</button>
       </nav>
+
+      {state.kind === 'ready' && <div aria-label="Resumen de operaciones MVP">
+        <div className="pilot-totals" aria-label="Métricas del piloto">
+          <div><small>Originales disponibles (no equivale a permiso de publicación)</small>
+            <strong>{state.summary.mvp?.content.ready
+              ? state.summary.mvp.content.available_assets : '—'}</strong></div>
+          <div><small>Próximos contenidos programados</small>
+            <strong>{state.summary.mvp?.upcoming.ready
+              ? state.summary.mvp.upcoming.total : '—'}</strong></div>
+          <div><small>Entregas externas confirmadas</small>
+            <strong>{state.summary.mvp?.deliveries.ready
+              ? state.summary.mvp.deliveries.counts?.published ?? 0 : '—'}</strong></div>
+        </div>
+        <p role="status">Almacenamiento de originales únicos: {' '}
+          {state.summary.mvp?.content.ready
+            ? formatBytes(state.summary.mvp.content.used_bytes) : 'No disponible'}.
+          Tráfico atribuible: no disponible sin evidencia verificable.</p>
+        <div className="pilot-day-scroll">
+          <table>
+            <caption>Próximas programaciones (UTC, hasta cinco)</caption>
+            <thead><tr><th scope="col">Contenido</th><th scope="col">Fecha UTC</th>
+              <th scope="col">Proveedor y destino</th></tr></thead>
+            <tbody>{state.summary.mvp?.upcoming.items.map((item, index) => <tr key={index}>
+              <td>{item.asset_name}</td><td>{item.scheduled_at_utc}</td>
+              <td>{item.provider && item.destination
+                ? item.provider + ' / ' + item.destination : 'Destino pendiente'}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {state.summary.mvp?.upcoming.ready && state.summary.mvp.upcoming.total === 0
+          && <p role="status">No hay próximas programaciones.</p>}
+        {!state.summary.mvp?.upcoming.ready
+          && <p role="status">La agenda no está disponible. No se presentan ceros.</p>}
+        <div className="pilot-day-scroll">
+          <table>
+            <caption>Últimas entregas del ledger externo (hasta seis)</caption>
+            <thead><tr><th scope="col">Contenido</th><th scope="col">Estado</th>
+              <th scope="col">Destino</th><th scope="col">Fecha UTC</th></tr></thead>
+            <tbody>{state.summary.mvp?.deliveries.recent.map((item, index) => <tr key={index}>
+              <td>{item.asset_name}</td><td>{deliveryLabels[item.status] ?? 'Desconocido'}</td>
+              <td>{item.provider + ' / ' + item.destination}</td><td>{item.updated_at}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {!state.summary.mvp?.deliveries.ready
+          && <p role="status">No hay evidencia de entregas externas disponible.</p>}
+        {state.summary.mvp?.deliveries.ready
+          && state.summary.mvp.deliveries.recent.length === 0
+          && <p role="status">No hay entregas externas registradas.</p>}
+      </div>}
       {state.kind === 'loading' && <p role="status">Cargando resumen semanal…</p>}
       {state.kind === 'error' && <p role="alert">{state.message}</p>}
       {state.kind === 'ready' && !state.summary.ready &&
