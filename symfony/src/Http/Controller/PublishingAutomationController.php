@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
+use GrindFlow\Http\BoundedJsonBody;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -78,8 +79,8 @@ final class PublishingAutomationController extends AbstractController
         if (!$this->schemaReady($db)) {
             return $this->error(503, 'automation_schema_required');
         }
-        $input = json_decode($request->getContent(), true);
-        if (!is_array($input) || !array_is_list(array_values($input))) {
+        $input = BoundedJsonBody::decode($request);
+        if (!is_array($input)) {
             return $this->error(422, 'invalid_automation');
         }
         $keys = array_keys($input);

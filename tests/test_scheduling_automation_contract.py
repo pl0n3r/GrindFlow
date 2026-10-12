@@ -71,6 +71,8 @@ class SchedulingAutomationContractTests(unittest.TestCase):
         s = source(CONTROLLER)
         self.assertIn("$memberships->find($user->id(), $selected)", s)
         self.assertIn("isCsrfTokenValid", s)
+        self.assertIn("BoundedJsonBody::decode($request)", s)
+        self.assertNotIn("json_decode($request->getContent()", s)
         self.assertIn("assertAvailableFor", s)
         self.assertIn("hash_equals", s)
         self.assertIn("FOR UPDATE", s)
