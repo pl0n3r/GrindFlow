@@ -239,32 +239,57 @@ class ReleaseAdoptionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     release_version(self.php, package, lock)
 
-    def test_release_version_allows_same_version_only_for_policy_bridge_paths(self):
+    def test_release_version_same_version_is_allowed_for_any_diff(self):
         module = load_release_version_module()
-        paths = tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS))
-        module.transition((0, 1, 193), (0, 1, 193), paths)
+        for changed in (
+            (), ("README.md",), ("symfony/src/Kernel.php",),
+            ("config/version.php",), (".github/workflows/politica.yml", "README.md"),
+        ):
+            with self.subTest(changed=changed):
+                module.transition((0, 1, 219), (0, 1, 219), changed)
 
-    def test_release_version_same_version_rejects_extra_runtime_or_version_paths(self):
+    def test_two_prs_with_same_target_version_do_not_conflict(self):
         module = load_release_version_module()
-        cases = (
-            (),
-            (".github/workflows/politica.yml",),
-            tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"README.md"})),
-            tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"config/version.php"})),
-            tuple(sorted(module.POLICY_BRIDGE_NO_BUMP_PATHS | {"symfony/src/Kernel.php"})),
-        )
-        for paths in cases:
-            with self.subTest(paths=paths):
-                with self.assertRaises(ValueError):
-                    module.transition((0, 1, 193), (0, 1, 193), paths)
+        module.transition((0, 1, 218), (0, 1, 219), ("src/first.php",))
+        for changed in (
+            ("symfony/src/Controller/FirstController.php",),
+            ("tests/Feature/SecondFeatureTest.php", "docs/DEVELOPMENT-MODEL.md"),
+        ):
+            with self.subTest(parallel_pr=changed):
+                module.transition((0, 1, 219), (0, 1, 219), changed)
 
     def test_release_version_normal_patch_transition_remains_required_outside_policy_bridge(self):
         module = load_release_version_module()
-        module.transition((0, 1, 193), (0, 1, 194), ("README.md",))
-        with self.assertRaises(ValueError):
-            module.transition((0, 1, 193), (0, 1, 193), ("README.md",))
-        with self.assertRaises(ValueError):
-            module.transition((0, 1, 193), (0, 1, 195), ("README.md",))
+        module.transition(None, (0, 1, 0))
+        module.transition((0, 1, 219), (0, 1, 220), ("README.md",))
+        module.transition((0, 1, 219), (0, 2, 0), ("README.md",))
+        for previous, current in (
+            (None, (0, 1, 1)),
+            ((0, 1, 219), (0, 1, 221)),
+            ((0, 1, 219), (0, 1, 218)),
+            ((0, 1, 219), (0, 3, 0)),
+            ((0, 1, 219), (0, 2, 1)),
+            ((0, 1, 219), (1, 0, 0)),
+        ):
+            with self.subTest(previous=previous, current=current):
+                with self.assertRaises(ValueError):
+                    module.transition(previous, current, ("README.md",))
+
+    def test_unparseable_metadata_and_major_one_still_fail(self):
+        module = load_release_version_module()
+        good = "<?php return ['number' => '0.1.219', 'released_at' => '2026-10-12'];"
+        self.assertEqual(module.parse_version(good), (0, 1, 219))
+        for bad in (
+            good.replace("'number'", "'other'"),
+            good.replace("'released_at'", "'other'"),
+            good.replace("2026-10-12", "2026-02-30"),
+            good.replace("0.1.219", "1.0.0"),
+            good + good,
+            good.replace("2026-10-12", "2026-10-12', 'released_at' => '2026-10-12"),
+        ):
+            with self.subTest(metadata=bad):
+                with self.assertRaises(ValueError):
+                    module.parse_version(bad)
 
     def test_release_identity_is_synchronized(self):
         expected = release_version(self.php, self.package, self.lock)

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Validate one explicit human product-version bump per deploy-bound PR/push.
+"""Validate product-version metadata and deliberate version transitions in CI.
 
 Product version and actual deployed source SHA are independent facts.
-The initial adoption bootstraps 0.1.0; after that only patch +1 or an
-explicit pre-1.0 minor milestone (next minor, patch 0) is accepted.
+The initial adoption bootstraps 0.1.0; parallel PRs may retain the same
+product version as the base. An actual bump must be patch +1 or the next
+pre-1.0 minor milestone (patch 0).
 CI validates committed metadata but never edits the repository.
 """
 from __future__ import annotations
@@ -18,11 +19,6 @@ VERSION = re.compile(r"'number'\s*=>\s*'(\d+)\.(\d+)\.(\d+)'")
 DATE = re.compile(r"'released_at'\s*=>\s*'(\d{4}-\d{2}-\d{2})'")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 BOOTSTRAP = (0, 1, 0)
-POLICY_BRIDGE_NO_BUMP_PATHS = frozenset({
-    ".github/workflows/politica.yml",
-    "tests/test_factory_policy_bridge.py",
-    "tests/test_factory_policy_adoption.py",
-})
 
 
 def parse_version(content: str) -> tuple[int, int, int]:
@@ -49,7 +45,7 @@ def transition(
         if current != BOOTSTRAP:
             raise ValueError("initial GrindFlow release must be 0.1.0")
         return
-    if current == previous and frozenset(changed) == POLICY_BRIDGE_NO_BUMP_PATHS:
+    if current == previous:
         return
     old_major, old_minor, old_patch = previous
     major, minor, patch = current
@@ -105,10 +101,10 @@ def self_test() -> None:
         ((0, 1, 9), (0, 2, 0)),
     ):
         transition(before, after)
-    transition((0, 1, 9), (0, 1, 9), tuple(POLICY_BRIDGE_NO_BUMP_PATHS))
+    for paths in ((), ("src/runtime.php",), ("config/version.php", "README.md")):
+        transition((0, 1, 9), (0, 1, 9), paths)
     for before, after in (
         (None, (0, 1, 1)),
-        ((0, 1, 0), (0, 1, 0)),
         ((0, 1, 0), (0, 1, 2)),
         ((0, 1, 5), (0, 1, 4)),
         ((0, 1, 5), (0, 3, 0)),
@@ -119,15 +115,6 @@ def self_test() -> None:
         except ValueError:
             continue
         raise AssertionError(f"unexpectedly accepted {before} -> {after}")
-    for changed in (
-        (".github/workflows/politica.yml",),
-        tuple(POLICY_BRIDGE_NO_BUMP_PATHS | {"README.md"}),
-    ):
-        try:
-            transition((0, 1, 9), (0, 1, 9), changed)
-        except ValueError:
-            continue
-        raise AssertionError("unexpectedly accepted same-version non-canonical diff")
     for bad in (
         sample.replace("2026-09-19", "2026-02-30"),
         sample.replace("0.1.0", "1.0.0"),
