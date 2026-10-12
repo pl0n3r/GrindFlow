@@ -172,7 +172,7 @@ final class PilotWeeklySummaryController extends AbstractController
     {
         $unknown = ['ready' => false, 'reason' => 'schema_unavailable'];
         $result = [
-            'content' => $unknown + ['available_assets' => null, 'original_blobs' => null, 'used_bytes' => null],
+            'content' => $unknown + ['available_assets' => null, 'original_blobs' => null, 'used_bytes' => null, 'eligibility_ready' => false, 'ready_to_schedule' => null],
             'upcoming' => $unknown + ['total' => null, 'items' => []],
             'deliveries' => $unknown + ['counts' => null, 'recent' => []],
             'traffic' => ['ready' => false, 'clicks' => null],
@@ -203,9 +203,51 @@ final class PilotWeeklySummaryController extends AbstractController
                     'available_assets' => $available,
                     'original_blobs' => (int) ($storage['originals'] ?? 0),
                     'used_bytes' => (int) ($storage['bytes'] ?? 0),
+                    'eligibility_ready' => false,
+                    'ready_to_schedule' => null,
                 ];
             } catch (\Doctrine\DBAL\Exception) {
                 // Partially migrated storage stays unknown, not zero.
+            }
+        }
+
+
+        // Matches the S4 ScheduleDraftApplicationService gate; availability in Vault
+        // never implies an asset is approved for internal scheduling.
+        if ($hasAssets && $schema->tablesExist([
+            'gf_content_rules',
+            'gf_content_review_events',
+            'gf_distribution_authorization_events',
+        ]) && $result['content']['ready']) {
+            try {
+                $eligible = (int) $db->fetchOne(<<<'SQL'
+                    SELECT COUNT(*)
+                    FROM gf_vault_assets asset
+                    WHERE asset.organization_id = :organization
+                      AND asset.deleted_at IS NULL
+                      AND asset.usage_scope = 'needs_review'
+                      AND EXISTS (
+                          SELECT 1 FROM gf_content_rules rule
+                          WHERE rule.organization_id = asset.organization_id
+                            AND rule.mode = 'review_only'
+                      )
+                      AND (
+                          SELECT event.action FROM gf_content_review_events event
+                          WHERE event.organization_id = asset.organization_id
+                            AND event.asset_id = asset.id
+                          ORDER BY event.created_at DESC, event.id DESC LIMIT 1
+                      ) = 'approve'
+                      AND (
+                          SELECT event.action FROM gf_distribution_authorization_events event
+                          WHERE event.organization_id = asset.organization_id
+                            AND event.asset_id = asset.id
+                          ORDER BY event.created_at DESC, event.id DESC LIMIT 1
+                      ) = 'grant'
+                    SQL, $params);
+                $result['content']['eligibility_ready'] = true;
+                $result['content']['ready_to_schedule'] = $eligible;
+            } catch (\Doctrine\DBAL\Exception) {
+                // Missing/drifted eligibility sources are UNKNOWN, not permission.
             }
         }
 

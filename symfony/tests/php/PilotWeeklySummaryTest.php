@@ -180,6 +180,8 @@ final class PilotWeeklySummaryTest extends WebTestCase
         self::assertTrue($data['mvp']['content']['ready']);
         self::assertSame(1, $data['mvp']['content']['available_assets']);
         self::assertSame(1, $data['mvp']['content']['original_blobs']);
+        self::assertTrue($data['mvp']['content']['eligibility_ready']);
+        self::assertSame(0, $data['mvp']['content']['ready_to_schedule']);
         self::assertSame(10, $data['mvp']['content']['used_bytes']);
         self::assertTrue($data['mvp']['upcoming']['ready']);
         self::assertSame(1, $data['mvp']['upcoming']['total']);
@@ -198,6 +200,40 @@ final class PilotWeeklySummaryTest extends WebTestCase
         self::assertSame('12345678', $data['mvp']['deliveries']['recent'][0]['destination']);
         self::assertFalse($data['mvp']['traffic']['ready']);
         self::assertNull($data['mvp']['traffic']['clicks']);
+
+
+        // S4 requires both review and distribution authorization, as well as
+        // a review-only weekly rule; storing an original is not eligibility.
+        $db->insert('gf_content_rules', [
+            'organization_id' => $mine,
+            'timezone' => 'UTC',
+            'weekdays' => 'mon',
+            'local_time' => '10:00',
+            'max_per_day' => 1,
+            'mode' => 'review_only',
+            'updated_by' => $user,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        foreach ([
+            ['gf_content_review_events', 'approve'],
+            ['gf_distribution_authorization_events', 'grant'],
+        ] as [$table, $action]) {
+            $db->insert($table, [
+                'id' => Uuid::v7()->toRfc4122(),
+                'organization_id' => $mine,
+                'asset_id' => $mineAsset,
+                'actor_id' => $user,
+                'action' => $action,
+                'created_at' => $now,
+            ]);
+        }
+        $client->request('GET', '/api/admin/pilot/weekly-summary?week='.$thisWeek);
+        self::assertResponseIsSuccessful();
+        $authorized = $this->payload($client)['data']['mvp']['content'];
+        self::assertTrue($authorized['eligibility_ready']);
+        self::assertSame(1, $authorized['ready_to_schedule']);
+        self::assertSame(1, $authorized['available_assets']);
 
         self::assertStringNotContainsString($other, (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('foreign.png', (string) $client->getResponse()->getContent());

@@ -9,7 +9,7 @@ type Day = {
 
 
 type Mvp = {
-  content: { ready: boolean; available_assets: number | null; original_blobs: number | null; used_bytes: number | null };
+  content: { ready: boolean; available_assets: number | null; original_blobs: number | null; used_bytes: number | null; eligibility_ready: boolean; ready_to_schedule: number | null };
   upcoming: { ready: boolean; total: number | null; items: {
     asset_name: string; scheduled_at_utc: string; provider: string | null; destination: string | null;
   }[] };
@@ -125,12 +125,12 @@ export function PilotWeeklySummaryPanel() {
         <div className="pilot-mvp-scroll" style={{ maxWidth: '100%', overflowX: 'auto' }}>
           <table style={{ minWidth: 440, width: '100%', borderCollapse: 'collapse' }}>
             <caption>Métricas del piloto</caption>
-            <thead><tr><th scope="col">Originales disponibles (no autoriza publicación)</th>
+            <thead><tr><th scope="col">Contenido listo para programación (no publicación externa)</th>
               <th scope="col">Próximos contenidos</th>
               <th scope="col">Entregas registradas como publicadas</th></tr></thead>
             <tbody><tr>
-              <td>{state.summary.mvp?.content.ready
-                ? state.summary.mvp.content.available_assets : '—'}</td>
+              <td>{state.summary.mvp?.content.eligibility_ready
+                ? state.summary.mvp.content.ready_to_schedule : '—'}</td>
               <td>{state.summary.mvp?.upcoming.ready
                 ? state.summary.mvp.upcoming.total : '—'}</td>
               <td>{state.summary.mvp?.deliveries.ready
@@ -138,7 +138,10 @@ export function PilotWeeklySummaryPanel() {
             </tr></tbody>
           </table>
         </div>
-        <p role="status">Almacenamiento de originales únicos: {' '}
+        <p role="status">Originales activos en Vault: {' '}
+          {state.summary.mvp?.content.ready
+            ? state.summary.mvp.content.available_assets : 'No disponible'}.
+          Almacenamiento de originales únicos: {' '}
           {state.summary.mvp?.content.ready
             ? formatBytes(state.summary.mvp.content.used_bytes) : 'No disponible'}.
           Tráfico atribuible: no disponible sin evidencia verificable.</p>
