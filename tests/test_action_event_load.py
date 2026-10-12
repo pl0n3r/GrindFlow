@@ -47,9 +47,34 @@ class ActionEventLoadTests(unittest.TestCase):
             "No hacer polling de checks, PRs ni comentarios",
             "Agrupar cambios locales y hacer un solo push por bloque lógico",
             "Publicar un solo comentario por hito",
-            "No exceder dos agentes simultáneos en GrindFlow",
+            "telemetría CI se muestrea una vez por hora",
         ):
-            self.assertIn(rule, agents)
+            with self.subTest(rule=rule):
+                self.assertIn(rule, agents)
+        self.assertNotIn("No exceder dos agentes simultáneos en GrindFlow", agents)
+        self.assertNotIn("Se permiten hasta **4 lineas de trabajo concurrentes**", agents)
+
+    def test_agents_capacity_is_claim_based_not_fixed(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        required = (
+            "Capacidad por claims, sin tope fijo de agentes por repo",
+            "claims exactos de archivos disjuntos",
+            "reserva V3 `active:true`",
+            "nunca tomar una ruta ya reclamada",
+            "ni reservar un directorio completo",
+            "1200 solicitudes",
+            "cupo restante de la API de GitHub autenticada",
+            "si el PLAN-AGENTES global impone un límite menor, prevalece",
+            "Un cupo UNKNOWN no autoriza nuevas reservas",
+            "claims de archivo disjuntos",
+            "sin tope fijo de agentes por repo",
+            "El cupo GitHub y cualquier límite menor del PLAN-AGENTES global prevalecen",
+        )
+        for rule in required:
+            with self.subTest(rule=rule):
+                self.assertIn(rule, agents)
+        self.assertNotIn("No exceder dos agentes simultáneos en GrindFlow", agents)
+        self.assertNotIn("Se permiten hasta **4 lineas de trabajo concurrentes**", agents)
 
 
 if __name__ == "__main__":
