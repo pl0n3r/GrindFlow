@@ -100,6 +100,8 @@ final class PilotWeeklySummaryTest extends WebTestCase
                 'local_date' => $thisWeek,
                 'local_time' => '10:00',
                 'status' => 'draft',
+                'delivery_provider' => 'facebook_page',
+                'delivery_destination_id' => '12345678',
                 'created_at' => $now,
             ]);
         }
@@ -118,6 +120,22 @@ final class PilotWeeklySummaryTest extends WebTestCase
                 'actor_id' => $user,
                 'action' => $action,
                 'created_at' => $created,
+            ]);
+        }
+
+
+        // Synthetic S4 ledger data: an external result is not a manual handoff event.
+        foreach ([[$mine, $mineDraft, 'published'], [$other, $otherDraft, 'rejected']] as [$organization, $draft, $status]) {
+            $db->insert('gf_external_publication_attempts', [
+                'id' => Uuid::v7()->toRfc4122(),
+                'organization_id' => $organization,
+                'provider' => 'facebook_page',
+                'idempotency_key' => 'schedule-draft:'.$draft.':facebook_page:v1',
+                'request_fingerprint' => hash('sha256', $organization.$draft),
+                'status' => $status,
+                'external_publication_id' => $status === 'published' ? 'synthetic-publication' : null,
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
         }
 
@@ -144,6 +162,20 @@ final class PilotWeeklySummaryTest extends WebTestCase
         self::assertNull($data['traffic']['clicks']);
         self::assertNull($data['external_publications_verified']);
         self::assertFalse($data['provider_calls']);
+
+        self::assertTrue($data['mvp']['content']['ready']);
+        self::assertSame(1, $data['mvp']['content']['available_assets']);
+        self::assertSame(1, $data['mvp']['content']['original_blobs']);
+        self::assertSame(10, $data['mvp']['content']['used_bytes']);
+        self::assertTrue($data['mvp']['deliveries']['ready']);
+        self::assertSame(1, $data['mvp']['deliveries']['counts']['published']);
+        self::assertSame(0, $data['mvp']['deliveries']['counts']['rejected']);
+        self::assertSame('published', $data['mvp']['deliveries']['recent'][0]['status']);
+        self::assertSame('facebook_page', $data['mvp']['deliveries']['recent'][0]['provider']);
+        self::assertSame('12345678', $data['mvp']['deliveries']['recent'][0]['destination']);
+        self::assertFalse($data['mvp']['traffic']['ready']);
+        self::assertNull($data['mvp']['traffic']['clicks']);
+
         self::assertStringNotContainsString($other, (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('foreign.png', (string) $client->getResponse()->getContent());
         self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
