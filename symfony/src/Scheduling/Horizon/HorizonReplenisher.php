@@ -45,7 +45,7 @@ final class HorizonReplenisher
         $eligibilityById = [];
         foreach ($assets as $asset) {
             if (!is_array($asset) || !isset($asset['id'], $asset['tenant_id'], $asset['eligible'])
-                || !is_string($asset['id']) || trim($asset['id']) === '' || strlen($asset['id']) > 128
+                || !is_string($asset['id']) || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/D', $asset['id']) !== 1
                 || !is_string($asset['tenant_id']) || trim($asset['tenant_id']) === ''
                 || !is_bool($asset['eligible'])) {
                 return self::rejected('invalid_asset');
