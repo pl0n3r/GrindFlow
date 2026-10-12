@@ -122,23 +122,28 @@ export function PilotWeeklySummaryPanel() {
       </nav>
 
       {state.kind === 'ready' && <div aria-label="Resumen de operaciones MVP">
-        <div className="pilot-totals" aria-label="Métricas del piloto">
-          <div><small>Originales disponibles (no equivale a permiso de publicación)</small>
-            <strong>{state.summary.mvp?.content.ready
-              ? state.summary.mvp.content.available_assets : '—'}</strong></div>
-          <div><small>Próximos contenidos programados</small>
-            <strong>{state.summary.mvp?.upcoming.ready
-              ? state.summary.mvp.upcoming.total : '—'}</strong></div>
-          <div><small>Entregas externas confirmadas</small>
-            <strong>{state.summary.mvp?.deliveries.ready
-              ? state.summary.mvp.deliveries.counts?.published ?? 0 : '—'}</strong></div>
+        <div className="pilot-mvp-scroll" style={{ maxWidth: '100%', overflowX: 'auto' }}>
+          <table style={{ minWidth: 440, width: '100%', borderCollapse: 'collapse' }}>
+            <caption>Métricas del piloto</caption>
+            <thead><tr><th scope="col">Originales disponibles (no autoriza publicación)</th>
+              <th scope="col">Próximos contenidos</th>
+              <th scope="col">Entregas externas confirmadas</th></tr></thead>
+            <tbody><tr>
+              <td>{state.summary.mvp?.content.ready
+                ? state.summary.mvp.content.available_assets : '—'}</td>
+              <td>{state.summary.mvp?.upcoming.ready
+                ? state.summary.mvp.upcoming.total : '—'}</td>
+              <td>{state.summary.mvp?.deliveries.ready
+                ? state.summary.mvp.deliveries.counts?.published ?? 0 : '—'}</td>
+            </tr></tbody>
+          </table>
         </div>
         <p role="status">Almacenamiento de originales únicos: {' '}
           {state.summary.mvp?.content.ready
             ? formatBytes(state.summary.mvp.content.used_bytes) : 'No disponible'}.
           Tráfico atribuible: no disponible sin evidencia verificable.</p>
-        <div className="pilot-day-scroll">
-          <table>
+        <div className="pilot-mvp-scroll" style={{ maxWidth: '100%', overflowX: 'auto' }}>
+          <table style={{ minWidth: 440, width: '100%', borderCollapse: 'collapse' }}>
             <caption>Próximas programaciones (UTC, hasta cinco)</caption>
             <thead><tr><th scope="col">Contenido</th><th scope="col">Fecha UTC</th>
               <th scope="col">Proveedor y destino</th></tr></thead>
@@ -153,8 +158,8 @@ export function PilotWeeklySummaryPanel() {
           && <p role="status">No hay próximas programaciones.</p>}
         {!state.summary.mvp?.upcoming.ready
           && <p role="status">La agenda no está disponible. No se presentan ceros.</p>}
-        <div className="pilot-day-scroll">
-          <table>
+        <div className="pilot-mvp-scroll" style={{ maxWidth: '100%', overflowX: 'auto' }}>
+          <table style={{ minWidth: 440, width: '100%', borderCollapse: 'collapse' }}>
             <caption>Últimas entregas del ledger externo (hasta seis)</caption>
             <thead><tr><th scope="col">Contenido</th><th scope="col">Estado</th>
               <th scope="col">Destino</th><th scope="col">Fecha UTC</th></tr></thead>
