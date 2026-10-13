@@ -100,6 +100,34 @@ class TagReleaseGateTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("uses: pl0n3r/factory/.github/workflows/release.yml@v1", workflow)
 
+    def _assert_first_installation_rejects_unsafe_skip(self, previous):
+        # El primer push que instala el preflight también cambia código/CI.
+        # Sin nueva identidad de versión debe fallar cerrado, nunca skip.
+        for relative in (
+            ".github/workflows/tag-release.yml",
+            "scripts/tag-release-version-gate.py",
+        ):
+            path = self.repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("bootstrap executable contract", encoding="utf-8")
+        installed = self.commit("install release preflight without bump")
+        with self.assertRaisesRegex(
+            GATE.GuardError, "Cambio ejecutable sin incremento de versión"
+        ):
+            GATE.decide_release(self.repo, previous, installed)
+        return installed
+
+    def test_first_preflight_installation_requires_version_bump(self):
+        self.tagged_base()
+        first = self.docs()
+        self.assertIs(GATE.decide_release(self.repo, self.base, first), False)
+        installed = self._assert_first_installation_rejects_unsafe_skip(first)
+        # Un bump posterior sigue pidiendo el reusable de release normal;
+        # no se añade ninguna excepción para silencios del primer push.
+        self.version("0.1.220")
+        bumped = self.commit("new version after preflight")
+        self.assertIs(GATE.decide_release(self.repo, installed, bumped), True)
+
     def test_invalid_history_or_missing_release_identity_fails_closed(self):
         first = self.docs()
         with self.assertRaises(GATE.GuardError):
@@ -130,6 +158,8 @@ class TagReleaseGateTests(unittest.TestCase):
                 with self.assertRaises(GATE.GuardError):
                     GATE.decide_release(self.repo, previous, changed)
             previous = changed
+        # AC-03 debe certificar el primer push que instala el gate.
+        previous = self._assert_first_installation_rejects_unsafe_skip(previous)
         self.version("0.1.218")
         down = self.commit("downgrade")
         with self.assertRaises(GATE.GuardError):
