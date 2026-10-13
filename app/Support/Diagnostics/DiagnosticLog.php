@@ -4,6 +4,7 @@ namespace App\Support\Diagnostics;
 
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
@@ -135,12 +136,18 @@ class DiagnosticLog
         $user = $request->user();
         $userId = $user?->getAuthIdentifier();
         $tenantContext = resolve(TenantContext::class);
+        $route = $request->route();
+        // Route templates are application-owned and never contain visitor tokens.
+        // Never fall back to the raw URL or path when routing fails.
+        $safePath = $route instanceof Route
+            ? '/'.ltrim($route->uri(), '/')
+            : '/[unmatched]';
 
         return [
             'source' => 'http',
             'method' => $request->method(),
-            'path' => '/'.ltrim($request->path(), '/'),
-            'route' => $request->route()?->getName(),
+            'path' => $safePath,
+            'route' => $route instanceof Route ? $route->getName() : null,
             'user_id' => $userId !== null ? (string) $userId : null,
             'organization_id' => $tenantContext->organizationId(),
         ];
