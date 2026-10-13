@@ -66,6 +66,29 @@ class TagReleaseGateTests(unittest.TestCase):
         with self.assertRaises(GATE.GuardError):
             GATE.decide_release(self.repo, runtime, manifest)
 
+    def test_document_prefix_never_hides_manifest_or_workflow_without_bump(self):
+        self.tagged_base()
+        path = self.repo / "readme/guide.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("safe reference", encoding="utf-8")
+        previous = self.commit("readme markdown without bump")
+        self.assertIs(GATE.decide_release(self.repo, self.base, previous), False)
+
+        # Un nombre dentro de docs/readme no hace seguro un manifest.
+        # Los workflows son código ejecutable aunque se llamen README.
+        for relative in (
+            "readme/project.json", "docs/manifest.yml",
+            "readme/build.sh", ".github/workflows/readme-contract.yml",
+        ):
+            with self.subTest(path=relative):
+                target = self.repo / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("unsafe without version bump", encoding="utf-8")
+                changed = self.commit("manifest or workflow without bump")
+                with self.assertRaises(GATE.GuardError):
+                    GATE.decide_release(self.repo, previous, changed)
+                previous = changed
+
     def test_changed_version_requires_factory_release(self):
         self.tagged_base()
         self.version("0.1.220")

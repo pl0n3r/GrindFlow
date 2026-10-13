@@ -80,13 +80,25 @@ def decide_release(repo: Path, before: str, after: str) -> bool:
         paths.pop()
     if not paths or len(paths) > 256 or len(set(paths)) != len(paths):
         raise GuardError("Inventario de cambios ausente, ambiguo o excesivo")
-    allow_exact = {"README.md", "AGENTS.md", "AGENTES.md", ".github/workflows/readme-contract.yml"}
-    allow_prefixes = ("docs/", "readme/", "tests/")
+    # Documentación pura y fixtures de tests pueden saltar publicación.
+    # Un JSON/YAML/script bajo readme/ o docs/ NO es documentación segura:
+    # puede cambiar metadata operativa sin variar config/version.php.
+    # El workflow readme-contract también es código de CI, no un archivo MD.
+    allow_exact = {"README.md", "AGENTS.md", "AGENTES.md"}
+    doc_suffixes = (".md", ".mdx", ".rst", ".txt", ".png", ".jpg",
+                    ".jpeg", ".gif", ".webp")
     for path in paths:
-        if (not path or path.startswith("/") or "\n" in path
-                or (path not in allow_exact and not path.startswith(allow_prefixes)
-                    and not ("/" not in path and path.endswith(".md")))):
-            raise GuardError("Cambio ejecutable sin incremento de versión")
+        if not path or path.startswith("/") or "\n" in path:
+            raise GuardError("Ruta de diff inválida")
+        if path in allow_exact:
+            continue
+        if path.startswith(("docs/", "readme/")):
+            if path.endswith(doc_suffixes) and ".." not in Path(path).parts:
+                continue
+            raise GuardError("Manifest o ruta ejecutable sin incremento de versión")
+        if path.startswith("tests/") or ("/" not in path and path.endswith(".md")):
+            continue
+        raise GuardError("Cambio ejecutable sin incremento de versión")
     version = ".".join(str(part) for part in previous)
     ref = f"refs/tags/v{version}"
     if git(repo, "cat-file", "-t", ref) != "tag":
