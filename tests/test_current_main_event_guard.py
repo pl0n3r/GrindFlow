@@ -134,6 +134,20 @@ class CurrentMainEventGuardTests(unittest.TestCase):
         self.assertIn("\n  current-main:\n", source)
         self.assertIn("\n  release:\n", source)
         release = source.split("\n  release:\n", 1)[1]
+        release_lines = release.splitlines()
+        expected_if = (
+            "    if: github.repository == 'pl0n3r/GrindFlow'"
+            " && github.ref == 'refs/heads/main'"
+            " && needs.current-main.outputs.current == 'true'"
+        )
+        if "\n  release-change:\n" in source:
+            expected_if += " && needs.release-change.outputs.publish == 'true'"
+        # Exact line, not a substring in a YAML comment or untrusted expression.
+        self.assertIn(expected_if, release_lines)
+        self.assertIn(
+            "    uses: pl0n3r/factory/.github/workflows/release.yml@v1",
+            release_lines,
+        )
         self.assertIn("needs.current-main.outputs.current == 'true'", release)
         self.assertIn("uses: pl0n3r/factory/.github/workflows/release.yml@v1", release)
         self.assertIn("    permissions:\n      contents: write\n", release)
@@ -169,7 +183,23 @@ class CurrentMainEventGuardTests(unittest.TestCase):
 
     def test_tag_release_rejects_weakened_dependencies(self):
         legacy, modern, _ = self._release_profile_fixtures()
+        legacy_if = (
+            "    if: github.repository == 'pl0n3r/GrindFlow'"
+            " && github.ref == 'refs/heads/main'"
+            " && needs.current-main.outputs.current == 'true'"
+        )
+        modern_if = (
+            legacy_if + " && needs.release-change.outputs.publish == 'true'"
+        )
         for name, original, mutated in (
+            ("legacy_if_reduced_to_true_with_comment", legacy,
+             self._mutate_release(
+                 legacy, legacy_if, "    if: true # " + legacy_if.strip(), 1
+             )),
+            ("postmerge_if_reduced_to_true_with_comment", modern,
+             self._mutate_release(
+                 modern, modern_if, "    if: true # " + modern_if.strip(), 1
+             )),
             ("legacy_without_current_main", legacy,
              self._mutate_release(legacy, "    needs: current-main\n",
                             "    needs: stale-event\n", 1)),
