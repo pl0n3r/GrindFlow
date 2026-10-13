@@ -55,17 +55,22 @@ final class CampaignCalendar
 
     /**
      * Ownership is a trusted, server-sourced catalog snapshot injected by the
-     * eventual consumer; callers must not synthesize it from campaign input.
+     * eventual consumer; the campaign-account-tenant binding is independently
+     * resolved by the server, never synthesized from campaign input.
      */
     private function verifyOwnership(array $campaign, array $ownership): void
     {
-        $expected = ['account_id', 'account_tenant_id', 'collection_tenant_by_id'];
+        $expected = ['account_id', 'account_tenant_id', 'campaign_id',
+            'campaign_account_id', 'campaign_tenant_id', 'collection_tenant_by_id'];
         $keys = array_keys($ownership);
         sort($keys);
         sort($expected);
         if ($keys !== $expected
             || $ownership['account_id'] !== $campaign['account_id']
             || $ownership['account_tenant_id'] !== $campaign['tenant_id']
+            || $ownership['campaign_id'] !== $campaign['campaign_id']
+            || $ownership['campaign_account_id'] !== $campaign['account_id']
+            || $ownership['campaign_tenant_id'] !== $campaign['tenant_id']
             || !is_array($ownership['collection_tenant_by_id'])
             || count($ownership['collection_tenant_by_id']) !== count($campaign['collection_ids'])) {
             throw new InvalidArgumentException('invalid_campaign_ownership');
