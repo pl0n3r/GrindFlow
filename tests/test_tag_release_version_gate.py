@@ -151,8 +151,15 @@ class TagReleaseGateTests(unittest.TestCase):
         # Nombres del diff -z con control inicial no son el README autorizado.
         # Estos casos pertenecen al AC-03, que debe fallar cerrado.
         previous = self.command("rev-parse", "HEAD")
-        for unsafe_name in ("\nREADME.md", "\rREADME.md", "\tREADME.md", " README.md"):
-            (self.repo / unsafe_name).write_text("unsafe filename", encoding="utf-8")
+        for unsafe_name in (
+            "\nREADME.md", "\rREADME.md", "\tREADME.md", " README.md",
+            # A directory with a leading space must not be normalized to docs/.
+            # This is the original -z/strip regression, even for a doc suffix.
+            " docs/hook.php", " docs/guide.md",
+        ):
+            target = self.repo / unsafe_name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("unsafe filename", encoding="utf-8")
             changed = self.commit("ambiguous filename must fail closed")
             with self.subTest(unsafe_path=repr(unsafe_name)):
                 with self.assertRaises(GATE.GuardError):
