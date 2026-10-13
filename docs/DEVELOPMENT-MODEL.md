@@ -31,7 +31,7 @@ a Finance multimoneda/UTC. El gate agregado continúa llamándose
 3. Use the ordered roadmap #2 unless explicitly reprioritized; reference requirement IDs when product behavior changes.
 4. Implement the smallest coherent change.
 5. Run directed tests first.
-6. Bump the deliberate human product version once in `config/version.php`; finalize the intended file set, README exact snapshot and progress convention.
+6. Validate product version metadata; bump `config/version.php` only for an intentional release milestone, then finalize the file set, README snapshot and progress convention.
 7. Open the PR and let GrindFlow CI + Sonar start.
 8. Request one CodeRabbit full review on the same stable intended head.
 9. Inspect CI, Sonar and CodeRabbit concurrently.
@@ -83,11 +83,13 @@ separate IMPLEMENTED, VALIDATED IN CODE, DEPLOYED and VALIDATED IN PRODUCTION.
   `🚧 Pending`: pending or in progress, not struck through.
 - Keep delivered checklist items struck through in **roadmap #2**, not as
   cumulative history in README.
-- Every deploy-bound PR commits a deliberate patch bump in
-  `config/version.php` before final review. Pre-1.0 minor bumps require an
-  explicit milestone; crossing 1.0 requires the product owner's decision.
-- `scripts/release-version.py` checks the exact Git base/head transition;
-  CI never rewrites product-version files or creates metadata commits.
+- Independent PRs may retain the same version as the base; the version does
+  not serialize parallel code reviews. On an intentional version change,
+  `scripts/release-version.py` accepts only patch +1 or the next pre-1.0
+  minor milestone with patch 0. Version >=1.0 requires an explicit owner milestone.
+- The script checks the exact Git base/head metadata transition, rejects
+  unparseable release dates/versions, and never edits version files in CI.
+  Deployment identity remains the observed source SHA, not this number.
 - Admin System displays the human version. It does **not** claim the real
   deployed SHA, which must be observed independently from Hostinger.
 
