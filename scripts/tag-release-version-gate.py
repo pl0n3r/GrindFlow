@@ -71,6 +71,22 @@ def decide_release(repo: Path, before: str, after: str) -> bool:
         raise GuardError("Descenso de versión prohibido")
     if current > previous:
         return True  # Factory release.yml@v1 debe seguir aplicando todas sus puertas.
+    # Un skip NO es admisible si el push cambia runtime, metadata ejecutable,
+    # manifests o release/CI: esas rutas requieren una versión nueva antes
+    # de publicación, aunque el guard de PR permita construir en paralelo.
+    changed = git(repo, "diff", "--name-only", "--no-renames", "-z", before, after, "--")
+    paths = changed.split("\0")
+    if paths[-1:] == [""]:
+        paths.pop()
+    if not paths or len(paths) > 256 or len(set(paths)) != len(paths):
+        raise GuardError("Inventario de cambios ausente, ambiguo o excesivo")
+    allow_exact = {"README.md", "AGENTS.md", "AGENTES.md", ".github/workflows/readme-contract.yml"}
+    allow_prefixes = ("docs/", "readme/", "tests/")
+    for path in paths:
+        if (not path or path.startswith("/") or "\n" in path
+                or (path not in allow_exact and not path.startswith(allow_prefixes)
+                    and not ("/" not in path and path.endswith(".md")))):
+            raise GuardError("Cambio ejecutable sin incremento de versión")
     version = ".".join(str(part) for part in previous)
     ref = f"refs/tags/v{version}"
     if git(repo, "cat-file", "-t", ref) != "tag":

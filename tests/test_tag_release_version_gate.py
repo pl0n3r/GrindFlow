@@ -55,6 +55,16 @@ class TagReleaseGateTests(unittest.TestCase):
         self.assertIs(GATE.decide_release(self.repo, self.base, first), False)
         second = self.docs("NOTES.md")
         self.assertIs(GATE.decide_release(self.repo, first, second), False)
+        # Un diff de runtime o manifests sin bump no es una edición documental.
+        (self.repo / "src").mkdir()
+        (self.repo / "src/App.php").write_text("<?php echo 1;", encoding="utf-8")
+        runtime = self.commit("runtime without bump")
+        with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, second, runtime)
+        (self.repo / "package.json").write_text('{"version":"0.1.220"}', encoding="utf-8")
+        manifest = self.commit("manifest without bump")
+        with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, runtime, manifest)
 
     def test_changed_version_requires_factory_release(self):
         self.tagged_base()
