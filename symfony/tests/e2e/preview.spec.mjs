@@ -592,6 +592,8 @@ test('S2 mobile Vault renders private MP4 controls and fails safely on undecodab
   await expect(page.getByText('clip-sin-mime.mp4', { exact: true })).toBeVisible();
   expect(videoUploads).toBe(1);
 
+  // El refresco del Vault puede mantener el selector deshabilitado tras guardar.
+  await expect(input).toBeEnabled();
   await input.setInputFiles({
     name: 'clip-prueba.mp4',
     mimeType: 'application/octet-stream',

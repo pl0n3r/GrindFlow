@@ -1,3 +1,4 @@
+import fnmatch
 import json
 import unittest
 from pathlib import Path
@@ -85,6 +86,81 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
         self.assertNotIn("contents: write", workflow)
         self.assertNotIn("@main", workflow)
         self.assertNotIn("secrets:", workflow)
+
+    @staticmethod
+    def _f2b_event_blocks():
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        event_yaml = workflow.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+        names = [line.strip().split(":", 1)[0] for line in event_yaml.splitlines()
+                 if line.startswith("  ") and not line.startswith("    ")]
+        if names != ["pull_request", "push", "workflow_dispatch"]:
+            raise AssertionError(f"Eventos no canónicos: {names}")
+        pr = event_yaml.split("  pull_request:\n", 1)[1].split("  push:\n", 1)[0]
+        push = event_yaml.split("  push:\n", 1)[1].split("  workflow_dispatch:\n", 1)[0]
+        return workflow, pr, push
+
+    @staticmethod
+    def _f2b_paths(block):
+        paths = [line.split("'")[1] for line in block.splitlines()
+                 if line.startswith("      - '") and line.endswith("'")]
+        if len(paths) != 4 or block.count("    paths:\n") != 1:
+            raise AssertionError("Filtro paths ausente, no literal o inesperado")
+        return paths
+
+    def test_f2b_readme_workflow_events_and_positive_paths(self):
+        workflow, pr, push = self._f2b_event_blocks()
+        expected = [
+            "README.md", "readme/**",
+            ".github/workflows/readme-contract.yml",
+            "tests/test_readme_contract_adoption.py",
+        ]
+        for event in (pr, push):
+            self.assertIn("    branches: [main]\n", event)
+            self.assertEqual(self._f2b_paths(event), expected)
+        self.assertIn("    types: [opened, synchronize, reopened, ready_for_review]\n", pr)
+        self.assertNotIn("    types:", push)
+        self.assertEqual(workflow.count("  workflow_dispatch:\n"), 1)
+
+    def test_f2b_readme_workflow_rejects_unrelated_paths(self):
+        _, pr, push = self._f2b_event_blocks()
+        relevant = [
+            "README.md", "readme/project.json",
+            ".github/workflows/readme-contract.yml",
+            "tests/test_readme_contract_adoption.py",
+        ]
+        unrelated = [
+            "src/App.php", "symfony/frontend/src/main.tsx",
+            "tests/test_login.py", "composer.json",
+            ".github/workflows/grindflow-ci.yml",
+        ]
+        for event in (pr, push):
+            paths = self._f2b_paths(event)
+            for path in relevant:
+                self.assertTrue(any(fnmatch.fnmatchcase(path, rule)
+                                    for rule in paths), path)
+            for path in unrelated:
+                self.assertFalse(any(fnmatch.fnmatchcase(path, rule)
+                                     for rule in paths), path)
+            self.assertNotIn("**", paths)
+            self.assertNotIn("src/**", paths)
+            self.assertNotIn("tests/**", paths)
+            self.assertNotIn("symfony/**", paths)
+
+    def test_f2b_readme_reusable_security_is_unchanged(self):
+        workflow, _, _ = self._f2b_event_blocks()
+        self.assertEqual(workflow.count("  validate:\n"), 1)
+        self.assertIn("permissions:\n  contents: read\n", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertNotIn("secrets:", workflow)
+        self.assertIn("  cancel-in-progress: true\n", workflow)
+        self.assertIn(
+            "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+            workflow,
+        )
+        self.assertIn("    uses: pl0n3r/factory/.github/workflows/readme.yml@v1\n", workflow)
+        self.assertIn("      readme_path: README.md\n", workflow)
+        self.assertIn("      metadata_path: readme/project.json\n", workflow)
+        self.assertIn("  workflow_dispatch:\n", workflow)
 
     def test_release_version_artifacts_stay_aligned(self):
         version_php = VERSION_PHP.read_text(encoding="utf-8")
