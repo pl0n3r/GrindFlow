@@ -8,6 +8,10 @@ use GrindFlow\Scheduling\WeeklySlotCalculator;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Kernel;
 use GrindFlow\Scheduling\PublishingAutomationRuleScheduler;
+use GrindFlow\Scheduling\ScheduleDraftApplicationService;
+use GrindFlow\Distribution\FacebookPageConfiguration;
+use GrindFlow\Distribution\FacebookPageProvider;
+use GrindFlow\Distribution\FacebookPageTransport;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
@@ -141,5 +145,98 @@ final class PublishingAutomationRuleTest extends KernelTestCase
         } finally {
             $db->delete('gf_content_rules', ['organization_id' => $tenant]);
         }
+    }
+
+    /**
+     * Regresión (CodeRabbit #455): más de 100 assets antiguos bloqueados no deben
+     * impedir que un asset elegible más nuevo se reserve.
+     */
+    public function testEligibleAssetBeyondBlockedFirstPageIsStillReserved(): void
+    {
+        self::bootKernel();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = Uuid::v7()->toRfc4122();
+        $user = Uuid::v7()->toRfc4122();
+        $at = gmdate('Y-m-d H:i:s');
+        $old = gmdate('Y-m-d H:i:s', time() - 86400 * 30);
+        $eligible = Uuid::v7()->toRfc4122();
+
+        $db->insert('gf_identity_users', [
+            'id' => $user, 'name' => 'Automatización', 'email' => $user.'@example.test',
+            'password_hash' => 'x', 'platform_role' => 'model', 'is_active' => 1,
+            'created_at' => $at, 'updated_at' => $at,
+        ]);
+        $db->insert('gf_identity_organizations', [
+            'id' => $organization, 'name' => 'Cola larga', 'slug' => 'cola-'.substr($organization, 0, 20),
+            'type' => 'independent', 'created_at' => $at, 'updated_at' => $at,
+        ]);
+        $db->insert('gf_identity_memberships', [
+            'id' => Uuid::v7()->toRfc4122(), 'user_id' => $user, 'organization_id' => $organization,
+            'role' => 'admin', 'created_at' => $at, 'updated_at' => $at,
+        ]);
+        // 105 assets antiguos sin clasificar (bloqueados) y uno elegible y más nuevo.
+        for ($i = 0; $i < 105; ++$i) {
+            $id = Uuid::v7()->toRfc4122();
+            $db->insert('gf_vault_assets', [
+                'id' => $id, 'organization_id' => $organization, 'uploaded_by' => $user,
+                'original_name' => $id.'.png', 'mime_type' => 'image/png', 'size_bytes' => 10,
+                'sha256' => hash('sha256', $id), 'storage_key' => $id,
+                'usage_scope' => 'unclassified', 'created_at' => $old,
+            ]);
+        }
+        $db->insert('gf_vault_assets', [
+            'id' => $eligible, 'organization_id' => $organization, 'uploaded_by' => $user,
+            'original_name' => 'elegible.png', 'mime_type' => 'image/png', 'size_bytes' => 10,
+            'sha256' => hash('sha256', $eligible), 'storage_key' => $eligible,
+            'usage_scope' => 'needs_review', 'created_at' => $at,
+        ]);
+        $db->insert('gf_content_review_events', [
+            'id' => Uuid::v7()->toRfc4122(), 'organization_id' => $organization, 'asset_id' => $eligible,
+            'actor_id' => $user, 'action' => 'approve', 'created_at' => $at,
+        ]);
+        $db->insert('gf_distribution_authorization_events', [
+            'id' => Uuid::v7()->toRfc4122(), 'organization_id' => $organization, 'asset_id' => $eligible,
+            'actor_id' => $user, 'action' => 'grant', 'created_at' => $at,
+        ]);
+        $db->insert('gf_content_rules', [
+            'organization_id' => $organization, 'timezone' => 'UTC',
+            'weekdays' => 'mon,tue,wed,thu,fri,sat,sun', 'local_time' => '10:00', 'max_per_day' => 1,
+            'mode' => 'review_only', 'updated_by' => $user, 'created_at' => $at, 'updated_at' => $at,
+            'automation_state' => 'active', 'automation_local_times' => '["10:00"]',
+            'automation_destination_id' => '1234567890',
+        ]);
+
+        $transport = new class implements FacebookPageTransport {
+            public function postFeed(string $graphVersion, string $pageId, string $accessToken, array $payload): array
+            {
+                throw new \RuntimeException('La automatización local nunca publica.');
+            }
+
+            public function postPhoto(string $graphVersion, string $pageId, string $accessToken, string $caption, string $filePath, string $mimeType): array
+            {
+                throw new \RuntimeException('La automatización local nunca publica.');
+            }
+        };
+        $provider = new FacebookPageProvider(
+            new FacebookPageConfiguration($organization, '1234567890', 'token-sintetico', 'v26.0'),
+            $transport,
+        );
+        $scheduler = new PublishingAutomationRuleScheduler(
+            $db,
+            new WeeklySlotCalculator(),
+            new ScheduleDraftApplicationService($db, new WeeklySlotCalculator()),
+            $provider,
+        );
+
+        // Las tablas de eventos son append-only; las pruebas usan una BD desechable
+        // y organizaciones con UUID únicos, igual que el resto de la suite.
+        $result = $scheduler->materialize($organization, true);
+        self::assertNotSame('selection_incomplete', $result['status']);
+        self::assertGreaterThanOrEqual(1, $result['created']);
+        self::assertSame(
+            $eligible,
+            $db->fetchOne('SELECT asset_id FROM gf_schedule_drafts WHERE organization_id = :o ORDER BY scheduled_at_utc LIMIT 1', ['o' => $organization]),
+        );
     }
 }

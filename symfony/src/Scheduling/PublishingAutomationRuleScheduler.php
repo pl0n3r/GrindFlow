@@ -14,6 +14,9 @@ use GrindFlow\Distribution\FacebookPageProvider;
  */
 final readonly class PublishingAutomationRuleScheduler
 {
+    private const PAGE_SIZE = 100;
+    private const MAX_PAGES = 5;
+
     public function __construct(
         private Connection $db,
         private WeeklySlotCalculator $slots,
@@ -79,6 +82,9 @@ final readonly class PublishingAutomationRuleScheduler
         }
 
         $created = $existing = $blocked = 0;
+        // Assets rechazados por elegibilidad (clasificación, revisión o autorización):
+        // no dependen del slot, así que no se reintentan en los slots siguientes de esta ejecución.
+        $blockedAssets = [];
         foreach (array_slice($slots, 0, 84) as $slot) {
             $stamp = str_replace(['T', 'Z'], [' ', ''], $slot['scheduled_at_utc']);
             // Existing manually prepared drafts already own this time slot.
@@ -98,51 +104,71 @@ final readonly class PublishingAutomationRuleScheduler
                 ['organization' => $organizationId, 'scheduled' => $stamp],
             );
             // Explicit tenant, soft-delete, finite pool; each candidate is
-            // independently revalidated under lock by reserve().
-            $candidates = $this->db->fetchFirstColumn(
-                "SELECT id FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL ORDER BY created_at, id LIMIT 101",
-                ['organization' => $organizationId],
-            );
-            if ($candidates === []) {
-                ++$blocked;
-                continue;
-            }
-            $hasMoreCandidates = count($candidates) > 100;
-            $candidates = array_slice($candidates, 0, 100);
-            if (count($candidates) > 1 && is_string($last)) {
-                usort($candidates, static fn (mixed $a, mixed $b): int =>
-                    ((string) $a === $last ? 1 : 0) <=> ((string) $b === $last ? 1 : 0));
-            }
+            // independently revalidated under lock by reserve(). The pool is read
+            // with keyset pagination so a long prefix of ineligible assets can never
+            // hide eligible newer ones.
             $success = false;
-            foreach ($candidates as $assetId) {
-                $attempt = $this->drafts->reserve(
-                    $organizationId, (string) $rule['updated_by'],
-                    (string) $assetId, $slot['scheduled_at_utc'], true,
-                    (string) $rule['automation_destination_id'],
-                );
-                if ($attempt['status'] === 'ok') {
-                    if ($attempt['changed']) {
-                        ++$created;
-                    } else {
-                        ++$existing;
+            $exhausted = false;
+            $cursor = null;
+            for ($page = 0; $page < self::MAX_PAGES && !$success && !$exhausted; ++$page) {
+                $rows = $cursor === null
+                    ? $this->db->fetchAllAssociative(
+                        'SELECT id, created_at FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL ORDER BY created_at, id LIMIT '.(self::PAGE_SIZE + 1),
+                        ['organization' => $organizationId],
+                    )
+                    : $this->db->fetchAllAssociative(
+                        'SELECT id, created_at FROM gf_vault_assets WHERE organization_id = :organization AND deleted_at IS NULL AND (created_at > :cursor_at OR (created_at = :cursor_at_eq AND id > :cursor_id)) ORDER BY created_at, id LIMIT '.(self::PAGE_SIZE + 1),
+                        ['organization' => $organizationId, 'cursor_at' => $cursor['created_at'], 'cursor_at_eq' => $cursor['created_at'], 'cursor_id' => $cursor['id']],
+                    );
+                $hasMoreCandidates = count($rows) > self::PAGE_SIZE;
+                $rows = array_slice($rows, 0, self::PAGE_SIZE);
+                if ($rows === []) {
+                    $exhausted = true;
+                    break;
+                }
+                $cursor = $rows[array_key_last($rows)];
+                $exhausted = !$hasMoreCandidates;
+                $candidates = array_values(array_filter(
+                    array_column($rows, 'id'),
+                    static fn (mixed $id): bool => !isset($blockedAssets[(string) $id]),
+                ));
+                if (count($candidates) > 1 && is_string($last)) {
+                    usort($candidates, static fn (mixed $a, mixed $b): int =>
+                        ((string) $a === $last ? 1 : 0) <=> ((string) $b === $last ? 1 : 0));
+                }
+                foreach ($candidates as $assetId) {
+                    $attempt = $this->drafts->reserve(
+                        $organizationId, (string) $rule['updated_by'],
+                        (string) $assetId, $slot['scheduled_at_utc'], true,
+                        (string) $rule['automation_destination_id'],
+                    );
+                    if ($attempt['status'] === 'ok') {
+                        if ($attempt['changed']) {
+                            ++$created;
+                        } else {
+                            ++$existing;
+                        }
+                        $success = true;
+                        break;
                     }
-                    $success = true;
-                    break;
-                }
-                if (in_array($attempt['status'], ['full', 'occupied'], true)) {
-                    ++$existing;
-                    $success = true;
-                    break;
-                }
-                if ($attempt['status'] === 'revoked' || $attempt['status'] === 'stale_slot') {
-                    // A paused/changed rule, revoked actor, or stale slot
-                    // cancels this run instead of trying another account.
-                    return $result('authorization_changed', $created, $existing, $blocked);
+                    if (in_array($attempt['status'], ['full', 'occupied'], true)) {
+                        ++$existing;
+                        $success = true;
+                        break;
+                    }
+                    if ($attempt['status'] === 'revoked' || $attempt['status'] === 'stale_slot') {
+                        // A paused/changed rule, revoked actor, or stale slot
+                        // cancels this run instead of trying another account.
+                        return $result('authorization_changed', $created, $existing, $blocked);
+                    }
+                    if ($attempt['status'] === 'blocked' || $attempt['status'] === 'missing') {
+                        $blockedAssets[(string) $assetId] = true;
+                    }
                 }
             }
-            if (!$success && $hasMoreCandidates) {
+            if (!$success && !$exhausted) {
                 // A valid resource may exist beyond the bounded scan.
-                // Never advertise an empty pool based on an incomplete page.
+                // Never advertise an empty pool based on an incomplete scan.
                 return $result('selection_incomplete', $created, $existing, $blocked);
             }
             if (!$success) {
