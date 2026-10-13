@@ -88,6 +88,97 @@ jobs:
       version_format: php-array
       version_key: number
 """
+CANONICAL_POSTMERGE_CALLER = r"""name: GrindFlow Tag Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-tag-release-${{ github.ref }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  current-main:
+    name: current-main
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      current: ${{ steps.guard.outputs.current }}
+      remote_sha: ${{ steps.guard.outputs.remote_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: guard
+        name: Reject stale main event
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash scripts/current-main-event-guard.sh
+
+  stale-event:
+    name: stale-main-event
+    needs: current-main
+    if: needs.current-main.outputs.current != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Record ignored stale event
+        run: |
+          {
+            echo '## Stale main event ignored'
+            echo
+            echo "Event SHA: \`$GITHUB_SHA\`"
+            echo "Current main: \`${{ needs.current-main.outputs.remote_sha }}\`"
+            echo 'No production I/O or release mutation was executed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release-change:
+    name: Verificar identidad de versión del push
+    needs: current-main
+    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: decision
+        name: Comparar versiones exactas antes de emitir release
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/tag-release-version-gate.py \
+            --before "$PUSH_BEFORE" \
+            --after "$PUSH_AFTER" \
+            --output "$GITHUB_OUTPUT"
+
+  release:
+    name: Publish GitHub Release
+    needs: [current-main, release-change]
+    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true' && needs.release-change.outputs.publish == 'true'
+    permissions:
+      contents: write
+    uses: pl0n3r/factory/.github/workflows/release.yml@v1
+    with:
+      version_source: config/version.php
+      version_format: php-array
+      version_key: number
+"""
 SEMVER = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 
 
@@ -109,10 +200,17 @@ def release_version(php: str, package: str, lock: str) -> str:
     return version
 
 
-def validate_caller(source: str) -> None:
-    """Comprueba manifiesto efectivo íntegro; ignora coincidencias en comentarios."""
-    if source != CANONICAL_CALLER:
+def _validate_caller_variant(source: str, *, postmerge: bool) -> None:
+    """Exige un único manifiesto exacto por fase, sin bypass por substring."""
+    expected = CANONICAL_POSTMERGE_CALLER if postmerge else CANONICAL_CALLER
+    if source != expected:
         raise ValueError("caller de release diferente del aprobado")
+
+
+def validate_caller(source: str) -> None:
+    """Cuando existe el gate posmerge, el caller antiguo queda PROHIBIDO."""
+    postmerge = (ROOT / "scripts/tag-release-version-gate.py").is_file()
+    _validate_caller_variant(source, postmerge=postmerge)
 
 
 def observer_filter(source: str) -> str:
@@ -169,7 +267,56 @@ class ReleaseAdoptionTests(unittest.TestCase):
         cls.lock = (ROOT / "package-lock.json").read_text(encoding="utf-8")
 
     def test_caller_is_push_only_with_job_scoped_write_and_approved_ref(self):
+        # Antes del merge #464 solo existe el caller original. Una vez que
+        # aparece el gate posmerge, se exige exclusivamente el nuevo perfil.
+        self.assertEqual(
+            self.caller,
+            CANONICAL_POSTMERGE_CALLER
+            if (ROOT / "scripts/tag-release-version-gate.py").is_file()
+            else CANONICAL_CALLER,
+        )
         validate_caller(self.caller)
+
+    def test_postmerge_caller_profile_rejects_rollback_and_privilege_bypass(self):
+        self.assertIn("  release-change:\n", CANONICAL_POSTMERGE_CALLER)
+        _validate_caller_variant(CANONICAL_CALLER, postmerge=False)
+        _validate_caller_variant(CANONICAL_POSTMERGE_CALLER, postmerge=True)
+        for text, enabled in (
+            (CANONICAL_CALLER, True),
+            (CANONICAL_POSTMERGE_CALLER, False),
+        ):
+            with self.subTest(wrong_profile=enabled):
+                with self.assertRaises(ValueError):
+                    _validate_caller_variant(text, postmerge=enabled)
+        # El nuevo gate nunca es un permiso libre. No tolerar un caller
+        # parecido con trigger, permisos, ref, needs o publish alterados.
+        mutations = (
+            ("  push:\n", "  pull_request_target:\n  push:\n"),
+            ("    branches: [main]\n", "    branches: [main]\n  workflow_dispatch:\n"),
+            ("permissions:\n  contents: read", "permissions:\n  contents: write"),
+            ("    needs: [current-main, release-change]", "    needs: current-main"),
+            ("needs.release-change.outputs.publish == 'true'", "true"),
+            ("      contents: read\n    outputs:\n      publish:",
+             "      contents: write\n    outputs:\n      publish:"),
+            ("      publish: ${{ steps.decision.outputs.publish }}",
+             "      publish: 'true'"),
+            ("          fetch-depth: 0", "          fetch-depth: 1"),
+            ("          persist-credentials: false", "          persist-credentials: true"),
+            ("python3 scripts/tag-release-version-gate.py", "echo publish=true"),
+            ("release.yml@v1", "release.yml@main"),
+            ("  release-change:\n", "  release-change-disabled:\n"),
+        )
+        for before, after in mutations:
+            with self.subTest(before=before):
+                candidate = CANONICAL_POSTMERGE_CALLER.replace(before, after, 1)
+                self.assertNotEqual(candidate, CANONICAL_POSTMERGE_CALLER)
+                with self.assertRaises(ValueError):
+                    _validate_caller_variant(candidate, postmerge=True)
+        with self.assertRaises(ValueError):
+            _validate_caller_variant(
+                CANONICAL_POSTMERGE_CALLER + "\n# unreviewed addition\n",
+                postmerge=True,
+            )
 
     def test_untrusted_events_secrets_permissions_ref_inputs_and_jobs_fail(self):
         mutations = (
