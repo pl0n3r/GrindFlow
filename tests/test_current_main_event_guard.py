@@ -92,12 +92,111 @@ class CurrentMainEventGuardTests(unittest.TestCase):
             self.assertIn("needs: current-main", body)
             self.assertIn("needs.current-main.outputs.current == 'true'", body)
 
-    def test_tag_release_gates_stale_push(self):
-        text = TAG.read_text(encoding="utf-8")
-        self.assertIn("current-main:", text)
-        release = text[text.index("  release:"):]
-        self.assertIn("needs: current-main", release)
+    def _release_profile_fixtures(self):
+        """El perfil anterior y el posmerge se comprueban en ambos HEAD."""
+        actual = TAG.read_text(encoding="utf-8")
+        if "\n  release-change:\n" in actual:
+            modern = actual
+            prefix, tail = actual.split("\n  release-change:\n", 1)
+            _, release = tail.split("\n  release:\n", 1)
+            legacy = (
+                prefix + "\n  release:\n" + release
+                .replace("    needs: [current-main, release-change]\n",
+                         "    needs: current-main\n", 1)
+                .replace(" && needs.release-change.outputs.publish == 'true'", "", 1)
+            )
+        else:
+            legacy = actual
+            prefix, release = actual.split("\n  release:\n", 1)
+            new_release = (
+                release
+                .replace("    needs: current-main\n",
+                         "    needs: [current-main, release-change]\n", 1)
+                .replace("needs.current-main.outputs.current == 'true'",
+                         "needs.current-main.outputs.current == 'true'"
+                         " && needs.release-change.outputs.publish == 'true'", 1)
+            )
+            gate = (
+                "\n  release-change:\n"
+                "    needs: current-main\n"
+                "    permissions:\n"
+                "      contents: read\n"
+                "    outputs:\n"
+                "      publish: " + "$" + "{{ steps.decision.outputs.publish }}" + "\n"
+                "    steps:\n"
+                "      - id: decision\n"
+                "        run: python3 scripts/tag-release-version-gate.py --before A --after B\n"
+            )
+            modern = prefix + gate + "\n  release:\n" + new_release
+        return legacy, modern, actual
+
+    def _assert_tag_release_contract(self, source):
+        self.assertIn("\n  current-main:\n", source)
+        self.assertIn("\n  release:\n", source)
+        release = source.split("\n  release:\n", 1)[1]
         self.assertIn("needs.current-main.outputs.current == 'true'", release)
+        self.assertIn("uses: pl0n3r/factory/.github/workflows/release.yml@v1", release)
+        self.assertIn("    permissions:\n      contents: write\n", release)
+        marker = "\n  release-change:\n"
+        if marker in source:
+            self.assertEqual(source.count(marker), 1)
+            gate = source.split(marker, 1)[1].split("\n  release:\n", 1)[0]
+            self.assertIn("    needs: current-main\n", gate)
+            self.assertIn("    permissions:\n      contents: read\n", gate)
+            self.assertIn("      publish: " + "$" + "{{ steps.decision.outputs.publish }}", gate)
+            self.assertIn("python3 scripts/tag-release-version-gate.py", gate)
+            self.assertIn("    needs: [current-main, release-change]\n", release)
+            self.assertIn("needs.release-change.outputs.publish == 'true'", release)
+        else:
+            self.assertIn("    needs: current-main\n", release)
+            self.assertNotIn("needs.release-change.outputs.publish", release)
+
+    def test_tag_release_gates_stale_push(self):
+        legacy, modern, actual = self._release_profile_fixtures()
+        for name, source in (("legacy", legacy), ("postmerge", modern),
+                             ("actual", actual)):
+            with self.subTest(profile=name):
+                self._assert_tag_release_contract(source)
+
+    def test_tag_release_rejects_weakened_dependencies(self):
+        legacy, modern, _ = self._release_profile_fixtures()
+        for name, original, mutated in (
+            ("legacy_without_current_main", legacy,
+             legacy.replace("    needs: current-main\n",
+                            "    needs: stale-event\n", 1)),
+            ("legacy_without_stale_guard", legacy,
+             legacy.replace("needs.current-main.outputs.current == 'true'",
+                            "true", 1)),
+            ("legacy_unpinned_reusable", legacy,
+             legacy.replace("release.yml@v1", "release.yml@main", 1)),
+            ("postmerge_without_release_gate", modern,
+             modern.replace("    needs: [current-main, release-change]\n",
+                            "    needs: current-main\n", 1)),
+            ("postmerge_without_current_main", modern,
+             modern.replace("    needs: [current-main, release-change]\n",
+                            "    needs: release-change\n", 1)),
+            ("postmerge_without_publish_guard", modern,
+             modern.replace(" && needs.release-change.outputs.publish == 'true'",
+                            "", 1)),
+            ("postmerge_without_stale_guard", modern,
+             modern.replace("needs.current-main.outputs.current == 'true'",
+                            "true", 1)),
+            ("postmerge_unpinned_reusable", modern,
+             modern.replace("release.yml@v1", "release.yml@main", 1)),
+            ("postmerge_escalated_gate", modern,
+             modern.replace("\n  release-change:\n"
+                            "    needs: current-main\n"
+                            "    permissions:\n"
+                            "      contents: read\n",
+                            "\n  release-change:\n"
+                            "    needs: current-main\n"
+                            "    permissions:\n"
+                            "      contents: write\n", 1)),
+        ):
+            with self.subTest(profile=name):
+                self.assertNotEqual(original, mutated)
+                with self.assertRaises(AssertionError):
+                    self._assert_tag_release_contract(mutated)
 
     def test_factory_deploy_requires_current_main_and_explicit_flag(self):
         text = DEPLOY.read_text(encoding="utf-8")
