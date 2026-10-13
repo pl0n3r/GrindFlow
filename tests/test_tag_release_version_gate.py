@@ -66,13 +66,12 @@ class TagReleaseGateTests(unittest.TestCase):
         with self.assertRaises(GATE.GuardError):
             GATE.decide_release(self.repo, runtime, manifest)
 
-    def test_document_prefix_never_hides_manifest_or_workflow_without_bump(self):
-        self.tagged_base()
+    def _assert_document_prefix_gate(self, initial):
         path = self.repo / "readme/guide.md"
         path.parent.mkdir(parents=True)
         path.write_text("safe reference", encoding="utf-8")
         previous = self.commit("readme markdown without bump")
-        self.assertIs(GATE.decide_release(self.repo, self.base, previous), False)
+        self.assertIs(GATE.decide_release(self.repo, initial, previous), False)
 
         # Un nombre dentro de docs/readme no hace seguro un manifest.
         # Los workflows son código ejecutable aunque se llamen README.
@@ -88,6 +87,10 @@ class TagReleaseGateTests(unittest.TestCase):
                 with self.assertRaises(GATE.GuardError):
                     GATE.decide_release(self.repo, previous, changed)
                 previous = changed
+
+    def test_document_prefix_never_hides_manifest_or_workflow_without_bump(self):
+        self.tagged_base()
+        self._assert_document_prefix_gate(self.base)
 
     def test_changed_version_requires_factory_release(self):
         self.tagged_base()
@@ -114,6 +117,9 @@ class TagReleaseGateTests(unittest.TestCase):
             with self.subTest(before=before[:8], after=after[:8]):
                 with self.assertRaises(GATE.GuardError):
                     GATE.decide_release(self.repo, before, after)
+        # AC-03 también ejecuta el negativo de manifests/workflows sin bump.
+        # fast sigue roto por #460; aceptación debe probar el guard por separado.
+        self._assert_document_prefix_gate(first)
         self.version("0.1.218")
         down = self.commit("downgrade")
         with self.assertRaises(GATE.GuardError):
