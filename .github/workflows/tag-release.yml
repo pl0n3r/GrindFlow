@@ -50,10 +50,37 @@ jobs:
             echo 'No production I/O or release mutation was executed.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  release:
-    name: Publish GitHub Release
+  release-change:
+    name: Verificar identidad de versión del push
     needs: current-main
     if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: decision
+        name: Comparar versiones exactas antes de emitir release
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/tag-release-version-gate.py \
+            --before "$PUSH_BEFORE" \
+            --after "$PUSH_AFTER" \
+            --output "$GITHUB_OUTPUT"
+
+  release:
+    name: Publish GitHub Release
+    needs: [current-main, release-change]
+    if: github.repository == 'pl0n3r/GrindFlow' && github.ref == 'refs/heads/main' && needs.current-main.outputs.current == 'true' && needs.release-change.outputs.publish == 'true'
     permissions:
       contents: write
     uses: pl0n3r/factory/.github/workflows/release.yml@v1

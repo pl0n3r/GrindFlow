@@ -1,0 +1,120 @@
+"""GrindFlow #464: regresiones offline del gate posmerge, sin tags reales."""
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / "scripts/tag-release-version-gate.py"
+SPEC = importlib.util.spec_from_file_location("tag_release_gate", SOURCE)
+assert SPEC and SPEC.loader
+GATE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(GATE)
+WORKFLOW = ROOT / ".github/workflows/tag-release.yml"
+
+
+class TagReleaseGateTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.repo = Path(self.temp.name)
+        self.command("init", "-q", "--initial-branch=main")
+        self.command("config", "user.email", "test@example.invalid")
+        self.command("config", "user.name", "QA")
+        self.version("0.1.219")
+        self.base = self.commit("initial")
+
+    def command(self, *args):
+        result = subprocess.run(["git", *args], cwd=self.repo, capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+
+    def version(self, value):
+        path = self.repo / "config/version.php"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("<?php\nreturn [\n 'number' => '" + value + "',\n];\n", encoding="utf-8")
+
+    def commit(self, message):
+        self.command("add", "-A")
+        self.command("commit", "-qm", message)
+        return self.command("rev-parse", "HEAD")
+
+    def docs(self, name="README.md"):
+        (self.repo / name).write_text("docs", encoding="utf-8")
+        return self.commit("docs")
+
+    def tagged_base(self, *, annotated=True):
+        args = ["tag"] + (["-a", "v0.1.219", "-m", "real"] if annotated else ["v0.1.219"])
+        self.command(*args)
+
+    def test_same_version_with_annotated_ancestor_tag_skips_release(self):
+        self.tagged_base()
+        first = self.docs()
+        self.assertIs(GATE.decide_release(self.repo, self.base, first), False)
+        second = self.docs("NOTES.md")
+        self.assertIs(GATE.decide_release(self.repo, first, second), False)
+
+    def test_changed_version_requires_factory_release(self):
+        self.tagged_base()
+        self.version("0.1.220")
+        changed = self.commit("new version")
+        self.assertIs(GATE.decide_release(self.repo, self.base, changed), True)
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("uses: pl0n3r/factory/.github/workflows/release.yml@v1", workflow)
+
+    def test_invalid_history_or_missing_release_identity_fails_closed(self):
+        first = self.docs()
+        with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, self.base, first)  # sin tag
+        self.command("tag", "v0.1.219")
+        with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, self.base, first)  # tag lightweight
+        self.command("tag", "-d", "v0.1.219")
+        self.tagged_base()
+        for before, after in (
+            ("0" * 40, first), (self.base, "0" * 40),
+            ("g" * 40, first), (self.base, self.base),
+            (first, self.base), ("f" * 40, first),
+        ):
+            with self.subTest(before=before[:8], after=after[:8]):
+                with self.assertRaises(GATE.GuardError):
+                    GATE.decide_release(self.repo, before, after)
+        self.version("0.1.218")
+        down = self.commit("downgrade")
+        with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, first, down)
+        with self.assertRaises(GATE.GuardError):
+            GATE.version_from_text("<?php\n'number'=>'0.1.219',\n'number'=>'0.1.220',")
+        with self.assertRaises(GATE.GuardError):
+            GATE.version_from_text("<?php\n'number'=>'unknown',")
+
+    def test_workflow_job_and_permission_guards(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("on:\n  push:\n    branches: [main]", workflow)
+        self.assertIn("  current-main:\n", workflow)
+        self.assertIn("  stale-event:\n", workflow)
+        self.assertIn("  release-change:\n", workflow)
+        self.assertIn("    needs: current-main\n", workflow)
+        self.assertIn("    needs: [current-main, release-change]\n", workflow)
+        gate = workflow.split("  release-change:\n", 1)[1].split("  release:\n", 1)[0]
+        self.assertIn("contents: read", gate)
+        self.assertNotIn("contents: write", gate)
+        self.assertIn("persist-credentials: false", gate)
+        self.assertIn("fetch-depth: 0", gate)
+        self.assertIn("python3 scripts/tag-release-version-gate.py", gate)
+        self.assertIn("--before", gate)
+        self.assertIn("--after", gate)
+        self.assertIn("--output", gate)
+        release = workflow.split("  release:\n", 1)[1]
+        self.assertIn("contents: write", release)
+        self.assertIn("needs.release-change.outputs.publish == 'true'", release)
+        self.assertIn("uses: pl0n3r/factory/.github/workflows/release.yml@v1", release)
+        self.assertIn("version_source: config/version.php", release)
+        self.assertIn("version_format: php-array", release)
+        self.assertNotIn("workflow_dispatch:", workflow)
+
+
+if __name__ == "__main__":
+    unittest.main()
