@@ -158,31 +158,40 @@ class CurrentMainEventGuardTests(unittest.TestCase):
             with self.subTest(profile=name):
                 self._assert_tag_release_contract(source)
 
+    def _mutate_release(self, source, needle, replacement, count=1):
+        # Alterar únicamente el job release. El mismo texto aparece antes
+        # en stale-event y no demuestra nada sobre la puerta de publicación.
+        prefix, release = source.split("\n  release:\n", 1)
+        self.assertIn(needle, release)
+        return prefix + "\n  release:\n" + release.replace(
+            needle, replacement, count
+        )
+
     def test_tag_release_rejects_weakened_dependencies(self):
         legacy, modern, _ = self._release_profile_fixtures()
         for name, original, mutated in (
             ("legacy_without_current_main", legacy,
-             legacy.replace("    needs: current-main\n",
+             self._mutate_release(legacy, "    needs: current-main\n",
                             "    needs: stale-event\n", 1)),
             ("legacy_without_stale_guard", legacy,
-             legacy.replace("needs.current-main.outputs.current == 'true'",
+             self._mutate_release(legacy, "needs.current-main.outputs.current == 'true'",
                             "true", 1)),
             ("legacy_unpinned_reusable", legacy,
-             legacy.replace("release.yml@v1", "release.yml@main", 1)),
+             self._mutate_release(legacy, "release.yml@v1", "release.yml@main", 1)),
             ("postmerge_without_release_gate", modern,
-             modern.replace("    needs: [current-main, release-change]\n",
+             self._mutate_release(modern, "    needs: [current-main, release-change]\n",
                             "    needs: current-main\n", 1)),
             ("postmerge_without_current_main", modern,
-             modern.replace("    needs: [current-main, release-change]\n",
+             self._mutate_release(modern, "    needs: [current-main, release-change]\n",
                             "    needs: release-change\n", 1)),
             ("postmerge_without_publish_guard", modern,
-             modern.replace(" && needs.release-change.outputs.publish == 'true'",
+             self._mutate_release(modern, " && needs.release-change.outputs.publish == 'true'",
                             "", 1)),
             ("postmerge_without_stale_guard", modern,
-             modern.replace("needs.current-main.outputs.current == 'true'",
+             self._mutate_release(modern, "needs.current-main.outputs.current == 'true'",
                             "true", 1)),
             ("postmerge_unpinned_reusable", modern,
-             modern.replace("release.yml@v1", "release.yml@main", 1)),
+             self._mutate_release(modern, "release.yml@v1", "release.yml@main", 1)),
             ("postmerge_escalated_gate", modern,
              modern.replace("\n  release-change:\n"
                             "    needs: current-main\n"
