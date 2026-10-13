@@ -40,13 +40,18 @@ class VaultMp4SelectionCIContractTests(unittest.TestCase):
         self.assertLess(case.index(first_saved), case.index(ready))
         self.assertLess(case.index(ready), case.index(second))
         self.assertLess(case.index(second), case.index(second_saved))
-        # Ambas selecciones conservan el marcador sin renderizar vídeo implícito.
-        self.assertGreaterEqual(
-            case.count("await expect(page.locator('.vault-selected-mark')).toHaveCount(1);"), 2)
-        self.assertGreaterEqual(
-            case.count("await expect(page.locator('.vault-selected-files video')).toHaveCount(0);"), 2)
-        self.assertGreaterEqual(
-            case.count("await expect(page.locator('.vault-selected-files [role=\"alert\"]')).toHaveCount(0);"), 2)
+        # Comprobar cada selección por separado: un conteo global puede
+        # esconder la ausencia de controles tras la segunda selección.
+        self.assertEqual(case.count(second), 1, "La segunda selección debe ser única")
+        before_second, after_second = case.split(second, 1)
+        for assertion in (
+            "await expect(page.locator('.vault-selected-mark')).toHaveCount(1);",
+            "await expect(page.locator('.vault-selected-files video')).toHaveCount(0);",
+            "await expect(page.locator('.vault-selected-files [role=\\\"alert\\\"]')).toHaveCount(0);",
+        ):
+            with self.subTest(assertion=assertion):
+                self.assertIn(assertion, before_second)
+                self.assertIn(assertion, after_second)
         self.assertIn("expect(videoUploads).toBe(2);", case)
 
     def test_private_mp4_error_and_no_autoplay_gates_remain(self):
