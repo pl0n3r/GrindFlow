@@ -38,11 +38,14 @@ function pattern(string $scope, string $target, string $tenant = 't1'): array
     ];
 }
 
-function ownership(array $collectionIds): array
+function ownership(array $collectionIds, string $campaignId = 'campaign_A'): array
 {
     return [
         'account_id' => 'account_A',
         'account_tenant_id' => 't1',
+        'campaign_id' => $campaignId,
+        'campaign_account_id' => 'account_A',
+        'campaign_tenant_id' => 't1',
         'collection_tenant_by_id' => array_fill_keys($collectionIds, 't1'),
     ];
 }
@@ -119,11 +122,11 @@ $cases = [
             'tenant_id' => 't1', 'campaign_id' => 'campaign_B',
             'account_id' => 'account_A', 'collection_ids' => ['three'],
         ];
-        $b = $calendar->define($second, pattern('campaign', 'campaign_B'), ownership(['three']));
+        $b = $calendar->define($second, pattern('campaign', 'campaign_B'), ownership(['three'], 'campaign_B'));
         $a['rule']['weekdays'][0] = 3;
         ensure($b['rule']['weekdays'] === [1, 5], 'independent_schedule');
         ensure($b['collection_ids'] === ['three'], 'independent_collections');
-        rejects(static fn () => $calendar->define($second, pattern('campaign', 'campaign_B', 't2'), ownership(['three'])));
+        rejects(static fn () => $calendar->define($second, pattern('campaign', 'campaign_B', 't2'), ownership(['three'], 'campaign_B')));
         // Client-selected IDs are insufficient: evidence must come from a
         // trusted server-side catalog for both account and every collection.
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A')));
@@ -136,6 +139,19 @@ $cases = [
         $wrongAccount = ownership(['one', 'two']);
         $wrongAccount['account_id'] = 'account_B';
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $wrongAccount));
+        // The trusted server snapshot must also prove this campaign's own
+        // identity and parent account; client-supplied campaign IDs are not proof.
+        $foreignCampaign = ownership(['one', 'two'], 'foreign_campaign');
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $foreignCampaign));
+        $otherCampaignAccount = ownership(['one', 'two']);
+        $otherCampaignAccount['campaign_account_id'] = 'account_B';
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $otherCampaignAccount));
+        $otherCampaignTenant = ownership(['one', 'two']);
+        $otherCampaignTenant['campaign_tenant_id'] = 't2';
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $otherCampaignTenant));
+        $withoutCampaignProof = ownership(['one', 'two']);
+        unset($withoutCampaignProof['campaign_id']);
+        rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $withoutCampaignProof));
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), ownership(['one'])));
         $extra = ownership(['one', 'two', 'extra']);
         rejects(static fn () => $calendar->define($first, pattern('campaign', 'campaign_A'), $extra));
