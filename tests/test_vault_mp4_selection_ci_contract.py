@@ -47,7 +47,7 @@ class VaultMp4SelectionCIContractTests(unittest.TestCase):
         for assertion in (
             "await expect(page.locator('.vault-selected-mark')).toHaveCount(1);",
             "await expect(page.locator('.vault-selected-files video')).toHaveCount(0);",
-            "await expect(page.locator('.vault-selected-files [role=\\\"alert\\\"]')).toHaveCount(0);",
+            "await expect(page.locator('.vault-selected-files [role=\"alert\"]')).toHaveCount(0);",
         ):
             with self.subTest(assertion=assertion):
                 self.assertIn(assertion, before_second)
