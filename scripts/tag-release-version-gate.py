@@ -22,7 +22,7 @@ class GuardError(ValueError):
     """Falta prueba canónica para autorizar un skip de release."""
 
 
-def git(repo: Path, *args: str) -> str:
+def git(repo: Path, *args: str, preserve_output: bool = False) -> str:
     try:
         result = subprocess.run(
             ["git", *args], cwd=repo, capture_output=True, text=True,
@@ -32,7 +32,9 @@ def git(repo: Path, *args: str) -> str:
         raise GuardError("Consulta Git no verificable") from exc
     if result.returncode != 0:
         raise GuardError("Objeto, tag o relación Git inválida")
-    return result.stdout.strip()
+    # Git diff -z is NUL-delimited. strip() would silently remove leading
+    # whitespace/control characters from the first filename.
+    return result.stdout if preserve_output else result.stdout.strip()
 
 
 def version_from_text(source: str) -> tuple[int, int, int]:
@@ -74,7 +76,8 @@ def decide_release(repo: Path, before: str, after: str) -> bool:
     # Un skip NO es admisible si el push cambia runtime, metadata ejecutable,
     # manifests o release/CI: esas rutas requieren una versión nueva antes
     # de publicación, aunque el guard de PR permita construir en paralelo.
-    changed = git(repo, "diff", "--name-only", "--no-renames", "-z", before, after, "--")
+    changed = git(repo, "diff", "--name-only", "--no-renames", "-z", before, after, "--",
+                  preserve_output=True)
     paths = changed.split("\0")
     if paths[-1:] == [""]:
         paths.pop()
@@ -88,7 +91,8 @@ def decide_release(repo: Path, before: str, after: str) -> bool:
     doc_suffixes = (".md", ".mdx", ".rst", ".txt", ".png", ".jpg",
                     ".jpeg", ".gif", ".webp")
     for path in paths:
-        if not path or path.startswith("/") or "\n" in path:
+        if (not path or path.startswith("/") or path.strip() != path
+                or any(ord(char) < 32 or ord(char) == 127 for char in path)):
             raise GuardError("Ruta de diff inválida")
         if path in allow_exact:
             continue

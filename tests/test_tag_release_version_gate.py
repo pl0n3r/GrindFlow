@@ -120,6 +120,16 @@ class TagReleaseGateTests(unittest.TestCase):
         # AC-03 también ejecuta el negativo de manifests/workflows sin bump.
         # fast sigue roto por #460; aceptación debe probar el guard por separado.
         self._assert_document_prefix_gate(first)
+        # Nombres del diff -z con control inicial no son el README autorizado.
+        # Estos casos pertenecen al AC-03, que debe fallar cerrado.
+        previous = self.command("rev-parse", "HEAD")
+        for unsafe_name in ("\nREADME.md", "\rREADME.md", "\tREADME.md", " README.md"):
+            (self.repo / unsafe_name).write_text("unsafe filename", encoding="utf-8")
+            changed = self.commit("ambiguous filename must fail closed")
+            with self.subTest(unsafe_path=repr(unsafe_name)):
+                with self.assertRaises(GATE.GuardError):
+                    GATE.decide_release(self.repo, previous, changed)
+            previous = changed
         self.version("0.1.218")
         down = self.commit("downgrade")
         with self.assertRaises(GATE.GuardError):
