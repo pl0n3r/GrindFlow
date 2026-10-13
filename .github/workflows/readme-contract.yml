@@ -4,8 +4,18 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'README.md'
+      - 'readme/**'
+      - '.github/workflows/readme-contract.yml'
+      - 'tests/test_readme_contract_adoption.py'
   push:
     branches: [main]
+    paths:
+      - 'README.md'
+      - 'readme/**'
+      - '.github/workflows/readme-contract.yml'
+      - 'tests/test_readme_contract_adoption.py'
   workflow_dispatch:
 
 permissions:
