@@ -58,7 +58,9 @@ def verify(snapshot, expected):
             or pr.get("mergeable") is not True
             or type(head) is not dict or type(base) is not dict
             or type(head.get("repo")) is not dict
-            or head["repo"].get("full_name") != REPO
+            or type(head["repo"].get("owner")) is not dict
+            or head["repo"]["owner"].get("login") != "pl0n3r"
+            or head["repo"].get("name") != "GrindFlow"
             or head["repo"].get("fork") is not False
             or head.get("sha") != expected or base.get("ref") != "main"
             or type(base.get("sha")) is not str or SHA.fullmatch(base["sha"]) is None

@@ -18,7 +18,7 @@ def fixture():
              for x in guard.REQUIRED]
     return {"switch": {"state": "closed", "user": {"login": "pl0n3r"}, "body": M},
             "pr": {"state": "open", "draft": False, "mergeable": True,
-                   "head": {"sha": H, "repo": {"fork": False, "full_name": guard.REPO}},
+                   "head": {"sha": H, "repo": {"fork": False, "owner": {"login": "pl0n3r"}, "name": "GrindFlow"}},
                    "base": {"sha": B, "ref": "main"}},
             "main_sha": B,
             "checks": {"total_count": len(items), "check_runs": items},
