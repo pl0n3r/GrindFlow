@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 REPO = "pl0n3r/GrindFlow"
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 MARKER = re.compile(r"<!--\s*factory-unattended-kill-switch\s+(\{[^\n]*\})\s*-->")
+MARKER_START = re.compile(r"<!--\s*factory-unattended-kill-switch\b")
 REQUIRED = ("Etiquetas", "validate", "SonarCloud Code Analysis", "CodeQL",
             "Factory policy / Validar decisiones y límite de revisión")
 
@@ -28,13 +29,17 @@ def unique(pairs):
 
 
 def switch_running(issue):
-    if (type(issue) is not dict or issue.get("state") != "closed"
+    if (type(issue) is not dict or issue.get("number") != 767
+            or issue.get("url") != "https://api.github.com/repos/pl0n3r/Factory/issues/767"
+            or issue.get("repository_url") != "https://api.github.com/repos/pl0n3r/Factory"
+            or issue.get("state") != "closed"
             or type(issue.get("user")) is not dict
             or issue["user"].get("login") != "pl0n3r"
             or type(issue.get("body")) is not str):
         return False
     marks = MARKER.findall(issue["body"])
-    if len(marks) != 1:
+    # A second malformed marker must not be ignored just because one is valid.
+    if len(marks) != 1 or len(MARKER_START.findall(issue["body"])) != 1:
         return False
     try:
         value = json.loads(marks[0], object_pairs_hook=unique)

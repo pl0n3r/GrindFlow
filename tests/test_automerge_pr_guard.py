@@ -16,7 +16,10 @@ M = '<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":
 def fixture():
     items = [{"name": x, "head_sha": H, "status": "completed", "conclusion": "success"}
              for x in guard.REQUIRED]
-    return {"switch": {"state": "closed", "user": {"login": "pl0n3r"}, "body": M},
+    return {"switch": {"number": 767,
+                       "url": "https://api.github.com/repos/pl0n3r/Factory/issues/767",
+                       "repository_url": "https://api.github.com/repos/pl0n3r/Factory",
+                       "state": "closed", "user": {"login": "pl0n3r"}, "body": M},
             "pr": {"state": "open", "draft": False, "mergeable": True,
                    "head": {"sha": H, "repo": {"fork": False, "owner": {"login": "pl0n3r"}, "name": "GrindFlow"}},
                    "base": {"sha": B, "ref": "main"}},
@@ -66,11 +69,17 @@ class AutoMergePrGuardTests(unittest.TestCase):
         for marker in (M.replace("RUNNING", "PAUSED"),
                        M.replace('"version":1', '"version":true'),
                        M.replace('"version":1', '"version":1,"version":1'),
-                       M + M):
+                       M + M,
+                       M + "<!-- factory-unattended-kill-switch malformed -->",
+                       "<!-- factory-unattended-kill-switch malformed -->" + M,
+                       M + "<!-- factory-unattended-kill-switch {bad} -->"):
             case = fixture()
             case["switch"]["body"] = marker
             self.denied(case)
         for change in (
+            lambda s: s["switch"].update(number=768),
+            lambda s: s["switch"].update(url="https://api.github.com/repos/pl0n3r/Factory/issues/768"),
+            lambda s: s["switch"].update(repository_url="https://api.github.com/repos/other/Factory"),
             lambda s: s["pr"]["head"]["repo"].update(fork=True),
             lambda s: s["pr"].update(draft=True),
             lambda s: s["pr"]["head"].update(sha=B),
