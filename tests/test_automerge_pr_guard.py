@@ -68,6 +68,23 @@ class AutoMergePrGuardTests(unittest.TestCase):
                         row["app"] = None
                     self.denied(case)
 
+    def test_coderabbit_incomplete_review_variants_denied(self):
+        """An OSS bot COMMENTED status is not a substantive review if unfinished."""
+        incomplete = (
+            "Skipped review", "Review was skipped", "Review not performed",
+            "Review was not completed", "Could not review", "Unable to review",
+            "Review pending", "Review in progress", "Analysis queued",
+            "Review cancelled", "Review not complete",
+        )
+        for message in incomplete:
+            with self.subTest(message=message):
+                case = fixture()
+                case["reviews"][0]["body"] = message
+                self.denied(case)
+        case = fixture()
+        case["reviews"][0]["body"] = "Full review finished."
+        guard.verify(case, H)
+
     def test_coderabbit_skipped_and_changes_requested_denied(self):
         for body in ("Review skipped: manual review required", "skip review", "rate limit", ""):
             case = fixture()
