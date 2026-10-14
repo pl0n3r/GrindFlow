@@ -86,15 +86,21 @@ def verify(snapshot, expected):
     if type(reviews) is not list or len(reviews) > 100:
         raise GuardError("incomplete_reviews")
     substantive = False
+    # The reviews REST API lists submissions from oldest to newest.
+    # COMMENTED is not a dismissal of an earlier outstanding veto.
+    latest_decisive = {}
     for review in reviews:
         if type(review) is not dict or type(review.get("user")) is not dict:
             raise GuardError("invalid_review")
         state = review.get("state")
         if state not in ("COMMENTED", "APPROVED", "DISMISSED", "CHANGES_REQUESTED"):
             raise GuardError("review_unknown")
-        if state == "CHANGES_REQUESTED":
-            raise GuardError("changes_requested")
         user = review["user"]
+        login = user.get("login")
+        if type(login) is not str or not login.strip():
+            raise GuardError("invalid_reviewer")
+        if state in ("CHANGES_REQUESTED", "APPROVED", "DISMISSED"):
+            latest_decisive[login] = state
         if (user.get("login") == "coderabbitai[bot]" and user.get("type") == "Bot"
                 and review.get("commit_id") == expected):
             body = review.get("body")
@@ -103,6 +109,8 @@ def verify(snapshot, expected):
             if state == "APPROVED" or (state == "COMMENTED" and type(body) is str
                     and body.strip() and not any(s in body.lower() for s in skipped)):
                 substantive = True
+    if "CHANGES_REQUESTED" in latest_decisive.values():
+        raise GuardError("changes_requested")
     if not substantive:
         raise GuardError("coderabbit_review_missing")
 

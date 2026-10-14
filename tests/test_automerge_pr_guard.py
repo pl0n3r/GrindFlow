@@ -124,6 +124,42 @@ class AutoMergePrGuardTests(unittest.TestCase):
                 self.assertEqual(guard.main(), 0)
                 self.assertEqual(get_mock.call_count, 10)
 
+    def test_only_latest_decisive_review_per_reviewer_can_veto(self):
+        reviewer = {"login": "security-reviewer"}
+        changes = {"user": reviewer, "state": "CHANGES_REQUESTED",
+                   "commit_id": H, "body": "changes needed"}
+        approved = {"user": reviewer, "state": "APPROVED",
+                    "commit_id": H, "body": "addressed"}
+        dismissed = {"user": reviewer, "state": "DISMISSED",
+                     "commit_id": H, "body": "review dismissed"}
+        commented = {"user": reviewer, "state": "COMMENTED",
+                     "commit_id": H, "body": "discussion"}
+
+        case = fixture()
+        case["reviews"].extend([changes, approved])
+        guard.verify(case, H)
+        case = fixture()
+        case["reviews"].extend([approved, changes])
+        self.denied(case)
+        case = fixture()
+        case["reviews"].extend([changes, dismissed])
+        guard.verify(case, H)
+        case = fixture()
+        case["reviews"].extend([changes, commented])
+        self.denied(case)
+        case = fixture()
+        case["reviews"].extend([changes, approved, changes])
+        self.denied(case)
+        case = fixture()
+        case["reviews"].append({"user": {"login": ""}, "state": "APPROVED"})
+        self.denied(case)
+
+    def test_review_event_does_not_run_untrusted_pr_workflow(self):
+        yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request_target:", yml)
+        self.assertNotIn("pull_request_review:", yml)
+        self.assertIn("persist-credentials: false", yml)
+
     def test_successful_evidence_allows_only_sha_locked_auto_merge(self):
         guard.verify(fixture(), H)
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
