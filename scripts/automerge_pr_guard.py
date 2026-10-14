@@ -122,10 +122,22 @@ def verify(snapshot, expected):
         if (user.get("login") == "coderabbitai[bot]" and user.get("type") == "Bot"
                 and review.get("commit_id") == expected):
             body = review.get("body")
-            skipped = ("review skipped", "skip review", "manual review required",
-                       "rate limit", "rate-limit", "review disabled")
-            if state == "APPROVED" or (state == "COMMENTED" and type(body) is str
-                    and body.strip() and not any(s in body.lower() for s in skipped)):
+            blocked_text = (
+                "review skipped", "skipped review", "review was skipped",
+                "skip review", "manual review required",
+                "review not performed", "review was not completed",
+                "could not review", "unable to review",
+                "review pending", "review in progress", "analysis queued",
+                "review cancelled", "review not complete",
+                "rate limit", "rate-limit", "review disabled",
+            )
+            # A nominal COMMENTED or APPROVED cannot override the bot's
+            # explicit statement that analysis was not actually completed.
+            if type(body) is str and any(s in body.lower() for s in blocked_text):
+                continue
+            if state == "APPROVED" or (
+                state == "COMMENTED" and type(body) is str and body.strip()
+            ):
                 substantive = True
     if "CHANGES_REQUESTED" in latest_decisive.values():
         raise GuardError("changes_requested")
