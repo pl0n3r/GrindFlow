@@ -227,7 +227,7 @@ final class VaultValidityTest extends WebTestCase
         ]);
         foreach ([$f['organization'] => 'Own workspace', $f['foreign'] => 'Other workspace'] as $id => $name) {
             $db->insert('gf_identity_organizations', [
-                'id' => $id, 'name' => $name, 'slug' => 'ci-'.substr($id, 0, 30),
+                'id' => $id, 'name' => $name, 'slug' => 'ci-'.bin2hex(random_bytes(12)), // v7 ids created back to back share their first 30 chars
                 'type' => 'independent', 'created_at' => $at, 'updated_at' => $at,
             ]);
         }

@@ -600,3 +600,9 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
 - **GF-LIB-052:** `GET /api/admin/vault/{id}/history` entrega una línea de tiempo acotada (100 eventos) de origen, cambios, variantes, borradores y traspasos, con actores opacos y sin PII, tokens ni secretos; otra organización responde 404.
 - **GF-LIB-052-DELIVERY:** migración aditiva, sin migración productiva, publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-PERMISSIONS.md`.
 
+### Library — reglas por red y reutilización (hoja GrindFlow #416, decisiones #45/#46)
+
+- **GF-LIB-045:** cada asset puede tener un `allow` o `deny` explícito por red; `deny` gana y bloquea la reserva (manual y automática), la vista previa, la asignación de proveedor y la publicación con `network_denied`. Sin regla = permitido; red desconocida o fallo de evaluación = denegado.
+- **GF-LIB-046:** una política de reutilización por asset y red (`single_use`, `max_n`, `unlimited`) con intervalo mínimo se evalúa en el horario pedido contando borradores no cancelados (`reuse_exhausted`, `reuse_interval`). Sin política = ilimitada.
+- **GF-LIB-045-DELIVERY:** migración aditiva, sin publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-NETWORK-REUSE.md`.
+
