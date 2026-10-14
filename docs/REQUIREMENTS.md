@@ -586,3 +586,10 @@ PHP fast/quality/test/MariaDB and Sonar PR gates as applicable.
 - **GF-LIB-042-DELIVERY:** implementación provisional, aditiva y reversible en CI desechable; sin autorización para merge, producción, publicación, proveedores o migración real. Validación: AC-01..AC-04 del Issue #414 más suite Symfony/MariaDB, seguridad y release secuencial.
 
 Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
+
+### Library — vigencia UTC de assets (hoja GrindFlow #407, decisión #41)
+
+- **GF-LIB-041:** un miembro con `content_prepare` y el CSRF de gestión del Vault puede fijar o limpiar la ventana de vigencia UTC de un asset activo de su organización (`POST /api/admin/vault/{id}/validity`, cuerpo estricto `valid_from_at`/`valid_until_at`, instantes `AAAA-MM-DDThh:mm:ssZ` o `null`, fin posterior al inicio). Un asset de otra organización, en papelera o inexistente responde 404 sin mutación.
+- **GF-LIB-041-STATE:** listado y detalle exponen únicamente las dos fechas y el estado derivado `not_yet_valid|valid|expired`; un asset vencido sigue visible en Library y en papelera según su ciclo de vida normal.
+- **GF-LIB-041-AUTOMATION:** la vista previa y la reserva transaccional de borradores (manual y automática) bloquean `asset_not_yet_valid` y `asset_expired` incluso con revisión y autorización válidas. La vigencia no es una licencia ni autoriza publicar.
+- **GF-LIB-041-DELIVERY:** migración aditiva, nullable y reversible solo en base descartable; sin migración productiva, publicación, providers, credenciales ni datos reales. Validación: AC-01..AC-06 del Issue #407.
