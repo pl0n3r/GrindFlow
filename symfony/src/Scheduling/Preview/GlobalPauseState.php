@@ -1,0 +1,120 @@
+<?php
+declare(strict_types=1);
+
+namespace GrindFlow\Scheduling\Preview;
+
+use InvalidArgumentException;
+
+final class GlobalPauseState
+{
+    /** The agenda stays outside the state; only a stable digest is retained. */
+    public static function initial(array $agenda): array
+    {
+        return [
+            'version' => 1, 'paused' => false, 'revision' => 0,
+            'agenda_sha256' => self::digest($agenda), 'audit' => [],
+        ];
+    }
+
+    public static function transition(array $state, string $action, string $reasonCode, int $at): array
+    {
+        self::validate($state);
+        if (!in_array($action, ['pause', 'resume'], true)
+            || !in_array($reasonCode, ['manual', 'maintenance', 'incident', 'recovered'], true)
+            || $at < 1 || count($state['audit']) >= 32) {
+            throw new InvalidArgumentException('invalid_pause_transition');
+        }
+        $nextPaused = $action === 'pause';
+        if ($state['paused'] === $nextPaused) {
+            throw new InvalidArgumentException('duplicate_pause_transition');
+        }
+        $last = $state['audit'] === [] ? 0 : $state['audit'][count($state['audit']) - 1]['at'];
+        if ($at <= $last) {
+            throw new InvalidArgumentException('out_of_order_pause_transition');
+        }
+        $copy = $state;
+        $copy['paused'] = $nextPaused;
+        ++$copy['revision'];
+        $copy['audit'][] = [
+            'revision' => $copy['revision'], 'action' => $action,
+            'reason_code' => $reasonCode, 'at' => $at,
+        ];
+        return $copy;
+    }
+
+    public static function canRun(array $state): bool
+    {
+        self::validate($state);
+        // A full audit cannot authorize execution while another pause is impossible.
+        return !$state['paused'] && count($state['audit']) < 32;
+    }
+
+    /** Only verifies equality of snapshots, never authorizes scheduling. */
+    public static function agendaUnchanged(array $state, array $agenda): bool
+    {
+        self::validate($state);
+        return hash_equals($state['agenda_sha256'], self::digest($agenda));
+    }
+
+    private static function validate(array $state): void
+    {
+        $fields = ['version', 'paused', 'revision', 'agenda_sha256', 'audit'];
+        if (!self::hasExactKeys($state, $fields) || $state['version'] !== 1
+            || !is_bool($state['paused']) || !is_int($state['revision'])
+            || $state['revision'] < 0 || !is_string($state['agenda_sha256'])
+            || preg_match('/^[a-f0-9]{64}$/D', $state['agenda_sha256']) !== 1
+            || !is_array($state['audit']) || !array_is_list($state['audit'])
+            || count($state['audit']) !== $state['revision'] || count($state['audit']) > 32
+            || ($state['revision'] === 0 && $state['paused'])) {
+            throw new InvalidArgumentException('invalid_pause_state');
+        }
+        $last = 0;
+        foreach ($state['audit'] as $index => $event) {
+            if (!is_array($event)
+                || !self::hasExactKeys($event, ['revision', 'action', 'reason_code', 'at'])
+                || $event['revision'] !== $index + 1
+                || $event['action'] !== ($index % 2 === 0 ? 'pause' : 'resume')
+                || !in_array($event['reason_code'], ['manual', 'maintenance', 'incident', 'recovered'], true)
+                || !is_int($event['at']) || $event['at'] <= $last) {
+                throw new InvalidArgumentException('invalid_pause_audit');
+            }
+            $last = $event['at'];
+        }
+        if ($state['audit'] !== [] && $state['paused'] !== (end($state['audit'])['action'] === 'pause')) {
+            throw new InvalidArgumentException('invalid_pause_state');
+        }
+    }
+
+    /** Associative JSON objects have no canonical field order; unknown keys still deny. */
+    private static function hasExactKeys(array $value, array $expected): bool
+    {
+        return count($value) === count($expected) && array_diff_key($value, array_fill_keys($expected, true)) === [];
+    }
+
+    private static function digest(array $agenda): string
+    {
+        if (count($agenda) > 1000) throw new InvalidArgumentException('agenda_too_large');
+        try {
+            $bytes = 0;
+            $canonical = static function (array $value, int $depth = 0) use (&$canonical, &$bytes): array {
+                if ($depth > 32) throw new InvalidArgumentException('agenda_too_deep');
+                if (($bytes += 8 * count($value)) > 65536) throw new InvalidArgumentException('agenda_too_large');
+                if (!array_is_list($value)) ksort($value, SORT_STRING);
+                foreach ($value as $k => $item) {
+                    $bytes += is_string($k) ? strlen($k) : 0;
+                    if (is_array($item)) $value[$k] = $canonical($item, $depth + 1);
+                    elseif (is_string($item)) $bytes += strlen($item);
+                    elseif (!is_int($item) && !is_bool($item) && !is_float($item) && $item !== null)
+                        throw new InvalidArgumentException('invalid_agenda');
+                    if ($bytes > 65536) throw new InvalidArgumentException('agenda_too_large');
+                }
+                return $value;
+            };
+            $json = json_encode($canonical($agenda), JSON_THROW_ON_ERROR);
+            if (strlen($json) > 65536) throw new InvalidArgumentException('agenda_too_large');
+            return hash('sha256', $json);
+        } catch (\JsonException) {
+            throw new InvalidArgumentException('invalid_agenda');
+        }
+    }
+}

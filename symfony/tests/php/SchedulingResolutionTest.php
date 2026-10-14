@@ -129,6 +129,21 @@ switch ($scenario) {
         ];
         verify($planner->plan($constrained) === $matched, 'matching_finds_safe_slot');
         verify($planner->plan(array_reverse($constrained)) === $matched, 'matching_deterministic');
+
+        // A later loser with its own free option must not displace an
+        // already-placed higher-priority loser from the nearest UTC slot.
+        $bothFlexible = [
+            item('a-high', 'alta', $at, rangeWindow($before, $after)),
+            item('b-low', 'normal', $at, rangeWindow($before, $after)),
+            item('c-winner', 'urgente', $at, exact($at))
+        ];
+        $minimalPreference = [
+            ['id' => 'a-high', 'scheduled_at_utc' => $before, 'moved' => true],
+            ['id' => 'b-low', 'scheduled_at_utc' => $after, 'moved' => true],
+            ['id' => 'c-winner', 'scheduled_at_utc' => $at, 'moved' => false]
+        ];
+        verify($planner->plan($bothFlexible) === $minimalPreference, 'avoid_unneeded_reassignment');
+        verify($planner->plan(array_reverse($bothFlexible)) === $minimalPreference, 'preference_deterministic');
         break;
 
     case 'AC-04':
@@ -149,6 +164,15 @@ switch ($scenario) {
         verify(rejected(fn () => $resolver->resolve([
             item('a', 'normal', $at, exact($at)) + ['private_token' => 'private']
         ])), 'unknown_fields');
+        verify(rejected(fn () => $selector->choose(
+            rangeWindow($before, $after), $at, [(object)['private_token' => 'private']]
+        )), 'occupied_object_rejected');
+        verify(rejected(fn () => $selector->choose(
+            rangeWindow($before, $after), $at, [[$before]]
+        )), 'occupied_array_rejected');
+        verify(rejected(fn () => $selector->choose(
+            rangeWindow($before, $after), $at, [$before, $before]
+        )), 'occupied_duplicates_rejected');
         verify(rejected(fn () => $planner->plan([
             item('a', 'normal', $at, exact($at)),
             item('b', 'urgente', $at, exact($at))

@@ -167,7 +167,9 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - **Carga GitHub / coordinación:** No hacer polling de checks, PRs ni comentarios; revisar señales una sola vez al cierre de un bloque o en otra sesión.
 - Agrupar cambios locales y hacer un solo push por bloque lógico; no empujar cada microajuste por separado.
 - Publicar un solo comentario por hito; evitar comentarios de progreso intermedio que disparen automatización sin aportar evidencia durable.
-- No exceder dos agentes simultáneos en GrindFlow; el PLAN-AGENTES global puede imponer un límite menor y, cuando lo haga, prevalece.
+- **Capacidad por claims, sin tope fijo de agentes por repo:** se admiten tantas líneas simultáneas en GrindFlow como hojas elegibles con reserva V3 `active:true` y claims exactos de archivos disjuntos permitan; nunca tomar una ruta ya reclamada ni reservar un directorio completo para ampliar concurrencia.
+- **Cupo GitHub:** pausar el despacho de trabajo nuevo cuando el cupo restante de la API de GitHub autenticada sea inferior a 1200 solicitudes; si el PLAN-AGENTES global impone un límite menor, prevalece el límite global. Un cupo UNKNOWN no autoriza nuevas reservas.
+- La telemetría CI se muestrea una vez por hora, no en cada ejecución; se mantienen los pushes agrupados y comentarios solo por hito.
 
 - El selector `scripts/ci-scope.sh` adapta gates según rutas modificadas. Documentación Symfony no dispara el stack pesado por sí sola; una mezcla de docs y código conserva **unión** de gates. Cambios al core del CI y ejecución manual disparan matriz completa.
 - `GrindFlow CI / validate` sigue exigiendo éxito real en todos los gates seleccionados; saltarse un gate que correspondía, reinterpretar un fallo como verde o alterar cobertura por tendencias históricas está prohibido.
@@ -384,7 +386,7 @@ en el mismo PR. Un agente nuevo nunca debe necesitar el historial de chat.
 ### Regla de paralelizacion
 
 - **Paralelizar todo lo que sea realmente independiente** cuando reduzca el tiempo total de entrega.
-- Se permiten hasta **4 lineas de trabajo concurrentes** si no comparten archivos, estado mutable, migraciones dependientes ni alcance de revision.
+- Se permiten tantas líneas de trabajo concurrentes como hojas con **claims de archivo disjuntos** y reserva V3 vigente existan, **sin tope fijo de agentes por repo**; nunca compartir archivos, estado mutable, migraciones dependientes ni alcance de revisión. El cupo GitHub y cualquier límite menor del PLAN-AGENTES global prevalecen.
 - Analisis, inspeccion de codigo, preparacion de pruebas, revision de gates y tareas sobre modulos independientes pueden ejecutarse en paralelo.
 - Mientras un gate externo corre, se debe aprovechar el tiempo avanzando trabajo independiente en vez de quedar inactivo.
 - Los merges a `main` son siempre **serializados**. Antes de cada merge hay que volver a comprobar el SHA actual de `main`, el SHA de la rama/PR y los gates aplicables.

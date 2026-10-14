@@ -87,13 +87,24 @@ final class MinimalReschedulePlanner
         array &$assignments,
         array &$seen
     ): bool {
+        // An available slot of the current loser is always preferable to
+        // needlessly relocating an already placed (possibly higher-priority)
+        // loser. Only attempt an augmenting displacement when none is free.
+        foreach ($choices[$id] as $instant) {
+            if (!isset($seen[$instant]) && !isset($slotOwners[$instant])) {
+                $seen[$instant] = true;
+                $slotOwners[$instant] = $id;
+                $assignments[$id] = $instant;
+                return true;
+            }
+        }
         foreach ($choices[$id] as $instant) {
             if (isset($seen[$instant])) {
                 continue;
             }
             $seen[$instant] = true;
-            if (!isset($slotOwners[$instant])
-                || self::assignSlot($slotOwners[$instant], $choices, $slotOwners, $assignments, $seen)) {
+            if (isset($slotOwners[$instant])
+                && self::assignSlot($slotOwners[$instant], $choices, $slotOwners, $assignments, $seen)) {
                 $slotOwners[$instant] = $id;
                 $assignments[$id] = $instant;
                 return true;

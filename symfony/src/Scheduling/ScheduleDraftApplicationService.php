@@ -30,6 +30,8 @@ final readonly class ScheduleDraftApplicationService
         string $userId,
         string $assetId,
         string $scheduledAtUtc,
+        bool $uniqueAutomationSlot = false,
+        ?string $expectedAutomationDestination = null,
     ): array {
         return $this->db->transactional(
             function (Connection $db) use (
@@ -37,6 +39,8 @@ final readonly class ScheduleDraftApplicationService
                 $userId,
                 $assetId,
                 $scheduledAtUtc,
+                $uniqueAutomationSlot,
+                $expectedAutomationDestination,
             ): array {
                 // Serialize all draft creation per organization: capacity and
                 // same-asset checks must be atomic across concurrent callers.
@@ -121,6 +125,38 @@ final readonly class ScheduleDraftApplicationService
                     return ['status' => 'blocked', 'reasons' => $reasons];
                 }
 
+                if ($uniqueAutomationSlot) {
+                    // Reconstruct authorized times from the same locked row.
+                    // An active->paused race invalidates all further writes.
+                    if (($rule['automation_state'] ?? null) !== 'active'
+                        || $expectedAutomationDestination === null
+                        || !hash_equals(
+                            (string) ($rule['automation_destination_id'] ?? ''),
+                            $expectedAutomationDestination,
+                        )) {
+                        // An active/paused race or destination reassignment
+                        // invalidates the entire automation run under lock.
+                        return ['status' => 'revoked'];
+                    }
+                    try {
+                        $times = json_decode((string) ($rule['automation_local_times'] ?? ''), true, 4, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException) {
+                        return ['status' => 'revoked'];
+                    }
+                    if (!is_array($times) || $times === [] || count($times) > 12
+                        || count($times) > (int) $rule['max_per_day']
+                        || count(array_unique($times, SORT_REGULAR)) !== count($times)) {
+                        return ['status' => 'revoked'];
+                    }
+                    foreach ($times as $time) {
+                        if (!is_string($time)
+                            || preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $time) !== 1) {
+                            return ['status' => 'revoked'];
+                        }
+                    }
+                    $rule['local_times'] = $times;
+                }
+
                 $slot = null;
                 foreach ($this->calculator->upcoming($rule) as $candidate) {
                     if (hash_equals($candidate['scheduled_at_utc'], $scheduledAtUtc)) {
@@ -162,6 +198,12 @@ final readonly class ScheduleDraftApplicationService
                         SQL,
                     ['organization' => $organizationId, 'scheduled' => $dateTime],
                 );
+                // Automation never consumes a second draft in an occupied
+                // time slot, even if max_per_day permits manual capacity >1.
+                // Organization lock above makes this decision serializable.
+                if ($uniqueAutomationSlot && $reserved > 0) {
+                    return ['status' => 'occupied'];
+                }
                 if ($reserved >= $slot['capacity']) {
                     return ['status' => 'full'];
                 }

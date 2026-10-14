@@ -123,6 +123,17 @@ final class ContentRuleController extends AbstractController
                 ],
             );
 
+            // A changed weekly timezone/capacity invalidates prior automation
+            // preferences. Do not silently keep an active background rule.
+            // Legacy schemas without the S4 migration remain functional.
+            $columns = $db->createSchemaManager()->listTableColumns('gf_content_rules');
+            if (isset($columns['automation_state'])) {
+                $db->executeStatement(
+                    "UPDATE gf_content_rules SET automation_state = 'paused' WHERE organization_id = :organization",
+                    ['organization' => $context['organization']['id']],
+                );
+            }
+
             return 'saved';
         });
         if ($status !== 'saved') {

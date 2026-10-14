@@ -88,12 +88,16 @@ final class FlexibleWindow
      */
     public function choose(array $window, string $preferredUtc, array $occupied): ?string
     {
-        if (!array_is_list($occupied) || count($occupied) > 100 ||
-            count(array_unique($occupied)) !== count($occupied)) {
+        if (!array_is_list($occupied) || count($occupied) > 100) {
             throw new InvalidArgumentException('invalid_occupied_slots');
         }
+        $seen = [];
         foreach ($occupied as $instant) {
             self::instant($instant);
+            if (isset($seen[$instant])) {
+                throw new InvalidArgumentException('invalid_occupied_slots');
+            }
+            $seen[$instant] = true;
         }
         foreach ($this->candidates($window, $preferredUtc) as $candidate) {
             if (!in_array($candidate, $occupied, true)) {
