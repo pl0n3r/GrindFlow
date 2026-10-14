@@ -76,11 +76,13 @@ class AutoMergePrGuardTests(unittest.TestCase):
             "Review pending", "Review in progress", "Analysis queued",
             "Review cancelled", "Review not complete",
         )
-        for message in incomplete:
-            with self.subTest(message=message):
-                case = fixture()
-                case["reviews"][0]["body"] = message
-                self.denied(case)
+        for state in ("COMMENTED", "APPROVED"):
+            for message in incomplete:
+                with self.subTest(state=state, message=message):
+                    case = fixture()
+                    case["reviews"][0]["state"] = state
+                    case["reviews"][0]["body"] = message
+                    self.denied(case)
         case = fixture()
         case["reviews"][0]["body"] = "Full review finished."
         guard.verify(case, H)
