@@ -10,6 +10,7 @@
 - `window`: `exact` con `at_utc`, o `range|suggested` con `start_utc`, `end_utc`, `step_minutes` entre 15 y 1440. Horizonte máximo 24 h y el instante original debe pertenecer a los candidatos. Si hay más de una opción, preferir el instante original o el más cercano; desempatar por hora UTC más temprana.
 - `PriorityConflictResolver::resolve(items)` devuelve `kept` y `move` (IDs ordenados) sin mutación.
 - `MinimalReschedulePlanner::plan(items)` conserva **todos los slots inicialmente únicos y ganadores** y solo mueve perdedores si existe slot libre dentro de su ventana. Si no hay alternativa, excepción `no_safe_slot`, sin generar una propuesta parcial.
+- Para perdedores, priorizar un slot libre propio antes de reasignar a otro perdedor ya colocado; si un slot está ocupado, intentar caminos aumentantes solo cuando no haya alternativa libre. Validar instantes UTC ocupados y sus tipos **antes** de comprobar duplicados, sin convertir objetos a texto.
 - Salida: lista ordenada por `id` con `id`, `scheduled_at_utc` y `moved`. Se mantiene el scope de tenant y no se propagan campos de entrada a logs o excepciones.
 
 ## Pruebas y límites
