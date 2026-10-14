@@ -593,3 +593,10 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
 - **GF-LIB-041-STATE:** listado y detalle exponen únicamente las dos fechas y el estado derivado `not_yet_valid|valid|expired`; un asset vencido sigue visible en Library y en papelera según su ciclo de vida normal.
 - **GF-LIB-041-AUTOMATION:** la vista previa y la reserva transaccional de borradores (manual y automática) bloquean `asset_not_yet_valid` y `asset_expired` incluso con revisión y autorización válidas. La vigencia no es una licencia ni autoriza publicar.
 - **GF-LIB-041-DELIVERY:** migración aditiva, nullable y reversible solo en base descartable; sin migración productiva, publicación, providers, credenciales ni datos reales. Validación: AC-01..AC-06 del Issue #407.
+
+### Library — permisos por miembro e historial (hoja GrindFlow #417, decisiones #52/#53)
+
+- **GF-LIB-053:** el servidor aplica siete capacidades Library (`view`, `upload`, `edit`, `approve`, `authorize_publication`, `archive`, `delete`) derivadas del rol y reducibles por miembro mediante restricciones de solo denegación; lo no demostrable se deniega y un miembro nunca supera a su rol.
+- **GF-LIB-052:** `GET /api/admin/vault/{id}/history` entrega una línea de tiempo acotada (100 eventos) de origen, cambios, variantes, borradores y traspasos, con actores opacos y sin PII, tokens ni secretos; otra organización responde 404.
+- **GF-LIB-052-DELIVERY:** migración aditiva, sin migración productiva, publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-PERMISSIONS.md`.
+

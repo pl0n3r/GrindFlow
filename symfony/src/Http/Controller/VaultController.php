@@ -10,6 +10,7 @@ use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Infrastructure\Storage\DirectUploadReadiness;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
+use GrindFlow\Library\LibraryPermissions;
 use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -35,6 +36,7 @@ final class VaultController extends AbstractController
         private readonly PrivateVaultDirectory $storage,
         private readonly VaultBlobVerifier $verifier,
         private readonly DirectUploadReadiness $directUploadReadiness,
+        private readonly LibraryPermissions $library,
     ) {
     }
 
@@ -162,7 +164,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'upload')) {
             return $this->error(403, 'upload_forbidden', 'Tu rol no permite añadir archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_upload', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -473,7 +476,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite renombrar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -561,7 +565,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite editar las notas.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -649,7 +654,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -731,7 +737,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite editar la vigencia.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -819,7 +826,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -956,7 +964,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'archive')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite gestionar estos archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -1045,6 +1054,9 @@ final class VaultController extends AbstractController
         if ($organization === null) {
             $request->getSession()->remove('grindflow_organization_id');
             return $this->error(403, 'organization_access_changed', 'Tu acceso a esta organización ha cambiado.');
+        }
+        if (!$this->library->allows($organization['id'], $user->id(), 'view')) {
+            return $this->error(403, 'library_view_forbidden', 'Tu acceso a la biblioteca está restringido.');
         }
 
         return ['user' => $user, 'organization' => $organization];
