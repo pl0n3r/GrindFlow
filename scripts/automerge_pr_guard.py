@@ -13,6 +13,14 @@ MARKER = re.compile(r"<!--\s*factory-unattended-kill-switch\s+(\{[^\n]*\})\s*-->
 MARKER_START = re.compile(r"<!--\s*factory-unattended-kill-switch\b")
 REQUIRED = ("Etiquetas", "validate", "SonarCloud Code Analysis", "CodeQL",
             "Factory policy / Validar decisiones y límite de revisión")
+REQUIRED_APPS = {
+    "Etiquetas": ("github-actions", 15368),
+    "validate": ("github-actions", 15368),
+    "SonarCloud Code Analysis": ("sonarqubecloud", 12526),
+    "CodeQL": ("github-advanced-security", 57789),
+    "Factory policy / Validar decisiones y límite de revisión": ("github-actions", 15368),
+}
+
 
 
 class GuardError(Exception):
@@ -87,6 +95,11 @@ def verify(snapshot, expected):
         row = seen.get(name)
         if not row or row.get("status") != "completed" or row.get("conclusion") != "success":
             raise GuardError("missing_or_failed_policy")
+        app = row.get("app")
+        slug, app_id = REQUIRED_APPS[name]
+        if (type(app) is not dict or app.get("slug") != slug
+                or type(app.get("id")) is not int or app["id"] != app_id):
+            raise GuardError("check_app_mismatch")
     reviews = snapshot.get("reviews")
     if type(reviews) is not list or len(reviews) > 100:
         raise GuardError("incomplete_reviews")

@@ -14,7 +14,8 @@ M = '<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":
 
 
 def fixture():
-    items = [{"name": x, "head_sha": H, "status": "completed", "conclusion": "success"}
+    items = [{"name": x, "head_sha": H, "status": "completed", "conclusion": "success",
+              "app": {"slug": guard.REQUIRED_APPS[x][0], "id": guard.REQUIRED_APPS[x][1]}}
              for x in guard.REQUIRED]
     return {"switch": {"number": 767,
                        "url": "https://api.github.com/repos/pl0n3r/Factory/issues/767",
@@ -48,6 +49,24 @@ class AutoMergePrGuardTests(unittest.TestCase):
         case = fixture()
         case["checks"]["total_count"] = 100
         self.denied(case)
+
+    def test_check_emitter_identity_is_required(self):
+        for name in guard.REQUIRED:
+            for spoof in ("missing", "wrong_slug", "wrong_id", "bool_id", "null"):
+                with self.subTest(check=name, spoof=spoof):
+                    case = fixture()
+                    row = next(c for c in case["checks"]["check_runs"] if c["name"] == name)
+                    if spoof == "missing":
+                        row.pop("app")
+                    elif spoof == "wrong_slug":
+                        row["app"]["slug"] = "different-app"
+                    elif spoof == "wrong_id":
+                        row["app"]["id"] = 99999999
+                    elif spoof == "bool_id":
+                        row["app"]["id"] = True
+                    else:
+                        row["app"] = None
+                    self.denied(case)
 
     def test_coderabbit_skipped_and_changes_requested_denied(self):
         for body in ("Review skipped: manual review required", "skip review", "rate limit", ""):
