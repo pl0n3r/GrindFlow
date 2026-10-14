@@ -10,7 +10,20 @@ type Asset = {
   download_url: string;
   note?: string | null;
   usage_scope?: UsageScope;
+  valid_from_at?: string | null;
+  valid_until_at?: string | null;
+  validity_state?: ValidityState;
 };
+
+type ValidityState = 'not_yet_valid' | 'valid' | 'expired';
+const validityLabels: Record<ValidityState, string> = {
+  not_yet_valid: 'Aún no vigente',
+  valid: 'Vigente',
+  expired: 'Vencido',
+};
+// Validity is always UTC; an empty bound means an open window. It is never a license.
+const toUtcInput = (iso?: string | null): string => (iso ? iso.slice(0, 16) : '');
+const fromUtcInput = (value: string): string | null => (value ? value + ':00Z' : null);
 
 type UsageScope = 'unclassified' | 'internal_only' | 'needs_review';
 const usageLabels: Record<UsageScope, string> = {
@@ -51,6 +64,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
   const [format, setFormat] = useState<'all' | 'jpeg' | 'png' | 'webp' | 'mp4' | 'webm'>('all');
   const [usage, setUsage] = useState<'all' | UsageScope>('all');
   const [usageDraft, setUsageDraft] = useState<UsageScope>('unclassified');
+  const [validFromDraft, setValidFromDraft] = useState('');
+  const [validUntilDraft, setValidUntilDraft] = useState('');
   const [batchIds, setBatchIds] = useState<string[]>([]);
   const [batchUsage, setBatchUsage] = useState<UsageScope>('needs_review');
   const [batchConfirm, setBatchConfirm] = useState(false);
@@ -249,11 +264,15 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetail(null);
       setNoteDraft('');
       setUsageDraft('unclassified');
+      setValidFromDraft('');
+      setValidUntilDraft('');
       return;
     }
     setDetail(null);
     setNoteDraft('');
     setUsageDraft('unclassified');
+    setValidFromDraft('');
+    setValidUntilDraft('');
     setDetailError('');
     setDetailLoading(true);
     try {
@@ -265,6 +284,8 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
       setDetail(body.data.asset as Asset);
       setNoteDraft(typeof body.data.asset.note === 'string' ? body.data.asset.note : '');
       setUsageDraft(body.data.asset.usage_scope ?? 'unclassified');
+      setValidFromDraft(toUtcInput(body.data.asset.valid_from_at));
+      setValidUntilDraft(toUtcInput(body.data.asset.valid_until_at));
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : 'No se pudo consultar el archivo.');
     } finally {
@@ -442,6 +463,47 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
     setBatchIds((previous) => previous.includes(id)
       ? previous.filter((selectedId) => selectedId !== id)
       : [...previous, id]);
+  }
+
+  async function saveValidity(event: FormEvent<HTMLFormElement>, id: string, clear = false) {
+    event.preventDefault();
+    if (!canUpload || !manageCsrf || busyId || batchSaving || detail?.id !== id) return;
+    const from = clear ? null : fromUtcInput(validFromDraft);
+    const until = clear ? null : fromUtcInput(validUntilDraft);
+    if (from && until && until <= from) {
+      setActionError('El fin de la vigencia debe ser posterior al inicio.');
+      return;
+    }
+    setBusyId(id);
+    setActionFeedback('');
+    setActionError('');
+    try {
+      const response = await fetch('/api/admin/vault/' + id + '/validity', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': manageCsrf, Accept: 'application/json' },
+        body: JSON.stringify({ valid_from_at: from, valid_until_at: until }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo guardar la vigencia.');
+      if (body?.data?.id !== id || !Object.hasOwn(validityLabels, body?.data?.validity_state)) {
+        throw new Error('La respuesta de vigencia no es válida.');
+      }
+      const saved = {
+        valid_from_at: body.data.valid_from_at as string | null,
+        valid_until_at: body.data.valid_until_at as string | null,
+        validity_state: body.data.validity_state as ValidityState,
+      };
+      setDetail((previous) => previous?.id === id ? { ...previous, ...saved } : previous);
+      setAssets((previous) => previous.map((asset) => asset.id === id ? { ...asset, ...saved } : asset));
+      setValidFromDraft(toUtcInput(saved.valid_from_at));
+      setValidUntilDraft(toUtcInput(saved.valid_until_at));
+      setActionFeedback('Vigencia actualizada. Solo excluye el archivo de la automatización; no autoriza ni publica.');
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo guardar la vigencia.');
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function saveBatch(event: FormEvent<HTMLFormElement>) {
@@ -773,6 +835,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
             <strong>{asset.name}</strong>
             <small>{(asset.size_bytes / (1024 * 1024)).toFixed(2)} MiB · {asset.mime_type}</small>
             <small>Clasificación: {usageLabels[asset.usage_scope ?? 'unclassified']}</small>
+            <small>Vigencia (UTC): {validityLabels[asset.validity_state ?? 'valid']}</small>
           </span>
           <button type="button" disabled={!!checkingId || bulkChecking || !!busyId || loading}
             onClick={() => void verifyOriginal(asset)}
@@ -827,6 +890,7 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               <dt>Guardada</dt><dd>{detail.created_at}</dd>
               <dt>Nota privada</dt><dd>{detail.note || 'Sin nota privada.'}</dd>
               <dt>Clasificación interna</dt><dd>{usageLabels[detail.usage_scope ?? 'unclassified']}</dd>
+              <dt>Vigencia (UTC)</dt><dd>{validityLabels[detail.validity_state ?? 'valid']}{detail.valid_from_at ? ' · desde ' + detail.valid_from_at : ''}{detail.valid_until_at ? ' · hasta ' + detail.valid_until_at : ''}</dd>
             </dl>
             {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveNote(event, asset.id)}>
               <label htmlFor={'vault-note-' + asset.id}>Nota privada del archivo (máximo 280 caracteres)</label>
@@ -853,6 +917,22 @@ export function VaultPanel({ canUpload, csrf, manageCsrf }: Props) {
               </button>
               <button type="button" disabled={!!busyId || usageDraft === (detail.usage_scope ?? 'unclassified')}
                 onClick={() => setUsageDraft(detail.usage_scope ?? 'unclassified')}>Descartar clasificación</button>
+            </form>}
+            {canUpload && manageCsrf && <form className="vault-note" onSubmit={(event) => void saveValidity(event, asset.id)}>
+              <label htmlFor={'vault-valid-from-' + asset.id}>Vigente desde (UTC, opcional)</label>
+              <input id={'vault-valid-from-' + asset.id} type="datetime-local" value={validFromDraft}
+                disabled={!!busyId} onChange={(event) => setValidFromDraft(event.currentTarget.value)} />
+              <label htmlFor={'vault-valid-until-' + asset.id}>Vigente hasta (UTC, opcional)</label>
+              <input id={'vault-valid-until-' + asset.id} type="datetime-local" value={validUntilDraft}
+                disabled={!!busyId} onChange={(event) => setValidUntilDraft(event.currentTarget.value)} />
+              <small>Un archivo vencido sigue en la biblioteca pero queda fuera de la automatización. La vigencia no es una licencia ni autoriza publicar.</small>
+              <button type="submit" disabled={!!busyId}>
+                {busyId === asset.id ? 'Guardando…' : 'Guardar vigencia'}
+              </button>
+              <button type="button" disabled={!!busyId || (!detail.valid_from_at && !detail.valid_until_at)}
+                onClick={(event) => void saveValidity(event as unknown as FormEvent<HTMLFormElement>, asset.id, true)}>
+                Quitar vigencia
+              </button>
             </form>}
             <figure className="vault-preview">
               {previewFailed &&

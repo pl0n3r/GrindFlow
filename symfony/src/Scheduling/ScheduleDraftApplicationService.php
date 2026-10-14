@@ -23,6 +23,25 @@ final readonly class ScheduleDraftApplicationService
     }
 
     /**
+     * Single source of truth for Library asset validity (UTC, half-open window
+     * [valid_from_at, valid_until_at)). Null bounds mean an open window. It is a
+     * scheduling exclusion only: never a license, approval or publication grant.
+     *
+     * @return 'not_yet_valid'|'valid'|'expired'
+     */
+    public static function validityState(?string $validFromAt, ?string $validUntilAt, string $atUtc): string
+    {
+        if ($validFromAt !== null && $atUtc < $validFromAt) {
+            return 'not_yet_valid';
+        }
+        if ($validUntilAt !== null && $atUtc >= $validUntilAt) {
+            return 'expired';
+        }
+
+        return 'valid';
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function reserve(
@@ -68,7 +87,7 @@ final readonly class ScheduleDraftApplicationService
 
                 $asset = $db->fetchAssociative(
                     <<<'SQL'
-                        SELECT id, original_name, usage_scope
+                        SELECT id, original_name, usage_scope, valid_from_at, valid_until_at
                         FROM gf_vault_assets
                         WHERE id = :asset AND organization_id = :organization
                           AND deleted_at IS NULL
@@ -108,6 +127,18 @@ final readonly class ScheduleDraftApplicationService
                     }
                 } else {
                     $reasons[] = 'classification_missing';
+                }
+
+                // Same window as the preview, revalidated under the asset lock for
+                // both "now" and the requested slot (manual and automatic paths).
+                $nowUtc = gmdate('Y-m-d H:i:s');
+                $slotUtc = str_replace(['T', 'Z'], [' ', ''], $scheduledAtUtc);
+                foreach ([$nowUtc, $slotUtc] as $instant) {
+                    $validity = self::validityState($asset['valid_from_at'], $asset['valid_until_at'], $instant);
+                    if ($validity !== 'valid') {
+                        $reasons[] = 'asset_'.$validity;
+                        break;
+                    }
                 }
 
                 $authorization = $db->fetchOne(
