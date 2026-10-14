@@ -111,6 +111,30 @@ class LabelSweepTests(unittest.TestCase):
         self.assertEqual(report["count"], 1)
         self.assertIn("#80", report["body"])
 
+    def test_planned_issues_are_not_reported_as_unclassified(self):
+        planned_numbers = [342, 343, 344, 345, 346, 347, 348, 350,
+                           351, 352, 353, 354, 355, 356, 358]
+        rows = [
+            item(number, ["tipo: producto", "prioridad: alta", "estado: planificado"])
+            for number in planned_numbers
+        ]
+        auto = item(
+            452, ["tipo: documentación", "prioridad: media", "estado: disponible"],
+            body=module.MARKER, title=module.AUTO_TITLE, user=module.BOT_LOGIN,
+        )
+        report = module.build_report([auto, *rows])
+        self.assertEqual(report["count"], 0)
+        self.assertEqual(report["existing_number"], 452)
+        self.assertIn("No hay ítems abiertos", report["body"])
+        self.assertNotIn("| #342 |", report["body"])
+
+        conflict = module.build_report([item(
+            460, ["tipo: producto", "prioridad: alta",
+                  "estado: planificado", "estado: disponible"],
+        )])
+        self.assertEqual(conflict["count"], 1)
+        self.assertIn("| #460 | Issue | estado |", conflict["body"])
+
     def test_cli_rejects_oversize_without_echo(self):
         result = subprocess.run(
             [sys.executable, str(PATH)],

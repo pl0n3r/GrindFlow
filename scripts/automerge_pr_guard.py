@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fail-closed exact-SHA auto-merge preflight. This script never writes to GitHub."""
+from datetime import datetime, timezone
 import json
 import os
 import re
@@ -58,6 +59,57 @@ def switch_running(issue):
             and value["state"] == "RUNNING" and value["owner"] == "pl0n3r")
 
 
+def verify_coderabbit_status(rows):
+    """Require an authenticated, completed CodeRabbit status for this SHA.
+
+    The REST /statuses history exposes author identity, unlike some
+    aggregate /status responses. A skipped state with conclusion success
+    is never equivalent to a completed security review.
+    """
+    if type(rows) is not list or not 1 <= len(rows) <= 100:
+        raise GuardError("coderabbit_status_history_missing")
+    seen = set()
+    previous = None
+    latest = None
+    for row in rows:
+        if type(row) is not dict or type(row.get("id")) is not int or row["id"] <= 0:
+            raise GuardError("coderabbit_status_history_invalid")
+        if row["id"] in seen:
+            raise GuardError("coderabbit_status_history_duplicate")
+        seen.add(row["id"])
+        created = row.get("created_at")
+        if type(created) is not str or not created.endswith("Z"):
+            raise GuardError("coderabbit_status_time_invalid")
+        try:
+            at = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        except ValueError as err:
+            raise GuardError("coderabbit_status_time_invalid") from err
+        if at.tzinfo is None or at.utcoffset() != timezone.utc.utcoffset(at):
+            raise GuardError("coderabbit_status_time_invalid")
+        # GitHub's status-history API presents newest statuses first.
+        # A changing/contradictory order is not evidence of completion.
+        if previous is not None and at > previous:
+            raise GuardError("coderabbit_status_order_changed")
+        previous = at
+        if row.get("context") != "CodeRabbit":
+            continue
+        author = row.get("creator")
+        if (type(author) is not dict
+                or author.get("login") != "coderabbitai[bot]"
+                or author.get("type") != "Bot"):
+            raise GuardError("coderabbit_status_author_unknown")
+        if latest is None:
+            latest = row
+    if latest is None:
+        raise GuardError("coderabbit_status_missing")
+    description = latest.get("description")
+    if (latest.get("state") != "success" or type(description) is not str
+            or description.strip().lower() not in {
+                "review completed", "review complete", "full review finished."
+            }):
+        raise GuardError("coderabbit_review_not_completed")
+
+
 def verify(snapshot, expected):
     if type(expected) is not str or not SHA.fullmatch(expected):
         raise GuardError("head_unknown")
@@ -100,6 +152,7 @@ def verify(snapshot, expected):
         if (type(app) is not dict or app.get("slug") != slug
                 or type(app.get("id")) is not int or app["id"] != app_id):
             raise GuardError("check_app_mismatch")
+    verify_coderabbit_status(snapshot.get("status_history"))
     reviews = snapshot.get("reviews")
     if type(reviews) is not list or len(reviews) > 100:
         raise GuardError("incomplete_reviews")
@@ -171,6 +224,7 @@ def read_snapshot(token, root, number, expected):
         "switch": get(token, "/repos/pl0n3r/Factory/issues/767"),
         "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
         "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100"),
+        "status_history": get(token, root + f"/commits/{expected}/statuses?per_page=100"),
     }
     base = get(token, root + "/branches/main")
     snapshot["main_sha"] = base.get("commit", {}).get("sha") if type(base) is dict else None

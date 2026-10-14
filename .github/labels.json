@@ -75,6 +75,11 @@
     "description": "Trabajo de baja urgencia o conveniencia."
   },
   {
+    "name": "estado: planificado",
+    "color": "C5DEF5",
+    "description": "Trabajo del roadmap aún no disponible para reserva ni ejecución."
+  },
+  {
     "name": "estado: disponible",
     "color": "2DA44E",
     "description": "Trabajo disponible para ser reservado."

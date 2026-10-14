@@ -27,7 +27,11 @@ def fixture():
             "main_sha": B,
             "checks": {"total_count": len(items), "check_runs": items},
             "reviews": [{"user": {"login": "coderabbitai[bot]", "type": "Bot"},
-                         "state": "COMMENTED", "commit_id": H, "body": "Full review finished."}]}
+                         "state": "COMMENTED", "commit_id": H, "body": "Full review finished."}],
+            "status_history": [{"id": 20, "context": "CodeRabbit", "state": "success",
+                                "description": "Review completed",
+                                "created_at": "2026-10-14T08:00:00Z",
+                                "creator": {"login": "coderabbitai[bot]", "type": "Bot"}}]}
 
 
 class AutoMergePrGuardTests(unittest.TestCase):
@@ -87,6 +91,68 @@ class AutoMergePrGuardTests(unittest.TestCase):
         case["reviews"][0]["body"] = "Full review finished."
         guard.verify(case, H)
 
+    def test_coderabbit_status_history_skipped_after_review_denied(self):
+        """A skipped status cannot hide behind an older completed review."""
+        guard.verify(fixture(), H)
+        for description, state in (
+            ("Review skipped: incremental reviews are disabled", "success"),
+            ("Review skipped: draft pull request", "success"),
+            ("Review rate limited", "success"),
+            ("Review in progress", "pending"),
+        ):
+            with self.subTest(description=description):
+                case = fixture()
+                case["status_history"].insert(0, {
+                    "id": 21, "context": "CodeRabbit", "state": state,
+                    "description": description,
+                    "created_at": "2026-10-14T08:01:00Z",
+                    "creator": {"login": "coderabbitai[bot]", "type": "Bot"},
+                })
+                self.denied(case)
+        case = fixture()
+        case["status_history"].append({
+            "id": 19, "context": "CodeRabbit", "state": "success",
+            "description": "Review skipped: draft pull request",
+            "created_at": "2026-10-14T07:59:00Z",
+            "creator": {"login": "coderabbitai[bot]", "type": "Bot"},
+        })
+        guard.verify(case, H)
+
+    def test_coderabbit_status_provenance_required(self):
+        for mutation in (
+            lambda s: s.pop("status_history"),
+            lambda s: s.update(status_history=[]),
+            lambda s: s.update(status_history={}),
+            lambda s: s["status_history"][0].update(context="other"),
+            lambda s: s["status_history"][0]["creator"].update(login="other"),
+            lambda s: s["status_history"][0]["creator"].update(type="User"),
+            lambda s: s["status_history"][0].pop("creator"),
+            lambda s: s["status_history"][0].update(state="pending"),
+            lambda s: s["status_history"][0].update(description=""),
+            lambda s: s["status_history"][0].update(created_at="not-a-time"),
+            lambda s: s["status_history"][0].update(id=True),
+            lambda s: s["status_history"].append(dict(s["status_history"][0])),
+        ):
+            case = fixture()
+            mutation(case)
+            self.denied(case)
+        case = fixture()
+        case["status_history"].insert(0, {
+            "id": 22, "context": "CodeRabbit", "state": "success",
+            "description": "Review completed",
+            "created_at": "2026-10-14T08:02:00Z",
+            "creator": {"login": "attacker", "type": "User"},
+        })
+        self.denied(case)
+        case = fixture()
+        case["status_history"].append({
+            "id": 19, "context": "CodeRabbit", "state": "success",
+            "description": "Review completed",
+            "created_at": "2026-10-14T08:03:00Z",
+            "creator": {"login": "coderabbitai[bot]", "type": "Bot"},
+        })
+        self.denied(case)
+
     def test_coderabbit_skipped_and_changes_requested_denied(self):
         for body in ("Review skipped: manual review required", "skip review", "rate limit", ""):
             case = fixture()
@@ -141,6 +207,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
                 rows.extend([
                     copy.deepcopy(state["pr"]), copy.deepcopy(state["switch"]),
                     copy.deepcopy(state["checks"]), copy.deepcopy(state["reviews"]),
+                    copy.deepcopy(state["status_history"]),
                     {"commit": {"sha": state["main_sha"]}},
                 ])
             return rows
@@ -149,6 +216,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
             "policy_failed": lambda s: s["checks"]["check_runs"][-1].update(conclusion="failure"),
             "policy_pending": lambda s: s["checks"]["check_runs"][-1].update(status="in_progress", conclusion=None),
             "review_missing": lambda s: s.update(reviews=[]),
+            "coderabbit_skipped": lambda s: s["status_history"][0].update(
+                description="Review skipped: incremental reviews are disabled"),
             "review_veto": lambda s: s["reviews"].append({
                 "user": {"login": "reviewer"}, "state": "CHANGES_REQUESTED",
                 "commit_id": H, "body": "blocking review"}),
@@ -165,11 +234,11 @@ class AutoMergePrGuardTests(unittest.TestCase):
                 with patch.dict(guard.os.environ, env, clear=True):
                     with patch.object(guard, "get", side_effect=responses(before, after)) as get_mock:
                         self.assertEqual(guard.main(), 1)
-                        self.assertEqual(get_mock.call_count, 10)
+                        self.assertEqual(get_mock.call_count, 12)
         with patch.dict(guard.os.environ, env, clear=True):
             with patch.object(guard, "get", side_effect=responses(fixture(), fixture())) as get_mock:
                 self.assertEqual(guard.main(), 0)
-                self.assertEqual(get_mock.call_count, 10)
+                self.assertEqual(get_mock.call_count, 12)
 
     def test_only_latest_decisive_review_per_reviewer_can_veto(self):
         reviewer = {"login": "security-reviewer"}
