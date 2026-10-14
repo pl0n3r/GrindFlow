@@ -1,9 +1,9 @@
 # Modelo de costos del piloto — GrindFlow (solo preparación)
 
-**Estado de costos:** UNKNOWN — sin consumos ni tarifas autenticados.
-**Precios finales:** NO DEFINIDOS.
-**Decisión de compra:** NO AUTORIZADA.
-**Activación / go-live:** NO AUTORIZADO.
+**Estado de costos:** UNKNOWN mientras no existan consumos y tarifas autenticados.
+**Precios finales:** NO DEFINIDOS por esta matriz sin evidencia y aprobación independientes.
+**Decisión de compra:** NO AUTORIZADA por esta matriz; requiere aprobación independiente.
+**Activación / go-live:** NO AUTORIZADO por esta matriz; requiere autorización independiente.
 
 Este documento enumera **rubros posibles**, no compras, cotizaciones, presupuestos aprobados, gastos incurridos, capacidad contratada ni certificación del piloto. Las referencias enlazadas identifican requisitos, **no evidencia de uso real ni ofertas de un proveedor**. No se consultan plataformas ni datos de clientes.
 
@@ -40,4 +40,4 @@ Para una ventana temporal y un proveedor validados, el subtotal de un rubro ser�
 
 Las siguientes puertas son **independientes**: costo estimado → revisión de presupuesto → contratación → go/no-go de piloto → publicación de versión → go-live. Esta matriz no aprueba ninguna de ellas. Las necesidades de operación y precio se coordinan mediante [#351](https://github.com/pl0n3r/GrindFlow/issues/351), las métricas reales del piloto mediante [#271](https://github.com/pl0n3r/GrindFlow/issues/271), y la preparación final mediante [#356](https://github.com/pl0n3r/GrindFlow/issues/356).
 
-**Resultado:** UNKNOWN / NO-GO documental. No hay precio definitivo, contrato autorizado, gasto, transferencia de datos ni activación de infraestructura.
+**Resultado:** UNKNOWN / NO-GO documental hasta acreditar evidencia suficiente. Esta matriz no autoriza precios definitivos, contratación, gasto, transferencia de datos ni activación de infraestructura.

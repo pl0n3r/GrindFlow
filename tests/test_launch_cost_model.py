@@ -18,10 +18,10 @@ REQUIRED = {
 SOURCE = "[#351](https://github.com/pl0n3r/GrindFlow/issues/351)"
 UNKNOWN_SOURCE = "UNKNOWN (sin medición autenticada)"
 STATUS = {
-    "Estado de costos": "UNKNOWN — sin consumos ni tarifas autenticados.",
-    "Precios finales": "NO DEFINIDOS.",
-    "Decisión de compra": "NO AUTORIZADA.",
-    "Activación / go-live": "NO AUTORIZADO.",
+    "Estado de costos": "UNKNOWN mientras no existan consumos y tarifas autenticados.",
+    "Precios finales": "NO DEFINIDOS por esta matriz sin evidencia y aprobación independientes.",
+    "Decisión de compra": "NO AUTORIZADA por esta matriz; requiere aprobación independiente.",
+    "Activación / go-live": "NO AUTORIZADO por esta matriz; requiere autorización independiente.",
 }
 
 
@@ -73,14 +73,19 @@ def parse_matrix(text: str) -> list[dict[str, str]]:
 def verify_decisions(text: str) -> None:
     for label, expected in STATUS.items():
         declaration = f"**{label}:** {expected}"
-        occurrences = [
-            line.strip() for line in text.splitlines()
-            if re.search(re.escape(label) + r"\s*:", line, re.IGNORECASE)
-            and line.lstrip().startswith("**")
-        ]
+        # Only a line-initial decision declaration is authoritative.
+        # Both plain and Markdown-emphasized labels must be inspected: an
+        # unformatted duplicate cannot silently authorize purchase/go-live.
+        marker = re.compile(
+            r"^[ \t]*(?:[-*+>][ \t]+|#{1,6}[ \t]+){0,2}(?:\*\*)?"
+            + re.escape(label) + r"[ \t]*(?:\*\*)?[ \t]*:(?:\*\*)?",
+            re.IGNORECASE,
+        )
+        occurrences = [line.strip() for line in text.splitlines()
+                       if marker.match(line)]
         if occurrences != [declaration]:
             raise ValueError("decisión ambigua, duplicada o falsamente aprobada")
-    if not text.endswith("**Resultado:** UNKNOWN / NO-GO documental. No hay precio definitivo, contrato autorizado, gasto, transferencia de datos ni activación de infraestructura.\n"):
+    if not text.endswith("**Resultado:** UNKNOWN / NO-GO documental hasta acreditar evidencia suficiente. Esta matriz no autoriza precios definitivos, contratación, gasto, transferencia de datos ni activación de infraestructura.\n"):
         raise ValueError("resultado documental no conserva NO-GO")
 
 
@@ -135,6 +140,24 @@ class LaunchCostModelTests(unittest.TestCase):
                 )
                 with self.assertRaises(ValueError):
                     verify_decisions(candidate)
+        # Plain/quoted declarations are not harmless prose, and must
+        # be rejected even when the canonical Markdown line remains present.
+        buy = "**Decisión de compra:** " + STATUS["Decisión de compra"]
+        for forged in ("Decisión de compra: AUTORIZADA.",
+                       "> Activación / go-live: AUTORIZADO.",
+                       "### Precios finales: $12/mes."):
+            with self.subTest(forged=forged):
+                candidate = self.doc.replace(buy, buy + "\n" + forged, 1)
+                self.assertNotEqual(candidate, self.doc)
+                with self.assertRaisesRegex(ValueError, "decisión ambigua"):
+                    verify_decisions(candidate)
+        # Prose mentions may document hazards without creating a decision.
+        prose = ("El ejemplo menciona Decisión de compra: AUTORIZADA "
+                 "para explicar una prohibición.")
+        candidate = self.doc.replace("## Método sin suposiciones monetarias",
+                                     prose + "\n\n## Método sin suposiciones monetarias", 1)
+        verify_decisions(candidate)
+
         with self.assertRaisesRegex(ValueError, "NO-GO"):
             verify_decisions(self.doc + "\n**Resultado:** GO\n")
 
