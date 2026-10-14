@@ -1,0 +1,212 @@
+<?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__, 2) . '/src/Scheduling/Studio/InheritedRuleSet.php';
+require dirname(__DIR__, 2) . '/src/Scheduling/Studio/StudioCalendarView.php';
+require dirname(__DIR__, 2) . '/src/Scheduling/Studio/TeamCapacityAnalyzer.php';
+
+use GrindFlow\Scheduling\Studio\InheritedRuleSet;
+use GrindFlow\Scheduling\Studio\StudioCalendarView;
+use GrindFlow\Scheduling\Studio\TeamCapacityAnalyzer;
+
+function check(bool $ok, string $name): void
+{
+    if (!$ok) { throw new RuntimeException('test_failed:' . $name); }
+}
+function rules(): array
+{
+    return ['daily_cap' => 5, 'minimum_gap_minutes' => 30, 'approval_required' => true];
+}
+function studio(): array
+{
+    return ['tenant_id' => 'tenant_1', 'studio_id' => 'studio_1', 'rules' => rules()];
+}
+function override(array $changes): array
+{
+    return ['tenant_id' => 'tenant_1', 'creator_id' => 'creator_1', 'changes' => $changes];
+}
+function slot(string $id, string $creator = 'creator_1'): array
+{
+    return ['tenant_id' => 'tenant_1', 'creator_id' => $creator,
+        'slot_id' => $id, 'day' => '2026-10-12', 'state' => 'awaiting_approval'];
+}
+function task(string $member, string $stage): array
+{
+    static $nextId = 0;
+    $nextId++;
+    return ['tenant_id' => 'tenant_1', 'task_id' => 'task_' . $nextId, 'creator_id' => 'creator_1',
+        'member_id' => $member, 'stage' => $stage, 'day' => '2026-10-12'];
+}
+$tests = [
+    'inheritance' => static function (): void {
+        $r = new InheritedRuleSet();
+        $original = studio();
+        $base = $r->resolve('tenant_1', 'creator_1', $original);
+        check($base['status'] === 'resolved' && $base['source'] === 'studio'
+            && $base['rules'] === rules(), 'inherited_without_mutation');
+        $new = $r->resolve('tenant_1', 'creator_1', $original, override(['daily_cap' => 2]));
+        check($new['status'] === 'resolved' && $new['source'] === 'creator_override'
+            && $new['rules']['daily_cap'] === 2 && $new['rules']['approval_required'] === true,
+            'explicit_override');
+        check($original['rules'] === rules(), 'studio_unmodified');
+        // Associative input maps may have any field order without losing validation.
+        $shuffledStudio = array_reverse(studio(), true);
+        $shuffledOverride = array_reverse(override(['daily_cap' => 2]), true);
+        check($r->resolve('tenant_1', 'creator_1', $shuffledStudio, $shuffledOverride)['status']
+            === 'resolved', 'reordered_studio_and_override');
+        // Reordering nested rules or override keys must never change the payload.
+        $nestedPermutation = studio();
+        $nestedPermutation['rules'] = array_reverse(rules(), true);
+        check($r->resolve('tenant_1', 'creator_1', $nestedPermutation) === $base
+            && $nestedPermutation['rules'] === array_reverse(rules(), true),
+            'canonical_studio_rule_order_without_input_mutation');
+        $permutedOverride = override(['approval_required' => true, 'daily_cap' => 2]);
+        $sameOverride = override(['daily_cap' => 2, 'approval_required' => true]);
+        $permutedStudio = $nestedPermutation;
+        check($r->resolve('tenant_1', 'creator_1', $permutedStudio, $permutedOverride)
+            === $r->resolve('tenant_1', 'creator_1', studio(), $sameOverride),
+            'canonical_override_payload_for_equivalent_maps');
+        $extraStudio = studio(); $extraStudio['unexpected'] = true;
+        check($r->resolve('tenant_1', 'creator_1', $extraStudio)['status'] === 'blocked',
+            'additional_studio_key_rejected');
+        $wrong = override(['daily_cap' => 2]); $wrong['creator_id'] = 'creator_2';
+        check($r->resolve('tenant_1', 'creator_1', studio(), $wrong)['status'] === 'blocked', 'creator_scope');
+        $wrong = override(['daily_cap' => 2]); $wrong['tenant_id'] = 'tenant_2';
+        check($r->resolve('tenant_1', 'creator_1', studio(), $wrong)['status'] === 'blocked', 'tenant_scope');
+        check($r->resolve('tenant_1', 'creator_1', studio(), override(['approval_required' => false]))['status'] === 'blocked',
+            'studio_approval_cannot_be_relaxed');
+        $lenient = studio(); $lenient['rules']['approval_required'] = false;
+        $stronger = $r->resolve('tenant_1', 'creator_1', $lenient, override(['approval_required' => true]));
+        check($stronger['status'] === 'resolved' && $stronger['rules']['approval_required'] === true,
+            'creator_may_require_approval');
+        check($r->resolve('tenant_1', '0', studio())['status'] === 'blocked',
+            'numeric_creator_id_rejected_by_rule_resolver');
+        check($r->resolve('tenant_1', 'creator_1', studio(), override(['secret' => 'x']))['status'] === 'blocked', 'unknown_override');
+        check($r->resolve('tenant_1', 'creator_1', studio(), override(['daily_cap' => '2']))['status'] === 'blocked', 'strict_types');
+        check($r->resolve('tenant_1', 'creator_1', null)['status'] === 'blocked', 'no_implicit_rules');
+    },
+    'calendar' => static function (): void {
+        $v = new StudioCalendarView();
+        $ok = $v->aggregate('tenant_1', ['creator_1', 'creator_2'], [slot('s1'), slot('s2', 'creator_2')]);
+        check($ok['status'] === 'ok' && $ok['total'] === 2
+            && $ok['by_creator']['creator_1']['awaiting_approval'] === 1
+            && $ok['by_creator']['creator_2']['awaiting_approval'] === 1,
+            'authorized_aggregation');
+        $creatorPermutation = $v->aggregate(
+            'tenant_1', ['creator_2', 'creator_1'], [slot('s2', 'creator_2'), slot('s1')],
+        );
+        $creatorCanonical = $v->aggregate(
+            'tenant_1', ['creator_1', 'creator_2'], [slot('s1'), slot('s2', 'creator_2')],
+        );
+        check($creatorPermutation === $creatorCanonical
+            && array_keys($creatorPermutation['by_creator']) === ['creator_1', 'creator_2'],
+            'global_view_stable_for_permuted_creator_allowlist');
+        check($v->aggregate('tenant_1', ['creator_1'], [array_reverse(slot('s6'), true)])['status']
+            === 'ok', 'reordered_slot_fields');
+        // The global view must not depend on query row order, including IDs
+        // such as "01" and "1" that PHP might compare as equal numerically.
+        $late = slot('slot_b', 'creator_2');
+        $late['day'] = '2026-10-13';
+        $unsorted = [$late, slot('1', 'creator_2'), slot('slot_c'),
+            slot('01', 'creator_2'), slot('slot_a')];
+        $global = $v->aggregate('tenant_1', ['creator_1', 'creator_2'], $unsorted);
+        $reverse = $v->aggregate('tenant_1', ['creator_1', 'creator_2'], array_reverse($unsorted));
+        check($global['status'] === 'ok' && $global['total'] === 5
+            && $global['slots'] === $reverse['slots']
+            && $global['by_creator'] === $reverse['by_creator']
+            && array_column($global['slots'], 'slot_id')
+                === ['slot_a', 'slot_c', '01', '1', 'slot_b'],
+            'calendar_order_is_deterministic_by_day_creator_and_id');
+        $creatorLocal = $v->aggregate('tenant_1', ['creator_1', 'creator_2'],
+            [slot('shared_id'), slot('shared_id', 'creator_2')]);
+        check($creatorLocal['status'] === 'ok' && $creatorLocal['total'] === 2,
+            'same_slot_id_allowed_for_distinct_creators');
+        check($v->aggregate('tenant_1', ['creator_1'],
+            [slot('shared_id'), slot('shared_id')])['status'] === 'blocked',
+            'duplicate_slot_same_creator_denied');
+        $foreign = slot('s3'); $foreign['tenant_id'] = 'tenant_2';
+        check($v->aggregate('tenant_1', ['creator_1'], [$foreign])['status'] === 'blocked', 'foreign_tenant');
+        check($v->aggregate('tenant_1', ['creator_1'], [slot('s4', 'creator_2')])['status'] === 'blocked', 'foreign_creator');
+        check($v->aggregate('tenant_1', ['0', '1'], [slot('s0', '0'), slot('s1', '1')])['status'] === 'blocked',
+            'numeric_creator_ids_cannot_become_json_array');
+        $alias = $v->aggregate('tenant_1', ['creator_0', 'creator_1'], [slot('s0', 'creator_0'), slot('s1', 'creator_1')]);
+        check($alias['status'] === 'ok'
+            && str_contains(json_encode($alias, JSON_THROW_ON_ERROR), '"by_creator":{"creator_0":'),
+            'creator_aliases_remain_json_object_keys');
+        check($v->aggregate('tenant_1', ['creator_1'], [slot('same'), slot('same')])['status'] === 'blocked', 'duplicate_slot');
+        check($v->aggregate('tenant_1', ['creator_1'], [slot('s5'), ['secret' => 'x']])['status'] === 'blocked', 'unknown_row');
+    },
+    'capacity' => static function (): void {
+        $a = new TeamCapacityAnalyzer();
+        $members = [['tenant_id' => 'tenant_1', 'member_id' => 'editor_1', 'daily_capacity' => 2]];
+        $tasks = [task('editor_1', 'preparation'), task('editor_1', 'approval'), task('editor_1', 'approval')];
+        $v = $a->analyze('tenant_1', $members, $tasks);
+        check($v['status'] === 'ok' && $v['task_count'] === 3
+            && count($v['bottlenecks']) === 1 && $v['bottlenecks'][0]['preparation'] === 1
+            && $v['bottlenecks'][0]['approval'] === 2
+            && $v['bottlenecks'][0]['total'] === 3, 'stage_specific_bottleneck');
+        // AC-03: the editor/day total must also identify per-creator pressure.
+        $mixed = [task('editor_1', 'preparation'), task('editor_1', 'approval'),
+            task('editor_1', 'approval')];
+        $mixed[1]['creator_id'] = 'creator_2';
+        $mixed[2]['creator_id'] = 'creator_2';
+        $multi = $a->analyze('tenant_1', $members, $mixed);
+        $overload = $multi['bottlenecks'][0] ?? [];
+        check($multi['status'] === 'ok'
+            && isset($overload['by_creator']['creator_1'], $overload['by_creator']['creator_2'])
+            && $overload['by_creator']['creator_1'] === ['preparation' => 1, 'approval' => 0]
+            && $overload['by_creator']['creator_2'] === ['preparation' => 0, 'approval' => 2]
+            && $overload['total'] === 3, 'creator_breakdown_of_daily_bottleneck');
+        $taskOne = task('editor_1', 'approval');
+        check($a->analyze('tenant_1', $members, [$taskOne, $taskOne])['status'] === 'blocked',
+            'duplicate_task_id_denied');
+        $taskTwo = $taskOne;
+        $taskTwo['task_id'] = 'different_task_id';
+        $distinct = $a->analyze('tenant_1', $members, [$taskOne, $taskTwo]);
+        check($distinct['status'] === 'ok' && $distinct['task_count'] === 2
+            && $distinct['bottlenecks'] === [],
+            'distinct_task_ids_same_business_fields_valid');
+        $noId = $taskOne;
+        unset($noId['task_id']);
+        check($a->analyze('tenant_1', $members, [$noId])['status'] === 'blocked',
+            'missing_task_id_denied');
+        $reversed = $a->analyze('tenant_1', $members, array_reverse($mixed));
+        check($reversed['bottlenecks'] === $multi['bottlenecks'],
+            'stable_breakdown_for_reordered_tasks');
+        $tomorrow = task('editor_1', 'approval');
+        $tomorrow['day'] = '2026-10-13';
+        check($a->analyze('tenant_1', $members, [$mixed[0], $mixed[1], $tomorrow])['bottlenecks'] === [],
+            'daily_capacity_not_combined_across_days');
+        check($a->analyze('tenant_1', $members, array_slice($tasks, 0, 2))['bottlenecks'] === [], 'within_capacity');
+        check($a->analyze('tenant_1', [array_reverse($members[0], true)],
+            [array_reverse(task('editor_1', 'approval'), true)])['status'] === 'ok',
+            'reordered_member_and_task');
+        $bad = task('editor_1', 'approval'); $bad['tenant_id'] = 'tenant_2';
+        check($a->analyze('tenant_1', $members, [$bad])['status'] === 'blocked', 'tenant_scoped');
+        check($a->analyze('tenant_1', [], [task('editor_1', 'preparation')])['status'] === 'blocked', 'unknown_assignment');
+        $numericCreator = task('editor_1', 'approval'); $numericCreator['creator_id'] = '0';
+        check($a->analyze('tenant_1', $members, [$numericCreator])['status'] === 'blocked',
+            'numeric_capacity_creator_id_rejected');
+        $zero = [['tenant_id' => 'tenant_1', 'member_id' => 'editor_1', 'daily_capacity' => 0]];
+        check(count($a->analyze('tenant_1', $zero, [task('editor_1', 'approval')])['bottlenecks']) === 1, 'no_capacity');
+    },
+    'independent' => static function (): void {
+        $r = new InheritedRuleSet();
+        $independent = $r->resolve('tenant_1', 'creator_1', null, override(rules()));
+        check($independent['status'] === 'resolved' && $independent['source'] === 'independent'
+            && $independent['execution_performed'] === false, 'independent_no_studio');
+        check($r->resolve('tenant_1', 'creator_1', null, override(array_reverse(rules(), true)))
+            === $independent, 'independent_rules_have_stable_order');
+        $view = (new StudioCalendarView())->aggregate('tenant_1', ['creator_1'], [slot('s1')]);
+        check($view['status'] === 'ok' && count($view['by_creator']) === 1, 'independent_calendar');
+        $cap = (new TeamCapacityAnalyzer())->analyze('tenant_1', [], []);
+        check($cap['status'] === 'ok' && $cap['bottlenecks'] === []
+            && $cap['execution_performed'] === false, 'independent_no_members');
+    },
+];
+$name = $argv[1] ?? null;
+if ($name !== null && !isset($tests[$name])) { fwrite(STDERR, "unknown_case\n"); exit(2); }
+foreach ($tests as $id => $test) {
+    if ($name === null || $name === $id) { $test(); echo "PASS {$id}\n"; }
+}
