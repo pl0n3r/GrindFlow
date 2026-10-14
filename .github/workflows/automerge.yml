@@ -2,15 +2,35 @@ name: Auto-merge cuando esté listo
 on:
   pull_request_target:
     types: [opened, reopened, ready_for_review, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 jobs:
   automerge:
-    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.fork == false &&
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
-      - env:
-          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Checkout trusted base only
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Verify exact-HEAD policy and substantive bot review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/automerge_pr_guard.py
+      - name: Arm exact-SHA normal squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: gh pr merge --auto --squash --match-head-commit "$PR_SHA" "$PR_URL"
