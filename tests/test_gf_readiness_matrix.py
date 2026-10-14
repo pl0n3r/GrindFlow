@@ -79,6 +79,17 @@ class GrindFlowReadinessMatrixTests(unittest.TestCase):
                 self.assertEqual(main(["--input", str(path), "--format", "markdown"]), 0)
             self.assertEqual(md, buffer.getvalue())
 
+    def test_duplicate_json_keys_are_rejected_not_hidden_by_parser(self) -> None:
+        malicious = ('{"as_of": "2026-10-13T20:00:00Z", '
+                     '"as_of": "2026-10-13T20:00:00Z", '
+                     '"milestones": {}, "signals": {}, "risks": []}')
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "ambiguous.json"
+            path.write_text(malicious, encoding="utf-8")
+            with self.assertRaises(SystemExit) as failed:
+                main(["--input", str(path)])
+            self.assertEqual(failed.exception.code, 2)
+
     def test_version_sha_deploy_production_are_separate_signals(self) -> None:
         data = deepcopy(self.manifest)
         del data["signals"]["sha"]

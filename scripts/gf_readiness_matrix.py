@@ -132,6 +132,16 @@ def render_markdown(report: dict[str, Any]) -> str:
     return "\n".join(rows) + "\n"
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """No aceptar ambigüedad de un JSON con claves repetidas en ningún nivel."""
+    unique: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in unique:
+            raise ValueError("Evidencia JSON ambigua: clave duplicada")
+        unique[key] = value
+    return unique
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path,
@@ -139,7 +149,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     args = parser.parse_args(argv)
     try:
-        manifest = json.loads(args.input.read_text(encoding="utf-8"))
+        manifest = json.loads(
+            args.input.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
         report = evaluate(manifest)
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
         parser.exit(2, "Evidencia inválida, readiness UNKNOWN: " + str(exc) + "\n")
