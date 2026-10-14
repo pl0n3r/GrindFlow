@@ -22,8 +22,8 @@ class FactoryCoordinationAdoptionTests(unittest.TestCase):
         text = (ROOT / ".github/workflows/work-coordination.yml").read_text(encoding="utf-8")
         job = text.split("  comentario:", 1)[1].split("  etiqueta:", 1)[0]
         guard = job.split("    if:", 1)[1].split("    # GitHub valida", 1)[0]
-        exact = re.findall(r"github\\.event\\.comment\\.body == '([^']+)'", guard)
-        prefixes = re.findall(r"startsWith\\(github\\.event\\.comment\\.body, '([^']+)'\\)", guard)
+        exact = re.findall(r"github\.event\.comment\.body == '([^']+)'", guard)
+        prefixes = re.findall(r"startsWith\(github\.event\.comment\.body, '([^']+)'\)", guard)
         return guard, exact, prefixes
 
     def test_comment_dispatch_does_not_match_embedded_prose(self):
@@ -41,7 +41,7 @@ class FactoryCoordinationAdoptionTests(unittest.TestCase):
             "### Nota sobre /adoptar-contrato-huerfana",
             "Se documentó /transferir 12345678-1234-4234-8234-123456789abc",
             "documentación sobre /renovar-contrato 12345678-1234-4234-8234-123456789abc",
-            "texto\\n/tomar",
+            "texto\n/tomar",
             " /tomar",
             "/tomar documentación",
         ):
