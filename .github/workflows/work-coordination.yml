@@ -32,14 +32,7 @@ jobs:
         startsWith(github.event.comment.body, '/liberar ') ||
         startsWith(github.event.comment.body, '/transferir ') ||
         startsWith(github.event.comment.body, '/migrar-contrato ') ||
-        startsWith(github.event.comment.body, '/renovar-contrato ') ||
-        contains(github.event.comment.body, '/tomar') ||
-        contains(github.event.comment.body, '/liberar-forzado') ||
-        contains(github.event.comment.body, '/adoptar-contrato-huerfana') ||
-        contains(github.event.comment.body, '/liberar ') ||
-        contains(github.event.comment.body, '/transferir ') ||
-        contains(github.event.comment.body, '/migrar-contrato ') ||
-        contains(github.event.comment.body, '/renovar-contrato ')
+        startsWith(github.event.comment.body, '/renovar-contrato ')
       )
     # GitHub valida el máximo permission envelope del reusable antes de
     # seleccionar el job interno. El reusable conserva mínimo privilegio por job.

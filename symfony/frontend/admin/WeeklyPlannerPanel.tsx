@@ -1,6 +1,20 @@
 import { ScheduleDraftPanel } from './ScheduleDraftPanel';
 import { useEffect, useState, type FormEvent } from 'react';
 
+type AutomationConfig = {
+  ready: boolean;
+  rule: null | {
+    state: 'active' | 'paused';
+    local_times: string[];
+    destination_id: string | null;
+    source: 'eligible_assets';
+    provider: 'facebook_page';
+    max_per_day: number;
+    timezone: string;
+  };
+  provider_calls: false;
+};
+
 type WeeklyRule = {
   timezone: string;
   weekdays: string[];
@@ -87,6 +101,11 @@ export function WeeklyPlannerPanel({
   canManualHandoff, manualHandoffCsrf, manualDestinationCsrf,
 }: Props) {
   const [rule, setRule] = useState<WeeklyRule | null>(null);
+  const [automation, setAutomation] = useState<AutomationConfig | null>(null);
+  const [automationState, setAutomationState] = useState<'active' | 'paused'>('paused');
+  const [automationTimes, setAutomationTimes] = useState('');
+  const [automationDestination, setAutomationDestination] = useState('');
+  const [automationBusy, setAutomationBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [timezone, setTimezone] = useState(browserTimezone());
   const [weekdays, setWeekdays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
@@ -103,13 +122,18 @@ export function WeeklyPlannerPanel({
     setLoading(true);
     setError('');
     try {
-      const [ruleResponse, previewResponse] = await Promise.all([
+      const [ruleResponse, previewResponse, automationResponse] = await Promise.all([
         fetch('/api/admin/rules/weekly', {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
           signal,
         }),
         fetch('/api/admin/rules/weekly/preview', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal,
+        }),
+        fetch('/api/admin/rules/automation', {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
           signal,
@@ -123,6 +147,17 @@ export function WeeklyPlannerPanel({
         throw new Error(previewBody?.error?.message ?? 'No se pudo preparar la vista previa.');
       }
 
+      // Automation has separate schema readiness, never inferred from weekly slots.
+      if (automationResponse.ok) {
+        const automationBody = await automationResponse.json();
+        const config = automationBody?.data as AutomationConfig;
+        if (config?.provider_calls === false) {
+          setAutomation(config);
+          setAutomationState(config.rule?.state ?? 'paused');
+          setAutomationTimes((config.rule?.local_times ?? []).join(','));
+          setAutomationDestination(config.rule?.destination_id ?? '');
+        }
+      }
       const nextRule = (ruleBody?.data?.rule ?? null) as WeeklyRule | null;
       const nextPreview = previewBody?.data as Preview;
       setRule(nextRule);
@@ -187,6 +222,36 @@ export function WeeklyPlannerPanel({
       setError(caught instanceof Error ? caught.message : 'No se pudo guardar la regla semanal.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveAutomation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canEdit || !csrf || !automation?.ready || automationBusy) return;
+    setAutomationBusy(true);
+    setError('');
+    setFeedback('');
+    const times = automationTimes.split(',').map((value) => value.trim()).filter(Boolean);
+    try {
+      const response = await fetch('/api/admin/rules/automation', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({
+          state: automationState,
+          local_times: times,
+          destination_id: automationDestination.trim() || null,
+          source: 'eligible_assets',
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo guardar la automatización.');
+      setAutomation(body.data as AutomationConfig);
+      setFeedback('Preferencias guardadas. Solo crea borradores locales mediante ejecución autorizada; no publica.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo actualizar la automatización.');
+    } finally {
+      setAutomationBusy(false);
     }
   }
 
@@ -301,6 +366,35 @@ export function WeeklyPlannerPanel({
             </button>
           </form>
         : <p className="weekly-readonly">Tu rol puede consultar la planificación, pero no modificar la regla semanal.</p>}
+
+      <section aria-label="Automatización de borradores S4">
+        <h3>Automatización local · MVP S4</h3>
+        <p>Esta pantalla solo configura futuros borradores. No ejecuta cron ni envía a Facebook.</p>
+        {automation?.ready && automation.rule && canEdit && csrf
+          ? <form onSubmit={saveAutomation}>
+              <label>Estado
+                <select value={automationState}
+                  onChange={(event) => setAutomationState(event.target.value as 'active' | 'paused')}>
+                  <option value="paused">Pausada</option>
+                  <option value="active">Activa para preparación local</option>
+                </select>
+              </label>
+              <label>Horas locales (HH:MM, separadas por comas)
+                <input value={automationTimes} onChange={(event) => setAutomationTimes(event.target.value)}
+                  maxLength={95} placeholder="09:00,18:00" />
+              </label>
+              <label>ID de página Facebook autorizada
+                <input value={automationDestination}
+                  onChange={(event) => setAutomationDestination(event.target.value)}
+                  maxLength={32} inputMode="numeric" autoComplete="off" />
+              </label>
+              <p>Origen: recursos elegibles · {automation.rule.timezone} · máximo {automation.rule.max_per_day} horarios diarios.</p>
+              <button type="submit" disabled={automationBusy}>
+                {automationBusy ? 'Guardando…' : 'Guardar automatización'}
+              </button>
+            </form>
+          : <p role="status">La configuración de automatización requiere la regla semanal, permisos y migración S4.</p>}
+      </section>
 
       {feedback && <p className="weekly-feedback" role="status">{feedback}</p>}
       {error && <p className="weekly-error" role="alert">{error}</p>}
