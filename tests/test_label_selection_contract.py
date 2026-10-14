@@ -28,6 +28,19 @@ class LabelSelectionTests(unittest.TestCase):
         ])
         self.assertEqual(result["types"], ["tipo: producto", "tipo: seguridad"])
 
+    def test_planned_state_is_canonical_but_conflicting_states_fail(self):
+        planned = ["tipo: producto", "prioridad: alta", "estado: planificado"]
+        self.assertEqual(
+            module.validate_selection(planned)["states"], ["estado: planificado"],
+        )
+        catalog = json.loads((ROOT / ".github/labels.json").read_text(encoding="utf-8"))
+        self.assertEqual(sum(x["name"] == "estado: planificado" for x in catalog), 1)
+        for bad in (planned + ["estado: disponible"],
+                    planned[:-1] + ["estado: inventado"]):
+            with self.subTest(bad=bad):
+                with self.assertRaises(module.LabelSelectionError):
+                    module.validate_selection(bad)
+
     def test_missing_or_duplicate_dimensions_fail_closed(self):
         invalid = [
             BASE[1:], BASE[:1] + BASE[2:], BASE[:2],
