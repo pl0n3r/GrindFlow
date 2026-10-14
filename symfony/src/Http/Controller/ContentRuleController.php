@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use GrindFlow\Scheduling\WeeklySlotCalculator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -177,6 +178,7 @@ final class ContentRuleController extends AbstractController
         $assets = $db->fetchAllAssociative(
             <<<'SQL'
                 SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at,
+                    asset.valid_from_at, asset.valid_until_at,
                     (
                         SELECT review_event.action
                         FROM gf_content_review_events review_event
@@ -233,7 +235,8 @@ final class ContentRuleController extends AbstractController
             $params,
         );
 
-        $items = array_map(function (array $asset) use ($rule): array {
+        $nowUtc = gmdate('Y-m-d H:i:s');
+        $items = array_map(function (array $asset) use ($rule, $nowUtc): array {
             $reasons = [];
             if ($rule === false) {
                 $reasons[] = 'weekly_rule_missing';
@@ -247,6 +250,15 @@ final class ContentRuleController extends AbstractController
             } elseif ($scope === 'needs_review' && !$contentReviewApproved) {
                 $reasons[] = 'content_review_required';
             }
+            // Same single validity semantics as the reservation boundary.
+            $validityState = ScheduleDraftApplicationService::validityState(
+                isset($asset['valid_from_at']) ? (string) $asset['valid_from_at'] : null,
+                isset($asset['valid_until_at']) ? (string) $asset['valid_until_at'] : null,
+                $nowUtc,
+            );
+            if ($validityState !== 'valid') {
+                $reasons[] = 'asset_'.$validityState;
+            }
             $distributionAuthorized = ($asset['distribution_action'] ?? null) === 'grant';
             if (!$distributionAuthorized) {
                 $reasons[] = 'distribution_authorization_missing';
@@ -257,6 +269,7 @@ final class ContentRuleController extends AbstractController
                 'name' => (string) $asset['original_name'],
                 'mime_type' => (string) $asset['mime_type'],
                 'usage_scope' => $scope,
+                'validity_state' => $validityState,
                 'content_review_approved' => $contentReviewApproved,
                 'content_review_updated_at' => $asset['content_review_updated_at'] === null
                     ? null

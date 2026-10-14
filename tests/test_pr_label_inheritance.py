@@ -80,6 +80,17 @@ class PrLabelInheritanceTests(unittest.TestCase):
         self.assertNotIn("estado: bloqueado", add)
         self.assertNotIn("cliente: valor-libre", add)
 
+    def test_planned_issue_state_is_not_inherited_into_pr(self):
+        source = ["tipo: infraestructura", "prioridad: alta", "estado: planificado"]
+        self.assertEqual(
+            module.plan_inheritance([], source),
+            ["estado: en revisión", "prioridad: alta", "tipo: infraestructura"],
+        )
+        with self.assertRaises(module.InheritanceError):
+            module.plan_inheritance(
+                ["estado: en revisión", "estado: planificado"], source,
+            )
+
     def test_invalid_source_or_conflicting_pr_fails_closed(self):
         invalid_sources = [
             ["prioridad: alta", "estado: disponible"],
