@@ -126,6 +126,19 @@ def get(token, path):
         raise GuardError("invalid_response") from err
 
 
+def read_snapshot(token, root, number, expected):
+    """Fetch independent live policy, reviewer, base and switch evidence."""
+    snapshot = {
+        "pr": get(token, root + f"/pulls/{number}"),
+        "switch": get(token, "/repos/pl0n3r/Factory/issues/767"),
+        "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
+        "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100"),
+    }
+    base = get(token, root + "/branches/main")
+    snapshot["main_sha"] = base.get("commit", {}).get("sha") if type(base) is dict else None
+    return snapshot
+
+
 def main():
     try:
         token = os.environ.get("GH_TOKEN")
@@ -135,21 +148,11 @@ def main():
                 or SHA.fullmatch(expected) is None or not 1 <= number <= 1000000):
             raise GuardError("invalid_environment")
         root = "/repos/" + REPO
-        snapshot = {
-            "pr": get(token, root + f"/pulls/{number}"),
-            "switch": get(token, "/repos/pl0n3r/Factory/issues/767"),
-            "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
-            "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100"),
-        }
-        base = get(token, root + "/branches/main")
-        snapshot["main_sha"] = base.get("commit", {}).get("sha") if type(base) is dict else None
-        verify(snapshot, expected)
-        current = get(token, root + f"/pulls/{number}")
-        switch = get(token, "/repos/pl0n3r/Factory/issues/767")
-        if (type(current) is not dict or type(current.get("head")) is not dict
-                or current["head"].get("sha") != expected or current.get("draft") is not False
-                or not switch_running(switch)):
-            raise GuardError("pre_merge_identity_changed")
+        # The first snapshot can become stale while we check it.
+        verify(read_snapshot(token, root, number, expected), expected)
+        # Re-read ALL security gates immediately before the merge step:
+        # policy, review, branch base and the global kill switch, not just HEAD.
+        verify(read_snapshot(token, root, number, expected), expected)
     except (GuardError, ValueError, TypeError, KeyError) as err:
         reason = str(err) if type(err) is GuardError else "invalid_input"
         print("AUTOMERGE_DENIED: " + reason, file=sys.stderr)

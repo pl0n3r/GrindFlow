@@ -83,6 +83,47 @@ class AutoMergePrGuardTests(unittest.TestCase):
         with self.assertRaises(guard.GuardError):
             json.loads('{"a":1,"a":2}', object_pairs_hook=guard.unique)
 
+    def test_second_snapshot_denies_policy_review_base_and_switch_races(self):
+        """A late security veto must deny, even after a passing first snapshot."""
+        import copy
+        from unittest.mock import patch
+
+        def responses(before, after):
+            rows = []
+            for state in (before, after):
+                rows.extend([
+                    copy.deepcopy(state["pr"]), copy.deepcopy(state["switch"]),
+                    copy.deepcopy(state["checks"]), copy.deepcopy(state["reviews"]),
+                    {"commit": {"sha": state["main_sha"]}},
+                ])
+            return rows
+
+        races = {
+            "policy_failed": lambda s: s["checks"]["check_runs"][-1].update(conclusion="failure"),
+            "policy_pending": lambda s: s["checks"]["check_runs"][-1].update(status="in_progress", conclusion=None),
+            "review_missing": lambda s: s.update(reviews=[]),
+            "review_veto": lambda s: s["reviews"].append({
+                "user": {"login": "reviewer"}, "state": "CHANGES_REQUESTED",
+                "commit_id": H, "body": "blocking review"}),
+            "base_sha_changed": lambda s: s.update(main_sha=H),
+            "switch_paused": lambda s: s["switch"].update(body=M.replace("RUNNING", "PAUSED")),
+            "pr_head_changed": lambda s: s["pr"]["head"].update(sha=B),
+        }
+        env = {"GH_TOKEN": "offline-placeholder", "PR_SHA": H,
+               "PR_NUMBER": "485", "GITHUB_REPOSITORY": guard.REPO}
+        for name, mutation in races.items():
+            with self.subTest(race=name):
+                before, after = fixture(), fixture()
+                mutation(after)
+                with patch.dict(guard.os.environ, env, clear=True):
+                    with patch.object(guard, "get", side_effect=responses(before, after)) as get_mock:
+                        self.assertEqual(guard.main(), 1)
+                        self.assertEqual(get_mock.call_count, 10)
+        with patch.dict(guard.os.environ, env, clear=True):
+            with patch.object(guard, "get", side_effect=responses(fixture(), fixture())) as get_mock:
+                self.assertEqual(guard.main(), 0)
+                self.assertEqual(get_mock.call_count, 10)
+
     def test_successful_evidence_allows_only_sha_locked_auto_merge(self):
         guard.verify(fixture(), H)
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
