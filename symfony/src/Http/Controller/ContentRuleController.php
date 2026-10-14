@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Library\AssetLifecycle;
 use GrindFlow\Library\AssetNetworkRules;
 use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use GrindFlow\Scheduling\WeeklySlotCalculator;
@@ -179,7 +180,7 @@ final class ContentRuleController extends AbstractController
         $assets = $db->fetchAllAssociative(
             <<<'SQL'
                 SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at,
-                    asset.valid_from_at, asset.valid_until_at,
+                    asset.valid_from_at, asset.valid_until_at, asset.lifecycle_state,
                     (
                         SELECT review_event.action
                         FROM gf_content_review_events review_event
@@ -266,6 +267,9 @@ final class ContentRuleController extends AbstractController
             if ($validityState !== 'valid') {
                 $reasons[] = 'asset_'.$validityState;
             }
+            foreach (AssetLifecycle::blockingReasons($asset['lifecycle_state'] ?? null) as $lifecycleReason) {
+                $reasons[] = $lifecycleReason;
+            }
             foreach ($networkRules->blockingReasons(
                 $organizationId, (string) $asset['id'], AssetNetworkRules::DEFAULT_NETWORK, $networkInstant,
             ) as $networkReason) {
@@ -282,6 +286,7 @@ final class ContentRuleController extends AbstractController
                 'mime_type' => (string) $asset['mime_type'],
                 'usage_scope' => $scope,
                 'validity_state' => $validityState,
+                'lifecycle_state' => AssetLifecycle::effectiveState($asset['lifecycle_state'] ?? null, $validityState),
                 'content_review_approved' => $contentReviewApproved,
                 'content_review_updated_at' => $asset['content_review_updated_at'] === null
                     ? null

@@ -16,7 +16,7 @@ restricciones individuales. Las restricciones son **solo denegación** (tabla
 | `upload`, `edit`, `archive` | admin, studio, editor | `content_prepare` |
 | `approve` | admin, studio, editor | `content_review_decide` |
 | `authorize_publication` | admin, studio | `distribution_authorize` |
-| `delete` | nadie | no existe borrado permanente en Vault; denegada por defecto |
+| `delete` | admin | eliminación definitiva explícita de un asset ya en papelera (#415); los demás roles, denegada |
 
 Todo lo que no se puede probar (capacidad desconocida, membresía inexistente o inactiva,
 otra organización) se deniega. `VaultController` aplica `view` en el contexto común,

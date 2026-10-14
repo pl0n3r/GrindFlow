@@ -606,3 +606,9 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
 - **GF-LIB-046:** una política de reutilización por asset y red (`single_use`, `max_n`, `unlimited`) con intervalo mínimo se evalúa en el horario pedido contando borradores no cancelados (`reuse_exhausted`, `reuse_interval`). Sin política = ilimitada.
 - **GF-LIB-045-DELIVERY:** migración aditiva, sin publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-NETWORK-REUSE.md`.
 
+### Library — estados y papelera (hoja GrindFlow #415, decisiones #44/#54)
+
+- **GF-LIB-044:** cada asset tiene un estado de ciclo de vida (`new`, `ready`, `in_review`, `in_use`, `paused`, `blocked`, `archived`; `expired` derivado de la vigencia) con transiciones válidas cerradas. Todo intento, aplicado o rechazado, queda auditado; `paused`, `blocked` y `archived` excluyen el asset de la programación.
+- **GF-LIB-054:** el borrado es reversible (actor y fecha) y la restauración conserva el historial. La eliminación definitiva exige la capacidad `delete` (admin), confirmación explícita y un asset ya en la papelera; borra el original privado pero conserva la fila, los eventos y las métricas históricas.
+- **GF-LIB-044-DELIVERY:** migración aditiva, sin publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-LIFECYCLE.md`.
+

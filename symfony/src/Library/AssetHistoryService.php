@@ -29,7 +29,7 @@ final readonly class AssetHistoryService
     public function forAsset(string $organizationId, string $assetId): ?array
     {
         $asset = $this->db->fetchAssociative(
-            'SELECT id, mime_type, size_bytes, created_at, uploaded_by, deleted_at, deleted_by FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
+            'SELECT id, mime_type, size_bytes, created_at, uploaded_by, deleted_at, deleted_by, purged_at, purged_by FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
             ['id' => $assetId, 'organization' => $organizationId],
         );
         if ($asset === false) {
@@ -49,6 +49,18 @@ final readonly class AssetHistoryService
         ]);
         if ($asset['deleted_at'] !== null) {
             $add('archived', (string) $asset['deleted_at'], $ref($asset['deleted_by']));
+        }
+        if ($asset['purged_at'] !== null) {
+            $add('purged', (string) $asset['purged_at'], $ref($asset['purged_by']));
+        }
+        foreach ($this->db->fetchAllAssociative(
+            'SELECT from_state, to_state, outcome, reason, actor_id, created_at FROM gf_vault_asset_lifecycle_events WHERE organization_id = :organization AND asset_id = :asset',
+            $params,
+        ) as $row) {
+            $add('lifecycle_transition', (string) $row['created_at'], $ref($row['actor_id']), [
+                'from' => (string) $row['from_state'], 'to' => (string) $row['to_state'],
+                'outcome' => (string) $row['outcome'], 'reason' => $row['reason'] === null ? null : (string) $row['reason'],
+            ]);
         }
         foreach ($this->db->fetchAllAssociative(
             'SELECT action, actor_id, created_at FROM gf_content_review_events WHERE organization_id = :organization AND asset_id = :asset',
