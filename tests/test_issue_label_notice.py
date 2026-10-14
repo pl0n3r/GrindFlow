@@ -114,6 +114,28 @@ class IssueLabelNoticeTests(unittest.TestCase):
         self.assertEqual(sum("/labels" in " ".join(args) for args in calls), 0)
         self.assertEqual(issue["labels"][-1]["name"], "estado: personalizado")
 
+    def test_planned_state_is_canonical_and_never_replaced(self):
+        issue = {"labels": [
+            {"name": "tipo: producto"}, {"name": "prioridad: media"},
+            {"name": "estado: planificado"},
+        ]}
+        calls = []
+
+        def fake_gh(*args):
+            calls.append(args)
+            if args[0] == "--paginate":
+                return [[]]
+            return issue
+
+        self.assertEqual(module.missing(module.names_of(issue)), ())
+        with patch.dict(module.os.environ, {
+            "GITHUB_REPOSITORY": "pl0n3r/GrindFlow", "ISSUE_NUMBER": "342",
+        }), patch.object(module, "gh", fake_gh):
+            self.assertEqual(module.main(), 0)
+        self.assertFalse(any("/labels" in " ".join(args) for args in calls))
+        self.assertFalse(any(args[:2] == ("--method", "POST") for args in calls))
+        self.assertEqual(issue["labels"][-1]["name"], "estado: planificado")
+
     def test_workflow_triggers_only_issue_metadata_and_limited_permissions(self):
         workflow = (ROOT / ".github/workflows/aviso-etiquetas-issues.yml").read_text()
         self.assertIn("types: [opened, edited, labeled, unlabeled, reopened]", workflow)

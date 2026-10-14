@@ -10,6 +10,7 @@ use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Infrastructure\Storage\DirectUploadReadiness;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
+use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -128,7 +129,7 @@ final class VaultController extends AbstractController
         $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$listFilter, $listParams);
         // Order-by is strictly selected from trusted SQL constants above; never interpolate client text.
         $assets = $db->fetchAllAssociative(
-            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at, asset.usage_scope '
+            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at, asset.usage_scope, asset.valid_from_at, asset.valid_until_at '
             .$scope.$filter.$listFilter.' ORDER BY '.$sortOrders[$sort].', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
             $listParams,
         );
@@ -298,7 +299,7 @@ final class VaultController extends AbstractController
         }
 
         $asset = $db->fetchAssociative(
-            'SELECT id, original_name, mime_type, size_bytes, created_at, usage_scope FROM gf_vault_assets WHERE id = :id',
+            'SELECT id, original_name, mime_type, size_bytes, created_at, usage_scope, valid_from_at, valid_until_at FROM gf_vault_assets WHERE id = :id',
             ['id' => $id],
         );
 
@@ -315,7 +316,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note, asset.usage_scope
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note, asset.usage_scope, asset.valid_from_at, asset.valid_until_at
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -720,6 +721,94 @@ final class VaultController extends AbstractController
     }
 
     /**
+     * Set or clear the optional UTC validity window of one active original.
+     * A window only excludes the asset from automation; it grants nothing.
+     */
+    #[Route('/api/admin/vault/{id}/validity', name: 'grindflow_vault_validity', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
+    public function validity(Request $request, MembershipContext $memberships, Connection $db, string $id): JsonResponse
+    {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite editar la vigencia.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado o es inválida.');
+        }
+        $body = json_decode($request->getContent(), true);
+        if ($request->request->all() !== [] || $request->files->all() !== [] || !is_array($body)
+            || array_keys($body) !== ['valid_from_at', 'valid_until_at']) {
+            return $this->error(422, 'invalid_validity', 'Indica únicamente inicio y fin de vigencia en UTC o null.');
+        }
+        $from = $this->parseUtcBound($body['valid_from_at']);
+        $until = $this->parseUtcBound($body['valid_until_at']);
+        if ($from === false || $until === false || ($from !== null && $until !== null && $until <= $from)) {
+            return $this->error(422, 'invalid_validity', 'La vigencia debe usar UTC (AAAA-MM-DDThh:mm:ssZ) y el fin debe ser posterior al inicio.');
+        }
+        $result = $db->transactional(function (Connection $db) use ($context, $id, $from, $until): string {
+            $organization = $context['organization']['id'];
+            if ($db->fetchOne(
+                'SELECT id FROM gf_identity_organizations WHERE id = :organization FOR UPDATE',
+                ['organization' => $organization],
+            ) === false) {
+                return 'revoked';
+            }
+            if ($db->fetchOne(
+                'SELECT id FROM gf_vault_assets WHERE id = :id AND organization_id = :organization AND deleted_at IS NULL',
+                ['id' => $id, 'organization' => $organization],
+            ) === false) {
+                return 'not_found';
+            }
+            $written = $db->executeStatement(
+                <<<'SQL'
+                    UPDATE gf_vault_assets asset
+                    SET asset.valid_from_at = :from_at, asset.valid_until_at = :until_at
+                    WHERE asset.id = :id AND asset.organization_id = :organization AND asset.deleted_at IS NULL
+                      AND EXISTS (
+                        SELECT 1 FROM gf_identity_memberships membership
+                        INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                        WHERE membership.organization_id = asset.organization_id
+                          AND membership.user_id = :user AND actor.is_active = 1
+                          AND membership.role IN ('admin', 'studio', 'editor')
+                      )
+                    SQL,
+                [
+                    'from_at' => $from, 'until_at' => $until, 'id' => $id,
+                    'organization' => $organization, 'user' => $context['user']->id(),
+                ],
+            );
+            if ($written === 1) {
+                return 'updated';
+            }
+            // MariaDB reports 0 affected rows when the same values are re-sent.
+            $allowed = $db->fetchOne(
+                <<<'SQL'
+                    SELECT 1 FROM gf_identity_memberships membership
+                    INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
+                    WHERE membership.organization_id = :organization
+                      AND actor.id = :user AND actor.is_active = 1
+                      AND membership.role IN ('admin', 'studio', 'editor')
+                    SQL,
+                ['organization' => $organization, 'user' => $context['user']->id()],
+            );
+
+            return $allowed === false ? 'revoked' : 'updated';
+        });
+        if ($result === 'not_found') {
+            return $this->error(404, 'file_not_found', 'No se encontró el archivo activo en tu organización.');
+        }
+        if ($result !== 'updated') {
+            return $this->error(403, 'organization_access_changed', 'Tu permiso para editar la vigencia cambió.');
+        }
+
+        return $this->privateJson(['data' => ['id' => $id] + $this->validityPayload([
+            'valid_from_at' => $from, 'valid_until_at' => $until,
+        ])]);
+    }
+
+    /**
      * Atomically classify 1..30 explicit active originals from the selected tenant.
      * Never interpret a classification as permission to publish or evidence of rights.
      */
@@ -1022,7 +1111,43 @@ final class VaultController extends AbstractController
             'deleted_at' => isset($asset['deleted_at']) ? (string) $asset['deleted_at'] : null,
             'download_url' => '/api/admin/vault/'.$asset['id'].'/download',
             'usage_scope' => (string) ($asset['usage_scope'] ?? 'unclassified'),
+        ] + $this->validityPayload($asset);
+    }
+
+    /**
+     * Sanitized validity view: only the two UTC bounds and the derived state.
+     * It is never a license, review or authorization to publish.
+     *
+     * @param array<string, mixed> $asset
+     * @return array{valid_from_at: ?string, valid_until_at: ?string, validity_state: string}
+     */
+    private function validityPayload(array $asset): array
+    {
+        $from = isset($asset['valid_from_at']) ? (string) $asset['valid_from_at'] : null;
+        $until = isset($asset['valid_until_at']) ? (string) $asset['valid_until_at'] : null;
+
+        return [
+            'valid_from_at' => $from === null ? null : str_replace(' ', 'T', $from).'Z',
+            'valid_until_at' => $until === null ? null : str_replace(' ', 'T', $until).'Z',
+            'validity_state' => ScheduleDraftApplicationService::validityState($from, $until, gmdate('Y-m-d H:i:s')),
         ];
+    }
+
+    /** Strict UTC instant `YYYY-MM-DDTHH:MM:SSZ` (or null = open bound); false when invalid. */
+    private function parseUtcBound(mixed $value): string|null|false
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_string($value) || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $value) !== 1) {
+            return false;
+        }
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $value, new \DateTimeZone('UTC'));
+        if ($parsed === false || $parsed->format('Y-m-d\TH:i:s\Z') !== $value) {
+            return false;
+        }
+
+        return $parsed->format('Y-m-d H:i:s');
     }
 
     private function error(int $status, string $code, string $message): JsonResponse
