@@ -36,7 +36,10 @@ class LibraryPermissionsHistoryContractTests(unittest.TestCase):
             self.assertIn(f"'{capability}'", self.migration)
         # Sólo denegación: el miembro nunca supera a su rol.
         self.assertNotRegex(self.permissions, r"(?i)\bgrant\w*\(")
-        self.assertNotRegex(self.permissions.split("private const ROLE_MATRIX")[1].split("];")[0], r"'delete'")
+        # `delete` solo la tiene el rol admin (eliminación definitiva explícita, #415).
+        matrix = self.permissions.split("private const ROLE_MATRIX")[1].split("];")[0]
+        self.assertEqual(len(re.findall(r"'delete'", matrix)), 1)
+        self.assertRegex(matrix, r"'admin' => \[[^\]]*'delete'")
         # El servidor aplica cada capacidad: ninguna decisión sale del navegador.
         for capability in ("upload", "edit", "archive", "view"):
             self.assertIn(f"->allows(", self.vault)

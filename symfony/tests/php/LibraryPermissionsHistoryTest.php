@@ -41,7 +41,7 @@ final class LibraryPermissionsHistoryTest extends WebTestCase
             }
             self::assertSame($legacy['content_review_decide'], $matrix['approve'], $role);
             self::assertSame($legacy['distribution_authorize'], $matrix['authorize_publication'], $role);
-            self::assertFalse($matrix['delete'], 'delete is denied by default for every role');
+            self::assertSame($role === 'admin', $matrix['delete'], 'only admin may delete permanently (explicit purge, #415)');
         }
         self::assertSame(array_fill_keys(LibraryPermissions::CAPABILITIES, false), $library->roleMatrix('visitor'));
 

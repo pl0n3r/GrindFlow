@@ -22,7 +22,7 @@ final readonly class LibraryPermissions
     ];
 
     private const ROLE_MATRIX = [
-        'admin' => ['view', 'upload', 'edit', 'approve', 'authorize_publication', 'archive'],
+        'admin' => ['view', 'upload', 'edit', 'approve', 'authorize_publication', 'archive', 'delete'],
         'studio' => ['view', 'upload', 'edit', 'approve', 'authorize_publication', 'archive'],
         'editor' => ['view', 'upload', 'edit', 'approve', 'archive'],
         'model' => ['view'],
