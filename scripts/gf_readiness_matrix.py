@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone, timedelta
 import json
-from pathlib import Path
+import sys
 import re
 from typing import Any
 
@@ -144,15 +144,14 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", required=True, type=Path,
-                        help="JSON de evidencia sintética; nunca lee remoto")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     args = parser.parse_args(argv)
     try:
-        manifest = json.loads(
-            args.input.read_text(encoding="utf-8"),
-            object_pairs_hook=_reject_duplicate_keys,
-        )
+        # Entrada textual explícita y acotada: ningún path arbitrario llega a open().
+        payload = sys.stdin.read(131073)
+        if len(payload) > 131072:
+            raise ValueError("Evidencia excede 128 KiB")
+        manifest = json.loads(payload, object_pairs_hook=_reject_duplicate_keys)
         report = evaluate(manifest)
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
         parser.exit(2, "Evidencia inválida, readiness UNKNOWN: " + str(exc) + "\n")

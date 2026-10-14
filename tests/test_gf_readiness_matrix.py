@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
-import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 from copy import deepcopy
 from io import StringIO
-from pathlib import Path
+from unittest.mock import patch
 
 from scripts.gf_readiness_matrix import (
     MILESTONES, SIGNALS, evaluate, main, render_markdown,
@@ -71,24 +70,32 @@ class GrindFlowReadinessMatrixTests(unittest.TestCase):
         md = render_markdown(report)
         self.assertIn("Publicación automática: **NO**", md)
         self.assertIn("No publicar", md)
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "readiness.json"
-            path.write_text(json.dumps(self.manifest), encoding="utf-8")
-            buffer = StringIO()
+        buffer = StringIO()
+        with patch("sys.stdin", StringIO(json.dumps(self.manifest))):
             with redirect_stdout(buffer):
-                self.assertEqual(main(["--input", str(path), "--format", "markdown"]), 0)
-            self.assertEqual(md, buffer.getvalue())
+                self.assertEqual(main(["--format", "markdown"]), 0)
+        self.assertEqual(md, buffer.getvalue())
 
     def test_duplicate_json_keys_are_rejected_not_hidden_by_parser(self) -> None:
         malicious = ('{"as_of": "2026-10-13T20:00:00Z", '
                      '"as_of": "2026-10-13T20:00:00Z", '
                      '"milestones": {}, "signals": {}, "risks": []}')
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "ambiguous.json"
-            path.write_text(malicious, encoding="utf-8")
-            with self.assertRaises(SystemExit) as failed:
-                main(["--input", str(path)])
-            self.assertEqual(failed.exception.code, 2)
+        with patch("sys.stdin", StringIO(malicious)):
+            with redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit) as failed:
+                    main([])
+        self.assertEqual(failed.exception.code, 2)
+
+    def test_cli_rejects_path_arguments_and_large_payloads(self) -> None:
+        with redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit) as invalid:
+                main(["--input", "/etc/passwd"])
+        self.assertEqual(invalid.exception.code, 2)
+        with patch("sys.stdin", StringIO("x" * 131073)):
+            with redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit) as oversized:
+                    main([])
+        self.assertEqual(oversized.exception.code, 2)
 
     def test_version_sha_deploy_production_are_separate_signals(self) -> None:
         data = deepcopy(self.manifest)
