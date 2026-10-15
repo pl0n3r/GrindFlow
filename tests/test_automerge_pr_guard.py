@@ -277,6 +277,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertNotIn("pull_request_review:", yml)
         self.assertIn("workflow_run:", yml)
         self.assertIn("persist-credentials: false", yml)
+        self.assertIn("concurrency:\\n  group: automerge-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.sha }}\\n  cancel-in-progress: false", yml)
         self.assertIn("permissions:\n  contents: read\njobs:", yml)
         self.assertIn("permissions:\n      contents: write\n      pull-requests: write", yml)
 
