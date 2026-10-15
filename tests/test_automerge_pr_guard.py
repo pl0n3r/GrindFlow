@@ -79,6 +79,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
             "Review was not completed", "Could not review", "Unable to review",
             "Review pending", "Review in progress", "Analysis queued",
             "Review cancelled", "Review not complete",
+            "Incremental reviews are disabled",
         )
         for state in ("COMMENTED", "APPROVED"):
             for message in incomplete:
@@ -275,6 +276,21 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertIn("pull_request_target:", yml)
         self.assertNotIn("pull_request_review:", yml)
         self.assertIn("persist-credentials: false", yml)
+
+    def test_malformed_main_commit_response_fails_closed_without_traceback(self):
+        from unittest.mock import patch
+
+        response_rows = [
+            fixture()["pr"], fixture()["switch"], fixture()["checks"],
+            fixture()["reviews"], fixture()["status_history"], {"commit": []},
+        ]
+        with patch.object(guard, "get", side_effect=response_rows):
+            snapshot = guard.read_snapshot(
+                "offline-token", "/repos/pl0n3r/GrindFlow", 485, H
+            )
+        self.assertIsNone(snapshot["main_sha"])
+        with self.assertRaises(guard.GuardError):
+            guard.verify(snapshot, H)
 
     def test_successful_evidence_allows_only_sha_locked_auto_merge(self):
         guard.verify(fixture(), H)
