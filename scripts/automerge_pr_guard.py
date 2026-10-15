@@ -183,6 +183,7 @@ def verify(snapshot, expected):
                 "review pending", "review in progress", "analysis queued",
                 "review cancelled", "review not complete",
                 "rate limit", "rate-limit", "review disabled",
+                "incremental reviews are disabled",
             )
             # A nominal COMMENTED or APPROVED cannot override the bot's
             # explicit statement that analysis was not actually completed.
@@ -227,7 +228,9 @@ def read_snapshot(token, root, number, expected):
         "status_history": get(token, root + f"/commits/{expected}/statuses?per_page=100"),
     }
     base = get(token, root + "/branches/main")
-    snapshot["main_sha"] = base.get("commit", {}).get("sha") if type(base) is dict else None
+    commit = base.get("commit") if type(base) is dict else None
+    main_sha = commit.get("sha") if type(commit) is dict else None
+    snapshot["main_sha"] = main_sha if type(main_sha) is str and SHA.fullmatch(main_sha) else None
     return snapshot
 
 
