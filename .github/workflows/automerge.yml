@@ -5,6 +5,7 @@ on:
   workflow_run:
     workflows: ["GrindFlow CI", "CI Factory v1", "Política Factory v1", "Privacidad", "Etiquetas", "Aceptación ejecutable", "CodeQL", "Sonar CI-based"]
     types: [completed]
+  status:
 permissions:
   contents: read
 jobs:
@@ -31,7 +32,9 @@ jobs:
             github.event.workflow_run.name == 'Aceptación ejecutable' ||
             github.event.workflow_run.name == 'CodeQL' ||
             github.event.workflow_run.name == 'Sonar CI-based'
-          ))
+          )) ||
+        (github.event_name == 'status' &&
+          github.event.context == 'CodeRabbit')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -130,6 +133,46 @@ jobs:
               if (not isinstance(number, int) or isinstance(number, bool) or number <= 0
                       or not isinstance(expected_ref, str) or not branch_pattern.fullmatch(expected_ref)):
                   deny("workflow_run_pr_identity_invalid")
+          elif event_name == "status":
+              if event.get("context") != "CodeRabbit":
+                  deny("status_context_untrusted")
+              expected_sha = event.get("sha")
+              if not isinstance(expected_sha, str) or not sha_pattern.fullmatch(expected_sha):
+                  deny("status_sha_invalid")
+              pulls_url = "https://api.github.com/repos/" + repo + "/commits/" + expected_sha + "/pulls?per_page=100"
+              pulls_request = Request(pulls_url, headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": "Bearer " + token,
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "grindflow-automerge-status-resolver",
+              })
+              try:
+                  with urlopen(pulls_request, timeout=10) as response:
+                      candidates = json.load(response)
+              except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+                  deny("status_pr_lookup_failed")
+              if not isinstance(candidates, list) or len(candidates) > 100:
+                  deny("status_pr_inventory_invalid")
+              matching = []
+              for candidate in candidates:
+                  if not isinstance(candidate, dict):
+                      deny("status_pr_record_invalid")
+                  head, base = candidate.get("head"), candidate.get("base")
+                  source_repo = head.get("repo") if isinstance(head, dict) else None
+                  if (candidate.get("state") == "open" and candidate.get("draft") is False
+                          and isinstance(head, dict) and isinstance(base, dict)
+                          and head.get("sha") == expected_sha
+                          and isinstance(head.get("ref"), str)
+                          and branch_pattern.fullmatch(head["ref"])
+                          and isinstance(source_repo, dict) and source_repo.get("full_name") == repo
+                          and source_repo.get("fork") is False and base.get("ref") == "main"):
+                      matching.append(candidate)
+              if len(matching) != 1:
+                  deny("status_pr_mapping_ambiguous")
+              number = matching[0].get("number")
+              expected_ref = matching[0].get("head", {}).get("ref")
+              if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
+                  deny("status_pr_number_invalid")
           else:
               deny("event_name_unsupported")
 
