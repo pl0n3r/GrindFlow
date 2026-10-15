@@ -275,7 +275,29 @@ class AutoMergePrGuardTests(unittest.TestCase):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("pull_request_target:", yml)
         self.assertNotIn("pull_request_review:", yml)
+        self.assertIn("workflow_run:", yml)
         self.assertIn("persist-credentials: false", yml)
+        self.assertIn("permissions:\\n  contents: read\\njobs:", yml)
+        self.assertIn("permissions:\\n      contents: write\\n      pull-requests: write", yml)
+
+    def test_workflow_run_rechecks_only_trusted_completed_ci_and_current_head(self):
+        yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
+        self.assertIn('workflows: ["GrindFlow CI", "CI Factory v1", "Política Factory v1"', yml)
+        for required in (
+            'run.get("name") not in trusted_runs',
+            'run.get("event") != "pull_request"',
+            'run.get("status") != "completed"',
+            'run.get("conclusion") != "success"',
+            'run.get("pull_requests")',
+            'head.get("sha") != expected_sha',
+            'base.get("ref") != "main"',
+            'deny("authenticated_pr_identity_or_head_changed")',
+            "steps.target.outputs.pr_number",
+            "steps.target.outputs.pr_sha",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, yml)
+        self.assertNotIn("pull_request_review:", yml)
 
     def test_malformed_main_commit_response_fails_closed_without_traceback(self):
         from unittest.mock import patch
@@ -296,7 +318,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
         guard.verify(fixture(), H)
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("persist-credentials: false", yml)
-        self.assertIn("pull_request.base.sha", yml)
+        self.assertIn("ref: main", yml)
         self.assertIn("python3 scripts/automerge_pr_guard.py", yml)
         self.assertIn('gh pr merge --auto --squash --match-head-commit "$PR_SHA"', yml)
         self.assertNotIn("secrets.AUTOMERGE_TOKEN", yml)
