@@ -283,6 +283,11 @@ class AutoMergePrGuardTests(unittest.TestCase):
     def test_workflow_run_rechecks_only_trusted_completed_ci_and_current_head(self):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn('workflows: ["GrindFlow CI", "CI Factory v1", "Política Factory v1"', yml)
+        self.assertIn("\\n  status:\\npermissions:", yml)
+        self.assertIn("github.event.context == 'CodeRabbit'", yml)
+        self.assertIn('elif event_name == "status":', yml)
+        self.assertIn('"/commits/" + expected_sha + "/pulls?per_page=100"', yml)
+        self.assertIn('deny("status_pr_mapping_ambiguous")', yml)
         for required in (
             'run.get("name") not in trusted_runs',
             'run.get("event") != "pull_request"',
