@@ -308,17 +308,36 @@ class AutoMergePrGuardTests(unittest.TestCase):
     def test_malformed_main_commit_response_fails_closed_without_traceback(self):
         from unittest.mock import patch
 
-        response_rows = [
-            fixture()["pr"], fixture()["switch"], fixture()["checks"],
-            fixture()["reviews"], fixture()["status_history"], {"commit": []},
+        malformed = (
+            None, [], {}, {"commit": None}, {"commit": []}, {"commit": {}},
+            {"commit": {"sha": None}}, {"commit": {"sha": "invalid"}},
+        )
+        for branch in malformed:
+            with self.subTest(branch=repr(branch)):
+                sample = fixture()
+                responses = [
+                    sample["pr"], sample["switch"], sample["checks"],
+                    sample["reviews"], sample["status_history"], branch,
+                ]
+                with patch.object(guard, "get", side_effect=responses):
+                    snapshot = guard.read_snapshot(
+                        "offline-token", "/repos/pl0n3r/GrindFlow", 485, H
+                    )
+                self.assertIsNone(snapshot["main_sha"])
+                with self.assertRaises(guard.GuardError):
+                    guard.verify(snapshot, H)
+
+        sample = fixture()
+        responses = [
+            sample["pr"], sample["switch"], sample["checks"],
+            sample["reviews"], sample["status_history"], {"commit": {"sha": B}},
         ]
-        with patch.object(guard, "get", side_effect=response_rows):
+        with patch.object(guard, "get", side_effect=responses):
             snapshot = guard.read_snapshot(
                 "offline-token", "/repos/pl0n3r/GrindFlow", 485, H
             )
-        self.assertIsNone(snapshot["main_sha"])
-        with self.assertRaises(guard.GuardError):
-            guard.verify(snapshot, H)
+        self.assertEqual(snapshot["main_sha"], B)
+        guard.verify(snapshot, H)
 
     def test_successful_evidence_allows_only_sha_locked_auto_merge(self):
         guard.verify(fixture(), H)
