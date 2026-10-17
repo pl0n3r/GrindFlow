@@ -593,3 +593,22 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
 - **GF-LIB-041-STATE:** listado y detalle exponen únicamente las dos fechas y el estado derivado `not_yet_valid|valid|expired`; un asset vencido sigue visible en Library y en papelera según su ciclo de vida normal.
 - **GF-LIB-041-AUTOMATION:** la vista previa y la reserva transaccional de borradores (manual y automática) bloquean `asset_not_yet_valid` y `asset_expired` incluso con revisión y autorización válidas. La vigencia no es una licencia ni autoriza publicar.
 - **GF-LIB-041-DELIVERY:** migración aditiva, nullable y reversible solo en base descartable; sin migración productiva, publicación, providers, credenciales ni datos reales. Validación: AC-01..AC-06 del Issue #407.
+
+### Library — permisos por miembro e historial (hoja GrindFlow #417, decisiones #52/#53)
+
+- **GF-LIB-053:** el servidor aplica siete capacidades Library (`view`, `upload`, `edit`, `approve`, `authorize_publication`, `archive`, `delete`) derivadas del rol y reducibles por miembro mediante restricciones de solo denegación; lo no demostrable se deniega y un miembro nunca supera a su rol.
+- **GF-LIB-052:** `GET /api/admin/vault/{id}/history` entrega una línea de tiempo acotada (100 eventos) de origen, cambios, variantes, borradores y traspasos, con actores opacos y sin PII, tokens ni secretos; otra organización responde 404.
+- **GF-LIB-052-DELIVERY:** migración aditiva, sin migración productiva, publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-PERMISSIONS.md`.
+
+### Library — reglas por red y reutilización (hoja GrindFlow #416, decisiones #45/#46)
+
+- **GF-LIB-045:** cada asset puede tener un `allow` o `deny` explícito por red; `deny` gana y bloquea la reserva (manual y automática), la vista previa, la asignación de proveedor y la publicación con `network_denied`. Sin regla = permitido; red desconocida o fallo de evaluación = denegado.
+- **GF-LIB-046:** una política de reutilización por asset y red (`single_use`, `max_n`, `unlimited`) con intervalo mínimo se evalúa en el horario pedido contando borradores no cancelados (`reuse_exhausted`, `reuse_interval`). Sin política = ilimitada.
+- **GF-LIB-045-DELIVERY:** migración aditiva, sin publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-NETWORK-REUSE.md`.
+
+### Library — estados y papelera (hoja GrindFlow #415, decisiones #44/#54)
+
+- **GF-LIB-044:** cada asset tiene un estado de ciclo de vida (`new`, `ready`, `in_review`, `in_use`, `paused`, `blocked`, `archived`; `expired` derivado de la vigencia) con transiciones válidas cerradas. Todo intento, aplicado o rechazado, queda auditado; `paused`, `blocked` y `archived` excluyen el asset de la programación.
+- **GF-LIB-054:** el borrado es reversible (actor y fecha) y la restauración conserva el historial. La eliminación definitiva exige la capacidad `delete` (admin), confirmación explícita y un asset ya en la papelera; borra el original privado pero conserva la fila, los eventos y las métricas históricas.
+- **GF-LIB-044-DELIVERY:** migración aditiva, sin publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-LIFECYCLE.md`.
+

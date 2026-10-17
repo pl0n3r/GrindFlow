@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace GrindFlow\Scheduling;
 
 use Doctrine\DBAL\Connection;
+use GrindFlow\Library\AssetLifecycle;
+use GrindFlow\Library\AssetNetworkRules;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -16,10 +18,20 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class ScheduleDraftApplicationService
 {
+    /**
+     * Blocking reasons that depend on the requested slot, not on the asset alone: a
+     * scheduler must retry the asset for a different slot instead of discarding it.
+     */
+    public const SLOT_DEPENDENT_REASONS = ['asset_not_yet_valid', 'asset_expired', 'reuse_interval'];
+
+    private AssetNetworkRules $networkRules;
+
     public function __construct(
         private Connection $db,
         private WeeklySlotCalculator $calculator,
+        ?AssetNetworkRules $networkRules = null,
     ) {
+        $this->networkRules = $networkRules ?? new AssetNetworkRules($db);
     }
 
     /**
@@ -87,7 +99,7 @@ final readonly class ScheduleDraftApplicationService
 
                 $asset = $db->fetchAssociative(
                     <<<'SQL'
-                        SELECT id, original_name, usage_scope, valid_from_at, valid_until_at
+                        SELECT id, original_name, usage_scope, valid_from_at, valid_until_at, lifecycle_state
                         FROM gf_vault_assets
                         WHERE id = :asset AND organization_id = :organization
                           AND deleted_at IS NULL
@@ -139,6 +151,19 @@ final readonly class ScheduleDraftApplicationService
                         $reasons[] = 'asset_'.$validity;
                         break;
                     }
+                }
+
+                // Lifecycle (#44): paused, blocked or archived assets stay out of scheduling.
+                foreach (AssetLifecycle::blockingReasons($asset['lifecycle_state']) as $lifecycleReason) {
+                    $reasons[] = $lifecycleReason;
+                }
+
+                // Network allow/deny and reuse policy (#45/#46) for the only delivery
+                // network today; the slot instant is part of the decision (interval).
+                foreach ($this->networkRules->blockingReasons(
+                    $organizationId, $assetId, AssetNetworkRules::DEFAULT_NETWORK, $slotUtc,
+                ) as $networkReason) {
+                    $reasons[] = $networkReason;
                 }
 
                 $authorization = $db->fetchOne(
