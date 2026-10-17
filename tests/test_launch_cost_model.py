@@ -51,7 +51,7 @@ def parse_matrix(text: str) -> list[dict[str, str]]:
     # Cost rows after a blank line must not escape the verified matrix.
     # This is a fail-closed document contract, not a price estimation.
     for remaining in lines[offset + 2 + len(records):]:
-        if re.match(r"^[ \\t]*\\|[ \\t]*GF-K[0-9]+[ \\t]*\\|", remaining, re.IGNORECASE):
+        if re.match(r"^[ \t]*\|[ \t]*GF-K[0-9]+[ \t]*\|", remaining, re.IGNORECASE):
             raise ValueError("fila de costos fuera de la matriz")
     ids = [r["ID"] for r in records]
     if len(ids) != len(REQUIRED) or set(ids) != set(REQUIRED) or len(set(ids)) != len(ids):
@@ -119,14 +119,14 @@ class LaunchCostModelTests(unittest.TestCase):
     def test_rows_after_blank_line_cannot_escape_cost_validation(self):
         # Regression for the real CodeRabbit finding on PR #484: a second
         # cost row after the blank line following GF-K12 was silently ignored.
-        boundary = "\\n\\n## Evidencia mínima para sustituir UNKNOWN"
+        boundary = "\n\n## Evidencia mínima para sustituir UNKNOWN"
         extra_row = (
             "| GF-K13 | Proveedores | Rubro adicional no inventariado | "
             "mensajes/mes | UNKNOWN | $12/mes | UNKNOWN | " + SOURCE
             + " | " + UNKNOWN_SOURCE
             + " | No existe medición ni cotización acreditada | UNKNOWN |"
         )
-        candidate = self.doc.replace(boundary, "\\n\\n" + extra_row + boundary, 1)
+        candidate = self.doc.replace(boundary, "\n\n" + extra_row + boundary, 1)
         self.assertNotEqual(candidate, self.doc)
         with self.assertRaisesRegex(ValueError, "fuera de la matriz"):
             parse_matrix(candidate)
