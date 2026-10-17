@@ -63,10 +63,12 @@ def parse_matrix(text: str) -> list[dict[str, str]]:
             raise ValueError("campo vacío")
         row = dict(zip(COLUMNS, values))
         records.append(row)
-    # Cost rows after a blank line must not escape the verified matrix.
-    # This is a fail-closed document contract, not a price estimation.
+    # A blank line may not conceal additional rows, including non-GF IDs.
+    # End of the cost section is the next Markdown heading, not whitespace.
     for remaining in lines[offset + 2 + len(records):]:
-        if re.match(r"^[ \t]*\|[ \t]*GF-K[0-9]+[ \t]*\|", remaining, re.IGNORECASE):
+        if re.match(r"^#{1,6}[ \t]+", remaining):
+            break
+        if re.match(r"^[ \t]*\|", remaining):
             raise ValueError("fila de costos fuera de la matriz")
     ids = [r["ID"] for r in records]
     if len(ids) != len(REQUIRED) or set(ids) != set(REQUIRED) or len(set(ids)) != len(ids):
@@ -147,6 +149,13 @@ class LaunchCostModelTests(unittest.TestCase):
         self.assertNotEqual(candidate, self.doc)
         with self.assertRaisesRegex(ValueError, "fuera de la matriz"):
             parse_matrix(candidate)
+        # Noncanonical IDs can hide an invented price just as effectively.
+        for extra_id in ("COST-X13", "GF-K14"):
+            with self.subTest(extra_id=extra_id):
+                variant = candidate.replace("| GF-K13 |", f"| {extra_id} |", 1)
+                self.assertNotEqual(variant, candidate)
+                with self.assertRaisesRegex(ValueError, "fuera de la matriz"):
+                    parse_matrix(variant)
 
     def test_cost_item_names_are_pinned_to_ids(self):
         # A valid GF-K01/Storage row must not silently replace its cost item.
