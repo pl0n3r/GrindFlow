@@ -94,22 +94,35 @@ def parse_matrix(text: str) -> list[dict[str, str]]:
     return records
 
 
+def decision_marker(label: str) -> re.Pattern[str]:
+    """Detecta declaraciones Markdown al inicio de línea, incluso duplicados."""
+    return re.compile(
+        r"^[ \t]*(?:[-*+>][ \t]+|[0-9]+[.)][ \t]+|#{1,6}[ \t]+){0,2}"
+        r"(?:[*_]{1,3})?"
+        + re.escape(label) + r"[ \t]*(?:[*_]{1,3})?[ \t]*:(?:[*_]{1,3})?",
+        re.IGNORECASE,
+    )
+
+
 def verify_decisions(text: str) -> None:
     for label, expected in STATUS.items():
         declaration = f"**{label}:** {expected}"
         # Only a line-initial decision declaration is authoritative.
         # Both plain and Markdown-emphasized labels must be inspected: an
         # unformatted duplicate cannot silently authorize purchase/go-live.
-        marker = re.compile(
-            r"^[ \t]*(?:[-*+>][ \t]+|#{1,6}[ \t]+){0,2}(?:\*\*)?"
-            + re.escape(label) + r"[ \t]*(?:\*\*)?[ \t]*:(?:\*\*)?",
-            re.IGNORECASE,
-        )
+        marker = decision_marker(label)
         occurrences = [line.strip() for line in text.splitlines()
                        if marker.match(line)]
         if occurrences != [declaration]:
             raise ValueError("decisión ambigua, duplicada o falsamente aprobada")
-    if not text.endswith("**Resultado:** UNKNOWN / NO-GO documental hasta acreditar evidencia suficiente. Esta matriz no autoriza precios definitivos, contratación, gasto, transferencia de datos ni activación de infraestructura.\n"):
+    final = (
+        "**Resultado:** UNKNOWN / NO-GO documental hasta acreditar evidencia "
+        "suficiente. Esta matriz no autoriza precios definitivos, contratación, "
+        "gasto, transferencia de datos ni activación de infraestructura."
+    )
+    declarations = [line.strip() for line in text.splitlines()
+                    if decision_marker("Resultado").match(line)]
+    if declarations != [final] or not text.endswith(final + "\n"):
         raise ValueError("resultado documental no conserva NO-GO")
 
 
@@ -200,7 +213,10 @@ class LaunchCostModelTests(unittest.TestCase):
         buy = "**Decisión de compra:** " + STATUS["Decisión de compra"]
         for forged in ("Decisión de compra: AUTORIZADA.",
                        "> Activación / go-live: AUTORIZADO.",
-                       "### Precios finales: $12/mes."):
+                       "### Precios finales: $12/mes.",
+                       "*Decisión de compra:* AUTORIZADA.",
+                       "__Decisión de compra:__ AUTORIZADA.",
+                       "1. Activación / go-live: AUTORIZADO."):
             with self.subTest(forged=forged):
                 candidate = self.doc.replace(buy, buy + "\n" + forged, 1)
                 self.assertNotEqual(candidate, self.doc)
@@ -212,6 +228,17 @@ class LaunchCostModelTests(unittest.TestCase):
         candidate = self.doc.replace("## Método sin suposiciones monetarias",
                                      prose + "\n\n## Método sin suposiciones monetarias", 1)
         verify_decisions(candidate)
+
+        for forged in ("**Resultado:** GO.", "*Resultado:* GO.",
+                       "__Resultado:__ GO.", "1. Resultado: GO."):
+            with self.subTest(result_forged=forged):
+                candidate = self.doc.replace(
+                    "## Método sin suposiciones monetarias",
+                    forged + "\n\n## Método sin suposiciones monetarias", 1,
+                )
+                self.assertNotEqual(candidate, self.doc)
+                with self.assertRaisesRegex(ValueError, "NO-GO"):
+                    verify_decisions(candidate)
 
         with self.assertRaisesRegex(ValueError, "NO-GO"):
             verify_decisions(self.doc + "\n**Resultado:** GO\n")
