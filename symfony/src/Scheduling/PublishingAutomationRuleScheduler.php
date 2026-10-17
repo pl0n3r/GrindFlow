@@ -162,7 +162,14 @@ final readonly class PublishingAutomationRuleScheduler
                         return $result('authorization_changed', $created, $existing, $blocked);
                     }
                     if ($attempt['status'] === 'blocked' || $attempt['status'] === 'missing') {
-                        $blockedAssets[(string) $assetId] = true;
+                        // Reasons that depend on the slot (validity window, minimum
+                        // interval) must not discard the asset for later slots.
+                        $slotDependent = $attempt['status'] === 'blocked'
+                            && $attempt['reasons'] !== []
+                            && array_diff($attempt['reasons'], ScheduleDraftApplicationService::SLOT_DEPENDENT_REASONS) === [];
+                        if (!$slotDependent) {
+                            $blockedAssets[(string) $assetId] = true;
+                        }
                     }
                 }
             }
