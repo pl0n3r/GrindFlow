@@ -10,6 +10,8 @@ use GrindFlow\Identity\Entity\IdentityUser;
 use GrindFlow\Infrastructure\Storage\DirectUploadReadiness;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
+use GrindFlow\Library\AssetLifecycle;
+use GrindFlow\Library\LibraryPermissions;
 use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -35,6 +37,7 @@ final class VaultController extends AbstractController
         private readonly PrivateVaultDirectory $storage,
         private readonly VaultBlobVerifier $verifier,
         private readonly DirectUploadReadiness $directUploadReadiness,
+        private readonly LibraryPermissions $library,
     ) {
     }
 
@@ -103,7 +106,7 @@ final class VaultController extends AbstractController
             INNER JOIN gf_identity_memberships membership
                 ON membership.organization_id = asset.organization_id
             INNER JOIN gf_identity_users actor ON actor.id = membership.user_id
-            WHERE asset.organization_id = :organization
+            WHERE asset.organization_id = :organization AND asset.purged_at IS NULL
               AND membership.user_id = :user AND actor.is_active = 1
             SQL;
         $usage = $db->fetchAssociative(
@@ -129,7 +132,7 @@ final class VaultController extends AbstractController
         $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope.$filter.$listFilter, $listParams);
         // Order-by is strictly selected from trusted SQL constants above; never interpolate client text.
         $assets = $db->fetchAllAssociative(
-            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at, asset.usage_scope, asset.valid_from_at, asset.valid_until_at '
+            'SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.deleted_at, asset.usage_scope, asset.valid_from_at, asset.valid_until_at, asset.lifecycle_state '
             .$scope.$filter.$listFilter.' ORDER BY '.$sortOrders[$sort].', asset.id DESC LIMIT 30 OFFSET '.(($page - 1) * 30),
             $listParams,
         );
@@ -162,7 +165,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'upload')) {
             return $this->error(403, 'upload_forbidden', 'Tu rol no permite añadir archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_upload', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -229,7 +233,7 @@ final class VaultController extends AbstractController
                     return 'revoked';
                 }
                 $usage = $db->fetchAssociative(
-                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization',
+                    'SELECT COUNT(*) AS count_assets, COALESCE(SUM(size_bytes), 0) AS used_bytes FROM gf_vault_assets WHERE organization_id = :organization AND purged_at IS NULL',
                     ['organization' => $context['organization']['id']],
                 );
                 if ((int) $usage['count_assets'] >= self::MAX_ORGANIZATION_ASSETS
@@ -244,7 +248,7 @@ final class VaultController extends AbstractController
                     <<<'SQL'
                         SELECT deleted_at
                         FROM gf_vault_assets
-                        WHERE organization_id = :organization AND sha256 = :sha
+                        WHERE organization_id = :organization AND purged_at IS NULL AND sha256 = :sha
                         ORDER BY (deleted_at IS NULL) DESC, id DESC
                         LIMIT 1
                         SQL,
@@ -299,7 +303,7 @@ final class VaultController extends AbstractController
         }
 
         $asset = $db->fetchAssociative(
-            'SELECT id, original_name, mime_type, size_bytes, created_at, usage_scope, valid_from_at, valid_until_at FROM gf_vault_assets WHERE id = :id',
+            'SELECT id, original_name, mime_type, size_bytes, created_at, usage_scope, valid_from_at, valid_until_at, lifecycle_state FROM gf_vault_assets WHERE id = :id',
             ['id' => $id],
         );
 
@@ -316,7 +320,7 @@ final class VaultController extends AbstractController
 
         $asset = $db->fetchAssociative(
             <<<'SQL'
-                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note, asset.usage_scope, asset.valid_from_at, asset.valid_until_at
+                SELECT asset.id, asset.original_name, asset.mime_type, asset.size_bytes, asset.created_at, asset.private_note, asset.usage_scope, asset.valid_from_at, asset.valid_until_at, asset.lifecycle_state
                 FROM gf_vault_assets asset
                 INNER JOIN gf_identity_memberships membership
                     ON membership.organization_id = asset.organization_id
@@ -473,7 +477,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite renombrar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -561,7 +566,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite editar las notas.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -649,7 +655,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -731,7 +738,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite editar la vigencia.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -819,7 +827,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'edit')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite clasificar archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -956,7 +965,8 @@ final class VaultController extends AbstractController
         if ($context instanceof JsonResponse) {
             return $context;
         }
-        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']
+            || !$this->library->allows($context['organization']['id'], $context['user']->id(), 'archive')) {
             return $this->error(403, 'vault_manage_forbidden', 'Tu rol no permite gestionar estos archivos.');
         }
         if (!$this->isCsrfTokenValid('grindflow_vault_manage', (string) $request->headers->get('X-CSRF-Token', ''))) {
@@ -976,10 +986,10 @@ final class VaultController extends AbstractController
                 return 'revoked';
             }
             $asset = $db->fetchAssociative(
-                'SELECT id, size_bytes, sha256, storage_key, deleted_at FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
+                'SELECT id, size_bytes, sha256, storage_key, deleted_at, purged_at FROM gf_vault_assets WHERE id = :id AND organization_id = :organization',
                 ['id' => $id, 'organization' => $context['organization']['id']],
             );
-            if ($asset === false) {
+            if ($asset === false || $asset['purged_at'] !== null) {
                 return 'not_found';
             }
             if ($action === 'trash' && $asset['deleted_at'] !== null) {
@@ -1046,6 +1056,9 @@ final class VaultController extends AbstractController
             $request->getSession()->remove('grindflow_organization_id');
             return $this->error(403, 'organization_access_changed', 'Tu acceso a esta organización ha cambiado.');
         }
+        if (!$this->library->allows($organization['id'], $user->id(), 'view')) {
+            return $this->error(403, 'library_view_forbidden', 'Tu acceso a la biblioteca está restringido.');
+        }
 
         return ['user' => $user, 'organization' => $organization];
     }
@@ -1102,6 +1115,9 @@ final class VaultController extends AbstractController
      */
     private function publicAsset(array $asset): array
     {
+        // Effective state: `expired` is derived from the UTC window, never stored.
+        $lifecycle = AssetLifecycle::effectiveState($asset['lifecycle_state'] ?? null, $this->validityPayload($asset)['validity_state']);
+
         return [
             'id' => (string) $asset['id'],
             'name' => (string) $asset['original_name'],
@@ -1111,6 +1127,7 @@ final class VaultController extends AbstractController
             'deleted_at' => isset($asset['deleted_at']) ? (string) $asset['deleted_at'] : null,
             'download_url' => '/api/admin/vault/'.$asset['id'].'/download',
             'usage_scope' => (string) ($asset['usage_scope'] ?? 'unclassified'),
+            'lifecycle_state' => $lifecycle,
         ] + $this->validityPayload($asset);
     }
 
@@ -1126,10 +1143,12 @@ final class VaultController extends AbstractController
         $from = isset($asset['valid_from_at']) ? (string) $asset['valid_from_at'] : null;
         $until = isset($asset['valid_until_at']) ? (string) $asset['valid_until_at'] : null;
 
+        $validity = ScheduleDraftApplicationService::validityState($from, $until, gmdate('Y-m-d H:i:s'));
+
         return [
             'valid_from_at' => $from === null ? null : str_replace(' ', 'T', $from).'Z',
             'valid_until_at' => $until === null ? null : str_replace(' ', 'T', $until).'Z',
-            'validity_state' => ScheduleDraftApplicationService::validityState($from, $until, gmdate('Y-m-d H:i:s')),
+            'validity_state' => $validity,
         ];
     }
 

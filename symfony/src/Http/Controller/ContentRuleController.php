@@ -7,6 +7,8 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
+use GrindFlow\Library\AssetLifecycle;
+use GrindFlow\Library\AssetNetworkRules;
 use GrindFlow\Scheduling\ScheduleDraftApplicationService;
 use GrindFlow\Scheduling\WeeklySlotCalculator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -152,7 +154,7 @@ final class ContentRuleController extends AbstractController
     }
 
     #[Route('/api/admin/rules/weekly/preview', name: 'grindflow_weekly_rule_preview', methods: ['GET'])]
-    public function preview(Request $request, MembershipContext $memberships, Connection $db, WeeklySlotCalculator $calculator): JsonResponse
+    public function preview(Request $request, MembershipContext $memberships, Connection $db, WeeklySlotCalculator $calculator, AssetNetworkRules $networkRules): JsonResponse
     {
         $context = $this->context($request, $memberships);
         if ($context instanceof JsonResponse) {
@@ -178,7 +180,7 @@ final class ContentRuleController extends AbstractController
         $assets = $db->fetchAllAssociative(
             <<<'SQL'
                 SELECT asset.id, asset.original_name, asset.mime_type, asset.usage_scope, asset.created_at,
-                    asset.valid_from_at, asset.valid_until_at,
+                    asset.valid_from_at, asset.valid_until_at, asset.lifecycle_state,
                     (
                         SELECT review_event.action
                         FROM gf_content_review_events review_event
@@ -236,7 +238,13 @@ final class ContentRuleController extends AbstractController
         );
 
         $nowUtc = gmdate('Y-m-d H:i:s');
-        $items = array_map(function (array $asset) use ($rule, $nowUtc): array {
+        $slots = $calculator->upcoming($rule);
+        // Network rules are evaluated at the first proposed slot (or now without a rule).
+        $networkInstant = $slots === []
+            ? $nowUtc
+            : str_replace(['T', 'Z'], [' ', ''], (string) $slots[0]['scheduled_at_utc']);
+        $organizationId = $context['organization']['id'];
+        $items = array_map(function (array $asset) use ($rule, $nowUtc, $networkRules, $networkInstant, $organizationId): array {
             $reasons = [];
             if ($rule === false) {
                 $reasons[] = 'weekly_rule_missing';
@@ -259,6 +267,14 @@ final class ContentRuleController extends AbstractController
             if ($validityState !== 'valid') {
                 $reasons[] = 'asset_'.$validityState;
             }
+            foreach (AssetLifecycle::blockingReasons($asset['lifecycle_state'] ?? null) as $lifecycleReason) {
+                $reasons[] = $lifecycleReason;
+            }
+            foreach ($networkRules->blockingReasons(
+                $organizationId, (string) $asset['id'], AssetNetworkRules::DEFAULT_NETWORK, $networkInstant,
+            ) as $networkReason) {
+                $reasons[] = $networkReason;
+            }
             $distributionAuthorized = ($asset['distribution_action'] ?? null) === 'grant';
             if (!$distributionAuthorized) {
                 $reasons[] = 'distribution_authorization_missing';
@@ -270,6 +286,7 @@ final class ContentRuleController extends AbstractController
                 'mime_type' => (string) $asset['mime_type'],
                 'usage_scope' => $scope,
                 'validity_state' => $validityState,
+                'lifecycle_state' => AssetLifecycle::effectiveState($asset['lifecycle_state'] ?? null, $validityState),
                 'content_review_approved' => $contentReviewApproved,
                 'content_review_updated_at' => $asset['content_review_updated_at'] === null
                     ? null
@@ -288,7 +305,7 @@ final class ContentRuleController extends AbstractController
 
         return $this->privateJson(['data' => [
             'rule' => $rule === false ? null : $this->publicRule($rule),
-            'slots' => $calculator->upcoming($rule),
+            'slots' => $slots,
             'assets' => $items,
             'visible' => count($items),
             'total_active_assets' => $total,
