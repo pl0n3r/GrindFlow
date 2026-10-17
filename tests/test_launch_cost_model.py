@@ -15,6 +15,21 @@ REQUIRED = {
     **{f"GF-K{i:02d}": "Operación" for i in (7, 8, 9, 10)},
     **{f"GF-K{i:02d}": "Proveedores" for i in (11, 12)},
 }
+EXPECTED_RUBROS = {
+    "GF-K01": "Objetos multimedia del piloto",
+    "GF-K02": "Copias y versiones de respaldo",
+    "GF-K03": "Egreso de archivos y CDN",
+    "GF-K04": "Trabajos encolados y ejecutados",
+    "GF-K05": "Reintentos y mensajes fallidos",
+    "GF-K06": "Procesamiento de contenido y workers",
+    "GF-K07": "Hosting y runtime de aplicación",
+    "GF-K08": "Persistencia de base de datos",
+    "GF-K09": "Observabilidad y alertas",
+    "GF-K10": "Atención y soporte humano",
+    "GF-K11": "Solicitudes a APIs de redes sociales",
+    "GF-K12": "Servicios externos de comunicación",
+}
+
 SOURCE = "[#351](https://github.com/pl0n3r/GrindFlow/issues/351)"
 UNKNOWN_SOURCE = "UNKNOWN (sin medición autenticada)"
 STATUS = {
@@ -59,6 +74,8 @@ def parse_matrix(text: str) -> list[dict[str, str]]:
     for row in records:
         if row["Área"] != REQUIRED[row["ID"]]:
             raise ValueError("clasificación de área alterada")
+        if row["Rubro"] != EXPECTED_RUBROS[row["ID"]]:
+            raise ValueError("identidad de rubro alterada")
         if row["Unidad de consumo"] in ("UNKNOWN", "-", "N/A", "0"):
             raise ValueError("unidad de consumo ausente")
         if len(row["Unidad de consumo"]) < 4 or re.search(r"[|<>{}]", row["Unidad de consumo"]):
@@ -129,6 +146,15 @@ class LaunchCostModelTests(unittest.TestCase):
         candidate = self.doc.replace(boundary, "\n\n" + extra_row + boundary, 1)
         self.assertNotEqual(candidate, self.doc)
         with self.assertRaisesRegex(ValueError, "fuera de la matriz"):
+            parse_matrix(candidate)
+
+    def test_cost_item_names_are_pinned_to_ids(self):
+        # A valid GF-K01/Storage row must not silently replace its cost item.
+        baseline = "| GF-K01 | Storage | Objetos multimedia del piloto |"
+        forged = "| GF-K01 | Storage | Rubro ajeno no inventariado |"
+        candidate = self.doc.replace(baseline, forged, 1)
+        self.assertNotEqual(candidate, self.doc)
+        with self.assertRaisesRegex(ValueError, "identidad de rubro alterada"):
             parse_matrix(candidate)
 
     def test_unknown_never_becomes_zero_or_free(self):
