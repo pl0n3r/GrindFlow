@@ -12,9 +12,6 @@ on:
   status:
 permissions:
   contents: read
-concurrency:
-  group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha || github.sha }}
-  cancel-in-progress: false
 jobs:
   postmerge_exact_main:
     # An Actions GITHUB_TOKEN-enabled auto-merge may suppress the push event.
@@ -81,6 +78,11 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Only eligible automerge jobs can contend; skipped status/workflow events
+    # must never evict a pending security-gate reevaluation.
+    concurrency:
+      group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha || github.sha }}
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write

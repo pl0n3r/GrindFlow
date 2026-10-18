@@ -248,7 +248,7 @@ def verify(snapshot, expected):
         # an ambiguous count is NOT evidence that no findings remain.
         labels = re.finditer(r"(?i)\bactionable\s+comments\s+posted\s*:", body)
         for label in labels:
-            remainder = body[label.end():].splitlines()[0]
+            remainder = body[label.end():].partition("\n")[0]
             count = re.match(r"[ \t*_`]*([0-9]+)(?![0-9A-Za-z_.])", remainder)
             if count is None:
                 raise GuardError("coderabbit_findings_unknown")
