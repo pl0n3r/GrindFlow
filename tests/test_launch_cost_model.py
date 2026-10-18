@@ -40,6 +40,14 @@ STATUS = {
 }
 
 
+PRICE_OR_FREE_UNIT = re.compile(
+    r"[$€£¥]|(?<!\w)(?:gratis|gratuit[oa]s?|free|incluid[oa]s?|"
+    r"sin\s+(?:costo|coste|cargo|pago)|costos?|costes?|precios?|tarifas?|"
+    r"usd|eur|cop|gbp|mxn|ars|clp|d[oó]lares?|euros?|pesos?)(?!\w)",
+    re.IGNORECASE,
+)
+
+
 def parse_matrix(text: str) -> list[dict[str, str]]:
     """Acepta solo el inventario completo, inequívoco, sin precios simulados."""
     lines = text.splitlines()
@@ -82,6 +90,9 @@ def parse_matrix(text: str) -> list[dict[str, str]]:
             raise ValueError("unidad de consumo ausente")
         if len(row["Unidad de consumo"]) < 4 or re.search(r"[|<>{}]", row["Unidad de consumo"]):
             raise ValueError("unidad de consumo inválida")
+        unit = row["Unidad de consumo"]
+        if PRICE_OR_FREE_UNIT.search(unit) or re.fullmatch(r"\d+(?:[.,]\d+)?", unit):
+            raise ValueError("unidad de consumo monetaria o gratuita")
         if row["Referencia de requisito"] != SOURCE:
             raise ValueError("origen normativo no acreditado")
         if row["Fuente de medición"] != UNKNOWN_SOURCE:
@@ -147,6 +158,32 @@ class LaunchCostModelTests(unittest.TestCase):
                 self.assertNotEqual(candidate, self.doc)
                 with self.assertRaises(ValueError):
                     parse_matrix(candidate)
+        # A price, currency or free-tier claim must never masquerade as a
+        # consumption unit while all monetary columns remain UNKNOWN.
+        for forged in (
+            "gratis", "0 USD", "0 COP/mes", "USD 0", "sin costo",
+            "incluido", "free", "$0", "€12/mes", "tarifa/mes", "0.00",
+        ):
+            with self.subTest(forged_unit=forged):
+                candidate = self.doc.replace(
+                    "GiB·mes | UNKNOWN", f"{forged} | UNKNOWN", 1
+                )
+                self.assertNotEqual(candidate, self.doc)
+                with self.assertRaisesRegex(ValueError, "unidad de consumo"):
+                    parse_matrix(candidate)
+
+        # No fixed allowlist by cost ID: genuine additional consumption units
+        # remain valid even with numbers describing their measurement scale.
+        for unit in (
+            "peticiones/semana", "minutos GPU/semana",
+            "operaciones/1000 solicitudes",
+        ):
+            with self.subTest(valid_unit=unit):
+                candidate = self.doc.replace(
+                    "GiB·mes | UNKNOWN", f"{unit} | UNKNOWN", 1
+                )
+                self.assertNotEqual(candidate, self.doc)
+                self.assertEqual(parse_matrix(candidate)[0]["Unidad de consumo"], unit)
 
     def test_rows_after_blank_line_cannot_escape_cost_validation(self):
         # Regression for the real CodeRabbit finding on PR #484: a second
