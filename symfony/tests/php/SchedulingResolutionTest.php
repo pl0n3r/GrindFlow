@@ -186,9 +186,13 @@ switch ($scenario) {
             item('c-winner', 'urgente', $at, exact($at))
         ];
         verify(rejected(fn () => $planner->plan($impossible)), 'matching_true_exhaustion');
-        verify(rejected(fn () => $resolver->resolve(array_fill(
-            0, 101, item('a', 'normal', $at, exact($at))
-        ))), 'bounded');
+        // Use distinct IDs so this probes the size bound, not duplicate-ID rejection.
+        $distinct = static fn (int $count): array => array_map(
+            static fn (int $i): array => item(sprintf('id-%03d', $i), 'normal', $at, exact($at)),
+            range(1, $count)
+        );
+        verify(count($resolver->resolve($distinct(100))['move']) === 99, 'bounded_accepts_100');
+        verify(rejected(fn () => $resolver->resolve($distinct(101))), 'bounded');
         break;
 
     default:

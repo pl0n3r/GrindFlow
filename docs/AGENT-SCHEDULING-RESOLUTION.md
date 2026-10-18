@@ -19,4 +19,3 @@
 
 La verificación de límites diarios, franjas bloqueadas y separación mínima corresponde a la hoja hermana #423. La autoridad sobre calendarios persistidos, slots multicuenta, destinos y publicación seguirá en el Scheduler Symfony canónico; **no** se conectan estas reglas a la base/producción en esta entrega. La cadencia y los horarios horarios IANA/DST deberán resolverse en los consumidores antes de persistir: este módulo recibe instantes UTC ya normalizados.
 
-No cambiar versión, README, package-lock o workflows reclamados por #414; el bump se resolverá de forma serial en integración. No merge/release mientras aceptación, preflight, revisión y compuertas no estén terminales exact-HEAD. Revertir el PR elimina únicamente los seis archivos nuevos.
