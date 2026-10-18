@@ -137,13 +137,16 @@ def verify(snapshot, expected):
             or checks["total_count"] != len(checks["check_runs"])
             or checks["total_count"] > 100):
         raise GuardError("incomplete_checks")
-    # GitHub returns check runs newest-first. Same-name jobs from distinct
+    # GitHub does not guarantee check-run ordering. Same-name jobs from distinct
     # workflow runs are legitimate retries, not automatically ambiguous.
     # Their immutable numeric IDs identify the creation order; never choose
     # the first *successful* result over a newer failed or pending attempt.
     seen = {}
     previous_id = None
-    for check in checks["check_runs"]:
+    for check in sorted(
+            checks["check_runs"],
+            key=lambda row: row["id"] if type(row) is dict and type(row.get("id")) is int else -1,
+            reverse=True):
         if (type(check) is not dict or type(check.get("name")) is not str
                 or not check["name"] or check.get("head_sha") != expected):
             raise GuardError("ambiguous_checks")
@@ -196,10 +199,18 @@ def verify(snapshot, expected):
     reviews = snapshot.get("reviews")
     if type(reviews) is not list or len(reviews) > 100:
         raise GuardError("incomplete_reviews")
-    substantive = False
-    # The reviews REST API lists submissions from oldest to newest.
-    # COMMENTED is not a dismissal of an earlier outstanding veto.
+    threads = snapshot.get("review_threads")
+    if type(threads) is not list or len(threads) > 100:
+        raise GuardError("incomplete_review_threads")
+    for thread in threads:
+        if (type(thread) is not dict or type(thread.get("isResolved")) is not bool
+                or type(thread.get("author_login")) is not str or not thread["author_login"]):
+            raise GuardError("invalid_review_thread")
+        if not thread["isResolved"] and thread["author_login"] in ("coderabbitai", "coderabbitai[bot]"):
+            raise GuardError("coderabbit_unresolved_thread")
+
     latest_decisive = {}
+    latest_bot = None
     for review in reviews:
         if type(review) is not dict or type(review.get("user")) is not dict:
             raise GuardError("invalid_review")
@@ -212,30 +223,31 @@ def verify(snapshot, expected):
             raise GuardError("invalid_reviewer")
         if state in ("CHANGES_REQUESTED", "APPROVED", "DISMISSED"):
             latest_decisive[login] = state
-        if (user.get("login") == "coderabbitai[bot]" and user.get("type") == "Bot"
-                and review.get("commit_id") == expected):
-            body = review.get("body")
-            blocked_text = (
-                "review skipped", "skipped review", "review was skipped",
-                "skip review", "manual review required",
-                "review not performed", "review was not completed",
-                "could not review", "unable to review",
-                "review pending", "review in progress", "analysis queued",
-                "review cancelled", "review not complete",
-                "rate limit", "rate-limit", "review disabled",
-                "incremental reviews are disabled",
-            )
-            # A nominal COMMENTED or APPROVED cannot override the bot's
-            # explicit statement that analysis was not actually completed.
-            if type(body) is str and any(s in body.lower() for s in blocked_text):
-                continue
-            if state == "APPROVED" or (
-                state == "COMMENTED" and type(body) is str and body.strip()
-            ):
-                substantive = True
+        if login == "coderabbitai[bot]" and user.get("type") == "Bot" and review.get("commit_id") == expected:
+            latest_bot = review
     if "CHANGES_REQUESTED" in latest_decisive.values():
         raise GuardError("changes_requested")
-    if not substantive:
+    if latest_bot is None:
+        raise GuardError("coderabbit_review_missing")
+    body = latest_bot.get("body")
+    blocked_text = (
+        "review skipped", "skipped review", "review was skipped",
+        "skip review", "manual review required",
+        "review not performed", "review was not completed",
+        "could not review", "unable to review",
+        "review pending", "review in progress", "analysis queued",
+        "review cancelled", "review not complete",
+        "rate limit", "rate-limit", "review disabled",
+        "incremental reviews are disabled",
+    )
+    if type(body) is str:
+        if any(s in body.lower() for s in blocked_text):
+            raise GuardError("coderabbit_review_incomplete")
+        findings = re.search(r"(?im)^\s*Actionable comments posted:\s*(\d+)\s*$", body)
+        if findings is not None and int(findings.group(1)) > 0:
+            raise GuardError("coderabbit_actionable_findings")
+    if not (latest_bot["state"] == "APPROVED" or (
+            latest_bot["state"] == "COMMENTED" and type(body) is str and body.strip())):
         raise GuardError("coderabbit_review_missing")
 
 
@@ -258,6 +270,66 @@ def get(token, path):
         raise GuardError("invalid_response") from err
 
 
+def parse_review_threads(payload):
+    """Require complete GraphQL review-thread inventory and authors."""
+    if type(payload) is not dict or "errors" in payload:
+        raise GuardError("review_threads_graphql_error")
+    try:
+        listing = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
+        nodes = listing["nodes"]
+        more = listing["pageInfo"]["hasNextPage"]
+    except (KeyError, TypeError, AttributeError) as err:
+        raise GuardError("review_threads_shape_unknown") from err
+    if type(nodes) is not list or len(nodes) > 100 or more is not False:
+        raise GuardError("incomplete_review_threads")
+    result = []
+    for node in nodes:
+        try:
+            resolved = node["isResolved"]
+            comments = node["comments"]["nodes"]
+            author = comments[0]["author"]["login"]
+        except (KeyError, TypeError, AttributeError, IndexError) as err:
+            raise GuardError("review_thread_author_unknown") from err
+        if (type(resolved) is not bool or type(comments) is not list
+                or len(comments) != 1 or type(author) is not str or not author.strip()):
+            raise GuardError("invalid_review_thread")
+        result.append({"isResolved": resolved, "author_login": author})
+    return result
+
+
+def get_threads(token, number):
+    """One authenticated GraphQL page; truncation/errors fail closed."""
+    query = """query($number: Int!) {
+      repository(owner: "pl0n3r", name: "GrindFlow") {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100) {
+            nodes { isResolved comments(first: 1) { nodes { author { login } } } }
+            pageInfo { hasNextPage }
+          }
+        }
+      }
+    }"""
+    request = Request("https://api.github.com/graphql",
+                      data=json.dumps({"query": query, "variables": {"number": number}}).encode(),
+                      headers={"Accept": "application/vnd.github+json",
+                               "Content-Type": "application/json",
+                               "Authorization": "Bearer " + token,
+                               "X-GitHub-Api-Version": "2022-11-28",
+                               "User-Agent": "grindflow-automerge-review-threads"})
+    try:
+        with urlopen(request, timeout=12) as response:
+            body = response.read(262145)
+            if len(body) > 262144:
+                raise GuardError("review_threads_too_large")
+    except (HTTPError, URLError, TimeoutError, OSError) as err:
+        raise GuardError("review_threads_transport_unknown") from err
+    try:
+        payload = json.loads(body.decode("utf-8"), object_pairs_hook=unique)
+    except (UnicodeError, ValueError, TypeError) as err:
+        raise GuardError("review_threads_invalid_json") from err
+    return parse_review_threads(payload)
+
+
 def read_snapshot(token, root, number, expected):
     """Fetch independent live policy, reviewer, base and switch evidence."""
     snapshot = {
@@ -266,6 +338,7 @@ def read_snapshot(token, root, number, expected):
         "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
         "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100"),
         "status_history": get(token, root + f"/commits/{expected}/statuses?per_page=100"),
+        "review_threads": get_threads(token, number),
     }
     base = get(token, root + "/branches/main")
     main_sha = None

@@ -34,7 +34,8 @@ def fixture():
             "status_history": [{"id": 20, "context": "CodeRabbit", "state": "success",
                                 "description": "Review completed",
                                 "created_at": "2026-10-14T08:00:00Z",
-                                "creator": {"login": "coderabbitai[bot]", "type": "Bot"}}]}
+                                "creator": {"login": "coderabbitai[bot]", "type": "Bot"}}],
+            "review_threads": []}
 
 
 class AutoMergePrGuardTests(unittest.TestCase):
@@ -101,7 +102,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
         case = fixture()
         retry(case)
         case["checks"]["check_runs"].reverse()
-        self.denied(case)
+        guard.verify(case, H)
 
         # Repeated nonrequired jobs do not falsely veto independent green gates.
         case = fixture()
@@ -113,10 +114,55 @@ class AutoMergePrGuardTests(unittest.TestCase):
                 "completed_at": "2026-10-14T08:01:30Z",
                 "app": {"slug": "github-actions", "id": 15368},
             })
-        # Their insertion order must still reflect newest-first IDs.
+        # Ordering of unrelated job results is not guaranteed by GitHub.
         case["checks"]["check_runs"][:2] = reversed(case["checks"]["check_runs"][:2])
         case["checks"]["total_count"] += 2
         guard.verify(case, H)
+
+    def test_unsorted_checks_latest_failure_and_id_collision(self):
+        from copy import deepcopy
+        sample = fixture()
+        newest = deepcopy(sample["checks"]["check_runs"][-1])
+        newest.update(id=106, conclusion="failure")
+        sample["checks"]["check_runs"].append(newest)
+        sample["checks"]["total_count"] += 1
+        self.denied(sample)
+        newest["conclusion"] = "success"
+        guard.verify(sample, H)
+        sample["checks"]["check_runs"][0]["id"] = 106
+        self.denied(sample)
+
+    def test_coderabbit_findings_and_threads_veto(self):
+        sample = fixture()
+        sample["reviews"][0]["body"] = "Actionable comments posted: 2"
+        self.denied(sample)
+        sample["reviews"][0]["body"] = "Actionable comments posted: 0"
+        guard.verify(sample, H)
+        sample["review_threads"] = [{"isResolved": False, "author_login": "coderabbitai"}]
+        self.denied(sample)
+        sample["review_threads"][0]["isResolved"] = True
+        guard.verify(sample, H)
+        sample["review_threads"][0]["author_login"] = ""
+        self.denied(sample)
+        del sample["review_threads"]
+        self.denied(sample)
+
+    def test_incomplete_review_thread_graphql_denied(self):
+        def payload(nodes=None, more=False):
+            if nodes is None:
+                nodes = [{"isResolved": False, "comments": {
+                    "nodes": [{"author": {"login": "coderabbitai"}}]}}]
+            return {"data": {"repository": {"pullRequest": {"reviewThreads": {
+                "nodes": nodes, "pageInfo": {"hasNextPage": more}}}}}}
+        self.assertEqual(guard.parse_review_threads(payload()),
+                         [{"isResolved": False, "author_login": "coderabbitai"}])
+        for invalid in (payload(more=True), payload(nodes=[{"isResolved": False}]),
+                        payload(nodes=[{"isResolved": "false", "comments": {
+                            "nodes": [{"author": {"login": "coderabbitai"}}]}}]),
+                        {"errors": [{"message": "rate limited"}]}, {}):
+            with self.subTest(payload=repr(invalid)):
+                with self.assertRaises(guard.GuardError):
+                    guard.parse_review_threads(invalid)
 
     def test_check_emitter_identity_is_required(self):
         for name in guard.REQUIRED:
@@ -289,6 +335,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
             "base_sha_changed": lambda s: s.update(main_sha=H),
             "switch_paused": lambda s: s["switch"].update(body=M.replace("RUNNING", "PAUSED")),
             "pr_head_changed": lambda s: s["pr"]["head"].update(sha=B),
+            "review_thread_open": lambda s: s["review_threads"].append(
+                {"isResolved": False, "author_login": "coderabbitai"}),
         }
         env = {"GH_TOKEN": "offline-placeholder", "PR_SHA": H,
                "PR_NUMBER": "485", "GITHUB_REPOSITORY": guard.REPO}
@@ -297,11 +345,13 @@ class AutoMergePrGuardTests(unittest.TestCase):
                 before, after = fixture(), fixture()
                 mutation(after)
                 with patch.dict(guard.os.environ, env, clear=True):
-                    with patch.object(guard, "get", side_effect=responses(before, after)) as get_mock:
+                    with (patch.object(guard, "get", side_effect=responses(before, after)) as get_mock,
+                          patch.object(guard, "get_threads", side_effect=[before["review_threads"], after["review_threads"]])):
                         self.assertEqual(guard.main(), 1)
                         self.assertEqual(get_mock.call_count, 12)
         with patch.dict(guard.os.environ, env, clear=True):
-            with patch.object(guard, "get", side_effect=responses(fixture(), fixture())) as get_mock:
+            with (patch.object(guard, "get", side_effect=responses(fixture(), fixture())) as get_mock,
+                  patch.object(guard, "get_threads", side_effect=[[], []])):
                 self.assertEqual(guard.main(), 0)
                 self.assertEqual(get_mock.call_count, 12)
 
@@ -383,7 +433,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
                     sample["pr"], sample["switch"], sample["checks"],
                     sample["reviews"], sample["status_history"], branch,
                 ]
-                with patch.object(guard, "get", side_effect=responses):
+                with (patch.object(guard, "get", side_effect=responses),
+                      patch.object(guard, "get_threads", return_value=[])):
                     snapshot = guard.read_snapshot(
                         "offline-token", "/repos/pl0n3r/GrindFlow", 485, H
                     )
@@ -396,7 +447,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
             sample["pr"], sample["switch"], sample["checks"],
             sample["reviews"], sample["status_history"], {"commit": {"sha": B}},
         ]
-        with patch.object(guard, "get", side_effect=responses):
+        with (patch.object(guard, "get", side_effect=responses),
+              patch.object(guard, "get_threads", return_value=[])):
             snapshot = guard.read_snapshot(
                 "offline-token", "/repos/pl0n3r/GrindFlow", 485, H
             )
