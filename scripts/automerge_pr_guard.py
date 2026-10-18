@@ -360,7 +360,81 @@ def read_snapshot(token, root, number, expected):
     return snapshot
 
 
+
+def verify_exact_main_ci_runs(payload, expected):
+    """A suppressed push is NOT a successful validation of the merged main SHA."""
+    if type(expected) is not str or SHA.fullmatch(expected) is None:
+        raise GuardError("exact_main_sha_invalid")
+    if (type(payload) is not dict or type(payload.get("total_count")) is not int
+            or type(payload.get("workflow_runs")) is not list
+            or not 0 <= payload["total_count"] <= 100
+            or payload["total_count"] != len(payload["workflow_runs"])):
+        raise GuardError("exact_main_runs_incomplete")
+    seen, matches = set(), []
+    for run in payload["workflow_runs"]:
+        if (type(run) is not dict or type(run.get("id")) is not int
+                or run["id"] <= 0 or run["id"] in seen
+                or type(run.get("head_sha")) is not str
+                or SHA.fullmatch(run["head_sha"]) is None):
+            raise GuardError("exact_main_run_invalid")
+        seen.add(run["id"])
+        if run["head_sha"] == expected and run.get("head_branch") == "main" and (
+                run.get("name") == "GrindFlow CI"
+                and run.get("event") in ("push", "workflow_dispatch")):
+            matches.append(run)
+    if not matches:
+        return "missing"
+    latest = max(matches, key=lambda run: run["id"])
+    if latest.get("status") == "completed":
+        if latest.get("conclusion") == "success":
+            return "validated"
+        raise GuardError("exact_main_ci_failed")
+    if latest.get("status") in ("queued", "in_progress", "waiting", "requested", "pending"):
+        return "pending"
+    raise GuardError("exact_main_ci_status_unknown")
+
+
+def audit_main():
+    """Independent scheduled recovery if an Actions GITHUB_TOKEN merge suppressed push."""
+    try:
+        token = os.environ.get("GH_TOKEN", "")
+        expected = os.environ.get("GITHUB_SHA", "")
+        if (os.environ.get("GITHUB_EVENT_NAME") != "schedule"
+                or os.environ.get("GITHUB_REPOSITORY") != REPO
+                or not token or SHA.fullmatch(expected) is None):
+            raise GuardError("exact_main_audit_environment_invalid")
+        root = "/repos/" + REPO
+        def current_main_sha():
+            branch = get(token, root + "/branches/main")
+            if (type(branch) is not dict or type(branch.get("commit")) is not dict
+                    or type(branch["commit"].get("sha")) is not str
+                    or SHA.fullmatch(branch["commit"]["sha"]) is None):
+                raise GuardError("exact_main_branch_unknown")
+            return branch["commit"]["sha"]
+
+        if current_main_sha() != expected:
+            raise GuardError("exact_main_changed_before_audit")
+        runs = get(token, root + "/actions/workflows/grindflow-ci.yml/runs"
+                   + "?branch=main&head_sha=" + expected + "&per_page=100")
+        verdict = verify_exact_main_ci_runs(runs, expected)
+        if current_main_sha() != expected:
+            raise GuardError("exact_main_changed_during_audit")
+        if verdict == "validated":
+            print("EXACT_MAIN_CI_VALIDATED " + expected)
+            return 0
+        if verdict == "missing":
+            print("EXACT_MAIN_DISPATCH_REQUIRED " + expected)
+            return 2
+        raise GuardError("exact_main_ci_pending")
+    except (GuardError, ValueError, TypeError, KeyError) as err:
+        reason = str(err) if type(err) is GuardError else "exact_main_audit_input_invalid"
+        print("EXACT_MAIN_CI_NOT_VALIDATED: " + reason, file=sys.stderr)
+        return 1
+
+
 def main():
+    if sys.argv[1:] == ["--audit-main"]:
+        return audit_main()
     try:
         token = os.environ.get("GH_TOKEN")
         expected = os.environ.get("PR_SHA", "")

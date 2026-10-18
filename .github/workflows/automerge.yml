@@ -1,5 +1,9 @@
 name: Auto-merge cuando esté listo
 on:
+  # Independent recovery for GitHub GITHUB_TOKEN-suppressed auto-merge push events.
+  # Post-merge validation is UNKNOWN until a CI run succeeds on exact main HEAD.
+  schedule:
+    - cron: '17 * * * *'
   pull_request_target:
     types: [opened, reopened, ready_for_review, synchronize]
   workflow_run:
@@ -12,6 +16,42 @@ concurrency:
   group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha || github.sha }}
   cancel-in-progress: false
 jobs:
+  postmerge_exact_main:
+    # An Actions GITHUB_TOKEN-enabled auto-merge may suppress the push event.
+    # An independent scheduled audit can dispatch the existing GrindFlow CI
+    # via workflow_dispatch (the GitHub-documented token-trigger exception).
+    # This never mutates main, deploys, or treats a pending validation as green.
+    if: github.repository == 'pl0n3r/GrindFlow' && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout trusted exact-main audit code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify exact-main CI; dispatch only if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          python3 scripts/automerge_pr_guard.py --audit-main
+          code=$?
+          if (( code == 2 )); then
+            # Guard against branch movement between audit and dispatch.
+            current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" || exit 1
+            [[ "$current" == "$GITHUB_SHA" ]] || { echo '::error::main moved; fail-closed'; exit 1; }
+            gh workflow run grindflow-ci.yml --ref main || exit 1
+            echo '::error::exact-main CI dispatched but NOT yet validated'
+            exit 1
+          fi
+          exit "$code"
   automerge:
     if: >-
       github.repository == 'pl0n3r/GrindFlow' &&

@@ -486,6 +486,61 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertEqual(snapshot["main_sha"], B)
         guard.verify(snapshot, H)
 
+
+    def test_exact_main_ci_requires_matching_terminal_green(self):
+        """A queued/missing/failed exact-main run is never proof of validation."""
+        run = {"id": 42, "name": "GrindFlow CI", "head_sha": H,
+               "head_branch": "main", "event": "workflow_dispatch",
+               "status": "completed", "conclusion": "success"}
+        good = {"total_count": 1, "workflow_runs": [run]}
+        self.assertEqual(guard.verify_exact_main_ci_runs(good, H), "validated")
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 0, "workflow_runs": []}, H), "missing")
+        for mutation in (
+            lambda row: row.update(head_sha=B),
+            lambda row: row.update(head_branch="trabajo/issue-482"),
+            lambda row: row.update(event="pull_request"),
+            lambda row: row.update(name="untrusted workflow"),
+        ):
+            sample = dict(run)
+            mutation(sample)
+            self.assertEqual(guard.verify_exact_main_ci_runs(
+                {"total_count": 1, "workflow_runs": [sample]}, H), "missing")
+        for status in ("queued", "in_progress", "requested"):
+            sample = dict(run, status=status, conclusion=None)
+            self.assertEqual(guard.verify_exact_main_ci_runs(
+                {"total_count": 1, "workflow_runs": [sample]}, H), "pending")
+        for conclusion in ("failure", "cancelled", "skipped", None):
+            sample = dict(run, conclusion=conclusion)
+            with self.assertRaises(guard.GuardError):
+                guard.verify_exact_main_ci_runs(
+                    {"total_count": 1, "workflow_runs": [sample]}, H)
+        with self.assertRaises(guard.GuardError):
+            guard.verify_exact_main_ci_runs({"total_count": 2, "workflow_runs": [run]}, H)
+        with self.assertRaises(guard.GuardError):
+            guard.verify_exact_main_ci_runs(
+                {"total_count": 2, "workflow_runs": [run, dict(run)]}, H)
+        older = dict(run, id=41)
+        newer_failed = dict(run, id=43, conclusion="failure")
+        with self.assertRaises(guard.GuardError):
+            guard.verify_exact_main_ci_runs(
+                {"total_count": 2, "workflow_runs": [older, newer_failed]}, H)
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 2, "workflow_runs": [
+                dict(older, conclusion="failure"), run]}, H), "validated")
+
+    def test_scheduled_postmerge_exact_main_audit_is_independent(self):
+        yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
+        self.assertIn("schedule:", yml)
+        self.assertIn("github.event_name == 'schedule'", yml)
+        self.assertIn("actions: write", yml)
+        self.assertIn("python3 scripts/automerge_pr_guard.py --audit-main", yml)
+        self.assertIn("gh workflow run grindflow-ci.yml --ref main", yml)
+        self.assertIn("EXACT_MAIN_CI_NOT_VALIDATED", (ROOT / "scripts/automerge_pr_guard.py").read_text(encoding="utf-8"))
+        self.assertIn("exit 1", yml)
+        self.assertNotIn("secrets.AUTOMERGE_TOKEN", yml)
+        self.assertNotIn("--admin", yml)
+
     def test_successful_evidence_allows_only_sha_locked_auto_merge(self):
         guard.verify(fixture(), H)
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
