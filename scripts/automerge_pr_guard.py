@@ -137,21 +137,61 @@ def verify(snapshot, expected):
             or checks["total_count"] != len(checks["check_runs"])
             or checks["total_count"] > 100):
         raise GuardError("incomplete_checks")
+    # GitHub returns check runs newest-first. Same-name jobs from distinct
+    # workflow runs are legitimate retries, not automatically ambiguous.
+    # Their immutable numeric IDs identify the creation order; never choose
+    # the first *successful* result over a newer failed or pending attempt.
     seen = {}
+    previous_id = None
     for check in checks["check_runs"]:
         if (type(check) is not dict or type(check.get("name")) is not str
-                or check.get("head_sha") != expected or check["name"] in seen):
+                or not check["name"] or check.get("head_sha") != expected):
             raise GuardError("ambiguous_checks")
-        seen[check["name"]] = check
+        run_id = check.get("id")
+        if (type(run_id) is not int or run_id <= 0
+                or (previous_id is not None and run_id >= previous_id)):
+            raise GuardError("check_id_or_order_unknown")
+        previous_id = run_id
+        app = check.get("app")
+        if (type(app) is not dict or type(app.get("slug")) is not str
+                or not app["slug"] or type(app.get("id")) is not int
+                or app["id"] <= 0):
+            raise GuardError("check_app_mismatch")
+        if check["name"] in REQUIRED_APPS:
+            slug, app_id = REQUIRED_APPS[check["name"]]
+            if (app["slug"], app["id"]) != (slug, app_id):
+                raise GuardError("check_app_mismatch")
+        # Check-run start/completion times establish independently readable
+        # temporal evidence, but an unrelated skipped job can complete before
+        # its recorded start; only gate-winning required runs need chronology.
+        for field in ("started_at", "completed_at"):
+            value = check.get(field)
+            if value is not None:
+                if type(value) is not str or not value.endswith("Z"):
+                    raise GuardError("check_time_invalid")
+                try:
+                    at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError as err:
+                    raise GuardError("check_time_invalid") from err
+                if at.tzinfo is None or at.utcoffset() != timezone.utc.utcoffset(at):
+                    raise GuardError("check_time_invalid")
+        name = check["name"]
+        if name in seen:
+            earlier_app = seen[name]["app"]
+            if (app["slug"], app["id"]) != (earlier_app["slug"], earlier_app["id"]):
+                raise GuardError("ambiguous_check_emitter")
+        else:
+            seen[name] = check
     for name in REQUIRED:
         row = seen.get(name)
         if not row or row.get("status") != "completed" or row.get("conclusion") != "success":
             raise GuardError("missing_or_failed_policy")
-        app = row.get("app")
-        slug, app_id = REQUIRED_APPS[name]
-        if (type(app) is not dict or app.get("slug") != slug
-                or type(app.get("id")) is not int or app["id"] != app_id):
-            raise GuardError("check_app_mismatch")
+        if row.get("started_at") is None or row.get("completed_at") is None:
+            raise GuardError("check_time_missing")
+        start = datetime.fromisoformat(row["started_at"].replace("Z", "+00:00"))
+        end = datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00"))
+        if end < start:
+            raise GuardError("check_time_reversed")
     verify_coderabbit_status(snapshot.get("status_history"))
     reviews = snapshot.get("reviews")
     if type(reviews) is not list or len(reviews) > 100:

@@ -17,6 +17,9 @@ def fixture():
     items = [{"name": x, "head_sha": H, "status": "completed", "conclusion": "success",
               "app": {"slug": guard.REQUIRED_APPS[x][0], "id": guard.REQUIRED_APPS[x][1]}}
              for x in guard.REQUIRED]
+    for index, item in enumerate(items):
+        item.update(id=105 - index, started_at="2026-10-14T08:00:00Z",
+                    completed_at="2026-10-14T08:00:30Z")
     return {"switch": {"number": 767,
                        "url": "https://api.github.com/repos/pl0n3r/Factory/issues/767",
                        "repository_url": "https://api.github.com/repos/pl0n3r/Factory",
@@ -53,6 +56,67 @@ class AutoMergePrGuardTests(unittest.TestCase):
         case = fixture()
         case["checks"]["total_count"] = 100
         self.denied(case)
+
+    def test_repeated_check_runs_use_latest_authentic_attempt(self):
+        """A newer green policy may supersede older failures, never vice versa."""
+        from copy import deepcopy
+
+        def retry(sample, status="completed", conclusion="success"):
+            previous = sample["checks"]["check_runs"][-1]
+            previous["conclusion"] = "failure"
+            newer = deepcopy(previous)
+            newer.update(id=106, started_at="2026-10-14T08:01:00Z",
+                         completed_at="2026-10-14T08:01:30Z",
+                         status=status, conclusion=conclusion)
+            sample["checks"]["check_runs"].insert(0, newer)
+            sample["checks"]["total_count"] += 1
+            return newer, previous
+
+        case = fixture()
+        retry(case)
+        guard.verify(case, H)
+
+        for status, conclusion in (("completed", "failure"),
+                                   ("in_progress", None), ("completed", "skipped")):
+            with self.subTest(status=status, conclusion=conclusion):
+                case = fixture()
+                newer, _ = retry(case, status, conclusion)
+                if status != "completed":
+                    newer["completed_at"] = None
+                self.denied(case)
+
+        for mutation in (
+            lambda n, o: n["app"].update(slug="attacker"),
+            lambda n, o: o["app"].update(id=99999),
+            lambda n, o: n.update(id=o["id"]),
+            lambda n, o: n.update(id=True),
+            lambda n, o: n.update(started_at="not-a-date"),
+            lambda n, o: n.update(completed_at="2026-10-14T07:00:00Z"),
+        ):
+            case = fixture()
+            new, old = retry(case)
+            mutation(new, old)
+            self.denied(case)
+
+        case = fixture()
+        retry(case)
+        case["checks"]["check_runs"].reverse()
+        self.denied(case)
+
+        # Repeated nonrequired jobs do not falsely veto independent green gates.
+        case = fixture()
+        for job_id, outcome in ((107, "failure"), (106, "success")):
+            case["checks"]["check_runs"].insert(0, {
+                "id": job_id, "name": "informational", "head_sha": H,
+                "status": "completed", "conclusion": outcome,
+                "started_at": "2026-10-14T08:01:00Z",
+                "completed_at": "2026-10-14T08:01:30Z",
+                "app": {"slug": "github-actions", "id": 15368},
+            })
+        # Their insertion order must still reflect newest-first IDs.
+        case["checks"]["check_runs"][:2] = reversed(case["checks"]["check_runs"][:2])
+        case["checks"]["total_count"] += 2
+        guard.verify(case, H)
 
     def test_check_emitter_identity_is_required(self):
         for name in guard.REQUIRED:
