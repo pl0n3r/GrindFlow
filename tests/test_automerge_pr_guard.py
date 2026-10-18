@@ -147,6 +147,37 @@ class AutoMergePrGuardTests(unittest.TestCase):
         del sample["review_threads"]
         self.denied(sample)
 
+    def test_coderabbit_real_markdown_findings_fail_closed(self):
+        """Read real Markdown counts; never interpret malformed labels as clean."""
+        denied_bodies = (
+            "**Actionable comments posted: 2**",
+            "> **Actionable comments posted: 1**\n\nAdditional detail",
+            "Review summary\n**Actionable comments posted: 3**\n\nNext steps",
+            "Actionable comments posted: **2**",
+            "Actionable comments posted: 0\nActionable comments posted: 1",
+            "Actionable comments posted: 1\nActionable comments posted: 0",
+            "Actionable comments posted: unknown",
+            "**Actionable comments posted:**",
+            "Actionable comments posted: 0\nActionable comments posted: ???",
+            "Actionable comments posted: 0.5",
+            "Actionable comments posted: 2abc",
+        )
+        for body in denied_bodies:
+            with self.subTest(denied=body):
+                case = fixture()
+                case["reviews"][0]["body"] = body
+                self.denied(case)
+        for body in (
+            "**Actionable comments posted: 0**",
+            "Summary\n> **Actionable comments posted: 0**\n\nNo issues",
+            "Actionable comments posted: **0**",
+            "Actionable comments posted: 0\nActionable comments posted: 0",
+        ):
+            with self.subTest(allowed=body):
+                case = fixture()
+                case["reviews"][0]["body"] = body
+                guard.verify(case, H)
+
     def test_incomplete_review_thread_graphql_denied(self):
         def payload(nodes=None, more=False):
             if nodes is None:

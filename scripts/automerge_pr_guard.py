@@ -243,9 +243,17 @@ def verify(snapshot, expected):
     if type(body) is str:
         if any(s in body.lower() for s in blocked_text):
             raise GuardError("coderabbit_review_incomplete")
-        findings = re.search(r"(?im)^\s*Actionable comments posted:\s*(\d+)\s*$", body)
-        if findings is not None and int(findings.group(1)) > 0:
-            raise GuardError("coderabbit_actionable_findings")
+        # CodeRabbit publishes e.g. "**Actionable comments posted: 2**".
+        # Evaluate every occurrence, including Markdown/blockquote variants;
+        # an ambiguous count is NOT evidence that no findings remain.
+        labels = re.finditer(r"(?i)\bactionable\s+comments\s+posted\s*:", body)
+        for label in labels:
+            remainder = body[label.end():].splitlines()[0]
+            count = re.match(r"[ \t*_`]*([0-9]+)(?![0-9A-Za-z_.])", remainder)
+            if count is None:
+                raise GuardError("coderabbit_findings_unknown")
+            if int(count.group(1)) > 0:
+                raise GuardError("coderabbit_actionable_findings")
     if not (latest_bot["state"] == "APPROVED" or (
             latest_bot["state"] == "COMMENTED" and type(body) is str and body.strip())):
         raise GuardError("coderabbit_review_missing")
