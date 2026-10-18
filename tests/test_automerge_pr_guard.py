@@ -531,12 +531,56 @@ class AutoMergePrGuardTests(unittest.TestCase):
             {"total_count": 2, "workflow_runs": [
                 dict(older, conclusion="failure"), run]}, H), "validated")
 
+    def test_exact_main_chain_never_skips_intermediate_commits(self):
+        """A later successful main CI cannot conceal an untested squash."""
+        old, new = "c" * 40, "d" * 40
+        anchor = guard.EXACT_MAIN_AUDIT_ANCHOR
+
+        def history(sequence):
+            n = len(sequence)
+            return {"base_commit": {"sha": anchor},
+                    "merge_base_commit": {"sha": anchor},
+                    "status": "identical" if n == 0 else "ahead",
+                    "ahead_by": n, "behind_by": 0,
+                    "total_commits": n,
+                    "commits": [{"sha": value} for value in sequence]}
+
+        self.assertEqual(guard.exact_main_commits_since_anchor(
+            history([]), anchor), [anchor])
+        self.assertEqual(guard.exact_main_commits_since_anchor(
+            history([old, new]), new), [old, new])
+        green = {"id": 42, "name": "GrindFlow CI", "head_sha": new,
+                 "head_branch": "main", "event": "push",
+                 "status": "completed", "conclusion": "success"}
+        # The latest is green, but the earlier main SHA still has no run.
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 1, "workflow_runs": [green]}, new), "validated")
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 0, "workflow_runs": []}, old), "missing")
+        with self.assertRaises(guard.GuardError):
+            guard.verify_exact_main_ci_chain(
+                [old, new], {old: "missing", new: "validated"}, new)
+        self.assertEqual(guard.verify_exact_main_ci_chain(
+            [old, new], {old: "validated", new: "missing"}, new), "missing")
+        with self.assertRaises(guard.GuardError):
+            guard.exact_main_commits_since_anchor(history([old, new]), old)
+        with self.assertRaises(guard.GuardError):
+            guard.exact_main_commits_since_anchor(history([old, new, new]), new)
+        with self.assertRaises(guard.GuardError):
+            guard.exact_main_commits_since_anchor(history(
+                [("e" * 40) for _ in range(guard.MAX_EXACT_MAIN_COMMITS + 1)]), new)
+        tampered = history([old, new])
+        tampered["merge_base_commit"]["sha"] = "f" * 40
+        with self.assertRaises(guard.GuardError):
+            guard.exact_main_commits_since_anchor(tampered, new)
+
     def test_scheduled_postmerge_exact_main_audit_is_independent(self):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("schedule:", yml)
         self.assertIn("github.event_name == 'schedule'", yml)
         self.assertIn("actions: write", yml)
         self.assertIn("python3 scripts/automerge_pr_guard.py --audit-main", yml)
+        self.assertIn("python3 scripts/automerge_pr_guard.py --audit-main || code=$?", yml)
         self.assertIn("gh workflow run grindflow-ci.yml --ref main", yml)
         self.assertIn("EXACT_MAIN_CI_NOT_VALIDATED", (ROOT / "scripts/automerge_pr_guard.py").read_text(encoding="utf-8"))
         self.assertIn("exit 1", yml)

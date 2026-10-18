@@ -38,8 +38,8 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: |
           set -uo pipefail
-          python3 scripts/automerge_pr_guard.py --audit-main
-          code=$?
+          code=0
+          python3 scripts/automerge_pr_guard.py --audit-main || code=$?
           if (( code == 2 )); then
             # Guard against branch movement between audit and dispatch.
             current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" || exit 1

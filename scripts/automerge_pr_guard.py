@@ -9,6 +9,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 REPO = "pl0n3r/GrindFlow"
+# Auditable checkpoint: main SHA at the start of protected #482 integration.
+# Examine EVERY following main commit, not merely the latest hourly HEAD.
+# Exceeding this bounded window fails closed; never treat it as green.
+EXACT_MAIN_AUDIT_ANCHOR = "91a1ae9de2ec9f8f14808acd0530e03befb52a86"
+MAX_EXACT_MAIN_COMMITS = 20
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 MARKER = re.compile(r"<!--\s*factory-unattended-kill-switch\s+(\{[^\n]*\})\s*-->")
 MARKER_START = re.compile(r"<!--\s*factory-unattended-kill-switch\b")
@@ -394,6 +399,56 @@ def verify_exact_main_ci_runs(payload, expected):
     raise GuardError("exact_main_ci_status_unknown")
 
 
+def exact_main_commits_since_anchor(payload, expected):
+    """Fail-closed list of all commits from the trusted cutover checkpoint."""
+    if type(expected) is not str or SHA.fullmatch(expected) is None:
+        raise GuardError("exact_main_sha_invalid")
+    if type(payload) is not dict:
+        raise GuardError("exact_main_history_invalid")
+    base = payload.get("base_commit")
+    merge_base = payload.get("merge_base_commit")
+    commits = payload.get("commits")
+    n = payload.get("total_commits")
+    ahead = payload.get("ahead_by")
+    behind = payload.get("behind_by")
+    if (type(base) is not dict or base.get("sha") != EXACT_MAIN_AUDIT_ANCHOR
+            or type(merge_base) is not dict
+            or merge_base.get("sha") != EXACT_MAIN_AUDIT_ANCHOR
+            or type(n) is not int or not 0 <= n <= MAX_EXACT_MAIN_COMMITS
+            or type(ahead) is not int or ahead != n
+            or type(behind) is not int or behind != 0
+            or type(commits) is not list or len(commits) != n
+            or payload.get("status") != ("identical" if n == 0 else "ahead")):
+        raise GuardError("exact_main_history_untrusted_or_incomplete")
+    seen = set()
+    commits_shas = []
+    for item in commits:
+        if (type(item) is not dict or type(item.get("sha")) is not str
+                or SHA.fullmatch(item["sha"]) is None or item["sha"] in seen
+                or item["sha"] == EXACT_MAIN_AUDIT_ANCHOR):
+            raise GuardError("exact_main_history_commit_invalid")
+        seen.add(item["sha"])
+        commits_shas.append(item["sha"])
+    if (n == 0 and expected != EXACT_MAIN_AUDIT_ANCHOR) or (
+            n > 0 and commits_shas[-1] != expected):
+        raise GuardError("exact_main_history_head_mismatch")
+    return commits_shas or [expected]
+
+
+def verify_exact_main_ci_chain(commits, statuses, expected):
+    """Require terminal green for *every* intermediate main commit."""
+    if (type(commits) is not list or not commits
+            or type(statuses) is not dict or commits[-1] != expected
+            or set(statuses) != set(commits)):
+        raise GuardError("exact_main_ci_chain_incomplete")
+    for sha in commits[:-1]:
+        if statuses[sha] != "validated":
+            raise GuardError("exact_main_intermediate_ci_not_validated")
+    if statuses[expected] in ("validated", "missing", "pending"):
+        return statuses[expected]
+    raise GuardError("exact_main_ci_chain_invalid")
+
+
 def audit_main():
     """Independent scheduled recovery if an Actions GITHUB_TOKEN merge suppressed push."""
     try:
@@ -414,9 +469,19 @@ def audit_main():
 
         if current_main_sha() != expected:
             raise GuardError("exact_main_changed_before_audit")
-        runs = get(token, root + "/actions/workflows/grindflow-ci.yml/runs"
-                   + "?branch=main&head_sha=" + expected + "&per_page=100")
-        verdict = verify_exact_main_ci_runs(runs, expected)
+        # The compare response must be complete and anchored to a trusted SHA.
+        # A later successful CI run does not forgive an unvalidated earlier
+        # squash commit whose push was suppressed by GITHUB_TOKEN.
+        history = get(token, root + "/compare/" + EXACT_MAIN_AUDIT_ANCHOR
+                      + "..." + expected + "?per_page="
+                      + str(MAX_EXACT_MAIN_COMMITS))
+        required = exact_main_commits_since_anchor(history, expected)
+        statuses = {}
+        for commit_sha in required:
+            runs = get(token, root + "/actions/workflows/grindflow-ci.yml/runs"
+                       + "?branch=main&head_sha=" + commit_sha + "&per_page=100")
+            statuses[commit_sha] = verify_exact_main_ci_runs(runs, commit_sha)
+        verdict = verify_exact_main_ci_chain(required, statuses, expected)
         if current_main_sha() != expected:
             raise GuardError("exact_main_changed_during_audit")
         if verdict == "validated":
