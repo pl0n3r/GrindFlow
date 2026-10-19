@@ -173,6 +173,75 @@ final class InstagramReelProviderTest extends TestCase
         }
     }
 
+    public function test429OnlyBeforeContainerCreationAllowsAutomaticRetry(): void
+    {
+        $video = $this->videoFixture();
+        $created = ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'];
+        $uploaded = ['status' => 200, 'headers' => [], 'body' => '{"success":true}'];
+        $finished = ['status' => 200, 'headers' => [], 'body' => '{"status_code":"FINISHED"}'];
+        $limited = ['status' => 429, 'headers' => ['retry-after' => '120'], 'body' => '{}'];
+        try {
+            foreach ([[$created, $limited], [$created, $uploaded, $limited],
+                      [$created, $uploaded, $finished, $limited]] as $responses) {
+                $transport = new FakeInstagramReelTransport($responses);
+                $error = $this->capture(fn () => $this->provider($transport)->publish($this->command($video)));
+                self::assertSame(DistributionProviderException::KIND_AMBIGUOUS, $error->kind);
+                self::assertFalse($error->automaticRetryAllowed);
+                self::assertCount(count($responses), $transport->calls);
+            }
+        } finally {
+            @unlink($video);
+        }
+    }
+
+    public function testStatusPollingWaitsBetweenChecksWithoutRealSleep(): void
+    {
+        $video = $this->videoFixture();
+        $sleepCalls = 0;
+        $transport = new FakeInstagramReelTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"success":true}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"status_code":"IN_PROGRESS"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"status_code":"PROCESSING"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"status_code":"FINISHED"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"789012"}'],
+        ]);
+        try {
+            $outcome = $this->provider($transport, true, null, static function () use (&$sleepCalls): void {
+                ++$sleepCalls;
+            })->publish($this->command($video));
+            self::assertSame('789012', $outcome->externalPublicationId);
+            self::assertSame(2, $sleepCalls);
+            self::assertSame(['create', 'upload', 'status', 'status', 'status', 'publish'], $transport->calls);
+        } finally {
+            @unlink($video);
+        }
+    }
+
+    public function testVerifiedUploadKeepsOriginalBytesWhenVaultFileChanges(): void
+    {
+        $video = $this->videoFixture();
+        $sha = hash_file('sha256', $video);
+        self::assertIsString($sha);
+        $transport = new FakeInstagramReelTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"success":true}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"status_code":"FINISHED"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"789012"}'],
+        ]);
+        $transport->onCreate = static function () use ($video): void {
+            file_put_contents($video, 'changed after verification');
+        };
+        try {
+            $outcome = $this->provider($transport)->publish($this->command($video));
+            self::assertSame('789012', $outcome->externalPublicationId);
+            self::assertSame($sha, $transport->uploadedSha);
+            self::assertNotSame($sha, hash_file('sha256', $video));
+        } finally {
+            @unlink($video);
+        }
+    }
+
     private function videoFixture(): string
     {
         $path = tempnam(sys_get_temp_dir(), 'gf-ig-fake-');
@@ -193,7 +262,7 @@ final class InstagramReelProviderTest extends TestCase
         );
     }
 
-    private function provider(FakeInstagramReelTransport $transport, bool $enabled = true, ?string $vaultRoot = null): InstagramReelProvider
+    private function provider(FakeInstagramReelTransport $transport, bool $enabled = true, ?string $vaultRoot = null, ?\Closure $sleeper = null): InstagramReelProvider
     {
         return new InstagramReelProvider(
             new InstagramReelConfiguration(
@@ -201,6 +270,7 @@ final class InstagramReelProviderTest extends TestCase
                 'v26.0', 'instagram_content_publish', $enabled, $vaultRoot ?? sys_get_temp_dir(),
             ),
             $transport,
+            $sleeper,
         );
     }
 
@@ -225,6 +295,8 @@ final class FakeInstagramReelTransport implements InstagramReelTransport
 {
     /** @var list<string> */
     public array $calls = [];
+    public ?\Closure $onCreate = null;
+    public ?string $uploadedSha = null;
 
     /** @param list<array{status:int,headers:array<string,string>,body:string}> $responses */
     public function __construct(private array $responses) {}
@@ -232,12 +304,20 @@ final class FakeInstagramReelTransport implements InstagramReelTransport
     public function createContainer(string $version, string $userId, string $token, string $caption): array
     {
         $this->calls[] = 'create';
-        return $this->next();
+        $response = $this->next();
+        if ($this->onCreate !== null) {
+            ($this->onCreate)();
+        }
+        return $response;
     }
 
-    public function uploadVideo(string $uploadUri, string $token, string $path, string $mime): array
+    public function uploadVideo(string $uploadUri, string $token, string $verifiedBytes, string $mime, string $expectedSha256): array
     {
         $this->calls[] = 'upload';
+        $this->uploadedSha = hash('sha256', $verifiedBytes);
+        if (!hash_equals(strtolower($expectedSha256), $this->uploadedSha)) {
+            throw new \RuntimeException('fake_instagram_upload_digest_mismatch');
+        }
         return $this->next();
     }
 

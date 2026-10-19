@@ -11,7 +11,7 @@ interface InstagramReelTransport
     public function createContainer(string $version, string $userId, string $token, string $caption): array;
 
     /** @return array{status:int,headers:array<string,string>,body:string} */
-    public function uploadVideo(string $uploadUri, string $token, string $path, string $mime): array;
+    public function uploadVideo(string $uploadUri, string $token, string $verifiedBytes, string $mime, string $expectedSha256): array;
 
     /** @return array{status:int,headers:array<string,string>,body:string} */
     public function containerStatus(string $version, string $containerId, string $token): array;

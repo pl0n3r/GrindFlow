@@ -25,6 +25,8 @@ class InstagramReelsContractTests(unittest.TestCase):
         self.assertIn("https://graph.facebook.com/", transport)
         self.assertIn("rupload.facebook.com", transport)
         self.assertIn("'FINISHED'", provider)
+        self.assertIn("$containerCreated && $e->kind === DistributionProviderException::KIND_RATE_LIMIT", provider)
+        self.assertIn("$this->sleepBetweenStatusChecks", provider)
         self.assertNotIn("video_url", provider + transport)
 
     def test_config_tenant_and_media_are_fail_closed(self):
@@ -37,6 +39,9 @@ class InstagramReelsContractTests(unittest.TestCase):
         self.assertIn("'instagram_content_publish'", config)
         self.assertIn("'instagram_business_content_publish'", config)
         self.assertIn("hash_file('sha256'", provider)
+        self.assertIn("return $bytes;", provider)
+        self.assertIn("hash_equals(strtolower($expectedSha256), hash('sha256', $verifiedBytes))",
+                      self.read("symfony/src/Distribution/StreamInstagramReelTransport.php"))
         self.assertIn("is_link($path)", provider)
         self.assertIn("realpath($this->configuration->vaultRoot())", provider)
         self.assertIn("GRINDFLOW_INSTAGRAM_VAULT_ROOT", self.read("symfony/config/services.yaml"))

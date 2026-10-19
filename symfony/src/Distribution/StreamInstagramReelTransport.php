@@ -27,22 +27,18 @@ final class StreamInstagramReelTransport implements InstagramReelTransport
         );
     }
 
-    public function uploadVideo(string $uploadUri, string $token, string $path, string $mime): array
+    public function uploadVideo(string $uploadUri, string $token, string $verifiedBytes, string $mime, string $expectedSha256): array
     {
+        $size = strlen($verifiedBytes);
         if (!InstagramReelProvider::isOfficialUploadUri($uploadUri)
             || !in_array($mime, ['video/mp4', 'video/quicktime'], true)
-            || is_link($path) || !is_file($path) || !is_readable($path)) {
+            || $size < 1 || $size > 32 * 1024 * 1024
+            || preg_match('/^[0-9a-f]{64}$/D', strtolower($expectedSha256)) !== 1
+            || !hash_equals(strtolower($expectedSha256), hash('sha256', $verifiedBytes))) {
             throw new InvalidArgumentException('instagram_private_upload_invalid');
         }
-        $size = @filesize($path);
-        if (!is_int($size) || $size < 1 || $size > 32 * 1024 * 1024) {
-            throw new InvalidArgumentException('instagram_private_upload_invalid');
-        }
-        $body = @file_get_contents($path);
-        if (!is_string($body) || strlen($body) !== $size) {
-            throw new InvalidArgumentException('instagram_private_upload_invalid');
-        }
-        return $this->request($uploadUri, 'POST', $token, $body, $mime, ['Offset: 0', 'File_size: '.$size]);
+        // No volver a abrir una ruta privada después de verificar su contenido.
+        return $this->request($uploadUri, 'POST', $token, $verifiedBytes, $mime, ['Offset: 0', 'File_size: '.$size]);
     }
 
     public function containerStatus(string $version, string $containerId, string $token): array

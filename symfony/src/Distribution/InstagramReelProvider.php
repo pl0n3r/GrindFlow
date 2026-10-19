@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GrindFlow\Distribution;
 
+use Closure;
 use InvalidArgumentException;
 use JsonException;
 use Throwable;
@@ -13,6 +14,7 @@ final readonly class InstagramReelProvider implements DistributionProvider
     public function __construct(
         private InstagramReelConfiguration $configuration,
         private InstagramReelTransport $transport,
+        private ?Closure $sleepBetweenStatusChecks = null,
     ) {}
 
     public function assertAvailableFor(string $organizationId): void
@@ -28,7 +30,7 @@ final readonly class InstagramReelProvider implements DistributionProvider
     public function publish(DistributionCommand $command): DistributionOutcome
     {
         $this->assertAvailableFor($command->organizationId);
-        $this->assertVerifiedPrivateVideo($command);
+        $verifiedBytes = $this->assertVerifiedPrivateVideo($command);
 
         if (mb_strlen($command->message) > 2200) {
             throw DistributionProviderException::rejected();
@@ -38,10 +40,12 @@ final readonly class InstagramReelProvider implements DistributionProvider
         $userId = $this->configuration->destinationId();
         $token = $this->configuration->token();
 
+        $containerCreated = false;
         try {
             $creation = $this->decode(
                 $this->transport->createContainer($version, $userId, $token, $command->message),
             );
+            $containerCreated = true;
             $container = $this->validId($creation['id'] ?? null);
             $uri = $creation['uri'] ?? null;
             if (!is_string($uri) || !self::isOfficialUploadUri($uri)) {
@@ -49,7 +53,7 @@ final readonly class InstagramReelProvider implements DistributionProvider
             }
 
             $uploaded = $this->decode($this->transport->uploadVideo(
-                $uri, $token, (string) $command->mediaPath, (string) $command->mediaMime,
+                $uri, $token, $verifiedBytes, (string) $command->mediaMime, (string) $command->mediaSha256,
             ));
             if (($uploaded['success'] ?? null) !== true) {
                 throw DistributionProviderException::ambiguous();
@@ -65,6 +69,13 @@ final readonly class InstagramReelProvider implements DistributionProvider
                 if (!in_array($status['status_code'] ?? null, ['IN_PROGRESS', 'PROCESSING'], true)) {
                     throw DistributionProviderException::ambiguous();
                 }
+                if ($attempt < 2) {
+                    if ($this->sleepBetweenStatusChecks !== null) {
+                        ($this->sleepBetweenStatusChecks)();
+                    } else {
+                        usleep(250_000);
+                    }
+                }
             }
             if (!$finished) {
                 throw DistributionProviderException::ambiguous();
@@ -75,13 +86,17 @@ final readonly class InstagramReelProvider implements DistributionProvider
 
             return new DistributionOutcome($this->validId($published['id'] ?? null));
         } catch (DistributionProviderException $e) {
+            if ($containerCreated && $e->kind === DistributionProviderException::KIND_RATE_LIMIT) {
+                // Tras crear el contenedor, nunca repetir automáticamente el envío.
+                throw DistributionProviderException::ambiguous();
+            }
             throw $e;
         } catch (Throwable) {
             throw DistributionProviderException::ambiguous();
         }
     }
 
-    private function assertVerifiedPrivateVideo(DistributionCommand $command): void
+    private function assertVerifiedPrivateVideo(DistributionCommand $command): string
     {
         $path = $command->mediaPath;
         if ($command->link !== null || !is_string($path)
@@ -114,6 +129,17 @@ final readonly class InstagramReelProvider implements DistributionProvider
             || !is_string($digest) || !hash_equals(strtolower((string) $command->mediaSha256), $digest)) {
             throw DistributionProviderException::rejected();
         }
+
+        // Capturar exactamente los bytes que después se enviarán: cualquier
+        // mutación del archivo entre la validación y la red deja de afectar
+        // la publicación, y una sustitución durante la lectura falla cerrado.
+        $bytes = @file_get_contents($actual);
+        if (!is_string($bytes) || strlen($bytes) !== $size
+            || !hash_equals($digest, hash('sha256', $bytes))
+            || (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) !== $command->mediaMime) {
+            throw DistributionProviderException::rejected();
+        }
+        return $bytes;
     }
 
     /** @param array{status:int,headers:array<string,string>,body:string} $response
