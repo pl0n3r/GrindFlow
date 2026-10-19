@@ -126,6 +126,24 @@ final class InstagramReelProviderTest extends TestCase
         }
     }
 
+    public function testPrivateVideoOutsideConfiguredVaultIsRejectedBeforeNetwork(): void
+    {
+        $video = $this->videoFixture();
+        $vault = sys_get_temp_dir().'/gf-ig-vault-empty-'.bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($vault, 0700));
+        $transport = new FakeInstagramReelTransport([]);
+        try {
+            $this->assertKind(
+                fn () => $this->provider($transport, true, $vault)->publish($this->command($video)),
+                DistributionProviderException::KIND_REJECTED,
+            );
+            self::assertSame([], $transport->calls);
+        } finally {
+            @unlink($video);
+            @rmdir($vault);
+        }
+    }
+
     public function testHostForgeryAndUnfinishedContainerAreAmbiguousNoSecondSend(): void
     {
         $video = $this->videoFixture();
@@ -175,12 +193,12 @@ final class InstagramReelProviderTest extends TestCase
         );
     }
 
-    private function provider(FakeInstagramReelTransport $transport, bool $enabled = true): InstagramReelProvider
+    private function provider(FakeInstagramReelTransport $transport, bool $enabled = true, ?string $vaultRoot = null): InstagramReelProvider
     {
         return new InstagramReelProvider(
             new InstagramReelConfiguration(
                 self::ORGANIZATION, '1234567890', 'fixture-ig-token',
-                'v26.0', 'instagram_content_publish', $enabled,
+                'v26.0', 'instagram_content_publish', $enabled, $vaultRoot ?? sys_get_temp_dir(),
             ),
             $transport,
         );

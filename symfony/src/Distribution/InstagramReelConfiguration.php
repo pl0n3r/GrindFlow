@@ -13,6 +13,7 @@ final readonly class InstagramReelConfiguration
         private string $graphVersion,
         private string $publishPermission,
         private bool $enabled = false,
+        private string $vaultRoot = '',
     ) {}
 
     public function assertAvailableFor(string $organizationId): void
@@ -26,9 +27,16 @@ final readonly class InstagramReelConfiguration
             || !preg_match('/^v\d{1,3}\.\d{1,3}$/D', $this->graphVersion)
             || !in_array($this->publishPermission, ['instagram_content_publish', 'instagram_business_content_publish'], true)
             || !hash_equals(strtolower($this->organizationId), strtolower($organizationId))
+            || $this->vaultRoot === ''
+            || !is_dir($this->vaultRoot)
         ) {
             throw DistributionProviderException::configuration();
         }
+    }
+
+    public function vaultRoot(): string
+    {
+        return $this->vaultRoot;
     }
 
     public function destinationId(): string

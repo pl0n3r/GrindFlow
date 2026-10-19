@@ -91,14 +91,22 @@ final readonly class InstagramReelProvider implements DistributionProvider
             throw DistributionProviderException::rejected();
         }
 
-        $size = @filesize($path);
+        // El vídeo solo puede proceder del Vault autorizado (ruta canónica).
+        $actual = realpath($path);
+        $root = realpath($this->configuration->vaultRoot());
+        if ($actual === false || $root === false
+            || !str_starts_with($actual, rtrim($root, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR)) {
+            throw DistributionProviderException::rejected();
+        }
+
+        $size = @filesize($actual);
         // Cota conservadora del piloto; evita buffers gigantes en shared hosting.
         if (!is_int($size) || $size < 1 || $size > 32 * 1024 * 1024) {
             throw DistributionProviderException::rejected();
         }
         try {
-            $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
-            $digest = hash_file('sha256', $path);
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($actual);
+            $digest = hash_file('sha256', $actual);
         } catch (Throwable) {
             throw DistributionProviderException::rejected();
         }

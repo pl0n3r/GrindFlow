@@ -92,3 +92,5 @@ Este documento concentra la guía operativa de Distribution que antes vivía en 
 - El vídeo proviene del Vault privado con SHA-256/MIME/tamaño comprobados antes de I/O; subir binario directo exclusivamente por `rupload.facebook.com` con URI allowlisted, sin URLs públicas.
 - Primero crear contenedor REELS con `upload_type=resumable`, después subir, comprobar `status_code=FINISHED` y publicar mediante `media_publish`; un resultado incierto es `ambiguous` sin reenvío y 429 usa retry acotado del ledger.
 - El transporte de CI es fake. La prueba real en Instagram requiere autorización del dueño, permisos en Meta y evidencia externa segura; ni un merge ni CI se consideran publicación live.
+
+- Límite de origen: `GRINDFLOW_INSTAGRAM_VAULT_ROOT` debe señalar el directorio privado permitido; sin raíz válida el provider no publica. La ruta canónica (`realpath`) rechaza archivos externos al Vault y escapes mediante enlaces simbólicos.

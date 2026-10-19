@@ -38,6 +38,8 @@ class InstagramReelsContractTests(unittest.TestCase):
         self.assertIn("'instagram_business_content_publish'", config)
         self.assertIn("hash_file('sha256'", provider)
         self.assertIn("is_link($path)", provider)
+        self.assertIn("realpath($this->configuration->vaultRoot())", provider)
+        self.assertIn("GRINDFLOW_INSTAGRAM_VAULT_ROOT", self.read("symfony/config/services.yaml"))
         self.assertIn("new \\finfo(FILEINFO_MIME_TYPE)", provider)
         self.assertIn("'video/mp4'", command)
         self.assertIn("!in_array($command->mediaMime, ['image/jpeg', 'image/png']", facebook)

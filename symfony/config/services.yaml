@@ -11,6 +11,7 @@ parameters:
   grindflow_facebook_page_access_token_default: ''
   grindflow_facebook_graph_version_default: 'v26.0'
   grindflow_instagram_enabled_default: 'false'
+  grindflow_instagram_vault_root_default: ''
   grindflow_instagram_org_default: ''
   grindflow_instagram_user_id_default: ''
   grindflow_instagram_token_default: ''
@@ -85,6 +86,7 @@ services:
       $graphVersion: '%env(default:grindflow_instagram_version_default:GRINDFLOW_INSTAGRAM_GRAPH_VERSION)%'
       $publishPermission: '%env(default:grindflow_instagram_permission_default:GRINDFLOW_INSTAGRAM_PUBLISH_PERMISSION)%'
       $enabled: '%env(bool:default:grindflow_instagram_enabled_default:GRINDFLOW_INSTAGRAM_REELS_ENABLED)%'
+      $vaultRoot: '%env(default:grindflow_instagram_vault_root_default:GRINDFLOW_INSTAGRAM_VAULT_ROOT)%'
 
   GrindFlow\Distribution\InstagramReelTransport:
     alias: GrindFlow\Distribution\StreamInstagramReelTransport
