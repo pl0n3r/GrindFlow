@@ -25,7 +25,7 @@ def origin(root: Path) -> tuple[str, str]:
         # 'git log -- docs/privacidad' would falsely attribute old files to it.
         index = (root / DEST / "00-LEEME.md").read_text(encoding="utf-8")
         match = re.match(
-            r"Última actualización automática de las fuentes: (\\d{4}-\\d\\d-\\d\\d) · SHA de origen: `([0-9a-f]{40})`",
+            r"Última actualización automática de las fuentes: (\d{4}-\d\d-\d\d) · SHA de origen: `([0-9a-f]{40})`",
             index,
         )
         if not match:
@@ -35,7 +35,7 @@ def origin(root: Path) -> tuple[str, str]:
         ["git", "log", "-1", "--format=%H%n%cs", "--", "docs/privacidad", "datos.yml"],
         cwd=root, capture_output=True, text=True, check=True, timeout=20,
     ).stdout.strip().splitlines()
-    if len(raw) != 2 or not re.fullmatch(r"[0-9a-f]{40}", raw[0]) or not re.fullmatch(r"\\d{4}-\\d\\d-\\d\\d", raw[1]):
+    if len(raw) != 2 or not re.fullmatch(r"[0-9a-f]{40}", raw[0]) or not re.fullmatch(r"\d{4}-\d\d-\d\d", raw[1]):
         raise ValueError("SHA y fecha fuente faltantes o inválidos")
     return raw[0], raw[1]
 
