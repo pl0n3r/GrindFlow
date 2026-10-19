@@ -449,7 +449,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertNotIn("pull_request_review:", yml)
         self.assertIn("workflow_run:", yml)
         self.assertIn("persist-credentials: false", yml)
-        self.assertIn("    concurrency:\n      group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha || github.sha }}\n      cancel-in-progress: false", yml)
+        self.assertIn("    concurrency:\n      group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.sha || github.sha }}\n      cancel-in-progress: false", yml)
         self.assertNotIn("\nconcurrency:\n  group: automerge-", yml)
         self.assertIn("permissions:\n  contents: read\njobs:", yml)
         self.assertIn("permissions:\n      contents: write\n      pull-requests: write", yml)
@@ -457,9 +457,16 @@ class AutoMergePrGuardTests(unittest.TestCase):
     def test_workflow_run_rechecks_only_trusted_completed_ci_and_current_head(self):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn('workflows: ["GrindFlow CI", "CI Factory v1", "Política Factory v1"', yml)
-        self.assertIn("\n  status:\npermissions:", yml)
+        self.assertIn("\n  status:\n", yml)
+        self.assertIn("\n  check_run:\n    types: [completed]\npermissions:", yml)
         self.assertIn("github.event.context == 'CodeRabbit'", yml)
-        self.assertIn('elif event_name == "status":', yml)
+        self.assertIn('elif event_name in ("status", "check_run"):', yml)
+        self.assertIn('if event_name == "status":', yml)
+        self.assertIn('expected_sha = check.get("head_sha")', yml)
+        self.assertIn('deny("check_run_untrusted")', yml)
+        self.assertIn("(github.event.check_run.app.slug == 'sonarqubecloud'", yml)
+        self.assertIn("(github.event.check_run.app.slug == 'github-advanced-security'", yml)
+        self.assertIn("github.event.check_run.conclusion == 'success'", yml)
         self.assertIn('"/commits/" + expected_sha + "/pulls?per_page=100"', yml)
         self.assertIn('deny("status_pr_mapping_ambiguous")', yml)
         for required in (
@@ -570,13 +577,12 @@ class AutoMergePrGuardTests(unittest.TestCase):
         anchor = guard.EXACT_MAIN_AUDIT_ANCHOR
 
         def history(sequence):
-            n = len(sequence)
-            return {"base_commit": {"sha": anchor},
-                    "merge_base_commit": {"sha": anchor},
-                    "status": "identical" if n == 0 else "ahead",
-                    "ahead_by": n, "behind_by": 0,
-                    "total_commits": n,
-                    "commits": [{"sha": value} for value in sequence]}
+            # REST /commits returns newest first and authentic first parents,
+            # with the anchor included inside the 21-commit bounded window.
+            chain = list(reversed(sequence)) + [anchor]
+            return [{"sha": sha, "parents": ([{"sha": chain[i+1]}]
+                    if i + 1 < len(chain) else [])}
+                    for i, sha in enumerate(chain)]
 
         self.assertEqual(guard.exact_main_commits_since_anchor(
             history([]), anchor), [anchor])
@@ -618,16 +624,14 @@ class AutoMergePrGuardTests(unittest.TestCase):
             guard.exact_main_commits_since_anchor(history(
                 [("e" * 40) for _ in range(guard.MAX_EXACT_MAIN_COMMITS + 1)]), new)
         tampered = history([old, new])
-        tampered["merge_base_commit"]["sha"] = "f" * 40
+        tampered[0]["parents"][0]["sha"] = "f" * 40
         with self.assertRaises(guard.GuardError):
             guard.exact_main_commits_since_anchor(tampered, new)
-        # Only a protected, owner-approved code change can rotate the anchor.
-        # After such a rotation the original compare ancestry must still match.
+        # Rotating the anchor is a separate owner-approved code change.
         from unittest.mock import patch
         with patch.object(guard, "EXACT_MAIN_AUDIT_ANCHOR", old):
-            rotated = dict(history([new]))
-            rotated["base_commit"] = {"sha": old}
-            rotated["merge_base_commit"] = {"sha": old}
+            rotated = [{"sha": new, "parents": [{"sha": old}]},
+                       {"sha": old, "parents": []}]
             self.assertEqual(guard.exact_main_commits_since_anchor(rotated, new), [new])
             with self.assertRaises(guard.GuardError):
                 guard.exact_main_commits_since_anchor(history([old, new]), new)
@@ -640,11 +644,10 @@ class AutoMergePrGuardTests(unittest.TestCase):
 
         old, middle, current = "c" * 40, "d" * 40, "e" * 40
         anchor = guard.EXACT_MAIN_AUDIT_ANCHOR
-        history = {"base_commit": {"sha": anchor},
-                   "merge_base_commit": {"sha": anchor},
-                   "status": "ahead", "ahead_by": 3, "behind_by": 0,
-                   "total_commits": 3,
-                   "commits": [{"sha": s} for s in (old, middle, current)]}
+        history = [{"sha": current, "parents": [{"sha": middle}]},
+                   {"sha": middle, "parents": [{"sha": old}]},
+                   {"sha": old, "parents": [{"sha": anchor}]},
+                   {"sha": anchor, "parents": []}]
         replay_ready = set()
         observed = []
         env = {"GH_TOKEN": "offline-test", "GITHUB_SHA": current,
@@ -655,8 +658,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
             self.assertEqual(token, "offline-test")
             if path.endswith("/branches/main"):
                 return {"commit": {"sha": current}}
-            if "/compare/" in path:
-                self.assertIn(anchor + "..." + current, path)
+            if "/commits?sha=" in path:
+                self.assertIn("?sha=" + current + "&per_page=21", path)
                 return history
             self.assertIn("/actions/workflows/grindflow-ci.yml/runs?", path)
             self.assertNotIn("branch=main", path)
@@ -700,6 +703,68 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertEqual(guard.verify_exact_main_ci_runs(
             {"total_count": 1, "workflow_runs": [wrong_run]}, old), "missing")
 
+    def test_large_authenticated_history_and_reviews_do_not_block_audit(self):
+        """Patches never enter first-parent history; reviews get a separate cap."""
+        from io import BytesIO
+        from unittest.mock import patch
+
+        class Response:
+            def __init__(self, payload, link=""):
+                self.data = BytesIO(json.dumps(payload).encode())
+                self.headers = {"Link": link}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.data.close()
+
+            def read(self, n):
+                return self.data.read(n)
+
+        anchor = guard.EXACT_MAIN_AUDIT_ANCHOR
+        head = "d" * 40
+        # Many large commit-message fields are legal; no cumulative diff patch.
+        commits = [{"sha": head, "parents": [{"sha": anchor}],
+                    "commit": {"message": "x" * 300000}},
+                   {"sha": anchor, "parents": []}]
+        with patch.object(guard, "urlopen", return_value=Response(
+                commits, '<https://api.github.com/next>; rel="next"')):
+            result = guard.get("offline-token",
+                               "/repos/pl0n3r/GrindFlow/commits?sha=" + head + "&per_page=21",
+                               max_bytes=1048576, allow_next=True)
+        self.assertEqual(guard.exact_main_commits_since_anchor(result, head), [head])
+        # Legacy cumulative compare JSON >256 KiB is never fetched by audit.
+        self.assertNotIn("/compare/", (ROOT / "scripts/automerge_pr_guard.py").read_text())
+
+        reviews = [{"user": {"login": "coderabbitai[bot]", "type": "Bot"},
+                    "state": "COMMENTED", "commit_id": head,
+                    "body": "full review " + "x" * 280000}]
+        with patch.object(guard, "urlopen", return_value=Response(reviews)):
+            verified = guard.get("offline-token",
+                                 "/repos/pl0n3r/GrindFlow/pulls/485/reviews?per_page=100",
+                                 max_bytes=4194304)
+        self.assertEqual(verified, reviews)
+        with patch.object(guard, "urlopen", return_value=Response(reviews)):
+            with self.assertRaisesRegex(guard.GuardError, "incomplete_page"):
+                guard.get("offline-token", "/repos/pl0n3r/GrindFlow/pulls/485/reviews?per_page=100")
+        # A second page of reviews is never silently accepted as complete.
+        with patch.object(guard, "urlopen", return_value=Response(
+                reviews, '<https://api.github.com/next>; rel="next"')):
+            with self.assertRaisesRegex(guard.GuardError, "incomplete_page"):
+                guard.get("offline-token", "/repos/pl0n3r/GrindFlow/pulls/485/reviews?per_page=100",
+                          max_bytes=4194304)
+        # A gap, non-first-parent merge, or absent anchor must fail closed.
+        for altered in (
+            [{"sha": head, "parents": [{"sha": "e" * 40}]},
+             {"sha": anchor, "parents": []}],
+            [{"sha": head, "parents": [{"sha": anchor}, {"sha": "f" * 40}]},
+             {"sha": anchor, "parents": []}],
+            [{"sha": head, "parents": [{"sha": "e" * 40}]}],
+        ):
+            with self.assertRaises(guard.GuardError):
+                guard.exact_main_commits_since_anchor(altered, head)
+
     def test_scheduled_postmerge_exact_main_audit_is_independent(self):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("schedule:", yml)
@@ -723,6 +788,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
         # su fallo no puede quedar invisible al job de aceptación selectiva.
         self.test_scheduled_postmerge_exact_main_audit_is_independent()
         self.test_audit_main_recovers_two_missing_shas_with_real_replay_evidence()
+        self.test_large_authenticated_history_and_reviews_do_not_block_audit()
         guard.verify(fixture(), H)
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("persist-credentials: false", yml)
