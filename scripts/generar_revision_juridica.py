@@ -76,12 +76,26 @@ def render(root: Path, sha: str, day: str) -> dict[str, bytes]:
 
 
 def sync(root: Path, check: bool) -> list[str]:
-    """Return stale names, writing differences only when explicitly generating."""
+    """Return stale names; reject foreign entries/links before any file writes."""
     sha, day = origin(root)
     output = render(root, sha, day)
+    folder = root / DEST
+    # Fail closed on an unsafe handoff directory or any ungenerated content.
+    # Never auto-delete an unexpected entry or follow a link outside the folder.
+    if folder.is_symlink() or (folder.exists() and not folder.is_dir()):
+        raise ValueError("Carpeta jurídica inválida: no es directorio regular")
+    if folder.is_dir():
+        unknown = sorted(
+            path.relative_to(folder).as_posix()
+            for path in folder.rglob("*")
+            if path.is_symlink() or path.is_dir()
+            or path.parent != folder or path.name not in output
+        )
+        if unknown:
+            raise ValueError("Entradas no previstas en carpeta jurídica: " + ", ".join(unknown))
     differences = []
     for name, expected in output.items():
-        target = root / DEST / name
+        target = folder / name
         if not target.is_file() or target.read_bytes() != expected:
             differences.append(name)
             if not check:

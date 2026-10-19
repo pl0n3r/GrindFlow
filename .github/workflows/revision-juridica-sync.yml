@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+# Serializar comprobación+creación para evitar Issues duplicados por cron/push.
+concurrency:
+  group: grindflow-revision-juridica-sync-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   verificar:
     if: github.repository == 'pl0n3r/GrindFlow'

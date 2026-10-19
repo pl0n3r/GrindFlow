@@ -4,6 +4,8 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/generar_revision_juridica.py"
@@ -36,10 +38,43 @@ class RevisionJuridicaTests(unittest.TestCase):
         wf = (ROOT / ".github/workflows/revision-juridica-sync.yml").read_text()
         for needle in ("schedule:", "branches: [main]", "contents: read",
                        "issues: write", "revision-juridica-desfase",
-                       "python3 scripts/generar_revision_juridica.py --check", "gh issue create"):
+                       "python3 scripts/generar_revision_juridica.py --check", "gh issue create",
+                       "concurrency:", "cancel-in-progress: false"):
             self.assertIn(needle, wf)
         self.assertNotIn("contents: write", wf)
         self.assertNotIn("pull_request_target:", wf)
+
+
+    def test_unknown_entries_and_symlinks_never_escape_or_mutate_handoff(self):
+        """Generated package is a closed set; reject extras before writing."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "revision-juridica"
+            folder.mkdir()
+            canonical = folder / "aviso-privacidad.md"
+            canonical.write_bytes(b"old")
+            unexpected = folder / "unknown.php"
+            unexpected.write_bytes(b"keep")
+            expected = {"aviso-privacidad.md": b"new"}
+            with patch.object(module, "origin", return_value=("a" * 40, "2026-10-19")), patch.object(
+                module, "render", return_value=expected
+            ):
+                for check in (True, False):
+                    with self.subTest(kind="foreign", check=check):
+                        with self.assertRaisesRegex(ValueError, "Entradas no previstas"):
+                            module.sync(root, check)
+                self.assertEqual(canonical.read_bytes(), b"old")
+                self.assertEqual(unexpected.read_bytes(), b"keep")
+                unexpected.unlink()
+                outside = root / "external.txt"
+                outside.write_bytes(b"safe")
+                canonical.unlink()
+                canonical.symlink_to(outside)
+                for check in (True, False):
+                    with self.subTest(kind="symlink", check=check):
+                        with self.assertRaisesRegex(ValueError, "Entradas no previstas"):
+                            module.sync(root, check)
+                self.assertEqual(outside.read_bytes(), b"safe")
 
 
 if __name__ == "__main__":
