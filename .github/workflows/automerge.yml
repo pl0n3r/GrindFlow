@@ -10,6 +10,9 @@ on:
     workflows: ["GrindFlow CI", "CI Factory v1", "Política Factory v1", "Privacidad", "Etiquetas", "Aceptación ejecutable", "CodeQL", "Sonar CI-based"]
     types: [completed]
   status:
+  # GitHub App checks complete independently of workflow_run and status.
+  check_run:
+    types: [completed]
 permissions:
   contents: read
 jobs:
@@ -99,14 +102,22 @@ jobs:
             github.event.workflow_run.name == 'Sonar CI-based'
           )) ||
         (github.event_name == 'status' &&
-          github.event.context == 'CodeRabbit')
+          github.event.context == 'CodeRabbit') ||
+        (github.event_name == 'check_run' &&
+          github.event.action == 'completed' &&
+          github.event.check_run.status == 'completed' &&
+          github.event.check_run.conclusion == 'success' &&
+          ((github.event.check_run.app.slug == 'sonarqubecloud' &&
+            github.event.check_run.name == 'SonarCloud Code Analysis') ||
+           (github.event.check_run.app.slug == 'github-advanced-security' &&
+            github.event.check_run.name == 'CodeQL')))
       )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Only eligible automerge jobs can contend; skipped status/workflow events
     # must never evict a pending security-gate reevaluation.
     concurrency:
-      group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha || github.sha }}
+      group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.sha || github.sha }}
       cancel-in-progress: false
     permissions:
       contents: write
@@ -203,12 +214,25 @@ jobs:
               if (not isinstance(number, int) or isinstance(number, bool) or number <= 0
                       or not isinstance(expected_ref, str) or not branch_pattern.fullmatch(expected_ref)):
                   deny("workflow_run_pr_identity_invalid")
-          elif event_name == "status":
-              if event.get("context") != "CodeRabbit":
-                  deny("status_context_untrusted")
-              expected_sha = event.get("sha")
+          elif event_name in ("status", "check_run"):
+              if event_name == "status":
+                  if event.get("context") != "CodeRabbit":
+                      deny("status_context_untrusted")
+                  expected_sha = event.get("sha")
+              else:
+                  check = event.get("check_run")
+                  if (event.get("action") != "completed" or not isinstance(check, dict)
+                          or check.get("status") != "completed"
+                          or check.get("conclusion") != "success"
+                          or not isinstance(check.get("app"), dict)
+                          or (check.get("name"), check["app"].get("slug"), check["app"].get("id")) not in {
+                              ("SonarCloud Code Analysis", "sonarqubecloud", 12526),
+                              ("CodeQL", "github-advanced-security", 57789),
+                          }):
+                      deny("check_run_untrusted")
+                  expected_sha = check.get("head_sha")
               if not isinstance(expected_sha, str) or not sha_pattern.fullmatch(expected_sha):
-                  deny("status_sha_invalid")
+                  deny("external_check_sha_invalid")
               pulls_url = "https://api.github.com/repos/" + repo + "/commits/" + expected_sha + "/pulls?per_page=100"
               pulls_request = Request(pulls_url, headers={
                   "Accept": "application/vnd.github+json",
