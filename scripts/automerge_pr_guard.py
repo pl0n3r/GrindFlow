@@ -575,8 +575,11 @@ def audit_main():
         required = exact_main_commits_since_anchor(history, expected)
         statuses = {}
         for commit_sha in required:
+            # Do not filter branch=main: historical verified replays run on
+            # audit/main-<sha>. The verifier below authenticates exact SHA,
+            # trusted workflow, branch and event for EACH run.
             runs = get(token, root + "/actions/workflows/grindflow-ci.yml/runs"
-                       + "?branch=main&head_sha=" + commit_sha + "&per_page=100")
+                       + "?head_sha=" + commit_sha + "&per_page=100")
             statuses[commit_sha] = verify_exact_main_ci_runs(runs, commit_sha)
         verdict = verify_exact_main_ci_chain(required, statuses, expected)
         if current_main_sha() != expected:

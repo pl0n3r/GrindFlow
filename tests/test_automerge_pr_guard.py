@@ -632,6 +632,74 @@ class AutoMergePrGuardTests(unittest.TestCase):
             with self.assertRaises(guard.GuardError):
                 guard.exact_main_commits_since_anchor(history([old, new]), new)
 
+    def test_audit_main_recovers_two_missing_shas_with_real_replay_evidence(self):
+        """A replay branch run must be discoverable and advance the audit."""
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from unittest.mock import patch
+
+        old, middle, current = "c" * 40, "d" * 40, "e" * 40
+        anchor = guard.EXACT_MAIN_AUDIT_ANCHOR
+        history = {"base_commit": {"sha": anchor},
+                   "merge_base_commit": {"sha": anchor},
+                   "status": "ahead", "ahead_by": 3, "behind_by": 0,
+                   "total_commits": 3,
+                   "commits": [{"sha": s} for s in (old, middle, current)]}
+        replay_ready = set()
+        observed = []
+        env = {"GH_TOKEN": "offline-test", "GITHUB_SHA": current,
+               "GITHUB_REPOSITORY": guard.REPO,
+               "GITHUB_EVENT_NAME": "schedule"}
+
+        def api(token, path):
+            self.assertEqual(token, "offline-test")
+            if path.endswith("/branches/main"):
+                return {"commit": {"sha": current}}
+            if "/compare/" in path:
+                self.assertIn(anchor + "..." + current, path)
+                return history
+            self.assertIn("/actions/workflows/grindflow-ci.yml/runs?", path)
+            self.assertNotIn("branch=main", path)
+            self.assertNotIn("&branch=", path)
+            self.assertIn("?head_sha=", path)
+            queried = path.split("?head_sha=", 1)[1].split("&", 1)[0]
+            self.assertIn(queried, (old, middle, current))
+            observed.append(queried)
+            if queried == current or queried in replay_ready:
+                branch = "main" if queried == current else "audit/main-" + queried
+                run = {"id": 120 + len(observed), "name": "GrindFlow CI",
+                       "head_sha": queried, "head_branch": branch,
+                       "event": "push" if queried == current else "workflow_dispatch",
+                       "status": "completed", "conclusion": "success"}
+                return {"total_count": 1, "workflow_runs": [run]}
+            return {"total_count": 0, "workflow_runs": []}
+
+        for validated, expected_code, expected_line in (
+            (set(), 3, "EXACT_MAIN_REPLAY_REQUIRED " + old),
+            ({old}, 3, "EXACT_MAIN_REPLAY_REQUIRED " + middle),
+            ({old, middle}, 0, "EXACT_MAIN_CI_VALIDATED " + current),
+        ):
+            with self.subTest(validated=sorted(validated)):
+                replay_ready.clear()
+                replay_ready.update(validated)
+                observed.clear()
+                buffer = StringIO()
+                with (patch.dict(guard.os.environ, env, clear=True),
+                      patch.object(guard, "get", side_effect=api),
+                      redirect_stdout(buffer)):
+                    self.assertEqual(guard.audit_main(), expected_code)
+                self.assertIn(expected_line, buffer.getvalue())
+                self.assertEqual(observed, [old, middle, current])
+
+        # A replay result from a wrong SHA cannot certify the historical SHA.
+        replay_ready.clear()
+        wrong_run = {"id": 301, "name": "GrindFlow CI",
+                     "head_sha": middle, "head_branch": "audit/main-" + old,
+                     "event": "workflow_dispatch", "status": "completed",
+                     "conclusion": "success"}
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 1, "workflow_runs": [wrong_run]}, old), "missing")
+
     def test_scheduled_postmerge_exact_main_audit_is_independent(self):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("schedule:", yml)
