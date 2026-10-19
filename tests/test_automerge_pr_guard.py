@@ -654,8 +654,12 @@ class AutoMergePrGuardTests(unittest.TestCase):
                "GITHUB_REPOSITORY": guard.REPO,
                "GITHUB_EVENT_NAME": "schedule"}
 
-        def api(token, path):
+        def api(token, path, **opts):
             self.assertEqual(token, "offline-test")
+            if "/commits?sha=" in path:
+                self.assertEqual(opts, {"max_bytes": 1048576, "allow_next": True})
+            else:
+                self.assertEqual(opts, {})
             if path.endswith("/branches/main"):
                 return {"commit": {"sha": current}}
             if "/commits?sha=" in path:
