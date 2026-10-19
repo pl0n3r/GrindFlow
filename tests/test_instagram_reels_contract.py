@@ -56,6 +56,7 @@ class InstagramReelsContractTests(unittest.TestCase):
         self.assertIn("'instagram_reels'", service)
         self.assertNotIn("CREATE TABLE", service)
         self.assertIn("retry_not_before", ledger)
+        self.assertIn("$this->resumeRateLimited($db, $command, $row, $now, $provider)", ledger)
         self.assertIn("organization_id", ledger)
 
     def test_fake_only_ci_and_live_separation(self):

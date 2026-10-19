@@ -28,7 +28,7 @@ final readonly class ExternalPublicationLedger
     ): DistributionOutcome {
         if (!in_array($provider, ['instagram_reels', 'facebook_page'], true)
             || !in_array($destinationKey, ['instagram_user_id', 'page_id'], true)
-            || !preg_match('/^\\d{1,32}$/D', $destinationId)) {
+            || !preg_match('/^\d{1,32}$/D', $destinationId)) {
             throw DistributionProviderException::configuration();
         }
 
@@ -126,7 +126,7 @@ final readonly class ExternalPublicationLedger
 
             return match ((string) $row['status']) {
                 'published' => $this->storedOutcome($row),
-                'rate_limited' => $this->resumeRateLimited($db, $command, $row, $now),
+                'rate_limited' => $this->resumeRateLimited($db, $command, $row, $now, $provider),
                 'authentication_failed' => throw DistributionProviderException::authentication(),
                 'rejected' => throw DistributionProviderException::rejected(),
                 'ambiguous', 'in_flight' => throw DistributionProviderException::ambiguous(),
