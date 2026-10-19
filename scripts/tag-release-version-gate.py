@@ -18,9 +18,9 @@ SHA = re.compile(r"[0-9a-f]{40}\Z")
 VERSION = re.compile(
     r"(?m)^[ \t]*['\"]number['\"][ \t]*=>[ \t]*['\"]"
     r"((?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})"
-    r"\.(?:0|[1-9][0-9]{0,8}))['\"][ \t]*,?[ \t]*$"
+    r"\.(?:0|[1-9][0-9]{0,8}))['\"][ \t]*(?:,[ \t]*)?$"
 )
-DATE = re.compile(r"(?m)^[ \t]*['\"]released_at['\"][ \t]*=>[ \t]*['\"](\d{4}-\d{2}-\d{2})['\"][ \t]*,?[ \t]*$")
+DATE = re.compile(r"(?m)^[ \t]*['\"]released_at['\"][ \t]*=>[ \t]*['\"](\d{4}-\d{2}-\d{2})['\"][ \t]*(?:,[ \t]*)?$")
 NUMBER_KEY = re.compile(r"(?m)^[ \t]*['\"]number['\"][ \t]*=>")
 DATE_KEY = re.compile(r"(?m)^[ \t]*['\"]released_at['\"][ \t]*=>")
 SOURCE = "config/version.php"
