@@ -101,6 +101,26 @@ def annotated_tag_commit(repo: Path, version: tuple[int, int, int]) -> str:
     return tagged
 
 
+def require_available_release_tag(
+    repo: Path, current: tuple[int, int, int], after: str
+) -> None:
+    """Reject a new release tag already claimed by a different Git identity."""
+    ref = "refs/tags/v" + ".".join(str(part) for part in current)
+    try:
+        found = subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", ref],
+            cwd=repo, capture_output=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise GuardError("No se pudo verificar exclusividad del nuevo tag") from exc
+    if found.returncode == 0:
+        # An idempotent retry may reuse only this exact annotated commit.
+        if annotated_tag_commit(repo, current) != after:
+            raise GuardError("La identidad de versión ya tiene tag en otro SHA")
+    elif found.returncode != 1:
+        raise GuardError("Estado de tags desconocido")
+
+
 def decide_release(repo: Path, before: str, after: str) -> bool:
     """Return True only for a valid, deliberate next product version."""
     if not SHA.fullmatch(before) or not SHA.fullmatch(after):
@@ -128,24 +148,7 @@ def decide_release(repo: Path, before: str, after: str) -> bool:
     if current not in allowed:
         raise GuardError("Incremento de versión no consecutivo o no permitido")
 
-    # Do not give a prior release identity to a different commit.
-    name = ".".join(str(part) for part in current)
-    ref = f"refs/tags/v{name}"
-    try:
-        found = subprocess.run(
-            ["git", "show-ref", "--verify", "--quiet", ref],
-            cwd=repo, capture_output=True, timeout=10, check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise GuardError("No se pudo verificar exclusividad del nuevo tag") from exc
-    if found.returncode == 0:
-        # Reintento del evento original: el reusable Factory es idempotente
-        # cuando el tag anotado apunta al HEAD exacto, nunca a otro SHA.
-        if annotated_tag_commit(repo, current) != after:
-            raise GuardError("La identidad de versión ya tiene tag en otro SHA")
-        return True
-    if found.returncode != 1:
-        raise GuardError("Estado de tags desconocido")
+    require_available_release_tag(repo, current, after)
     return True
 
 

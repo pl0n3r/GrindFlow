@@ -125,24 +125,48 @@ class TagReleaseGateTests(unittest.TestCase):
             GATE.decide_release(self.repo, self.base, docs)
         self.git("tag", "-d", "v0.1.219")
         self.annotate()
-        for before, after in (
-            ("0" * 40, docs), (self.base, "0" * 40),
-            ("g" * 40, docs), (self.base, self.base),
-            (docs, self.base), ("f" * 40, docs),
+        for before, after, message in (
+            ("0" * 40, docs, "Historia de evento no comprobable"),
+            (self.base, "0" * 40, "Checkout no coincide"),
+            ("g" * 40, docs, "SHAs de evento inválidos"),
+            (self.base, self.base, "Historia de evento no comprobable"),
+            ("f" * 40, docs, "Objeto, tag o relación Git inválida"),
         ):
             with self.subTest(before=before[:9], after=after[:9]):
-                with self.assertRaises(GATE.GuardError):
+                if after in (self.base, docs):
+                    self.git("checkout", "-q", "--detach", after)
+                with self.assertRaisesRegex(GATE.GuardError, re.escape(message)):
                     GATE.decide_release(self.repo, before, after)
-        for text in (
-            "<?php return ['number'=>'0.1.219', 'number'=>'0.1.219'];",
-            "<?php return ['number'=>'invalid', 'released_at'=>'2026-10-09'];",
-            "<?php return ['number'=>'0.01.219', 'released_at'=>'2026-10-09'];",
-            "<?php return ['number'=>'0.1.219', 'released_at'=>'2026-02-30'];",
-            "<?php return ['number'=>'0.1.219'];",
-            "<?php return ['number'=>'1.0.0', 'released_at'=>'2026-10-09'];",
+        # This divergent sibling is a real commit but not descended from docs.
+        self.git("checkout", "-q", "--detach", self.base)
+        sibling = self.change("sibling.txt", "different history")
+        self.assertEqual(self.git("merge-base", docs, sibling), self.base)
+        with self.assertRaisesRegex(
+            GATE.GuardError, "Objeto, tag o relación Git inválida"
         ):
-            with self.subTest(source=text):
-                with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, docs, sibling)
+        self.git("checkout", "-q", "--detach", docs)
+        # Each fixture is real multiline PHP, so the rejection reaches the
+        # intended validation instead of failing the parser's first key check.
+        cases = (
+            ((("number", "0.1.219"), ("number", "0.1.219"),
+              ("released_at", "2026-10-09")), "Fuente de versión ambigua"),
+            ((("number", "invalid"), ("released_at", "2026-10-09")),
+             "Metadatos PHP ausentes o malformados"),
+            ((("number", "0.01.219"), ("released_at", "2026-10-09")),
+             "Metadatos PHP ausentes o malformados"),
+            ((("number", "0.1.219"), ("released_at", "2026-02-30")),
+             "Fecha de versión inválida"),
+            ((("number", "0.1.219"),), "Fecha de versión ausente o ambigua"),
+            ((("number", "1.0.0"), ("released_at", "2026-10-09")),
+             "La publicación 1.0 exige hito explícito"),
+        )
+        for fields, message in cases:
+            text = "<?php\nreturn [\n" + "".join(
+                f"  '{key}' => '{value}',\n" for key, value in fields
+            ) + "];\n"
+            with self.subTest(fields=fields):
+                with self.assertRaisesRegex(GATE.GuardError, re.escape(message)):
                     GATE.version_from_text(text)
         # Both whitespace and control characters in NUL-delimited Git paths
         # are rejected rather than stripped into apparently safe identities.
@@ -156,7 +180,8 @@ class TagReleaseGateTests(unittest.TestCase):
         # A tag created on a newer commit is not evidence for the older base.
         self.git("tag", "-d", "v0.1.219")
         self.annotate(sha=prev)
-        with self.assertRaises(GATE.GuardError):
+        self.git("checkout", "-q", "--detach", docs)
+        with self.assertRaisesRegex(GATE.GuardError, "Objeto, tag o relación Git inválida"):
             GATE.decide_release(self.repo, self.base, docs)
         self.git("tag", "-d", "v0.1.219")
         self.annotate(sha=self.base)
