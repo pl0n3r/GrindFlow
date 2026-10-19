@@ -67,13 +67,19 @@ class PreliveComplianceGateTests(unittest.TestCase):
                 probe_spec.loader.exec_module(probe)
 
     def test_network_guard_catches_evaluate_side_effect(self):
-        # A synthetic regression in evaluate must be rejected before I/O.
-        with patch.object(
-            module, "evaluate",
-            side_effect=lambda _: socket.socket().connect(("127.0.0.1", 9)),
-        ):
-            with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
-                module.evaluate(fixture())
+        # Reject both outgoing TCP and datagram effects in a synthetic evaluator.
+        for operation in ("connect", "sendto"):
+            with self.subTest(operation=operation):
+                def synthetic_evaluate(_facts):
+                    with socket.socket() as probe:
+                        if operation == "connect":
+                            probe.connect(("127.0.0.1", 9))
+                        else:
+                            probe.sendto(b"probe", ("127.0.0.1", 9))
+
+                with patch.object(module, "evaluate", side_effect=synthetic_evaluate):
+                    with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                        module.evaluate(fixture())
 
     def blocked(self, payload, reason):
         result = module.evaluate(payload)
