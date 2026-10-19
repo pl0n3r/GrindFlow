@@ -634,7 +634,7 @@ class AutoMergePrGuardTests(unittest.TestCase):
                        {"sha": old, "parents": []}]
             self.assertEqual(guard.exact_main_commits_since_anchor(rotated, new), [new])
             with self.assertRaises(guard.GuardError):
-                guard.exact_main_commits_since_anchor(history([old, new]), new)
+                guard.exact_main_commits_since_anchor(history([new]), new)
 
     def test_audit_main_recovers_two_missing_shas_with_real_replay_evidence(self):
         """A replay branch run must be discoverable and advance the audit."""
