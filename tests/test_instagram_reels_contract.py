@@ -58,6 +58,10 @@ class InstagramReelsContractTests(unittest.TestCase):
         self.assertIn("retry_not_before", ledger)
         self.assertIn("$this->resumeRateLimited($db, $command, $row, $now, $provider)", ledger)
         self.assertIn("organization_id", ledger)
+        expansion = self.read("symfony/migrations/Version20261019193000.php")
+        self.assertIn("DROP CONSTRAINT ck_gf_external_attempt_provider", expansion)
+        self.assertIn("CHECK (provider IN ('facebook_page', 'instagram_reels'))", expansion)
+        self.assertIn("gf_external_publication_attempts", expansion)
 
     def test_fake_only_ci_and_live_separation(self):
         tests = self.read("symfony/tests/php/InstagramReelProviderTest.php")
