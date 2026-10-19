@@ -78,8 +78,8 @@ def changed_paths(repo: Path, before: str, after: str) -> tuple[str, ...]:
     paths = raw.split("\0")
     if paths[-1:] == [""]:
         paths.pop()
-    if not paths or len(paths) > 256 or len(paths) != len(set(paths)):
-        raise GuardError("Diff ausente, excesivo o ambiguo")
+    if not paths or len(paths) != len(set(paths)):
+        raise GuardError("Diff ausente o ambiguo")
     for path in paths:
         if (
             not path or path.startswith("/") or path.strip() != path
@@ -139,7 +139,11 @@ def decide_release(repo: Path, before: str, after: str) -> bool:
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise GuardError("No se pudo verificar exclusividad del nuevo tag") from exc
     if found.returncode == 0:
-        raise GuardError("La identidad de nueva versión ya tiene tag")
+        # Reintento del evento original: el reusable Factory es idempotente
+        # cuando el tag anotado apunta al HEAD exacto, nunca a otro SHA.
+        if annotated_tag_commit(repo, current) != after:
+            raise GuardError("La identidad de versión ya tiene tag en otro SHA")
+        return True
     if found.returncode != 1:
         raise GuardError("Estado de tags desconocido")
     return True

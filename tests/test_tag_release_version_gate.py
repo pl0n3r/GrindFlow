@@ -81,10 +81,18 @@ class TagReleaseGateTests(unittest.TestCase):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("uses: pl0n3r/factory/.github/workflows/release.yml@v1", source)
         self.assertIn("needs.release-change.outputs.publish == 'true'", source)
-        # Factory must never recycle an already existing release identity.
+        # A rerun of the original push may complete a GitHub Release
+        # if its annotated tag was already created on the exact HEAD.
         self.annotate("v0.1.220", sha=head)
+        self.assertIs(GATE.decide_release(self.repo, self.base, head), True)
+        self.git("tag", "-d", "v0.1.220")
+        self.git("tag", "v0.1.220", head)
         with self.assertRaises(GATE.GuardError):
-            GATE.decide_release(self.repo, self.base, head)
+            GATE.decide_release(self.repo, self.base, head)  # lightweight
+        self.git("tag", "-d", "v0.1.220")
+        self.annotate("v0.1.220", sha=self.base)
+        with self.assertRaises(GATE.GuardError):
+            GATE.decide_release(self.repo, self.base, head)  # wrong SHA
         for next_version in ("0.1.221", "0.1.218", "0.3.0", "0.2.1", "1.0.0"):
             with self.subTest(version=next_version):
                 self.version(next_version)
@@ -96,6 +104,17 @@ class TagReleaseGateTests(unittest.TestCase):
         self.version("0.2.0")
         next_minor = self.commit("deliberate minor")
         self.assertIs(GATE.decide_release(self.repo, self.base, next_minor), True)
+
+    def test_large_deliberate_release_does_not_fail_path_count_only(self):
+        # 257 paths are legitimate in a large release. Keep diff integrity.
+        self.annotate()
+        self.version("0.1.220")
+        for i in range(257):
+            self.write(f"src/generated/{i:03}.php", "<?php return true;")
+        released = self.commit("large release across more than 256 files")
+        paths = GATE.changed_paths(self.repo, self.base, released)
+        self.assertGreater(len(paths), 256)
+        self.assertIs(GATE.decide_release(self.repo, self.base, released), True)
 
     def test_invalid_history_or_missing_release_identity_fails_closed(self):
         docs = self.change("README.md", "new docs")
