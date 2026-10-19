@@ -90,6 +90,42 @@ final class InstagramReelProviderTest extends TestCase
         }
     }
 
+    public function testUploadNotAcknowledgedDoesNotAdvanceToMediaPublish(): void
+    {
+        $video = $this->videoFixture();
+        try {
+            $transport = new FakeInstagramReelTransport([
+                ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'],
+                ['status' => 200, 'headers' => [], 'body' => '{"success":false}'],
+            ]);
+            $this->assertKind(
+                fn () => $this->provider($transport)->publish($this->command($video)),
+                DistributionProviderException::KIND_AMBIGUOUS,
+            );
+            self::assertSame(['create', 'upload'], $transport->calls);
+        } finally {
+            @unlink($video);
+        }
+    }
+
+    public function testCaptionOverInstagramMaximumFailsBeforeNetwork(): void
+    {
+        $video = $this->videoFixture();
+        $transport = new FakeInstagramReelTransport([]);
+        try {
+            $this->assertKind(
+                fn () => $this->provider($transport)->publish(new DistributionCommand(
+                    self::ORGANIZATION, 'caption-too-long', str_repeat('x', 2201),
+                    null, $video, 'video/mp4', hash_file('sha256', $video),
+                )),
+                DistributionProviderException::KIND_REJECTED,
+            );
+            self::assertSame([], $transport->calls);
+        } finally {
+            @unlink($video);
+        }
+    }
+
     public function testHostForgeryAndUnfinishedContainerAreAmbiguousNoSecondSend(): void
     {
         $video = $this->videoFixture();

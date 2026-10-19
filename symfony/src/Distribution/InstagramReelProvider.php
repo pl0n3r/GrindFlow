@@ -30,6 +30,10 @@ final readonly class InstagramReelProvider implements DistributionProvider
         $this->assertAvailableFor($command->organizationId);
         $this->assertVerifiedPrivateVideo($command);
 
+        if (mb_strlen($command->message) > 2200) {
+            throw DistributionProviderException::rejected();
+        }
+
         $version = $this->configuration->graphVersion();
         $userId = $this->configuration->destinationId();
         $token = $this->configuration->token();
@@ -44,9 +48,12 @@ final readonly class InstagramReelProvider implements DistributionProvider
                 throw DistributionProviderException::ambiguous();
             }
 
-            $this->decode($this->transport->uploadVideo(
+            $uploaded = $this->decode($this->transport->uploadVideo(
                 $uri, $token, (string) $command->mediaPath, (string) $command->mediaMime,
             ));
+            if (($uploaded['success'] ?? null) !== true) {
+                throw DistributionProviderException::ambiguous();
+            }
             // Son lecturas del contenedor ya creado, no reenvíos de vídeo.
             $finished = false;
             for ($attempt = 0; $attempt < 3; ++$attempt) {
