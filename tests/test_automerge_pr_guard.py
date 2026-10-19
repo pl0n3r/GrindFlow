@@ -485,6 +485,77 @@ class AutoMergePrGuardTests(unittest.TestCase):
                 self.assertIn(required, yml)
         self.assertNotIn("pull_request_review:", yml)
 
+    def test_public_factory_switch_omits_cross_repo_token_only_for_canonical_issue(self):
+        """Cross-repo GITHUB_TOKEN 404 must not masquerade as a paused switch."""
+        from io import BytesIO
+        from unittest.mock import patch
+
+        class Response:
+            def __init__(self, data):
+                self.body = BytesIO(json.dumps(data).encode("utf-8"))
+                self.headers = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                self.body.close()
+
+            def read(self, size):
+                return self.body.read(size)
+
+        seen = []
+
+        def fetch(request, timeout):
+            self.assertEqual(timeout, 12)
+            seen.append(request)
+            return Response(fixture()["switch"])
+
+        canonical = "/repos/pl0n3r/Factory/issues/767"
+        local = "/repos/pl0n3r/GrindFlow/issues/482"
+        with patch.object(guard, "urlopen", side_effect=fetch):
+            public = guard.get("repo-scoped-token", canonical, public_factory=True)
+            authenticated = guard.get("repo-scoped-token", local)
+        self.assertEqual(public["number"], 767)
+        self.assertIsNone(seen[0].get_header("Authorization"))
+        self.assertEqual(seen[0].full_url,
+                         "https://api.github.com" + canonical)
+        self.assertEqual(seen[1].get_header("Authorization"),
+                         "Bearer repo-scoped-token")
+        self.assertEqual(seen[1].full_url, "https://api.github.com" + local)
+        with patch.object(guard, "urlopen") as opener:
+            for invalid in (local, canonical + "/comments",
+                            "/repos/pl0n3r/Factory/issues/768",
+                            "/repos/pl0n3r/Factory/issues/767?foo=1"):
+                with self.subTest(path=invalid):
+                    with self.assertRaisesRegex(
+                            guard.GuardError, "unauthenticated_endpoint_invalid"):
+                        guard.get("repo-scoped-token", invalid, public_factory=True)
+            opener.assert_not_called()
+        with self.assertRaisesRegex(guard.GuardError, "response_limit_invalid"):
+            guard.get("repo-scoped-token", canonical, public_factory="true")
+
+        # Independently ensure that read_snapshot uses the explicitly
+        # allowlisted unauthenticated route, and every other GET is scoped.
+        case = fixture()
+        responses = [
+            case["pr"], case["lease_issue"], case["lease_comments"],
+            case["lease_files"], case["switch"], case["checks"],
+            case["reviews"], case["status_history"], {"commit": {"sha": B}},
+        ]
+        with (patch.object(guard, "get", side_effect=responses) as reader,
+              patch.object(guard, "get_threads", return_value=[])):
+            snapshot = guard.read_snapshot(
+                "repo-scoped-token", "/repos/pl0n3r/GrindFlow", 485, H)
+        self.assertEqual(snapshot["switch"], case["switch"])
+        self.assertEqual(reader.call_count, 9)
+        requests = reader.call_args_list
+        self.assertEqual(requests[4].args[1], canonical)
+        self.assertEqual(requests[4].kwargs, {"public_factory": True})
+        for index, call in enumerate(requests):
+            if index != 4:
+                self.assertNotIn("public_factory", call.kwargs)
+
     def test_malformed_main_commit_response_fails_closed_without_traceback(self):
         from unittest.mock import patch
 
