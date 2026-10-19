@@ -14,12 +14,24 @@ SCRIPT = ROOT / "scripts/tag-release-version-gate.py"
 WORKFLOW = ROOT / ".github/workflows/tag-release.yml"
 ADOPTION = ROOT / "tests/test_release_adoption.py"
 spec = importlib.util.spec_from_file_location("grindflow_tag_release_gate", SCRIPT)
-assert spec and spec.loader
+assert spec is not None
+assert spec.loader is not None
 GATE = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(GATE)
 
 
 class TagReleaseGateTests(unittest.TestCase):
+    def test_version_headers_do_not_cross_newline(self):
+        source = ("<?php\nreturn [\n"
+                  "  'number' => '0.1.219',\n"
+                  "  'released_at' => '2026-10-09',\n];\n")
+        self.assertEqual(GATE.version_from_text(source), (0, 1, 219))
+        for bad in (source.replace("'number' =>", "'number'\n =>"),
+                    source.replace("'released_at' =>", "'released_at'\n =>")):
+            with self.subTest(source=bad):
+                with self.assertRaises(GATE.GuardError):
+                    GATE.version_from_text(bad)
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
