@@ -295,8 +295,7 @@
       "consent": "review_required",
       "providers": [
         "meta_instagram"
-      ],
-      "status": "activation_disabled_pending_legal_review"
+      ]
     }
   ]
 }
