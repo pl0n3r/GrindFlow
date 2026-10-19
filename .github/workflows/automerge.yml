@@ -1,16 +1,317 @@
 name: Auto-merge cuando esté listo
 on:
+  # Independent recovery for GitHub GITHUB_TOKEN-suppressed auto-merge push events.
+  # Post-merge validation is UNKNOWN until a CI run succeeds on exact main HEAD.
+  schedule:
+    - cron: '17 * * * *'
   pull_request_target:
     types: [opened, reopened, ready_for_review, synchronize]
+  workflow_run:
+    workflows: ["GrindFlow CI", "CI Factory v1", "Política Factory v1", "Privacidad", "Etiquetas", "Aceptación ejecutable", "CodeQL", "Sonar CI-based"]
+    types: [completed]
+  status:
+  # GitHub App checks complete independently of workflow_run and status.
+  check_run:
+    types: [completed]
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 jobs:
-  automerge:
-    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
+  postmerge_exact_main:
+    # An Actions GITHUB_TOKEN-enabled auto-merge may suppress the push event.
+    # An independent scheduled audit can dispatch the existing GrindFlow CI
+    # via workflow_dispatch (the GitHub-documented token-trigger exception).
+    # For suppressed intermediate main SHAs, create a deterministic audit-only
+    # branch at that SHA and dispatch the SAME full CI on its immutable tree.
+    # Never accept a run on a different SHA or treat pending/replay as green.
+    # Audit-only refs are not releases/tags or pushes to main.
+    # This never mutates main, deploys, or treats a pending validation as green.
+    if: github.repository == 'pl0n3r/GrindFlow' && github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # Only this trusted scheduled job may create immutable audit replay refs.
+      contents: write
+      actions: write
     steps:
-      - env:
-          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Checkout trusted exact-main audit code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify exact-main CI; dispatch only if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          code=0
+          audit_output="$(python3 scripts/automerge_pr_guard.py --audit-main 2>&1)" || code=$?
+          printf '%s\n' "$audit_output"
+          if (( code == 3 )); then
+            # No owner exception is inferred: test the exact historical SHA.
+            replay_sha="$(printf '%s\n' "$audit_output" | sed -n 's/^EXACT_MAIN_REPLAY_REQUIRED \([0-9a-f]\{40\}\)$/\1/p')"
+            [[ "$replay_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" || exit 1
+            [[ "$current" == "$GITHUB_SHA" ]] || { echo '::error::main moved; fail-closed'; exit 1; }
+            audit_branch="audit/main-$replay_sha"
+            ref_path="repos/$GITHUB_REPOSITORY/git/ref/heads/$audit_branch"
+            if existing="$(gh api "$ref_path" --jq '.object.sha' 2>/dev/null)"; then
+              [[ "$existing" == "$replay_sha" ]] || { echo '::error::replay ref moved; fail-closed'; exit 1; }
+            else
+              gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f ref="refs/heads/audit/main-$replay_sha" -f sha="$replay_sha" || exit 1
+            fi
+            [[ "$(gh api "$ref_path" --jq '.object.sha')" == "$replay_sha" ]] || exit 1
+            gh workflow run grindflow-ci.yml --ref "$audit_branch" || exit 1
+            echo "::error::historical main CI dispatched for exact SHA $replay_sha but NOT validated yet"
+            exit 1
+          fi
+          if (( code == 2 )); then
+            # Guard against branch movement between audit and dispatch.
+            current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" || exit 1
+            [[ "$current" == "$GITHUB_SHA" ]] || { echo '::error::main moved; fail-closed'; exit 1; }
+            gh workflow run grindflow-ci.yml --ref main || exit 1
+            echo '::error::exact-main CI dispatched but NOT yet validated'
+            exit 1
+          fi
+          exit "$code"
+  automerge:
+    if: >-
+      github.repository == 'pl0n3r/GrindFlow' &&
+      github.actor != 'dependabot[bot]' &&
+      (
+        (github.event_name == 'pull_request_target' &&
+          github.event.pull_request.draft == false &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.head.repo.fork == false &&
+          github.event.pull_request.base.ref == 'main') ||
+        (github.event_name == 'workflow_run' &&
+          github.event.action == 'completed' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          (
+            github.event.workflow_run.name == 'GrindFlow CI' ||
+            github.event.workflow_run.name == 'CI Factory v1' ||
+            github.event.workflow_run.name == 'Política Factory v1' ||
+            github.event.workflow_run.name == 'Privacidad' ||
+            github.event.workflow_run.name == 'Etiquetas' ||
+            github.event.workflow_run.name == 'Aceptación ejecutable' ||
+            github.event.workflow_run.name == 'CodeQL' ||
+            github.event.workflow_run.name == 'Sonar CI-based'
+          )) ||
+        (github.event_name == 'status' &&
+          github.event.context == 'CodeRabbit') ||
+        (github.event_name == 'check_run' &&
+          github.event.action == 'completed' &&
+          github.event.check_run.status == 'completed' &&
+          github.event.check_run.conclusion == 'success' &&
+          ((github.event.check_run.app.slug == 'sonarqubecloud' &&
+            github.event.check_run.name == 'SonarCloud Code Analysis') ||
+           (github.event.check_run.app.slug == 'github-advanced-security' &&
+            github.event.check_run.name == 'CodeQL')))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only eligible automerge jobs can contend; skipped status/workflow events
+    # must never evict a pending security-gate reevaluation.
+    concurrency:
+      group: automerge-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.sha || github.sha }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout trusted base only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Resolve current internal PR and exact HEAD from trusted event
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          token = os.environ.get("GH_TOKEN", "")
+          event_path = os.environ.get("GITHUB_EVENT_PATH", "")
+          output_path = os.environ.get("GITHUB_OUTPUT", "")
+          expected_repo = "pl0n3r/GrindFlow"
+          trusted_runs = {
+              "GrindFlow CI", "CI Factory v1", "Política Factory v1",
+              "Privacidad", "Etiquetas", "Aceptación ejecutable",
+              "CodeQL", "Sonar CI-based",
+          }
+          sha_pattern = re.compile(r"[0-9a-f]{40}\Z")
+          branch_pattern = re.compile(r"trabajo/issue-([1-9][0-9]*)\Z")
+
+          def deny(reason):
+              print("AUTOMERGE_DENIED: " + reason, file=sys.stderr)
+              raise SystemExit(1)
+
+          if repo != expected_repo or not token or not event_path or not output_path:
+              deny("event_resolver_environment_invalid")
+          try:
+              with open(event_path, encoding="utf-8") as stream:
+                  event = json.load(stream)
+          except (OSError, ValueError):
+              deny("event_payload_invalid")
+          if (not isinstance(event, dict) or not isinstance(event.get("repository"), dict)
+                  or event["repository"].get("full_name") != repo
+                  or event["repository"].get("default_branch") != "main"):
+              deny("event_repository_untrusted")
+
+          number = None
+          expected_sha = None
+          expected_ref = None
+          if event_name == "pull_request_target":
+              if event.get("action") not in {"opened", "reopened", "ready_for_review", "synchronize"}:
+                  deny("pull_request_action_invalid")
+              source = event.get("pull_request")
+              if not isinstance(source, dict) or source.get("state") != "open" or source.get("draft") is not False:
+                  deny("pull_request_state_invalid")
+              head, base = source.get("head"), source.get("base")
+              if not isinstance(head, dict) or not isinstance(base, dict):
+                  deny("pull_request_refs_missing")
+              source_repo = head.get("repo")
+              number = source.get("number")
+              expected_ref, expected_sha = head.get("ref"), head.get("sha")
+              if (not isinstance(number, int) or isinstance(number, bool) or number <= 0
+                      or not isinstance(source_repo, dict) or source_repo.get("full_name") != repo
+                      or source_repo.get("fork") is not False or base.get("ref") != "main"
+                      or not isinstance(expected_sha, str) or not sha_pattern.fullmatch(expected_sha)):
+                  deny("pull_request_source_untrusted")
+          elif event_name == "workflow_run":
+              run = event.get("workflow_run")
+              if (not isinstance(run, dict) or event.get("action") != "completed"
+                      or run.get("name") not in trusted_runs or run.get("event") != "pull_request"
+                      or run.get("status") != "completed" or run.get("conclusion") != "success"
+                      or not isinstance(run.get("repository"), dict)
+                      or run["repository"].get("full_name") != repo
+                      or not isinstance(run.get("head_repository"), dict)
+                      or run["head_repository"].get("full_name") != repo
+                      or not isinstance(run.get("head_sha"), str)
+                      or not sha_pattern.fullmatch(run["head_sha"])):
+                  deny("workflow_run_untrusted_or_incomplete")
+              pull_requests = run.get("pull_requests")
+              if not isinstance(pull_requests, list) or len(pull_requests) != 1 or not isinstance(pull_requests[0], dict):
+                  deny("workflow_run_pr_mapping_ambiguous")
+              number = pull_requests[0].get("number")
+              expected_ref, expected_sha = run.get("head_branch"), run.get("head_sha")
+              if (not isinstance(number, int) or isinstance(number, bool) or number <= 0
+                      or not isinstance(expected_ref, str) or not branch_pattern.fullmatch(expected_ref)):
+                  deny("workflow_run_pr_identity_invalid")
+          elif event_name in ("status", "check_run"):
+              if event_name == "status":
+                  if event.get("context") != "CodeRabbit":
+                      deny("status_context_untrusted")
+                  expected_sha = event.get("sha")
+              else:
+                  check = event.get("check_run")
+                  if (event.get("action") != "completed" or not isinstance(check, dict)
+                          or check.get("status") != "completed"
+                          or check.get("conclusion") != "success"
+                          or not isinstance(check.get("app"), dict)
+                          or (check.get("name"), check["app"].get("slug"), check["app"].get("id")) not in {
+                              ("SonarCloud Code Analysis", "sonarqubecloud", 12526),
+                              ("CodeQL", "github-advanced-security", 57789),
+                          }):
+                      deny("check_run_untrusted")
+                  expected_sha = check.get("head_sha")
+              if not isinstance(expected_sha, str) or not sha_pattern.fullmatch(expected_sha):
+                  deny("external_check_sha_invalid")
+              pulls_url = "https://api.github.com/repos/" + repo + "/commits/" + expected_sha + "/pulls?per_page=100"
+              pulls_request = Request(pulls_url, headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": "Bearer " + token,
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "grindflow-automerge-status-resolver",
+              })
+              try:
+                  with urlopen(pulls_request, timeout=10) as response:
+                      candidates = json.load(response)
+              except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+                  deny("status_pr_lookup_failed")
+              if not isinstance(candidates, list) or len(candidates) > 100:
+                  deny("status_pr_inventory_invalid")
+              matching = []
+              for candidate in candidates:
+                  if not isinstance(candidate, dict):
+                      deny("status_pr_record_invalid")
+                  head, base = candidate.get("head"), candidate.get("base")
+                  source_repo = head.get("repo") if isinstance(head, dict) else None
+                  if (candidate.get("state") == "open" and candidate.get("draft") is False
+                          and isinstance(head, dict) and isinstance(base, dict)
+                          and head.get("sha") == expected_sha
+                          and isinstance(head.get("ref"), str)
+                          and branch_pattern.fullmatch(head["ref"])
+                          and isinstance(source_repo, dict) and source_repo.get("full_name") == repo
+                          and source_repo.get("fork") is False and base.get("ref") == "main"):
+                      matching.append(candidate)
+              if len(matching) != 1:
+                  deny("status_pr_mapping_ambiguous")
+              number = matching[0].get("number")
+              expected_ref = matching[0].get("head", {}).get("ref")
+              if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
+                  deny("status_pr_number_invalid")
+          else:
+              deny("event_name_unsupported")
+
+          if not isinstance(expected_ref, str) or not branch_pattern.fullmatch(expected_ref):
+              deny("event_branch_noncanonical")
+          api_url = "https://api.github.com/repos/" + repo + "/pulls/" + str(number)
+          request = Request(api_url, headers={
+              "Accept": "application/vnd.github+json",
+              "Authorization": "Bearer " + token,
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "grindflow-automerge-event-resolver",
+          })
+          try:
+              with urlopen(request, timeout=10) as response:
+                  current = json.load(response)
+          except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+              deny("authenticated_pr_lookup_failed")
+          if not isinstance(current, dict):
+              deny("authenticated_pr_invalid")
+          head, base = current.get("head"), current.get("base")
+          source_repo = head.get("repo") if isinstance(head, dict) else None
+          if (current.get("number") != number or current.get("state") != "open"
+                  or current.get("draft") is not False or not isinstance(head, dict)
+                  or not isinstance(base, dict) or head.get("ref") != expected_ref
+                  or head.get("sha") != expected_sha or base.get("ref") != "main"
+                  or not isinstance(source_repo, dict) or source_repo.get("full_name") != repo
+                  or source_repo.get("fork") is not False
+                  or not isinstance(head.get("sha"), str) or not sha_pattern.fullmatch(head["sha"])):
+              deny("authenticated_pr_identity_or_head_changed")
+          with open(output_path, "a", encoding="utf-8") as stream:
+              stream.write("pr_number=" + str(number) + "\n")
+              stream.write("pr_sha=" + head["sha"] + "\n")
+              stream.write("pr_url=https://github.com/" + repo + "/pull/" + str(number) + "\n")
+          print("Resolved current internal PR #" + str(number) + " at exact HEAD " + head["sha"])
+          PY
+      - name: Verify exact-HEAD policy and substantive bot review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
+          PR_SHA: ${{ steps.target.outputs.pr_sha }}
+        run: python3 scripts/automerge_pr_guard.py
+      - name: Arm exact-SHA normal squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_SHA: ${{ steps.target.outputs.pr_sha }}
+          PR_URL: ${{ steps.target.outputs.pr_url }}
+        run: gh pr merge --auto --squash --match-head-commit "$PR_SHA" "$PR_URL"
