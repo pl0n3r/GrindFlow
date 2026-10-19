@@ -719,6 +719,10 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertNotIn("--admin", yml)
 
     def test_successful_evidence_allows_only_sha_locked_auto_merge(self):
+        # AC-04 ejecuta también el audit postmerge y la recuperación de dos SHAs:
+        # su fallo no puede quedar invisible al job de aceptación selectiva.
+        self.test_scheduled_postmerge_exact_main_audit_is_independent()
+        self.test_audit_main_recovers_two_missing_shas_with_real_replay_evidence()
         guard.verify(fixture(), H)
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
         self.assertIn("persist-credentials: false", yml)
