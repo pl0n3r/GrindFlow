@@ -31,6 +31,9 @@ final readonly class FacebookPageProvider implements DistributionProvider
 
         try {
             if ($command->hasMedia()) {
+                if (!in_array($command->mediaMime, ['image/jpeg', 'image/png'], true)) {
+                    throw DistributionProviderException::rejected();
+                }
                 $response = $this->transport->postPhoto(
                     $this->configuration->graphVersion(),
                     $this->configuration->pageId(),
