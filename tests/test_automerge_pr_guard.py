@@ -489,7 +489,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
             with self.subTest(branch=repr(branch)):
                 sample = fixture()
                 responses = [
-                    sample["pr"], sample["switch"], sample["checks"],
+                    sample["pr"], sample["lease_issue"], sample["lease_comments"],
+                    sample["lease_files"], sample["switch"], sample["checks"],
                     sample["reviews"], sample["status_history"], branch,
                 ]
                 with (patch.object(guard, "get", side_effect=responses),
@@ -503,7 +504,8 @@ class AutoMergePrGuardTests(unittest.TestCase):
 
         sample = fixture()
         responses = [
-            sample["pr"], sample["switch"], sample["checks"],
+            sample["pr"], sample["lease_issue"], sample["lease_comments"],
+            sample["lease_files"], sample["switch"], sample["checks"],
             sample["reviews"], sample["status_history"], {"commit": {"sha": B}},
         ]
         with (patch.object(guard, "get", side_effect=responses),
@@ -524,6 +526,11 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertEqual(guard.verify_exact_main_ci_runs(good, H), "validated")
         self.assertEqual(guard.verify_exact_main_ci_runs(
             {"total_count": 0, "workflow_runs": []}, H), "missing")
+        replay = dict(run, head_branch="audit/main-" + H)
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 1, "workflow_runs": [replay]}, H), "validated")
+        self.assertEqual(guard.verify_exact_main_ci_runs(
+            {"total_count": 1, "workflow_runs": [dict(replay, event="push")]}, H), "missing")
         for mutation in (
             lambda row: row.update(head_sha=B),
             lambda row: row.update(head_branch="trabajo/issue-482"),
@@ -583,11 +590,26 @@ class AutoMergePrGuardTests(unittest.TestCase):
             {"total_count": 1, "workflow_runs": [green]}, new), "validated")
         self.assertEqual(guard.verify_exact_main_ci_runs(
             {"total_count": 0, "workflow_runs": []}, old), "missing")
-        with self.assertRaises(guard.GuardError):
-            guard.verify_exact_main_ci_chain(
-                [old, new], {old: "missing", new: "validated"}, new)
+        self.assertEqual(guard.verify_exact_main_ci_chain(
+            [old, new], {old: "missing", new: "validated"}, new),
+            "replay:" + old)
         self.assertEqual(guard.verify_exact_main_ci_chain(
             [old, new], {old: "validated", new: "missing"}, new), "missing")
+        # Two missing commits must be replayed in order, never silently
+        # accepted by a later terminal green HEAD or merged into a single run.
+        mid = "e" * 40
+        self.assertEqual(guard.verify_exact_main_ci_chain(
+            [old, mid, new], {old: "missing", mid: "missing", new: "validated"}, new),
+            "replay:" + old)
+        self.assertEqual(guard.verify_exact_main_ci_chain(
+            [old, mid, new], {old: "validated", mid: "missing", new: "validated"}, new),
+            "replay:" + mid)
+        self.assertEqual(guard.verify_exact_main_ci_chain(
+            [old, mid, new], {old: "validated", mid: "validated", new: "validated"}, new),
+            "validated")
+        with self.assertRaises(guard.GuardError):
+            guard.verify_exact_main_ci_chain(
+                [old, mid, new], {old: "pending", mid: "validated", new: "validated"}, new)
         with self.assertRaises(guard.GuardError):
             guard.exact_main_commits_since_anchor(history([old, new]), old)
         with self.assertRaises(guard.GuardError):
@@ -599,6 +621,16 @@ class AutoMergePrGuardTests(unittest.TestCase):
         tampered["merge_base_commit"]["sha"] = "f" * 40
         with self.assertRaises(guard.GuardError):
             guard.exact_main_commits_since_anchor(tampered, new)
+        # Only a protected, owner-approved code change can rotate the anchor.
+        # After such a rotation the original compare ancestry must still match.
+        from unittest.mock import patch
+        with patch.object(guard, "EXACT_MAIN_AUDIT_ANCHOR", old):
+            rotated = dict(history([new]))
+            rotated["base_commit"] = {"sha": old}
+            rotated["merge_base_commit"] = {"sha": old}
+            self.assertEqual(guard.exact_main_commits_since_anchor(rotated, new), [new])
+            with self.assertRaises(guard.GuardError):
+                guard.exact_main_commits_since_anchor(history([old, new]), new)
 
     def test_scheduled_postmerge_exact_main_audit_is_independent(self):
         yml = (ROOT / ".github/workflows/automerge.yml").read_text(encoding="utf-8")
@@ -608,6 +640,10 @@ class AutoMergePrGuardTests(unittest.TestCase):
         self.assertIn("python3 scripts/automerge_pr_guard.py --audit-main", yml)
         self.assertIn("python3 scripts/automerge_pr_guard.py --audit-main || code=$?", yml)
         self.assertIn("gh workflow run grindflow-ci.yml --ref main", yml)
+        self.assertIn("EXACT_MAIN_REPLAY_REQUIRED", yml)
+        self.assertIn('gh workflow run grindflow-ci.yml --ref "$audit_branch"', yml)
+        self.assertIn("refs/heads/audit/main-$replay_sha", yml)
+        self.assertIn("contents: write", yml)
         self.assertIn("EXACT_MAIN_CI_NOT_VALIDATED", (ROOT / "scripts/automerge_pr_guard.py").read_text(encoding="utf-8"))
         self.assertIn("exit 1", yml)
         self.assertNotIn("secrets.AUTOMERGE_TOKEN", yml)

@@ -17,12 +17,17 @@ jobs:
     # An Actions GITHUB_TOKEN-enabled auto-merge may suppress the push event.
     # An independent scheduled audit can dispatch the existing GrindFlow CI
     # via workflow_dispatch (the GitHub-documented token-trigger exception).
+    # For suppressed intermediate main SHAs, create a deterministic audit-only
+    # branch at that SHA and dispatch the SAME full CI on its immutable tree.
+    # Never accept a run on a different SHA or treat pending/replay as green.
+    # Audit-only refs are not releases/tags or pushes to main.
     # This never mutates main, deploys, or treats a pending validation as green.
     if: github.repository == 'pl0n3r/GrindFlow' && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
+      # Only this trusted scheduled job may create immutable audit replay refs.
+      contents: write
       actions: write
     steps:
       - name: Checkout trusted exact-main audit code
@@ -39,7 +44,27 @@ jobs:
         run: |
           set -uo pipefail
           code=0
-          python3 scripts/automerge_pr_guard.py --audit-main || code=$?
+          audit_output="$(python3 scripts/automerge_pr_guard.py --audit-main 2>&1)" || code=$?
+          printf '%s\n' "$audit_output"
+          if (( code == 3 )); then
+            # No owner exception is inferred: test the exact historical SHA.
+            replay_sha="$(printf '%s\n' "$audit_output" | sed -n 's/^EXACT_MAIN_REPLAY_REQUIRED \([0-9a-f]\{40\}\)$/\1/p')"
+            [[ "$replay_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" || exit 1
+            [[ "$current" == "$GITHUB_SHA" ]] || { echo '::error::main moved; fail-closed'; exit 1; }
+            audit_branch="audit/main-$replay_sha"
+            ref_path="repos/$GITHUB_REPOSITORY/git/ref/heads/$audit_branch"
+            if existing="$(gh api "$ref_path" --jq '.object.sha' 2>/dev/null)"; then
+              [[ "$existing" == "$replay_sha" ]] || { echo '::error::replay ref moved; fail-closed'; exit 1; }
+            else
+              gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f ref="refs/heads/audit/main-$replay_sha" -f sha="$replay_sha" || exit 1
+            fi
+            [[ "$(gh api "$ref_path" --jq '.object.sha')" == "$replay_sha" ]] || exit 1
+            gh workflow run grindflow-ci.yml --ref "$audit_branch" || exit 1
+            echo "::error::historical main CI dispatched for exact SHA $replay_sha but NOT validated yet"
+            exit 1
+          fi
           if (( code == 2 )); then
             # Guard against branch movement between audit and dispatch.
             current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" || exit 1

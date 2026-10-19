@@ -11,7 +11,11 @@ from urllib.request import Request, urlopen
 REPO = "pl0n3r/GrindFlow"
 # Auditable checkpoint: main SHA at the start of protected #482 integration.
 # Examine EVERY following main commit, not merely the latest hourly HEAD.
-# Exceeding this bounded window fails closed; never treat it as green.
+# Exceeding this bounded window fails closed. Owner-authorized recovery:
+# (1) file an issue listing EVERY exact-main SHA and its verified CI outcome,
+# (2) obtain an explicit owner decision for any unvalidated commit,
+# (3) advance the checkpoint only in a separately reviewed, protected PR.
+# NEVER auto-advance or represent an acknowledged missing run as green.
 EXACT_MAIN_AUDIT_ANCHOR = "91a1ae9de2ec9f8f14808acd0530e03befb52a86"
 MAX_EXACT_MAIN_COMMITS = 20
 SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -465,9 +469,14 @@ def verify_exact_main_ci_runs(payload, expected):
                 or SHA.fullmatch(run["head_sha"]) is None):
             raise GuardError("exact_main_run_invalid")
         seen.add(run["id"])
-        if run["head_sha"] == expected and run.get("head_branch") == "main" and (
-                run.get("name") == "GrindFlow CI"
-                and run.get("event") in ("push", "workflow_dispatch")):
+        on_main = (run.get("head_branch") == "main"
+                   and run.get("event") in ("push", "workflow_dispatch"))
+        # Recovery dispatch checks out the SAME immutable main commit on a
+        # designated audit-only branch. No arbitrary PR workflow is evidence.
+        on_replay = (run.get("head_branch") == "audit/main-" + expected
+                     and run.get("event") == "workflow_dispatch")
+        if (run["head_sha"] == expected and run.get("name") == "GrindFlow CI"
+                and (on_main or on_replay)):
             matches.append(run)
     if not matches:
         return "missing"
@@ -524,6 +533,12 @@ def verify_exact_main_ci_chain(commits, statuses, expected):
             or set(statuses) != set(commits)):
         raise GuardError("exact_main_ci_chain_incomplete")
     for sha in commits[:-1]:
+        # Return the FIRST missing immutable commit so a trusted scheduled
+        # workflow can dispatch real CI for it, never skip to a later green.
+        if statuses[sha] == "missing":
+            return "replay:" + sha
+        if statuses[sha] == "pending":
+            raise GuardError("exact_main_intermediate_ci_pending")
         if statuses[sha] != "validated":
             raise GuardError("exact_main_intermediate_ci_not_validated")
     if statuses[expected] in ("validated", "missing", "pending"):
@@ -572,6 +587,9 @@ def audit_main():
         if verdict == "missing":
             print("EXACT_MAIN_DISPATCH_REQUIRED " + expected)
             return 2
+        if verdict.startswith("replay:") and SHA.fullmatch(verdict[7:]):
+            print("EXACT_MAIN_REPLAY_REQUIRED " + verdict[7:])
+            return 3
         raise GuardError("exact_main_ci_pending")
     except (GuardError, ValueError, TypeError, KeyError) as err:
         reason = str(err) if type(err) is GuardError else "exact_main_audit_input_invalid"
