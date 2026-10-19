@@ -55,6 +55,8 @@ final readonly class FacebookPageProvider implements DistributionProvider
                     $payload,
                 );
             }
+        } catch (DistributionProviderException $e) {
+            throw $e;
         } catch (InvalidArgumentException) {
             throw DistributionProviderException::rejected();
         } catch (Throwable) {
