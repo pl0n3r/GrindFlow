@@ -52,7 +52,7 @@ jobs:
           gh label create revision-juridica-desfase --color 9F5319 --description 'Paquete jurídico desactualizado' --force
           count="$(gh issue list --state open --label revision-juridica-desfase --json number --jq 'length')"
           if [ "$count" -eq 0 ]; then
-            version="$(sed -n "s/.*'number' => '\([^']*\)'.*/\1/p" config/version.php | head -n 1)"
+            version="$(python3 -c 'from pathlib import Path; from scripts.generar_revision_juridica import version; print(version(Path(".")))')"
             test -n "$version"
             body="$(cat <<'ISSUE'
           ### Contexto

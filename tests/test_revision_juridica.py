@@ -1,6 +1,7 @@
 """Legal handoff contract: byte copies, bundle and read-only workflow."""
 import importlib.util
 import subprocess
+import shutil
 import sys
 import unittest
 from pathlib import Path
@@ -75,6 +76,60 @@ class RevisionJuridicaTests(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError, "Entradas no previstas"):
                             module.sync(root, check)
                 self.assertEqual(outside.read_bytes(), b"safe")
+
+
+    def test_check_rejects_stale_copy_without_writing(self):
+        """An actual CLI --check failure must preserve every legal copy byte-for-byte."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            (root / "config").mkdir()
+            shutil.copy2(SCRIPT, root / "scripts/generar_revision_juridica.py")
+            shutil.copy2(ROOT / "config/version.php", root / "config/version.php")
+            shutil.copy2(ROOT / "datos.yml", root / "datos.yml")
+            shutil.copytree(ROOT / "docs/privacidad", root / "docs/privacidad")
+
+            commands = [
+                ["git", "init", "--quiet"],
+                ["git", "add", "--", "docs/privacidad", "datos.yml"],
+                ["git", "-c", "user.name=Legal Test", "-c", "user.email=legal@test.invalid",
+                 "commit", "--quiet", "-m", "Fixture de procedencia jurídica"],
+            ]
+            for args in commands:
+                setup = subprocess.run(args, cwd=root, capture_output=True,
+                                       text=True, check=False, timeout=35)
+                self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
+
+            script = root / "scripts/generar_revision_juridica.py"
+            generate = subprocess.run([sys.executable, str(script)], cwd=root,
+                                      capture_output=True, text=True, check=False, timeout=35)
+            self.assertEqual(generate.returncode, 0, generate.stdout + generate.stderr)
+
+            folder = root / "revision-juridica"
+            stale = folder / "aviso-privacidad.md"
+            stale.write_bytes(stale.read_bytes() + b"\nDesfase de prueba\n")
+            before = {p.relative_to(folder).as_posix(): p.read_bytes()
+                      for p in folder.rglob("*") if p.is_file()}
+            check = subprocess.run([sys.executable, str(script), "--check"], cwd=root,
+                                   capture_output=True, text=True, check=False, timeout=35)
+            after = {p.relative_to(folder).as_posix(): p.read_bytes()
+                     for p in folder.rglob("*") if p.is_file()}
+            self.assertEqual(check.returncode, 1, check.stdout + check.stderr)
+            self.assertIn("aviso-privacidad.md", check.stdout)
+            self.assertEqual(after, before)
+
+    def test_workflow_version_uses_generator_parser(self):
+        """Version parsing must accept valid PHP whitespace variants."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "config").mkdir()
+            (root / "config/version.php").write_text(
+                "<?php return ['number'   =>   '0.1.220'];", encoding="utf-8"
+            )
+            self.assertEqual(module.version(root), "0.1.220")
+        workflow = (ROOT / ".github/workflows/revision-juridica-sync.yml").read_text()
+        self.assertIn("from scripts.generar_revision_juridica import version", workflow)
+        self.assertNotIn('sed -n "s/.*', workflow)
 
 
 if __name__ == "__main__":
