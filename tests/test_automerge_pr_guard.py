@@ -25,8 +25,13 @@ def fixture():
                        "repository_url": "https://api.github.com/repos/pl0n3r/Factory",
                        "state": "closed", "user": {"login": "pl0n3r"}, "body": M},
             "pr": {"state": "open", "draft": False, "mergeable": True,
-                   "head": {"sha": H, "repo": {"fork": False, "owner": {"login": "pl0n3r"}, "name": "GrindFlow"}},
+                   "body": "<!-- condor-reserva-id: 11111111-2222-3333-4444-555555555555 -->",
+                   "head": {"ref": "trabajo/issue-482", "sha": H, "repo": {"fork": False, "owner": {"login": "pl0n3r"}, "name": "GrindFlow"}},
                    "base": {"sha": B, "ref": "main"}},
+            "lease_issue": {"number": 482, "state": "open", "user": {"login": "pl0n3r"}},
+            "lease_comments": [{"id": 17, "user": {"login": "github-actions[bot]", "type": "Bot"},
+                "body": '<!-- condor-reserva {"version":3,"active":true,"owner":"pl0n3r","branch":"trabajo/issue-482","reservation_id":"11111111-2222-3333-4444-555555555555","task_paths":["scripts/automerge_pr_guard.py"],"task_depends_on":[]} -->'}],
+            "lease_files": [{"filename": "scripts/automerge_pr_guard.py"}],
             "main_sha": B,
             "checks": {"total_count": len(items), "check_runs": items},
             "reviews": [{"user": {"login": "coderabbitai[bot]", "type": "Bot"},
@@ -42,6 +47,25 @@ class AutoMergePrGuardTests(unittest.TestCase):
     def denied(self, sample):
         with self.assertRaises(guard.GuardError):
             guard.verify(sample, H)
+
+    def test_active_v3_reservation_and_claimed_paths_required(self):
+        from copy import deepcopy
+        sample = fixture()
+        guard.verify(sample, H)
+        mutations = (
+            lambda x: x.pop("lease_comments"),
+            lambda x: x["lease_issue"].update(state="closed"),
+            lambda x: x["pr"]["head"].update(ref="trabajo/issue-483"),
+            lambda x: x["pr"].update(body="no lease marker"),
+            lambda x: x["lease_comments"][0]["user"].update(login="attacker"),
+            lambda x: x["lease_comments"][0].update(body=x["lease_comments"][0]["body"].replace('"active":true', '"active":false')),
+            lambda x: x["lease_files"].append({"filename": "other-work.yml"}),
+            lambda x: x["lease_files"].append({"filename": "scripts/automerge_pr_guard.py"}),
+        )
+        for mutate in mutations:
+            candidate = deepcopy(sample)
+            mutate(candidate)
+            self.denied(candidate)
 
     def test_failed_pending_or_missing_policy_denied(self):
         for result in ("failure", "pending", "skipped", None):
@@ -348,7 +372,9 @@ class AutoMergePrGuardTests(unittest.TestCase):
             rows = []
             for state in (before, after):
                 rows.extend([
-                    copy.deepcopy(state["pr"]), copy.deepcopy(state["switch"]),
+                    copy.deepcopy(state["pr"]), copy.deepcopy(state["lease_issue"]),
+                    copy.deepcopy(state["lease_comments"]), copy.deepcopy(state["lease_files"]),
+                    copy.deepcopy(state["switch"]),
                     copy.deepcopy(state["checks"]), copy.deepcopy(state["reviews"]),
                     copy.deepcopy(state["status_history"]),
                     {"commit": {"sha": state["main_sha"]}},
@@ -380,12 +406,12 @@ class AutoMergePrGuardTests(unittest.TestCase):
                     with (patch.object(guard, "get", side_effect=responses(before, after)) as get_mock,
                           patch.object(guard, "get_threads", side_effect=[before["review_threads"], after["review_threads"]])):
                         self.assertEqual(guard.main(), 1)
-                        self.assertEqual(get_mock.call_count, 12)
+                        self.assertEqual(get_mock.call_count, 18)
         with patch.dict(guard.os.environ, env, clear=True):
             with (patch.object(guard, "get", side_effect=responses(fixture(), fixture())) as get_mock,
                   patch.object(guard, "get_threads", side_effect=[[], []])):
                 self.assertEqual(guard.main(), 0)
-                self.assertEqual(get_mock.call_count, 12)
+                self.assertEqual(get_mock.call_count, 18)
 
     def test_only_latest_decisive_review_per_reviewer_can_veto(self):
         reviewer = {"login": "security-reviewer"}

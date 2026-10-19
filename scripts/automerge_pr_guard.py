@@ -19,6 +19,9 @@ MARKER = re.compile(r"<!--\s*factory-unattended-kill-switch\s+(\{[^\n]*\})\s*-->
 MARKER_START = re.compile(r"<!--\s*factory-unattended-kill-switch\b")
 REQUIRED = ("Etiquetas", "validate", "SonarCloud Code Analysis", "CodeQL",
             "Factory policy / Validar decisiones y límite de revisión")
+V3_MARKER = re.compile(r"<!--\s*condor-reserva\s+(\{[^\n]*\})\s*-->")
+V3_ID = re.compile(r"<!--\s*condor-reserva-id:\s*([0-9a-f-]{36})\s*-->")
+V3_BRANCH = re.compile(r"trabajo/issue-([1-9][0-9]*)\Z")
 REQUIRED_APPS = {
     "Etiquetas": ("github-actions", 15368),
     "validate": ("github-actions", 15368),
@@ -115,6 +118,70 @@ def verify_coderabbit_status(rows):
         raise GuardError("coderabbit_review_not_completed")
 
 
+def verify_reservation(pr, issue, comments, files):
+    """Trust only the latest official active V3, matching this PR and its diff."""
+    head = pr.get("head") if type(pr) is dict else None
+    if type(head) is not dict or type(head.get("ref")) is not str:
+        raise GuardError("v3_branch_missing")
+    branch = head["ref"]
+    match = V3_BRANCH.fullmatch(branch)
+    if match is None or type(pr.get("body")) is not str:
+        raise GuardError("v3_branch_or_pr_body_invalid")
+    if (type(issue) is not dict or issue.get("number") != int(match.group(1))
+            or issue.get("state") != "open"
+            or type(issue.get("user")) is not dict
+            or issue["user"].get("login") != "pl0n3r"):
+        raise GuardError("v3_issue_mismatch")
+    ids = V3_ID.findall(pr["body"])
+    if len(ids) != 1:
+        raise GuardError("v3_pr_marker_missing_or_ambiguous")
+    if type(comments) is not list or not 1 <= len(comments) <= 100:
+        raise GuardError("v3_comments_incomplete")
+    official, seen = [], set()
+    for row in comments:
+        if (type(row) is not dict or type(row.get("id")) is not int
+                or row["id"] <= 0 or row["id"] in seen
+                or type(row.get("user")) is not dict
+                or type(row.get("body")) is not str):
+            raise GuardError("v3_comment_untrusted")
+        seen.add(row["id"])
+        if "condor-reserva" not in row["body"]:
+            continue
+        if (row["user"].get("login") != "github-actions[bot]"
+                or row["user"].get("type") != "Bot"):
+            continue
+        markers = V3_MARKER.findall(row["body"])
+        if len(markers) != 1:
+            raise GuardError("v3_official_marker_ambiguous")
+        try:
+            marker = json.loads(markers[0], object_pairs_hook=unique)
+        except (ValueError, TypeError, GuardError) as err:
+            raise GuardError("v3_marker_invalid") from err
+        official.append((row["id"], marker))
+    if not official:
+        raise GuardError("v3_official_marker_missing")
+    marker = max(official, key=lambda item: item[0])[1]
+    paths = marker.get("task_paths") if type(marker) is dict else None
+    if (type(marker) is not dict or type(marker.get("version")) is not int
+            or marker["version"] != 3 or marker.get("active") is not True
+            or marker.get("owner") != "pl0n3r" or marker.get("branch") != branch
+            or marker.get("reservation_id") != ids[0]
+            or marker.get("task_depends_on") != []
+            or type(paths) is not list or not paths
+            or any(type(p) is not str or not p for p in paths)
+            or len(paths) != len(set(paths))):
+        raise GuardError("v3_inactive_or_mismatched")
+    if type(files) is not list or not 1 <= len(files) <= 100:
+        raise GuardError("v3_diff_incomplete")
+    names = []
+    for file in files:
+        if type(file) is not dict or type(file.get("filename")) is not str:
+            raise GuardError("v3_diff_untrusted")
+        names.append(file["filename"])
+    if len(names) != len(set(names)) or not set(names).issubset(set(paths)):
+        raise GuardError("v3_unclaimed_file")
+
+
 def verify(snapshot, expected):
     if type(expected) is not str or not SHA.fullmatch(expected):
         raise GuardError("head_unknown")
@@ -136,6 +203,7 @@ def verify(snapshot, expected):
             or type(base.get("sha")) is not str or SHA.fullmatch(base["sha"]) is None
             or base["sha"] != snapshot.get("main_sha")):
         raise GuardError("pull_identity_or_base_unknown")
+    verify_reservation(pr, snapshot.get("lease_issue"), snapshot.get("lease_comments"), snapshot.get("lease_files"))
     checks = snapshot.get("checks")
     if (type(checks) is not dict or type(checks.get("total_count")) is not int
             or type(checks.get("check_runs")) is not list
@@ -345,8 +413,18 @@ def get_threads(token, number):
 
 def read_snapshot(token, root, number, expected):
     """Fetch independent live policy, reviewer, base and switch evidence."""
+    pr = get(token, root + f"/pulls/{number}")
+    head = pr.get("head") if type(pr) is dict else None
+    ref = head.get("ref") if type(head) is dict else None
+    matched = V3_BRANCH.fullmatch(ref) if type(ref) is str else None
+    if matched is None:
+        raise GuardError("v3_branch_invalid")
+    issue_number = int(matched.group(1))
     snapshot = {
-        "pr": get(token, root + f"/pulls/{number}"),
+        "pr": pr,
+        "lease_issue": get(token, root + f"/issues/{issue_number}"),
+        "lease_comments": get(token, root + f"/issues/{issue_number}/comments?per_page=100"),
+        "lease_files": get(token, root + f"/pulls/{number}/files?per_page=100"),
         "switch": get(token, "/repos/pl0n3r/Factory/issues/767"),
         "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
         "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100"),
