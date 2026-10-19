@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+// Las pruebas Symfony se cargan juntas: evitar colisiones entre helpers globales.
+namespace GrindFlow\Tests\Studio;
+
+use RuntimeException;
+
 require dirname(__DIR__, 2) . '/src/Scheduling/Studio/InheritedRuleSet.php';
 require dirname(__DIR__, 2) . '/src/Scheduling/Studio/StudioCalendarView.php';
 require dirname(__DIR__, 2) . '/src/Scheduling/Studio/TeamCapacityAnalyzer.php';
