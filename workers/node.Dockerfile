@@ -12,7 +12,9 @@
 # la imagen es mucho mas ligera que la de medios.
 
 # Misma imagen oficial Docker, via ECR Public para evitar throttling de Docker Hub.
-FROM public.ecr.aws/docker/library/node:22-alpine
+# CI may use only a digest-verified Official mirror; production defaults to ECR.
+ARG NODE_BASE_IMAGE=public.ecr.aws/docker/library/node:22-alpine
+FROM ${NODE_BASE_IMAGE}
 WORKDIR /app
 
 # Las dependencias antes que el codigo: cambiar el worker no reinstala todo.

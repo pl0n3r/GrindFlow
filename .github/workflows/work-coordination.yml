@@ -20,27 +20,50 @@ concurrency:
   queue: max
 
 jobs:
+  clasificar-comentario:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request == null &&
+      github.event.sender.login == github.event.comment.user.login
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      valido: ${{ steps.validar.outputs.valido }}
+    steps:
+      - id: validar
+        shell: bash
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Clasificación sin interpretar como shell el comentario del usuario.
+          # Gramática de SESSION_RE y parse_comment_command en Factory@v1.
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          import re
+
+          body = os.environ["COMMENT_BODY"].strip()
+          exactos = {"/tomar", "/liberar-forzado", "/adoptar-contrato-huerfana"}
+          prefijos = ("/liberar ", "/transferir ", "/migrar-contrato ", "/renovar-contrato ")
+          uuid = re.compile(
+              r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+              r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          )
+          valido = body in exactos or any(
+              body.startswith(prefix)
+              and uuid.fullmatch(body[len(prefix):].strip().lower()) is not None
+              for prefix in prefijos
+          )
+          print("valido=" + ("true" if valido else "false"))
+          PY
+
   comentario:
+    needs: clasificar-comentario
     if: >-
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request == null &&
       github.event.sender.login == github.event.comment.user.login &&
-      (
-        github.event.comment.body == '/tomar' ||
-        github.event.comment.body == '/liberar-forzado' ||
-        github.event.comment.body == '/adoptar-contrato-huerfana' ||
-        startsWith(github.event.comment.body, '/liberar ') ||
-        startsWith(github.event.comment.body, '/transferir ') ||
-        startsWith(github.event.comment.body, '/migrar-contrato ') ||
-        startsWith(github.event.comment.body, '/renovar-contrato ') ||
-        contains(github.event.comment.body, '/tomar') ||
-        contains(github.event.comment.body, '/liberar-forzado') ||
-        contains(github.event.comment.body, '/adoptar-contrato-huerfana') ||
-        contains(github.event.comment.body, '/liberar ') ||
-        contains(github.event.comment.body, '/transferir ') ||
-        contains(github.event.comment.body, '/migrar-contrato ') ||
-        contains(github.event.comment.body, '/renovar-contrato ')
-      )
+      needs['clasificar-comentario'].outputs.valido == 'true'
     # GitHub valida el máximo permission envelope del reusable antes de
     # seleccionar el job interno. El reusable conserva mínimo privilegio por job.
     permissions:
