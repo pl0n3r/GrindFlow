@@ -262,7 +262,8 @@ final class InstagramReelProviderTest extends WebTestCase
         // El CI revierte el CHECK a facebook_page al terminar PHPUnit.
         // Una tabla temporal por conexión evita dejar filas instagram_reels
         // en el ledger persistente sin alterar triggers ni la migración real.
-        $db->executeStatement('CREATE TEMPORARY TABLE gf_external_publication_attempts LIKE gf_external_publication_attempts');
+        $db->executeStatement('CREATE TEMPORARY TABLE gf_external_attempts_fixture LIKE gf_external_publication_attempts');
+        $db->executeStatement('CREATE TEMPORARY TABLE gf_external_publication_attempts LIKE gf_external_attempts_fixture');
         $video = $this->videoFixture();
         $transport = new FakeInstagramReelTransport([
             ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'],
@@ -297,6 +298,7 @@ final class InstagramReelProviderTest extends WebTestCase
         } finally {
             @unlink($video);
             $db->executeStatement('DROP TEMPORARY TABLE IF EXISTS gf_external_publication_attempts');
+            $db->executeStatement('DROP TEMPORARY TABLE IF EXISTS gf_external_attempts_fixture');
         }
     }
 
@@ -306,7 +308,8 @@ final class InstagramReelProviderTest extends WebTestCase
         /** @var Connection $db */
         $db = static::getContainer()->get(Connection::class);
         $organization = $this->organization($db);
-        $db->executeStatement('CREATE TEMPORARY TABLE gf_external_publication_attempts LIKE gf_external_publication_attempts');
+        $db->executeStatement('CREATE TEMPORARY TABLE gf_external_attempts_fixture LIKE gf_external_publication_attempts');
+        $db->executeStatement('CREATE TEMPORARY TABLE gf_external_publication_attempts LIKE gf_external_attempts_fixture');
         $now = new DateTimeImmutable('2026-10-19 18:00:00', new DateTimeZone('UTC'));
         $clock = static function () use (&$now): DateTimeImmutable {
             return $now;
@@ -359,6 +362,7 @@ final class InstagramReelProviderTest extends WebTestCase
         } finally {
             @unlink($video);
             $db->executeStatement('DROP TEMPORARY TABLE IF EXISTS gf_external_publication_attempts');
+            $db->executeStatement('DROP TEMPORARY TABLE IF EXISTS gf_external_attempts_fixture');
         }
     }
 
