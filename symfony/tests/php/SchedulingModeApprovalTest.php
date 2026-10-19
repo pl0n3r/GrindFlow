@@ -5,13 +5,13 @@ require dirname(__DIR__, 2) . '/src/Scheduling/Mode/ApprovalPolicy.php';
 
 use GrindFlow\Scheduling\Mode\AutomationMode;
 use GrindFlow\Scheduling\Mode\ApprovalPolicy;
-function check(bool $condition, string $reason): void
+function gf427_checkbool $condition, string $reason): void
 {
     if (!$condition) {
         throw new RuntimeException('test_failed:' . $reason);
     }
 }
-function context(): array
+function gf427_context): array
 {
     return ['tenant_id' => 'tenant_1', 'account_id' => 'account_1',
         'permission_granted' => true, 'content_eligible' => true,
@@ -19,7 +19,7 @@ function context(): array
         'minimum_separation_met' => true, 'external_state_known' => true,
         'approval_granted' => true];
 }
-function request(bool $studio = true): array
+function gf427_requestbool $studio = true): array
 {
     return ['tenant_id' => 'tenant_1', 'creator_id' => 'creator_1',
         'request_id' => 'approval_001', 'issued_at' => 1800000000,
@@ -27,7 +27,7 @@ function request(bool $studio = true): array
         'required_roles' => $studio ? ['editor', 'reviewer'] : ['owner'],
         'expires_at' => 1800000100];
 }
-function response(string $role = 'editor'): array
+function gf427_responsestring $role = 'editor'): array
 {
     return ['tenant_id' => 'tenant_1', 'creator_id' => 'creator_1',
         'request_id' => 'approval_001',
@@ -37,89 +37,89 @@ function response(string $role = 'editor'): array
 $tests = [
     'hard_rules' => static function (): void {
         $mode = new AutomationMode();
-        $hardRules = array_diff(array_keys(context()), ['tenant_id', 'account_id']);
+        $hardRules = array_diff(array_keys(gf427_context)), ['tenant_id', 'account_id']);
         foreach ($hardRules as $name) {
             foreach (['manual', 'assisted', 'autopilot', 'pilot'] as $value) {
-                $ctx = context();
+                $ctx = gf427_context);
                 $ctx[$name] = false;
                 $out = $mode->assess($value, $ctx, true);
-                check($out['status'] === 'blocked' && !$out['execution_performed'],
+                gf427_check$out['status'] === 'blocked' && !$out['execution_performed'],
                     'same_hard_rule_' . $name . '_' . $value);
             }
         }
-        $bad = context();
+        $bad = gf427_context);
         $bad['unknown_gate'] = true;
-        check($mode->assess('pilot', $bad)['status'] === 'blocked', 'unknown_input');
-        $bad = context();
+        gf427_check$mode->assess('pilot', $bad)['status'] === 'blocked', 'unknown_input');
+        $bad = gf427_context);
         $bad['approval_granted'] = 'true';
-        check($mode->assess('pilot', $bad)['status'] === 'blocked', 'type_bypass');
+        gf427_check$mode->assess('pilot', $bad)['status'] === 'blocked', 'type_bypass');
     },
     'assisted' => static function (): void {
         $mode = new AutomationMode();
-        check($mode->assess('manual', context(), true)['status'] ===
+        gf427_check$mode->assess('manual', gf427_context), true)['status'] ===
             'manual_action_required', 'manual_no_autonomy');
-        check($mode->assess('assisted', context())['status'] ===
+        gf427_check$mode->assess('assisted', gf427_context))['status'] ===
             'confirmation_required', 'assisted_requires_confirmation');
-        check($mode->assess('assisted', context(), true)['status'] ===
+        gf427_check$mode->assess('assisted', gf427_context), true)['status'] ===
             'eligible', 'explicit_confirmation');
-        check($mode->assess('pilot', context())['status'] === 'eligible', 'legacy_pilot');
-        check($mode->assess('autopilot', context())['status'] === 'eligible',
+        gf427_check$mode->assess('pilot', gf427_context))['status'] === 'eligible', 'legacy_pilot');
+        gf427_check$mode->assess('autopilot', gf427_context))['status'] === 'eligible',
             'contractual_autopilot');
-        check($mode->assess('autopilot', context()) === $mode->assess('pilot', context()),
+        gf427_check$mode->assess('autopilot', gf427_context)) === $mode->assess('pilot', gf427_context)),
             'pilot_alias_same_result');
-        check($mode->assess('unknown', context(), true)['status'] === 'blocked',
+        gf427_check$mode->assess('unknown', gf427_context), true)['status'] === 'blocked',
             'invalid_mode');
         foreach (['manual','assisted','autopilot','pilot'] as $value) {
-            check($mode->assess($value, context(), true)['execution_performed'] ===
+            gf427_check$mode->assess($value, gf427_context), true)['execution_performed'] ===
                 false, 'pure_no_execution');
         }
     },
     'studio' => static function (): void {
         $p = new ApprovalPolicy();
         $now = 1800000001;
-        $req = request();
-        $first = $p->decide($req, [response()], $now);
-        check($first['status'] === 'pending' && !$first['approved']
+        $req = gf427_request);
+        $first = $p->decide($req, [gf427_response)], $now);
+        gf427_check$first['status'] === 'pending' && !$first['approved']
             && $first['pending_roles'] === ['reviewer'], 'missing_required_role');
-        $both = $p->decide($req, [response(), response('reviewer')], $now);
-        check($both['status'] === 'approved' && $both['approved']
+        $both = $p->decide($req, [gf427_response), gf427_response'reviewer')], $now);
+        gf427_check$both['status'] === 'approved' && $both['approved']
             && count($both['audit']) === 2, 'all_roles_required');
         // A previous Studio approval must never authorize a new request.
         $new = $req;
         $new['request_id'] = 'approval_002';
         $new['issued_at'] = $now;
-        $oldResponses = [response(), response('reviewer')];
-        check($p->decide($new, $oldResponses, $now)['status'] === 'invalid',
+        $oldResponses = [gf427_response), gf427_response'reviewer')];
+        gf427_check$p->decide($new, $oldResponses, $now)['status'] === 'invalid',
             'replay_from_other_request_rejected');
         foreach ($oldResponses as &$oldResponse) {
             $oldResponse['request_id'] = 'approval_002';
         }
         unset($oldResponse);
-        check($p->decide($new, $oldResponses, $now)['status'] === 'invalid',
+        gf427_check$p->decide($new, $oldResponses, $now)['status'] === 'invalid',
             'old_timestamp_rejected_even_with_new_request_id');
         foreach ($oldResponses as &$currentResponse) {
             $currentResponse['at'] = $now;
         }
         unset($currentResponse);
-        check($p->decide($new, $oldResponses, $now)['approved'],
+        gf427_check$p->decide($new, $oldResponses, $now)['approved'],
             'all_new_request_approvals_valid');
         $malformedRequest = $new;
         $malformedRequest['issued_at'] = true;
-        check($p->decide($malformedRequest, [], $now)['status'] === 'invalid',
+        gf427_check$p->decide($malformedRequest, [], $now)['status'] === 'invalid',
             'issued_at_requires_integer');
         $malformedRequest = $new;
         $malformedRequest['request_id'] = '';
-        check($p->decide($malformedRequest, [], $now)['status'] === 'invalid',
+        gf427_check$p->decide($malformedRequest, [], $now)['status'] === 'invalid',
             'request_id_required');
-        $foreign = response('reviewer');
+        $foreign = gf427_response'reviewer');
         $foreign['tenant_id'] = 'tenant_2';
-        check(!$p->decide($req, [response(), $foreign], $now)['approved'],
+        gf427_check!$p->decide($req, [gf427_response), $foreign], $now)['approved'],
             'foreign_tenant');
-        $dup = $p->decide($req, [response(), response()], $now);
-        check($dup['status'] === 'invalid', 'duplicate_role');
-        $duproles = request();
+        $dup = $p->decide($req, [gf427_response), gf427_response)], $now);
+        gf427_check$dup['status'] === 'invalid', 'duplicate_role');
+        $duproles = gf427_request);
         $duproles['required_roles'] = ['editor', 'editor'];
-        check($p->decide($duproles, [], $now)['status'] === 'invalid',
+        gf427_check$p->decide($duproles, [], $now)['status'] === 'invalid',
             'duplicate_required_role');
         // Malformed nested roles must fail without warnings or runtime errors.
         $oldHandler = set_error_handler(static function (int $severity, string $message): never {
@@ -127,57 +127,57 @@ $tests = [
         });
         try {
             foreach ([['editor'], new \stdClass(), true] as $malformedRole) {
-                $malformed = request();
+                $malformed = gf427_request);
                 $malformed['required_roles'] = [$malformedRole];
                 $out = $p->decide($malformed, [], $now);
-                check($out['status'] === 'invalid' && !$out['approved']
+                gf427_check$out['status'] === 'invalid' && !$out['approved']
                     && $out['audit'] === [], 'nested_role_fails_cleanly');
             }
             foreach ([null, false, 17, 'untrusted', new \stdClass()] as $badResponse) {
-                $out = $p->decide(request(), [$badResponse], $now);
-                check($out['status'] === 'invalid' && !$out['approved']
+                $out = $p->decide(gf427_request), [$badResponse], $now);
+                gf427_check$out['status'] === 'invalid' && !$out['approved']
                     && $out['audit'] === [], 'non_array_response_fails_closed');
             }
         } finally {
             restore_error_handler();
         }
-        $deny = response('reviewer');
+        $deny = gf427_response'reviewer');
         $deny['decision'] = 'reject';
-        check($p->decide($req, [response(), $deny], $now)['status'] ===
+        gf427_check$p->decide($req, [gf427_response), $deny], $now)['status'] ===
             'rejected', 'studio_rejection');
-        check($p->decide($req, [response(), response('reviewer')], 1800000100)['status']
+        gf427_check$p->decide($req, [gf427_response), gf427_response'reviewer')], 1800000100)['status']
             === 'expired', 'expired_request');
     },
     'insufficient_role' => static function (): void {
         $p = new ApprovalPolicy();
         $now = 1800000001;
-        $req = request(false);
-        $unverified = response('owner');
+        $req = gf427_requestfalse);
+        $unverified = gf427_response'owner');
         $unverified['role_verified'] = false;
-        check(!$p->decide($req, [$unverified], $now)['approved'], 'unverified_role');
-        check(!$p->decide($req, [response('editor')], $now)['approved'],
+        gf427_check!$p->decide($req, [$unverified], $now)['approved'], 'unverified_role');
+        gf427_check!$p->decide($req, [gf427_response'editor')], $now)['approved'],
             'wrong_role');
-        check($p->decide($req, [response('owner')], $now)['approved'],
+        gf427_check$p->decide($req, [gf427_response'owner')], $now)['approved'],
             'verified_personal');
         $req['approval_required'] = false;
         $req['required_roles'] = [];
-        check($p->decide($req, [], $now)['status'] === 'not_required',
+        gf427_check$p->decide($req, [], $now)['status'] === 'not_required',
             'optional_personal');
         // An expired timestamp applies to an actual required approval only.
         $req['expires_at'] = $now;
         $optionalExpired = $p->decide($req, [], $now);
-        check($optionalExpired['status'] === 'not_required'
+        gf427_check$optionalExpired['status'] === 'not_required'
             && $optionalExpired['approved'] && $optionalExpired['audit'] === [],
             'optional_personal_no_expiry_veto');
-        check($p->decide($req, [response('owner')], $now)['status'] === 'invalid',
+        gf427_check$p->decide($req, [gf427_response'owner')], $now)['status'] === 'invalid',
             'optional_personal_rejects_spurious_approval');
         $req['approval_required'] = true;
         $req['required_roles'] = ['owner'];
-        check($p->decide($req, [response('owner')], $now)['status'] === 'expired',
+        gf427_check$p->decide($req, [gf427_response'owner')], $now)['status'] === 'expired',
             'required_personal_still_expires');
-        $req = request();
+        $req = gf427_request);
         $out = $p->decide($req, [['secret' => 'untrusted']], $now);
-        check($out['status'] === 'invalid' && !str_contains(json_encode($out),
+        gf427_check$out['status'] === 'invalid' && !str_contains(json_encode($out),
             'untrusted'), 'safe_audit');
     },
 ];
