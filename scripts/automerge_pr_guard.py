@@ -414,8 +414,12 @@ def get_threads(token, number):
 def read_snapshot(token, root, number, expected):
     """Fetch independent live policy, reviewer, base and switch evidence."""
     pr = get(token, root + f"/pulls/{number}")
-    head = pr.get("head") if type(pr) is dict else None
-    ref = head.get("ref") if type(head) is dict else None
+    if type(pr) is not dict:
+        raise GuardError("v3_pr_unknown")
+    head = pr.get("head")
+    if type(head) is not dict:
+        raise GuardError("v3_head_unknown")
+    ref = head.get("ref")
     matched = V3_BRANCH.fullmatch(ref) if type(ref) is str else None
     if matched is None:
         raise GuardError("v3_branch_invalid")
