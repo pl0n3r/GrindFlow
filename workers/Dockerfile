@@ -6,7 +6,10 @@
 # ejecucion de ese modelo.
 
 # Docker Official Image publicada por Docker via ECR Public; evita cuota/auth de Docker Hub en CI.
-FROM public.ecr.aws/docker/library/python:3.11-slim
+# CI override permitted only with Docker Official and Google mirror manifest digests identical.
+# Production keeps the Docker Official ECR Public base unchanged.
+ARG PYTHON_BASE_IMAGE=public.ecr.aws/docker/library/python:3.11-slim
+FROM ${PYTHON_BASE_IMAGE}
 
 # ffmpeg para video; las libs de imagen las necesita Pillow para JPEG y WEBP.
 # --no-install-recommends evita arrastrar medio escritorio como dependencia.

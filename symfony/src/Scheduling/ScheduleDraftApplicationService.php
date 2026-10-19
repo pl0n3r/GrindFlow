@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace GrindFlow\Scheduling;
 
 use Doctrine\DBAL\Connection;
+use GrindFlow\Library\AssetLifecycle;
+use GrindFlow\Library\AssetNetworkRules;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -16,10 +18,39 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class ScheduleDraftApplicationService
 {
+    /**
+     * Blocking reasons that depend on the requested slot, not on the asset alone: a
+     * scheduler must retry the asset for a different slot instead of discarding it.
+     */
+    public const SLOT_DEPENDENT_REASONS = ['asset_not_yet_valid', 'asset_expired', 'reuse_interval'];
+
+    private AssetNetworkRules $networkRules;
+
     public function __construct(
         private Connection $db,
         private WeeklySlotCalculator $calculator,
+        ?AssetNetworkRules $networkRules = null,
     ) {
+        $this->networkRules = $networkRules ?? new AssetNetworkRules($db);
+    }
+
+    /**
+     * Single source of truth for Library asset validity (UTC, half-open window
+     * [valid_from_at, valid_until_at)). Null bounds mean an open window. It is a
+     * scheduling exclusion only: never a license, approval or publication grant.
+     *
+     * @return 'not_yet_valid'|'valid'|'expired'
+     */
+    public static function validityState(?string $validFromAt, ?string $validUntilAt, string $atUtc): string
+    {
+        if ($validFromAt !== null && $atUtc < $validFromAt) {
+            return 'not_yet_valid';
+        }
+        if ($validUntilAt !== null && $atUtc >= $validUntilAt) {
+            return 'expired';
+        }
+
+        return 'valid';
     }
 
     /**
@@ -30,6 +61,8 @@ final readonly class ScheduleDraftApplicationService
         string $userId,
         string $assetId,
         string $scheduledAtUtc,
+        bool $uniqueAutomationSlot = false,
+        ?string $expectedAutomationDestination = null,
     ): array {
         return $this->db->transactional(
             function (Connection $db) use (
@@ -37,6 +70,8 @@ final readonly class ScheduleDraftApplicationService
                 $userId,
                 $assetId,
                 $scheduledAtUtc,
+                $uniqueAutomationSlot,
+                $expectedAutomationDestination,
             ): array {
                 // Serialize all draft creation per organization: capacity and
                 // same-asset checks must be atomic across concurrent callers.
@@ -64,7 +99,7 @@ final readonly class ScheduleDraftApplicationService
 
                 $asset = $db->fetchAssociative(
                     <<<'SQL'
-                        SELECT id, original_name, usage_scope
+                        SELECT id, original_name, usage_scope, valid_from_at, valid_until_at, lifecycle_state
                         FROM gf_vault_assets
                         WHERE id = :asset AND organization_id = :organization
                           AND deleted_at IS NULL
@@ -106,6 +141,31 @@ final readonly class ScheduleDraftApplicationService
                     $reasons[] = 'classification_missing';
                 }
 
+                // Same window as the preview, revalidated under the asset lock for
+                // both "now" and the requested slot (manual and automatic paths).
+                $nowUtc = gmdate('Y-m-d H:i:s');
+                $slotUtc = str_replace(['T', 'Z'], [' ', ''], $scheduledAtUtc);
+                foreach ([$nowUtc, $slotUtc] as $instant) {
+                    $validity = self::validityState($asset['valid_from_at'], $asset['valid_until_at'], $instant);
+                    if ($validity !== 'valid') {
+                        $reasons[] = 'asset_'.$validity;
+                        break;
+                    }
+                }
+
+                // Lifecycle (#44): paused, blocked or archived assets stay out of scheduling.
+                foreach (AssetLifecycle::blockingReasons($asset['lifecycle_state']) as $lifecycleReason) {
+                    $reasons[] = $lifecycleReason;
+                }
+
+                // Network allow/deny and reuse policy (#45/#46) for the only delivery
+                // network today; the slot instant is part of the decision (interval).
+                foreach ($this->networkRules->blockingReasons(
+                    $organizationId, $assetId, AssetNetworkRules::DEFAULT_NETWORK, $slotUtc,
+                ) as $networkReason) {
+                    $reasons[] = $networkReason;
+                }
+
                 $authorization = $db->fetchOne(
                     <<<'SQL'
                         SELECT action FROM gf_distribution_authorization_events
@@ -119,6 +179,38 @@ final readonly class ScheduleDraftApplicationService
                 }
                 if ($reasons !== []) {
                     return ['status' => 'blocked', 'reasons' => $reasons];
+                }
+
+                if ($uniqueAutomationSlot) {
+                    // Reconstruct authorized times from the same locked row.
+                    // An active->paused race invalidates all further writes.
+                    if (($rule['automation_state'] ?? null) !== 'active'
+                        || $expectedAutomationDestination === null
+                        || !hash_equals(
+                            (string) ($rule['automation_destination_id'] ?? ''),
+                            $expectedAutomationDestination,
+                        )) {
+                        // An active/paused race or destination reassignment
+                        // invalidates the entire automation run under lock.
+                        return ['status' => 'revoked'];
+                    }
+                    try {
+                        $times = json_decode((string) ($rule['automation_local_times'] ?? ''), true, 4, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException) {
+                        return ['status' => 'revoked'];
+                    }
+                    if (!is_array($times) || $times === [] || count($times) > 12
+                        || count($times) > (int) $rule['max_per_day']
+                        || count(array_unique($times, SORT_REGULAR)) !== count($times)) {
+                        return ['status' => 'revoked'];
+                    }
+                    foreach ($times as $time) {
+                        if (!is_string($time)
+                            || preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $time) !== 1) {
+                            return ['status' => 'revoked'];
+                        }
+                    }
+                    $rule['local_times'] = $times;
                 }
 
                 $slot = null;
@@ -162,6 +254,12 @@ final readonly class ScheduleDraftApplicationService
                         SQL,
                     ['organization' => $organizationId, 'scheduled' => $dateTime],
                 );
+                // Automation never consumes a second draft in an occupied
+                // time slot, even if max_per_day permits manual capacity >1.
+                // Organization lock above makes this decision serializable.
+                if ($uniqueAutomationSlot && $reserved > 0) {
+                    return ['status' => 'occupied'];
+                }
                 if ($reserved >= $slot['capacity']) {
                     return ['status' => 'full'];
                 }
