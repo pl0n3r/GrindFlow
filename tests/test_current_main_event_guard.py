@@ -95,9 +95,15 @@ class CurrentMainEventGuardTests(unittest.TestCase):
     def test_tag_release_gates_stale_push(self):
         text = TAG.read_text(encoding="utf-8")
         self.assertIn("current-main:", text)
+        self.assertIn("  stale-event:", text)
+        self.assertIn("  release-change:", text)
+        change = text.split("  release-change:", 1)[1].split("  release:", 1)[0]
+        self.assertIn("needs: current-main", change)
+        self.assertIn("needs.current-main.outputs.current == 'true'", change)
         release = text[text.index("  release:"):]
-        self.assertIn("needs: current-main", release)
+        self.assertIn("needs: [current-main, release-change]", release)
         self.assertIn("needs.current-main.outputs.current == 'true'", release)
+        self.assertIn("needs.release-change.outputs.publish == 'true'", release)
 
     def test_factory_deploy_requires_current_main_and_explicit_flag(self):
         text = DEPLOY.read_text(encoding="utf-8")
