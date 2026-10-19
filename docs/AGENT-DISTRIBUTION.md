@@ -83,3 +83,12 @@ Este documento concentra la guía operativa de Distribution que antes vivía en 
 - Mantener estas cuatro familias como guía operativa de lectura y validación en este archivo; los requisitos de comportamiento permanecen canónicos en `docs/REQUIREMENTS.md`.
 - Si cambia comportamiento de Distribution, actualizar primero el requisito funcional aplicable y, en el mismo PR, alinear código, tests y esta guía.
 - No copiar esta guía de vuelta a `AGENTS.md`; allí solo debe permanecer el enlace de descubrimiento.
+
+
+### Instagram Reels — segundo provider (deshabilitado por defecto)
+
+- #264 reutiliza el port Symfony y la tabla `gf_external_publication_attempts`; la identidad `instagram_reels` distingue este proveedor de `facebook_page`.
+- La configuración se inyecta **solo por entorno** con `GRINDFLOW_INSTAGRAM_REELS_ENABLED=false` por defecto; sin cuenta profesional/autorización y puerta legal de datos D-059, no activar ni conectar un controller/scheduler operativo.
+- El vídeo proviene del Vault privado con SHA-256/MIME/tamaño comprobados antes de I/O; subir binario directo exclusivamente por `rupload.facebook.com` con URI allowlisted, sin URLs públicas.
+- Primero crear contenedor REELS con `upload_type=resumable`, después subir, comprobar `status_code=FINISHED` y publicar mediante `media_publish`; un resultado incierto es `ambiguous` sin reenvío y 429 usa retry acotado del ledger.
+- El transporte de CI es fake. La prueba real en Instagram requiere autorización del dueño, permisos en Meta y evidencia externa segura; ni un merge ni CI se consideran publicación live.
