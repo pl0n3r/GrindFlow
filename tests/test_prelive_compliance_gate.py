@@ -2,15 +2,33 @@
 import copy
 import importlib.util
 import io
+import socket
+import tempfile
 import unittest
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import ExitStack, contextmanager, redirect_stdout, redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/prelive_compliance_gate.py"
+@contextmanager
+def block_network():
+    """Fail at the socket boundary, also for imports and indirect transports."""
+    with ExitStack() as stack:
+        for target in (
+            "socket.socket.connect", "socket.socket.connect_ex",
+            "socket.socket.sendto", "socket.socket.send",
+            "socket.socket.sendall", "socket.create_connection",
+            "socket.getaddrinfo",
+        ):
+            stack.enter_context(patch(target, side_effect=AssertionError("NETWORK_DISABLED")))
+        yield
+
+
 spec = importlib.util.spec_from_file_location("prelive_compliance_gate", SCRIPT)
 module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+with block_network():
+    spec.loader.exec_module(module)
 
 
 def fixture():
@@ -29,6 +47,34 @@ def fixture():
 
 
 class PreliveComplianceGateTests(unittest.TestCase):
+    def setUp(self):
+        # Keep the guard active around *every* evaluate() call in this suite.
+        guard = block_network()
+        guard.__enter__()
+        self.addCleanup(guard.__exit__, None, None, None)
+
+    def test_network_guard_catches_import_side_effect(self):
+        # This probe must never open a real socket; the guard intercepts it.
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "synthetic_import.py"
+            path.write_text(
+                'import socket\nsocket.create_connection(("127.0.0.1", 9))\n',
+                encoding="utf-8",
+            )
+            probe_spec = importlib.util.spec_from_file_location("synthetic_import", path)
+            probe = importlib.util.module_from_spec(probe_spec)
+            with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                probe_spec.loader.exec_module(probe)
+
+    def test_network_guard_catches_evaluate_side_effect(self):
+        # A synthetic regression in evaluate must be rejected before I/O.
+        with patch.object(
+            module, "evaluate",
+            side_effect=lambda _: socket.socket().connect(("127.0.0.1", 9)),
+        ):
+            with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                module.evaluate(fixture())
+
     def blocked(self, payload, reason):
         result = module.evaluate(payload)
         self.assertEqual(result["status"], "BLOCKED")
