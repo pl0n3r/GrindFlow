@@ -18,7 +18,7 @@ PRIORITIES = frozenset({
     "prioridad: crítica", "prioridad: alta", "prioridad: media", "prioridad: baja",
 })
 STATES = frozenset({
-    "estado: disponible", "estado: reservado", "estado: en revisión",
+    "estado: planificado", "estado: disponible", "estado: reservado", "estado: en revisión",
     "estado: bloqueado", "estado: requiere recuperación",
     "estado: completado", "estado: cancelado",
 })

@@ -39,7 +39,15 @@ def product_version(content: str) -> str:
     return found[0]
 
 
-def validate_title(title: str, version: str) -> None:
+DEPENDABOT_AUTHOR = "dependabot[bot]"
+DEPENDABOT_TITLE = re.compile(r"^(?:chore|build)\(deps(?:-dev)?\): [^\n]+$")
+
+
+def validate_title(title: str, version: str, author: str | None = None) -> None:
+    # Dependabot no puede añadir "(V X.Y.Z)" a sus títulos y sus PRs no cambian la
+    # versión del producto: solo ese autor y solo ese formato quedan exentos.
+    if author == DEPENDABOT_AUTHOR and DEPENDABOT_TITLE.fullmatch(title):
+        return
     match = PR_TITLE.fullmatch(title)
     if match is None:
         raise ValueError("El título del PR debe terminar exactamente con (V X.Y.Z).")
@@ -119,6 +127,21 @@ def self_test() -> None:
         except ValueError:
             continue
         raise AssertionError(f"Título incorrecto aceptado: {invalid!r}")
+    # Dependabot: exento solo con su autor y su formato de título.
+    dependabot_title = "chore(deps): bump the composer-minor group with 3 updates"
+    validate_title(dependabot_title, version, DEPENDABOT_AUTHOR)
+    validate_title("chore(deps-dev): bump vitest from 4.0.1 to 4.0.2", version, DEPENDABOT_AUTHOR)
+    for author, title in (
+        ("pl0n3r", dependabot_title),
+        (DEPENDABOT_AUTHOR, "feat: algo ajeno a dependencias"),
+        (DEPENDABOT_AUTHOR, "chore(deps): bump x\nextra"),
+        (None, dependabot_title),
+    ):
+        try:
+            validate_title(title, version, author)
+        except ValueError:
+            continue
+        raise AssertionError(f"Excepción de Dependabot mal aplicada: {author!r} {title!r}")
     assert product_version("<?php return ['number' => '0.1.16'];") == version
     print("Contrato de gobierno: títulos válidos e inválidos comprobados.")
 
@@ -126,6 +149,7 @@ def self_test() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pr-title")
+    parser.add_argument("--pr-author")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     try:
@@ -138,7 +162,7 @@ def main() -> int:
                 version = product_version(
                     (ROOT / "config/version.php").read_text(encoding="utf-8")
                 )
-                validate_title(args.pr_title, version)
+                validate_title(args.pr_title, version, args.pr_author)
             except ValueError as error:
                 problems.append(str(error))
         if problems:

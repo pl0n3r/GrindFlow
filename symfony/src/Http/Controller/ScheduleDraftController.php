@@ -10,6 +10,7 @@ use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
 use GrindFlow\Distribution\FacebookPagePublicationService;
 use GrindFlow\Identity\Application\MembershipContext;
+use GrindFlow\Library\AssetNetworkRules;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
 use GrindFlow\Infrastructure\Storage\VaultBlobVerifier;
 use GrindFlow\Infrastructure\Storage\VaultPhotoSafetyMaterializer;
@@ -375,6 +376,10 @@ final class ScheduleDraftController extends AbstractController
                 }
             }
 
+            if ((new AssetNetworkRules($db))->isDenied($organization, (string) $draft['asset_id'], AssetNetworkRules::DEFAULT_NETWORK)) {
+                return ['status' => 'network_denied'];
+            }
+
             $changed = ($draft['caption'] ?? null) !== $caption
                 || ($draft['delivery_provider'] ?? null) !== 'facebook_page'
                 || (string) ($draft['delivery_destination_id'] ?? '') !== $pageId;
@@ -404,6 +409,9 @@ final class ScheduleDraftController extends AbstractController
         }
         if ($result['status'] === 'handoff_active') {
             return $this->error(409, 'manual_handoff_active', 'Cierra la salida manual antes de preparar una entrega externa.');
+        }
+        if ($result['status'] === 'network_denied') {
+            return $this->error(409, 'network_denied', 'Este archivo tiene la red denegada y no puede prepararse para ella.');
         }
 
         return $this->privateJson(['data' => [
@@ -888,6 +896,25 @@ final class ScheduleDraftController extends AbstractController
         );
         if ($authorization !== 'grant') {
             $reasons[] = 'distribution_authorization_missing';
+        }
+        // The validity window (#41) and an explicit network deny (#45) also hold at
+        // publication time, not only when the draft was reserved.
+        $window = $db->fetchAssociative(
+            'SELECT valid_from_at, valid_until_at FROM gf_vault_assets WHERE id = :asset AND organization_id = :organization',
+            ['organization' => $organization, 'asset' => $assetId],
+        );
+        $validity = $window === false
+            ? 'expired'
+            : ScheduleDraftApplicationService::validityState(
+                $window['valid_from_at'] === null ? null : (string) $window['valid_from_at'],
+                $window['valid_until_at'] === null ? null : (string) $window['valid_until_at'],
+                gmdate('Y-m-d H:i:s'),
+            );
+        if ($validity !== 'valid') {
+            $reasons[] = 'asset_'.$validity;
+        }
+        if ((new AssetNetworkRules($db))->isDenied($organization, $assetId, AssetNetworkRules::DEFAULT_NETWORK)) {
+            $reasons[] = 'network_denied';
         }
 
         return $reasons;
