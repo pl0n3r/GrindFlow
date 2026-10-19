@@ -1,0 +1,73 @@
+name: Revisión jurídica · comprobar copias
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/privacidad/**'
+      - 'datos.yml'
+      - 'config/version.php'
+      - 'revision-juridica/**'
+      - 'scripts/generar_revision_juridica.py'
+      - '.github/workflows/revision-juridica-sync.yml'
+  schedule:
+    - cron: '37 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serializar comprobación+creación para evitar Issues duplicados por cron/push.
+concurrency:
+  group: grindflow-revision-juridica-sync-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    if: github.repository == 'pl0n3r/GrindFlow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout solo de main confiable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Comprobar la carpeta sin escribir
+        id: check
+        continue-on-error: true
+        run: python3 scripts/generar_revision_juridica.py --check
+      - name: Registrar desfase como Issue deduplicado
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh label create revision-juridica-desfase --color 9F5319 --description 'Paquete jurídico desactualizado' --force
+          count="$(gh issue list --state open --label revision-juridica-desfase --json number --jq 'length')"
+          if [ "$count" -eq 0 ]; then
+            version="$(python3 -c 'from pathlib import Path; from scripts.generar_revision_juridica import version; print(version(Path(".")))')"
+            test -n "$version"
+            body="$(cat <<'ISSUE'
+          ### Contexto
+          Las copias de revisión jurídica se desfasaron respecto a las fuentes. Regenerar con `python3 scripts/generar_revision_juridica.py`, ejecutar `--check` y entregar por Issue → PR → squash; sin aprobación jurídica ni datos reales.
+
+          ### Criterios de aceptación
+          - [ ] AC-01 `tests/test_revision_juridica.py::RevisionJuridicaTests::test_package_and_workflow`
+          <!-- factory-acceptance {"version":1,"criteria":[{"id":"AC-01","kind":"test","target":"tests/test_revision_juridica.py::RevisionJuridicaTests::test_package_and_workflow"}]} -->
+          ### Rutas reclamadas
+          - revision-juridica/
+          <!-- factory-plan-task {"version":1,"epic":2,"task_key":"GF_REVISION_JURIDICA_REGEN","order":1,"owner":"pl0n3r","roles":["legal-privacidad","documentacion","ingenieria-software"],"depends_on":[],"paths":["revision-juridica/"]} -->
+          ISSUE
+            )"
+            gh issue create --title "fix(legal): regenerar paquete de abogado (V $version)" --body "$body" --label 'revision-juridica-desfase' --label 'estado: disponible' --label 'prioridad: media' --label 'tipo: documentación' --label 'rol: legal-privacidad'
+          fi
+      - name: Fallar cerrado si hay desfase
+        if: steps.check.outcome == 'failure'
+        run: exit 1
