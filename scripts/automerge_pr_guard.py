@@ -336,17 +336,27 @@ def verify(snapshot, expected):
         raise GuardError("coderabbit_review_missing")
 
 
-def get(token, path, *, max_bytes=262144, allow_next=False):
+def get(token, path, *, max_bytes=262144, allow_next=False, public_factory=False):
     # Large authenticated reviews and commit history can exceed the generic
     # 256 KiB ceiling. Keep per-endpoint bounded limits; never truncate JSON.
     if (type(max_bytes) is not int or not 1 <= max_bytes <= 4194304
-            or type(allow_next) is not bool):
+            or type(allow_next) is not bool or type(public_factory) is not bool):
         raise GuardError("response_limit_invalid")
-    request = Request("https://api.github.com" + path, headers={
+    # GITHUB_TOKEN is scoped to GrindFlow; GitHub rejects it on Factory.
+    # Read the public canonical kill switch without sending that credential.
+    # Never allow an arbitrary path to opt out of authenticated requests.
+    if public_factory and path != "/repos/pl0n3r/Factory/issues/767":
+        raise GuardError("unauthenticated_endpoint_invalid")
+    headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "grindflow-automerge-readonly",
-        "Authorization": "Bearer " + token})
+    }
+    if not public_factory:
+        if type(token) is not str or not token:
+            raise GuardError("github_token_missing")
+        headers["Authorization"] = "Bearer " + token
+    request = Request("https://api.github.com" + path, headers=headers)
     try:
         with urlopen(request, timeout=12) as response:
             body = response.read(max_bytes + 1)
@@ -438,7 +448,7 @@ def read_snapshot(token, root, number, expected):
         "lease_issue": get(token, root + f"/issues/{issue_number}"),
         "lease_comments": get(token, root + f"/issues/{issue_number}/comments?per_page=100"),
         "lease_files": get(token, root + f"/pulls/{number}/files?per_page=100"),
-        "switch": get(token, "/repos/pl0n3r/Factory/issues/767"),
+        "switch": get(token, "/repos/pl0n3r/Factory/issues/767", public_factory=True),
         "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
         "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100", max_bytes=4194304),
         "status_history": get(token, root + f"/commits/{expected}/statuses?per_page=100"),
