@@ -15,26 +15,29 @@ DEST = "revision-juridica"
 
 
 def origin(root: Path) -> tuple[str, str]:
-    """Find stable provenance of legal sources rather than generator commits."""
+    """Use full Git history; shallow acceptance uses index provenance and checks source bytes."""
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=root, capture_output=True, text=True, check=True, timeout=20,
+    ).stdout.strip()
+    if shallow == "true":
+        # A depth-1 checkout treats the synthetic PR merge as a root commit:
+        # 'git log -- docs/privacidad' would falsely attribute old files to it.
+        index = (root / DEST / "00-LEEME.md").read_text(encoding="utf-8")
+        match = re.match(
+            r"Última actualización automática de las fuentes: (\\d{4}-\\d\\d-\\d\\d) · SHA de origen: `([0-9a-f]{40})`",
+            index,
+        )
+        if not match:
+            raise ValueError("Proveniencia ausente en checkout superficial")
+        return match.group(2), match.group(1)
     raw = subprocess.run(
         ["git", "log", "-1", "--format=%H%n%cs", "--", "docs/privacidad", "datos.yml"],
         cwd=root, capture_output=True, text=True, check=True, timeout=20,
     ).stdout.strip().splitlines()
-    if not raw:
-        # Acceptance checks out a depth-1 PR merge ref, which cannot see earlier
-        # source commits. Reuse the previously generated provenance there;
-        # content and bundle equality are checked independently below.
-        index = (root / DEST / "00-LEEME.md").read_text(encoding="utf-8")
-        match = re.match(
-            r"Última actualización automática de las fuentes: (\d{4}-\d\d-\d\d) · SHA de origen: `([0-9a-f]{40})`",
-            index,
-        )
-        if match:
-            return match.group(2), match.group(1)
-    if len(raw) != 2 or not re.fullmatch(r"[0-9a-f]{40}", raw[0]) or not re.fullmatch(r"\d{4}-\d\d-\d\d", raw[1]):
+    if len(raw) != 2 or not re.fullmatch(r"[0-9a-f]{40}", raw[0]) or not re.fullmatch(r"\\d{4}-\\d\\d-\\d\\d", raw[1]):
         raise ValueError("SHA y fecha fuente faltantes o inválidos")
     return raw[0], raw[1]
-
 
 def version(root: Path) -> str:
     """Read the declared product version without executing PHP."""
