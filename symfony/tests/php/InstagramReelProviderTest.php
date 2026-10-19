@@ -4,16 +4,27 @@ declare(strict_types=1);
 
 namespace GrindFlow\Tests;
 
+use DateTimeImmutable;
+use DateTimeZone;
+use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DistributionCommand;
 use GrindFlow\Distribution\DistributionOutcome;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\InstagramReelConfiguration;
 use GrindFlow\Distribution\InstagramReelProvider;
+use GrindFlow\Distribution\InstagramReelPublicationService;
 use GrindFlow\Distribution\InstagramReelTransport;
-use PHPUnit\Framework\TestCase;
+use GrindFlow\Kernel;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Uid\Uuid;
 
-final class InstagramReelProviderTest extends TestCase
+final class InstagramReelProviderTest extends WebTestCase
 {
+    protected static function getKernelClass(): string
+    {
+        return Kernel::class;
+    }
+
     private const string ORGANIZATION = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     public function testHappyPathResumableUploadUsesFourFakeOnlyOperations(): void
@@ -242,6 +253,130 @@ final class InstagramReelProviderTest extends TestCase
         }
     }
 
+    public function testInstagramLedgerPublishedReplayAndFingerprintConflictAreIsolated(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $video = $this->videoFixture();
+        $transport = new FakeInstagramReelTransport([
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"success":true}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"status_code":"FINISHED"}'],
+            ['status' => 200, 'headers' => [], 'body' => '{"id":"789012"}'],
+        ]);
+        try {
+            $service = new InstagramReelPublicationService(
+                $db, $this->provider($transport, true, null, null, $organization),
+            );
+            $key = 'ig-success-'.Uuid::v7()->toRfc4122();
+            $command = $this->commandForOrganization($video, $organization, $key);
+            $first = $service->publish($command);
+            $second = $service->publish($command);
+            self::assertSame('789012', $first->externalPublicationId);
+            self::assertSame('789012', $second->externalPublicationId);
+            self::assertSame(['create', 'upload', 'status', 'publish'], $transport->calls);
+            $different = new DistributionCommand(
+                $organization, $key, 'Contenido modificado', null,
+                $video, 'video/mp4', hash_file('sha256', $video),
+            );
+            $this->assertKind(fn () => $service->publish($different), DistributionProviderException::KIND_REJECTED);
+            self::assertCount(4, $transport->calls);
+            self::assertSame('published', (string) $db->fetchOne(
+                'SELECT status FROM gf_external_publication_attempts WHERE organization_id = :organization AND provider = :provider AND idempotency_key = :key',
+                ['organization' => $organization, 'provider' => 'instagram_reels', 'key' => $key],
+            ));
+            $foreign = $this->commandForOrganization($video, Uuid::v7()->toRfc4122(), $key);
+            $this->assertKind(fn () => $service->publish($foreign), DistributionProviderException::KIND_CONFIGURATION);
+            self::assertCount(4, $transport->calls);
+        } finally {
+            @unlink($video);
+        }
+    }
+
+    public function testInstagramLedgerRateLimitAndAmbiguousReplayNeverDuplicateSends(): void
+    {
+        static::createClient();
+        /** @var Connection $db */
+        $db = static::getContainer()->get(Connection::class);
+        $organization = $this->organization($db);
+        $now = new DateTimeImmutable('2026-10-19 18:00:00', new DateTimeZone('UTC'));
+        $clock = static function () use (&$now): DateTimeImmutable {
+            return $now;
+        };
+        $video = $this->videoFixture();
+        $created = ['status' => 200, 'headers' => [], 'body' => '{"id":"123456","uri":"https://rupload.facebook.com/ig-api-upload/v26.0/123456"}'];
+        $uploaded = ['status' => 200, 'headers' => [], 'body' => '{"success":true}'];
+        $finished = ['status' => 200, 'headers' => [], 'body' => '{"status_code":"FINISHED"}'];
+        $limited = ['status' => 429, 'headers' => ['retry-after' => '120'], 'body' => '{}'];
+        try {
+            $transport = new FakeInstagramReelTransport([
+                $limited,
+                $created, $uploaded, $finished,
+                ['status' => 200, 'headers' => [], 'body' => '{"id":"789012"}'],
+            ]);
+            $service = new InstagramReelPublicationService(
+                $db, $this->provider($transport, true, null, null, $organization), $clock,
+            );
+            $command = $this->commandForOrganization($video, $organization, 'ig-rate-'.Uuid::v7()->toRfc4122());
+            $early = $this->capture(fn () => $service->publish($command));
+            self::assertSame(DistributionProviderException::KIND_RATE_LIMIT, $early->kind);
+            self::assertSame(['create'], $transport->calls);
+            $this->assertKind(fn () => $service->publish($command), DistributionProviderException::KIND_RATE_LIMIT);
+            self::assertSame(['create'], $transport->calls);
+            $now = $now->modify('+121 seconds');
+            $outcome = $service->publish($command);
+            self::assertSame('789012', $outcome->externalPublicationId);
+            self::assertSame(['create', 'create', 'upload', 'status', 'publish'], $transport->calls);
+
+            $uncertain = new FakeInstagramReelTransport([$created, $limited]);
+            $uncertainService = new InstagramReelPublicationService(
+                $db, $this->provider($uncertain, true, null, null, $organization), $clock,
+            );
+            $uncertainCommand = $this->commandForOrganization(
+                $video, $organization, 'ig-ambiguous-'.Uuid::v7()->toRfc4122(),
+            );
+            $this->assertKind(
+                fn () => $uncertainService->publish($uncertainCommand),
+                DistributionProviderException::KIND_AMBIGUOUS,
+            );
+            $this->assertKind(
+                fn () => $uncertainService->publish($uncertainCommand),
+                DistributionProviderException::KIND_AMBIGUOUS,
+            );
+            self::assertSame(['create', 'upload'], $uncertain->calls);
+            self::assertSame('ambiguous', (string) $db->fetchOne(
+                'SELECT status FROM gf_external_publication_attempts WHERE organization_id = :organization AND provider = :provider AND idempotency_key = :key',
+                ['organization' => $organization, 'provider' => 'instagram_reels', 'key' => $uncertainCommand->idempotencyKey],
+            ));
+        } finally {
+            @unlink($video);
+        }
+    }
+
+    private function organization(Connection $db): string
+    {
+        $id = Uuid::v7()->toRfc4122();
+        $now = gmdate('Y-m-d H:i:s');
+        $db->insert('gf_identity_organizations', [
+            'id' => $id,
+            'name' => 'Instagram fake '.substr($id, 0, 8),
+            'slug' => 'instagram-fake-'.substr(str_replace('-', '', $id), 0, 16),
+            'type' => 'independent',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        return $id;
+    }
+
+    private function commandForOrganization(string $video, string $organization, string $key): DistributionCommand
+    {
+        $sha = hash_file('sha256', $video);
+        self::assertIsString($sha);
+        return new DistributionCommand($organization, $key, 'Reel de prueba', null, $video, 'video/mp4', $sha);
+    }
+
     private function videoFixture(): string
     {
         $path = tempnam(sys_get_temp_dir(), 'gf-ig-fake-');
@@ -262,11 +397,11 @@ final class InstagramReelProviderTest extends TestCase
         );
     }
 
-    private function provider(FakeInstagramReelTransport $transport, bool $enabled = true, ?string $vaultRoot = null, ?\Closure $sleeper = null): InstagramReelProvider
+    private function provider(FakeInstagramReelTransport $transport, bool $enabled = true, ?string $vaultRoot = null, ?\Closure $sleeper = null, string $organizationId = self::ORGANIZATION): InstagramReelProvider
     {
         return new InstagramReelProvider(
             new InstagramReelConfiguration(
-                self::ORGANIZATION, '1234567890', 'fixture-ig-token',
+                $organizationId, '1234567890', 'fixture-ig-token',
                 'v26.0', 'instagram_content_publish', $enabled, $vaultRoot ?? sys_get_temp_dir(),
             ),
             $transport,
