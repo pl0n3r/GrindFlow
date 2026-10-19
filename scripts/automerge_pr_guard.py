@@ -336,7 +336,12 @@ def verify(snapshot, expected):
         raise GuardError("coderabbit_review_missing")
 
 
-def get(token, path):
+def get(token, path, *, max_bytes=262144, allow_next=False):
+    # Large authenticated reviews and commit history can exceed the generic
+    # 256 KiB ceiling. Keep per-endpoint bounded limits; never truncate JSON.
+    if (type(max_bytes) is not int or not 1 <= max_bytes <= 4194304
+            or type(allow_next) is not bool):
+        raise GuardError("response_limit_invalid")
     request = Request("https://api.github.com" + path, headers={
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -344,8 +349,8 @@ def get(token, path):
         "Authorization": "Bearer " + token})
     try:
         with urlopen(request, timeout=12) as response:
-            body = response.read(262145)
-            if len(body) > 262144 or 'rel="next"' in response.headers.get("Link", ""):
+            body = response.read(max_bytes + 1)
+            if len(body) > max_bytes or (not allow_next and 'rel="next"' in response.headers.get("Link", "")):
                 raise GuardError("incomplete_page")
     except (HTTPError, URLError, TimeoutError, OSError) as err:
         raise GuardError("github_transport_unknown") from err
@@ -435,7 +440,7 @@ def read_snapshot(token, root, number, expected):
         "lease_files": get(token, root + f"/pulls/{number}/files?per_page=100"),
         "switch": get(token, "/repos/pl0n3r/Factory/issues/767"),
         "checks": get(token, root + f"/commits/{expected}/check-runs?per_page=100"),
-        "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100"),
+        "reviews": get(token, root + f"/pulls/{number}/reviews?per_page=100", max_bytes=4194304),
         "status_history": get(token, root + f"/commits/{expected}/statuses?per_page=100"),
         "review_threads": get_threads(token, number),
     }
@@ -491,40 +496,43 @@ def verify_exact_main_ci_runs(payload, expected):
 
 
 def exact_main_commits_since_anchor(payload, expected):
-    """Fail-closed list of all commits from the trusted cutover checkpoint."""
+    """Audit contiguous first-parent commits, newest first, including anchor.
+
+    GET /commits?sha=<head>&per_page=21 omits unbounded cumulative diff
+    patches. GitHub authenticates each parent; never skip an intermediate SHA.
+    A missing anchor, merge commit or truncated window is UNKNOWN.
+    """
     if type(expected) is not str or SHA.fullmatch(expected) is None:
         raise GuardError("exact_main_sha_invalid")
-    if type(payload) is not dict:
-        raise GuardError("exact_main_history_invalid")
-    base = payload.get("base_commit")
-    merge_base = payload.get("merge_base_commit")
-    commits = payload.get("commits")
-    n = payload.get("total_commits")
-    ahead = payload.get("ahead_by")
-    behind = payload.get("behind_by")
-    if (type(base) is not dict or base.get("sha") != EXACT_MAIN_AUDIT_ANCHOR
-            or type(merge_base) is not dict
-            or merge_base.get("sha") != EXACT_MAIN_AUDIT_ANCHOR
-            or type(n) is not int or not 0 <= n <= MAX_EXACT_MAIN_COMMITS
-            or type(ahead) is not int or ahead != n
-            or type(behind) is not int or behind != 0
-            or type(commits) is not list or len(commits) != n
-            or payload.get("status") != ("identical" if n == 0 else "ahead")):
+    if (type(payload) is not list or not payload
+            or len(payload) > MAX_EXACT_MAIN_COMMITS + 1):
         raise GuardError("exact_main_history_untrusted_or_incomplete")
-    seen = set()
-    commits_shas = []
-    for item in commits:
-        if (type(item) is not dict or type(item.get("sha")) is not str
-                or SHA.fullmatch(item["sha"]) is None or item["sha"] in seen
-                or item["sha"] == EXACT_MAIN_AUDIT_ANCHOR):
-            raise GuardError("exact_main_history_commit_invalid")
-        seen.add(item["sha"])
-        commits_shas.append(item["sha"])
-    if (n == 0 and expected != EXACT_MAIN_AUDIT_ANCHOR) or (
-            n > 0 and commits_shas[-1] != expected):
+    if type(payload[0]) is not dict or payload[0].get("sha") != expected:
         raise GuardError("exact_main_history_head_mismatch")
-    return commits_shas or [expected]
-
+    seen = set()
+    recent = []
+    for index, record in enumerate(payload):
+        if (type(record) is not dict or type(record.get("sha")) is not str
+                or SHA.fullmatch(record["sha"]) is None
+                or record["sha"] in seen):
+            raise GuardError("exact_main_history_commit_invalid")
+        sha = record["sha"]
+        seen.add(sha)
+        if sha == EXACT_MAIN_AUDIT_ANCHOR:
+            return list(reversed(recent)) or [expected]
+        if len(recent) >= MAX_EXACT_MAIN_COMMITS:
+            raise GuardError("exact_main_history_window_exceeded")
+        parents = record.get("parents")
+        if (type(parents) is not list or len(parents) != 1
+                or type(parents[0]) is not dict
+                or type(parents[0].get("sha")) is not str
+                or SHA.fullmatch(parents[0]["sha"]) is None
+                or index + 1 >= len(payload)
+                or type(payload[index + 1]) is not dict
+                or parents[0]["sha"] != payload[index + 1].get("sha")):
+            raise GuardError("exact_main_first_parent_gap")
+        recent.append(sha)
+    raise GuardError("exact_main_anchor_missing")
 
 def verify_exact_main_ci_chain(commits, statuses, expected):
     """Require terminal green for *every* intermediate main commit."""
@@ -566,12 +574,12 @@ def audit_main():
 
         if current_main_sha() != expected:
             raise GuardError("exact_main_changed_before_audit")
-        # The compare response must be complete and anchored to a trusted SHA.
-        # A later successful CI run does not forgive an unvalidated earlier
-        # squash commit whose push was suppressed by GITHUB_TOKEN.
-        history = get(token, root + "/compare/" + EXACT_MAIN_AUDIT_ANCHOR
-                      + "..." + expected + "?per_page="
-                      + str(MAX_EXACT_MAIN_COMMITS))
+        # Authenticate a bounded contiguous first-parent history. A compare
+        # response can exceed 256 KiB with cumulative patches; commit history
+        # contains no patches. A later green HEAD cannot excuse a missing SHA.
+        history = get(token, root + "/commits?sha=" + expected
+                      + "&per_page=" + str(MAX_EXACT_MAIN_COMMITS + 1),
+                      max_bytes=1048576, allow_next=True)
         required = exact_main_commits_since_anchor(history, expected)
         statuses = {}
         for commit_sha in required:
