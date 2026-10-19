@@ -24,19 +24,26 @@ Este procedimiento no define SLA ni plazo jurídico de respuesta. Cualquier plaz
 
 ## Solicitudes de derechos
 
-Tipos operativos contemplados:
-
+Tipos operativos contemplados (sujetos a revisión jurídica humana):
 - acceso;
-- rectificación;
+- rectificación/corrección;
+- actualización;
 - portabilidad;
-- eliminación.
+- supresión/eliminación;
+- revocación del consentimiento, cuando corresponda.
+
+El `request_type` **documental** admite exactamente los valores `access`,
+`rectification`, `update`, `portability`, `deletion` y `revocation`.
+«Corrección» es sinónimo de rectificación y «eliminación» de supresión;
+actualización y revocación son mecanismos separados, no se omiten por sinónimos.
+Este catálogo no afirma que exista un formulario, API ni enum de producción.
 
 ### Recepción y trazabilidad mínima
 
 Cuando exista un canal aprobado, registrar únicamente:
 
 - `request_ref`: identificador opaco;
-- `request_type`: uno de los tipos anteriores;
+- `request_type`: uno de `access|rectification|update|portability|deletion|revocation` del catálogo documental anterior;
 - `received_at`: timestamp;
 - `status`;
 - `assigned_role`: rol responsable, no identidad personal si no es necesaria;
@@ -52,7 +59,7 @@ GitHub/Issues/logs: prohibido copiar PII, documentos de identidad, contenido de 
 
 ### Identidad y autorización
 
-Antes de ejecutar acceso, rectificación, portabilidad o eliminación, verificar identidad y representación por un canal privado aprobado. Si identidad, representación o alcance no son suficientes, mover a `verification_required` y no ejecutar cambios.
+Antes de tramitar cualquiera de los seis mecanismos (acceso, rectificación/corrección, actualización, portabilidad, supresión/eliminación o revocación), verificar identidad, legitimación y representación según corresponda por un canal privado aprobado. Si identidad, representación o alcance no son suficientes, mover a `verification_required` y no ejecutar cambios ni divulgar datos. Revocar consentimiento no implica automáticamente suprimir datos.
 
 ### Ejecución y cierre
 

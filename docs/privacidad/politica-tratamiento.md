@@ -34,4 +34,17 @@
 
 ## Derechos y revisión
 
-Las solicitudes de acceso, corrección, actualización, supresión o revocación se canalizan mediante el canal de derechos indicado arriba. Las finalidades, bases, consentimientos, proveedores y retenciones aquí documentadas requieren la revisión jurídica aplicable antes de declararse aprobadas.
+Los seis mecanismos documentados son **acceso**, **rectificación/corrección**,
+**actualización**, **portabilidad**, **supresión/eliminación** y **revocación**
+del consentimiento cuando corresponda. Sus `request_type` documentales son,
+respectivamente, `access`, `rectification`, `update`, `portability`,
+`deletion` y `revocation`. «Corrección» y «eliminación» son sinónimos,
+no derechos adicionales; actualización y revocación son independientes.
+
+El canal de derechos indicado arriba es **pendiente de completar y aprobar**.
+Antes de divulgar o modificar datos para atender una solicitud, verificar
+identidad, legitimación y representación por un canal privado autorizado;
+ante verificación insuficiente, no ejecutar ni divulgar información. La revocación
+no produce supresión automática. Finalidades, bases, consentimientos, proveedores,
+retenciones, requisitos y plazos continúan sujetos a revisión jurídica humana:
+no constituyen aprobación legal ni habilitación del tratamiento real.

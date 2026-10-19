@@ -17,4 +17,15 @@ Producto: `pl0n3r/GrindFlow`
 - Flujo interno de atención: [COMPLETAR POR EL DUEÑO] — revisión jurídica requerida.
 - Plazos aplicables: [COMPLETAR POR EL DUEÑO] — deben ser definidos con revisión jurídica; este kit no inventa un plazo legal.
 
-El canal debe permitir solicitudes de acceso, corrección, actualización, supresión o revocación según corresponda. Este documento describe una frontera técnica y no constituye aprobación jurídica.
+El canal, cuando sea aprobado, deberá contemplar los seis mecanismos:
+**acceso**, **rectificación/corrección**, **actualización**, **portabilidad**,
+**supresión/eliminación** y **revocación** del consentimiento según corresponda.
+Su `request_type` documental comprende `access`, `rectification`, `update`,
+`portability`, `deletion` y `revocation`, sin excluir sinónimos.
+
+La identidad, legitimación y representación deben verificarse por canal privado
+aprobado antes de divulgar o cambiar datos. Ante evidencia insuficiente, suspender
+la acción y pedir verificación, sin divulgar información personal. El canal,
+la recepción, los requisitos y los plazos siguen pendientes de revisión jurídica
+humana y de datos del responsable **[COMPLETAR POR EL DUEÑO]**.
+Este borrador no aprueba mecanismos de producción ni inventa un plazo.
