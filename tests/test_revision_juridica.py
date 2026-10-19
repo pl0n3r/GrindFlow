@@ -22,10 +22,11 @@ class RevisionJuridicaTests(unittest.TestCase):
                              cwd=ROOT, capture_output=True, text=True, timeout=35)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         sha, day = module.origin(ROOT)
+        self.assertEqual(len(sha), 64)
         expected = module.render(ROOT, sha, day)
         self.assertEqual(len(expected), 9)
         self.assertTrue(expected["00-LEEME.md"].decode().startswith(
-            f"Última actualización automática de las fuentes: {day} · SHA de origen: `{sha}`"))
+            f"Última actualización automática de las fuentes: {day} · SHA-256 de origen: `{sha}`"))
         self.assertIn("documented_not_legally_approved", expected["00-LEEME.md"].decode())
         for provider in ("cloudflare_r2", "dropbox", "google_drive", "supabase"):
             self.assertIn(provider, expected["00-LEEME.md"].decode())
@@ -117,6 +118,18 @@ class RevisionJuridicaTests(unittest.TestCase):
             self.assertEqual(check.returncode, 1, check.stdout + check.stderr)
             self.assertIn("aviso-privacidad.md", check.stdout)
             self.assertEqual(after, before)
+
+            # Metadata-only source changes must invalidate the fingerprint even
+            # when the visible provider list and all seven copied docs are equal.
+            stale.write_bytes((root / "docs/privacidad/aviso-privacidad.md").read_bytes())
+            manifest = root / "datos.yml"
+            manifest.write_bytes(manifest.read_bytes() + b"\n")
+            before = {p.name: p.read_bytes() for p in folder.iterdir()}
+            check = subprocess.run([sys.executable, str(script), "--check"], cwd=root,
+                                   capture_output=True, text=True, check=False, timeout=35)
+            self.assertEqual(check.returncode, 1, check.stdout + check.stderr)
+            self.assertIn("00-LEEME.md", check.stdout)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in folder.iterdir()})
 
     def test_workflow_version_uses_generator_parser(self):
         """Version parsing must accept valid PHP whitespace variants."""
