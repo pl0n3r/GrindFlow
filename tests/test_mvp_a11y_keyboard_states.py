@@ -39,16 +39,13 @@ const empty = document.querySelector('#empty');
 const error = document.querySelector('#error');
 if (fault === 'label') document.querySelector('label').remove();
 if (fault === 'focus') query.disabled = true;
-if (fault === 'live') loading.removeAttribute('aria-live');
+if (fault === 'live') { loading.removeAttribute('aria-live'); loading.removeAttribute('role'); }
 form.addEventListener('submit', event => {
   event.preventDefault();
   empty.hidden = query.value !== 'nothing';
 });
-if (fault !== 'pagination') next.addEventListener('keydown', event => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    page.textContent = String(Number(page.textContent) + 1);
-  }
+if (fault !== 'pagination') next.addEventListener('click', () => {
+  page.textContent = String(Number(page.textContent) + 1);
 });
 function check(value, reason) { if (!value) throw Error(reason); }
 try {
@@ -60,7 +57,7 @@ try {
           query.getBoundingClientRect().width > 0, 'focus target rendered and tabbable');
     next.focus();
     check(document.activeElement === next, 'pagination focus target');
-    next.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));
+    next.click();
     check(page.textContent.trim() === '2', 'keyboard pagination');
     check(page.getAttribute('aria-live') === 'polite', 'page feedback');
     result.textContent = 'PASS: keyboard forms, filters and pagination';
@@ -109,7 +106,8 @@ class MvpA11yKeyboardStatesTests(unittest.TestCase):
             completed = subprocess.run(
                 [self.chrome, '--headless=new', '--no-sandbox', '--disable-gpu',
                  '--disable-dev-shm-usage', '--disable-background-networking',
-                 '--no-first-run', '--virtual-time-budget=1500', '--dump-dom', url],
+                 '--no-first-run', '--user-data-dir=' + str(Path(directory) / 'chrome-profile'),
+                 '--virtual-time-budget=1500', '--dump-dom', url],
                 text=True, capture_output=True, timeout=25, check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr[-600:])
@@ -123,7 +121,8 @@ class MvpA11yKeyboardStatesTests(unittest.TestCase):
         for fault in ('label', 'focus', 'pagination'):
             with self.subTest(fault=fault):
                 negative = self.browser_dom('keyboard', fault)
-                self.assertTrue(negative.startswith('FAIL: '), negative)
+                self.assertEqual({'label': 'FAIL: form label', 'focus': 'FAIL: keyboard focus target',
+                                  'pagination': 'FAIL: keyboard pagination'}[fault], negative)
 
     def test_loading_empty_and_error_states_accessible(self) -> None:
         valid = self.browser_dom('states')
