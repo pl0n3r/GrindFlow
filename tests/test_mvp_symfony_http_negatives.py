@@ -110,7 +110,7 @@ class MvpSymfonyHttpNegativeTests(unittest.TestCase):
         # gate; the workflow assertion above alone cannot catch scope drift.
         scope = subprocess.run(
             ["bash", str(ROOT / "scripts/ci-scope.sh"), "pull_request"],
-            input="tests/test_mvp_symfony_http_negatives.py\\n".replace("\\n", "\n"),
+            input="tests/test_mvp_symfony_http_negatives.py\n",
             text=True, capture_output=True, check=False, timeout=15,
         )
         self.assertEqual(0, scope.returncode, scope.stdout + scope.stderr)
