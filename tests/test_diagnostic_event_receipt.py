@@ -46,7 +46,6 @@ try {
     return json.loads(p.stdout)
 
 
-@unittest.skipIf(PHP is None, "PHP CLI no disponible en este entorno")
 class DiagnosticEventReceiptTests(unittest.TestCase):
     def test_error_receipt_redacts_secrets_and_preserves_correlation(self):
         for kind in ("HTTP_500", "JOB_FAILURE", "PUBLICATION_FAILURE"):
