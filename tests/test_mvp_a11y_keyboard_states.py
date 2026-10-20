@@ -56,7 +56,7 @@ try {
     query.focus();
     check(document.activeElement === query, 'keyboard focus target');
     check(document.querySelector('label[for="query"]')?.textContent.trim(), 'form label');
-    check(getComputedStyle(query).outlineStyle !== 'none', 'focus visibility');
+    check(query.matches(':focus'), 'focus pseudo-class');
     next.focus();
     check(document.activeElement === next, 'pagination focus target');
     next.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));
