@@ -83,6 +83,29 @@ def _method_source(path: Path, method: str) -> str:
 
 
 class MvpSymfonyHttpNegativeTests(unittest.TestCase):
+    def test_workflow_runs_http_negatives_in_disposable_symfony_preview(self) -> None:
+        # This contract guard is safe for the generic acceptance runner; the
+        # actual HTTP tests run in Symfony CI with a disposable MariaDB service.
+        workflow = (ROOT / ".github/workflows/grindflow-ci.yml").read_text(
+            encoding="utf-8"
+        )
+        marker = "\n  symfony-preview:\n"
+        self.assertEqual(workflow.count(marker), 1)
+        tail = workflow.split(marker, 1)[1]
+        boundary = re.search(r"(?m)^  [a-z][a-z0-9_-]*:\\s*$", tail)
+        job = tail[:boundary.start()] if boundary else tail
+
+        self.assertIn("services:\n      mariadb:\n", job)
+        self.assertIn("APP_ENV: test", job)
+        self.assertIn("DATABASE_URL:", job)
+        self.assertIn("composer install --working-dir=symfony", job)
+        migration = "php bin/console doctrine:migrations:migrate --no-interaction"
+        command = "python3 -m unittest tests/test_mvp_symfony_http_negatives.py -v"
+        self.assertIn(migration, job)
+        self.assertEqual(job.count(command), 1)
+        self.assertLess(job.index(migration), job.index(command))
+        self.assertIn("- name: Ejecutar aceptación HTTP negativa de MVP", job)
+
     def test_vault_and_composer_negative_routes_execute(self) -> None:
         evidence = _execute_web_tests()
         self.assertEqual(set(evidence), {"Vault", "Composer"})
