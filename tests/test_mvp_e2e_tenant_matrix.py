@@ -89,7 +89,7 @@ def _denial_is_linked_to_request(
         request = "$client->request(" + part
         if (
             all(marker in request for marker in request_markers)
-            and re.search(r"self::assertResponseStatusCodeSame\\(" + str(status) + r"\\)", request)
+            and re.search(r"self::assertResponseStatusCodeSame\(" + str(status) + r"\)", request)
         ):
             return True
     return False
