@@ -106,6 +106,16 @@ class MvpSymfonyHttpNegativeTests(unittest.TestCase):
         self.assertLess(job.index(migration), job.index(command))
         self.assertIn("- name: Ejecutar aceptación HTTP negativa de MVP", job)
 
+        # Prove that changing only this acceptance path schedules the Symfony
+        # gate; the workflow assertion above alone cannot catch scope drift.
+        scope = subprocess.run(
+            ["bash", str(ROOT / "scripts/ci-scope.sh"), "pull_request"],
+            input="tests/test_mvp_symfony_http_negatives.py\\n".replace("\\n", "\n"),
+            text=True, capture_output=True, check=False, timeout=15,
+        )
+        self.assertEqual(0, scope.returncode, scope.stdout + scope.stderr)
+        self.assertIn("run_symfony=true", scope.stdout.splitlines())
+
     def test_vault_and_composer_negative_routes_execute(self) -> None:
         evidence = _execute_web_tests()
         self.assertEqual(set(evidence), {"Vault", "Composer"})
