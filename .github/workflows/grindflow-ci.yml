@@ -803,6 +803,10 @@ jobs:
       - name: Symfony HTTP test suite
         working-directory: symfony
         run: php vendor/bin/simple-phpunit -c phpunit.xml.dist
+      - name: Ejecutar aceptación HTTP negativa de MVP
+        # La fuente del test está en tests/, pero usa Symfony/MariaDB de este job.
+        working-directory: .
+        run: python3 -m unittest tests/test_mvp_symfony_http_negatives.py -v
       - name: Verify migration reversibility on disposable MariaDB
         working-directory: symfony
         run: |
