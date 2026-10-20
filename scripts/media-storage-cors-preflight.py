@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 CONTRACT = "gf345-cors-offline-v1"
 MAX_INPUT_BYTES = 128 * 1024
 REQUIRED_HEADERS = {"content-type", "x-amz-*"}
+S3_ALLOWED_METHODS = {"GET", "PUT", "POST", "DELETE", "HEAD"}
 
 
 def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -19,6 +20,10 @@ def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
             raise ValueError("ambiguous JSON")
         result[key] = value
     return result
+
+
+def reject_json_constant(_value: str) -> None:
+    raise ValueError("non-JSON constant")
 
 
 def valid_origin(origin: str) -> bool:
@@ -50,11 +55,13 @@ def assess(policy: object, origin: str) -> str:
             for k in ("AllowedOrigins", "AllowedMethods", "AllowedHeaders")
         ):
             return "unknown"
+        if not set(rule["AllowedMethods"]) <= S3_ALLOWED_METHODS:
+            return "unknown"
         if any("*" in v for v in rule["AllowedOrigins"]):
             return "incompatible"
     for rule in rules:
         origins = rule["AllowedOrigins"]
-        methods = {v.upper() for v in rule["AllowedMethods"]}
+        methods = set(rule["AllowedMethods"])
         headers = {v.lower() for v in rule["AllowedHeaders"]}
         # All properties must be satisfied by the SAME policy rule.
         if origin in origins and "PUT" in methods and REQUIRED_HEADERS <= headers:
@@ -64,13 +71,14 @@ def assess(policy: object, origin: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Offline S3 CORS declaration check")
-    parser.add_argument("--origin", required=True, help="exact HTTPS browser origin")
+    parser.add_argument("--origin", default="", help="exact HTTPS browser origin")
     args = parser.parse_args()
     status = "unknown"
     try:
         raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
         if raw and len(raw) <= MAX_INPUT_BYTES:
-            policy = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
+            policy = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
+                                parse_constant=reject_json_constant)
             status = assess(policy, args.origin)
     except (ValueError, TypeError, RecursionError):
         pass

@@ -1,7 +1,9 @@
 """Synthetic, side-effect-free tests for a declared S3 bucket CORS policy."""
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 import importlib.util
+import io
 import json
 from pathlib import Path
 import socket
@@ -49,6 +51,8 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedOrigins": ["*"]}]}, ORIGIN, "incompatible"),
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedOrigins": ["https://*.grindflow.com.co"]}]}, ORIGIN, "incompatible"),
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedMethods": ["GET"]}]}, ORIGIN, "incompatible"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedMethods": ["put"]}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedMethods": ["PUT", "PATCH"]}]}, ORIGIN, "unknown"),
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedHeaders": ["Content-Type"]}]}, ORIGIN, "incompatible"),
             ({"CORSRules": [{}]}, ORIGIN, "unknown"),
             ({"CORSRules": []}, ORIGIN, "unknown"),
@@ -63,6 +67,7 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
             "", "{", '{"CORSRules":[],"CORSRules":[]}',
             "x" * (128 * 1024 + 1),
             '{"secret":"s3-secret-leak"}',
+            '{"CORSRules":[{"AllowedOrigins":["https://www.grindflow.com.co"],"AllowedMethods":["PUT"],"AllowedHeaders":["content-type","x-amz-*"],"MaxAgeSeconds":NaN}]}',
             "[" * 4000,
         ):
             with self.subTest(raw=raw[:20]):
@@ -74,22 +79,30 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
                 self.assertIs(output["target_verified"], False)
                 self.assertEqual("offline_configuration_only", output["evidence_scope"])
                 self.assertNotIn("s3-secret-leak", proc.stdout + proc.stderr)
+        no_origin = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(policy()),
+                                   text=True, capture_output=True, check=False)
+        self.assertEqual(2, no_origin.returncode)
+        self.assertEqual("unknown", json.loads(no_origin.stdout)["declared_status"])
+        self.assertEqual("", no_origin.stderr)
 
     def test_cli_is_offline_and_never_claims_bucket_ready(self) -> None:
+        module = load_module()
+        data = io.TextIOWrapper(io.BytesIO(json.dumps(policy()).encode("utf-8")), encoding="utf-8")
+        stdout = io.StringIO()
         with patch.object(socket.socket, "connect", side_effect=AssertionError("network")), \
-             patch.object(socket, "create_connection", side_effect=AssertionError("network")):
-            module = load_module()
-            self.assertEqual("compatible", module.assess(policy(), ORIGIN))
-        proc = subprocess.run([sys.executable, str(SCRIPT), "--origin", ORIGIN],
-                              input=json.dumps(policy()), text=True, capture_output=True, check=False)
-        self.assertEqual(0, proc.returncode, proc.stderr)
-        output = json.loads(proc.stdout)
+             patch.object(socket, "create_connection", side_effect=AssertionError("network")), \
+             patch.object(sys, "stdin", data), \
+             patch.object(sys, "argv", [str(SCRIPT), "--origin", ORIGIN]), \
+             redirect_stdout(stdout):
+            exit_code = module.main()
+        self.assertEqual(0, exit_code)
+        raw_output = stdout.getvalue()
+        output = json.loads(raw_output)
         self.assertEqual("compatible", output["declared_status"])
         self.assertEqual("offline_configuration_only", output["evidence_scope"])
         self.assertIs(output["target_verified"], False)
-        self.assertNotIn(ORIGIN, proc.stdout)
-        self.assertNotIn("MEDIA_STORAGE_READY", proc.stdout)
-        self.assertEqual("", proc.stderr)
+        self.assertNotIn(ORIGIN, raw_output)
+        self.assertNotIn("MEDIA_STORAGE_READY", raw_output)
 
 
 if __name__ == "__main__":
