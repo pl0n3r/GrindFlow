@@ -325,4 +325,7 @@ GRINDFLOW_BROWSER_CHROME="$CHROME" bash scripts/browser-workflow.sh
 # Chromium executes the disposable keyboard/focus and a11y-state DOM contract.
 GRINDFLOW_BROWSER_CHROME="$CHROME" python3 -m unittest tests/test_mvp_a11y_keyboard_states.py -v
 
+# Disposable exact-size viewport contracts in Chromium; no production traffic.
+GRINDFLOW_BROWSER_CHROME="$CHROME" python3 -m unittest tests/test_mvp_responsive_viewports.py -v
+
 echo "Real browser smoke tests passed."
