@@ -49,10 +49,33 @@ guardar el ID del run al entregar y no inventar resultado local.
 
 ## Criterios y reversión
 
-- AC-01: `MvpSymfonyHttpNegativeTests::test_vault_and_composer_negative_routes_execute`.
-- AC-02: `MvpSymfonyHttpNegativeTests::test_tenant_role_denials_use_disposable_fixtures`.
-- AC-03: `validate` terminal sobre HEAD exacto.
+- **AC-01:** check autenticado `symfony-preview` SUCCESS del HEAD exacto. Su
+  step obligatorio ejecuta el método
+  `MvpSymfonyHttpNegativeTests::test_vault_and_composer_negative_routes_execute`
+  sobre PHP, Composer y MariaDB aislados.
+- **AC-02:** el mismo check autentica
+  `test_tenant_role_denials_use_disposable_fixtures`: los WebTestCase de Vault
+  y Composer exigen 401/403/404 y tenant/rol adversarios sobre fixtures
+  descartables. El runner CI informa ambos métodos en stdout/stderr.
+- **AC-03:** `validate` terminal SUCCESS sobre HEAD exacto.
+- **AC-04:** la aceptación genérica de Factory ejecuta exclusivamente la
+  regresión Python sin dependencias externas
+  `test_workflow_runs_http_negatives_in_disposable_symfony_preview`.
+  Verifica que `symfony-preview` mantiene MariaDB service, `APP_ENV=test`,
+  `DATABASE_URL`, Composer, migraciones y el comando Python **después**
+  de migrar, una sola vez. Si alguien elimina esa invocación, falla AC-04.
+
+### Por qué se reparó el contrato
+
+La gate reusable de Factory ejecuta los targets `kind:test` directamente en
+un runner mínimo sin `symfony/vendor` ni MariaDB; no puede ejecutar tests HTTP
+genuinos por sí sola. En el HEAD anterior, `symfony-preview` sí informó ambos
+métodos PASS, pero la aceptación volvió a ejecutarlos en otro runner sin la DB
+y falló correctamente. AC-01/02 pasan a `kind:check` de `symfony-preview`
+**sin omitir los tests reales**; AC-04 fija la obligación de ejecutarlos.
+No convertir la ejecución real en lectura source-only ni afirmar PASS cuando
+`symfony-preview` esté skipped, missing, pending o failed.
 
 Sin publicación, datos reales, credenciales, tráfico externo, deploy, compras,
-decisiones legales o go-live. Reversión por squash exclusivo de los dos paths
-reservados por #523. #524 depende de #519 y no se adelanta a esta entrega.
+decisiones legales o go-live. Reversión por squash de los cuatro paths
+reclamados por #523. #524 depende de #519 y no se adelanta a esta entrega.
