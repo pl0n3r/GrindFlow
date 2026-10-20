@@ -54,6 +54,8 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
             ({"CORSRules": []}, ORIGIN, "unknown"),
             (policy(), "http://www.grindflow.com.co", "unknown"),
             (policy(), "https://www.grindflow.com.co@evil.test", "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedOrigins": [ORIGIN + ":443"]}]},
+             ORIGIN + ":443", "unknown"),
         ):
             with self.subTest(candidate=candidate, origin=origin):
                 self.assertEqual(expected, m.assess(candidate, origin))
@@ -61,12 +63,16 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
             "", "{", '{"CORSRules":[],"CORSRules":[]}',
             "x" * (128 * 1024 + 1),
             '{"secret":"s3-secret-leak"}',
+            "[" * 4000,
         ):
             with self.subTest(raw=raw[:20]):
                 proc = subprocess.run([sys.executable, str(SCRIPT), "--origin", ORIGIN],
                                       input=raw, text=True, capture_output=True, check=False)
                 self.assertEqual(2, proc.returncode)
-                self.assertEqual("unknown", json.loads(proc.stdout)["declared_status"])
+                output = json.loads(proc.stdout)
+                self.assertEqual("unknown", output["declared_status"])
+                self.assertIs(output["target_verified"], False)
+                self.assertEqual("offline_configuration_only", output["evidence_scope"])
                 self.assertNotIn("s3-secret-leak", proc.stdout + proc.stderr)
 
     def test_cli_is_offline_and_never_claims_bucket_ready(self) -> None:

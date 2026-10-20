@@ -26,9 +26,9 @@ def valid_origin(origin: str) -> bool:
         url = urlsplit(origin)
         return (url.scheme == "https" and bool(url.hostname)
                 and url.username is None and url.password is None
-                and url.port in (None, 443) and url.path in ("", "/")
+                and url.port is None and url.path in ("", "/")
                 and not url.query and not url.fragment and "*" not in origin
-                and origin == f"https://{url.hostname}" + (":443" if url.port == 443 else ""))
+                and origin == f"https://{url.hostname}")
     except (ValueError, AttributeError):
         return False
 
@@ -72,7 +72,7 @@ def main() -> int:
         if raw and len(raw) <= MAX_INPUT_BYTES:
             policy = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
             status = assess(policy, args.origin)
-    except (ValueError, UnicodeError, TypeError):
+    except (ValueError, TypeError, RecursionError):
         pass
     # No input, endpoint, origin, header value, signed URL or secret is printed.
     print(json.dumps({
