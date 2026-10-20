@@ -4,7 +4,7 @@ Esta hoja crea un **contrato de navegador real (Chromium headless)** sobre un DO
 
 ## Cobertura ejecutable
 
-- `tests/test_mvp_a11y_keyboard_states.py::MvpA11yKeyboardStatesTests::test_forms_filters_and_pagination_keyboard_focus`: foco real de Chromium sobre filtro y botón, label asociada al input, pseudoclase CSS `:focus` activa, tecla Enter entregada al handler de paginación y estado de página anunciado con `aria-live`. Las variantes negativas desactivan foco, label y handler por separado; todas deben fallar.
+- `tests/test_mvp_a11y_keyboard_states.py::MvpA11yKeyboardStatesTests::test_forms_filters_and_pagination_keyboard_focus`: foco real de Chromium sobre filtro y botón, label asociada al input, control tabulable y visible según el DOM renderizado, tecla Enter entregada al handler de paginación y estado de página anunciado con `aria-live`. Las variantes negativas desactivan foco, label y handler por separado; todas deben fallar.
 - `tests/test_mvp_a11y_keyboard_states.py::MvpA11yKeyboardStatesTests::test_loading_empty_and_error_states_accessible`: DOM real en los estados `loading`, `empty` y `error`, roles `status`/`alert` y `aria-live`. Una variante sin canal de anuncio falla.
 - La ejecución está conectada a `scripts/browser-smoke.sh`, que ya se ejecuta desde el job `browser` de CI. Se pasa el binario descubierto con `GRINDFLOW_BROWSER_CHROME`, sin tocar el workflow reservado por #504.
 
