@@ -44,6 +44,9 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
              "AllowedHeaders": ["Content-Type", "x-amz-*"]},
         ]}
         self.assertEqual("incompatible", m.assess(split, ORIGIN))
+        optional = {**policy()["CORSRules"][0], "ID": "gf528-cors",
+                    "ExposeHeaders": ["x-amz-request-id"], "MaxAgeSeconds": 3600}
+        self.assertEqual("compatible", m.assess({"CORSRules": [optional]}, ORIGIN))
 
     def test_invalid_or_untrusted_policy_fails_closed_without_leak(self) -> None:
         m = load_module()
@@ -54,6 +57,15 @@ class MediaStorageCorsPreflightTests(unittest.TestCase):
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedMethods": ["put"]}]}, ORIGIN, "unknown"),
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedMethods": ["PUT", "PATCH"]}]}, ORIGIN, "unknown"),
             ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedHeaders": ["Content-Type"]}]}, ORIGIN, "incompatible"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "MaxAgeSeconds": "invalid"}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "MaxAgeSeconds": True}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "MaxAgeSeconds": -1}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "ID": "x" * 256}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "ExposeHeaders": "bad"}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "ExposeHeaders": [7]}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "Unsupported": True}]}, ORIGIN, "unknown"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedHeaders": ["Content-Type", "x-amz-*", "*"]}]}, ORIGIN, "incompatible"),
+            ({"CORSRules": [{**policy()["CORSRules"][0], "AllowedHeaders": ["Content-Type", "x-amz-*", "X-*"]}]}, ORIGIN, "incompatible"),
             ({"CORSRules": [{}]}, ORIGIN, "unknown"),
             ({"CORSRules": []}, ORIGIN, "unknown"),
             (policy(), "http://www.grindflow.com.co", "unknown"),

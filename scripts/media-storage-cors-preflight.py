@@ -55,8 +55,27 @@ def assess(policy: object, origin: str) -> str:
             for k in ("AllowedOrigins", "AllowedMethods", "AllowedHeaders")
         ):
             return "unknown"
+        allowed_keys = {"AllowedOrigins", "AllowedMethods", "AllowedHeaders",
+                        "ExposeHeaders", "MaxAgeSeconds", "ID"}
+        if set(rule) - allowed_keys:
+            return "unknown"
+        if "MaxAgeSeconds" in rule and (
+            type(rule["MaxAgeSeconds"]) is not int or rule["MaxAgeSeconds"] < 0
+        ):
+            return "unknown"
+        if "ExposeHeaders" in rule and (
+            not isinstance(rule["ExposeHeaders"], list)
+            or not all(isinstance(v, str) and v for v in rule["ExposeHeaders"])
+        ):
+            return "unknown"
+        if "ID" in rule and (
+            not isinstance(rule["ID"], str) or len(rule["ID"]) > 255
+        ):
+            return "unknown"
         if not set(rule["AllowedMethods"]) <= S3_ALLOWED_METHODS:
             return "unknown"
+        if any("*" in v and v.lower() != "x-amz-*" for v in rule["AllowedHeaders"]):
+            return "incompatible"
         if any("*" in v for v in rule["AllowedOrigins"]):
             return "incompatible"
     for rule in rules:
