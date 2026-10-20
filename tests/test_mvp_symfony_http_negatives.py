@@ -59,7 +59,8 @@ def _execute_web_tests() -> dict[str, str]:
                 + output[-1400:]
             )
         # Success with zero tests is a false positive, not execution evidence.
-        if not re.search(r"\bOK\s*\(\s*1\s+test\b", output):
+        plain_output = re.sub(r"\x1b\[[0-9;]*m", "", output)
+        if not re.search(r"(?m)^OK\s*\(\s*1\s+test\b", plain_output):
             raise AssertionError(
                 f"{module} WebTestCase did not report exactly one passed test: "
                 + output[-800:]
