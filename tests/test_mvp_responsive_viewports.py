@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import unittest
@@ -44,6 +45,7 @@ const fault=__FAULT__;
 const next=document.querySelector('#next'),page=document.querySelector('#page');
 if(fault!=='pagination'){next.addEventListener('click',()=>{
 page.textContent=String(Number(page.textContent)+1)})}
+if(fault==='tabindex'){next.tabIndex=-1}
 if(fault==='overflow'){const wide=document.createElement('div');
 wide.style.width='1600px';wide.style.height='1px';document.body.appendChild(wide)}
 for(const kind of ['loading','empty','error']){
@@ -85,7 +87,9 @@ check(!empty.hidden&&win.getComputedStyle(empty).display!=='none'
 empty.hidden=true;error.hidden=false;
 check(!error.hidden&&win.getComputedStyle(error).display!=='none'
 &&announced(error),'error announcement');
-const next=doc.getElementById('next');next.focus();
+const next=doc.getElementById('next');
+check(next.tabIndex>=0,'pagination is not tabbable');
+next.focus();
 const box=next.getBoundingClientRect();
 check(doc.activeElement===next&&box.left>=0&&box.right<=win.innerWidth+1
 &&box.width>=44&&next.textContent.trim()!=='','pagination inaccessible');
@@ -121,7 +125,7 @@ class MvpResponsiveViewportsTests(unittest.TestCase):
     def browser_result(self, width: int, height: int, mode: str, fault: str = '') -> str:
         self.assertIn((width, height), ((390, 844), (768, 900)))
         self.assertIn(mode, ('overflow', 'states'))
-        self.assertIn(fault, ('', 'overflow', 'pagination', 'loading', 'empty', 'error'))
+        self.assertIn(fault, ('', 'overflow', 'pagination', 'tabindex', 'loading', 'empty', 'error'))
         with tempfile.TemporaryDirectory(prefix='gf-responsive-') as directory:
             inner = INNER.replace('__FAULT__', json.dumps(fault))
             encoded = base64.b64encode(inner.encode('ascii')).decode('ascii')
@@ -138,8 +142,25 @@ class MvpResponsiveViewportsTests(unittest.TestCase):
                 '--window-size=1024,1100', '--virtual-time-budget=3000',
                 '--dump-dom', path.resolve().as_uri(),
             ]
-            completed = subprocess.run(
-                command, capture_output=True, text=True, timeout=30, check=False,
+            # Chromium forks renderers; kill its process group on timeout so
+            # temporary profiles cannot be removed while descendants remain.
+            proc = subprocess.Popen(
+                command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, start_new_session=True,
+            )
+            try:
+                stdout, stderr = proc.communicate(timeout=30)
+            except subprocess.TimeoutExpired as timeout:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                stdout, stderr = proc.communicate()
+                self.fail(
+                    f'Chromium timeout tras {timeout.timeout}s; stderr: {stderr[-600:]}'
+                )
+            completed = subprocess.CompletedProcess(
+                command, proc.returncode, stdout, stderr,
             )
             self.assertEqual(0, completed.returncode, completed.stderr[-600:])
             marker = re.search(r'<p id="result">([^<]+)</p>', completed.stdout)
@@ -166,6 +187,7 @@ class MvpResponsiveViewportsTests(unittest.TestCase):
                 )
         for fault, expected in (
             ('pagination', 'FAIL: pagination did not advance'),
+            ('tabindex', 'FAIL: pagination is not tabbable'),
             ('loading', 'FAIL: loading announcement'),
             ('empty', 'FAIL: empty announcement'),
             ('error', 'FAIL: error announcement'),
