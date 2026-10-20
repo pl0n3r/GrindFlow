@@ -94,6 +94,24 @@ class DiagnosticEventReceiptTests(unittest.TestCase):
             obj = fixture()
             obj[field] = value
             self.assertEqual(receipt(obj), {"error": "INVALID_DIAGNOSTIC_METADATA"})
+        # Present-but-null correlation fields are malformed, not omitted.
+        for field in ("event_id", "request_id", "job_id", "publication_id"):
+            with self.subTest(null_field=field):
+                obj = fixture()
+                obj[field] = None
+                self.assertEqual(receipt(obj), {"error": "INVALID_DIAGNOSTIC_METADATA"})
+        # Truly absent optional correlation fields remain valid and do not
+        # produce fabricated references in the resulting receipt.
+        for kind, required in (("HTTP_500", "request_id"),
+                               ("JOB_FAILURE", "job_id"),
+                               ("PUBLICATION_FAILURE", "publication_id")):
+            with self.subTest(minimal_kind=kind):
+                minimal = fixture(kind)
+                for ref_field in ("request_id", "job_id", "publication_id"):
+                    if ref_field != required:
+                        del minimal[ref_field]
+                self.assertEqual(receipt(minimal)["correlation"],
+                                 {required: minimal[required]})
         for kind, required in (("HTTP_500", "request_id"),
                                ("JOB_FAILURE", "job_id"),
                                ("PUBLICATION_FAILURE", "publication_id")):

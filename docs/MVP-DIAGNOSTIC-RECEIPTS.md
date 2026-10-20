@@ -12,8 +12,11 @@ Entradas válidas: event_id (evt_), request_id (req_), job_id (job_),
 publication_id (pub_) con entre 16 y 32 caracteres hexadecimales en minúscula.
 event_id, kind (HTTP_500, JOB_FAILURE, PUBLICATION_FAILURE) y state
 (FAILED, UNKNOWN, STALE) son obligatorios. Cada clase de evento requiere su
-ID correspondiente; las demás referencias de correlación pueden estar presentes
-para vincular una misma operación sin exponer identidades ni contenido.
+ID correspondiente; las demás referencias de correlación pueden omitirse.
+Cuando se incluyen, deben ser strings de identificador válido; null explícito,
+booleanos y otros tipos inválidos se rechazan, en lugar de tratarse como ausencia.
+Las referencias opcionales válidas vinculan una misma operación sin exponer
+identidades ni contenido.
 
 La salida estable reutiliza el event_id como receipt_id y solo devuelve
 schema_version, receipt_id, kind, state, diagnostic_status,

@@ -45,10 +45,14 @@ final class DiagnosticReceipt
             throw new InvalidArgumentException('INVALID_DIAGNOSTIC_METADATA');
         }
         foreach (self::IDENTIFIERS as $field => $prefix) {
-            $value = $source[$field] ?? null;
-            if ($value === null && $field !== 'event_id') {
+            // An absent optional reference is valid; an explicit null is not.
+            if (!array_key_exists($field, $source)) {
+                if ($field === 'event_id') {
+                    throw new InvalidArgumentException('INVALID_DIAGNOSTIC_METADATA');
+                }
                 continue;
             }
+            $value = $source[$field];
             if (!is_string($value)
                 || preg_match('/^' . $prefix . '_[0-9a-f]{16,32}$/D', $value) !== 1) {
                 throw new InvalidArgumentException('INVALID_DIAGNOSTIC_METADATA');
