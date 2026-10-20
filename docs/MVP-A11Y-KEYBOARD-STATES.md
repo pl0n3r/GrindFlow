@@ -6,7 +6,7 @@ Esta hoja crea un **contrato de navegador real (Chromium headless)** sobre un DO
 
 - `tests/test_mvp_a11y_keyboard_states.py::MvpA11yKeyboardStatesTests::test_forms_filters_and_pagination_keyboard_focus`: foco real de Chromium sobre filtro y botón, label asociada al input, control tabulable y visible según el DOM renderizado, activación nativa del botón de paginación mediante click en Chromium y estado de página anunciado con `aria-live`. Las variantes negativas desactivan foco, label y handler por separado; todas deben fallar.
 - `tests/test_mvp_a11y_keyboard_states.py::MvpA11yKeyboardStatesTests::test_loading_empty_and_error_states_accessible`: DOM real en los estados `loading`, `empty` y `error`, roles `status`/`alert` y `aria-live`. Una variante sin canal de anuncio falla.
-- La ejecución está conectada a `scripts/browser-smoke.sh`, que ya se ejecuta desde el job `browser` de CI. Se pasa el binario descubierto con `GRINDFLOW_BROWSER_CHROME`, sin tocar el workflow reservado por #504.
+- La ejecución está conectada a `scripts/browser-smoke.sh`, invocado por los jobs `browser` y `real-stack` de CI con bases de datos locales descartables. El script ejecuta **primero** `scripts/browser-workflow.sh` (flujo autenticado) y **después** `GRINDFLOW_BROWSER_CHROME="$CHROME" python3 -m unittest tests/test_mvp_a11y_keyboard_states.py -v` (fixture Chromium de accesibilidad). `set -euo pipefail` propaga el error de cualquiera de las dos fases y no permite un falso verde. No se modifica la guía general `docs/AGENT-SMOKE-E2E.md`, fuera de la V3 de #532, ni el workflow reservado por #504.
 
 ## Ejecución y criterios de corte
 
