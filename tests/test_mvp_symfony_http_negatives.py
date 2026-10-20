@@ -92,7 +92,7 @@ class MvpSymfonyHttpNegativeTests(unittest.TestCase):
         marker = "\n  symfony-preview:\n"
         self.assertEqual(workflow.count(marker), 1)
         tail = workflow.split(marker, 1)[1]
-        boundary = re.search(r"(?m)^  [a-z][a-z0-9_-]*:\\s*$", tail)
+        boundary = re.search(r"(?m)^  [a-z][a-z0-9_-]*:\s*$", tail)
         job = tail[:boundary.start()] if boundary else tail
 
         self.assertIn("services:\n      mariadb:\n", job)
