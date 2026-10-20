@@ -112,25 +112,23 @@ class MvpA11yKeyboardStatesTests(unittest.TestCase):
                 text=True, capture_output=True, timeout=25, check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr[-600:])
-            return completed.stdout
+            marker = '<p id="result">'
+            self.assertIn(marker, completed.stdout, 'Chrome no publicó el resultado DOM')
+            return completed.stdout.split(marker, 1)[1].split('</p>', 1)[0]
 
     def test_forms_filters_and_pagination_keyboard_focus(self) -> None:
         valid = self.browser_dom('keyboard')
-        self.assertIn('PASS: keyboard forms, filters and pagination', valid)
-        self.assertNotIn('id="result">FAIL:', valid)
+        self.assertEqual('PASS: keyboard forms, filters and pagination', valid)
         for fault in ('label', 'focus', 'pagination'):
             with self.subTest(fault=fault):
                 negative = self.browser_dom('keyboard', fault)
-                self.assertIn('id="result">FAIL:', negative)
-                self.assertNotIn('PASS: keyboard forms, filters and pagination', negative)
+                self.assertTrue(negative.startswith('FAIL: '), negative)
 
     def test_loading_empty_and_error_states_accessible(self) -> None:
         valid = self.browser_dom('states')
-        self.assertIn('PASS: loading, empty and error announcements', valid)
-        self.assertNotIn('id="result">FAIL:', valid)
+        self.assertEqual('PASS: loading, empty and error announcements', valid)
         negative = self.browser_dom('states', 'live')
-        self.assertIn('id="result">FAIL: loading announced', negative)
-        self.assertNotIn('PASS: loading, empty and error announcements', negative)
+        self.assertEqual('FAIL: loading announced', negative)
 
 
 if __name__ == '__main__':
