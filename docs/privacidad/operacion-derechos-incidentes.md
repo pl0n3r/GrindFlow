@@ -81,6 +81,14 @@ Antes de tramitar cualquiera de los seis mecanismos (acceso, rectificación/corr
 
 Fail-closed: si no puede demostrarse con evidencia mínima segura que el incidente está acotado, no se presume seguridad ni cumplimiento y no se reanuda el tratamiento afectado.
 
+## Handoff del paquete jurídico tras alinear las fuentes
+
+La coherencia de los seis mecanismos y del catálogo **documental** de `request_type` exige contrastar **tres** documentos: este runbook, `docs/privacidad/canal-derechos.md` y `docs/privacidad/politica-tratamiento.md`. Los dos últimos son **salidas generadas** por el kit de privacidad de Factory a partir de `datos.yml`: no corregirlas a mano ni aceptar un canal/política que omita portabilidad. Verificar identidad y legitimación sigue siendo obligatorio; el texto no promete una API de exportación ni una aprobación jurídica.
+
+La plantilla upstream para portabilidad quedó reparada en Factory #1423/PR #1424, pero **integrarla en GrindFlow requiere** un pin/reusable del kit aprobado y los claims V3 del workflow y de las salidas. El claim de `politica-tratamiento.md` pertenece a GrindFlow #264 hasta su liberación efectiva: no editarlo ni regenerarlo desde #504 bajo otra reserva. Validar después `Privacidad como código`/CI con los bytes emitidos desde el mismo kit fijado; no declarar AC-01/AC-03 satisfechos mientras los tres textos difieran.
+
+El generador del expediente para abogado **ya está integrado** por GrindFlow #493/PR #498. Una vez fusionadas las fuentes definitivas, ejecutar `python3 scripts/generar_revision_juridica.py` **solamente** en el PR de regeneración con reserva V3 independiente para `revision-juridica/`, seguido de `python3 scripts/generar_revision_juridica.py --check`. Verificar las copias byte-exactas, `00-LEEME.md`, la huella de origen y `paquete-completo.md`. El workflow `revision-juridica-sync.yml` detecta desfase tras cambios en `main` y abre un Issue deduplicado con etiqueta `revision-juridica-desfase`; no escribe en `main`. No modificar copias del abogado en este PR ni presentar el paquete como aprobado. Estado hasta completar ese handoff: `documented_not_legally_approved` y `BLOCKED_REAL_DATA`.
+
 ## Fronteras pre-live
 
 - `datos.yml` conserva `phase=construccion`.
