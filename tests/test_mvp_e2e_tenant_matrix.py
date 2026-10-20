@@ -35,6 +35,65 @@ STATES = {
 }
 
 
+
+# Every denial is bound to the *request* and its authenticated scenario.
+# A standalone HTTP 403 may be a CSRF failure, not an RBAC regression.
+DENIAL_CASES = {
+    "Vault": (
+        (401, ("'GET'", "'/api/admin/vault'"), None),
+        (404, ("'GET'", "'/api/admin/vault/'.$foreignAsset"), None),
+        (403, ("'POST'", "'/api/admin/vault'", "'HTTP_X_CSRF_TOKEN' => $token"),
+         "$db->update('gf_identity_memberships', ['role' => 'model']"),
+    ),
+    "Composer": (
+        (401, ("'POST'", "'/api/admin/schedules'", "'asset_id' => $asset"), None),
+        (404, ("'POST'", "'/api/admin/schedules'",
+               "'asset_id' => $foreignAsset", "'HTTP_X_CSRF_TOKEN' => $csrf"), None),
+        (403, ("'POST'", "'/api/admin/schedules'",
+               "'asset_id' => $asset", "'HTTP_X_CSRF_TOKEN' => $csrf"),
+         "['role' => 'model', 'updated_at'"),
+    ),
+    "Scheduling": (
+        (401, ("'POST'", "'/api/admin/schedules'", "'asset_id' => $asset"), None),
+        (404, ("'POST'", "'/api/admin/schedules'",
+               "'asset_id' => $foreignAsset", "'HTTP_X_CSRF_TOKEN' => $csrf"), None),
+        (403, ("'POST'", "'/api/admin/schedules'",
+               "'asset_id' => $asset", "'HTTP_X_CSRF_TOKEN' => $csrf"),
+         "['role' => 'model', 'updated_at'"),
+    ),
+    "Distribution": (
+        (401, ("'PUT'", "'/api/admin/distribution-authorizations/'.$asset"), None),
+        (404, ("'PUT'", "'/api/admin/distribution-authorizations/'.$foreignAsset",
+               "'HTTP_X_CSRF_TOKEN' => $csrf"), None),
+    ),
+    "Dashboard": (
+        (401, ("'GET'", "'/api/admin/pilot/weekly-summary'"), None),
+        (403, ("'GET'", "'/api/admin/pilot/weekly-summary?week='.$thisWeek",
+               "'organization_access_changed'"),
+         "$db->delete('gf_identity_memberships'"),
+    ),
+}
+
+
+def _denial_is_linked_to_request(
+    block: str, status: int, request_markers: tuple[str, ...],
+    after: str | None,
+) -> bool:
+    # Constrain the search to the scenario's setup and the individual HTTP
+    # request. Do not count an unrelated status later in the same PHP method.
+    if after is not None:
+        if after not in block:
+            return False
+        block = block.split(after, 1)[1]
+    for part in block.split("$client->request(")[1:]:
+        request = "$client->request(" + part
+        if (
+            all(marker in request for marker in request_markers)
+            and re.search(r"self::assertResponseStatusCodeSame\\(" + str(status) + r"\\)", request)
+        ):
+            return True
+    return False
+
 def _method(source: str, name: str) -> str:
     match = re.search(r"\bfunction\s+" + re.escape(name) + r"\s*\(", source)
     if match is None:
@@ -74,10 +133,21 @@ class MvpE2eTenantMatrixTests(unittest.TestCase):
                 self.assertIn("organization_id", block)
                 self.assertIn("role", block)
                 self.assertRegex(block, r"(?i)\b(?:foreign|other)\b")
-                for code in codes:
+                self.assertEqual(
+                    {status for status, _, _ in DENIAL_CASES[module]}, set(codes)
+                )
+                for status, request_markers, after in DENIAL_CASES[module]:
+                    self.assertTrue(
+                        _denial_is_linked_to_request(
+                            block, status, request_markers, after
+                        ),
+                        f"Missing scoped {status} denial for {module}: "
+                        f"{request_markers!r} after {after!r}",
+                    )
+                if module == "Dashboard":
                     self.assertIn(
-                        f"assertResponseStatusCodeSame({code})", block,
-                        f"Missing actual HTTP denial {code} for {module}",
+                        "self::assertStringNotContainsString('foreign.png', "
+                        "(string) $client->getResponse()->getContent());", block
                     )
                 self.assertIn("| " + module + " |", markdown)
                 self.assertIn(relative, markdown)
