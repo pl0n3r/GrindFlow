@@ -255,6 +255,7 @@ jobs:
           [[ -f tests/test_mobile_upload_ingest.py ]] && python3 -m unittest tests/test_mobile_upload_ingest.py
           [[ -f tests/test_mobile_upload_ux.py ]] && python3 -m unittest tests/test_mobile_upload_ux.py
           [[ -f tests/test_media_pilot_readiness_contract.py ]] && python3 -m unittest tests/test_media_pilot_readiness_contract.py
+           python3 -m unittest tests/test_media_storage_cors_preflight.py
           python3 -m unittest tests/test_s4_database_url_percent_encoding.py
 
       - name: Validate workflow YAML and smoke shell syntax
@@ -803,6 +804,10 @@ jobs:
       - name: Symfony HTTP test suite
         working-directory: symfony
         run: php vendor/bin/simple-phpunit -c phpunit.xml.dist
+      - name: Ejecutar aceptación HTTP negativa de MVP
+        # La fuente del test está en tests/, pero usa Symfony/MariaDB de este job.
+        working-directory: .
+        run: python3 -m unittest tests/test_mvp_symfony_http_negatives.py -v
       - name: Verify migration reversibility on disposable MariaDB
         working-directory: symfony
         run: |

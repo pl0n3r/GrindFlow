@@ -99,6 +99,10 @@ grindflow_ci_classify_files() {
         grindflow_ci_scope_add_area "Browser tests"
         GRINDFLOW_SCOPE_RUN_BROWSER=true
         ;;
+      tests/test_mvp_symfony_http_negatives.py)
+        grindflow_ci_scope_add_area "Symfony HTTP negative acceptance"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
+        ;;
       tests/*)
         grindflow_ci_scope_add_area "Laravel tests"
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
