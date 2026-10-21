@@ -35,7 +35,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           EVENT_SHA: ${{ github.sha }}
           EVENT_REF: ${{ github.ref }}
-          RUN_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
@@ -47,8 +47,11 @@ jobs:
           case "$EVENT_NAME" in
             schedule|workflow_dispatch) ;;
             workflow_run)
-              case "$RUN_WORKFLOW_NAME" in
-                "GrindFlow CI Health"|"GrindFlow Deploy Observer"|"GrindFlow Production Smoke") ;;
+              # GitHub's workflow_run.name is the dynamic run-name, not the
+              # canonical workflow registration name. Verify immutable source
+              # workflow IDs supplied by GitHub instead of comparing run names.
+              case "$RUN_WORKFLOW_ID" in
+                362753174|362346952|362299230) ;;
                 *) echo "::error::Unsupported health source"; exit 1 ;;
               esac
               [[ "$RUN_HEAD_BRANCH" == "main" && "$RUN_HEAD_REPO" == "$REPOSITORY" && "$RUN_STATUS" == "completed" ]] || {
