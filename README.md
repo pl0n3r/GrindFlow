@@ -50,6 +50,8 @@ La arquitectura objetivo es un monolito modular API-first. La transición tecnol
 
 El código incluye [colecciones y variantes de Library #414](https://github.com/pl0n3r/GrindFlow/issues/414) y [vigencia UTC de assets #407](https://github.com/pl0n3r/GrindFlow/issues/407), entregas fusionadas. La ruta [Composer Symfony → Facebook Pages #260](https://github.com/pl0n3r/GrindFlow/issues/260) y la [entrega técnica MVP #250](https://github.com/pl0n3r/GrindFlow/pull/258) cuentan con implementación, **no** con autorización para publicación externa, cohorte real o go-live: rigen las decisiones de [#271](https://github.com/pl0n3r/GrindFlow/issues/271) y [#453](https://github.com/pl0n3r/GrindFlow/issues/453).
 
+La readiness S4 `forbidden` es una señal fail-closed de configuración y publicación; solo evidencia de Production Smoke y el SHA efectivamente desplegado permiten acreditar su superación. El README no certifica esos hechos.
+
 La fuente técnica de los límites del piloto y la separación entre código y runtime está en [AGENTS.md](AGENTS.md) y [STACK-TRANSITION-SYMFONY.md](docs/STACK-TRANSITION-SYMFONY.md).
 
 ## Stack e infraestructura
