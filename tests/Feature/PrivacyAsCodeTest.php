@@ -24,6 +24,7 @@ final class PrivacyAsCodeTest extends TestCase
                 'account_credentials',
                 'account_identity',
                 'cloud_connections',
+                'diagnostic_incidents',
                 'instagram_reels_publication',
                 'legacy_supabase_link_clicks',
                 'legacy_supabase_platform_credentials',
@@ -104,7 +105,7 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertSame(['supabase'], $this->treatment($data, 'organization_membership')['providers']);
         self::assertSame(['supabase'], $this->treatment($data, 'traffic_links')['providers']);
 
-        foreach (['account_credentials', 'traffic_dedupe', 'traffic_metrics'] as $id) {
+        foreach (['account_credentials', 'diagnostic_incidents', 'traffic_dedupe', 'traffic_metrics'] as $id) {
             self::assertSame([], $this->treatment($data, $id)['providers']);
         }
 
@@ -158,12 +159,12 @@ final class PrivacyAsCodeTest extends TestCase
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '1cf771d0678feafc8826dfe4304da504462e78b22c498de0e3938e48e7631660',
-            'aviso-privacidad.md' => '98ae90ada7d25864e2308b683fe9292f9d47bac808e267d985c136f7c07167dd',
+            'politica-tratamiento.md' => '079d996b4990e05dfac11d4ccca71d8dd48825b7833682c3850f8451ed0a5460',
+            'aviso-privacidad.md' => '0ddc1aa96857a917eca201f98be996d21e2b7533996a8a87fa9bbfb8bdd9b283',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
-            'registro-tratamientos.md' => 'eec243f966e6f3005c02c995f1f1eb9e3f474ecce9d8e06c3b5f6bc318f7941e',
+            'registro-tratamientos.md' => '55205ee6ee8912aeb4e06a7d809ec9aad13b61202ed9eecbc3f67e861fbb501c',
             'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
-            'retencion.md' => 'da325350e92674a930feff5d4f0502bf1453bd48e88476cccc16715243aac491',
+            'retencion.md' => '07fe532dd8fb2cd0f80aef7579b09dae739b161a2f2434e6fa86b3037caccfeb',
         ];
 
         foreach ($expected as $name => $sha256) {
