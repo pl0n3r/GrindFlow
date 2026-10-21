@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "operations-health.py"
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "operations-health.yml"
+CI_HEALTH_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci-health.yml"
 RUNBOOK_PATH = ROOT / "docs" / "PRODUCTION-OPERATIONS.md"
 
 SPEC = importlib.util.spec_from_file_location("operations_health", SCRIPT_PATH)
@@ -177,6 +178,49 @@ class OperationsHealthContractTests(unittest.TestCase):
         ):
             self.assertIn(forbidden, text)
         self.assertIn("no sustituye una autorización operacional específica", text)
+
+    def test_ci_health_is_scheduled_on_main_push_only(self) -> None:
+        workflow = CI_HEALTH_WORKFLOW_PATH.read_text(encoding="utf-8")
+        triggers = workflow.split("permissions:", 1)[0]
+        self.assertIn("name: GrindFlow CI Health", workflow)
+        self.assertIn("on:\n  push:\n    branches: [main]\n", triggers)
+        self.assertIn("  schedule:\n", triggers)
+        self.assertIn("  workflow_dispatch:\n", triggers)
+        self.assertNotIn("pull_request:", triggers)
+        self.assertNotIn("pull_request_target:", triggers)
+
+    def test_workflow_run_reconciles_only_exact_main_ci_health(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        triggers = workflow.split("permissions:", 1)[0]
+        self.assertIn(
+            'workflow_run:\n    workflows: ["GrindFlow CI Health", "GrindFlow Deploy Observer", "GrindFlow Production Smoke"]\n'
+            '    types: [completed]\n    branches: [main]',
+            triggers,
+        )
+        for required in (
+            "schedule|workflow_dispatch",
+            "workflow_run)",
+            'RUN_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}',
+            'RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}',
+            'RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}',
+            'RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}',
+            'RUN_EVENT: ${{ github.event.workflow_run.event }}',
+            'RUN_STATUS: ${{ github.event.workflow_run.status }}',
+            ' "GrindFlow CI Health"|"GrindFlow Deploy Observer"|"GrindFlow Production Smoke") ;; '.strip(),
+            '"$RUN_HEAD_BRANCH" == "main"',
+            '"$RUN_HEAD_REPO" == "$REPOSITORY"',
+            '"$RUN_STATUS" == "completed"',
+            'push|schedule|workflow_dispatch) ;;',
+            '"$RUN_HEAD_SHA" != "$current_main"',
+            'report_main="$(jq -r',
+            '"$report_main" == "$current_main"',
+        ):
+            self.assertIn(required, workflow)
+        self.assertNotIn("pull_request:", triggers)
+        self.assertLess(
+            workflow.index('[[ "$report_main" == "$current_main" ]]'),
+            workflow.index("gh issue edit"),
+        )
 
     def test_workflow_is_read_only_against_production(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")

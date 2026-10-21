@@ -10,6 +10,17 @@ El workflow .github/workflows/operations-health.yml corre por schedule o manualm
 desde main. Lee únicamente metadata saneada de GitHub Actions para las fuentes
 ci_health, deploy_observer y production_smoke.
 
+CI Health corre además ante cada push a main; la finalización de cualquiera de
+las tres fuentes (CI Health, Deploy Observer o Production Smoke) activa
+Operations Health para reconciliar la alerta sin esperar al cron. Así, si
+CI Health termina primero, la última señal productiva dispara otra observación.
+La
+observación rechaza runs de ramas, repositorios o SHA diferentes del main
+actual, y el job escritor vuelve a validar ese SHA antes de cerrar o editar
+la alerta. Si main avanza durante la verificación, se conserva el estado
+anterior hasta un nuevo run válido; un workflow_run completado no implica
+por sí solo un resultado HEALTHY ni autoriza despliegues.
+
 Cada señal queda reducida a source, severity, state, freshness, SHA, run ID/URL,
 conclusión y timestamp terminal. El evaluador scripts/operations-health.py no hace red
 ni lee producción.

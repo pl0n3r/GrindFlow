@@ -2,6 +2,8 @@ name: GrindFlow CI Health
 run-name: CI Health #${{ github.run_number }} · ${{ github.event_name }}
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '15 8 * * *'
   workflow_dispatch:
