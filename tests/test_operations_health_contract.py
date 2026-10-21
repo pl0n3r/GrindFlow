@@ -252,12 +252,23 @@ class OperationsHealthContractTests(unittest.TestCase):
                     RUN_WORKFLOW_ID=identity, RUN_WORKFLOW_NAME=display
                 )
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        # Non-workflow-run entry points remain usable without source metadata.
+        for event in ("schedule", "workflow_dispatch"):
+            with self.subTest(event=event):
+                result = self._run_workflow_run_guard(
+                    EVENT_NAME=event, RUN_WORKFLOW_ID="",
+                    RUN_WORKFLOW_NAME="",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_dynamic_health_run_names_reject_forged_or_malformed_sources(self) -> None:
         for override in (
             {"RUN_WORKFLOW_ID": "999999"},
             {"RUN_WORKFLOW_ID": "invalid"},
             {"RUN_WORKFLOW_ID": ""},
+            {"RUN_WORKFLOW_ID": "362346952-extra"},
+            {"EVENT_NAME": "pull_request"},
+            {"EVENT_REF": "refs/heads/feature"},
             {"RUN_HEAD_REPO": "external/repository"},
             {"RUN_HEAD_BRANCH": "feature"},
             {"RUN_STATUS": "in_progress"},
