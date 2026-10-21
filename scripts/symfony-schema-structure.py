@@ -356,7 +356,7 @@ def apply_create_table(
     tables[name] = parse_table(name, body, migration)
 
 
-def apply_alter_table(statement: str, tables: dict[str, dict[str, Any]]) -> None:
+def apply_alter_table(statement: str, tables: dict[str, dict[str, Any]], migration: str) -> None:
     """Apply supported additive ALTER TABLE operations to an existing table."""
     match = ALTER_TABLE.match(normalize_space(statement))
     if match is None:
@@ -368,6 +368,22 @@ def apply_alter_table(statement: str, tables: dict[str, dict[str, Any]]) -> None
     table = tables.get(name)
     if table is None:
         raise ValueError(f"ALTER TABLE targets unknown table: {name}")
+
+    # This *single* exact source migration only widens an already-named CHECK.
+    # The schema inventory intentionally does not model CHECK expressions, so
+    # columns, indexes and FKs remain structurally unchanged. Every other DROP,
+    # including a weaker or missing replacement, remains forbidden.
+    fragments = [normalize_space(part) for part in split_top_level(operations)]
+    known_expansion = [
+        "DROP CONSTRAINT ck_gf_external_attempt_provider",
+        "ADD CONSTRAINT ck_gf_external_attempt_provider CHECK (provider IN ('facebook_page', 'instagram_reels'))",
+    ]
+    if (
+        name == "gf_external_publication_attempts"
+        and migration == "symfony/migrations/Version20261019193000.php"
+        and fragments == known_expansion
+    ):
+        return
 
     for operation in split_top_level(operations):
         normalized = normalize_space(operation)
@@ -440,7 +456,7 @@ def apply_statement(
         apply_create_table(statement, migration, tables, duplicate_tables)
         return
     if upper.startswith("ALTER TABLE "):
-        apply_alter_table(statement, tables)
+        apply_alter_table(statement, tables, migration)
         return
     if upper.startswith("DROP TRIGGER "):
         apply_drop_trigger(statement, migration, triggers)

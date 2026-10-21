@@ -2,15 +2,39 @@
 import copy
 import importlib.util
 import io
+import socket
+import tempfile
 import unittest
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import ExitStack, contextmanager, redirect_stdout, redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/prelive_compliance_gate.py"
+@contextmanager
+def block_network():
+    """Fail at the socket boundary, also for imports and indirect transports."""
+    with ExitStack() as stack:
+        targets = [
+            "socket.socket.connect", "socket.socket.connect_ex",
+            "socket.socket.sendto", "socket.socket.send",
+            "socket.socket.sendall", "socket.create_connection",
+            "socket.getaddrinfo", "socket.gethostbyname",
+            "socket.gethostbyname_ex", "socket.getnameinfo",
+        ]
+        # Vectored datagram sends can include a destination without connect().
+        # This socket method is optional on some platforms, so guard it when present.
+        if hasattr(socket.socket, "sendmsg"):
+            targets.append("socket.socket.sendmsg")
+        for target in targets:
+            stack.enter_context(patch(target, side_effect=AssertionError("NETWORK_DISABLED")))
+        yield
+
+
 spec = importlib.util.spec_from_file_location("prelive_compliance_gate", SCRIPT)
 module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+with block_network():
+    spec.loader.exec_module(module)
 
 
 def fixture():
@@ -29,6 +53,56 @@ def fixture():
 
 
 class PreliveComplianceGateTests(unittest.TestCase):
+    def setUp(self):
+        # Keep the guard active around *every* evaluate() call in this suite.
+        guard = block_network()
+        guard.__enter__()
+        self.addCleanup(guard.__exit__, None, None, None)
+
+    def test_network_guard_catches_import_side_effect(self):
+        # This probe must never open a real socket; the guard intercepts it.
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "synthetic_import.py"
+            path.write_text(
+                'import socket\nsocket.create_connection(("127.0.0.1", 9))\n',
+                encoding="utf-8",
+            )
+            probe_spec = importlib.util.spec_from_file_location("synthetic_import", path)
+            probe = importlib.util.module_from_spec(probe_spec)
+            with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                probe_spec.loader.exec_module(probe)
+
+    def test_network_guard_catches_evaluate_side_effect(self):
+        # Reject both outgoing TCP and datagram effects in a synthetic evaluator.
+        for operation in ("connect", "sendto"):
+            with self.subTest(operation=operation):
+                def synthetic_evaluate(_facts):
+                    with socket.socket() as probe:
+                        if operation == "connect":
+                            probe.connect(("127.0.0.1", 9))
+                        else:
+                            probe.sendto(b"probe", ("127.0.0.1", 9))
+
+                with patch.object(module, "evaluate", side_effect=synthetic_evaluate):
+                    with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                        module.evaluate(fixture())
+
+    def test_network_guard_catches_dns_and_vectored_send(self):
+        # Invalid arguments guarantee no real DNS or packet emission even if
+        # a future regression inadvertently removes one of these patches.
+        for target, invoke in (
+            ("gethostbyname", lambda: socket.gethostbyname(None)),
+            ("gethostbyname_ex", lambda: socket.gethostbyname_ex(None)),
+            ("getnameinfo", lambda: socket.getnameinfo(None, 0)),
+        ):
+            with self.subTest(target=target):
+                with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                    invoke()
+        if hasattr(socket.socket, "sendmsg"):
+            # Invalid receiver would raise TypeError without the guard; no I/O.
+            with self.assertRaisesRegex(AssertionError, "NETWORK_DISABLED"):
+                socket.socket.sendmsg(object(), [b"probe"], [], 0, ("127.0.0.1", 9))
+
     def blocked(self, payload, reason):
         result = module.evaluate(payload)
         self.assertEqual(result["status"], "BLOCKED")
