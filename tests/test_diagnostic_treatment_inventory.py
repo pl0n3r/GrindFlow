@@ -56,6 +56,10 @@ class DiagnosticTreatmentInventoryTests(unittest.TestCase):
         self.assertEqual(self.row["purpose"], "application_error_diagnostics")
         self.assertEqual(self.row["providers"], [])
         self.assertEqual(self.row["fields"], DIAGNOSTIC_FIELDS)
+        # AC-01: no inventar telemetría móvil/salud o señales no emitidas.
+        self.assertTrue(set(self.row["fields"]).isdisjoint(
+            {"event_name", "health", "mobile", "ip"}
+        ))
         for persisted in (
             "'timestamp' =>", "'incident_id' =>", "'status' =>",
             "'exception' =>", "'message' =>", "'location' =>",
