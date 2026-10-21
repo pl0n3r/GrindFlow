@@ -34,6 +34,16 @@ Producto: `pl0n3r/GrindFlow`
 - Proveedores: `dropbox`, `google_drive`, `supabase`
 - Retención: `review_required`
 
+## diagnostic_incidents
+
+- Categoría: `usage`
+- Campos de software: `timestamp`, `incident_id`, `status`, `exception`, `message`, `location`, `request.source`, `request.method`, `request.path`, `request.route`, `request.user_id`, `request.organization_id`, `trace.file`, `trace.line`, `trace.call`
+- Finalidad: `application_error_diagnostics`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
 ## instagram_reels_publication
 
 - Categoría: `usage`

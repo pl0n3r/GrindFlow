@@ -38,6 +38,34 @@ secretos de conexion.
 Los archivos diagnosticos rotan aproximadamente cada 2 MB. La lectura del panel
 esta limitada a los 50 incidentes mas recientes.
 
+## Inventario técnico y límites de privacidad
+
+El tratamiento `diagnostic_incidents` de `datos.yml` documenta los
+campos que `DiagnosticLog::record()` escribe en JSONL privado:
+`timestamp`, `incident_id`, `status`, `exception`, `message`,
+`location`, `request.source/method/path/route/user_id/organization_id`
+y `trace.file/line/call`, sin argumentos de llamadas. En invocaciones
+de consola solo se guarda `request.source=console`; los campos HTTP no
+están presentes. Finalidad: `application_error_diagnostics` (uso/seguridad).
+Base, consentimiento y retención: `review_required`. No hay un proveedor
+externo acreditado para el JSONL local.
+
+La **retención local del JSONL es UNKNOWN**: `MAX_FILE_BYTES=2_000_000`
+expresa rotación por tamaño y **no** constituye eliminación por antigüedad.
+Los artifacts redactados de GitHub `production-diagnostics-*` tienen
+**3 días** de conservación; este plazo **no aplica** a los archivos locales
+`storage/logs/diagnostics-*.jsonl*`. No se ha demostrado el borrado
+automático de los archivos rotados.
+
+El JSONL está en el almacenamiento privado del servidor y no tiene acceso
+HTTP público; el panel y el JSON de `/admin/diagnostics` exigen
+`platform_role=admin`. La sanitización por patrones comunes **no
+garantiza** ausencia total de datos personales o secretos incidentales en
+mensajes, ubicaciones y trazas. No copiar registros reales a repositorios,
+issues ni artefactos públicos. Un artefacto redactado de tres días no es
+evidencia de consentimiento, retención local, aprobación jurídica ni go-live.
+
+
 ## Panel admin
 
 Solo un usuario con `platform_role=admin` puede abrir:
