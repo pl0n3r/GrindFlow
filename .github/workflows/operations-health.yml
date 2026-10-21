@@ -3,7 +3,7 @@ run-name: "Operations Health #${{ github.run_number }} · ${{ github.ref_name }}
 
 on:
   workflow_run:
-    workflows: ["GrindFlow CI Health"]
+    workflows: ["GrindFlow CI Health", "GrindFlow Deploy Observer", "GrindFlow Production Smoke"]
     types: [completed]
     branches: [main]
   schedule:
@@ -35,6 +35,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           EVENT_SHA: ${{ github.sha }}
           EVENT_REF: ${{ github.ref }}
+          RUN_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
@@ -46,13 +47,17 @@ jobs:
           case "$EVENT_NAME" in
             schedule|workflow_dispatch) ;;
             workflow_run)
+              case "$RUN_WORKFLOW_NAME" in
+                "GrindFlow CI Health"|"GrindFlow Deploy Observer"|"GrindFlow Production Smoke") ;;
+                *) echo "::error::Unsupported health source"; exit 1 ;;
+              esac
               [[ "$RUN_HEAD_BRANCH" == "main" && "$RUN_HEAD_REPO" == "$REPOSITORY" && "$RUN_STATUS" == "completed" ]] || {
-                echo "::error::CI Health workflow_run is not terminal main of this repository"
+                echo "::error::Health workflow_run is not terminal main of this repository"
                 exit 1
               }
               case "$RUN_EVENT" in
                 push|schedule|workflow_dispatch) ;;
-                *) echo "::error::Unsupported CI Health origin"; exit 1 ;;
+                *) echo "::error::Unsupported source workflow origin"; exit 1 ;;
               esac
               ;;
             *) echo "::error::Unsupported event"; exit 1 ;;
@@ -67,7 +72,7 @@ jobs:
             exit 1
           }
           if [[ "$EVENT_NAME" == "workflow_run" && "$RUN_HEAD_SHA" != "$current_main" ]]; then
-            echo "::error::Stale CI Health run cannot reconcile current main"
+            echo "::error::Stale source run cannot reconcile current main"
             exit 1
           fi
 

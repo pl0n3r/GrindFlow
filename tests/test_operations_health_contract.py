@@ -193,18 +193,20 @@ class OperationsHealthContractTests(unittest.TestCase):
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         triggers = workflow.split("permissions:", 1)[0]
         self.assertIn(
-            'workflow_run:\n    workflows: ["GrindFlow CI Health"]\n'
+            'workflow_run:\n    workflows: ["GrindFlow CI Health", "GrindFlow Deploy Observer", "GrindFlow Production Smoke"]\n'
             '    types: [completed]\n    branches: [main]',
             triggers,
         )
         for required in (
             "schedule|workflow_dispatch",
             "workflow_run)",
+            'RUN_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}',
             'RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}',
             'RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}',
             'RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}',
             'RUN_EVENT: ${{ github.event.workflow_run.event }}',
             'RUN_STATUS: ${{ github.event.workflow_run.status }}',
+            ' "GrindFlow CI Health"|"GrindFlow Deploy Observer"|"GrindFlow Production Smoke") ;; '.strip(),
             '"$RUN_HEAD_BRANCH" == "main"',
             '"$RUN_HEAD_REPO" == "$REPOSITORY"',
             '"$RUN_STATUS" == "completed"',
