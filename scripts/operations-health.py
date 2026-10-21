@@ -67,6 +67,7 @@ def evaluate(payload: Mapping[str, Any], *, main_sha: str) -> dict[str, Any]:
     fingerprint_payload = [
         {
             "source": row["source"],
+            "status": row["status"],
             "state": row["state"],
             "freshness": row["freshness"],
             "head_sha": row["head_sha"],
@@ -113,6 +114,7 @@ def _signal(raw: Any, *, main_sha: str) -> dict[str, Any]:
             raise OperationsHealthError("signal missing no puede traer evidencia.")
         return {
             "source": source,
+            "status": status,
             "severity": SEVERITY[source],
             "state": "UNKNOWN",
             "freshness": "UNKNOWN",
@@ -153,6 +155,7 @@ def _signal(raw: Any, *, main_sha: str) -> dict[str, Any]:
 
     return {
         "source": source,
+        "status": status,
         "severity": SEVERITY[source],
         "state": state,
         "freshness": freshness,

@@ -144,6 +144,68 @@ class OperationsHealthContractTests(unittest.TestCase):
         self.assertNotIn('"$issue_state" == "CLOSED"', workflow)
         self.assertNotIn("gh issue comment", workflow)
 
+    def test_nonterminal_signals_are_unknown_and_render_real_status(self) -> None:
+        fingerprints = set()
+        for state in ("in_progress", "queued", "pending", "waiting"):
+            with self.subTest(state=state):
+                pending = payload()
+                pending["signals"][0]["status"] = state
+                pending["signals"][0]["conclusion"] = None
+                result = OPERATIONS.evaluate(pending, main_sha=self.MAIN_SHA)
+                row = next(
+                    item for item in result["signals"]
+                    if item["source"] == "production_smoke"
+                )
+                self.assertEqual("UNKNOWN", result["state"])
+                self.assertEqual(("UNKNOWN", "CURRENT", "run_not_terminal"),
+                                 (row["state"], row["freshness"], row["reason"]))
+                self.assertEqual(state, row["status"])
+                self.assertIsNone(row["conclusion"])
+                self.assertIn(
+                    f"[run 103](https://github.com/pl0n3r/GrindFlow/actions/runs/103) · {state}",
+                    result["alert"]["body"],
+                )
+                fingerprints.add(result["fingerprint"])
+        self.assertEqual(4, len(fingerprints))
+
+    def test_missing_and_failed_signals_render_safe_evidence(self) -> None:
+        missing = payload()
+        missing["signals"][0] = {
+            "source": "production_smoke",
+            "status": "missing",
+            "conclusion": None,
+            "head_sha": None,
+            "run_id": None,
+            "url": None,
+            "updated_at": None,
+        }
+        result = OPERATIONS.evaluate(missing, main_sha=self.MAIN_SHA)
+        self.assertEqual("UNKNOWN", result["state"])
+        smoke = next(x for x in result["signals"] if x["source"] == "production_smoke")
+        self.assertEqual("missing", smoke["status"])
+        self.assertEqual("UNKNOWN", smoke["freshness"])
+        self.assertIn(
+            "| production_smoke | S2 | UNKNOWN | UNKNOWN | missing |",
+            result["alert"]["body"],
+        )
+        failed = payload()
+        failed["signals"][1]["conclusion"] = "failure"
+        result = OPERATIONS.evaluate(failed, main_sha=self.MAIN_SHA)
+        self.assertEqual("DEGRADED", result["state"])
+        ci = next(x for x in result["signals"] if x["source"] == "ci_health")
+        self.assertEqual(("completed", "failure", "DEGRADED"),
+                         (ci["status"], ci["conclusion"], ci["state"]))
+        self.assertIn(
+            "[run 101](https://github.com/pl0n3r/GrindFlow/actions/runs/101) · failure",
+            result["alert"]["body"],
+        )
+        tainted = payload()
+        tainted["signals"][0]["authorization"] = "Bearer test-secret"
+        with self.assertRaises(OPERATIONS.OperationsHealthError) as ctx:
+            OPERATIONS.evaluate(tainted, main_sha=self.MAIN_SHA)
+        self.assertNotIn("test-secret", str(ctx.exception))
+        self.assertNotIn("test-secret", result["alert"]["body"])
+
     def test_runbook_covers_health_publication_storage_incidents_and_recovery(self) -> None:
         text = RUNBOOK_PATH.read_text(encoding="utf-8")
         for heading in (
