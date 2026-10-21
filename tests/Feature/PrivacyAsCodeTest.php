@@ -159,11 +159,11 @@ final class PrivacyAsCodeTest extends TestCase
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '079d996b4990e05dfac11d4ccca71d8dd48825b7833682c3850f8451ed0a5460',
+            'politica-tratamiento.md' => 'ded8e86099cfa9b93dd0258d6d13ff9423a89e1f60ae9345bdfcd80b8e7ce7b5',
             'aviso-privacidad.md' => '0ddc1aa96857a917eca201f98be996d21e2b7533996a8a87fa9bbfb8bdd9b283',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
             'registro-tratamientos.md' => '55205ee6ee8912aeb4e06a7d809ec9aad13b61202ed9eecbc3f67e861fbb501c',
-            'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
+            'canal-derechos.md' => 'd1f16337c52fd7afed1aeffd03bed96ce7d0ec2407b5963d4511612e03a17d25',
             'retencion.md' => '07fe532dd8fb2cd0f80aef7579b09dae739b161a2f2434e6fa86b3037caccfeb',
         ];
 
