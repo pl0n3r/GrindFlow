@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import os
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -9,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "operations-health.py"
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "operations-health.yml"
+CI_HEALTH_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci-health.yml"
 RUNBOOK_PATH = ROOT / "docs" / "PRODUCTION-OPERATIONS.md"
 
 SPEC = importlib.util.spec_from_file_location("operations_health", SCRIPT_PATH)
@@ -177,6 +182,137 @@ class OperationsHealthContractTests(unittest.TestCase):
         ):
             self.assertIn(forbidden, text)
         self.assertIn("no sustituye una autorización operacional específica", text)
+
+    def test_ci_health_is_scheduled_on_main_push_only(self) -> None:
+        workflow = CI_HEALTH_WORKFLOW_PATH.read_text(encoding="utf-8")
+        triggers = workflow.split("permissions:", 1)[0]
+        self.assertIn("name: GrindFlow CI Health", workflow)
+        self.assertIn("on:\n  push:\n    branches: [main]\n", triggers)
+        self.assertIn("  schedule:\n", triggers)
+        self.assertIn("  workflow_dispatch:\n", triggers)
+        self.assertNotIn("pull_request:", triggers)
+        self.assertNotIn("pull_request_target:", triggers)
+
+
+    @staticmethod
+    def _run_workflow_run_guard(**overrides: str) -> subprocess.CompletedProcess[str]:
+        """Execute the actual event guard with a fake, read-only gh CLI."""
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        guard = workflow.split(
+            "      - name: Validate event and exact main before checkout", 1
+        )[1].split("        run: |\n", 1)[1].split(
+            "\n      - name: Checkout exact main", 1
+        )[0]
+        guard = textwrap.dedent(guard)
+        main_sha = "a" * 40
+        with tempfile.TemporaryDirectory() as directory:
+            gh = Path(directory) / "gh"
+            gh.write_text(
+                "#!/bin/sh\n"
+                'if [ "$1" = api ] && [ "$2" = "repos/pl0n3r/GrindFlow/commits/main" ]; then\n'
+                '  printf "%s\\n" "$FAKE_MAIN_SHA"\n'
+                "else\n"
+                "  exit 2\n"
+                "fi\n",
+                encoding="utf-8",
+            )
+            gh.chmod(0o700)
+            env = os.environ.copy()
+            env.update({
+                "PATH": directory + os.pathsep + env.get("PATH", ""),
+                "FAKE_MAIN_SHA": main_sha,
+                "EVENT_NAME": "workflow_run",
+                "REPOSITORY": "pl0n3r/GrindFlow",
+                "EVENT_SHA": main_sha,
+                "EVENT_REF": "refs/heads/main",
+                "RUN_WORKFLOW_ID": "362346952",
+                "RUN_WORKFLOW_NAME": "GrindFlow Deploy Observer #248 · main",
+                "RUN_HEAD_SHA": main_sha,
+                "RUN_HEAD_BRANCH": "main",
+                "RUN_HEAD_REPO": "pl0n3r/GrindFlow",
+                "RUN_EVENT": "push",
+                "RUN_STATUS": "completed",
+            })
+            env.update(overrides)
+            return subprocess.run(
+                ["bash", "-e", "-o", "pipefail", "-c", guard],
+                cwd=ROOT, env=env, text=True, capture_output=True, check=False,
+            )
+
+    def test_dynamic_health_run_names_use_strict_trusted_allowlist(self) -> None:
+        # Names from authenticated runs are dynamic and must not block the
+        # immutable workflow IDs for CI Health, Deploy Observer, and Smoke.
+        for identity, display in (
+            ("362753174", "CI Health #31 · push"),
+            ("362346952", "GrindFlow Deploy Observer #248 · main"),
+            ("362299230", "GrindFlow Production Smoke"),
+        ):
+            with self.subTest(workflow_id=identity):
+                result = self._run_workflow_run_guard(
+                    RUN_WORKFLOW_ID=identity, RUN_WORKFLOW_NAME=display
+                )
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        # Non-workflow-run entry points remain usable without source metadata.
+        for event in ("schedule", "workflow_dispatch"):
+            with self.subTest(event=event):
+                result = self._run_workflow_run_guard(
+                    EVENT_NAME=event, RUN_WORKFLOW_ID="",
+                    RUN_WORKFLOW_NAME="",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+    def test_dynamic_health_run_names_reject_forged_or_malformed_sources(self) -> None:
+        for override in (
+            {"RUN_WORKFLOW_ID": "999999"},
+            {"RUN_WORKFLOW_ID": "invalid"},
+            {"RUN_WORKFLOW_ID": ""},
+            {"RUN_WORKFLOW_ID": "362346952-extra"},
+            {"EVENT_NAME": "pull_request"},
+            {"EVENT_REF": "refs/heads/feature"},
+            {"RUN_HEAD_REPO": "external/repository"},
+            {"RUN_HEAD_BRANCH": "feature"},
+            {"RUN_STATUS": "in_progress"},
+            {"RUN_EVENT": "pull_request"},
+            {"RUN_HEAD_SHA": "b" * 40},
+            {"EVENT_SHA": "b" * 40},
+        ):
+            with self.subTest(override=override):
+                result = self._run_workflow_run_guard(**override)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("::error::", result.stdout + result.stderr)
+
+    def test_workflow_run_reconciles_only_exact_main_ci_health(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        triggers = workflow.split("permissions:", 1)[0]
+        self.assertIn(
+            'workflow_run:\n    workflows: ["GrindFlow CI Health", "GrindFlow Deploy Observer", "GrindFlow Production Smoke"]\n'
+            '    types: [completed]\n    branches: [main]',
+            triggers,
+        )
+        for required in (
+            "schedule|workflow_dispatch",
+            "workflow_run)",
+            'RUN_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}',
+            'RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}',
+            'RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}',
+            'RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}',
+            'RUN_EVENT: ${{ github.event.workflow_run.event }}',
+            'RUN_STATUS: ${{ github.event.workflow_run.status }}',
+            '362753174|362346952|362299230) ;;',
+            '"$RUN_HEAD_BRANCH" == "main"',
+            '"$RUN_HEAD_REPO" == "$REPOSITORY"',
+            '"$RUN_STATUS" == "completed"',
+            'push|schedule|workflow_dispatch) ;;',
+            '"$RUN_HEAD_SHA" != "$current_main"',
+            'report_main="$(jq -r',
+            '"$report_main" == "$current_main"',
+        ):
+            self.assertIn(required, workflow)
+        self.assertNotIn("pull_request:", triggers)
+        self.assertLess(
+            workflow.index('[[ "$report_main" == "$current_main" ]]'),
+            workflow.index("gh issue edit"),
+        )
 
     def test_workflow_is_read_only_against_production(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")

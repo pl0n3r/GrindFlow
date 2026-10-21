@@ -2,6 +2,10 @@ name: GrindFlow Operations Health
 run-name: "Operations Health #${{ github.run_number }} · ${{ github.ref_name }}"
 
 on:
+  workflow_run:
+    workflows: ["GrindFlow CI Health", "GrindFlow Deploy Observer", "GrindFlow Production Smoke"]
+    types: [completed]
+    branches: [main]
   schedule:
     - cron: '35 9 * * *'
   workflow_dispatch:
@@ -31,11 +35,34 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           EVENT_SHA: ${{ github.sha }}
           EVENT_REF: ${{ github.ref }}
+          RUN_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_STATUS: ${{ github.event.workflow_run.status }}
         shell: bash
         run: |
           set -euo pipefail
           case "$EVENT_NAME" in
             schedule|workflow_dispatch) ;;
+            workflow_run)
+              # GitHub's workflow_run.name is the dynamic run-name, not the
+              # canonical workflow registration name. Verify immutable source
+              # workflow IDs supplied by GitHub instead of comparing run names.
+              case "$RUN_WORKFLOW_ID" in
+                362753174|362346952|362299230) ;;
+                *) echo "::error::Unsupported health source"; exit 1 ;;
+              esac
+              [[ "$RUN_HEAD_BRANCH" == "main" && "$RUN_HEAD_REPO" == "$REPOSITORY" && "$RUN_STATUS" == "completed" ]] || {
+                echo "::error::Health workflow_run is not terminal main of this repository"
+                exit 1
+              }
+              case "$RUN_EVENT" in
+                push|schedule|workflow_dispatch) ;;
+                *) echo "::error::Unsupported source workflow origin"; exit 1 ;;
+              esac
+              ;;
             *) echo "::error::Unsupported event"; exit 1 ;;
           esac
           [[ "$EVENT_REF" == "refs/heads/main" ]] || {
@@ -47,6 +74,10 @@ jobs:
             echo "::error::Stale or non-main workflow execution"
             exit 1
           }
+          if [[ "$EVENT_NAME" == "workflow_run" && "$RUN_HEAD_SHA" != "$current_main" ]]; then
+            echo "::error::Stale source run cannot reconcile current main"
+            exit 1
+          fi
 
       - name: Checkout exact main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -156,6 +187,12 @@ jobs:
           report_file="$RUNNER_TEMP/grindflow-operations-health.json"
           body_file="$RUNNER_TEMP/grindflow-operations-health.md"
           printf '%s' "$REPORT_JSON" > "$report_file"
+          report_main="$(jq -r '.main_sha // empty' "$report_file")"
+          current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha')"
+          [[ "$report_main" == "$current_main" ]] || {
+            echo "::error::Main moved after observation; refuse stale alert reconciliation"
+            exit 1
+          }
           jq -e '.state == "HEALTHY" or .state == "DEGRADED" or .state == "UNKNOWN"' "$report_file" >/dev/null
           jq -r '.alert.body' "$report_file" > "$body_file"
 
