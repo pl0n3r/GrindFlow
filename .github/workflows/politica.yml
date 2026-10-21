@@ -14,8 +14,8 @@ permissions:
 jobs:
   factory-policy:
     name: Factory policy
-    uses: pl0n3r/factory/.github/workflows/politica.yml@f7661bc12f6953576d209de73ff182dc8498af91
+    uses: pl0n3r/factory/.github/workflows/politica.yml@4c26baad32f307adfb6c29e00eee989a935aa966
     with:
-      factory_ref: f7661bc12f6953576d209de73ff182dc8498af91
+      factory_ref: 4c26baad32f307adfb6c29e00eee989a935aa966
       pr_number: ${{ github.event.pull_request.number }}
       required_review_bot: coderabbitai[bot]

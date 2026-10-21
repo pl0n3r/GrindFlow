@@ -328,4 +328,7 @@ GRINDFLOW_BROWSER_CHROME="$CHROME" python3 -m unittest tests/test_mvp_a11y_keybo
 # Disposable exact-size viewport contracts in Chromium; no production traffic.
 GRINDFLOW_BROWSER_CHROME="$CHROME" python3 -m unittest tests/test_mvp_responsive_viewports.py -v
 
+# Chromium fixture: computed AA contrast, no production traffic.
+GRINDFLOW_BROWSER_CHROME="$CHROME" python3 -m unittest tests/test_mvp_a11y_contrast_browser.py -v
+
 echo "Real browser smoke tests passed."

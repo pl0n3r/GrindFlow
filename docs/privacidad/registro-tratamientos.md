@@ -34,6 +34,16 @@ Producto: `pl0n3r/GrindFlow`
 - Proveedores: `dropbox`, `google_drive`, `supabase`
 - Retención: `review_required`
 
+## instagram_reels_publication
+
+- Categoría: `usage`
+- Campos de software: `destination_instagram_user_id`, `caption`, `media_sha256`, `external_publication_id`
+- Finalidad: `professional_instagram_reels_publication`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: `meta_instagram`
+- Retención: `review_required`
+
 ## legacy_supabase_link_clicks
 
 - Categoría: `usage`

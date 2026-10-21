@@ -279,6 +279,23 @@
       "retention": "review_required",
       "consent": "review_required",
       "providers": []
+    },
+    {
+      "id": "instagram_reels_publication",
+      "category": "usage",
+      "fields": [
+        "destination_instagram_user_id",
+        "caption",
+        "media_sha256",
+        "external_publication_id"
+      ],
+      "purpose": "professional_instagram_reels_publication",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": [
+        "meta_instagram"
+      ]
     }
   ]
 }
