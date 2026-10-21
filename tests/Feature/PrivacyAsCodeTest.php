@@ -12,6 +12,7 @@ final class PrivacyAsCodeTest extends TestCase
     private const PLACEHOLDER = '[COMPLETAR POR EL DUEÑO]';
 
     private const FACTORY_SHA = 'a33b04cafeabfe0004f01fdf79291a0645a60f0a';
+
     // Privacy docs switched kit; legacy audit remains pinned separately.
     private const PRIVACY_KIT_SHA = '7d520aa7bede0f19d2ca43852212fd607f9e94b4';
 
