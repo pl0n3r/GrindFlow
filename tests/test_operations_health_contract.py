@@ -196,24 +196,24 @@ class OperationsHealthContractTests(unittest.TestCase):
 
     @staticmethod
     def _run_workflow_run_guard(**overrides: str) -> subprocess.CompletedProcess[str]:
-        """Execute the real workflow guard with a fake, read-only gh CLI."""
+        """Execute the actual event guard with a fake, read-only gh CLI."""
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         guard = workflow.split(
             "      - name: Validate event and exact main before checkout", 1
-        )[1].split("        run: |\\n".replace("\\\\n", "\\n"), 1)[1].split(
-            "\\n      - name: Checkout exact main", 1
+        )[1].split("        run: |\n", 1)[1].split(
+            "\n      - name: Checkout exact main", 1
         )[0]
         guard = textwrap.dedent(guard)
         main_sha = "a" * 40
         with tempfile.TemporaryDirectory() as directory:
             gh = Path(directory) / "gh"
             gh.write_text(
-                "#!/bin/sh\\n"
-                'if [ "$1" = api ] && [ "$2" = "repos/pl0n3r/GrindFlow/commits/main" ]; then\\n'
-                '  printf "%s\\\\n" "$FAKE_MAIN_SHA"\\n'
-                "else\\n"
-                "  exit 2\\n"
-                "fi\\n",
+                "#!/bin/sh\n"
+                'if [ "$1" = api ] && [ "$2" = "repos/pl0n3r/GrindFlow/commits/main" ]; then\n'
+                '  printf "%s\\n" "$FAKE_MAIN_SHA"\n'
+                "else\n"
+                "  exit 2\n"
+                "fi\n",
                 encoding="utf-8",
             )
             gh.chmod(0o700)
