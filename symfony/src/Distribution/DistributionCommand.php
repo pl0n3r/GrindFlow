@@ -53,7 +53,7 @@ final readonly class DistributionCommand
             if ($this->mediaPath === '' || str_contains($this->mediaPath, "\0")) {
                 throw new InvalidArgumentException('Distribution media path is invalid.');
             }
-            if (!in_array($this->mediaMime, ['image/jpeg', 'image/png'], true)) {
+            if (!in_array($this->mediaMime, ['image/jpeg', 'image/png', 'video/mp4', 'video/quicktime'], true)) {
                 throw new InvalidArgumentException('Distribution media MIME is not supported.');
             }
             if (preg_match('/^[0-9a-f]{64}$/D', strtolower((string) $this->mediaSha256)) !== 1) {

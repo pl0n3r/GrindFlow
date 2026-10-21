@@ -24,6 +24,7 @@ final class PrivacyAsCodeTest extends TestCase
                 'account_credentials',
                 'account_identity',
                 'cloud_connections',
+                'instagram_reels_publication',
                 'legacy_supabase_link_clicks',
                 'legacy_supabase_platform_credentials',
                 'legacy_supabase_upload_audit',
@@ -157,12 +158,12 @@ final class PrivacyAsCodeTest extends TestCase
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '85e24efddeec3193fe8ae5d8a9ce0f204b49f5af3fd967b95e9afee156e9593b',
-            'aviso-privacidad.md' => '12d002a416578fe5040874aeb64d7db8c10e4dc2479c0e73d9bde30736359787',
+            'politica-tratamiento.md' => '1cf771d0678feafc8826dfe4304da504462e78b22c498de0e3938e48e7631660',
+            'aviso-privacidad.md' => '98ae90ada7d25864e2308b683fe9292f9d47bac808e267d985c136f7c07167dd',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
-            'registro-tratamientos.md' => '81c3243808316e7eb7d7675977923170db19609dfcee974369b648daf6958096',
+            'registro-tratamientos.md' => 'eec243f966e6f3005c02c995f1f1eb9e3f474ecce9d8e06c3b5f6bc318f7941e',
             'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
-            'retencion.md' => '83f2248f31c9be19494303c146a1942ff65ec686be81de907fea3fe4a7d8ba23',
+            'retencion.md' => 'da325350e92674a930feff5d4f0502bf1453bd48e88476cccc16715243aac491',
         ];
 
         foreach ($expected as $name => $sha256) {

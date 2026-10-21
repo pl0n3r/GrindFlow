@@ -133,6 +133,33 @@ class SymfonySchemaStructureTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-additive ALTER"):
                 MODULE.build_inventory(Path(folder))
 
+    def test_exact_ledger_check_expansion_is_the_only_supported_constraint_replacement(self) -> None:
+        migration = "symfony/migrations/Version20261019193000.php"
+        original = (
+            "ALTER TABLE gf_external_publication_attempts "
+            "DROP CONSTRAINT ck_gf_external_attempt_provider, "
+            "ADD CONSTRAINT ck_gf_external_attempt_provider "
+            "CHECK (provider IN ('facebook_page', 'instagram_reels'))"
+        )
+        table = MODULE.new_table("gf_external_publication_attempts", "VersionOriginal.php")
+        tables = {"gf_external_publication_attempts": table}
+        MODULE.apply_alter_table(original, tables, migration)
+        self.assertEqual([], table["columns"])
+        self.assertEqual([], table["indexes"])
+        self.assertEqual([], table["foreign_keys"])
+
+        invalid = [
+            (original, "Version20261019193000.php"),
+            (original.replace("'instagram_reels'", "'unknown_provider'"), migration),
+            (original.replace("ck_gf_external_attempt_provider", "ck_unrelated_provider"), migration),
+            (original.replace(", ADD CONSTRAINT", ", DROP COLUMN id, ADD CONSTRAINT"), migration),
+            (original.replace("'facebook_page', 'instagram_reels'", "'instagram_reels'"), migration),
+        ]
+        for sql, source in invalid:
+            with self.subTest(sql=sql, migration=source):
+                with self.assertRaisesRegex(ValueError, "non-additive ALTER"):
+                    MODULE.apply_alter_table(sql, tables, source)
+
     def test_rejects_unprefixed_symfony_table(self) -> None:
         with self.assertRaisesRegex(ValueError, "gf_ prefix"):
             MODULE.parse_table("users", "id CHAR(36) NOT NULL", "Version1.php")
