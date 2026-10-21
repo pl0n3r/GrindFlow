@@ -28,7 +28,7 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
         self.assertTrue(forbidden.isdisjoint(metadata))
         self.assertTrue(all(isinstance(value, str) and value.strip() for value in metadata.values()))
 
-    def test_readme_has_contract_v1_anatomy(self):
+    def test_readme_is_contract_v2_without_unknown_blocks(self):
         readme = README.read_text(encoding="utf-8")
         headings = [
             "## Operational Cockpit",
@@ -43,39 +43,43 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
             "## Mapa de la fábrica",
         ]
         self.assertTrue(readme.startswith("# GrindFlow\n"))
+        positions = []
         for heading in headings:
             self.assertEqual(readme.count(heading), 1, heading)
-        self.assertNotIn("# GrindFlow — Último deploy", readme)
+            positions.append(readme.index(heading))
+        self.assertEqual(positions, sorted(positions))
+        for stale in (
+            "UNKNOWN", "factory:status", "factory:progress-readiness",
+            "Progress + Readiness", "| Señal | Estado |",
+            "| Dimensión | Progress | Readiness |",
+        ):
+            self.assertNotIn(stale, readme, stale)
+        cockpit = readme.split("## Operational Cockpit", 1)[1].split("## Work Queue", 1)[0]
+        self.assertIn(
+            "https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main",
+            cockpit,
+        )
+        self.assertIn(
+            "https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml?query=branch%3Amain",
+            cockpit,
+        )
+        self.assertIn("https://img.shields.io/github/v/release/pl0n3r/GrindFlow", cockpit)
+        self.assertIn("https://github.com/pl0n3r/GrindFlow/releases", cockpit)
+        self.assertIn("https://control.condorapp.com.co/", cockpit)
+        self.assertIn("acceso restringido", cockpit)
+        self.assertNotIn("| --- |", cockpit)
+
+    def test_readme_v2_keeps_operational_authority_outside_the_cover(self):
+        readme = README.read_text(encoding="utf-8")
+        self.assertIn("config/version.php", readme)
+        self.assertIn("no demuestra el SHA desplegado", readme)
+        self.assertIn("https://github.com/pl0n3r/GrindFlow/issues/2", readme)
+        self.assertIn("https://github.com/pl0n3r/GrindFlow/issues/414", readme)
+        self.assertIn("https://github.com/pl0n3r/GrindFlow/issues/407", readme)
+        self.assertIn("https://github.com/pl0n3r/GrindFlow/issues/271", readme)
+        self.assertIn("https://github.com/pl0n3r/GrindFlow/issues/453", readme)
         self.assertNotIn("## Archivos modificados en esta entrega candidata", readme)
         self.assertNotIn("## Qué se hizo", readme)
-
-    def test_derived_blocks_fail_closed_without_evidence(self):
-        readme = README.read_text(encoding="utf-8")
-        status_start = "<!-- factory:status:start -->"
-        status_end = "<!-- factory:status:end -->"
-        progress_start = "<!-- factory:progress-readiness:start -->"
-        progress_end = "<!-- factory:progress-readiness:end -->"
-        self.assertEqual(readme.count(status_start), 1)
-        self.assertEqual(readme.count(status_end), 1)
-        self.assertEqual(readme.count(progress_start), 1)
-        self.assertEqual(readme.count(progress_end), 1)
-
-        status = readme.split(status_start, 1)[1].split(status_end, 1)[0]
-        for label in (
-            "main SHA", "versión", "CI", "release", "health", "smoke/observer",
-            "quality/security", "Issue activo", "PR activo", "último release",
-        ):
-            self.assertIn(f"| {label} | UNKNOWN |", status)
-        self.assertNotIn("| GREEN |", status)
-        self.assertNotIn("| DEGRADED |", status)
-
-        progress = readme.split(progress_start, 1)[1].split(progress_end, 1)[0]
-        for label in (
-            "Target", "Progress", "Readiness", "Evidence freshness",
-            "Critical blockers", "Trend",
-        ):
-            self.assertIn(f"| {label} | UNKNOWN |", progress)
-        self.assertIn("| UNKNOWN | UNKNOWN | UNKNOWN |", progress)
 
     def test_consumer_workflow_uses_factory_v1(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
