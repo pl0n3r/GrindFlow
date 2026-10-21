@@ -12,6 +12,8 @@ final class PrivacyAsCodeTest extends TestCase
     private const PLACEHOLDER = '[COMPLETAR POR EL DUEÑO]';
 
     private const FACTORY_SHA = 'a33b04cafeabfe0004f01fdf79291a0645a60f0a';
+    // Privacy docs switched kit; legacy audit remains pinned separately.
+    private const PRIVACY_KIT_SHA = '7d520aa7bede0f19d2ca43852212fd607f9e94b4';
 
     public function test_data_map_matches_observed_grind_flow_treatments(): void
     {
@@ -182,17 +184,17 @@ final class PrivacyAsCodeTest extends TestCase
         $audit = file_get_contents($this->root().'/.github/workflows/auditoria-privacidad.yml');
 
         self::assertStringContainsString(
-            'uses: pl0n3r/factory/.github/workflows/privacidad.yml@'.self::FACTORY_SHA,
+            'uses: pl0n3r/factory/.github/workflows/privacidad.yml@'.self::PRIVACY_KIT_SHA,
             $privacy,
         );
-        self::assertStringContainsString('kit_ref: '.self::FACTORY_SHA, $privacy);
+        self::assertStringContainsString('kit_ref: '.self::PRIVACY_KIT_SHA, $privacy);
         self::assertStringContainsString("permissions:\n  contents: read", $privacy);
         self::assertStringNotContainsString('issues: write', $privacy);
         self::assertStringNotContainsString('secrets:', $privacy);
 
         $ci = file_get_contents($this->root().'/.github/workflows/grindflow-ci.yml');
         self::assertStringContainsString('repository: pl0n3r/factory', $ci);
-        self::assertStringContainsString('ref: '.self::FACTORY_SHA, $ci);
+        self::assertStringContainsString('ref: '.self::PRIVACY_KIT_SHA, $ci);
         self::assertStringContainsString('path: .factory', $ci);
         self::assertStringContainsString(
             "PRIVACY_BASE_SHA: \${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}",

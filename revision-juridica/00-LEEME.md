@@ -1,4 +1,4 @@
-Última actualización automática de las fuentes: 2026-10-19 · SHA-256 de origen: `2e799e09c40bac9a86a446ad3243623c9d600d757e5700c3952174b6eacf63bc`
+Última actualización automática de las fuentes: 2026-10-21 · SHA-256 de origen: `cf807436549874f77e31bf67bfc0be541c82e89823251d1b7db077585cd08702`
 
 # Documentos para revisión jurídica · GrindFlow
 
@@ -7,7 +7,7 @@
 ## Procedencia
 
 - Proyecto: `pl0n3r/GrindFlow` · versión declarada: `0.1.219`.
-- Fuentes: `docs/privacidad/`, `datos.yml` y `config/version.php`; huella SHA-256 verificable: `2e799e09c40bac9a86a446ad3243623c9d600d757e5700c3952174b6eacf63bc`. Fecha de generación del contenido: 2026-10-19. La huella se calcula sobre bytes y rutas de origen, no sobre el commit del paquete; permanece válida después de squash.
+- Fuentes: `docs/privacidad/`, `datos.yml` y `config/version.php`; huella SHA-256 verificable: `cf807436549874f77e31bf67bfc0be541c82e89823251d1b7db077585cd08702`. Fecha de generación del contenido: 2026-10-21. La huella se calcula sobre bytes y rutas de origen, no sobre el commit del paquete; permanece válida después de squash.
 - Las copias de los siete documentos son byte-exactas; no se editan en esta carpeta. Las correcciones del abogado deben aplicarse primero a las fuentes.
 
 ## Documentos para el abogado
@@ -40,6 +40,7 @@ Estos identificadores figuran en `datos.yml`, sin afirmar que estén operativos.
 - `cloudflare_r2`: declarado; uso efectivo y base contractual pendientes de confirmar.
 - `dropbox`: declarado; uso efectivo y base contractual pendientes de confirmar.
 - `google_drive`: declarado; uso efectivo y base contractual pendientes de confirmar.
+- `meta_instagram`: declarado; uso efectivo y base contractual pendientes de confirmar.
 - `supabase`: declarado; uso efectivo y base contractual pendientes de confirmar.
 
 ## Mantenimiento
