@@ -246,6 +246,28 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringNotContainsString('secrets:', $audit);
     }
 
+    public function test_rights_and_request_types_agree_in_all_privacy_sources(): void
+    {
+        $runbook = file_get_contents($this->root().'/docs/privacidad/operacion-derechos-incidentes.md');
+        $channel = file_get_contents($this->root().'/docs/privacidad/canal-derechos.md');
+        $policy = file_get_contents($this->root().'/docs/privacidad/politica-tratamiento.md');
+
+        foreach (['acceso', 'rectificación/corrección', 'actualización', 'portabilidad',
+            'supresión/eliminación', 'revocación'] as $right) {
+            foreach ([$runbook, $channel, $policy] as $document) {
+                self::assertStringContainsString($right, $document, 'Derecho omitido: '.$right);
+            }
+        }
+
+        foreach (['access', 'rectification', 'update', 'portability', 'deletion', 'revocation'] as $requestType) {
+            self::assertStringContainsString('`'.$requestType.'`', $runbook);
+        }
+
+        self::assertStringNotContainsString('continúan bajo la reserva V3 de GrindFlow #264', $runbook);
+        self::assertStringContainsString('no constituye aprobación jurídica', $policy);
+        self::assertStringContainsString('revisión jurídica requerida', $channel);
+    }
+
     public function test_pending_legal_states_are_not_invented(): void
     {
         $data = $this->data();
