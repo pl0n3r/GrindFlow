@@ -4,53 +4,25 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.219 · no equivale a despliegue ni a salud de producción. Candidato de colecciones y variantes (#414); `main` previo integró V0.1.218.
-<!-- recovery-sync: issue-307 · base=eb983c17576a0dd1f121870a7c4ee94589824e13 · previous=V0.1.188 -->
+**Versión de código declarada:** V0.1.219 ([`config/version.php`](config/version.php), [release publicada](https://github.com/pl0n3r/GrindFlow/releases/tag/v0.1.219)); no demuestra el SHA desplegado ni salud de producción.
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
 
 ## Operational Cockpit
 
-<!-- factory:status:start -->
-| Señal | Estado |
-| --- | --- |
-| main SHA | UNKNOWN |
-| versión | UNKNOWN |
-| CI | UNKNOWN |
-| release | UNKNOWN |
-| health | UNKNOWN |
-| smoke/observer | UNKNOWN |
-| quality/security | UNKNOWN |
-| Issue activo | UNKNOWN |
-| PR activo | UNKNOWN |
-| último release | UNKNOWN |
-<!-- factory:status:end -->
+[![GrindFlow CI · main](https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml/badge.svg?branch=main)](https://github.com/pl0n3r/GrindFlow/actions/workflows/grindflow-ci.yml?query=branch%3Amain)
+[![Última release](https://img.shields.io/github/v/release/pl0n3r/GrindFlow)](https://github.com/pl0n3r/GrindFlow/releases)
 
-### Progress + Readiness
+[GitHub Actions](https://github.com/pl0n3r/GrindFlow/actions) · [Releases](https://github.com/pl0n3r/GrindFlow/releases) · [Orquestador de ControlBot (acceso restringido)](https://control.condorapp.com.co/)
 
-<!-- factory:progress-readiness:start -->
-| Señal | Estado |
-| --- | --- |
-| Target | UNKNOWN |
-| Progress | UNKNOWN |
-| Readiness | UNKNOWN |
-| Evidence freshness | UNKNOWN |
-| Critical blockers | UNKNOWN |
-| Trend | UNKNOWN |
-
-| Dimensión | Progress | Readiness |
-| --- | --- | --- |
-| UNKNOWN | UNKNOWN | UNKNOWN |
-<!-- factory:progress-readiness:end -->
-
-> Los bloques anteriores son derivados. `UNKNOWN` o `PENDING` significa que falta evidencia canónica; nunca se promueve a `GREEN` o `DEGRADED` sin evidencia.
+Las insignias consultan fuentes vivas; **no** certifican despliegue, recuperación, preparación del piloto ni salud integral. Omitimos /health porque no se ha acreditado un endpoint público seguro.
 
 ## Work Queue
 
-- **NOW:** [#414 · colecciones y variantes Library](https://github.com/pl0n3r/GrindFlow/issues/414), candidato V0.1.219 en PR #419 pendiente de revisión y gates del HEAD final.
-- **NEXT:** [#407 · vigencia UTC Library](https://github.com/pl0n3r/GrindFlow/issues/407), después del merge de #414 y de liberar los claims compartidos.
-- **LATER:** evolución funcional y transición de stack según el [Roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2).
-- **BLOCKED:** [#139 · vulnerabilidades/dependencias](https://github.com/pl0n3r/GrindFlow/issues/139) y cualquier bloqueo vigente enlazado desde el roadmap.
+- **NOW:** [issues abiertos y su prioridad vigente](https://github.com/pl0n3r/GrindFlow/issues?q=is%3Aissue+is%3Aopen), con reserva y CI por PR, no por esta portada.
+- **NEXT:** [MVP técnico #250](https://github.com/pl0n3r/GrindFlow/issues/250) y su ruta Library → Scheduling → Distribution, con aceptación por integración.
+- **LATER:** [roadmap maestro #2](https://github.com/pl0n3r/GrindFlow/issues/2) y [transición a Symfony](docs/STACK-TRANSITION-SYMFONY.md) por slices.
+- **BLOCKED:** las decisiones B de [cohorte real #271](https://github.com/pl0n3r/GrindFlow/issues/271) y [publicación externa #453](https://github.com/pl0n3r/GrindFlow/issues/453) no autorizan participantes, datos reales ni posts en Facebook.
 
 Esta vista resume el trabajo; no sustituye el roadmap, los Issues ni las Releases.
 
@@ -74,9 +46,13 @@ flowchart LR
 
 La arquitectura objetivo es un monolito modular API-first. La transición tecnológica conserva el runtime existente hasta demostrar paridad y cutover; el README no convierte un objetivo arquitectónico en estado desplegado.
 
-### Distribution Symfony · provider pilot
+### Library, Scheduling y Distribution · transición segura
 
-En el código candidato **V0.1.219**, Symfony S4 conserva un fingerprint determinista de migraciones para el gate backup→recheck y conserva el consumo robusto de `DATABASE_URL` para credenciales percent-encoded y conserva la conexión de Schedule Draft/Composer con el adaptador **Facebook Pages**, el comando local `grindflow:s4:provision-smoke-identity` para reconciliar exclusivamente la identidad sintética reservada del smoke S4 y añade un diagnóstico owner-only de configuración, base, esquema e identidad junto con un runbook de backup, dry-run, migración, provisioning y rollback. Nada de esto se ejecuta automáticamente en producción: la capacidad de publicación **no se considera desplegada** hasta verificar el SHA del checkout productivo, el bridge web y el smoke posterior con evidencia exacta. La readiness `forbidden` de S4 es un estado transitorio de seguridad y solo se considera superada cuando Production Smoke demuestra el contrato posterior sobre el `main` exacto desplegado.
+El código incluye [colecciones y variantes de Library #414](https://github.com/pl0n3r/GrindFlow/issues/414) y [vigencia UTC de assets #407](https://github.com/pl0n3r/GrindFlow/issues/407), entregas fusionadas. La ruta [Composer Symfony → Facebook Pages #260](https://github.com/pl0n3r/GrindFlow/issues/260) y la [entrega técnica MVP #250](https://github.com/pl0n3r/GrindFlow/pull/258) cuentan con implementación, **no** con autorización para publicación externa, cohorte real o go-live: rigen las decisiones de [#271](https://github.com/pl0n3r/GrindFlow/issues/271) y [#453](https://github.com/pl0n3r/GrindFlow/issues/453).
+
+La readiness S4 `forbidden` es una señal fail-closed de configuración y publicación; solo evidencia de Production Smoke y el SHA efectivamente desplegado permiten acreditar su superación. El README no certifica esos hechos.
+
+La fuente técnica de los límites del piloto y la separación entre código y runtime está en [AGENTS.md](AGENTS.md) y [STACK-TRANSITION-SYMFONY.md](docs/STACK-TRANSITION-SYMFONY.md).
 
 ## Stack e infraestructura
 
