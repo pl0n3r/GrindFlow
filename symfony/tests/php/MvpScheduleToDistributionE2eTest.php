@@ -91,7 +91,10 @@ final class MvpScheduleToDistributionE2eTest extends WebTestCase
         self::assertFalse($agenda['can_publish']);
         self::assertSame([$created['draft']['id']], array_column($agenda['drafts'], 'id'));
         self::assertSame(0, $transport->calls);
-        self::assertSame(0, (int) $db->fetchOne('SELECT COUNT(*) FROM gf_external_publication_attempts'));
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_external_publication_attempts WHERE organization_id IN (:own, :other)',
+            ['own' => $fixture['mine'], 'other' => $fixture['foreign']],
+        ));
     }
 
     public function testCrossTenantAndRoleDenialsLeaveNoPublicationOrExternalCall(): void
@@ -174,7 +177,10 @@ final class MvpScheduleToDistributionE2eTest extends WebTestCase
             'SELECT COUNT(*) FROM gf_distribution_authorization_events WHERE organization_id IN (:own, :other)',
             ['own' => $fixture['mine'], 'other' => $fixture['foreign']],
         ));
-        self::assertSame(0, (int) $db->fetchOne('SELECT COUNT(*) FROM gf_external_publication_attempts'));
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_external_publication_attempts WHERE organization_id IN (:own, :other)',
+            ['own' => $fixture['mine'], 'other' => $fixture['foreign']],
+        ));
         self::assertSame(0, $transport->calls);
     }
 
