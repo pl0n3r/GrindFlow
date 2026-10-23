@@ -17,7 +17,7 @@ final class RequestIdDiagnosticContractTest extends TestCase
 {
     public function testMainResponseIdAcceptedByDiagnosticReceipt(): void
     {
-        $request = Request::create('/health');
+        $request = Request::create('/');
         $response = new Response('ok');
         $this->applySubscriber($request, $response);
 
