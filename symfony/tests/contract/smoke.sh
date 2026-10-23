@@ -14,7 +14,37 @@ assert body["runtime"] == {"compatible": True, "contract": "symfony-mariadb-v1"}
 for forbidden in ("release_sha", "database_url", "php_version", "extensions", "sapi"):
     assert forbidden not in body
 PY
-grep -qi '^x-request-id: [0-9a-f]\{24\}' "$tmp/health-headers"
+tr -d '\r' < "$tmp/health-headers" | grep -Eqi '^x-request-id: req_[0-9a-f]{24}
+grep -qi '^content-security-policy:' "$tmp/health-headers"
+grep -qi '^cache-control: no-store' "$tmp/health-headers"
+
+curl -fsS "$base/" >"$tmp/home"
+grep -q 'Una carga' "$tmp/home"
+grep -q 'GrindFlow' "$tmp/home"
+curl -fsS "$base/assets/grindflow.css" -D "$tmp/cssheaders" >"$tmp/style"
+grep -qi 'text/css' "$tmp/cssheaders"
+
+curl -fsS "$base/preview" >"$tmp/preview"
+grep -q 'id="grindflow-preview"' "$tmp/preview"
+grep -Eq '/build/assets/preview-[A-Za-z0-9_-]+\.js' "$tmp/preview"
+grep -Eq '/build/assets/[^"]+\.css' "$tmp/preview"
+js="$(grep -oE '/build/assets/preview-[A-Za-z0-9_-]+\.js' "$tmp/preview" | head -1)"
+css="$(grep -oE '/build/assets/[^"]+\.css' "$tmp/preview" | head -1)"
+curl -fsS "$base$js" >/dev/null
+curl -fsS "$base$css" >/dev/null
+
+code="$(curl -sS -o "$tmp/admin" -w '%{http_code}' "$base/admin")"
+test "$code" = '302'
+curl -fsS "$base/login" > "$tmp/login"
+grep -q 'name="_csrf_token"' "$tmp/login"
+code="$(curl -sS -o "$tmp/notfound" -w '%{http_code}' "$base/not-found-S0")"
+test "$code" = '404'
+if grep -Eiq 'APP_SECRET|DATABASE_URL|Stack trace' "$tmp/home" "$tmp/preview" "$tmp/admin" "$tmp/notfound" "$tmp/health.json" "$tmp/login"; then
+  echo 'S0 public responses exposed a sensitive diagnostic' >&2
+  exit 1
+fi
+echo "S0 Symfony/Twig/React build, headers, login guard, private admin and error statuses passed."
+
 grep -qi '^content-security-policy:' "$tmp/health-headers"
 grep -qi '^cache-control: no-store' "$tmp/health-headers"
 
