@@ -17,7 +17,7 @@ final class RequestIdSubscriber
     public function begin(RequestEvent $event): void
     {
         if ($event->isMainRequest()) {
-            $event->getRequest()->attributes->set(self::KEY, bin2hex(random_bytes(12)));
+            $event->getRequest()->attributes->set(self::KEY, 'req_'.bin2hex(random_bytes(12)));
         }
     }
 
