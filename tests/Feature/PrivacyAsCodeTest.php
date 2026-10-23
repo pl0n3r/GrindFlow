@@ -259,8 +259,16 @@ final class PrivacyAsCodeTest extends TestCase
             }
         }
 
-        foreach (['access', 'rectification', 'update', 'portability', 'deletion', 'revocation'] as $requestType) {
-            self::assertStringContainsString('`'.$requestType.'`', $runbook);
+        // Documented rights must remain paired with their request_type, not merely listed.
+        foreach ([
+            '`access`: acceso;',
+            '`rectification`: rectificación/corrección;',
+            '`update`: actualización;',
+            '`portability`: portabilidad;',
+            '`deletion`: supresión/eliminación;',
+            '`revocation`: revocación del consentimiento, cuando corresponda.',
+        ] as $mapping) {
+            self::assertStringContainsString('- '.$mapping, $runbook);
         }
 
         self::assertStringNotContainsString('continúan bajo la reserva V3 de GrindFlow #264', $runbook);

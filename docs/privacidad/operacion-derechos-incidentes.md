@@ -25,12 +25,12 @@ Este procedimiento no define SLA ni plazo jurídico de respuesta. Cualquier plaz
 ## Solicitudes de derechos
 
 Tipos operativos contemplados (sujetos a revisión jurídica humana):
-- acceso;
-- rectificación/corrección;
-- actualización;
-- portabilidad;
-- supresión/eliminación;
-- revocación del consentimiento, cuando corresponda.
+- `access`: acceso;
+- `rectification`: rectificación/corrección;
+- `update`: actualización;
+- `portability`: portabilidad;
+- `deletion`: supresión/eliminación;
+- `revocation`: revocación del consentimiento, cuando corresponda.
 
 El `request_type` **documental** admite exactamente los valores `access`,
 `rectification`, `update`, `portability`, `deletion` y `revocation`.
