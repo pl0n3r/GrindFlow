@@ -21,6 +21,8 @@ class DistributionControllerCoberturaTests(unittest.TestCase):
         controller = CONTROLLER.read_text(encoding="utf-8")
         for case in (
             "test_studio_can_create_only_sandbox_destinations",
+            "test_studio_can_update_own_destination",
+            "test_retry_budget_exhaustion_is_not_queued",
             "test_model_cannot_create_or_update_destinations",
             "test_foreign_destination_is_not_mutated_even_with_a_valid_local_studio",
             "test_destination_update_rejects_invalid_status_without_mutating_row",

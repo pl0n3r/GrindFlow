@@ -68,6 +68,57 @@ class DistributionControllerTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_studio_can_update_own_destination(): void
+    {
+        [$actor, $org] = $this->identity();
+        $destination = $this->destination($actor, $org);
+        $this->actingAs($actor)->patch(route(
+            'organizations.distribution.destinations.update',
+            ['organizationId' => $org->getKey(), 'destinationId' => $destination->getKey()],
+        ), [
+            'name' => 'Updated owned sandbox',
+            'status' => PublishingDestination::STATUS_DISABLED,
+        ])->assertRedirect();
+
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $org->getKey(),
+            function () use ($destination): void {
+                $this->assertSame('Updated owned sandbox', $destination->fresh()->name);
+                $this->assertSame(PublishingDestination::STATUS_DISABLED, $destination->fresh()->status);
+                $this->assertSame('sandbox', $destination->fresh()->provider);
+            },
+        );
+        Queue::assertNothingPushed();
+    }
+
+    public function test_retry_budget_exhaustion_is_not_queued(): void
+    {
+        [$actor, $org] = $this->identity();
+        $delivery = $this->delivery($actor, $org, PublicationDelivery::STATUS_FAILED);
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $org->getKey(),
+            fn () => $delivery->forceFill([
+                'attempts' => \App\Services\Distribution\PublicationDeliveryManager::MAX_ATTEMPTS,
+            ])->save(),
+        );
+
+        $this->actingAs($actor)->post(route(
+            'organizations.distribution.deliveries.retry',
+            ['organizationId' => $org->getKey(), 'deliveryId' => $delivery->getKey()],
+        ))->assertStatus(409);
+        app(TenantContext::class)->runWithinOrganization(
+            $actor,
+            (string) $org->getKey(),
+            fn () => $this->assertSame(
+                PublicationDelivery::STATUS_FAILED,
+                $delivery->fresh()->status,
+            ),
+        );
+        Queue::assertNothingPushed();
+    }
+
     public function test_model_cannot_create_or_update_destinations(): void
     {
         [$owner, $org] = $this->identity();
