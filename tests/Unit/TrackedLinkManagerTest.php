@@ -28,14 +28,13 @@ class TrackedLinkManagerTest extends TestCase
     {
         [$actor, $organization] = $this->identity(UserRole::Studio);
 
-        $link = $this->within($actor, $organization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $actor,
-                '  Summer link  ',
-                '  https://example.test/offer  ',
-                '  social  ',
-                '  ',
-            ),
+        $link = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+            $actor,
+            '  Summer link  ',
+            '  https://example.test/offer  ',
+            '  social  ',
+            '  ',
+        ),
         );
 
         $this->assertSame('Summer link', $link->label);
@@ -71,10 +70,9 @@ class TrackedLinkManagerTest extends TestCase
     {
         [$actor, $organization] = $this->identity(UserRole::Editor);
         [$foreignActor, $foreignOrganization] = $this->identity(UserRole::Studio);
-        $existing = $this->within($foreignActor, $foreignOrganization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $foreignActor, 'Foreign', 'https://example.test/foreign', null, null,
-            ),
+        $existing = $this->within($foreignActor, $foreignOrganization, fn (): TrackedLink => $this->manager()->create(
+            $foreignActor, 'Foreign', 'https://example.test/foreign', null, null,
+        ),
         );
         $collision = $existing->token;
         $fresh = str_repeat('B', 22);
@@ -87,10 +85,9 @@ class TrackedLinkManagerTest extends TestCase
         });
 
         try {
-            $created = $this->within($actor, $organization, fn (): TrackedLink =>
-                $this->manager()->create(
-                    $actor, 'Local', 'https://example.test/local', null, null,
-                ),
+            $created = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+                $actor, 'Local', 'https://example.test/local', null, null,
+            ),
             );
         } finally {
             Str::createRandomStringsNormally();
@@ -105,10 +102,9 @@ class TrackedLinkManagerTest extends TestCase
     public function test_create_fails_closed_after_eight_token_collisions(): void
     {
         [$actor, $organization] = $this->identity(UserRole::Studio);
-        $existing = $this->within($actor, $organization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $actor, 'Existing', 'https://example.test/existing', null, null,
-            ),
+        $existing = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+            $actor, 'Existing', 'https://example.test/existing', null, null,
+        ),
         );
         $calls = 0;
         Str::createRandomStringsUsing(static function (int $length) use (&$calls, $existing): string {
@@ -142,10 +138,9 @@ class TrackedLinkManagerTest extends TestCase
     public function test_set_status_is_reversible_idempotent_and_preserves_click_history(): void
     {
         [$actor, $organization] = $this->identity(UserRole::Studio);
-        $link = $this->within($actor, $organization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $actor, 'Campaign', 'https://example.test/target', 'x', 'august',
-            ),
+        $link = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+            $actor, 'Campaign', 'https://example.test/target', 'x', 'august',
+        ),
         );
         $token = $link->token;
         $this->within($actor, $organization, function () use ($actor, $link): void {
@@ -172,10 +167,9 @@ class TrackedLinkManagerTest extends TestCase
     {
         [$actor, $organization] = $this->identity(UserRole::Editor);
         [$foreignActor, $foreignOrganization] = $this->identity(UserRole::Studio);
-        $foreign = $this->within($foreignActor, $foreignOrganization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $foreignActor, 'Foreign', 'https://example.test/foreign', null, null,
-            ),
+        $foreign = $this->within($foreignActor, $foreignOrganization, fn (): TrackedLink => $this->manager()->create(
+            $foreignActor, 'Foreign', 'https://example.test/foreign', null, null,
+        ),
         );
 
         $this->within($actor, $organization, function () use ($actor, $foreign): void {
@@ -201,10 +195,9 @@ class TrackedLinkManagerTest extends TestCase
     public function test_update_details_normalizes_nullable_fields_without_rotating_token_or_status(): void
     {
         [$actor, $organization] = $this->identity(UserRole::Studio);
-        $link = $this->within($actor, $organization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $actor, 'Original', 'https://example.test/original', 'x', 'spring',
-            ),
+        $link = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+            $actor, 'Original', 'https://example.test/original', 'x', 'spring',
+        ),
         );
         $originalToken = $link->token;
         $this->within($actor, $organization, function () use ($actor, $link): void {
@@ -240,10 +233,9 @@ class TrackedLinkManagerTest extends TestCase
     public function test_update_details_rejects_invalid_metadata_atomically(): void
     {
         [$actor, $organization] = $this->identity(UserRole::Studio);
-        $link = $this->within($actor, $organization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $actor, 'Before', 'https://example.test/before', 'x', 'fixed',
-            ),
+        $link = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+            $actor, 'Before', 'https://example.test/before', 'x', 'fixed',
+        ),
         );
         $invalid = [
             ['', 'https://example.test/ok', null, null],
@@ -273,10 +265,9 @@ class TrackedLinkManagerTest extends TestCase
         [$actor, $organization] = $this->identity(UserRole::Studio);
         [$foreignActor, $foreignOrganization] = $this->identity(UserRole::Studio);
         [$viewer, $viewerOrganization] = $this->identity(UserRole::Model);
-        $foreign = $this->within($foreignActor, $foreignOrganization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $foreignActor, 'Foreign', 'https://example.test/foreign', null, null,
-            ),
+        $foreign = $this->within($foreignActor, $foreignOrganization, fn (): TrackedLink => $this->manager()->create(
+            $foreignActor, 'Foreign', 'https://example.test/foreign', null, null,
+        ),
         );
         $this->within($actor, $organization, function () use ($actor, $foreign): void {
             try {
@@ -304,10 +295,9 @@ class TrackedLinkManagerTest extends TestCase
             $this->markTestSkipped('Deterministic SQLite trigger for rollback test.');
         }
         [$actor, $organization] = $this->identity(UserRole::Studio);
-        $link = $this->within($actor, $organization, fn (): TrackedLink =>
-            $this->manager()->create(
-                $actor, 'Before', 'https://example.test/before', 'x', 'fixed',
-            ),
+        $link = $this->within($actor, $organization, fn (): TrackedLink => $this->manager()->create(
+            $actor, 'Before', 'https://example.test/before', 'x', 'fixed',
+        ),
         );
         DB::statement("CREATE TRIGGER reject_link_update BEFORE UPDATE ON tracked_links BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END");
         try {
