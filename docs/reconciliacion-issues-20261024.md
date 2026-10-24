@@ -36,6 +36,8 @@
 
 ## Separación de tareas completadas y operación real
 
+La versión declarada de producto en `config/version.php` es `0.1.219` al corte. Una versión visible **no** acredita por sí sola el SHA desplegado ni cumple los criterios de aceptación de un Issue.
+
 - [PR #258](https://github.com/pl0n3r/GrindFlow/pull/258) ya fusionado no cierra #250: [opción B de cohorte](https://github.com/pl0n3r/GrindFlow/issues/271#issuecomment-6325358992) y [decisión B de publicación](https://github.com/pl0n3r/GrindFlow/issues/453) conservan la prohibición de operación real.
 - La revisión legal [#457](https://github.com/pl0n3r/GrindFlow/issues/457) y el storage [#146](https://github.com/pl0n3r/GrindFlow/issues/146) dependen de personas/proveedores ajenos al código. No exponer secretos, emitir permisos ni cerrar con un smoke genérico.
 - Las hojas #574/#575/#580 tienen PR propios [#588](https://github.com/pl0n3r/GrindFlow/pull/588), [#589](https://github.com/pl0n3r/GrindFlow/pull/589) y [#585](https://github.com/pl0n3r/GrindFlow/pull/585); no se invaden. #578 y #579 desaparecieron del censo tras [completarse #578](https://github.com/pl0n3r/GrindFlow/issues/578) en [main@d84a1ba0](https://github.com/pl0n3r/GrindFlow/commit/d84a1ba0cef8ba189d38c11238c15942299c3663) y [fusionarse PR #586](https://github.com/pl0n3r/GrindFlow/pull/586) para #579. #576 también está [cerrada como completada](https://github.com/pl0n3r/GrindFlow/issues/576).
