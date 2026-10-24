@@ -5,7 +5,7 @@
 Decisión A auténtica del propietario en GrindFlow #571, hoja #581. Dos tests PHPUnit sintéticos, sin modificación del runtime, credenciales, hosting ni publicación real.
 
 - `testUtcBoundariesAndDstTransitionsAreDeterministic`: `WeeklySlotCalculator` con reloj fijo. En UTC una programación de lunes 00:15 conserva el instante; una hora local inexistente en primavera se omite. **La hora repetida del otoño se selecciona en su primera ocurrencia bajo la implementación actual de PHP**. No se afirma que el código detecte o rechace esa ambigüedad, ni se cambia esa regla sin una decisión de producto posterior.
-- `testRejectedOrAmbiguousStateNeverTriggersDuplicateExternalDelivery`: base de datos de prueba y tenant sintético. `ExternalPublicationLedger` recibe una función `send` local que simula rechazo o resultado ambiguo. El replay de la misma clave no vuelve a invocar el emisor; se limpia el fixture después. No hay HTTP hacia un proveedor.
+- `testRejectedOrAmbiguousStateNeverTriggersDuplicateExternalDelivery`: base de datos de prueba y tenant sintético. `ExternalPublicationLedger` recibe una función `send` local que simula rechazo o resultado ambiguo. El replay de la misma clave no vuelve a invocar el emisor; la base MariaDB descartable de CI elimina los fixtures tras el job; el ledger append-only nunca se borra. No hay HTTP hacia un proveedor.
 
 ## Verificación
 

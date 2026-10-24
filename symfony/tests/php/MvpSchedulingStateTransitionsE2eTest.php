@@ -69,46 +69,43 @@ final class MvpSchedulingStateTransitionsE2eTest extends WebTestCase
             'updated_at' => $created,
         ]);
 
-        try {
-            $ledger = new ExternalPublicationLedger(
-                $db,
-                static fn (): DateTimeImmutable => new DateTimeImmutable('2026-10-24T12:00:00Z', new DateTimeZone('UTC')),
-            );
-            foreach (['ambiguous', 'rejected'] as $kind) {
-                $command = new DistributionCommand($organizationId, 'gf581-'.$kind, 'Mensaje de prueba sin PII');
-                $sendCalls = 0;
-                $firstSend = static function () use (&$sendCalls, $kind): never {
-                    ++$sendCalls;
-                    throw $kind === 'ambiguous'
-                        ? DistributionProviderException::ambiguous()
-                        : DistributionProviderException::rejected();
-                };
-                try {
-                    $ledger->publish($command, 'facebook_page', 'page_id', '123456789', $firstSend);
-                    self::fail('Expected first synthetic send failure.');
-                } catch (DistributionProviderException $e) {
-                    self::assertSame($kind, $e->kind);
-                }
-                $unexpectedSecondSend = static function () use (&$sendCalls): never {
-                    ++$sendCalls;
-                    self::fail('Unsafe replay must never invoke external delivery.');
-                };
-                try {
-                    $ledger->publish($command, 'facebook_page', 'page_id', '123456789', $unexpectedSecondSend);
-                    self::fail('Unsafe replay must remain blocked.');
-                } catch (DistributionProviderException $e) {
-                    self::assertSame($kind, $e->kind);
-                    self::assertFalse($e->automaticRetryAllowed);
-                }
-                self::assertSame(1, $sendCalls);
-                self::assertSame($kind, $db->fetchOne(
-                    'SELECT status FROM gf_external_publication_attempts WHERE organization_id = :organization AND idempotency_key = :key',
-                    ['organization' => $organizationId, 'key' => $command->idempotencyKey],
-                ));
+        // The CI MariaDB is disposable; publication attempts are append-only.
+        $ledger = new ExternalPublicationLedger(
+            $db,
+            static fn (): DateTimeImmutable => new DateTimeImmutable('2026-10-24T12:00:00Z', new DateTimeZone('UTC')),
+        );
+        foreach (['ambiguous', 'rejected'] as $kind) {
+            $command = new DistributionCommand($organizationId, 'gf581-'.$kind, 'Mensaje de prueba sin PII');
+            $sendCalls = 0;
+            $firstSend = static function () use (&$sendCalls, $kind): never {
+                ++$sendCalls;
+                throw $kind === 'ambiguous'
+                    ? DistributionProviderException::ambiguous()
+                    : DistributionProviderException::rejected();
+            };
+            try {
+                $ledger->publish($command, 'facebook_page', 'page_id', '123456789', $firstSend);
+                self::fail('Expected first synthetic send failure.');
+            } catch (DistributionProviderException $e) {
+                self::assertSame($kind, $e->kind);
             }
-        } finally {
-            $db->delete('gf_external_publication_attempts', ['organization_id' => $organizationId]);
-            $db->delete('gf_identity_organizations', ['id' => $organizationId]);
+            $unexpectedSecondSend = static function () use (&$sendCalls): never {
+                ++$sendCalls;
+                self::fail('Unsafe replay must never invoke external delivery.');
+            };
+            try {
+                $ledger->publish($command, 'facebook_page', 'page_id', '123456789', $unexpectedSecondSend);
+                self::fail('Unsafe replay must remain blocked.');
+            } catch (DistributionProviderException $e) {
+                self::assertSame($kind, $e->kind);
+                self::assertFalse($e->automaticRetryAllowed);
+            }
+            self::assertSame(1, $sendCalls);
+            self::assertSame($kind, $db->fetchOne(
+                'SELECT status FROM gf_external_publication_attempts WHERE organization_id = :organization AND idempotency_key = :key',
+                ['organization' => $organizationId, 'key' => $command->idempotencyKey],
+            ));
         }
+
     }
 }
