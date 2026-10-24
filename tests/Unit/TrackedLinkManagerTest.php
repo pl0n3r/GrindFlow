@@ -158,7 +158,7 @@ class TrackedLinkManagerTest extends TestCase
             $this->assertSame(TrackedLink::STATUS_ACTIVE, $link->fresh()->status);
         });
 
-        $this->assertSame($token, $link->fresh()->token);
+        $this->assertSame($token, $this->within($actor, $organization, fn (): string => $link->fresh()->token));
         $this->assertSame(7, (int) DB::table('tracked_link_daily_metrics')
             ->where('tracked_link_id', $link->getKey())->value('clicks'));
     }
@@ -189,7 +189,7 @@ class TrackedLinkManagerTest extends TestCase
             }
         });
 
-        $this->assertSame(TrackedLink::STATUS_ACTIVE, $foreign->fresh()->status);
+        $this->assertSame(TrackedLink::STATUS_ACTIVE, $this->within($foreignActor, $foreignOrganization, fn (): string => $foreign->fresh()->status));
     }
 
     public function test_update_details_normalizes_nullable_fields_without_rotating_token_or_status(): void
@@ -219,7 +219,7 @@ class TrackedLinkManagerTest extends TestCase
             );
         });
 
-        $updated = $link->fresh();
+        $updated = $this->within($actor, $organization, fn (): TrackedLink => $link->fresh());
         $this->assertSame('Renamed', $updated->label);
         $this->assertSame('https://example.test/new', $updated->destination_url);
         $this->assertNull($updated->channel);
@@ -286,7 +286,7 @@ class TrackedLinkManagerTest extends TestCase
                 $viewer, (string) $foreign->getKey(), 'Leak', 'https://example.test/leak', null, null,
             ),
         ));
-        $this->assertSame('Foreign', $foreign->fresh()->label);
+        $this->assertSame('Foreign', $this->within($foreignActor, $foreignOrganization, fn (): string => $foreign->fresh()->label));
     }
 
     public function test_update_details_rolls_back_on_database_failure(): void
