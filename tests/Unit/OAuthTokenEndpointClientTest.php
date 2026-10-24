@@ -20,7 +20,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function testAuthorizationExchangePostsOnceAndNormalizesPayload(): void
+    public function test_authorization_exchange_posts_once_and_normalizes_payload(): void
     {
         Http::fake([
             self::TOKEN_URL => Http::response([
@@ -43,8 +43,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         $this->assertSame(60, $tokens->expiresInSeconds);
         $this->assertSame(['media.read', 'media.write'], $tokens->scopes);
         $this->assertSame('provider-account', $tokens->accountIdentifier);
-        Http::assertSent(fn (Request $request): bool =>
-            $request->url() === self::TOKEN_URL
+        Http::assertSent(fn (Request $request): bool => $request->url() === self::TOKEN_URL
             && $request->method() === 'POST'
             && $request['grant_type'] === 'authorization_code'
             && $request['client_id'] === 'example-client'
@@ -56,7 +55,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function testAuthorizationUsesDefaultScopesAndIgnoresInvalidOptionalAccount(): void
+    public function test_authorization_uses_default_scopes_and_ignores_invalid_optional_account(): void
     {
         Http::fake([
             self::TOKEN_URL => Http::response([
@@ -74,7 +73,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function testMissingAuthorizationParametersFailBeforeNetwork(): void
+    public function test_missing_authorization_parameters_fail_before_network(): void
     {
         Http::fake();
 
@@ -89,7 +88,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function testAuthorizationRejectsProviderErrorsAndMalformedResponsesWithoutLeakingSecrets(): void
+    public function test_authorization_rejects_provider_errors_and_malformed_responses_without_leaking_secrets(): void
     {
         foreach ([
             Http::response(['error_description' => 'fixture-secret exposed by provider'], 401),
@@ -104,7 +103,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         }
     }
 
-    public function testAuthorizationRateLimitClampsRetryAfterWithoutRetrying(): void
+    public function test_authorization_rate_limit_clamps_retry_after_without_retrying(): void
     {
         foreach ([['2', 60], ['99999', 3600], ['tomorrow', null]] as [$header, $expected]) {
             Http::fake([
@@ -122,7 +121,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         }
     }
 
-    public function testAuthorizationConnectionTimeoutIsSafeAndIsNotRetried(): void
+    public function test_authorization_connection_timeout_is_safe_and_is_not_retried(): void
     {
         $attempts = 0;
         Http::fake(function () use (&$attempts) {
@@ -134,7 +133,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         $this->assertSame(1, $attempts);
     }
 
-    public function testRefreshPostsOnceWithBoundedExpiryAndParsedScopes(): void
+    public function test_refresh_posts_once_with_bounded_expiry_and_parsed_scopes(): void
     {
         Http::fake([
             self::TOKEN_URL => Http::response([
@@ -148,8 +147,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         $this->assertSame('new-access', $result->accessToken);
         $this->assertSame(86_400, $result->expiresInSeconds);
         $this->assertSame(['files.read', 'files.write'], $result->scopes);
-        Http::assertSent(fn (Request $request): bool =>
-            $request->url() === self::TOKEN_URL
+        Http::assertSent(fn (Request $request): bool => $request->url() === self::TOKEN_URL
             && $request['grant_type'] === 'refresh_token'
             && $request['refresh_token'] === 'fixture-refresh-secret'
             && $request['client_id'] === 'example-client'
@@ -159,7 +157,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function testRefreshRejectsInvalidGrantAndOtherHttpErrorsUsingOnlySafeCodes(): void
+    public function test_refresh_rejects_invalid_grant_and_other_http_errors_using_only_safe_codes(): void
     {
         Http::fake([
             self::TOKEN_URL => Http::response([
@@ -177,7 +175,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         $this->assertSafeError(fn () => $this->refresh(), 'connector_request_failed');
     }
 
-    public function testRefreshRejectsInvalidPayloadAndBoundsShortExpiry(): void
+    public function test_refresh_rejects_invalid_payload_and_bounds_short_expiry(): void
     {
         foreach ([
             Http::response('not-json', 200),
@@ -199,7 +197,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         $this->assertSame([], $result->scopes);
     }
 
-    public function testRefreshRateLimitHasSafeBoundedRetryAfterAndOneRequest(): void
+    public function test_refresh_rate_limit_has_safe_bounded_retry_after_and_one_request(): void
     {
         Http::fake([
             self::TOKEN_URL => Http::response(
@@ -212,7 +210,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function testRefreshConnectionTimeoutIsSafeAndIsNotRetried(): void
+    public function test_refresh_connection_timeout_is_safe_and_is_not_retried(): void
     {
         $attempts = 0;
         Http::fake(function () use (&$attempts) {
@@ -226,7 +224,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
 
     private function client(): OAuthTokenEndpointClient
     {
-        return new OAuthTokenEndpointClient();
+        return new OAuthTokenEndpointClient;
     }
 
     private function exchange(
