@@ -14,7 +14,7 @@ assert body["runtime"] == {"compatible": True, "contract": "symfony-mariadb-v1"}
 for forbidden in ("release_sha", "database_url", "php_version", "extensions", "sapi"):
     assert forbidden not in body
 PY
-grep -qi '^x-request-id: [0-9a-f]\{24\}' "$tmp/health-headers"
+grep -Eqi '^x-request-id: req_[0-9a-f]{24}' "$tmp/health-headers"
 grep -qi '^content-security-policy:' "$tmp/health-headers"
 grep -qi '^cache-control: no-store' "$tmp/health-headers"
 
