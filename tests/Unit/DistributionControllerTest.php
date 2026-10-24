@@ -12,6 +12,7 @@ use App\Models\PublicationDelivery;
 use App\Models\PublishingDestination;
 use App\Models\ScheduledPublication;
 use App\Models\User;
+use App\Services\Distribution\PublicationDeliveryManager;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -100,7 +101,7 @@ class DistributionControllerTest extends TestCase
             $actor,
             (string) $org->getKey(),
             fn () => $delivery->forceFill([
-                'attempts' => \App\Services\Distribution\PublicationDeliveryManager::MAX_ATTEMPTS,
+                'attempts' => PublicationDeliveryManager::MAX_ATTEMPTS,
             ])->save(),
         );
 
@@ -309,6 +310,7 @@ class DistributionControllerTest extends TestCase
                     'scheduled_for_utc' => now('UTC')->subMinute(),
                     'timezone' => 'UTC',
                 ]);
+
                 return PublicationDelivery::query()->create([
                     'scheduled_publication_id' => $schedule->getKey(),
                     'idempotency_key' => 'qa-'.$schedule->getKey(),
