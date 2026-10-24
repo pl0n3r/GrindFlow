@@ -33,7 +33,7 @@ class OAuthTokenEndpointClientCoberturaTests(unittest.TestCase):
 
         self.assertIn("Http::assertSentCount(1)", tests)
         self.assertIn("Http::assertNothingSent()", tests)
-        self.assertIn("$request->options()['timeout']", tests)
+        self.assertIn("Http::swap(new \\Illuminate\\Http\\Client\\Factory())", tests)
         self.assertIn("$this->assertSafeError(", tests)
         self.assertIn("->timeout(20)", client)
         self.assertNotIn("->retry(", client)

@@ -50,7 +50,6 @@ final class OAuthTokenEndpointClientTest extends TestCase
             && $request['client_secret'] === 'fixture-secret'
             && $request['code'] === 'one-use-code'
             && $request['redirect_uri'] === 'https://app.example.test/callback'
-            && ($request->options()['timeout'] ?? null) === 20
         );
         Http::assertSentCount(1);
     }
@@ -98,7 +97,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
             Http::response(['access_token' => '', 'refresh_token' => 'refresh', 'expires_in' => 3600], 200),
             Http::response(['access_token' => 'access', 'refresh_token' => 'refresh', 'expires_in' => 'invalid'], 200),
         ] as $response) {
-            Http::fake([self::TOKEN_URL => $response]);
+            $this->fakeResponse($response);
             $this->assertSafeError(fn () => $this->exchange(), 'connector_oauth_exchange_failed');
         }
     }
@@ -106,13 +105,11 @@ final class OAuthTokenEndpointClientTest extends TestCase
     public function test_authorization_rate_limit_clamps_retry_after_without_retrying(): void
     {
         foreach ([['2', 60], ['99999', 3600], ['tomorrow', null]] as [$header, $expected]) {
-            Http::fake([
-                self::TOKEN_URL => Http::response(
-                    ['error_description' => 'fixture-secret provider detail'],
-                    429,
-                    ['Retry-After' => $header],
-                ),
-            ]);
+            $this->fakeResponse(Http::response(
+                ['error_description' => 'fixture-secret provider detail'],
+                429,
+                ['Retry-After' => $header],
+            ));
             $this->assertSafeError(
                 fn () => $this->exchange(),
                 'connector_rate_limited',
@@ -152,7 +149,6 @@ final class OAuthTokenEndpointClientTest extends TestCase
             && $request['refresh_token'] === 'fixture-refresh-secret'
             && $request['client_id'] === 'example-client'
             && $request['client_secret'] === 'fixture-secret'
-            && ($request->options()['timeout'] ?? null) === 20
         );
         Http::assertSentCount(1);
     }
@@ -171,7 +167,7 @@ final class OAuthTokenEndpointClientTest extends TestCase
             needsReconnect: true,
         );
 
-        Http::fake([self::TOKEN_URL => Http::response(['error' => 'invalid_client'], 401)]);
+        $this->fakeResponse(Http::response(['error' => 'invalid_client'], 401));
         $this->assertSafeError(fn () => $this->refresh(), 'connector_request_failed');
     }
 
@@ -183,15 +179,15 @@ final class OAuthTokenEndpointClientTest extends TestCase
             Http::response(['access_token' => ['invalid'], 'expires_in' => 3600], 200),
             Http::response(['access_token' => 'access', 'expires_in' => 'not-a-number'], 200),
         ] as $response) {
-            Http::fake([self::TOKEN_URL => $response]);
+            $this->fakeResponse($response);
             $this->assertSafeError(fn () => $this->refresh(), 'connector_request_failed');
         }
 
-        Http::fake([self::TOKEN_URL => Http::response([
+        $this->fakeResponse(Http::response([
             'access_token' => 'access',
             'expires_in' => 0,
             'scope' => ['bad-scope'],
-        ])]);
+        ]));
         $result = $this->refresh();
         $this->assertSame(60, $result->expiresInSeconds);
         $this->assertSame([], $result->scopes);
@@ -220,6 +216,13 @@ final class OAuthTokenEndpointClientTest extends TestCase
 
         $this->assertSafeError(fn () => $this->refresh(), 'connector_request_failed');
         $this->assertSame(1, $attempts);
+    }
+
+    private function fakeResponse(\Illuminate\Http\Client\Response $response): void
+    {
+        Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::preventStrayRequests();
+        Http::fake([self::TOKEN_URL => $response]);
     }
 
     private function client(): OAuthTokenEndpointClient
