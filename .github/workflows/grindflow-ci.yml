@@ -1012,7 +1012,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5
         with:
           repository: pl0n3r/factory
-          ref: a33b04cafeabfe0004f01fdf79291a0645a60f0a
+          ref: 7d520aa7bede0f19d2ca43852212fd607f9e94b4
           path: .factory
           persist-credentials: false
 

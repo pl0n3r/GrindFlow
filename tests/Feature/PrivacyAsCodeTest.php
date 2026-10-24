@@ -13,6 +13,9 @@ final class PrivacyAsCodeTest extends TestCase
 
     private const FACTORY_SHA = 'a33b04cafeabfe0004f01fdf79291a0645a60f0a';
 
+    // Privacy docs switched kit; legacy audit remains pinned separately.
+    private const PRIVACY_KIT_SHA = '7d520aa7bede0f19d2ca43852212fd607f9e94b4';
+
     public function test_data_map_matches_observed_grind_flow_treatments(): void
     {
         $data = $this->data();
@@ -159,11 +162,11 @@ final class PrivacyAsCodeTest extends TestCase
     public function test_generated_privacy_documents_are_current(): void
     {
         $expected = [
-            'politica-tratamiento.md' => '079d996b4990e05dfac11d4ccca71d8dd48825b7833682c3850f8451ed0a5460',
+            'politica-tratamiento.md' => 'ded8e86099cfa9b93dd0258d6d13ff9423a89e1f60ae9345bdfcd80b8e7ce7b5',
             'aviso-privacidad.md' => '0ddc1aa96857a917eca201f98be996d21e2b7533996a8a87fa9bbfb8bdd9b283',
             'terminos-condiciones.md' => 'a8bab030d4056482b7153d17695ec119f0715805d430130e27dc4a3fa7b64840',
             'registro-tratamientos.md' => '55205ee6ee8912aeb4e06a7d809ec9aad13b61202ed9eecbc3f67e861fbb501c',
-            'canal-derechos.md' => 'd8568464c8cd9bc04140846ee9dd30d65b3f5cb1564a387f10f268bede03e297',
+            'canal-derechos.md' => 'd1f16337c52fd7afed1aeffd03bed96ce7d0ec2407b5963d4511612e03a17d25',
             'retencion.md' => '07fe532dd8fb2cd0f80aef7579b09dae739b161a2f2434e6fa86b3037caccfeb',
         ];
 
@@ -182,17 +185,17 @@ final class PrivacyAsCodeTest extends TestCase
         $audit = file_get_contents($this->root().'/.github/workflows/auditoria-privacidad.yml');
 
         self::assertStringContainsString(
-            'uses: pl0n3r/factory/.github/workflows/privacidad.yml@'.self::FACTORY_SHA,
+            'uses: pl0n3r/factory/.github/workflows/privacidad.yml@'.self::PRIVACY_KIT_SHA,
             $privacy,
         );
-        self::assertStringContainsString('kit_ref: '.self::FACTORY_SHA, $privacy);
+        self::assertStringContainsString('kit_ref: '.self::PRIVACY_KIT_SHA, $privacy);
         self::assertStringContainsString("permissions:\n  contents: read", $privacy);
         self::assertStringNotContainsString('issues: write', $privacy);
         self::assertStringNotContainsString('secrets:', $privacy);
 
         $ci = file_get_contents($this->root().'/.github/workflows/grindflow-ci.yml');
         self::assertStringContainsString('repository: pl0n3r/factory', $ci);
-        self::assertStringContainsString('ref: '.self::FACTORY_SHA, $ci);
+        self::assertStringContainsString('ref: '.self::PRIVACY_KIT_SHA, $ci);
         self::assertStringContainsString('path: .factory', $ci);
         self::assertStringContainsString(
             "PRIVACY_BASE_SHA: \${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}",
@@ -241,6 +244,36 @@ final class PrivacyAsCodeTest extends TestCase
         self::assertStringContainsString("permissions:\n  contents: read\n  issues: write", $audit);
         self::assertStringNotContainsString('contents: write', $audit);
         self::assertStringNotContainsString('secrets:', $audit);
+    }
+
+    public function test_rights_and_request_types_agree_in_all_privacy_sources(): void
+    {
+        $runbook = file_get_contents($this->root().'/docs/privacidad/operacion-derechos-incidentes.md');
+        $channel = file_get_contents($this->root().'/docs/privacidad/canal-derechos.md');
+        $policy = file_get_contents($this->root().'/docs/privacidad/politica-tratamiento.md');
+
+        foreach (['acceso', 'rectificación/corrección', 'actualización', 'portabilidad',
+            'supresión/eliminación', 'revocación'] as $right) {
+            foreach ([$runbook, $channel, $policy] as $document) {
+                self::assertStringContainsString($right, $document, 'Derecho omitido: '.$right);
+            }
+        }
+
+        // Documented rights must remain paired with their request_type, not merely listed.
+        foreach ([
+            '`access`: acceso;',
+            '`rectification`: rectificación/corrección;',
+            '`update`: actualización;',
+            '`portability`: portabilidad;',
+            '`deletion`: supresión/eliminación;',
+            '`revocation`: revocación del consentimiento, cuando corresponda.',
+        ] as $mapping) {
+            self::assertStringContainsString('- '.$mapping, $runbook);
+        }
+
+        self::assertStringNotContainsString('continúan bajo la reserva V3 de GrindFlow #264', $runbook);
+        self::assertStringContainsString('no constituye aprobación jurídica', $policy);
+        self::assertStringContainsString('revisión jurídica requerida', $channel);
     }
 
     public function test_pending_legal_states_are_not_invented(): void
