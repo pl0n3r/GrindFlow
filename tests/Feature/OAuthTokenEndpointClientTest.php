@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Services\Media\Connections\OAuthTokenEndpointClient;
 use App\Services\Media\Connectors\MediaConnectorException;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -218,9 +220,9 @@ final class OAuthTokenEndpointClientTest extends TestCase
         $this->assertSame(1, $attempts);
     }
 
-    private function fakeResponse(\Illuminate\Http\Client\Response $response): void
+    private function fakeResponse(PromiseInterface $response): void
     {
-        Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::swap(new Factory);
         Http::preventStrayRequests();
         Http::fake([self::TOKEN_URL => $response]);
     }
