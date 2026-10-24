@@ -24,19 +24,26 @@ Este procedimiento no define SLA ni plazo jurídico de respuesta. Cualquier plaz
 
 ## Solicitudes de derechos
 
-Tipos operativos contemplados:
+Tipos operativos contemplados (sujetos a revisión jurídica humana):
+- `access`: acceso;
+- `rectification`: rectificación/corrección;
+- `update`: actualización;
+- `portability`: portabilidad;
+- `deletion`: supresión/eliminación;
+- `revocation`: revocación del consentimiento, cuando corresponda.
 
-- acceso;
-- rectificación;
-- portabilidad;
-- eliminación.
+El `request_type` **documental** admite exactamente los valores `access`,
+`rectification`, `update`, `portability`, `deletion` y `revocation`.
+«Corrección» es sinónimo de rectificación y «eliminación» de supresión;
+actualización y revocación son mecanismos separados, no se omiten por sinónimos.
+Este catálogo no afirma que exista un formulario, API ni enum de producción.
 
 ### Recepción y trazabilidad mínima
 
 Cuando exista un canal aprobado, registrar únicamente:
 
 - `request_ref`: identificador opaco;
-- `request_type`: uno de los tipos anteriores;
+- `request_type`: uno de `access|rectification|update|portability|deletion|revocation` del catálogo documental anterior;
 - `received_at`: timestamp;
 - `status`;
 - `assigned_role`: rol responsable, no identidad personal si no es necesaria;
@@ -52,7 +59,7 @@ GitHub/Issues/logs: prohibido copiar PII, documentos de identidad, contenido de 
 
 ### Identidad y autorización
 
-Antes de ejecutar acceso, rectificación, portabilidad o eliminación, verificar identidad y representación por un canal privado aprobado. Si identidad, representación o alcance no son suficientes, mover a `verification_required` y no ejecutar cambios.
+Antes de tramitar cualquiera de los seis mecanismos (acceso, rectificación/corrección, actualización, portabilidad, supresión/eliminación o revocación), verificar identidad, legitimación y representación según corresponda por un canal privado aprobado. Si identidad, representación o alcance no son suficientes, mover a `verification_required` y no ejecutar cambios ni divulgar datos. Revocar consentimiento no implica automáticamente suprimir datos.
 
 ### Ejecución y cierre
 
@@ -73,6 +80,14 @@ Antes de ejecutar acceso, rectificación, portabilidad o eliminación, verificar
 6. **Reanudar**: solo cuando la causa técnica esté contenida y exista autoridad explícita para el alcance aplicable.
 
 Fail-closed: si no puede demostrarse con evidencia mínima segura que el incidente está acotado, no se presume seguridad ni cumplimiento y no se reanuda el tratamiento afectado.
+
+## Handoff del paquete jurídico tras alinear las fuentes
+
+La coherencia de los seis mecanismos y del catálogo **documental** de `request_type` exige contrastar **tres** documentos: este runbook, `docs/privacidad/canal-derechos.md` y `docs/privacidad/politica-tratamiento.md`. Los dos últimos son **salidas generadas** por el kit de privacidad de Factory a partir de `datos.yml`: no corregirlas a mano ni aceptar un canal/política que omita portabilidad. Verificar identidad y legitimación sigue siendo obligatorio; el texto no promete una API de exportación ni una aprobación jurídica.
+
+La plantilla de los seis mecanismos está fijada en el kit inmutable de Factory `7d520aa7bede0f19d2ca43852212fd607f9e94b4`, consumido por `.github/workflows/privacidad.yml` y `.github/workflows/grindflow-ci.yml`. Los derivados `docs/privacidad/canal-derechos.md` y `docs/privacidad/politica-tratamiento.md` se generan byte-exactos desde `datos.yml` con el mismo kit; no deben editarse a mano. La coherencia de los **seis derechos** y de los valores documentales `request_type` en los tres archivos debe comprobarse con `Privacidad como código`, tests PHP y `validate` en el HEAD definitivo. Un CI verde no acredita aprobación legal ni un canal de derechos activo en producción.
+
+El generador del expediente para abogado **ya está integrado** por GrindFlow #493/PR #498. Una vez fusionadas las fuentes definitivas, ejecutar `python3 scripts/generar_revision_juridica.py` **solamente** en el PR de regeneración con reserva V3 independiente para `revision-juridica/`, seguido de `python3 scripts/generar_revision_juridica.py --check`. Verificar las copias byte-exactas, `00-LEEME.md`, la huella de origen y `paquete-completo.md`. El workflow `revision-juridica-sync.yml` detecta desfase tras cambios en `main` y abre un Issue deduplicado con etiqueta `revision-juridica-desfase`; no escribe en `main`. No modificar copias del abogado en este PR ni presentar el paquete como aprobado. Estado hasta completar ese handoff: `documented_not_legally_approved` y `BLOCKED_REAL_DATA`.
 
 ## Fronteras pre-live
 
