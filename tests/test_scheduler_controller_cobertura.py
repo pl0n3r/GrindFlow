@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "app/Http/Controllers/Scheduling/SchedulerController.php"
-TEST = ROOT / "tests/Unit/SchedulerControllerTest.php"
+TEST = ROOT / "tests/Feature/SchedulerControllerTest.php"
 
 
 class SchedulerControllerCoberturaTests(unittest.TestCase):
@@ -58,7 +58,7 @@ class SchedulerControllerCoberturaTests(unittest.TestCase):
 
         if (ROOT / "vendor/autoload.php").is_file():
             result = subprocess.run(
-                [php, "artisan", "test", "tests/Unit/SchedulerControllerTest.php", "--no-ansi"],
+                [php, "artisan", "test", "tests/Feature/SchedulerControllerTest.php", "--no-ansi"],
                 cwd=ROOT, capture_output=True, text=True, timeout=180, check=False,
             )
             self.assertEqual(result.returncode, 0, (result.stdout + result.stderr)[-1800:])
