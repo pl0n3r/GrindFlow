@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Feature;
 
 use App\Services\Media\Connections\OAuthTokenEndpointClient;
 use App\Services\Media\Connectors\MediaConnectorException;
