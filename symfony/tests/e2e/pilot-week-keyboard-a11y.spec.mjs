@@ -107,9 +107,6 @@ for (const width of [360, 820]) {
 
     // Keyboard-only travel between the two real buttons (not locator.click).
     await previous.focus();
-    await page.keyboard.press('Tab');
-    await expect(next).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
     await expect(previous).toBeFocused();
     const visibleFocus = await previous.evaluate((node) => ({
       focusVisible: node.matches(':focus-visible'),
@@ -124,6 +121,11 @@ for (const width of [360, 820]) {
     await expect(previous).toBeFocused();
     await expect(weeks).toContainText(previousWeek);
     await expect.poll(() => reads.includes(previousWeek)).toBe(true);
+    // 'Semana siguiente' only becomes tabbable after moving off the current week.
+    await page.keyboard.press('Tab');
+    await expect(next).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(previous).toBeFocused();
     await expect(page.getByRole('status').getByText('No hay actividad interna registrada en esta semana.')).toBeVisible();
     await expect(page.locator('.pilot-totals strong')).toHaveText(['0', '0', '0']);
 
