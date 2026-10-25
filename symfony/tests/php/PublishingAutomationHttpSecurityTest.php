@@ -75,16 +75,22 @@ final class PublishingAutomationHttpSecurityTest extends WebTestCase
         $client->request('GET', self::ENDPOINT);
         self::assertResponseStatusCodeSame(403);
         self::assertSame('organization_access_changed', self::responseJson($client)['error']['code']);
+        // The denied GET invalidates the tampered organization selection.
+        // Set it again so PUT verifies membership instead of just missing context.
+        $session = $client->getRequest()->getSession();
+        $session->set('grindflow_organization_id', $ids['foreign_org']);
+        $session->save();
         $client->request('PUT', self::ENDPOINT, [], [], self::JSON_HEADERS + [
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ], $body);
-        self::assertContains($client->getResponse()->getStatusCode(), [403, 409]);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame('organization_access_changed', self::responseJson($client)['error']['code']);
 
         self::assertSame('["09:00"]', $db->fetchOne(
             'SELECT automation_local_times FROM gf_content_rules WHERE organization_id = :org',
             ['org' => $ids['own_org']],
         ));
-        self::assertSame('["09:00"]', $db->fetchOne(
+        self::assertSame('["11:00"]', $db->fetchOne(
             'SELECT automation_local_times FROM gf_content_rules WHERE organization_id = :org',
             ['org' => $ids['foreign_org']],
         ));
@@ -133,7 +139,7 @@ final class PublishingAutomationHttpSecurityTest extends WebTestCase
             'SELECT automation_local_times FROM gf_content_rules WHERE organization_id = :org',
             ['org' => $ids['own_org']],
         ));
-        self::assertSame('["09:00"]', $db->fetchOne(
+        self::assertSame('["11:00"]', $db->fetchOne(
             'SELECT automation_local_times FROM gf_content_rules WHERE organization_id = :org',
             ['org' => $ids['foreign_org']],
         ));
@@ -218,7 +224,7 @@ final class PublishingAutomationHttpSecurityTest extends WebTestCase
                 'created_at' => $now,
                 'updated_at' => $now,
                 'automation_state' => 'paused',
-                'automation_local_times' => '["09:00"]',
+                'automation_local_times' => $label === 'foreign' ? '["11:00"]' : '["09:00"]',
                 'automation_destination_id' => null,
             ]);
         }
