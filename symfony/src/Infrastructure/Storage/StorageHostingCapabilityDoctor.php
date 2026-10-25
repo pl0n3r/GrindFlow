@@ -146,7 +146,22 @@ final class StorageHostingCapabilityDoctor
             return false;
         }
 
-        $segments = explode('/', trim($parts['path'], '/'));
+        // Preserve the leading slash: trimming it would hide a double-slash path.
+        $path = $parts['path'];
+        if (!str_starts_with($path, '/') || str_starts_with($path, '//')) {
+            return false;
+        }
+
+        $segments = explode('/', substr($path, 1));
+        foreach ($segments as $segment) {
+            $decoded = rawurldecode($segment);
+            if ($decoded === '' || $decoded === '.' || $decoded === '..'
+                || str_contains($decoded, '/') || str_contains($decoded, '\\')
+            ) {
+                return false;
+            }
+        }
+
         return count($segments) >= 3
             && $segments[0] === 'tenant'
             && rawurldecode($segments[1]) === $tenant

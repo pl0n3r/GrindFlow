@@ -102,6 +102,11 @@ final class StorageHostingCapabilityDoctorTest extends TestCase
             ['expires_at' => 1899],
             ['url' => 'http://uploads.invalid/tenant/tenant_a/object?signature=synthetic'],
             ['url' => 'https://uploads.invalid/tenant/other_tenant/object?signature=synthetic'],
+            ['url' => 'https://uploads.invalid/tenant/tenant_a/../other_tenant/object?signature=synthetic'],
+            ['url' => 'https://uploads.invalid/tenant/tenant_a/%2e%2e/object?signature=synthetic'],
+            ['url' => 'https://uploads.invalid/tenant/tenant_a/%2E/object?signature=synthetic'],
+            ['url' => 'https://uploads.invalid//tenant/tenant_a/object?signature=synthetic'],
+            ['url' => 'https://uploads.invalid/tenant/tenant_a/%2Fother_tenant/object?signature=synthetic'],
             ['signature_present' => false],
         ] as $change) {
             $fixtures = $this->fixtures();

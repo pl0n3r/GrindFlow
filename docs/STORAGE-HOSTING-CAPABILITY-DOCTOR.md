@@ -27,4 +27,4 @@ La compuerta real `symfony-preview` ejecuta PHPUnit para AC-01..05. En el contra
 
 Un operador autorizado debe aportar de forma independiente el origin real y su política CORS del bucket, evidencia de un PUT prefirmado tenant-bound con TTL y método correctos, ejecución efectiva de ffmpeg y ffprobe, procedencia/versiones, backup y rollback, autenticación/privacidad y smoke con SHA exacto. La comprobación productiva requiere autorización adicional y nunca se hace desde este doctor.
 
-**Reversión:** squash-revert del PR #596 y rerun de PHPUnit/CI exact-HEAD. No se cambia ningún flujo de upload, credencial, workflow productivo ni configuración de hosting.
+**Reversión:** squash-revert del PR #597 (Issue #596) y rerun de PHPUnit/CI exact-HEAD. No se cambia ningún flujo de upload, credencial, workflow productivo ni configuración de hosting.
