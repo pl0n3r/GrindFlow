@@ -105,8 +105,17 @@ for (const width of [360, 820]) {
     await expect(weeks).toContainText(week);
     await expect.poll(() => reads.includes(week)).toBe(true);
 
-    // Keyboard-only travel between the two real buttons (not locator.click).
-    await previous.focus();
+    // Reach the first control using only keyboard Tab, never locator.focus().
+    // Bounded traversal fails closed if responsive navigation traps keyboard focus.
+    let reachedByTab = false;
+    for (let index = 0; index < 64; index += 1) {
+      await page.keyboard.press('Tab');
+      if (await previous.evaluate((node) => node === document.activeElement)) {
+        reachedByTab = true;
+        break;
+      }
+    }
+    expect(reachedByTab, 'Previous week must be reachable by keyboard Tab').toBe(true);
     await expect(previous).toBeFocused();
 
     await page.keyboard.press('Enter');

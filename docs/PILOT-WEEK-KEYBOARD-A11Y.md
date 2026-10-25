@@ -28,7 +28,7 @@ La aceptación Python comprueba descubrimiento y wiring al job symfony-preview, 
 ## Evidencia y límites de fusión
 
 - AC-01: pendiente de check de aceptación GitHub Actions sobre el HEAD final.
-- AC-02: pendiente de logs Playwright Chromium / symfony-preview y job browser del HEAD final.
+- AC-02: pendiente de logs Playwright Chromium en `symfony-preview` del HEAD final; `browser` es un job Laravel omitido por alcance en cambios Symfony-only.
 - AC-03: pendiente de validate, SonarCloud, CodeQL, Factory Policy terminal verdes y revisión CodeRabbit FINAL exact-HEAD conforme a D-062.
 - Una pantalla accesible en CI no acredita piloto activo, proveedor configurado, despliegue Hostinger ni datos reales.
 

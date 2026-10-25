@@ -72,7 +72,7 @@ class PilotWeekKeyboardA11yTests(unittest.TestCase):
         for token in ("page.keyboard.press('Space')", "status: 503", "toBeFocused()"):
             with self.subTest(missing=token):
                 with self.assertRaisesRegex(AssertionError, "Missing real-browser"):
-                    self._check_scenarios(source.replace(token, "removed", 1))
+                    self._check_scenarios(source.replace(token, "removed"))
 
 
 if __name__ == "__main__":
