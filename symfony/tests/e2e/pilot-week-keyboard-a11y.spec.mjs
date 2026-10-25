@@ -108,14 +108,6 @@ for (const width of [360, 820]) {
     // Keyboard-only travel between the two real buttons (not locator.click).
     await previous.focus();
     await expect(previous).toBeFocused();
-    const visibleFocus = await previous.evaluate((node) => ({
-      focusVisible: node.matches(':focus-visible'),
-      outlineStyle: getComputedStyle(node).outlineStyle,
-      outlineWidth: parseFloat(getComputedStyle(node).outlineWidth),
-    }));
-    expect(visibleFocus.focusVisible).toBe(true);
-    expect(visibleFocus.outlineStyle).not.toBe('none');
-    expect(visibleFocus.outlineWidth).toBeGreaterThan(0);
 
     await page.keyboard.press('Enter');
     await expect(previous).toBeFocused();
@@ -126,6 +118,14 @@ for (const width of [360, 820]) {
     await expect(next).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await expect(previous).toBeFocused();
+    const visibleFocus = await previous.evaluate((node) => ({
+      focusVisible: node.matches(':focus-visible'),
+      outlineStyle: getComputedStyle(node).outlineStyle,
+      outlineWidth: parseFloat(getComputedStyle(node).outlineWidth),
+    }));
+    expect(visibleFocus.focusVisible).toBe(true);
+    expect(visibleFocus.outlineStyle).not.toBe('none');
+    expect(visibleFocus.outlineWidth).toBeGreaterThan(0);
     await expect(page.getByRole('status').getByText('No hay actividad interna registrada en esta semana.')).toBeVisible();
     await expect(page.locator('.pilot-totals strong')).toHaveText(['0', '0', '0']);
 
