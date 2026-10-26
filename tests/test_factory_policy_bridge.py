@@ -44,6 +44,12 @@ class FactoryPolicyBridgeTests(unittest.TestCase):
         self.assertNotEqual(FACTORY_SHA, historical_sha)
         content = WORKFLOW.read_text(encoding="utf-8")
         self.assertNotIn(historical_sha, _factory_policy_job(content))
+        # Both caller references must remain aligned on the repaired immutable SHA.
+        self.assertIn(
+            f"pl0n3r/factory/.github/workflows/politica.yml@{FACTORY_SHA}", content
+        )
+        self.assertIn(f"factory_ref: {FACTORY_SHA}", content)
+        self.assertNotIn(f"factory_ref: {historical_sha}", content)
 
     def test_bridge_preserves_reviewer_triggers_and_read_only_permissions(self):
         content = WORKFLOW.read_text(encoding="utf-8")
