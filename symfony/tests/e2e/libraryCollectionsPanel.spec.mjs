@@ -73,7 +73,7 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'incompleto']) {
     } else if (scenario === 'incompleto') {
       await expect(page.getByRole('status').getByText(/UNKNOWN: hay más colecciones/)).toBeVisible();
     } else {
-      await expect(page.getByRole('alert')).toContainText(scenario === '403' ? 'Acceso denegado' : 'No se pudo consultar');
+      await expect(page.locator('#colecciones').getByRole('alert')).toContainText(scenario === '403' ? 'Acceso denegado' : 'No se pudo consultar');
     }
     expect(unsafe).toEqual([]);
   });
