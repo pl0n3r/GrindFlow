@@ -95,6 +95,9 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'desconocido']) {
     await expect(link).toHaveAttribute('aria-current', 'location');
     const section = page.locator('#entregas-manuales');
     await expect(section.getByRole('heading', { name: 'Entregas manuales' })).toBeVisible();
+    // Avoid duplicating the S3 planner heading "Destinos manuales".
+    await expect(section.getByRole('heading', { name: 'Catálogo de destinos de entrega' }))
+      .toBeVisible();
 
     if (scenario === 'lista') {
       await expect(section.getByRole('table', { name: /Entregas manuales pendientes/ })

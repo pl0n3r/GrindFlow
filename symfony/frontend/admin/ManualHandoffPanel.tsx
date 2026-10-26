@@ -139,7 +139,7 @@ export function ManualHandoffPanel() {
       </section>
 
       <section aria-labelledby="manual-destinations-title">
-        <h3 id="manual-destinations-title">Destinos manuales</h3>
+        <h3 id="manual-destinations-title">Catálogo de destinos de entrega</h3>
         {destinations.kind === 'loading' && <p role="status">Cargando destinos…</p>}
         {destinations.kind === 'error' && <p role="alert">No se pudieron cargar los destinos. {destinations.message}</p>}
         {destinations.kind === 'unknown' && <p role="status">UNKNOWN: destinos no verificables.</p>}
