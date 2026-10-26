@@ -46,6 +46,58 @@ def classify(status: str) -> str:
 
 
 class S4MediaReadinessHttpDiagnosticsTests(unittest.TestCase):
+    def test_scheduler_smoke_failure_reason_is_allowlisted(self) -> None:
+        start = SMOKE.index("safe_module_http_class() {")
+        end = SMOKE.index("\nmodule_failure() {", start)
+        helper = SMOKE[start:end]
+        cases = {
+            "200": "ok",
+            "": "unreachable",
+            "000": "unreachable",
+            "301": "redirect",
+            "302": "redirect",
+            "401": "unauthorized",
+            "403": "forbidden",
+            "404": "not_found",
+            "500": "server_error",
+            "503": "server_error",
+            "418": "other_non_200",
+            "302\nPASSWORD=leak": "other_non_200",
+            "503; echo leak": "other_non_200",
+            "200\r\nLocation: /secret": "other_non_200",
+        }
+        for status, expected in cases.items():
+            with self.subTest(status=status):
+                completed = subprocess.run(
+                    ["bash", "-c", helper + '\nsafe_module_http_class "$1"', "_", status],
+                    cwd=ROOT, text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(completed.stdout.strip(), expected)
+                self.assertEqual(completed.stderr, "")
+                self.assertNotIn("leak", completed.stdout)
+                self.assertNotIn("secret", completed.stdout)
+        for sensitive in ("Location:", "cookie", "password", "headers", "--request"):
+            self.assertNotIn(sensitive.lower(), helper.lower())
+
+    def test_scheduler_smoke_stays_fail_closed(self) -> None:
+        block = SMOKE.split("check_workspace_modules() {", 1)[1].split(
+            "# Reduce the authenticated S4 readiness", 1
+        )[0]
+        self.assertEqual(1, block.count('"$BASE_URL$workspace_path/$module"'))
+        self.assertIn('curl_common --cookie "$cookie_jar"', block)
+        self.assertIn('if [[ "$status" != "200" ]]; then', block)
+        self.assertIn('if ! assert_contains "$module_html" "$marker"; then', block)
+        self.assertIn('MODULE_READ_ONLY_DIAGNOSTIC=%s', block)
+        self.assertIn('MODULE_READ_ONLY_DIAGNOSTIC=marker_missing', block)
+        self.assertEqual(2, block.count('module_failure "$module"; return $?'))
+        self.assertLess(
+            block.index('if [[ "$status" != "200" ]]'),
+            block.index('if ! assert_contains "$module_html" "$marker"; then'),
+        )
+        self.assertNotIn("--request POST", block)
+        self.assertIn('printf \'MODULE_READ_ONLY=%s:ok\\n\' "$module"', block)
+
     def test_authenticated_non_200_is_classified_with_allowlist(self) -> None:
         cases = {
             "301": "redirect",
