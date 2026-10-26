@@ -114,9 +114,9 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'unknown']) {
       await expect(page.getByText('No hay horarios propuestos.')).toBeVisible();
       await expect(page.getByText('No hay una automatización configurada.')).toBeVisible();
     } else if (scenario === '403') {
-      await expect(page.getByRole('alert')).toContainText('401/403/409');
+      await expect(section.getByRole('alert')).toContainText('401/403/409');
     } else if (scenario === 'red') {
-      await expect(page.getByRole('alert')).toContainText('Error de red');
+      await expect(section.getByRole('alert')).toContainText('Error de red');
     } else {
       await expect(page.getByText(/UNKNOWN: regla semanal no verificable/)).toBeVisible();
       await expect(page.getByText(/UNKNOWN: vista previa no verificable/)).toBeVisible();
