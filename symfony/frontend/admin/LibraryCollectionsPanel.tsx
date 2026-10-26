@@ -11,11 +11,16 @@ const validUuid = (value: unknown): value is string =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
 async function read(url: string, signal: AbortSignal) {
-  const response = await fetch(url, {
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+  } catch {
+    throw new Error('No se pudo consultar la biblioteca (error de red).');
+  }
   if (response.status === 401 || response.status === 403 || response.status === 409) {
     throw new Error('Acceso denegado o sesión cambiada (403/401/409). Vuelve a seleccionar tu organización.');
   }
@@ -40,8 +45,9 @@ async function countAssets(id: string, signal: AbortSignal): Promise<number | nu
       if (!data.has_more) return seen.size;
       if (!validUuid(data.next_cursor) || cursors.has(data.next_cursor)
         || data.assets.length === 0) return null;
-      after = data.next_cursor;
-      cursors.add(after);
+      const nextCursor: string = data.next_cursor;
+      after = nextCursor;
+      cursors.add(nextCursor);
     }
   } catch {
     // Missing permissions, transient errors, and incomplete pages remain UNKNOWN.
@@ -76,8 +82,9 @@ export function LibraryCollectionsPanel() {
           incomplete = true;
           if (!validUuid(data.next_cursor) || cursors.has(data.next_cursor)
             || data.collections.length === 0) break;
-          after = data.next_cursor;
-          cursors.add(after);
+          const nextCursor: string = data.next_cursor;
+          after = nextCursor;
+          cursors.add(nextCursor);
         }
 
         const collections: Collection[] = ids.map((id) => ({ id, count: null }));
