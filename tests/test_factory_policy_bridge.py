@@ -4,7 +4,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/politica.yml"
-FACTORY_SHA = "4c26baad32f307adfb6c29e00eee989a935aa966"
+FACTORY_SHA = "1072b8b26582d4285f4b8215ce5098548b4a03d8"
 
 
 def _factory_policy_job(content: str) -> str:
@@ -37,6 +37,19 @@ class FactoryPolicyBridgeTests(unittest.TestCase):
             "pl0n3r/factory/.github/workflows/politica.yml@v1",
             job,
         )
+
+    def test_history_fix_cannot_regress_to_old_policy_sha(self):
+        """Pinned policy must not revert to the revision that hid retry attempts."""
+        historical_sha = "4c26baad32f307adfb6c29e00eee989a935aa966"
+        self.assertNotEqual(FACTORY_SHA, historical_sha)
+        content = WORKFLOW.read_text(encoding="utf-8")
+        self.assertNotIn(historical_sha, _factory_policy_job(content))
+        # Both caller references must remain aligned on the repaired immutable SHA.
+        self.assertIn(
+            f"pl0n3r/factory/.github/workflows/politica.yml@{FACTORY_SHA}", content
+        )
+        self.assertIn(f"factory_ref: {FACTORY_SHA}", content)
+        self.assertNotIn(f"factory_ref: {historical_sha}", content)
 
     def test_bridge_preserves_reviewer_triggers_and_read_only_permissions(self):
         content = WORKFLOW.read_text(encoding="utf-8")
