@@ -35,6 +35,8 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'unknown']) {
     });
 
     await page.goto('/preview');
+    const script = await page.locator('script[type="module"]').first().getAttribute('src');
+    expect(script).toBeTruthy();
     await page.route('**/api/admin/context', (route) => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: {
@@ -90,10 +92,18 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'unknown']) {
       });
     });
 
-    await page.goto('/preview');
-    await expect(page.getByRole('link', { name: /Reglas/ })).toBeVisible();
-    await page.getByRole('link', { name: /Reglas/ }).click();
-    await expect(page.getByRole('heading', { name: 'Reglas semanales y automatización' })).toBeVisible();
+    await page.evaluate(() => {
+      document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1">' +
+        '<div id="grindflow-admin"></div></main></div>';
+    });
+    await page.addScriptTag({ url: script + '?rules-panel-e2e=' + scenario, type: 'module' });
+    const nav = page.getByRole('navigation', { name: 'Navegación administrativa' });
+    const link = nav.getByRole('link', { name: /Reglas/ });
+    await expect(link).toBeVisible();
+    await link.click();
+    await expect(link).toHaveAttribute('aria-current', 'location');
+    const section = page.locator('#reglas');
+    await expect(section.getByRole('heading', { name: 'Reglas semanales y automatización' })).toBeVisible();
     await expect.poll(() => queries.length).toBeGreaterThanOrEqual(3);
     if (scenario === 'lista') {
       await expect(page.getByText('Miércoles')).toBeVisible();
