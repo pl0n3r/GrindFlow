@@ -2,6 +2,8 @@ import { WorkspaceNavigation } from './WorkspaceNavigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { VaultPanel } from './VaultPanel';
 import { LibraryCollectionsPanel } from './LibraryCollectionsPanel';
+import { ManualHandoffPanel } from './ManualHandoffPanel';
+import { RulesPanel } from './RulesPanel';
 import { WeeklyPlannerPanel } from './WeeklyPlannerPanel';
 import { PilotWeeklySummaryPanel } from './PilotWeeklySummaryPanel';
 
@@ -60,6 +62,8 @@ export function AdminApp() {
     if (window.location.hash === '#biblioteca') return 'biblioteca';
     if (window.location.hash === '#colecciones') return 'colecciones';
     if (window.location.hash === '#programacion') return 'programacion';
+    if (window.location.hash === '#entregas-manuales') return 'entregas-manuales';
+    if (window.location.hash === '#reglas') return 'reglas';
     if (window.location.hash === '#piloto') return 'piloto';
     return 'resumen';
   });
@@ -69,6 +73,8 @@ export function AdminApp() {
       setActiveSection(window.location.hash === '#biblioteca' ? 'biblioteca'
         : window.location.hash === '#colecciones' ? 'colecciones'
         : window.location.hash === '#programacion' ? 'programacion'
+          : window.location.hash === '#entregas-manuales' ? 'entregas-manuales'
+          : window.location.hash === '#reglas' ? 'reglas'
           : window.location.hash === '#piloto' ? 'piloto' : 'resumen');
     };
     window.addEventListener('hashchange', synchronizeSection);
@@ -248,8 +254,10 @@ export function AdminApp() {
           { id: 'biblioteca', number: '02', label: 'Biblioteca', href: '#biblioteca', stage: 'S2' },
           { id: 'colecciones', number: '03', label: 'Colecciones', href: '#colecciones', stage: 'S2' },
           { id: 'programacion', number: '04', label: 'Programación', href: '#programacion', stage: 'S4' },
+          { id: 'entregas-manuales', number: '05', label: 'Entregas manuales', href: '#entregas-manuales', stage: 'S4' },
+          { id: 'reglas', number: '06', label: 'Reglas', href: '#reglas', stage: 'S4' },
           ...(context.weekly_rule_csrf !== undefined
-            ? [{ id: 'piloto', number: '05', label: 'Piloto', href: '#piloto', stage: 'S5' }]
+            ? [{ id: 'piloto', number: '07', label: 'Piloto', href: '#piloto', stage: 'S5' }]
             : []),
         ]}
         footer={<div className="admin-tenant">
@@ -364,6 +372,8 @@ export function AdminApp() {
               manualHandoffCsrf={context.manual_handoff_csrf ?? null}
               manualDestinationCsrf={context.manual_destination_csrf ?? null}
             />}
+          {context.permissions.workspace_view && <ManualHandoffPanel />}
+          {context.permissions.workspace_view && <RulesPanel />}
           {context.weekly_rule_csrf !== undefined && <PilotWeeklySummaryPanel />}
           <section className="admin-notice" role="status">
             {context.weekly_rule_csrf !== undefined
