@@ -502,6 +502,20 @@ vault_failure_status() {
   return 4
 }
 
+# Fixed classifications for remote module status; never echo untrusted status.
+safe_module_http_class() {
+  case "${1:-}" in
+    200) printf "ok\n" ;;
+    000|"") printf "unreachable\n" ;;
+    3??) printf "redirect\n" ;;
+    401) printf "unauthorized\n" ;;
+    403) printf "forbidden\n" ;;
+    404) printf "not_found\n" ;;
+    5??) printf "server_error\n" ;;
+    *) printf "other_non_200\n" ;;
+  esac
+}
+
 module_failure() {
   local label="$1"
   printf 'MODULE_READ_ONLY=failed\n' >&2
@@ -527,7 +541,12 @@ check_workspace_modules() {
     esac
 
     status="$(curl_common --cookie "$cookie_jar" --output "$module_html" --write-out '%{http_code}' "$BASE_URL$workspace_path/$module" || true)"
-    if [[ "$status" != 200 ]] || ! assert_contains "$module_html" "$marker"; then
+    if [[ "$status" != "200" ]]; then
+      printf 'MODULE_READ_ONLY_DIAGNOSTIC=%s\n' "$(safe_module_http_class "$status")" >&2
+      module_failure "$module"; return $?
+    fi
+    if ! assert_contains "$module_html" "$marker"; then
+      printf 'MODULE_READ_ONLY_DIAGNOSTIC=marker_missing\n' >&2
       module_failure "$module"; return $?
     fi
     printf 'MODULE_READ_ONLY=%s:ok\n' "$module"
