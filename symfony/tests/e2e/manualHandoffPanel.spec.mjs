@@ -89,7 +89,7 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'desconocido']) {
     });
     await page.addScriptTag({ url: script + '?manual-handoff-e2e=' + scenario, type: 'module' });
     const nav = page.getByRole('navigation', { name: 'Navegación administrativa' });
-    const link = nav.getByRole('link', { name: 'Entregas manuales' });
+    const link = nav.getByRole('link', { name: /Entregas manuales/ });
     await expect(link).toBeVisible();
     await link.click();
     await expect(link).toHaveAttribute('aria-current', 'location');
