@@ -9,7 +9,6 @@ use GrindFlow\Observability\DiagnosticReceipt;
 use InvalidArgumentException;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
-use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
@@ -180,9 +179,10 @@ final class LogSanitizationContractTest extends WebTestCase
             ['schema_version', 'receipt_id', 'kind', 'state', 'diagnostic_status', 'operational_ready', 'correlation'],
             array_keys($receipt),
         );
-        self::assertEqualsCanonicalizing(
-            array_intersect(['request_id', 'job_id', 'publication_id'], array_keys($receipt['correlation'])),
-            array_keys($receipt['correlation']),
+        self::assertSame(
+            [],
+            array_diff(array_keys($receipt['correlation']), ['request_id', 'job_id', 'publication_id']),
+            'Correlation must contain only opaque references from the allowlist.',
         );
         self::assertSame(1, $receipt['schema_version']);
     }
