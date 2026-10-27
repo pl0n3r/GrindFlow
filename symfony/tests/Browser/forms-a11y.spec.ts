@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Supplemental browser contract for the isolated Symfony preview.
- * This claimed path is outside playwright.config.mjs's default testDir
- * (tests/e2e), so it requires explicit discovery in a dedicated run.
+ * This suite is discovered alongside tests/e2e by playwright.config.mjs.
+ * CI executes its real browser assertions on synthetic inputs.
  * It never connects to production or uses personal accounts.
  */
 for (const width of [360, 390, 820]) {
@@ -40,7 +40,10 @@ for (const width of [360, 390, 820]) {
     await page.getByRole('button', { name: 'Enviar instrucciones' }).click();
     await expect(email).toBeFocused();
     await page.goto('/recover-password');
-    await expect(page.getByLabel('Nueva contraseña')).toHaveAttribute('type', 'password');
+    // The section is also aria-labelledby with “Nueva contraseña”; select the field
+    // by its stable associated id to avoid a strict-mode match on the region.
+    await expect(page.locator('label[for="recovery-password"]')).toHaveText('Nueva contraseña');
+    await expect(page.locator('#recovery-password')).toHaveAttribute('type', 'password');
     await expect(page.getByLabel('Confirmar contraseña')).toHaveAttribute('type', 'password');
     await expect(page.locator('#password-recovery-token')).toHaveValue('');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
