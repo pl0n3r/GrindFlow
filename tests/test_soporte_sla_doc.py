@@ -66,7 +66,10 @@ class DocContractTests(unittest.TestCase):
                 self.assertIn("POR ASIGNAR", cols[3])
                 self.assertIn("POR ASIGNAR", cols[4])
                 self.assertIn("PROPUESTA", cols[5])
-                self.assertIn("onboarding", cols[7]) if level != "S4" else self.assertIn("#651", cols[7])
+                if level == "S4":
+                    self.assertIn("#651", cols[7])
+                else:
+                    self.assertIn("onboarding", cols[7])
         self.assertIn("referencia opaca", self.content.lower())
         self.assertIn("Próxima actualización", self.content)
 
