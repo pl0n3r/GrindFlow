@@ -87,7 +87,7 @@ def validate_honesty(text):
     for marker in required:
         if marker.lower() not in text.lower():
             raise ValueError("afirmación o límite faltante: " + marker)
-    if re.search(r"(?im)(?:verificación real|estado de la prueba|decisión):\\s*(?:LISTO|VERIFICADO|GO|SUCCESS)\\b", text):
+    if re.search(r"(?im)(?:verificación real|estado de la prueba|decisión):\s*(?:LISTO|VERIFICADO|GO|SUCCESS)\b", text):
         raise ValueError("estado productivo falsamente acreditado")
 
 
