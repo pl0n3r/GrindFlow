@@ -257,5 +257,19 @@ class CommercialReadinessContractTests(unittest.TestCase):
             validate_package(forged)
 
 
+    def test_future_dated_header_and_missing_sla_cannot_authorize_sale(self) -> None:
+        for old, replacement in (
+            ("**Corte de evidencia UTC:** UNKNOWN (sin observación autenticada).",
+             "**Corte de evidencia UTC:** 2026-10-27T20:00:00Z."),
+            ("**SLA:**", "**Acuerdo:**"),
+            ("**Decisión go/no-go comercial:** NO-GO (sin evidencias autenticadas).",
+             "**Decisión go/no-go comercial:** GO."),
+        ):
+            with self.subTest(replacement=replacement):
+                self.assertIn(old, self.original)
+                with self.assertRaises(ValueError):
+                    validate_package(self.original.replace(old, replacement, 1))
+
+
 if __name__ == "__main__":
     unittest.main()
