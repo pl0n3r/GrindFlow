@@ -117,7 +117,7 @@ def validate_package(markdown: str) -> None:
     for label, value in DECISIONS.items():
         # No hidden alternative status, including plain and Markdown versions.
         marker = re.compile(r"^\s*(?:[*_]{0,2})" + re.escape(label)
-                            + r"(?:[*_]{0,2})\s*:", flags=re.M | re.I)
+                            + r"\s*:(?:[*_]{0,2})", flags=re.M | re.I)
         declared = [line.strip() for line in markdown.splitlines()
                     if marker.match(line)]
         if declared != ["**" + label + ":** " + value]:
@@ -159,6 +159,9 @@ def validate_package(markdown: str) -> None:
                   "persona asignada UNKNOWN", "PROPUESTA_NO_APROBADA"):
         if token not in operational:
             raise ValueError("Falta el flujo de onboarding, soporte u owner")
+
+    if operational.count("persona asignada UNKNOWN") != 2:
+        raise ValueError("No se permite asignar responsables sin evidencia")
 
     risk = section(markdown, "Riesgos y motivos NO-GO")
     for index in range(1, 8):
