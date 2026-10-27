@@ -89,7 +89,7 @@ final class CrossModuleReportTest extends WebTestCase
     {
         /** @var Connection&\PHPUnit\Framework\MockObject\MockObject $db */
         $db = $this->createMock(Connection::class);
-        $db->method('fetchOne')->willThrowException(new DbalException('synthetic query failure'));
+        $db->method('fetchOne')->willThrowException(new class('synthetic query failure') extends \Exception implements DbalException {});
 
         $report = CrossModuleReportController::report($db, 'tenant-a', '2026-10-01', '2026-10-08');
         self::assertFalse($report['ready']);
@@ -162,7 +162,7 @@ final class CrossModuleReportTest extends WebTestCase
                 'local_time' => '10:00',
                 'status' => 'draft',
                 'delivery_provider' => 'facebook_page',
-                'delivery_destination_id' => 'synthetic-destination',
+                'delivery_destination_id' => '12345678',
                 'created_at' => $now,
             ]);
         }
