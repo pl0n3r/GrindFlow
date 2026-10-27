@@ -24,14 +24,15 @@ def validate_sections(text):
     if any(text.count(title) != 1 for title in SECTIONS):
         raise ValueError("sección ausente o duplicada")
     for token in (
-        "curl --silent --show-error --request OPTIONS",
+        "curl --config - --silent --show-error --request OPTIONS",
         "Access-Control-Request-Method: PUT",
-        "Access-Control-Request-Headers: content-type,x-amz-content-sha256",
-        "curl --silent --show-error --request PUT",
+        "Access-Control-Request-Headers: content-type",
+        "curl --config - --silent --show-error --request PUT",
         "--upload-file",
         "Access-Control-Allow-Origin", "Access-Control-Allow-Methods",
         "Access-Control-Allow-Headers", "OPTIONS 403/405", "PUT 400/403",
         "Medición UTC", "Integridad SHA-256", "--dump-header",
+        "curl --config -", "IFS= read -r -s", "unset URL_FIRMADA",
     ):
         if token not in text:
             raise ValueError("falta un elemento del guion: " + token)
@@ -54,9 +55,22 @@ def validate_privacy(text):
     for safe in ("<ORIGIN_HTTPS_REAL_CONFIRMADO>", "<URL_FIRMADA_PUT_EFIMERA_PRIVADA>", "<RUTA_PRIVADA_FIXTURE_JPEG_SIN_PII>"):
         if safe not in text:
             raise ValueError("marcador seguro ausente")
-    commands = [ln.lstrip() for ln in text.splitlines() if ln.lstrip().startswith("curl ")]
-    for command in commands:
-        if any(bad in command for bad in ("curl -v ", "--trace ", "--verbose ", "--trace-ascii")):
+    lines = text.splitlines()
+    for start, line in enumerate(lines):
+        if not line.lstrip().startswith("curl "):
+            continue
+        end = start
+        while end + 1 < len(lines) and lines[end].rstrip().endswith("\\"):
+            end += 1
+        tokens = " ".join(
+            segment.strip().rstrip("\\") for segment in lines[start:end + 1]
+        ).split()
+        if any(
+            token in ("-v", "--verbose", "--trace", "--trace-ascii")
+            or token.startswith("--trace=")
+            or token.startswith("--trace-ascii=")
+            for token in tokens
+        ):
             raise ValueError("curl con salida sensible")
 
 
@@ -73,7 +87,7 @@ def validate_honesty(text):
     for marker in required:
         if marker.lower() not in text.lower():
             raise ValueError("afirmación o límite faltante: " + marker)
-    if re.search(r"(?im)^(?:estado de la prueba|decisión):\s*(?:LISTO|VERIFICADO|GO|SUCCESS)\s*$", text):
+    if re.search(r"(?im)(?:verificación real|estado de la prueba|decisión):\\s*(?:LISTO|VERIFICADO|GO|SUCCESS)\\b", text):
         raise ValueError("estado productivo falsamente acreditado")
 
 
@@ -101,14 +115,24 @@ class DocContractTests(unittest.TestCase):
 
     def test_sin_datos_sensibles(self):
         validate_privacy(self.text)
-        for bad in ("AKIAABCDEFGHIJKLMNOP", "access_token=real123", "persona@example.com", "X-Amz-Signature=abcdef"):
+        for bad in ("AKIA" + "ABCDEFGHIJKLMNOP", "access_token=real123", "persona@example.com", "X-Amz-Signature=abcdef"):
             with self.subTest(sensitive=bad), self.assertRaises(ValueError):
                 validate_privacy(self.text + "\n" + bad)
+        unsafe = self.text.replace(
+            "curl --config - --silent --show-error --request PUT " + chr(92) + "\n",
+            "curl --config - --silent --show-error --request PUT " + chr(92) + "\n  -v " + chr(92) + "\n",
+            1,
+        )
+        self.assertNotEqual(unsafe, self.text)
+        with self.assertRaises(ValueError):
+            validate_privacy(unsafe)
 
     def test_estado_honesto(self):
         validate_honesty(self.text)
         with self.assertRaises(ValueError):
             validate_honesty(self.text.replace("Verificación real: NO ENSAYADO", "Verificación real: LISTO", 1))
+        with self.assertRaises(ValueError):
+            validate_honesty(self.text + "\nVerificación real: LISTO\n")
 
     def test_enlaza_fila_de_salida(self):
         source = SOURCE.read_text(encoding="utf-8")
