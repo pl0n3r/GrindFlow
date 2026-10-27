@@ -28,6 +28,19 @@ Lectura de solo código de las pantallas Twig y React del viaje **login, subir m
 
 **Correcciones pequeñas aplicadas:** solo este inventario con archivos/líneas verificables y su test contractual offline. **No se modificaron componentes**, estilos, runtime ni plantillas. Ninguna corrección de UI se declara hecha sin hoja, claims y tests propios.
 
+## Matriz de verificación pendiente por etapa
+
+La secuencia de teclado, la visibilidad del foco, el reflow y la comunicación de errores necesitan una ejecución autenticada en navegador sobre un artefacto identificado; las referencias a componentes prueban **estructura en fuente**, no conformidad. Esta matriz es una **PROPUESTA** de observación, no una lista de resultados aprobados:
+
+| Etapa | Teclado y foco a ensayar | Mensajes de error a comprobar | Contraste y móvil | Estado |
+| --- | --- | --- | --- | --- |
+| Login | Tab desde «Saltar al contenido», foco de email a contraseña y botón Entrar; regreso de foco después de un error | `role="alert"` y enlaces de `aria-describedby` del fallo de sesión; lectura con tecnología asistiva | Medir ratios de texto/controles en normal, error y foco a 320 CSS px | NO ENSAYADO |
+| Subir material | Recorrer selector de archivos, descartes y botón Guardar sin trampas de foco | Anuncio de rechazos de formato/tamaño, progreso y resultado por archivo; `VaultPanel.tsx:703-769` | Reflow de lista de archivos y controles con zoom 400 %; contraste de botones deshabilitados y mensajes | NO ENSAYADO |
+| Programar | Tab por recurso, horario y botón; comprobar foco tras error de red; `ScheduleDraftPanel.tsx:568-594` | `role="alert"` y `role="status"` del formulario, sin suponer que lectores de pantalla los anuncian | Reflow de selects y etiquetas a 320 CSS px; contraste de error y foco | NO ENSAYADO |
+| Preparar/publicar | Recorrer botones condicionales, destinos manuales y regiones desplazables; `ManualHandoffPanel.tsx:116-123` | Distinguir `prepared`, `published`, `failed` y estado incierto sin equipararlos a publicación efectiva | Reflow de tablas con scroll horizontal accesible y medición de contraste AA | UNKNOWN / NO ENSAYADO |
+
+**Criterio de evidencia:** conservar build/SHA desplegado, viewport, dispositivo o navegador, pasos, resultado accesible, fecha y capturas anonimizadas. Un resultado positivo en fixtures o CI no reemplaza la auditoría real de la fila `DEL_DUEÑO`.
+
 ## Pruebas pendientes y responsables
 
 - **NO ENSAYADO:** navegación real de login, subida, programación y publicación con teclado y lector de pantalla en build desplegado identificado. OWNER y QA.
