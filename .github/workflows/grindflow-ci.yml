@@ -823,6 +823,16 @@ jobs:
         # La fuente del test está en tests/, pero usa Symfony/MariaDB de este job.
         working-directory: .
         run: python3 -m unittest tests/test_mvp_symfony_http_negatives.py -v
+      - name: Ejecutar evidencia GF356 cuando el test forma parte del HEAD
+        # #684 aporta este test; una ejecución sin su archivo nunca equivale a PASS.
+        if: ${{ hashFiles('tests/test_release_100_evidence.py') != '' }}
+        working-directory: .
+        run: python3 -m unittest tests/test_release_100_evidence.py -v
+      - name: Ejecutar matriz GF-MIG-003 cuando el test forma parte del HEAD
+        # #681 aporta la matriz; no informar éxito si el test no existe aquí.
+        if: ${{ hashFiles('tests/test_parity_matrix_executable.py') != '' }}
+        working-directory: .
+        run: python3 -m unittest tests/test_parity_matrix_executable.py -v
       - name: Verify migration reversibility on disposable MariaDB
         working-directory: symfony
         run: |

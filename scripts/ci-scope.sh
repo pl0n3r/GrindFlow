@@ -105,6 +105,12 @@ grindflow_ci_classify_files() {
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
         GRINDFLOW_SCOPE_RUN_TESTS=true
         ;;
+      tests/test_release_100_evidence.py)
+        grindflow_ci_scope_add_area "Symfony release GF356 Python acceptance"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
+        GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
+        GRINDFLOW_SCOPE_RUN_TESTS=true
+        ;;
       tests/test_mvp_symfony_http_negatives.py)
         grindflow_ci_scope_add_area "Symfony HTTP negative acceptance"
         GRINDFLOW_SCOPE_RUN_SYMFONY=true
