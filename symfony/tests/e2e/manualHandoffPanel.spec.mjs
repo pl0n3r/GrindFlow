@@ -249,6 +249,23 @@ for (const width of [360, 820]) {
       expect(await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       )).toBe(true);
+      // Resize the same mounted component: ResizeObserver must refresh both
+      // regions without remounting or introducing global horizontal overflow.
+      if (width === 820) {
+        await page.setViewportSize({ width: 360, height: 900 });
+        for (let index = 0; index < 2; index += 1) {
+          const wrapper = wrappers.nth(index);
+          await expect.poll(() => wrapper.evaluate(
+            (element) => element.scrollWidth > element.clientWidth,
+          )).toBe(true);
+          await expect(wrapper).toHaveAttribute('tabindex', '0');
+          await expect(wrapper).toHaveAttribute('role', 'region');
+          await expect(wrapper).toHaveAttribute('aria-label', labels[index]);
+        }
+        expect(await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        )).toBe(true);
+      }
       const API = ['/api/admin/manual-handoff-queue', '/api/admin/manual-destinations'];
       expect(API.every((path) => requested.some(
         (request) => request.path === path && request.method === 'GET',
