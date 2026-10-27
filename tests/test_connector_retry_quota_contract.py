@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
 import unittest
 from pathlib import Path
 
@@ -67,10 +66,6 @@ def assert_transient_backoff_behavior(manager_source: str) -> None:
             timeout=15,
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        # The acceptance harness captures unittest reports; print a bounded,
-        # non-sensitive failure class so its own logs identify infrastructure errors.
-        detail = (getattr(exc, "stderr", None) or "").splitlines()[:2]
-        print("AC01_PHP_DIAGNOSTIC:", type(exc).__name__, detail, file=sys.stderr)
         raise AssertionError("Cannot verify PHP backoff behavior") from exc
     try:
         intervals = [int(line) for line in result.stdout.splitlines()]
@@ -229,7 +224,7 @@ def audit_real_feature_tests(source: str, controller: str) -> None:
         r"'organizations\.distribution\.deliveries\.retry',\s*"
         r"\[\s*'organizationId'\s*=>\s*\$org->getKey\(\),\s*"
         r"'deliveryId'\s*=>\s*\$alien->getKey\(\),?\s*"
-        r"\]\s*,?\s*\)\s*->assertNotFound\(\)"
+        r"\]\s*,?\s*\)\s*\)\s*->assertNotFound\(\)"
     )
     if not re.search(foreign_retry, cross, re.DOTALL):
         raise AssertionError("Foreign delivery retry must return 404 from its own request")
@@ -254,12 +249,8 @@ class ConnectorRetryQuotaTests(unittest.TestCase):
     def test_provider_error_retry_and_idempotency(self) -> None:
         """AC-01: genuine disposable PHP behaviors plus their production guards."""
         manager, job, feature, controller = self.load_contract()
-        try:
-            audit_manager(manager, job)
-            audit_real_feature_tests(feature, controller)
-        except AssertionError as exc:
-            print("AC01_CONTRACT_DIAGNOSTIC:", str(exc)[:200], file=sys.stderr)
-            raise
+        audit_manager(manager, job)
+        audit_real_feature_tests(feature, controller)
 
     def test_negative_mutations_reject_weakened_retry_guards(self) -> None:
         manager, job, _, _ = self.load_contract()
