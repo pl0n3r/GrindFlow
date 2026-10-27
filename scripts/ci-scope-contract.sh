@@ -71,6 +71,15 @@ expect_flag "$symfony_docs" "run_symfony=false" "Symfony documentation skips hea
 symfony_mixed="$(run_scope pull_request symfony/README.md symfony/src/Kernel.php)"
 expect_flag "$symfony_mixed" $RUN_SYMFONY_ENABLED "Symfony source cannot be masked by docs"
 
+parity="$(run_scope pull_request tests/test_parity_matrix_executable.py)"
+expect_flag "$parity" "$RUN_SYMFONY_ENABLED" "GF-MIG-003 Python test selects Symfony preview"
+expect_flag "$parity" "run_tests=true" "GF-MIG-003 Python test still selects Laravel tests"
+expect_flag "$parity" "run_php_quality=true" "GF-MIG-003 Python test keeps PHP quality"
+unrelated_py="$(run_scope pull_request tests/test_historical_parity_matrix.py)"
+expect_flag "$unrelated_py" "run_symfony=false" "unrelated Python test does not broaden Symfony preview"
+mixed_parity="$(run_scope pull_request docs/PARITY-MATRIX-EXECUTABLE.md tests/test_parity_matrix_executable.py)"
+expect_flag "$mixed_parity" "$RUN_SYMFONY_ENABLED" "matrix documentation cannot mask Symfony test"
+
 schema_tooling="$(run_scope pull_request scripts/mariadb-structure-snapshot.php)"
 expect_flag "$schema_tooling" $RUN_SYMFONY_ENABLED "schema snapshot tooling selects Symfony parity gate"
 
