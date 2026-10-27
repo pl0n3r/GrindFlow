@@ -95,6 +95,10 @@ class OperationsStorageReadinessTests(unittest.TestCase):
             "AllowedHeaders": ["Content-Type", "x-amz-*"],
         }]}
         self.assertEqual("compatible", cors.assess(policy, ORIGIN))
+        missing_content_type = {"CORSRules": [{
+            **policy["CORSRules"][0], "AllowedHeaders": ["x-amz-*"],
+        }]}
+        self.assertEqual("incompatible", cors.assess(missing_content_type, ORIGIN))
         wildcard = {"CORSRules": [{
             **policy["CORSRules"][0], "AllowedOrigins": ["*"],
         }]}
@@ -205,6 +209,12 @@ echo json_encode([
             self.assertIs(result[name]["operational_ready"], False)
         self.assertEqual("HTTP_500", result["http"]["kind"])
         self.assertEqual("JOB_FAILURE", result["job"]["kind"])
+        self.assertEqual("evt_aaaaaaaaaaaaaaaa", result["http"]["receipt_id"])
+        self.assertEqual({"request_id": "req_bbbbbbbbbbbbbbbb"},
+                         result["http"]["correlation"])
+        self.assertEqual("evt_cccccccccccccccc", result["job"]["receipt_id"])
+        self.assertEqual({"job_id": "job_dddddddddddddddd"},
+                         result["job"]["correlation"])
         self.assertEqual(3, result["rejected"])
         output = json.dumps(result, sort_keys=True)
         for secret in ("fake-secret", "uploads.invalid", "tenant_a", "other_tenant"):
