@@ -8,6 +8,7 @@ their implementations; CI's PHP suite executes those tests separately.
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -40,10 +41,45 @@ def php_method(source: str, name: str) -> str:
     return source[match.start():end]
 
 
+PHP_BACKOFF_PROBE = r"""
+require $argv[1];
+$reflection = new ReflectionClass('App\\Services\\Distribution\\PublicationDeliveryManager');
+$manager = $reflection->newInstanceWithoutConstructor();
+$method = $reflection->getMethod('transientDelay');
+foreach ([1, 2, 3, 4] as $attempt) {
+    echo $method->invoke($manager, $attempt), "\n";
+}
+"""
+
+
+def assert_transient_backoff_behavior(manager_source: str) -> None:
+    """Execute the real PHP retry method without creating a manager or provider."""
+    method = php_method(manager_source, "transientDelay")
+    need(method, "return self::TRANSIENT_BACKOFF_SECONDS[", "Backoff lookup")
+    need(method, "min(max($attempts, 1), 3)", "Attempt clamping")
+    try:
+        result = subprocess.run(
+            ["php", "-r", PHP_BACKOFF_PROBE, str(MANAGER)],
+            check=True,
+            text=True,
+            capture_output=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise AssertionError("Cannot verify PHP backoff behavior") from exc
+    try:
+        intervals = [int(line) for line in result.stdout.splitlines()]
+    except ValueError as exc:
+        raise AssertionError("Backoff probe emitted nonnumeric results") from exc
+    if intervals != [60, 300, 900, 900]:
+        raise AssertionError(f"Expected 60/300/900/900 second delays; got {intervals}")
+
+
 def audit_manager(source: str, job: str) -> None:
     need(source, "public const MAX_ATTEMPTS = 4;", "Retry budget")
     for pair in ("1 => 60", "2 => 300", "3 => 900"):
         need(source, pair, "Bounded backoff")
+    assert_transient_backoff_behavior(source)
     failure = php_method(source, "handleProviderFailure")
     for item in (
         "KIND_AUTHENTICATION",
@@ -183,6 +219,17 @@ def audit_real_feature_tests(source: str, controller: str) -> None:
         "Queue::assertNothingPushed()",
     ):
         need(cross, token, "Foreign-tenant retry and no-side-effect guard")
+    foreign_retry = (
+        r"\$this->actingAs\(\$actor\)->post\(route\(\s*"
+        r"'organizations\.distribution\.deliveries\.retry',\s*"
+        r"\[\s*'organizationId'\s*=>\s*\$org->getKey\(\),\s*"
+        r"'deliveryId'\s*=>\s*\$alien->getKey\(\),?\s*"
+        r"\]\s*,?\s*\)\s*->assertNotFound\(\)"
+    )
+    if not re.search(foreign_retry, cross, re.DOTALL):
+        raise AssertionError("Foreign delivery retry must return 404 from its own request")
+
+
 
 
 class ConnectorRetryQuotaTests(unittest.TestCase):
@@ -210,6 +257,7 @@ class ConnectorRetryQuotaTests(unittest.TestCase):
         cases = (
             ("MAX_ATTEMPTS = 4", "MAX_ATTEMPTS = 9"),
             ("2 => 300", "2 => 0"),
+            ("min(max($attempts, 1), 3)", "1"),
             ("decrementAttempt: true", "decrementAttempt: false"),
             ("? max(0, $delivery->attempts - 1)",
              "? max(1, $delivery->attempts - 1)"),
@@ -241,12 +289,18 @@ class ConnectorRetryQuotaTests(unittest.TestCase):
         ):
             with self.subTest(regression=original):
                 self.assertIn(original, feature)
+                mutated_feature = feature.replace(original, weakened, 1)
                 with self.assertRaises(AssertionError):
-                    audit_real_feature_tests(feature.replace(original, weakened, 1), controller)
-        self.assertIn("->assertNotFound()", controller)
-        with self.assertRaises(AssertionError):
-            audit_real_feature_tests(
-                feature, controller.replace("->assertNotFound()", "->assertOk()"))
+                    audit_real_feature_tests(mutated_feature, controller)
+        for original, weakened in (
+            ("->assertNotFound()", "->assertOk()"),
+            ("\'deliveryId\' => $alien->getKey()",
+             "\'deliveryId\' => $queued->getKey()"),
+        ):
+            self.assertIn(original, controller)
+            mutated_controller = controller.replace(original, weakened, 1)
+            with self.assertRaises(AssertionError):
+                audit_real_feature_tests(feature, mutated_controller)
 
 
 if __name__ == "__main__":
