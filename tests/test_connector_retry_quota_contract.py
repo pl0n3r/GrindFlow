@@ -223,7 +223,7 @@ class ConnectorRetryQuotaTests(unittest.TestCase):
         for original, weakened in cases:
             with self.subTest(guard=original):
                 self.assertIn(original, manager)
-                changed = manager.replace(original, weakened, 1)
+                changed = manager.replace(original, weakened)
                 with self.assertRaises(AssertionError):
                     audit_manager(changed, job)
 
@@ -246,7 +246,7 @@ class ConnectorRetryQuotaTests(unittest.TestCase):
         self.assertIn("->assertNotFound()", controller)
         with self.assertRaises(AssertionError):
             audit_real_feature_tests(
-                feature, controller.replace("->assertNotFound()", "->assertOk()", 1))
+                feature, controller.replace("->assertNotFound()", "->assertOk()"))
 
 
 if __name__ == "__main__":
