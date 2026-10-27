@@ -31,7 +31,7 @@ def validate_sections(text):
         "--upload-file",
         "Access-Control-Allow-Origin", "Access-Control-Allow-Methods",
         "Access-Control-Allow-Headers", "OPTIONS 403/405", "PUT 400/403",
-        "Medición UTC", "Integridad SHA-256",
+        "Medición UTC", "Integridad SHA-256", "--dump-header",
     ):
         if token not in text:
             raise ValueError("falta un elemento del guion: " + token)
@@ -45,7 +45,7 @@ def validate_privacy(text):
         r"(?i)ASIA[0-9A-Z]{16}",
         r"(?i)-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
         r"(?i)\b(?:secret_access_key|aws_secret_access_key|private_key|access_token)\s*[:=]\s*['\"]?[^<\s'\"]+",
-        r"(?i)(?:^|[?&])X-Amz-(?:Signature|Credential|Security-Token)=\S+",
+        r"(?im)(?:^|[?&])X-Amz-(?:Signature|Credential|Security-Token)=\S+",
         r"(?i)\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b",
         r"(?i)https?://[^\s'\"]+:[^\s'\"]+@",
     )
