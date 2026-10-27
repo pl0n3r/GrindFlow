@@ -186,8 +186,9 @@ class ParityMatrixExecutableTests(unittest.TestCase):
             if item["symfony"]["definition"]:
                 self.assertTrue(item["symfony"]["definition"].startswith("symfony/src/Http/Controller/"))
         test_source = Path(__file__).read_text(encoding="utf-8")
-        for forbidden in ("requests.get(", "urlopen(", "urllib.request", "subprocess.run("):
-            self.assertNotIn(forbidden, test_source)
+        for module, suffix in (("requests", ".get("), ("url", "open("),
+                               ("urllib", ".request"), ("subprocess", ".run(")):
+            self.assertNotIn(module + suffix, test_source)
 
 
 if __name__ == "__main__":
