@@ -28,7 +28,9 @@ async function mountAdmin(page: Page) {
     document.body.innerHTML = '<div class="admin-page"><main id="contenido" tabindex="-1">' +
       '<div id="grindflow-admin"></div></main></div>';
   });
-  await page.addScriptTag({ url: script!, type: 'module' });
+  // /preview already executed this ES module for its original preview root.
+  // Force a distinct module URL to mount the synthetic admin root after replacing DOM.
+  await page.addScriptTag({ url: script! + '?ui-states-admin=1', type: 'module' });
 }
 
 function monitorWrites(page: Page) {
