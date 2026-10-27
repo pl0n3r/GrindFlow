@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Collection = { id: string; count: number | null };
 type CollectionState =
@@ -57,6 +57,9 @@ async function countAssets(id: string, signal: AbortSignal): Promise<number | nu
 
 export function LibraryCollectionsPanel() {
   const [state, setState] = useState<CollectionState>({ kind: 'loading' });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
+  const [scrollFocused, setScrollFocused] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -107,6 +110,22 @@ export function LibraryCollectionsPanel() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    if (state.kind !== 'ready' || state.collections.length === 0) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    const updateOverflow = () => {
+      setHasHorizontalOverflow(container.scrollWidth > container.clientWidth + 1);
+    };
+    updateOverflow();
+    // Table or viewport resizing can change whether an extra keyboard stop is useful.
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(container);
+    const table = container.querySelector('table');
+    if (table) observer.observe(table);
+    return () => observer.disconnect();
+  }, [state]);
+
   return (
     <section className="admin-settings" id="colecciones" aria-labelledby="library-collections-title">
       <span className="admin-kicker">S2 · BIBLIOTECA · SOLO LECTURA</span>
@@ -121,7 +140,16 @@ export function LibraryCollectionsPanel() {
           <p role="status">No hay colecciones en esta organización.</p>}
         {state.incomplete &&
           <p role="status">UNKNOWN: hay más colecciones que no se pudieron verificar.</p>}
-        {state.collections.length > 0 && <div style={{ maxWidth: '100%', overflowX: 'auto' }}>
+        {state.collections.length > 0 && <div
+          ref={scrollRef}
+          data-testid="collections-horizontal-scroll"
+          role={hasHorizontalOverflow ? 'region' : undefined}
+          aria-label={hasHorizontalOverflow ? 'Desplazamiento horizontal de colecciones' : undefined}
+          tabIndex={hasHorizontalOverflow ? 0 : undefined}
+          onFocus={() => setScrollFocused(true)}
+          onBlur={() => setScrollFocused(false)}
+          style={{ maxWidth: '100%', overflowX: 'auto',
+            outline: scrollFocused ? '2px solid currentColor' : undefined, outlineOffset: 3 }}>
           <table style={{ width: '100%', minWidth: 440 }}>
             <caption>Colecciones de la organización seleccionada</caption>
             <thead><tr><th scope="col">Identificador de colección</th><th scope="col">Activos vinculados</th></tr></thead>
