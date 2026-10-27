@@ -12,6 +12,7 @@ este issue no autoriza modificarla ni afirmar una API disponible.
 ## Contrato de lectura
 
 - Entrada: UUID de organización obtenido del `MembershipContext` autenticado y fechas UTC `from` / `to` (`YYYY-MM-DD`).
+- Acceso al agregado: membresía actual de la organización **admin** o **studio** (`organization_manage`); otros roles reciben 403 sin consultar cifras.
 - `from` es inclusivo, `to` es exclusivo; duración entre 1 y 31 días. Datos inválidos se rechazan sin consultar filas.
 - `assets`: recursos Vault creados en el período que no estén eliminados.
 - `scheduled`: borradores Scheduling con fecha programada dentro del período y recurso Vault de la misma organización.
@@ -27,8 +28,8 @@ este issue no autoriza modificarla ni afirmar una API disponible.
 Los SQL filtran `organization_id` en cada módulo y correlacionan `attempt` → `draft` → `asset`
 por el mismo tenant, proveedor e idempotency key. Nunca se infiere ownership desde una clave textual.
 `symfony/tests/php/CrossModuleReportTest.php` usa organizaciones, recursos, borradores y outcomes sintéticos:
-comprueba mezcla de tenants, un intento huérfano, distintos períodos, límite exclusivo, entrada malformada,
-estado vacío y error de fuente. Revertir el filtro/join incrementa los totales esperados y hace fallar la suite.
+comprueba mezcla de tenants, un intento huérfano, fechas exactamente inclusivas/exclusivas en las tres fuentes, entrada malformada,
+estado vacío, error de fuente y las respuestas HTTP 401/409/403/422 con caché privada. Revertir el filtro/join o la validación de límites altera los totales esperados y hace fallar la suite.
 
 ## Verificación y reversión
 
