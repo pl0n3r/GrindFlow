@@ -117,6 +117,19 @@ class PostMvpScopeGateTests(unittest.TestCase):
         for unexpected in (None, {}, {"scope": "aws"}, {"scope": "__unknown__"}, {"scope": []}):
             self.assertEqual("BLOCKED", evaluate_s7(unexpected)[0])
 
+    def test_synthetic_evidence_never_authorizes_runtime(self):
+        # Una evaluación revisable no es un permiso para activar ninguna fase S7.
+        for scope in sorted(S7):
+            with self.subTest(scope=scope):
+                fixture = synthetic_candidate(scope)
+                self.assertEqual("REVIEW_ONLY", evaluate_s7(fixture)[0])
+                for attempted_activation in ("deploy_authorized", "new_provider_active"):
+                    altered = copy.deepcopy(fixture)
+                    altered[attempted_activation] = True
+                    result, reasons = evaluate_s7(altered)
+                    self.assertEqual("BLOCKED", result)
+                    self.assertIn("runtime_activation_out_of_scope", reasons)
+
     def test_roadmap_policy_stays_explicitly_deferred(self):
         text = TRANSITION.read_text(encoding="utf-8")
         rows = [line for line in text.splitlines() if line.startswith("| **S7 · Escala** |")]
