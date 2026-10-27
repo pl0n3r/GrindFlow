@@ -65,6 +65,30 @@ class MatrizCoberturaTests(unittest.TestCase):
             if row[2] == "DESCARTADO":
                 self.assertIn("cerrado", row[3])
 
+    def test_referencias_apuntan_a_la_fuente_exacta(self) -> None:
+        """No aceptar filas que enlacen un ID o sección distinta al source real."""
+        for prefix, path in (("REQ", REQ), ("STACK", STACK)):
+            source_lines = path.read_text(encoding="utf-8").splitlines()
+            for key, row in self.entries.items():
+                if not key.startswith(prefix + ":"):
+                    continue
+                match = re.search(r"\[.+?:L(\d+)\]\(https://github\.com/pl0n3r/GrindFlow/blob/[0-9a-f]{40}/docs/[^)]+#L\d+\)", row[3])
+                self.assertIsNotNone(match, key)
+                line = int(match.group(1))
+                self.assertGreaterEqual(line, 1)
+                self.assertLessEqual(line, len(source_lines))
+                self.assertIn(key.split(":", 1)[1], source_lines[line-1], key)
+        headings = [
+            (number, line)
+            for number, line in enumerate(SPEC.read_text(encoding="utf-8").splitlines(), 1)
+            if re.match(r"^#{2,4}\s+\S", line)
+        ]
+        for index, (number, heading) in enumerate(headings, 1):
+            key = f"SPEC:{index:03d}"
+            self.assertIn(key, self.entries)
+            self.assertIn(f"GRINDFLOW-SPEC.md:L{number}", self.entries[key][3])
+            self.assertTrue(heading.startswith("##"))
+
     def test_resumen_por_estado(self) -> None:
         counts = Counter(row[2] for row in self.rows)
         names = ["CUBIERTO", "EN_CURSO", "SIN_COBERTURA", "DESCARTADO", "NO_VERIFICABLE"]
