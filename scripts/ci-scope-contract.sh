@@ -80,6 +80,15 @@ expect_flag "$unrelated_py" "run_symfony=false" "unrelated Python test does not 
 mixed_parity="$(run_scope pull_request docs/PARITY-MATRIX-EXECUTABLE.md tests/test_parity_matrix_executable.py)"
 expect_flag "$mixed_parity" "$RUN_SYMFONY_ENABLED" "matrix documentation cannot mask Symfony test"
 
+release100="$(run_scope pull_request tests/test_release_100_evidence.py)"
+expect_flag "$release100" "$RUN_SYMFONY_ENABLED" "GF356 Python evidence selects Symfony preview"
+expect_flag "$release100" "run_tests=true" "GF356 Python evidence keeps Laravel unit checks"
+expect_flag "$release100" "run_php_quality=true" "GF356 Python evidence keeps PHP quality"
+release100_mixed="$(run_scope pull_request docs/launch/release-100-gate.md tests/test_release_100_evidence.py)"
+expect_flag "$release100_mixed" "$RUN_SYMFONY_ENABLED" "GF356 Python test cannot be masked by docs"
+release100_docs="$(run_scope pull_request docs/launch/release-100-gate.md)"
+expect_flag "$release100_docs" "run_symfony=false" "GF356 docs alone do not trigger Symfony"
+
 schema_tooling="$(run_scope pull_request scripts/mariadb-structure-snapshot.php)"
 expect_flag "$schema_tooling" $RUN_SYMFONY_ENABLED "schema snapshot tooling selects Symfony parity gate"
 
