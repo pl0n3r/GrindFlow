@@ -68,6 +68,30 @@ for (const scenario of ['lista', 'vacio', '403', 'red', 'incompleto']) {
       await expect(page.getByRole('table', { name: /Colecciones de la organización/ }).locator('tbody tr')).toHaveCount(2);
       await expect(page.getByRole('table', { name: /Colecciones de la organización/ }).locator('tbody tr').first()).toContainText('3');
       await expect(page.getByRole('table', { name: /Colecciones de la organización/ }).locator('tbody tr').last()).toContainText('0');
+
+      // The scrollbar gets a keyboard stop only when its content overflows.
+      await page.setViewportSize({ width: 360, height: 720 });
+      const scroll = page.getByTestId('collections-horizontal-scroll');
+      const region = page.getByRole('region', { name: 'Desplazamiento horizontal de colecciones' });
+      await expect(region).toBeVisible();
+      await expect(scroll).toHaveAttribute('tabindex', '0');
+      expect(await scroll.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+      const bounds = await scroll.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(360);
+      await region.focus();
+      await expect(region).toBeFocused();
+      await expect(region).toHaveCSS('outline-style', 'solid');
+      const before = await region.evaluate((element) => element.scrollLeft);
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(before);
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      await expect(region).toBeFocused();
+
+      await page.setViewportSize({ width: 820, height: 720 });
+      await expect(region).toHaveCount(0);
+      await expect(scroll).not.toHaveAttribute('tabindex', '0');
     } else if (scenario === 'vacio') {
       await expect(page.getByRole('status').getByText(/No hay colecciones/)).toBeVisible();
     } else if (scenario === 'incompleto') {
