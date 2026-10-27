@@ -19,12 +19,13 @@ PRIVATE_SECRET = re.compile(
     r"['\"]?[A-Za-z0-9_/-]{6,}"
 )
 IP_ADDRESS = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+PHONE = re.compile(r"(?<!\d)(?:\+\d{1,3}[ -]?)?\d{10}(?!\d)")
 LIVE_TOKEN = re.compile(r"(?i)\b(?:sk_(?:live|test)_|ghp_)[A-Za-z0-9]{10,}\b")
 
 
 def contains_private_data(content: str) -> bool:
     """Only detect content; no network, accounts or user data."""
-    return any(pattern.search(content) for pattern in (EMAIL, PRIVATE_SECRET, IP_ADDRESS, LIVE_TOKEN))
+    return any(pattern.search(content) for pattern in (EMAIL, PRIVATE_SECRET, IP_ADDRESS, PHONE, LIVE_TOKEN))
 
 
 def severity_rows(content: str) -> dict[str, list[str]]:
@@ -81,6 +82,7 @@ class DocContractTests(unittest.TestCase):
             "persona@example.invalid",
             "api_key=VALORFICTICIO",
             "192.168.1.15",
+            "0" * 10,
         ):
             with self.subTest(negative=invented_private_value):
                 self.assertTrue(contains_private_data(invented_private_value))
