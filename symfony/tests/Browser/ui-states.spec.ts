@@ -73,10 +73,12 @@ for (const scenario of ['vacio', 'error'] as const) {
     let releaseCollections: (() => void) | undefined;
     const blocked = new Promise<void>((resolve) => { releaseCollections = resolve; });
 
-    // Prevent accidental requests to providers or actual tenant data.
+    // Deny all unrelated APIs. A synthetic 200 response with a partial shape
+    // would break the Vault component (it expects data.assets), unmounting
+    // the workspace and masking the collection state under test.
     await page.route('**/api/admin/**', (route) => route.fulfill({
-      status: 200, contentType: 'application/json',
-      body: JSON.stringify({ data: { ready: false, items: [] } }),
+      status: 403, contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'synthetic_access_denied' } }),
     }));
     await page.route('**/api/admin/library/collections*', async (route) => {
       expect(route.request().method()).toBe('GET');
