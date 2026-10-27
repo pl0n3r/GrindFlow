@@ -1,6 +1,8 @@
 # Matriz de cobertura · GrindFlow #630
 
-Fuentes: `docs/REQUIREMENTS.md`, `docs/MIGRATION-LARAVEL.md` (históricos GF-MIG), `docs/STACK-TRANSITION-SYMFONY.md`, `docs/GRINDFLOW-SPEC.md` y roadmaps #342–#358.\n\nCorte exacto: `main@af275aef3ae1e0b8d4bd2eca6a1a646cac312795` (27-oct-2026). Fase `construccion`. Esta matriz registra **cobertura verificable**; `NO_VERIFICABLE` **no significa funcionalidad ausente** y `EN_CURSO` significa que existe issue abierto, no que haya PR activo.
+Fuentes: `docs/REQUIREMENTS.md`, `docs/MIGRATION-LARAVEL.md` (históricos GF-MIG), `docs/STACK-TRANSITION-SYMFONY.md`, `docs/GRINDFLOW-SPEC.md` y roadmaps #342–#358.
+
+Corte exacto: `main@af275aef3ae1e0b8d4bd2eca6a1a646cac312795` (27-oct-2026). Fase `construccion`. Esta matriz registra **cobertura verificable**; `NO_VERIFICABLE` **no significa funcionalidad ausente** y `EN_CURSO` significa que existe issue abierto, no que haya PR activo.
 
 **Criterios:** `CUBIERTO` solo con ruta/test y PR fusionado (puede ser exclusivamente offline); `EN_CURSO` con issue abierto; `SIN_COBERTURA` únicamente tras demostrar un gap sin issue, creando primero su hoja canónica; `DESCARTADO` con motivo; `NO_VERIFICABLE` cuando faltan pruebas o correlación. En código, CI y Hostinger, `NO_ACREDITADO` significa que falta evidencia para la fila. Ruta presente no implica implementación probada, CI verde no implica deploy y un despliegue no demuestra operación ni aprobación legal.
 
