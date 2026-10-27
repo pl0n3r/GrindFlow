@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 
 // Read-only S4 projection. Backend membership/session checks remain authoritative.
 type QueueRow = {
@@ -80,6 +81,51 @@ function destinationView(data: unknown): View<Destination> {
   return { kind: 'ready', items: data.destinations as Destination[], total: data.total };
 }
 
+
+type HorizontalScrollRegionProps = {
+  label: string;
+  children: ReactNode;
+};
+
+// A native scrolling region is keyboard-reachable only when it really overflows.
+function HorizontalScrollRegion({ label, children }: HorizontalScrollRegionProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const updateOverflow = () => {
+      setHasOverflow(element.scrollWidth > element.clientWidth);
+    };
+    updateOverflow();
+
+    // Both viewport changes and growing/shrinking table content affect overflow.
+    const observer = typeof ResizeObserver === 'undefined'
+      ? null : new ResizeObserver(updateOverflow);
+    observer?.observe(element);
+    if (element.firstElementChild) observer?.observe(element.firstElementChild);
+    window.addEventListener('resize', updateOverflow);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateOverflow);
+    };
+  }, [children]);
+
+  return (
+    <div
+      ref={ref}
+      className="manual-handoff-scroll-region"
+      style={{ maxWidth: '100%', overflowX: 'auto' }}
+      tabIndex={hasOverflow ? 0 : undefined}
+      role={hasOverflow ? 'region' : undefined}
+      aria-label={hasOverflow ? label : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ManualHandoffPanel() {
   const [queue, setQueue] = useState<View<QueueRow>>({ kind: 'loading' });
   const [destinations, setDestinations] = useState<View<Destination>>({ kind: 'loading' });
@@ -108,6 +154,10 @@ export function ManualHandoffPanel() {
 
   return (
     <section className="admin-settings" id="entregas-manuales" aria-labelledby="manual-handoff-title">
+      <style>{`.manual-handoff-scroll-region:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+      }`}</style>
       <span className="admin-kicker">S4 · ENTREGA HUMANA · SOLO LECTURA</span>
       <h2 id="manual-handoff-title">Entregas manuales</h2>
       <p>Esta cola es una preparación interna para entrega humana. No acredita publicación
@@ -120,7 +170,7 @@ export function ManualHandoffPanel() {
         {queue.kind === 'unknown' && <p role="status">UNKNOWN: cola no verificable.</p>}
         {queue.kind === 'ready' && <>
           {queue.items.length === 0 && <p role="status">No hay entregas manuales pendientes.</p>}
-          {queue.items.length > 0 && <div style={{ maxWidth: '100%', overflowX: 'auto' }}>
+          {queue.items.length > 0 && <HorizontalScrollRegion label="Desplazamiento horizontal de entregas manuales">
             <table style={{ width: '100%', minWidth: 640 }}>
               <caption>Entregas manuales pendientes en esta organización</caption>
               <thead><tr><th scope="col">Recurso</th><th scope="col">Horario UTC</th>
@@ -132,7 +182,7 @@ export function ManualHandoffPanel() {
                 <td>{item.destination?.label ?? 'UNKNOWN'}</td>
               </tr>)}</tbody>
             </table>
-          </div>}
+          </HorizontalScrollRegion>}
           {queue.total > queue.items.length &&
             <p role="status">Mostrando {queue.items.length} de {queue.total} entregas pendientes.</p>}
         </>}
@@ -145,7 +195,7 @@ export function ManualHandoffPanel() {
         {destinations.kind === 'unknown' && <p role="status">UNKNOWN: destinos no verificables.</p>}
         {destinations.kind === 'ready' && <>
           {destinations.items.length === 0 && <p role="status">No hay destinos manuales registrados.</p>}
-          {destinations.items.length > 0 && <div style={{ maxWidth: '100%', overflowX: 'auto' }}>
+          {destinations.items.length > 0 && <HorizontalScrollRegion label="Desplazamiento horizontal de destinos manuales">
             <table style={{ width: '100%', minWidth: 440 }}>
               <caption>Destinos registrados en la organización seleccionada</caption>
               <thead><tr><th scope="col">Destino</th><th scope="col">Disponibilidad</th></tr></thead>
@@ -153,7 +203,7 @@ export function ManualHandoffPanel() {
                 <td>{item.label}</td><td>{item.active ? 'Activo' : 'Deshabilitado'}</td>
               </tr>)}</tbody>
             </table>
-          </div>}
+          </HorizontalScrollRegion>}
           {destinations.total > destinations.items.length &&
             <p role="status">Mostrando {destinations.items.length} de {destinations.total} destinos.</p>}
         </>}
