@@ -44,6 +44,10 @@ final class CrossModuleReportController extends AbstractController
 
             return $this->privateJson(['error' => ['code' => 'organization_access_changed']], 403);
         }
+        // Aggregated organization-wide publication outcomes are admin-only.
+        if (!$memberships->permissions($organization['role'])['organization_manage']) {
+            return $this->privateJson(['error' => ['code' => 'forbidden']], 403);
+        }
 
         $query = $request->query->all();
         if (array_diff(array_keys($query), ['from', 'to']) !== []
