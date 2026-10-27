@@ -258,6 +258,21 @@ jobs:
            python3 -m unittest tests/test_media_storage_cors_preflight.py
           python3 -m unittest tests/test_s4_database_url_percent_encoding.py
 
+      - name: Contrato offline CORS en fast
+        shell: bash
+        run: |
+          set -euo pipefail
+          guion=docs/launch/cors-operator-script.md
+          contrato=tests/test_cors_guion_doc.py
+          if [[ -f "$guion" && -f "$contrato" ]]; then
+            python3 -m unittest discover -s tests -p test_cors_guion_doc.py -v
+          elif [[ -f "$guion" || -f "$contrato" ]]; then
+            echo "::error::Contrato CORS incompleto: guion y prueba deben existir juntos." >&2
+            exit 1
+          else
+            echo "Contrato CORS no integrado: se omite prueba offline."
+          fi
+
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
 
