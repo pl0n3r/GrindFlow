@@ -14,6 +14,7 @@ SPEC = ROOT / "docs/GRINDFLOW-SPEC.md"
 MIGRATION = ROOT / "docs/MIGRATION-LARAVEL.md"
 SNAPSHOT_SHA = "af275aef3ae1e0b8d4bd2eca6a1a646cac312795"
 ALLOWED = {"CUBIERTO", "EN_CURSO", "SIN_COBERTURA", "DESCARTADO", "NO_VERIFICABLE"}
+INTRO_SPEC_ROWS = {"SPEC:001", "SPEC:002", "SPEC:003", "SPEC:004", "SPEC:006", "SPEC:023"}
 ID_RE = re.compile(r"\bGF-(?:FR|NFR|SEC|MIG|OPS|UX|ARCH|LIB)-\d{3}(?:[A-Z]|-[A-Z]+)?\b")
 
 
@@ -45,16 +46,38 @@ class MatrizCoberturaTests(unittest.TestCase):
             self.assertRegex(canonical, rf"(?m)^### {historical}\b")
         headings = re.findall(r"^#{2,4}\s+\S", SPEC.read_text(encoding="utf-8"), re.MULTILINE)
         self.assertTrue(headings)
-        self.assertFalse({f"SPEC:{n:03}" for n in range(1, len(headings)+1)} - self.entries.keys())
+        self.assertFalse(
+            {f"SPEC:{n:03}" for n in range(1, len(headings)+1)}
+            - INTRO_SPEC_ROWS - self.entries.keys()
+        )
+        self.assertTrue(INTRO_SPEC_ROWS.isdisjoint(self.entries))
         self.assertFalse({f"RM-{n}" for n in range(342, 359)} - self.entries.keys())
 
     def test_sin_cobertura_tiene_issue(self) -> None:
+        # The GitHub-created leaf registry is recorded explicitly in the document.
+        registered = {int(n) for n in re.findall(
+            r"(?m)^- \[#(\d+)\]\(https://github\.com/pl0n3r/GrindFlow/issues/\d+\) · GAP-",
+            self.content,
+        )}
+        self.assertEqual(9, len(registered))
+        uncovered = 0
         for row in self.rows:
             if row[2] == "SIN_COBERTURA":
-                self.assertRegex(row[4], r"\[#\d+\]\(https://github\.com/pl0n3r/GrindFlow/issues/\d+\)")
+                uncovered += 1
+                match = re.search(
+                    r"\[#(\d+)\]\(https://github\.com/pl0n3r/GrindFlow/issues/\d+\)",
+                    row[4],
+                )
+                self.assertIsNotNone(match, row[0])
+                self.assertIn(int(match.group(1)), registered, row[0])
                 self.assertNotIn("épico", row[4])
+            if row[2] == "EN_CURSO":
+                # A roadmap is not an executable leaf or a PR.
+                self.assertNotRegex(row[4], r"/issues/(?:34[2-9]|35[0-8])\)")
+                self.assertTrue("GAP-" in row[4] or "/pull/" in row[4], row[0])
             if row[2] == "NO_VERIFICABLE":
                 self.assertRegex(row[3], r"(?i:falta)")
+        self.assertEqual(17, uncovered)
 
     def test_formato_y_estados(self) -> None:
         self.assertIn("| ID/fuente | Requisito resumido | Estado | Evidencia / qué falta | Issue | Código | CI | Hostinger |", self.content)
@@ -128,6 +151,7 @@ class MatrizCoberturaTests(unittest.TestCase):
         self.assertEqual(values[5], len(self.rows))
         self.assertEqual(sum(values[:5]), len(self.rows))
         self.assertEqual(float(found.group(7)), round(100 * counts["CUBIERTO"] / len(self.rows), 2))
+        self.assertIn("Hojas nuevas: 9.", self.content)
 
 
 if __name__ == "__main__":
