@@ -20,11 +20,12 @@ curl --silent --show-error --request OPTIONS \
   --header "Origin: <ORIGIN_HTTPS_REAL_CONFIRMADO>" \
   --header "Access-Control-Request-Method: PUT" \
   --header "Access-Control-Request-Headers: content-type,x-amz-content-sha256" \
+  --dump-header "<RUTA_PRIVADA_HEADERS_TEMPORALES>" \
   --output /dev/null --write-out '%{http_code}\n' \
   "<URL_FIRMADA_PUT_EFIMERA_PRIVADA>"
 ~~~
 
-**Esperado (NO ENSAYADO):** HTTP 200/204 según proveedor; Access-Control-Allow-Origin coincide exactamente con el origin autorizado, Access-Control-Allow-Methods incluye PUT y Access-Control-Allow-Headers admite todas las cabeceras **realmente firmadas** (p. ej. Content-Type y x-amz-*). Si el proveedor exige otras cabeceras, no improvisarlas. Un OPTIONS con éxito por curl **no equivale** a preflight exitoso del navegador real. Fuente: [preflight local](../MEDIA-STORAGE-CORS-PREFLIGHT.md) y [#345](https://github.com/pl0n3r/GrindFlow/issues/345).
+**Esperado (NO ENSAYADO):** HTTP 200/204 según proveedor. Revisar el archivo temporal de cabeceras únicamente en sesión privada y eliminarlo tras redactar el recibo; no adjuntarlo ni registrarlo;  Access-Control-Allow-Origin coincide exactamente con el origin autorizado, Access-Control-Allow-Methods incluye PUT y Access-Control-Allow-Headers admite todas las cabeceras **realmente firmadas** (p. ej. Content-Type y x-amz-*). Si el proveedor exige otras cabeceras, no improvisarlas. Un OPTIONS con éxito por curl **no equivale** a preflight exitoso del navegador real. Fuente: [preflight local](../MEDIA-STORAGE-CORS-PREFLIGHT.md) y [#345](https://github.com/pl0n3r/GrindFlow/issues/345).
 
 ## 3. PUT firmado — plantilla NO ENSAYADA
 
@@ -76,4 +77,4 @@ Decisión: DEL_DUEÑO / NO-GO
 
 ## 6. Límite y retorno a la lista de salida
 
-La fila **[«PUT firmado y preflight OPTIONS desde el origin real»](../lista-salida-produccion.md)** permanece DEL_DUEÑO. Ni este texto ni los tests offline ni un preflight de JSON son evidencia suficiente para marcar MEDIA_STORAGE_READY, hacer go-live, configurar infraestructura o declarar production_ready. **Resultado hoy: NO ENSAYADO / UNKNOWN / NO-GO.** Fuentes: [lista de salida](../lista-salida-produccion.md), [preflight local](../MEDIA-STORAGE-CORS-PREFLIGHT.md), [#345](https://github.com/pl0n3r/GrindFlow/issues/345).
+**No cambiar** el estado de la fila como consecuencia de este guion. La fila **[«PUT firmado y preflight OPTIONS desde el origin real»](../lista-salida-produccion.md)** permanece DEL_DUEÑO. Ni este texto ni los tests offline ni un preflight de JSON son evidencia suficiente para marcar MEDIA_STORAGE_READY, hacer go-live, configurar infraestructura o declarar production_ready. **Resultado hoy: NO ENSAYADO / UNKNOWN / NO-GO.** Fuentes: [lista de salida](../lista-salida-produccion.md), [preflight local](../MEDIA-STORAGE-CORS-PREFLIGHT.md), [#345](https://github.com/pl0n3r/GrindFlow/issues/345).
