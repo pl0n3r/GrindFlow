@@ -11,13 +11,15 @@ MATRIX = ROOT / "docs/matriz-cobertura.md"
 REQ = ROOT / "docs/REQUIREMENTS.md"
 STACK = ROOT / "docs/STACK-TRANSITION-SYMFONY.md"
 SPEC = ROOT / "docs/GRINDFLOW-SPEC.md"
+MIGRATION = ROOT / "docs/MIGRATION-LARAVEL.md"
+SNAPSHOT_SHA = "af275aef3ae1e0b8d4bd2eca6a1a646cac312795"
 ALLOWED = {"CUBIERTO", "EN_CURSO", "SIN_COBERTURA", "DESCARTADO", "NO_VERIFICABLE"}
 ID_RE = re.compile(r"\bGF-(?:FR|NFR|SEC|MIG|OPS|UX|ARCH|LIB)-\d{3}(?:[A-Z]|-[A-Z]+)?\b")
 
 
 def rows_from_markdown(content: str) -> list[list[str]]:
     return [
-        [part.strip() for part in line.strip("|").split("|")]
+        [part.strip() for part in re.split(r"(?<!\\)\|", line.strip("|"))]
         for line in content.splitlines()
         if line.startswith("| ") and not line.startswith("| ID/fuente")
         and not re.match(r"^\|\s*---\s*\|", line)
@@ -36,6 +38,11 @@ class MatrizCoberturaTests(unittest.TestCase):
             required = {name + ":" + key for key in ID_RE.findall(source.read_text(encoding="utf-8"))}
             self.assertTrue(required)
             self.assertFalse(required - self.entries.keys())
+        canonical = MIGRATION.read_text(encoding="utf-8")
+        for number in range(1, 5):
+            historical = f"GF-MIG-00{number}"
+            self.assertIn("REQ:" + historical, self.entries)
+            self.assertRegex(canonical, rf"(?m)^### {historical}\b")
         headings = re.findall(r"^#{2,4}\s+\S", SPEC.read_text(encoding="utf-8"), re.MULTILINE)
         self.assertTrue(headings)
         self.assertFalse({f"SPEC:{n:03}" for n in range(1, len(headings)+1)} - self.entries.keys())
@@ -52,6 +59,9 @@ class MatrizCoberturaTests(unittest.TestCase):
     def test_formato_y_estados(self) -> None:
         self.assertIn("| ID/fuente | Requisito resumido | Estado | Evidencia / qué falta | Issue | Código | CI | Hostinger |", self.content)
         self.assertGreaterEqual(len(self.rows), 95)
+        # El delimitador escapado pertenece a la celda, no crea columnas extra.
+        sample = r"| DEMO | a\|b | NO_VERIFICABLE | falta | #2 | NA | NA | NA |"
+        self.assertEqual(rows_from_markdown(sample)[0][1], r"a\|b")
         self.assertEqual(len(self.entries), len(self.rows))
         for row in self.rows:
             self.assertEqual(len(row), 8, row[0])
@@ -66,28 +76,43 @@ class MatrizCoberturaTests(unittest.TestCase):
                 self.assertIn("cerrado", row[3])
 
     def test_referencias_apuntan_a_la_fuente_exacta(self) -> None:
-        """No aceptar filas que enlacen un ID o sección distinta al source real."""
-        for prefix, path in (("REQ", REQ), ("STACK", STACK)):
-            source_lines = path.read_text(encoding="utf-8").splitlines()
-            for key, row in self.entries.items():
-                if not key.startswith(prefix + ":"):
-                    continue
-                match = re.search(r"\[.+?:L(\d+)\]\(https://github\.com/pl0n3r/GrindFlow/blob/[0-9a-f]{40}/docs/[^)]+#L\d+\)", row[3])
-                self.assertIsNotNone(match, key)
-                line = int(match.group(1))
-                self.assertGreaterEqual(line, 1)
-                self.assertLessEqual(line, len(source_lines))
-                self.assertIn(key.split(":", 1)[1], source_lines[line-1], key)
-        headings = [
-            (number, line)
-            for number, line in enumerate(SPEC.read_text(encoding="utf-8").splitlines(), 1)
-            if re.match(r"^#{2,4}\s+\S", line)
+        """Comprueba el destino real de cada URL normativa, incluido SHA y línea."""
+        pattern = re.compile(
+            r"\[(?P<label>[\w.-]+):L(?P<label_line>\d+)\]"
+            r"\(https://github\.com/pl0n3r/GrindFlow/blob/(?P<sha>[0-9a-f]{40})/"
+            r"docs/(?P<file>[\w.-]+)#L(?P<line>\d+)\)"
+        )
+        sources = {
+            "REQUIREMENTS.md": REQ,
+            "STACK-TRANSITION-SYMFONY.md": STACK,
+            "MIGRATION-LARAVEL.md": MIGRATION,
+            "GRINDFLOW-SPEC.md": SPEC,
+        }
+        spec_headings = [
+            index for index, item in enumerate(SPEC.read_text(encoding="utf-8").splitlines(), 1)
+            if re.match(r"^#{2,4}\s+\S", item)
         ]
-        for index, (number, heading) in enumerate(headings, 1):
-            key = f"SPEC:{index:03d}"
-            self.assertIn(key, self.entries)
-            self.assertIn(f"GRINDFLOW-SPEC.md:L{number}", self.entries[key][3])
-            self.assertTrue(heading.startswith("##"))
+        for key, row in self.entries.items():
+            if not key.startswith(("REQ:", "STACK:", "SPEC:")):
+                continue
+            match = pattern.search(row[3])
+            self.assertIsNotNone(match, key)
+            found = match.groupdict()
+            self.assertEqual(found["sha"], SNAPSHOT_SHA, key)
+            self.assertEqual(found["file"], found["label"], key)
+            self.assertEqual(found["line"], found["label_line"], key)
+            expected = ("MIGRATION-LARAVEL.md" if key.startswith("REQ:GF-MIG-")
+                        else "REQUIREMENTS.md" if key.startswith("REQ:")
+                        else "STACK-TRANSITION-SYMFONY.md" if key.startswith("STACK:")
+                        else "GRINDFLOW-SPEC.md")
+            self.assertEqual(found["file"], expected, key)
+            lines = sources[expected].read_text(encoding="utf-8").splitlines()
+            line_number = int(found["line"])
+            self.assertTrue(1 <= line_number <= len(lines), key)
+            if key.startswith("SPEC:"):
+                self.assertEqual(line_number, spec_headings[int(key.split(":")[1])-1], key)
+            else:
+                self.assertIn(key.split(":")[1], lines[line_number-1], key)
 
     def test_resumen_por_estado(self) -> None:
         counts = Counter(row[2] for row in self.rows)
