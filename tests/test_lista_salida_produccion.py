@@ -137,6 +137,18 @@ class ListaSalidaTests(unittest.TestCase):
                   "](https://github.com/pl0n3r/GrindFlow/issues/2)", 1)
         with self.assertRaises(ValueError):
             parse_rows(false_in_progress)
+        false_ready = self.doc.replace(
+            "| DEL_DUEÑO | OWNER y operador:",
+            "| LISTO | OWNER y operador:", 1,
+        )
+        with self.assertRaises(ValueError):
+            parse_rows(false_ready)
+        missing_owner = self.doc.replace(
+            "| DEL_DUEÑO | OWNER y operador:",
+            "| DEL_DUEÑO | Operador:", 1,
+        )
+        with self.assertRaises(ValueError):
+            parse_rows(missing_owner)
 
     def test_resumen_final(self):
         totals = Counter(row[2] for row in self.rows)
