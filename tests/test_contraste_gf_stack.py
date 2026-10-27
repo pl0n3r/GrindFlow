@@ -57,6 +57,7 @@ class ContrasteTests(unittest.TestCase):
                 self.assertIn(key[6:], self.source.splitlines()[line - 1])
                 self.assertIn("/blob/" + SOURCE_SHA + "/", matrix[3])
                 self.assertIn("/blob/" + SOURCE_SHA + "/", doc[1])
+                self.assertIn("#L" + str(line) + ")", doc[1])
                 self.assertIn("contraste #663", matrix[3])
                 self.assertGreater(len(doc[6]), 12)
 
