@@ -78,6 +78,7 @@ def parse_matrix(text: str) -> dict[str, tuple[str, ...]]:
 
 
 def section(text: str, heading: str) -> str | None:
+    """Extraer exactamente una sección STACK con encabezado completo."""
     # Cada encabezado del documento tiene título después del ID.
     positions = list(re.finditer(
         r"(?m)^" + re.escape(heading) + r"(?:[ \t]+[^\n]*)?$", text
@@ -108,7 +109,8 @@ def actions_compatible(workflows: dict[str, str]) -> str:
         return UNKNOWN
     seen = set()
     pattern = re.compile(
-        r"\buses:\s*actions/(checkout|cache|setup-node|upload-artifact)@([^\s#]+)([^\n]*)"
+        r"(?m)^[ \t]*(?:-[ \t]+)?uses:[ \t]*actions/"
+        r"(checkout|cache|setup-node|upload-artifact)(?:/[\w.-]+)*@([^\s#]+)([^\n]*)"
     )
     for source in workflows.values():
         if type(source) is not str:
@@ -137,24 +139,24 @@ def actions_compatible(workflows: dict[str, str]) -> str:
 
 
 def checkouts_safe(workflows: dict[str, str]) -> str:
-    """Cada step checkout exige opt-out explícito, no el de otro step."""
+    """Inspeccionar cada checkout activo, aun si el step comienza con name."""
     if not workflows:
         return UNKNOWN
     count = 0
-    pattern = re.compile(
-        r"(?m)^(?P<indent>[ \t]*)-\s+uses:\s*actions/checkout@[^\n]+"
+    checkout = re.compile(
+        r"(?m)^[ \t]*(?:-[ \t]+)?uses:[ \t]*actions/checkout@[^\s#]+"
     )
+    step_start = re.compile(r"(?m)^(?=[ \t]*-[ \t]+(?:name|uses|id|if):)")
     for source in workflows.values():
         if type(source) is not str:
             return UNKNOWN
-        for match in pattern.finditer(source):
+        for step in step_start.split(source):
+            if not checkout.search(step):
+                continue
             count += 1
-            tail = source[match.end():]
-            next_step = re.search(r"(?m)^" + re.escape(match.group("indent"))
-                                  + r"-\s+", tail)
-            body = tail[:next_step.start()] if next_step else tail
             opts = re.findall(
-                r"(?m)^\s+persist-credentials:\s*(\S+)", body
+                r"(?m)^[ \t]+persist-credentials:[ \t]*(\S+)[ \t]*(?:#.*)?$",
+                step,
             )
             if opts != ["false"]:
                 return UNKNOWN
@@ -162,6 +164,7 @@ def checkouts_safe(workflows: dict[str, str]) -> str:
 
 
 def shell_consistent(sources: dict[str, str]) -> str:
+    """Exigir shell Laravel único y reglas responsive verificables."""
     sidebar = sources.get(SIDEBAR, "")
     tests = sources.get(SIDEBAR_TEST, "")
     labels = sources.get(NAV_TEST, "")
@@ -191,6 +194,7 @@ def shell_consistent(sources: dict[str, str]) -> str:
 
 
 def private_access_consistent(sources: dict[str, str]) -> str:
+    """Contrastar cabecera Symfony, CSRF y selección explícita de tenant."""
     header = sources.get(HEADER, "")
     login = sources.get(LOGIN, "")
     org = sources.get(ORGS, "")
@@ -228,6 +232,7 @@ def synthetic_journey(route: object, csrf: object, membership: object) -> str:
 
 def inspect(identifier: str, rows: dict[str, tuple[str, ...]],
             sources: dict[str, str], workflows: dict[str, str]) -> dict[str, str]:
+    """Emitir evidencia local por contrato sin inferir CI, browser ni live."""
     status = {"code": UNKNOWN, "ci": UNKNOWN, "browser": UNKNOWN,
               "production": UNKNOWN}
     if identifier not in CLAUSES:
@@ -247,10 +252,18 @@ def inspect(identifier: str, rows: dict[str, tuple[str, ...]],
         return status
     if identifier == "STACK:GF-OPS-012":
         ci = sources.get(CI, "")
-        if (re.search(r"symfony-preview:\s*\n", ci)
+        validate = re.search(
+            r"(?ms)^  validate:[ \t]*\n(?P<body>.*?)"
+            r"(?=^  [A-Za-z0-9_.-]+:[ \t]*(?:#.*)?$|\Z)", ci,
+        )
+        if (re.search(r"(?m)^  symfony-preview:[ \t]*$", ci)
                 and "SYMFONY_DEPRECATIONS_HELPER: 'max[total]=30&max[self]=0&max[direct]=0'" in ci
-                and "symfony-preview" in ci.split("  validate:", 1)[-1]
-                and deprecations({"total": 30, "self": 0, "direct": 0}) == LOCAL):
+                and validate is not None
+                and re.search(
+                    r"(?m)^    needs:[ \t]*\[[^\]\n]*"
+                    r"\bsymfony-preview\b[^\]\n]*\][ \t]*(?:#.*)?$",
+                    validate.group("body"),
+                )):
             status["code"] = LOCAL
     elif identifier == "STACK:GF-OPS-013":
         lint = sources.get(LINTER, "")
@@ -274,6 +287,7 @@ def inspect(identifier: str, rows: dict[str, tuple[str, ...]],
 class BrechasGrindflow16Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        """Leer únicamente fixtures versionados; sin servicios externos."""
         cls.sources = {path: (ROOT / path).read_text(encoding="utf-8")
                        for path in FILES}
         cls.workflows = {
@@ -329,6 +343,13 @@ class BrechasGrindflow16Tests(unittest.TestCase):
         self.assertEqual(UNKNOWN, inspect(
             "STACK:GF-OPS-012", self.rows,
             {**self.sources, CI: broken_ci}, self.workflows)["code"])
+        broken_needs = self.sources[CI].replace(
+            "legacy, symfony-preview, privacy]", "legacy, privacy]", 1,
+        )
+        self.assertNotEqual(self.sources[CI], broken_needs)
+        self.assertEqual(UNKNOWN, inspect(
+            "STACK:GF-OPS-012", self.rows,
+            {**self.sources, CI: broken_needs}, self.workflows)["code"])
         first_wf, first_body = next(
             (name, body) for name, body in self.workflows.items()
             if "actions/checkout@v5" in body)
@@ -336,10 +357,34 @@ class BrechasGrindflow16Tests(unittest.TestCase):
         old[first_wf] = first_body.replace("actions/checkout@v5",
                                           "actions/checkout@v4", 1)
         self.assertEqual(UNKNOWN, actions_compatible(old))
+        self.assertEqual(UNKNOWN, actions_compatible({
+            "comments.yml": (
+                "# uses: actions/checkout@v5\n"
+                "# uses: actions/cache@v5\n"
+                "# uses: actions/setup-node@v5\n"
+                "# uses: actions/upload-artifact@v6\n"
+            ),
+        }))
+        self.assertEqual(UNKNOWN, actions_compatible({
+            **self.workflows,
+            "obsolete-subaction.yml": (
+                "jobs:\n  check:\n    steps:\n"
+                "      - uses: actions/cache/restore@v4\n"
+            ),
+        }))
         weakened = self.workflows.copy()
         weakened[first_wf] = first_body.replace(
             "persist-credentials: false", "persist-credentials: true", 1)
         self.assertEqual(UNKNOWN, checkouts_safe(weakened))
+        self.assertEqual(UNKNOWN, checkouts_safe({
+            **self.workflows,
+            "unsafe-named-step.yml": (
+                "jobs:\n  test:\n    steps:\n"
+                "      - name: Unsafe checkout\n"
+                "        uses: actions/checkout@v5\n"
+                "        with:\n          persist-credentials: true\n"
+            ),
+        }))
         view = VIEW_PATHS[0]
         duplicated = self.sources[view] + "\n<x-workspace-sidebar />"
         self.assertEqual(UNKNOWN, shell_consistent(
