@@ -26,7 +26,7 @@ IDS = tuple(f"SPEC:{n:03d}" for n in range(39, 44))
 CLAUSES = {
     "SPEC:039": (470, "## 20. Disposable authenticated browser workflow coverage",
                  ("isolated local/testing tenant", "27 scheduled",
-                  "session and CSRF", "failure artifact"),
+                  "session and CSRF", "A leak detector discards"),
                  BROWSER, ("PASS: real browser login", "PASS: Scheduler 106 ready assets",
                            "PASS: Finance append-only allocation")),
     "SPEC:040": (495, "## 21. Distribution: historial paginado por organización",
