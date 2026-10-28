@@ -80,7 +80,7 @@ CODE_ANCHORS = {
                 "'usage_scope' => (string) ($asset['usage_scope'] ?? 'unclassified')"),
         TRASH_TEST: ("testTrashAndRestoreKeepPrivateOriginalAndEnforceMembership",
                      "/api/admin/vault?view=trash&usage=internal_only",
-                     "'invalid_usage_scope'"),
+                     "self::assertSame('internal_only'"),
     },
     "SPEC:016": {
         VAULT: ("public function bulkUsage(", "count($ids) > 30",
