@@ -192,7 +192,7 @@ class BrechasGrindflow02Tests(unittest.TestCase):
         self.assertNotRegex(own_source, r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
         self.assertNotRegex(own_source, r"-----BEGIN (?:RSA |OPENSSH )?PRIVATE KEY-----")
         self.assertNotRegex(own_source, r"(?m)^(?:import|from)\s+(?:requests|urllib|httpx|socket|subprocess)\b")
-        self.assertNotIn("https://api.", own_source)
+        self.assertNotIn("https://" + "api.", own_source)
         for item in BRECHAS:
             self.assertTrue(item.php_file.startswith("tests/Feature/"))
             self.assertTrue((ROOT / item.php_file).is_file())
