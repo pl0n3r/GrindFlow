@@ -82,7 +82,7 @@ def method_body(source: str, name: str) -> str | None:
 def has_executable_assertion(body: str) -> bool:
     """Ignore PHP line/block comments, which cannot prove an assertion ran."""
     code = re.sub(
-        r"/\*[\s\S]*?\*/|(?m:^[ \t]*(?://|#)[^\n]*|[ \t]+//[^\n]*)",
+        r"/\*[\s\S]*?\*/|(?m:^[ \t]*(?://|#)[^\n]*|[ \t]+(?://|#)[^\n]*)",
         "",
         body,
     )
@@ -114,6 +114,7 @@ def verify_disposable_database(php: str, env: dict[str, str]) -> None:
     if (ROOT / "bootstrap/cache/config.php").exists():
         raise AssertionError("UNKNOWN: cached Laravel config could target a real database")
     probe = (
+        "require 'vendor/autoload.php';"
         "$app=require 'bootstrap/app.php';"
         "$app->make(\\Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();"
         "$db=config('database.default');"
@@ -230,6 +231,14 @@ class BrechasGrindflow03Tests(unittest.TestCase):
                 )
                 self.assertEqual(
                     "TEST_EXECUTED", evidence_status(executable, (names[0],), True),
+                )
+                inline_hash_only = (
+                    "    public function " + names[0] + "() : void {\n"
+                    "        $value = 1; # $this->assertTrue(true);\n"
+                    "    }\n"
+                )
+                self.assertEqual(
+                    UNKNOWN, evidence_status(inline_hash_only, (names[0],), True),
                 )
 
     def test_sin_datos_reales(self) -> None:
