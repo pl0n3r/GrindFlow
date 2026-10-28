@@ -184,6 +184,7 @@ def valid_rule(rule: object) -> bool:
     }:
         return False
     if (type(rule["weekdays"]) is not tuple or not rule["weekdays"]
+            or any(type(day) is not str for day in rule["weekdays"])
             or len(rule["weekdays"]) != len(set(rule["weekdays"]))
             or any(day not in WEEKDAYS for day in rule["weekdays"])
             or type(rule["max_per_day"]) is not int
@@ -203,7 +204,8 @@ def valid_rule(rule: object) -> bool:
 def weekly_preview(assets: object, tenant: str, active_member: object,
                    rule: object):
     """SPEC:042: 30 visibles, total activo completo, blockers antes de eligible."""
-    if (type(assets) is not list or not tenant or active_member is not True
+    if (type(assets) is not list or type(tenant) is not str
+            or not tenant or active_member is not True
             or rule is not None and not valid_rule(rule)):
         return UNKNOWN
     required = {"tenant", "id", "state", "scope", "reviewed", "authorized"}
@@ -406,6 +408,11 @@ class BrechasGrindflow13Tests(unittest.TestCase):
         self.assertEqual(weekly_slots(None, datetime.now(ZoneInfo("UTC"))), ())
         self.assertEqual(weekly_slots({"timezone": "Bad/Zone"},
                                       datetime.now(ZoneInfo("UTC"))), UNKNOWN)
+        invalid_rule = {"timezone": "America/Bogota", "weekdays": (["mon"],),
+                        "local_time": "10:30", "max_per_day": 2}
+        self.assertEqual(weekly_slots(invalid_rule,
+                                      datetime.now(ZoneInfo("UTC"))), UNKNOWN)
+        self.assertEqual(weekly_preview([good_asset], 123, True, None), UNKNOWN)
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: solo fixtures falsas y contratos de archivos versionados."""
