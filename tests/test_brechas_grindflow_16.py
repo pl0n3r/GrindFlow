@@ -322,7 +322,7 @@ class BrechasGrindflow16Tests(unittest.TestCase):
             {**self.sources, CI: broken_ci}, self.workflows)["code"])
         first_wf, first_body = next(
             (name, body) for name, body in self.workflows.items()
-            if "actions/checkout@" in body)
+            if "actions/checkout@v5" in body)
         old = self.workflows.copy()
         old[first_wf] = first_body.replace("actions/checkout@v5",
                                           "actions/checkout@v4", 1)
