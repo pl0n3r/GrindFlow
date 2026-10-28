@@ -9,6 +9,7 @@ It never writes the coverage matrix or opens a network connection.
 """
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -78,13 +79,64 @@ def method_body(source: str, name: str) -> str | None:
     return tail[:next_method.start()] if next_method else tail
 
 
+def has_executable_assertion(body: str) -> bool:
+    """Ignore PHP line/block comments, which cannot prove an assertion ran."""
+    code = re.sub(
+        r"/\*[\s\S]*?\*/|(?m:^[ \t]*(?://|#)[^\n]*|[ \t]+//[^\n]*)",
+        "",
+        body,
+    )
+    return bool(re.search(r"(?:->assert[A-Z]|\$this->assert[A-Z])", code))
+
+
+def disposable_php_env(source: dict[str, str] | None = None) -> dict[str, str]:
+    """Allowlist environment; never forward inherited credentials or DB URLs."""
+    original = os.environ if source is None else source
+    allowed = ("PATH", "HOME", "CI", "LANG", "TZ", "TMPDIR")
+    env = {key: original[key] for key in allowed if key in original}
+    env.update({
+        "APP_ENV": "testing",
+        "APP_DEBUG": "false",
+        "APP_KEY": "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "DB_CONNECTION": "sqlite",
+        "DB_DATABASE": ":memory:",
+        "DB_URL": "",
+        "DATABASE_URL": "",
+        "CACHE_STORE": "array",
+        "SESSION_DRIVER": "array",
+        "QUEUE_CONNECTION": "sync",
+    })
+    return env
+
+
+def verify_disposable_database(php: str, env: dict[str, str]) -> None:
+    """Fail before PHPUnit if Laravel resolves to a non-ephemeral database."""
+    if (ROOT / "bootstrap/cache/config.php").exists():
+        raise AssertionError("UNKNOWN: cached Laravel config could target a real database")
+    probe = (
+        "$app=require 'bootstrap/app.php';"
+        "$app->make(\\Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();"
+        "$db=config('database.default');"
+        "$path=config('database.connections.sqlite.database');"
+        "if ($db !== 'sqlite' || $path !== ':memory:') {"
+        "fwrite(STDERR,'UNKNOWN: database is not disposable'); exit(7); }"
+        "echo 'ISOLATED_SQLITE_MEMORY_OK';"
+    )
+    result = subprocess.run(
+        [php, "-r", probe], cwd=ROOT, env=env,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    if result.returncode != 0 or "ISOLATED_SQLITE_MEMORY_OK" not in result.stdout:
+        raise AssertionError("UNKNOWN: effective database isolation could not be verified")
+
+
 def evidence_status(source: str | None, names: tuple[str, ...], executed: bool) -> str:
     """No code search or passing CI alone certifies the behavior."""
     if not source or not names:
         return UNKNOWN
     for name in names:
         body = method_body(source, name)
-        if body is None or not re.search(r"(?:->assert[A-Z]|\$this->assert[A-Z])", body):
+        if body is None or not has_executable_assertion(body):
             return UNKNOWN
     return "TEST_EXECUTED" if executed else UNKNOWN
 
@@ -116,15 +168,17 @@ class BrechasGrindflow03Tests(unittest.TestCase):
                 for name in names:
                     body = method_body(source, name)
                     self.assertIsNotNone(body, f"{requirement}: {UNKNOWN}, {name}")
-                    self.assertRegex(
-                        body or "", r"(?:->assert[A-Z]|\$this->assert[A-Z])",
-                        f"{requirement}: {UNKNOWN}, no behavioral assertion in {name}",
+                    self.assertTrue(
+                        has_executable_assertion(body or ""),
+                        f"{requirement}: {UNKNOWN}, no executable assertion in {name}",
                     )
 
         # If Laravel's disposable test runner is available, execute the real
         # PHP tests. Without Composer, code-level evidence remains UNKNOWN.
         php = shutil.which("php")
         if php and PHPUNIT.is_file():
+            env = disposable_php_env()
+            verify_disposable_database(php, env)
             by_file: dict[str, set[str]] = {}
             for path, names in CASES.values():
                 by_file.setdefault(path, set()).update(names)
@@ -133,7 +187,7 @@ class BrechasGrindflow03Tests(unittest.TestCase):
                 run = subprocess.run(
                     [php, str(PHPUNIT), "--configuration", "phpunit.xml",
                      "--no-coverage", "--filter", selector, path],
-                    cwd=ROOT, capture_output=True, text=True,
+                    cwd=ROOT, env=env, capture_output=True, text=True,
                     timeout=180, check=False,
                 )
                 self.assertEqual(
@@ -159,6 +213,24 @@ class BrechasGrindflow03Tests(unittest.TestCase):
                 fake = "    public function " + names[0] + "() : void {\n"
                 fake += "        // Test stub with no assertion\n    }\n"
                 self.assertEqual(UNKNOWN, evidence_status(fake, (names[0],), True))
+                comment_only = (
+                    "    public function " + names[0] + "() : void {\n"
+                    "        // $this->assertTrue(true);\n"
+                    "        /* $this->assertSame(1, 1); */\n"
+                    "    }\n"
+                )
+                self.assertEqual(
+                    UNKNOWN, evidence_status(comment_only, (names[0],), True),
+                )
+                executable = (
+                    "    public function " + names[0] + "() : void {\n"
+                    "        // $this->assertFalse(true);\n"
+                    "        $this->assertTrue(true);\n"
+                    "    }\n"
+                )
+                self.assertEqual(
+                    "TEST_EXECUTED", evidence_status(executable, (names[0],), True),
+                )
 
     def test_sin_datos_reales(self) -> None:
         """Require disposable DB/fixtures, not production secrets or network."""
@@ -166,6 +238,24 @@ class BrechasGrindflow03Tests(unittest.TestCase):
         self.assertIn('name="APP_ENV" value="testing"', xml)
         self.assertIn('name="DB_CONNECTION" value="sqlite"', xml)
         self.assertIn('name="DB_DATABASE" value=":memory:"', xml)
+        inherited = {
+            "PATH": os.environ.get("PATH", ""),
+            "DB_CONNECTION": "mysql",
+            "DB_DATABASE": "production",
+            "DB_URL": "mysql://private.example/production",
+            "APP_KEY": "private-value",
+        }
+        isolated = disposable_php_env(inherited)
+        self.assertEqual("testing", isolated["APP_ENV"])
+        self.assertEqual("sqlite", isolated["DB_CONNECTION"])
+        self.assertEqual(":memory:", isolated["DB_DATABASE"])
+        self.assertEqual("", isolated["DB_URL"])
+        self.assertEqual("", isolated["DATABASE_URL"])
+        self.assertNotEqual("private-value", isolated["APP_KEY"])
+        self.assertFalse(any("private.example" in v for v in isolated.values()))
+        php = shutil.which("php")
+        if php and PHPUNIT.is_file():
+            verify_disposable_database(php, isolated)
         for path in {entry[0] for entry in CASES.values()}:
             with self.subTest(path=path):
                 source = (ROOT / path).read_text(encoding="utf-8")
