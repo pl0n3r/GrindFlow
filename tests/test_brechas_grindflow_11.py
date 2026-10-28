@@ -83,7 +83,7 @@ def assertion_method(document: str, method: str) -> bool:
     if match is None:
         return False
     body = document[match.end():].split("public function ", 1)[0]
-    return re.search(r"(?:->assert[A-Z]|::assert[A-Z])", body) is not None
+    return re.search(r"(?:->assert[A-Z]|::assert[A-Z]|->expectException\()", body) is not None
 
 
 def inspect_local(identifier: str, rows: dict, sources: dict) -> dict[str, str]:
