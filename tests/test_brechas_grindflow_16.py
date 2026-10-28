@@ -78,7 +78,10 @@ def parse_matrix(text: str) -> dict[str, tuple[str, ...]]:
 
 
 def section(text: str, heading: str) -> str | None:
-    positions = list(re.finditer(r"(?m)^" + re.escape(heading) + r"\s*$", text))
+    # Cada encabezado del documento tiene título después del ID.
+    positions = list(re.finditer(
+        r"(?m)^" + re.escape(heading) + r"(?:[ \t]+[^\n]*)?$", text
+    ))
     if len(positions) != 1:
         return None
     remainder = text[positions[0].end():]
