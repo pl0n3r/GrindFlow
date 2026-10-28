@@ -52,6 +52,10 @@ CASES = {
     ),
 }
 FILES = {MATRIX, SPEC, DISTRIBUTION, TRAFFIC, VERSION, SMOKE}
+SPEC_ANCHORS = {
+    "SPEC:029": 313, "SPEC:030": 329, "SPEC:031": 346,
+    "SPEC:032": 357, "SPEC:033": 367,
+}
 
 
 def parse_rows(document: str) -> dict[str, tuple[str, ...]]:
@@ -96,6 +100,11 @@ def inspect_local(identifier: str, rows: dict, sources: dict) -> dict[str, str]:
             or "GRINDFLOW-SPEC.md" not in row[3]):
         return result
     title, token, path, methods = CASES[identifier]
+    anchor = SPEC_ANCHORS[identifier]
+    reference = (rf"\[GRINDFLOW-SPEC\.md:L{anchor}\]"
+                 rf"\([^)]*/docs/GRINDFLOW-SPEC\.md#L{anchor}\)")
+    if re.search(reference, row[3]) is None:
+        return result
     clause = spec_section(sources.get(SPEC, ""), title)
     source = sources.get(path, "")
     if not clause or token not in clause or not source:
@@ -133,6 +142,13 @@ def append_attempt(history: object, delivery: object, event: object):
             or type(event["attempt"]) is not int or event["attempt"] < 0
             or event["error"] not in (None, "rate_limited", "transient")):
         return UNKNOWN
+    for number, previous in enumerate(history, 1):
+        if (type(previous) is not tuple or len(previous) != 4
+                or type(previous[0]) is not int or previous[0] != number
+                or previous[1] not in ("started", "retry", "delivered", "failed")
+                or type(previous[2]) is not int or previous[2] < 0
+                or previous[3] not in (None, "rate_limited", "transient")):
+            return UNKNOWN
     return history + ((len(history) + 1, event["type"], event["attempt"],
                        event["error"]),)
 
@@ -188,11 +204,16 @@ def synthetic_smoke(responses: object, version: str, pending: object):
     if (type(responses) is not dict or pending is not False
             or not re.fullmatch(r"\d+\.\d+\.\d+", version)
             or set(responses) != {
-                "login_count", "version", "vault", "scheduler",
+                "login_count", "version", "admin", "vault", "scheduler",
                 "distribution", "traffic", "finance", "csv",
             }
             or responses["login_count"] != 1
             or responses["version"] != version):
+        return UNKNOWN
+    admin = responses["admin"]
+    if (type(admin) is not tuple or len(admin) != 2 or admin[0] != 200
+            or type(admin[1]) is not str
+            or f'data-grindflow-release="{version}"' not in admin[1]):
         return UNKNOWN
     markers = {
         "vault": "Vault",
@@ -204,7 +225,8 @@ def synthetic_smoke(responses: object, version: str, pending: object):
     for key, marker in markers.items():
         entry = responses.get(key)
         if (type(entry) is not tuple or len(entry) != 2
-                or entry[0] != 200 or marker not in entry[1]):
+                or entry[0] != 200 or type(entry[1]) is not str
+                or marker not in entry[1]):
             return UNKNOWN
     if responses["csv"] != (200, "text/csv", "attachment",
                             "date_utc,label,short_link,channel,campaign,status,clicks"):
@@ -275,6 +297,7 @@ class BrechasGrindflow11Tests(unittest.TestCase):
 
         # SPEC:033: un login y sólo GETs con markers/CSV, nunca live.
         responses = {"login_count": 1, "version": version.group(1),
+                     "admin": (200, f'data-grindflow-release="{version.group(1)}"'),
                      "vault": (200, "Vault ready"),
                      "scheduler": (200, "Scheduling schema ready"),
                      "distribution": (200, "Distribution ready"),
@@ -305,6 +328,13 @@ class BrechasGrindflow11Tests(unittest.TestCase):
                                  UNKNOWN)
         row = next(x for x in self.sources[MATRIX].splitlines()
                    if x.startswith("| SPEC:029 |"))
+        mislinked = dict(self.rows)
+        wrong = list(mislinked["SPEC:029"])
+        wrong[3] = wrong[3].replace("L313", "L329")
+        mislinked["SPEC:029"] = tuple(wrong)
+        self.assertEqual(
+            inspect_local("SPEC:029", mislinked, self.sources)["code"], UNKNOWN
+        )
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
             parse_rows(self.sources[MATRIX] + "\n" + row)
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
@@ -314,6 +344,9 @@ class BrechasGrindflow11Tests(unittest.TestCase):
                  "attempt": 1, "error": None}
         self.assertEqual(append_attempt((), sample, event), UNKNOWN)
         sample["fenced"] = True
+        self.assertEqual(append_attempt((None,), sample, event), UNKNOWN)
+        self.assertEqual(append_attempt(((2, "started", 0, None),),
+                                        sample, event), UNKNOWN)
         for extra in ({"provider_response": "disallowed"}, {"header": "disallowed"}):
             self.assertEqual(append_attempt((), sample, {**event, **extra}),
                              UNKNOWN)
@@ -329,6 +362,22 @@ class BrechasGrindflow11Tests(unittest.TestCase):
         self.assertEqual(set_link_status(link, "foreign", "disabled"), UNKNOWN)
         self.assertEqual(set_link_status(link, "org-fake", "deleted"), UNKNOWN)
         self.assertEqual(synthetic_smoke({}, "0.1.219", False), UNKNOWN)
+        smoke = {
+            "login_count": 1, "version": "0.1.219",
+            "admin": (200, 'data-grindflow-release="0.1.219"'),
+            "vault": (200, "Vault ready"),
+            "scheduler": (200, "Scheduling schema ready"),
+            "distribution": (200, "Distribution ready"),
+            "traffic": (200, "Traffic schema ready"),
+            "finance": (200, "Finance schema ready"),
+            "csv": (200, "text/csv", "attachment",
+                    "date_utc,label,short_link,channel,campaign,status,clicks"),
+        }
+        self.assertEqual(synthetic_smoke(smoke, "0.1.219", False), LOCAL)
+        self.assertEqual(synthetic_smoke({**smoke, "admin": (503, "")},
+                                         "0.1.219", False), UNKNOWN)
+        self.assertEqual(synthetic_smoke({**smoke, "vault": (200, None)},
+                                         "0.1.219", False), UNKNOWN)
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: fixtures offline; no llamadas de red, datos o secretos."""
