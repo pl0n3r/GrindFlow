@@ -70,9 +70,11 @@ def parse_rows(raw: str) -> dict[str, tuple[str, ...]]:
     """La matriz ausente, duplicada o ambigua no otorga una acreditación."""
     rows = {}
     for line in raw.splitlines():
-        if not any(line.startswith(f"| {ident} |") for ident in IDS):
+        if not line.lstrip().startswith("|"):
             continue
-        fields = tuple(part.strip() for part in line.strip("|").split("|"))
+        fields = tuple(part.strip() for part in line.strip().strip("|").split("|"))
+        if not fields or fields[0] not in IDS:
+            continue
         if len(fields) != 8 or fields[0] in rows:
             raise ValueError("UNKNOWN: fila duplicada o incompleta")
         rows[fields[0]] = fields
@@ -101,9 +103,10 @@ def inspect_local(ident: str, rows: dict, sources: dict) -> dict[str, str]:
             or row[5:8] != ("NO_ACREDITADO",) * 3):
         return result
     anchor, heading, phrases, path, markers = CLAUSES[ident]
-    if (f"GRINDFLOW-SPEC.md:L{anchor}" not in row[3]
-            or f"GRINDFLOW-SPEC.md#L{anchor}" not in row[3]):
-        return result
+    for prefix in ("GRINDFLOW-SPEC.md:L", "GRINDFLOW-SPEC.md#L"):
+        if re.search(re.escape(prefix + str(anchor)) + r"(?![0-9])",
+                     row[3]) is None:
+            return result
     clause = section(sources.get(SPEC, ""), heading)
     evidence = sources.get(path, "")
     if not clause or not evidence:
@@ -137,10 +140,26 @@ def browser_contract(payload: object) -> str:
     return LOCAL
 
 
+def is_utc_timestamp(value: object) -> bool:
+    """Timestamp sintético bien formado: rechazar fechas imposibles."""
+    if (type(value) is not str
+            or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z",
+                            value) is None):
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
+
+
 def history_page(records: object, tenant: str, page: int,
                  status: str | None = None):
     """SPEC:040: paginar 25 y filtrar tenant antes de contar u ordenar."""
-    allowed = {"queued", "delivered", "failed", "retry"}
+    allowed = {
+        "queued", "processing", "retry_scheduled",
+        "published", "authentication_failed", "failed",
+    }
     if (type(records) is not list or type(tenant) is not str or not tenant
             or type(page) is not int or page < 1
             or status is not None and status not in allowed):
@@ -149,8 +168,7 @@ def history_page(records: object, tenant: str, page: int,
         if (type(record) is not tuple or len(record) != 4
                 or any(type(v) is not str or not v for v in record)
                 or record[3] not in allowed
-                or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z",
-                                    record[1])):
+                or not is_utc_timestamp(record[1])):
             return UNKNOWN
     selected = sorted(
         (r for r in records if r[0] == tenant and (status is None or r[3] == status)),
@@ -208,17 +226,22 @@ def weekly_preview(assets: object, tenant: str, active_member: object,
             or not tenant or active_member is not True
             or rule is not None and not valid_rule(rule)):
         return UNKNOWN
-    required = {"tenant", "id", "state", "scope", "reviewed", "authorized"}
+    required = {"tenant", "id", "state", "scope", "reviewed", "authorized",
+                "created_at"}
     for asset in assets:
         if (type(asset) is not dict or set(asset) != required
                 or type(asset["tenant"]) is not str
                 or type(asset["id"]) is not str or not asset["id"]
+                or not is_utc_timestamp(asset["created_at"])
                 or asset["state"] not in ("active", "trash")
                 or asset["scope"] not in ("unclassified", "internal_only", "public")
                 or type(asset["reviewed"]) is not bool
                 or type(asset["authorized"]) is not bool):
             return UNKNOWN
-    visible = [a for a in assets if a["tenant"] == tenant and a["state"] == "active"]
+    visible = sorted(
+        (a for a in assets if a["tenant"] == tenant and a["state"] == "active"),
+        key=lambda a: (a["created_at"], a["id"]), reverse=True,
+    )
     entries = []
     for asset in visible[:30]:
         blockers = []
@@ -246,18 +269,31 @@ def weekly_slots(rule: object, now: object):
             or now.tzinfo is None or now.utcoffset() is None):
         return UNKNOWN
     tz = ZoneInfo(rule["timezone"])
+    utc_zone = ZoneInfo("UTC")
     current = now.astimezone(tz)
+    now_utc = now.astimezone(utc_zone)
     hour, minute = map(int, rule["local_time"].split(":"))
     slots = []
     for weekday in rule["weekdays"]:
         step = (WEEKDAYS.index(weekday) - current.weekday()) % 7
-        day = current.date() + timedelta(days=step)
-        future = datetime.combine(day, time(hour, minute), tzinfo=tz)
-        if future <= current:
-            future += timedelta(days=7)
-        utc = future.astimezone(ZoneInfo("UTC"))
+        candidates = []
+        for week in (0, 1, 2):
+            day = current.date() + timedelta(days=step + 7 * week)
+            wall = datetime.combine(day, time(hour, minute))
+            for fold in (0, 1):
+                local = wall.replace(tzinfo=tz, fold=fold)
+                utc = local.astimezone(utc_zone)
+                # Excluye horas inexistentes y compara instantes, no wall time.
+                if (utc > now_utc
+                        and utc.astimezone(tz).replace(tzinfo=None) == wall):
+                    candidates.append((utc, local))
+            if candidates:
+                break
+        if not candidates:
+            return UNKNOWN
+        utc, local = min(candidates, key=lambda item: item[0])
         slots.append({
-            "weekday": weekday, "local_date": future.date().isoformat(),
+            "weekday": weekday, "local_date": local.date().isoformat(),
             "local_time": rule["local_time"], "timezone": rule["timezone"],
             "scheduled_at_utc": utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "capacity": rule["max_per_day"],
@@ -304,6 +340,14 @@ class BrechasGrindflow13Tests(unittest.TestCase):
         self.assertEqual((len(last["ids"]), last["next"]), (6, None))
         self.assertEqual(first["ids"][0], "synthetic-105")
         self.assertNotIn("foreign", str((first, second, last)))
+        for delivery_status in (
+            "queued", "processing", "retry_scheduled", "published",
+            "authentication_failed", "failed",
+        ):
+            sample = [("tenant-a", "2026-10-01T00:00:00Z",
+                       delivery_status, delivery_status)]
+            result = history_page(sample, "tenant-a", 1, delivery_status)
+            self.assertEqual(result["ids"], (delivery_status,))
 
         # SPEC:041: marker público anuncia release, nunca SHA ni test live.
         marker = deployment_marker(
@@ -317,19 +361,32 @@ class BrechasGrindflow13Tests(unittest.TestCase):
                 "local_time": "10:30", "max_per_day": 2}
         assets = [
             {"tenant": "tenant-a", "id": f"fake-{n}", "state": "active",
-             "scope": "public", "reviewed": True, "authorized": True}
+             "scope": "public", "reviewed": True, "authorized": True,
+             "created_at": (datetime(2026, 10, 1) + timedelta(minutes=n))
+                           .strftime("%Y-%m-%dT%H:%M:%SZ")}
             for n in range(34)
         ]
         assets += [{"tenant": "tenant-b", "id": "foreign", "state": "active",
-                    "scope": "public", "reviewed": True, "authorized": True},
+                    "scope": "public", "reviewed": True, "authorized": True,
+                    "created_at": "2026-10-09T00:00:00Z"},
                    {"tenant": "tenant-a", "id": "trashed", "state": "trash",
-                    "scope": "public", "reviewed": True, "authorized": True},
+                    "scope": "public", "reviewed": True, "authorized": True,
+                    "created_at": "2026-10-09T00:00:00Z"},
                    {"tenant": "tenant-a", "id": "needs-review", "state": "active",
-                    "scope": "unclassified", "reviewed": False, "authorized": False}]
+                    "scope": "unclassified", "reviewed": False, "authorized": False,
+                    "created_at": "2026-09-01T00:00:00Z"}]
         preview = weekly_preview(assets, "tenant-a", True, rule)
         self.assertEqual(preview["total_active_assets"], 35)
         self.assertEqual(len(preview["assets"]), 30)
+        self.assertEqual(tuple(a["id"] for a in preview["assets"]),
+                         tuple(f"fake-{n}" for n in range(33, 3, -1)))
         self.assertTrue(preview["assets"][0]["eligible"])
+        same_time = {**assets[0], "created_at": "2026-10-15T00:00:00Z"}
+        tied = weekly_preview([
+            {**same_time, "id": "same-a"}, {**same_time, "id": "same-b"},
+        ], "tenant-a", True, rule)
+        self.assertEqual(tuple(a["id"] for a in tied["assets"]),
+                         ("same-b", "same-a"))
         self.assertFalse(preview["can_publish"])
         self.assertEqual(preview["mode"], "review_only")
         blocked = weekly_preview(assets[-1:], "tenant-a", True, rule)["assets"][0]
@@ -348,6 +405,14 @@ class BrechasGrindflow13Tests(unittest.TestCase):
         self.assertTrue(all(s["capacity"] == 2 for s in slots))
         self.assertTrue(all(s["scheduled_at_utc"].endswith("15:30:00Z")
                             for s in slots))
+        # Segundo 01:15 de la hora repetida: elegir 01:30 EST (06:30 UTC).
+        ny_rule = {"timezone": "America/New_York", "weekdays": ("sun",),
+                   "local_time": "01:30", "max_per_day": 1}
+        fallback_now = datetime(2026, 11, 1, 1, 15,
+                                tzinfo=ZoneInfo("America/New_York"), fold=1)
+        fallback_slots = weekly_slots(ny_rule, fallback_now)
+        self.assertEqual(fallback_slots[0]["scheduled_at_utc"],
+                         "2026-11-01T06:30:00Z")
 
     def test_falla_cerrado(self) -> None:
         """AC-02: sin fuentes fiables, acceso u orden no hay éxito implícito."""
@@ -373,6 +438,9 @@ class BrechasGrindflow13Tests(unittest.TestCase):
             parse_rows(self.sources[MATRIX] + "\n" + original)
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
             parse_rows(self.sources[MATRIX].replace(original + "\n", "", 1))
+        with self.assertRaisesRegex(ValueError, "UNKNOWN"):
+            parse_rows(self.sources[MATRIX] + "\n"
+                       + original.replace("| SPEC:039 |", "| SPEC:039|", 1))
 
         valid_browser = {"environment": "testing", "authenticated": True,
                          "media": 106, "scheduled": 27, "links": 1,
@@ -387,6 +455,11 @@ class BrechasGrindflow13Tests(unittest.TestCase):
         self.assertEqual(history_page([("tenant-a",)], "tenant-a", 1), UNKNOWN)
         self.assertEqual(history_page([], "tenant-a", 0), UNKNOWN)
         self.assertEqual(history_page([], "tenant-a", 1, "arbitrary"), UNKNOWN)
+        self.assertEqual(history_page([], "tenant-a", 1, "retry"), UNKNOWN)
+        self.assertEqual(history_page([], "tenant-a", 1, "delivered"), UNKNOWN)
+        self.assertEqual(history_page([
+            ("tenant-a", "2026-99-01T00:00:00Z", "bad", "failed"),
+        ], "tenant-a", 1), UNKNOWN)
         self.assertEqual(deployment_marker(
             {"version": "0.1.219", "exact": True, "commit": "a" * 40,
              "source": "release-only"}, {"Cache-Control": "no-store"})["code"],
@@ -396,7 +469,8 @@ class BrechasGrindflow13Tests(unittest.TestCase):
              "source": "release-only"}, {})["code"], UNKNOWN)
 
         good_asset = {"tenant": "tenant-a", "id": "synthetic", "state": "active",
-                      "scope": "public", "reviewed": True, "authorized": True}
+                      "scope": "public", "reviewed": True, "authorized": True,
+                      "created_at": "2026-10-01T00:00:00Z"}
         self.assertEqual(weekly_preview([good_asset], "tenant-a", False, None),
                          UNKNOWN)
         self.assertEqual(weekly_preview([{"tenant": "tenant-a"}],
@@ -440,6 +514,13 @@ class BrechasGrindflow13Tests(unittest.TestCase):
                 anchor = CLAUSES[ident][0]
                 fields[3] = fields[3].replace(f"L{anchor}", "L999")
                 altered[ident] = tuple(fields)
+                self.assertEqual(inspect_local(ident, altered, self.sources)[
+                    "code"], UNKNOWN)
+                altered[ident] = tuple(
+                    field.replace(f"L{anchor}", f"L{anchor}0")
+                    if index == 3 else field
+                    for index, field in enumerate(self.rows[ident])
+                )
                 self.assertEqual(inspect_local(ident, altered, self.sources)[
                     "code"], UNKNOWN)
 
