@@ -192,7 +192,7 @@ class BrechasGrindflow08Tests(unittest.TestCase):
                     clause, self.rows, {**self.sources, SPEC: ""})["code"])
                 # Remove the defining behavior (not merely a comment).
                 path, anchors = next(iter(CODE_ANCHORS[clause].items()))
-                altered = self.sources[path].replace(anchors[0], "contract_removed", 1)
+                altered = self.sources[path].replace(anchors[0], "contract_removed")
                 self.assertEqual(UNKNOWN, inspect(
                     clause, self.rows, {**self.sources, path: altered})["code"])
         original = self.sources[MATRIX]
