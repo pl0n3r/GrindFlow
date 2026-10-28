@@ -105,7 +105,7 @@ def parse_rows(text: str) -> dict[str, tuple[str, ...]]:
 
 def section_text(source: str, header: str) -> str | None:
     hits = list(re.finditer(
-        r"(?m)^### " + re.escape(header) + r"\s+[^\\n]*$", source
+        r"(?m)^### " + re.escape(header) + r"\s+[^\n]*$", source
     ))
     if len(hits) != 1:
         return None
