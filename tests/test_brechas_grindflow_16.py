@@ -118,8 +118,14 @@ def actions_compatible(workflows: dict[str, str]) -> str:
             elif re.fullmatch(r"[0-9a-f]{40}", ref):
                 label = re.search(r"#\s*v(\d+)(?:\.\d+)*\b", suffix)
                 if label is None:
-                    return UNKNOWN
-                version = int(label.group(1))
+                    # Pin exacto checkout v5 usado también por Factory Kit.
+                    # Ningún otro SHA sin identidad de release se acepta.
+                    if not (name == "checkout" and
+                            ref == "3d3c42e5aac5ba805825da76410c181273ba90b1"):
+                        return UNKNOWN
+                    version = 5
+                else:
+                    version = int(label.group(1))
             else:
                 return UNKNOWN
             if version < OFFICIAL[name]:
