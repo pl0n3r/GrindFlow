@@ -3,7 +3,12 @@
 Solo inspección estática de la plantilla Blade, la hoja de estilos y la tipografía local.
 """
 import hashlib
+import json
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -129,19 +134,132 @@ class LoginParrillaDesignTests(unittest.TestCase):
         for stage in ("Biblioteca", "Reglas", "Distribución", "Tráfico"):
             with self.subTest(stage=stage):
                 self.assertIn(f">{stage}</li>", html)
-        for field in ('name="email"', 'name="password"', 'name="remember"', "@csrf", "route('login')"):
+        login_form = re.search(
+            r'<form[^>]*action="{{ route\(\'login\'\) }}"[^>]*>(.*?)</form>',
+            html, flags=re.DOTALL,
+        )
+        self.assertIsNotNone(login_form, "Se requiere el formulario de login real")
+        form = login_form.group(1)
+        for field in ('name="email"', 'name="password"', 'name="remember"', "@csrf"):
             with self.subTest(field=field):
-                self.assertIn(field, html)
+                self.assertIn(field, form)
         self.assertNotIn("style=", html)
         self.assertNotIn("gf-kicker", html)
+
+    def test_login_stages_render_without_overflow_at_320_and_360(self) -> None:
+        """Chromium real: CSS del Blade, viewport interno exacto, sin red ni sesiones."""
+        browser = os.environ.get("GRINDFLOW_BROWSER_CHROME")
+        if not browser:
+            browser = next(
+                (path for name in ("google-chrome", "chromium", "chromium-browser")
+                 if (path := shutil.which(name))), None,
+            )
+        if not browser:
+            self.skipTest("Chromium no disponible; el gate browser debe cubrirlo")
+        html = text(LOGIN)
+        stages = re.search(r'<ol class="gp-login__stages"[^>]*>.*?</ol>', html,
+                           flags=re.DOTALL)
+        self.assertIsNotNone(stages, "El viewport prueba la lista real del Blade")
+        css = text(CSS)
+        inner = (
+            '<!doctype html><html lang="es"><head>'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            '<style>' + css + '</style></head><body class="gp-page gp-login-page">'
+            '<main class="gp-login"><section class="gp-login__band">'
+            '<div class="gp-login__statement">' + stages.group(0) + '</div>'
+            '</section></main></body></html>'
+        )
+        probe = (
+            '<!doctype html><html><body>'
+            '<iframe id="mobile320" width="320" height="800"></iframe>'
+            '<iframe id="mobile360" width="360" height="800"></iframe>'
+            '<output id="mobile-probe" data-result="PENDING"></output>'
+            '<script>'
+            'const frames=[...document.querySelectorAll("iframe")];'
+            'let finished=0;'
+            'frames.forEach(frame=>{'
+            'frame.addEventListener("load",()=>{'
+            'const doc=frame.contentDocument;'
+            'const grid=doc.querySelector(".gp-login__stages");'
+            'const columns=frame.contentWindow.getComputedStyle(grid).gridTemplateColumns'
+            '.trim().split(/\\s+/);'
+            'const ok=doc.documentElement.scrollWidth<=frame.contentWindow.innerWidth+1'
+            ' && grid.scrollWidth<=grid.clientWidth+1'
+            ' && [...grid.children].every(li=>li.scrollWidth<=li.clientWidth+1)'
+            ' && columns.length===2;'
+            'frame.dataset.result=ok?"PASS":"FAIL";'
+            'finished++;'
+            'if(finished===frames.length){'
+            'document.getElementById("mobile-probe").dataset.result='
+            'frames.every(frame=>frame.dataset.result==="PASS")?"PASS":"FAIL";'
+            '}'
+            '});'
+            'frame.srcdoc=' + json.dumps(inner) + ';'
+            '});'
+            '</script></body></html>'
+        )
+        with tempfile.TemporaryDirectory(prefix="grindflow-login-mobile-") as directory:
+            page = Path(directory) / "probe.html"
+            page.write_text(probe, encoding="utf-8")
+            result = subprocess.run(
+                [browser, "--headless=new", "--no-sandbox",
+                 "--disable-dev-shm-usage", "--disable-gpu",
+                 "--window-size=900,900", "--virtual-time-budget=4000",
+                 "--dump-dom", page.as_uri()],
+                capture_output=True, text=True, timeout=25, check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr[-1200:])
+        check = re.search(r'<output id="mobile-probe" data-result="([^"]+)"',
+                          result.stdout)
+        self.assertIsNotNone(check, "Chromium no ejecutó el probe")
+        self.assertEqual(check.group(1), "PASS",
+                         "A 320/360 px la lista de etapas debe encajar en dos columnas")
 
     def test_login_card_text_and_fields_meet_wcag_aa_on_the_parrilla_colors(self) -> None:
         t = tokens()
         for foreground, background in (("gp-ink", "gp-ground"), ("gp-ink-2", "gp-paper"), ("gp-paper", "gp-lib")):
             with self.subTest(pair=f"{foreground} sobre {background}"):
                 self.assertGreaterEqual(contrast(t[foreground], t[background]), 4.5)
-        border = re.search(r"\.gp-login__card \.gf-input \{[^}]*border: 1px solid (#[0-9a-f]{6})", text(CSS)).group(1)
-        self.assertGreaterEqual(contrast(border, t["gp-ground"]), 3.0, "Borde de campo, WCAG 1.4.11")
+        css = text(CSS)
+        declarations = re.findall(
+            r"\.gp-login__card\s+\.gf-input\s*\{([^}]*)\}", css,
+            flags=re.DOTALL,
+        )
+        self.assertTrue(declarations, "No existe CSS para el input del login")
+        # Ancla semántica de propiedad: background-color y border-color no son texto.
+        colors = [
+            color for rule in declarations
+            for color in re.findall(r"(?:^|;)\s*color\s*:\s*var\(--(gp-[\w-]+)\)\s*;", rule)
+        ]
+        backgrounds = [
+            color for rule in declarations
+            for color in re.findall(r"(?:^|;)\s*background\s*:\s*var\(--(gp-[\w-]+)\)\s*;", rule)
+        ]
+        self.assertEqual(colors, ["gp-ink"])
+        self.assertEqual(backgrounds, ["gp-ground"])
+        self.assertGreaterEqual(contrast(t[colors[0]], t[backgrounds[0]]), 4.5,
+                                "Texto de input, WCAG 1.4.3")
+        border = re.search(
+            r"\.gp-login__card \.gf-input \{[^}]*border: 1px solid (#[0-9a-f]{6})",
+            css,
+        )
+        self.assertIsNotNone(border)
+        self.assertGreaterEqual(contrast(border.group(1), t[backgrounds[0]]), 3.0,
+                                "Borde de campo, WCAG 1.4.11")
+        # Mutación deliberada: un background-color no puede suplantar color.
+        mutated = css.replace(
+            "color: var(--gp-ink); background: var(--gp-ground);",
+            "background-color: var(--gp-ink); background: var(--gp-ground);",
+            1,
+        )
+        mutated_rules = re.findall(
+            r"\.gp-login__card\s+\.gf-input\s*\{([^}]*)\}", mutated,
+            flags=re.DOTALL,
+        )
+        self.assertFalse([
+            color for rule in mutated_rules
+            for color in re.findall(r"(?:^|;)\s*color\s*:\s*var\(--(gp-[\w-]+)\)\s*;", rule)
+        ], "La prueba debe detectar la ausencia del color de texto")
 
 
 if __name__ == "__main__":
