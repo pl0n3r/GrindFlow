@@ -268,8 +268,14 @@ class LoginParrillaDesignTests(unittest.TestCase):
 
 class WorkspaceShellParrillaTests(unittest.TestCase):
     def test_every_workspace_view_loads_the_parrilla_shell_after_the_base_css(self) -> None:
-        views = [v for v in VIEWS.rglob("*.blade.php") if "css/grindflow.css" in text(v) and v.name not in ("welcome.blade.php", "login.blade.php")]
-        self.assertGreaterEqual(len(views), 9)
+        names = (
+            "admin/diagnostics.blade.php", "admin/system.blade.php",
+            "dashboard.blade.php", "distribution/index.blade.php",
+            "errors/500.blade.php", "finance/index.blade.php",
+            "scheduling/index.blade.php", "traffic/index.blade.php",
+            "vault/guest-upload.blade.php", "vault/index.blade.php",
+        )
+        views = [VIEWS / name for name in names]
         for view in views:
             with self.subTest(view=str(view.relative_to(ROOT))):
                 html = text(view)
