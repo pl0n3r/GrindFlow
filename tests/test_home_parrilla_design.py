@@ -63,7 +63,7 @@ class HomeParrillaDesignTests(unittest.TestCase):
         blocks = re.findall(r"<div class=\"gp-block[^\"]*\">(.*?)</div>", html, flags=re.DOTALL)
         self.assertGreaterEqual(len(blocks), 10)
         for block in blocks:
-            state = re.search(r"<small>(.*?)</small>", block).group(1)
+            state = re.search(r"<small>(.*?)</small>", block, flags=re.DOTALL).group(1).strip()
             self.assertTrue(state.startswith(STATES), state)
 
     def test_the_example_is_labeled_and_the_home_makes_no_external_promises(self) -> None:
