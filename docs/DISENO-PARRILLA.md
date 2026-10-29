@@ -47,6 +47,6 @@ El home Twig y el panel React importan los tokens `--gp-*` y los colores por eta
 ## Pendiente
 
 - Revisión final de Impeccable y su PRODUCT.md/DESIGN.md.
-- Fotografía real en los tres espacios de imagen.
+- Fotografía real en los tres espacios de imagen. Al sustituir los marcos decorativos por imágenes aprobadas, conservar sus relaciones 4:5 y 4:3; si la imagen comunica información, retirar `aria-hidden` de ese contenido y proporcionar texto alternativo útil. No presentar material provisional como fotografía real.
 - Limpiar del CSS heredado `public/css/grindflow.css` las reglas de la portada anterior (`gf-landing*`, `gf-auth*`, `gf-gradient-text`), que ninguna vista usa.
 - Revisión con lector de pantalla.
