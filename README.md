@@ -4,7 +4,7 @@
 
 **Rol en la fábrica:** product · **Fase:** construction · **Roadmap:** [GitHub Issue #2](https://github.com/pl0n3r/GrindFlow/issues/2)
 
-**Versión de código declarada:** V0.1.221 ([`config/version.php`](config/version.php)). El candidato **V0.1.220** introdujo el sistema visual del **home público** ([diseño de la parrilla](docs/DISENO-PARRILLA.md)); el candidato posterior **V0.1.221** adaptó el **login Blade** a ese sistema. Esta distinción es histórica: ninguna versión declarada acredita por sí sola el SHA desplegado ni la salud de producción.
+**Código declarado:** V0.1.221 ([`config/version.php`](config/version.php)). **V0.1.220** renovó el **home** ([parrilla](docs/DISENO-PARRILLA.md)); **V0.1.221** adaptó el **login Blade**. Son candidatos, no evidencia de SHA desplegado ni salud de producción.
 
 GrindFlow ayuda a creadores y equipos a cargar contenido una vez, organizarlo, programar su distribución y medir el tráfico hacia destinos configurados, manteniendo control humano sobre reglas, permisos y publicación.
 
