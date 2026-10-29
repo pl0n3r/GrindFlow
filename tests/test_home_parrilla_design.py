@@ -48,6 +48,21 @@ def tokens() -> dict[str, str]:
     return dict(re.findall(r"--(gp-[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\s*;", root))
 
 
+def inside_no_preference_block(css: str, offset: int) -> bool:
+    """True si el desplazamiento está dentro de un @media (prefers-reduced-motion: no-preference) abierto."""
+    stack: list[bool] = []
+    index = 0
+    while index < offset:
+        char = css[index]
+        if char == "{":
+            header = css[css.rfind("}", 0, index) + 1:index].rsplit(";", 1)[-1]
+            stack.append("prefers-reduced-motion: no-preference" in header)
+        elif char == "}" and stack:
+            stack.pop()
+        index += 1
+    return any(stack)
+
+
 class HomeParrillaDesignTests(unittest.TestCase):
     def test_text_on_every_color_meets_wcag_aa(self) -> None:
         t = tokens()
@@ -96,11 +111,11 @@ class HomeParrillaDesignTests(unittest.TestCase):
         self.assertNotIn("forwards", css)
         self.assertNotIn("opacity: 0;", css, "Los bloques deben ser visibles durante el retardo")
         self.assertIn("from { opacity: 1; transform: scaleX(.96); }", animation)
-        media_start = css.index("@media (prefers-reduced-motion: no-preference)", css.index("/* La parrilla:"))
-        media_end = css.index("}\n@keyframes gp-fill", media_start)
         animation_rules = list(re.finditer(r"\banimation\s*:", css))
-        self.assertEqual(len(animation_rules), 1)
-        self.assertTrue(all(media_start < rule.start() < media_end for rule in animation_rules))
+        self.assertGreaterEqual(len(animation_rules), 1)
+        for rule in animation_rules:
+            with self.subTest(offset=rule.start()):
+                self.assertTrue(inside_no_preference_block(css, rule.start()), "Toda animación va dentro de no-preference")
         self.assertNotRegex(css, r"transition:\s*all\b")
         self.assertIn("overflow-wrap: anywhere;", css)
 
@@ -336,6 +351,33 @@ class WorkspaceShellParrillaTests(unittest.TestCase):
                     contrast(foreground, background), 4.5,
                     f"{selector}: {foreground} sobre {background}, WCAG AA",
                 )
+
+class HomeImageSlotsTests(unittest.TestCase):
+    def test_home_reserves_labeled_image_slots_that_are_decorative_for_screen_readers(self) -> None:
+        html = text(BLADE)
+        slots = re.findall(r'<figure class="gp-img [^"]*">(.*?)</figure>', html, flags=re.DOTALL)
+        self.assertEqual(len(slots), 3)
+        for slot in slots:
+            with self.subTest(slot=slot.strip()[:40]):
+                self.assertIn('<div class="gp-img__frame" aria-hidden="true">', slot)
+                self.assertIn('<figcaption aria-hidden="true">', slot)
+                self.assertRegex(slot, r"Espacio para imagen · \d:\d · ")
+        self.assertNotIn("<img", html)
+
+    def test_slots_keep_a_fixed_ratio_so_real_images_cause_no_layout_shift(self) -> None:
+        css = text(CSS)
+        self.assertIn("aspect-ratio: var(--gp-img-ratio", css)
+        expected = {".gp-img--hero": "4 / 5", ".gp-img--card": "4 / 3"}
+        for selector, ratio in expected.items():
+            with self.subTest(selector=selector):
+                rule = re.search(
+                    rf"^{re.escape(selector)}\s*\{{([^}}]*)\}}",
+                    css,
+                    flags=re.MULTILINE,
+                )
+                self.assertIsNotNone(rule)
+                self.assertIn(f"--gp-img-ratio: {ratio};", rule.group(1))
+
 
 if __name__ == "__main__":
     unittest.main()

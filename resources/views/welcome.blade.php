@@ -39,8 +39,20 @@
                 </a>
             </div>
             <p class="gp-note">Plataforma en desarrollo · Piloto inicial en preparación</p>
+            <figure class="gp-img gp-img--hero">
+                <div class="gp-img__frame" aria-hidden="true"><span>Imagen</span></div>
+                <figcaption aria-hidden="true">Espacio para imagen · 4:5 · Captura del workspace o foto de un creador</figcaption>
+            </figure>
         </div>
     </section>
+
+    <div class="gp-ticker" aria-hidden="true">
+        <div class="gp-ticker__track">
+            @for ($pass = 0; $pass < 2; $pass++)
+                <span class="gp-row--lib">Biblioteca</span><span class="gp-row--rules">Reglas</span><span class="gp-row--dist">Distribución</span><span class="gp-row--traf">Tráfico</span>
+            @endfor
+        </div>
+    </div>
 
         <section class="gp-board-section" aria-label="Vista conceptual del flujo de contenido de GrindFlow">
             <div class="gp-wrap">
@@ -191,10 +203,20 @@
                     <p>Una misma plataforma, distintas formas de crear y trabajar con contenido.</p>
                 </div>
                 <div class="gp-aud">
-                        <article><span>INDIVIDUAL</span>
+                        <article>
+                            <figure class="gp-img gp-img--card">
+                <div class="gp-img__frame" aria-hidden="true"><span>Imagen</span></div>
+                <figcaption aria-hidden="true">Espacio para imagen · 4:3 · Creador trabajando con su biblioteca</figcaption>
+            </figure>
+                            <span>INDIVIDUAL</span>
                         <h3>Creadores</h3>
                         <p>Una biblioteca para tus recursos y un flujo que libera tiempo para crear.</p></article>
-                        <article><span>COLABORATIVO</span>
+                        <article>
+                            <figure class="gp-img gp-img--card">
+                <div class="gp-img__frame" aria-hidden="true"><span>Imagen</span></div>
+                <figcaption aria-hidden="true">Espacio para imagen · 4:3 · Equipo revisando la programación</figcaption>
+            </figure>
+                            <span>COLABORATIVO</span>
                         <h3>Estudios y agencias</h3>
                         <p>Organiza trabajo, perfiles y entregas con responsabilidades claras.</p></article>
                 </div>
