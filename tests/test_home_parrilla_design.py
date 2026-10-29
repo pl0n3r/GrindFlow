@@ -379,5 +379,21 @@ class HomeImageSlotsTests(unittest.TestCase):
                 self.assertIn(f"--gp-img-ratio: {ratio};", rule.group(1))
 
 
+class DashboardImpactTests(unittest.TestCase):
+    def test_each_metric_takes_the_color_of_its_stage_from_the_parrilla_tokens(self) -> None:
+        css = text(WORKSPACE_CSS)
+        t = tokens()
+        for metric, stage in (("organizations", "gp-traf"), ("ready-media", "gp-lib"), ("scheduled-publications", "gp-dist")):
+            with self.subTest(metric=metric):
+                self.assertIn(f'.gf-metric[data-dashboard-metric="{metric}"] {{ --stage: {t[stage]}; }}', css)
+                self.assertIn(f'data-dashboard-metric="{metric}"', text(ROOT / "resources" / "views" / "dashboard.blade.php"))
+
+    def test_the_label_goes_below_the_title_and_the_numbers_are_tabular(self) -> None:
+        css = text(WORKSPACE_CSS)
+        self.assertIn(".gf-pagehead h1 { order: 1;", css)
+        self.assertIn(".gf-pagehead .gf-kicker { order: 3;", css)
+        self.assertIn("font-variant-numeric: tabular-nums;", css.split(".gf-metric__value {", 1)[1].split("}", 1)[0])
+
+
 if __name__ == "__main__":
     unittest.main()
