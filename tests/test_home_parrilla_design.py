@@ -395,5 +395,29 @@ class DashboardImpactTests(unittest.TestCase):
         self.assertIn("font-variant-numeric: tabular-nums;", css.split(".gf-metric__value {", 1)[1].split("}", 1)[0])
 
 
+class LegacyCssRemovalTests(unittest.TestCase):
+    FAMILIES = ("gf-landing", "gf-auth", "gf-gradient-text")
+
+    def test_the_base_sheet_no_longer_carries_the_unused_landing_and_auth_rules(self) -> None:
+        css = text(ROOT / "public" / "css" / "grindflow.css")
+        for family in self.FAMILIES:
+            with self.subTest(family=family):
+                self.assertNotIn(family, css)
+
+    def test_no_view_brings_the_removed_classes_back(self) -> None:
+        for view in VIEWS.rglob("*.blade.php"):
+            html = text(view)
+            for family in self.FAMILIES:
+                with self.subTest(view=str(view.relative_to(ROOT)), family=family):
+                    self.assertNotIn(family, html)
+
+    def test_the_rules_the_workspace_still_depends_on_survive_and_braces_balance(self) -> None:
+        css = text(ROOT / "public" / "css" / "grindflow.css")
+        for live in (".gf-kicker", ".gf-navitem", ".gf-sidebar", ".gf-metric", ".gf-form", ".gf-input", ".gf-brand"):
+            with self.subTest(selector=live):
+                self.assertIn(live, css)
+        self.assertEqual(css.count("{"), css.count("}"))
+
+
 if __name__ == "__main__":
     unittest.main()
