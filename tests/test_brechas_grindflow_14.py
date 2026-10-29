@@ -280,6 +280,10 @@ class BrechasGrindflow14Tests(unittest.TestCase):
                          "2030-01-01T00:00:00Z",
                          "2030-01-01T00:00:00Z"), UNKNOWN)
         self.assertEqual(validity_state(None, None, "not-a-timestamp"), UNKNOWN)
+        self.assertEqual(validity_state(None, None,
+                         "2030-01-01T00:00:00+00:00"), UNKNOWN)
+        self.assertEqual(asset_relationship(("tenant-a", "asset-a", "blob-a"),
+                         [("tenant-a", "c"), ("tenant-a", "c")], []), UNKNOWN)
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: lectura local de fuentes y fixtures sin red ni secretos."""
