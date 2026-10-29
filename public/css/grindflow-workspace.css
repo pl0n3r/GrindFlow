@@ -78,3 +78,14 @@ h1, .gf-page-title { font-family: "Archivo GF", "Arial Narrow", Arial, sans-seri
 .gf-upload-picker__label { background: var(--gf-bg); border-color: #6b7487; }
 .gf-upload-picker__label:hover { background: #ffffff; border-color: #10131a; }
 .gf-upload-picker__icon { background: var(--gf-bg); }
+
+/* Resumen con impacto: números a gran escala, cada métrica con el color de su etapa y la etiqueta bajo el título. */
+.gf-pagehead > div { display: flex; flex-direction: column; align-items: flex-start; }
+.gf-pagehead h1 { order: 1; font-size: clamp(3rem, 8vw, 6.5rem); }
+.gf-pagehead p { order: 2; }
+.gf-pagehead .gf-kicker { order: 3; margin-top: 16px; }
+.gf-metric { --stage: var(--gf-text); border-top: 6px solid var(--stage); }
+.gf-metric[data-dashboard-metric="organizations"] { --stage: #5b3cc4; }
+.gf-metric[data-dashboard-metric="ready-media"] { --stage: #c8105a; }
+.gf-metric[data-dashboard-metric="scheduled-publications"] { --stage: #f2a900; }
+.gf-metric__value { font-family: "Archivo GF", "Arial Narrow", Arial, sans-serif; font-stretch: 68%; font-weight: 800; font-size: clamp(3.4rem, 7vw, 5.5rem); line-height: .9; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
