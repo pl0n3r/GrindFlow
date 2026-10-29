@@ -298,13 +298,43 @@ class WorkspaceShellParrillaTests(unittest.TestCase):
         self.assertIn(".gf-upload-picker__label { background: var(--gf-bg);", css)
 
     def test_shell_text_colors_meet_wcag_aa_on_their_surfaces(self) -> None:
-        for foreground, background in (("#10131a", "#ffffff"), ("#4b5565", "#ffffff"), ("#4b5565", "#eef1f6"),
-                                       ("#ffffff", "#10131a"), ("#ffffff", "#c8105a"), ("#0b5a34", "#e2f4ea"),
-                                       ("#7a1020", "#fde8eb"), ("#00766a", "#ffffff"), ("#eef1f6", "#10131a")):
-            with self.subTest(pair=f"{foreground} sobre {background}"):
-                self.assertGreaterEqual(contrast(foreground, background), 4.5)
-                self.assertIn(foreground, text(WORKSPACE_CSS) + "#10131a#4b5565#ffffff#eef1f6#00766a")
-
+        css = text(WORKSPACE_CSS)
+        tokens = dict(re.findall(r"(--gf-[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;", css))
+        rules = re.findall(r"(?m)^\s*([^{\n]+)\{([^{}]*)\}", css)
+        selectors = (
+            ".gf-navitem:hover", ".gf-navitem--active", ".gf-diagnostic__code",
+            ".gf-button--primary", ".gf-button--ghost", ".gf-kicker",
+            ".gf-badge", ".gf-avatar", ".gf-state--ok", ".gf-state--error",
+            ".gf-state--neutral", ".gf-notice--success",
+            ".gf-upload-alert--danger", ".gf-sidebar .gf-brand__mark",
+        )
+        for selector in selectors:
+            with self.subTest(selector=selector):
+                candidates = [
+                    body for names, body in rules
+                    if selector in [name.strip() for name in names.split(",")]
+                    and "color:" in body and "background:" in body
+                ]
+                self.assertEqual(len(candidates), 1, "Regla CSS ausente o ambigua")
+                properties = dict(re.findall(
+                    r"(?:^|;)\s*(color|background)\s*:\s*(var\(--gf-[\w-]+\)|#[0-9a-fA-F]{6})\s*;",
+                    candidates[0],
+                ))
+                self.assertIn("color", properties)
+                self.assertIn("background", properties)
+                def actual_color(name: str) -> str:
+                    value = properties[name]
+                    if value.startswith("var("):
+                        token = value[4:-1]
+                        self.assertIn(token, tokens)
+                        return tokens[token]
+                    return value
+                foreground = actual_color("color")
+                background = actual_color("background")
+                self.assertGreaterEqual(
+                    contrast(foreground, background), 4.5,
+                    f"{selector}: {foreground} sobre {background}, WCAG AA",
+                )
 
 if __name__ == "__main__":
     unittest.main()
