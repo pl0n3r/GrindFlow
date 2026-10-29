@@ -45,7 +45,10 @@ require 'symfony/src/Infrastructure/Runtime/RuntimeReadiness.php';
 require 'symfony/src/Scheduling/WeeklySlotCalculator.php';
 require 'symfony/src/Scheduling/ScheduleDraftApplicationService.php';
 require 'symfony/src/Library/AssetLifecycle.php';
+require 'symfony/src/Identity/Application/MembershipContext.php';
 $readiness = new GrindFlow\Infrastructure\Runtime\RuntimeReadiness();
+$membershipReflection = new ReflectionClass(GrindFlow\Identity\Application\MembershipContext::class);
+$membership = $membershipReflection->newInstanceWithoutConstructor();
 $extensions = ['ctype','iconv','PDO','pdo_mysql'];
 $calculator = new GrindFlow\Scheduling\WeeklySlotCalculator();
 $rule = ['timezone'=>'UTC','weekdays'=>'thu,fri','local_time'=>'11:00',
@@ -66,6 +69,12 @@ echo json_encode([
     $readiness->supports(80300,['ctype','iconv','PDO'])
   ],
   'public'=>$readiness->publicSummary(),
+  'expected_compatible'=>$readiness->supports(PHP_VERSION_ID,get_loaded_extensions()),
+  'membership_permissions'=>[
+    $membership->permissions('admin'),
+    $membership->permissions('model'),
+    $membership->permissions('unknown'),
+  ],
   'slots'=>$calculator->upcoming($rule,$clock),
   'invalid_slots'=>$calculator->upcoming($invalidRule,$clock),
   'empty_slots'=>$calculator->upcoming($emptyRule,$clock),
@@ -87,6 +96,7 @@ echo json_encode([
 
 
 def php_probe() -> dict:
+    """Execute real PHP contracts in a disposable offline process."""
     binary = shutil.which("php")
     if binary is None:
         raise AssertionError("UNKNOWN: PHP required for actual product probe")
@@ -100,7 +110,10 @@ def php_probe() -> dict:
         )
     if result.returncode or result.stderr.strip():
         raise AssertionError("UNKNOWN: PHP product probe failed: " + result.stderr[-1200:])
-    value = json.loads(result.stdout)
+    try:
+        value = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError("UNKNOWN: invalid product output: " + result.stdout[:1200]) from exc
     if not isinstance(value, dict):
         raise AssertionError("UNKNOWN: invalid product output")
     return value
@@ -126,6 +139,7 @@ def workflow_probe() -> str:
 class CoberturaGrindflow04Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        """Run probes once, failing closed when tools or evidence are missing."""
         cls.actual = php_probe()
         cls.actions = workflow_probe()
 
@@ -144,6 +158,7 @@ class CoberturaGrindflow04Tests(unittest.TestCase):
             "SPEC:044": self.actual["supported"] == [True, True, False, False, False]
                 and self.actual["public"]["contract"] == "symfony-mariadb-v1"
                 and isinstance(self.actual["public"]["compatible"], bool)
+                and self.actual["public"]["compatible"] == self.actual["expected_compatible"]
                 and set(self.actual["public"]) == {"compatible", "contract"},
             "SPEC:046": self.actual["validity"] == [
                 "not_yet_valid", "valid", "expired", "valid",
@@ -169,6 +184,13 @@ class CoberturaGrindflow04Tests(unittest.TestCase):
         self.assertEqual(self.actual["validity"][0], "not_yet_valid")
         self.assertEqual(self.actual["validity"][2], "expired")
         self.assertNotIn("script", json.dumps(self.actual["public"]).lower())
+        # MembershipContext is the real role capability boundary; this offline
+        # probe exercises policy, not tenant DB membership or revocation state.
+        permissions = self.actual["membership_permissions"]
+        self.assertTrue(permissions[0]["distribution_authorize"])
+        self.assertFalse(permissions[1]["distribution_authorize"])
+        self.assertFalse(permissions[1]["organization_manage"])
+        self.assertFalse(any(permissions[2].values()))
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: disposable local process, synthetic instants, no client data."""
