@@ -36,10 +36,9 @@ Archivo variable (ejes de ancho y peso), subconjunto latino, servido desde `publ
 
 ## Cómo lo hereda Symfony/React
 
-El home Twig y el panel React importan los tokens `--gp-*` y los colores por etapa, reutilizan la gramática de la parrilla (filas por etapa, bloques con estado en texto) y no vuelven a decidir color, tipografía ni reglas de estado. El login (`resources/views/auth/login.blade.php`) ya usa el sistema: banda de portada en el color de Biblioteca con las cuatro etapas y el formulario sobre papel. El shell autenticado del workspace en Blade sigue con su estilo actual hasta una entrega aparte.
+El home Twig y el panel React importan los tokens `--gp-*` y los colores por etapa, reutilizan la gramática de la parrilla (filas por etapa, bloques con estado en texto) y no vuelven a decidir color, tipografía ni reglas de estado. El login (`resources/views/auth/login.blade.php`) ya usa el sistema: banda de portada en el color de Biblioteca con las cuatro etapas y el formulario sobre papel. El shell autenticado del workspace (`public/css/grindflow-workspace.css`, cargado tras `grindflow.css`) remapea los tokens `--gf-*` al sistema claro de la parrilla: papel con borde fino, navegación activa en tinta y estados con lavado, borde y palabra.
 
 ## Pendiente
 
-- Rehacer el shell autenticado del workspace con el mismo sistema.
 - Revisión final de Impeccable y su PRODUCT.md/DESIGN.md.
 - Revisión con lector de pantalla.

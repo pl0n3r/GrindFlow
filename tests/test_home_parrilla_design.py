@@ -19,6 +19,8 @@ FONT = ROOT / "public" / "fonts" / "archivo-latin-standard-normal.woff2"
 LICENSE = ROOT / "public" / "fonts" / "LICENSE-OFL-archivo.txt"
 DOC = ROOT / "docs" / "DISENO-PARRILLA.md"
 LOGIN = ROOT / "resources" / "views" / "auth" / "login.blade.php"
+WORKSPACE_CSS = ROOT / "public" / "css" / "grindflow-workspace.css"
+VIEWS = ROOT / "resources" / "views"
 
 # Archivo 5.3.0 tal cual del paquete npm @fontsource-variable/archivo.
 FONT_SHA256 = "e3a28eade21a900c7155a247757f4b2834c07bb7ef07ad7efa55cebaac1e8f5e"
@@ -262,6 +264,35 @@ class LoginParrillaDesignTests(unittest.TestCase):
             color for rule in mutated_rules
             for color in re.findall(r"(?:^|;)\s*color\s*:\s*var\(--(gp-[\w-]+)\)\s*;", rule)
         ], "La prueba debe detectar la ausencia del color de texto")
+
+
+class WorkspaceShellParrillaTests(unittest.TestCase):
+    def test_every_workspace_view_loads_the_parrilla_shell_after_the_base_css(self) -> None:
+        views = [v for v in VIEWS.rglob("*.blade.php") if "css/grindflow.css" in text(v) and v.name not in ("welcome.blade.php", "login.blade.php")]
+        self.assertGreaterEqual(len(views), 9)
+        for view in views:
+            with self.subTest(view=str(view.relative_to(ROOT))):
+                html = text(view)
+                self.assertLess(html.index("css/grindflow.css"), html.index("css/grindflow-parrilla.css"))
+                self.assertLess(html.index("css/grindflow-parrilla.css"), html.index("css/grindflow-workspace.css"))
+
+    def test_shell_css_is_light_flat_and_free_of_third_party_resources(self) -> None:
+        css = text(WORKSPACE_CSS)
+        self.assertIn("color-scheme: light;", css)
+        self.assertNotIn("!important", css)
+        self.assertNotIn("http", css)
+        self.assertNotIn("@import", css)
+        self.assertNotRegex(css, r"box-shadow:\s*\d")
+        self.assertNotRegex(css, r"transition:\s*all\b")
+        self.assertIn("--gf-shadow: none;", css)
+
+    def test_shell_text_colors_meet_wcag_aa_on_their_surfaces(self) -> None:
+        for foreground, background in (("#10131a", "#ffffff"), ("#4b5565", "#ffffff"), ("#4b5565", "#eef1f6"),
+                                       ("#ffffff", "#10131a"), ("#ffffff", "#c8105a"), ("#0b5a34", "#e2f4ea"),
+                                       ("#7a1020", "#fde8eb"), ("#00766a", "#ffffff"), ("#eef1f6", "#10131a")):
+            with self.subTest(pair=f"{foreground} sobre {background}"):
+                self.assertGreaterEqual(contrast(foreground, background), 4.5)
+                self.assertIn(foreground, text(WORKSPACE_CSS) + "#10131a#4b5565#ffffff#eef1f6#00766a")
 
 
 if __name__ == "__main__":

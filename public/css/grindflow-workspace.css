@@ -1,0 +1,74 @@
+/* GrindFlow · workspace autenticado en la parrilla de programación (docs/DISENO-PARRILLA.md).
+   Se carga después de grindflow.css: remapea sus tokens --gf-* al sistema claro de la parrilla y restyla el shell.
+   Los tokens de color por etapa vienen de grindflow-parrilla.css; aquí se repiten solo los usados por el shell. */
+:root {
+  color-scheme: light;
+  --gf-bg: #eef1f6;
+  --gf-bg-soft: #e5e9f0;
+  --gf-panel: #ffffff;
+  --gf-panel-strong: #ffffff;
+  --gf-line: #d5dae3;
+  --gf-line-strong: #b4bccb;
+  --gf-text: #10131a;
+  --gf-muted: #4b5565;
+  --gf-cyan: #00766a;
+  --gf-violet: #5b3cc4;
+  --gf-pink: #c8105a;
+  --gf-success: #0f7a47;
+  --gf-danger: #b3203a;
+  --gf-warning: #7a5200;
+  --gf-radius: 18px;
+  --gf-radius-sm: 10px;
+  --gf-shadow: none;
+}
+html { background: var(--gf-bg); }
+body { background: var(--gf-bg); font-family: "Archivo GF", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.gf-grid { display: none; }
+h1, .gf-page-title { font-family: "Archivo GF", "Arial Narrow", Arial, sans-serif; font-stretch: 68%; font-weight: 800; text-transform: uppercase; letter-spacing: -.01em; line-height: .95; }
+.gf-sidebar { background: #ffffff; backdrop-filter: none; border-right: 1px solid var(--gf-line); }
+.gf-sidebar__label { color: var(--gf-muted); }
+.gf-navitem { border-radius: 10px; color: var(--gf-muted); transition: background-color 120ms ease-out, color 120ms ease-out; }
+.gf-navitem:hover { color: var(--gf-text); background: var(--gf-bg); }
+.gf-navitem--active, .gf-navitem--active:hover { color: #ffffff; background: #10131a; border-color: #10131a; }
+.gf-navitem:active { transform: scale(.98); }
+.gf-topbar { background: rgba(238, 241, 246, .92); backdrop-filter: none; border-bottom: 1px solid var(--gf-line); }
+:focus-visible { outline: 3px solid #10131a; outline-offset: 2px; }
+
+/* Superficies: papel con borde fino, sin degradados ni sombras. */
+.gf-card, .gf-panel, .gf-metric { background: #ffffff; border-color: var(--gf-line); box-shadow: none; backdrop-filter: none; }
+.gf-diagnostic__code { background: #10131a; color: #eef1f6; }
+.gf-calendar__day { background: #ffffff; border-color: var(--gf-line); }
+.gf-chart__bar { background: var(--gf-cyan); }
+.gf-button--primary { color: #ffffff; background: #10131a; box-shadow: none; border-color: #10131a; }
+.gf-button--ghost { background: #ffffff; border-color: #6b7487; color: var(--gf-text); }
+.gf-button--ghost:hover { background: var(--gf-bg); border-color: #10131a; }
+.gf-button { transition: transform 120ms ease-out, background-color 120ms ease-out; }
+.gf-button:active { transform: scale(.97); }
+.gf-gradient-text { color: var(--gf-pink); background: none; -webkit-background-clip: border-box; background-clip: border-box; }
+@media (max-width: 900px) { .gf-sidebar { background: #ffffff; border-color: var(--gf-line); } }
+
+/* Etiquetas, avatar y distintivos: texto en tinta sobre lavado de etapa, el estado siempre lleva su palabra. */
+.gf-kicker { color: #10131a; background: #ffffff; border: 1px solid var(--gf-line-strong); }
+.gf-kicker__dot { background: var(--gf-cyan); color: var(--gf-cyan); box-shadow: none; }
+.gf-badge { color: #0b5a34; background: #e2f4ea; border: 1px solid #7fbf9c; }
+.gf-avatar { color: #ffffff; background: #10131a; border-color: #10131a; }
+
+/* Texto claro heredado del tema oscuro: se pasa a tinta, con estados en lavado + borde + palabra. */
+.gf-field label, .gf-table td, summary, label { color: var(--gf-text); }
+.gf-calendar__day span, .gf-calendar__day small, .gf-chart__column { color: var(--gf-muted); }
+.gf-chart__value { color: var(--gf-text); }
+.gf-state--ok { color: #0b5a34; background: #e2f4ea; border-color: #7fbf9c; }
+.gf-state--error, .gf-alert { color: #7a1020; background: #fde8eb; border-color: #c8105a; }
+.gf-state--neutral { color: var(--gf-text); background: var(--gf-bg); border-color: var(--gf-line-strong); }
+.gf-notice--success, .gf-upload-alert--success { color: #0b5a34; background: #e2f4ea; border-color: #7fbf9c; }
+.gf-upload-alert--danger, .gf-upload-rejections, .gf-upload-rejections span, .gf-incident code { color: #7a1020; }
+.gf-upload-alert--danger { background: #fde8eb; }
+.gf-upload-preview__remove { color: #7a1020; }
+.gf-diagnostic__code, .gf-diagnostic__code * { color: #eef1f6; }
+.gf-table th, th { color: var(--gf-muted); }
+.gf-org__id { color: var(--gf-muted); }
+.gf-release-footer, .gf-release-footer--workspace { color: var(--gf-muted); }
+.gf-hash { color: var(--gf-text); }
+.gf-upload__icon, .gf-empty__icon { color: var(--gf-cyan); }
+.gf-sidebar .gf-brand__mark, .gf-topbar .gf-brand__mark { color: #ffffff; background: var(--gf-pink); border-color: var(--gf-pink); box-shadow: none; }
+.gf-upload__icon { color: var(--gf-text); }
