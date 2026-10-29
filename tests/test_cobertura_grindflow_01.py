@@ -280,8 +280,7 @@ class CoberturaGrindflow01Tests(unittest.TestCase):
         self.assertNotIn("https://", PHP_PRODUCT_PROBE)
         self.assertNotIn("curl_", PHP_PRODUCT_PROBE)
         self.assertEqual(set(SUBCONTROLS) - set(REAL_WORLD_GAPS), set())
-        self.assertIsNone(integral_coverage("REQ:GF-FR-001") == "CUBIERTO"
-                          or None)
+        self.assertEqual(integral_coverage("REQ:GF-FR-001"), UNKNOWN)
 
     def test_ci_gate_contract(self) -> None:
         """AC-04: verify CI wiring, NOT pretend exact-SHA GitHub was green."""
