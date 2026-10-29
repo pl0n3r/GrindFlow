@@ -286,6 +286,11 @@ class WorkspaceShellParrillaTests(unittest.TestCase):
         self.assertNotRegex(css, r"transition:\s*all\b")
         self.assertIn("--gf-shadow: none;", css)
 
+    def test_guest_upload_card_is_light_so_its_ink_text_keeps_contrast(self) -> None:
+        css = text(WORKSPACE_CSS)
+        self.assertIn(".gf-guest-upload__card { background: #ffffff;", css)
+        self.assertIn(".gf-upload-picker__label { background: var(--gf-bg);", css)
+
     def test_shell_text_colors_meet_wcag_aa_on_their_surfaces(self) -> None:
         for foreground, background in (("#10131a", "#ffffff"), ("#4b5565", "#ffffff"), ("#4b5565", "#eef1f6"),
                                        ("#ffffff", "#10131a"), ("#ffffff", "#c8105a"), ("#0b5a34", "#e2f4ea"),

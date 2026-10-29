@@ -72,3 +72,9 @@ h1, .gf-page-title { font-family: "Archivo GF", "Arial Narrow", Arial, sans-seri
 .gf-upload__icon, .gf-empty__icon { color: var(--gf-cyan); }
 .gf-sidebar .gf-brand__mark, .gf-topbar .gf-brand__mark { color: #ffffff; background: var(--gf-pink); border-color: var(--gf-pink); box-shadow: none; }
 .gf-upload__icon { color: var(--gf-text); }
+
+/* Carga de invitados: la tarjeta también pasa a papel, así el texto en tinta conserva contraste. */
+.gf-guest-upload__card { background: #ffffff; box-shadow: none; }
+.gf-upload-picker__label { background: var(--gf-bg); border-color: #6b7487; }
+.gf-upload-picker__label:hover { background: #ffffff; border-color: #10131a; }
+.gf-upload-picker__icon { background: var(--gf-bg); }
