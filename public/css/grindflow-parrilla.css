@@ -194,3 +194,28 @@ body.gp-page { margin: 0; min-height: 100vh; color: var(--gp-ink); background: v
 @media (max-width: 959px) {
   .gp-hero .gp-img--hero { margin-top: 32px; max-width: 420px; }
 }
+
+/* Impacto: titular a gran escala, cinta de etapas y entrada de las franjas al hacer scroll (CSS puro). */
+.gp-hero h1 { font-size: clamp(56px, 12.5vw, 150px); line-height: .84; letter-spacing: -.015em; }
+@media (min-width: 960px) { .gp-hero h1 { font-size: clamp(64px, 8.4vw, 118px); } }
+.gp-ticker { position: relative; z-index: 2; overflow: hidden; background: var(--gp-ink); color: #ffffff; border-block: 2px solid var(--gp-ink); }
+.gp-ticker__track { display: inline-flex; width: max-content; padding-block: 14px; font: 800 clamp(18px, 2.4vw, 30px)/1 var(--gp-display); font-stretch: 68%; letter-spacing: .06em; text-transform: uppercase; }
+.gp-ticker__track span { display: inline-flex; align-items: center; padding-inline: 1.1em; }
+.gp-ticker__track span::before { content: ""; width: .5em; height: .5em; margin-right: .7em; border-radius: 50%; background: var(--row); }
+.gp-band__n { font-size: clamp(56px, 7vw, 96px); }
+@media (prefers-reduced-motion: no-preference) {
+  .gp-ticker__track { animation: gp-ticker 34s linear infinite; }
+  @keyframes gp-ticker { to { transform: translateX(-50%); } }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .gp-band, .gp-aud article, .gp-head { animation: gp-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
+    @keyframes gp-rise { from { opacity: .35; transform: translateY(28px); } }
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .gp-band { transition: transform .25s cubic-bezier(.22, 1, .36, 1); }
+  .gp-band:hover { transform: translateX(8px); }
+}
+.gp-hero { padding-bottom: 72px; }
+.gp-ticker + .gp-board-section { margin-top: 40px; }

@@ -46,6 +46,14 @@
         </div>
     </section>
 
+    <div class="gp-ticker" aria-hidden="true">
+        <div class="gp-ticker__track">
+            @for ($pass = 0; $pass < 2; $pass++)
+                <span class="gp-row--lib">Biblioteca</span><span class="gp-row--rules">Reglas</span><span class="gp-row--dist">Distribución</span><span class="gp-row--traf">Tráfico</span>
+            @endfor
+        </div>
+    </div>
+
         <section class="gp-board-section" aria-label="Vista conceptual del flujo de contenido de GrindFlow">
             <div class="gp-wrap">
                 <div class="gp-board">
