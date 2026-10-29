@@ -51,7 +51,7 @@ body.gp-page { margin: 0; min-height: 100vh; color: var(--gp-ink); background: v
 /* Portada: el color de la etapa «Biblioteca» ocupa toda la banda */
 .gp-hero { background: var(--gp-lib); color: #ffffff; padding-bottom: 120px; }
 .gp-hero h1 { margin: 56px 0 28px; font-size: clamp(52px, 10.5vw, 96px); line-height: .9; }
-.gp-hero h1 span { display: block; }
+.gp-hero h1 span { display: block; overflow-wrap: anywhere; }
 .gp-lead { max-width: 34em; font-size: clamp(18px, 1.6vw, 21px); }
 .gp-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .gp-btn { display: inline-flex; align-items: center; justify-content: center; gap: .6em; min-height: 48px; padding: 14px 24px; border: 2px solid transparent; border-radius: 999px; font: 700 16px/1 var(--gp-body); text-decoration: none; }
@@ -97,7 +97,7 @@ body.gp-page { margin: 0; min-height: 100vh; color: var(--gp-ink); background: v
   .gp-row--dist .gp-block { animation-delay: 1.2s; }
   .gp-row--traf .gp-block { animation-delay: 1.55s; }
 }
-@keyframes gp-fill { from { opacity: 0; transform: scaleX(.2); } }
+@keyframes gp-fill { from { opacity: 1; transform: scaleX(.96); } }
 
 /* Secciones */
 .gp-section { padding-block: 96px 0; }

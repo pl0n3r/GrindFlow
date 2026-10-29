@@ -47,6 +47,7 @@ class HomeParrillaDesignTests(unittest.TestCase):
             ("gp-ink", "gp-ground"), ("gp-ink-2", "gp-ground"), ("gp-ink-2", "gp-paper"),
             ("gp-paper", "gp-lib"), ("gp-paper", "gp-rules"), ("gp-ink", "gp-dist"),
             ("gp-paper", "gp-traf"), ("gp-paper", "gp-ink"), ("gp-ink", "gp-paper"),
+            ("gp-line", "gp-ink"),
         ]
         for foreground, background in pairs:
             with self.subTest(pair=f"{foreground} sobre {background}"):
@@ -75,6 +76,7 @@ class HomeParrillaDesignTests(unittest.TestCase):
             with self.subTest(phrase=forbidden):
                 self.assertNotIn(forbidden, lowered)
         self.assertEqual(html.count("<h1"), 1)
+        self.assertLess(html.index('<main id="contenido">'), html.index('<section class="gp-hero"'))
         self.assertNotIn("gf-landing__eyebrow", html)
 
     def test_motion_is_css_only_starts_visible_and_respects_reduced_motion(self) -> None:
@@ -84,16 +86,22 @@ class HomeParrillaDesignTests(unittest.TestCase):
         animation = css[css.index("@keyframes gp-fill"):]
         self.assertIn("backwards", css)
         self.assertNotIn("forwards", css)
-        self.assertEqual(css.count("opacity: 0;"), 1, "Solo el fotograma inicial de la animación parte de opacidad 0")
-        self.assertIn("from { opacity: 0; transform: scaleX(.2); }", animation)
+        self.assertNotIn("opacity: 0;", css, "Los bloques deben ser visibles durante el retardo")
+        self.assertIn("from { opacity: 1; transform: scaleX(.96); }", animation)
+        media_start = css.index("@media (prefers-reduced-motion: no-preference)", css.index("/* La parrilla:"))
+        media_end = css.index("}\n@keyframes gp-fill", media_start)
+        animation_rules = list(re.finditer(r"\banimation\s*:", css))
+        self.assertEqual(len(animation_rules), 1)
+        self.assertTrue(all(media_start < rule.start() < media_end for rule in animation_rules))
         self.assertNotRegex(css, r"transition:\s*all\b")
+        self.assertIn("overflow-wrap: anywhere;", css)
 
     def test_css_has_no_hard_shadows_important_or_third_party_resources(self) -> None:
         css = text(CSS)
         self.assertNotIn("!important", css)
         self.assertIsNone(re.search(r"box-shadow:\s*\d+px\s+\d+px\s+0\b", css))
-        self.assertNotIn("http://", css)
-        self.assertEqual(set(re.findall(r"url\(\"([^\"]+)\"\)", css)), {"../fonts/archivo-latin-standard-normal.woff2"})
+        self.assertNotRegex(css, r"https?://")
+        self.assertEqual(re.findall(r"url\(\s*[\"']?([^\"')\s]+)", css), ["../fonts/archivo-latin-standard-normal.woff2"])
         for forbidden in ("googleapis", "gstatic", "@import"):
             self.assertNotIn(forbidden, css)
 

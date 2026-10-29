@@ -34,7 +34,7 @@ class VisualShellTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('css/grindflow-parrilla.css?v='.config('version.number'))
+            ->assertSee('<link rel="stylesheet" href="'.asset('css/grindflow-parrilla.css').'?v='.config('version.number').'">', false)
             ->assertSee('Parrilla de ejemplo')
             ->assertSee('Son datos ilustrativos, no de una cuenta real.')
             ->assertSee('Programado 09:00')

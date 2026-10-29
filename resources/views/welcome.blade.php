@@ -12,7 +12,8 @@
 <body class="gp-page">
     <a class="gf-skip-link" href="#contenido">Saltar al contenido</a>
 
-    <section class="gp-hero" aria-labelledby="gf-hero-title">
+    <main id="contenido">
+        <section class="gp-hero" aria-labelledby="gf-hero-title">
         <div class="gp-wrap">
             <header class="gp-header">
                 <x-brand />
@@ -41,7 +42,6 @@
         </div>
     </section>
 
-    <main id="contenido">
         <section class="gp-board-section" aria-label="Vista conceptual del flujo de contenido de GrindFlow">
             <div class="gp-wrap">
                 <div class="gp-board">
