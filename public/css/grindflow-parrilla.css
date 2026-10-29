@@ -147,8 +147,11 @@ body.gp-page { margin: 0; min-height: 100vh; color: var(--gp-ink); background: v
 .gp-login__statement h1 { font-size: clamp(44px, 9vw, 84px); line-height: .9; }
 .gp-login__statement h1 span { display: block; }
 .gp-login__statement p { max-width: 38ch; margin-top: 20px; font-size: 17px; }
-.gp-login__stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 28px 0 0; padding: 0; list-style: none; }
-.gp-login__stages li { padding: 10px 8px; border-radius: var(--gp-radius-in); font: 700 13px/1.1 var(--gp-body); }
+.gp-login__stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 28px 0 0; padding: 0; list-style: none; }
+@media (max-width: 599px) {
+  .gp-login__stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.gp-login__stages li { min-width: 0; overflow-wrap: anywhere; padding: 10px 8px; border-radius: var(--gp-radius-in); font: 700 13px/1.1 var(--gp-body); }
 .gp-login__stages .gp-row--lib { background: var(--gp-ink); color: #ffffff; }
 .gp-login__stages .gp-row--rules { background: var(--gp-rules); color: #ffffff; }
 .gp-login__stages .gp-row--dist { background: var(--gp-dist); color: var(--gp-ink); }
