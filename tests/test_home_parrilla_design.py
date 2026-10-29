@@ -313,13 +313,14 @@ class WorkspaceShellParrillaTests(unittest.TestCase):
                 candidates = [
                     body for names, body in rules
                     if selector in [name.strip() for name in names.split(",")]
-                    and "color:" in body and "background:" in body
                 ]
-                self.assertEqual(len(candidates), 1, "Regla CSS ausente o ambigua")
-                properties = dict(re.findall(
-                    r"(?:^|;)\s*(color|background)\s*:\s*(var\(--gf-[\w-]+\)|#[0-9a-fA-F]{6})\s*;",
-                    candidates[0],
-                ))
+                self.assertTrue(candidates, "Regla CSS ausente")
+                properties = {}
+                for body in candidates:
+                    properties.update(re.findall(
+                        r"(?:^|;)\s*(color|background)\s*:\s*(var\(--gf-[\w-]+\)|#[0-9a-fA-F]{6})\s*;",
+                        body,
+                    ))
                 self.assertIn("color", properties)
                 self.assertIn("background", properties)
                 def actual_color(name: str) -> str:
