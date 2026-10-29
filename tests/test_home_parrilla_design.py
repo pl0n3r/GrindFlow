@@ -247,11 +247,13 @@ class LoginParrillaDesignTests(unittest.TestCase):
         self.assertGreaterEqual(contrast(border.group(1), t[backgrounds[0]]), 3.0,
                                 "Borde de campo, WCAG 1.4.11")
         # Mutación deliberada: un background-color no puede suplantar color.
+        # Mutar la regla del input, no el body.gp-page que usa los mismos tokens.
         mutated = css.replace(
-            "color: var(--gp-ink); background: var(--gp-ground);",
-            "background-color: var(--gp-ink); background: var(--gp-ground);",
+            ".gp-login__card .gf-input { color: var(--gp-ink); background: var(--gp-ground);",
+            ".gp-login__card .gf-input { background-color: var(--gp-ink); background: var(--gp-ground);",
             1,
         )
+        self.assertNotEqual(mutated, css, "La mutación debe alcanzar el input real")
         mutated_rules = re.findall(
             r"\.gp-login__card\s+\.gf-input\s*\{([^}]*)\}", mutated,
             flags=re.DOTALL,
