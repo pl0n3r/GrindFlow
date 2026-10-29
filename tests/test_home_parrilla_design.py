@@ -337,5 +337,24 @@ class WorkspaceShellParrillaTests(unittest.TestCase):
                     f"{selector}: {foreground} sobre {background}, WCAG AA",
                 )
 
+class HomeImageSlotsTests(unittest.TestCase):
+    def test_home_reserves_labeled_image_slots_that_are_decorative_for_screen_readers(self) -> None:
+        html = text(BLADE)
+        slots = re.findall(r'<figure class="gp-img [^"]*">(.*?)</figure>', html, flags=re.DOTALL)
+        self.assertEqual(len(slots), 3)
+        for slot in slots:
+            with self.subTest(slot=slot.strip()[:40]):
+                self.assertIn('aria-hidden="true"', slot)
+                self.assertRegex(slot, r"Espacio para imagen · \d:\d · ")
+        self.assertNotIn("<img", html)
+
+    def test_slots_keep_a_fixed_ratio_so_real_images_cause_no_layout_shift(self) -> None:
+        css = text(CSS)
+        self.assertIn("aspect-ratio: var(--gp-img-ratio", css)
+        for ratio in ("4 / 5", "4 / 3"):
+            with self.subTest(ratio=ratio):
+                self.assertIn(f"--gp-img-ratio: {ratio};", css)
+
+
 if __name__ == "__main__":
     unittest.main()
