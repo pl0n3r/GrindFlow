@@ -16,6 +16,9 @@ import sys
 import unittest
 from pathlib import Path
 
+from scripts import ci_retry
+from workers.config import Config, ConfigError
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "docs/matriz-cobertura.md"
 CI = ROOT / ".github/workflows/grindflow-ci.yml"
@@ -253,7 +256,6 @@ class CoberturaGrindflow01Tests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, UNKNOWN):
                     extract_rows(value)
 
-        from scripts import ci_retry  # Actual product CI retry implementation
         self.assertTrue(ci_retry.transient(75, ""))
         self.assertTrue(ci_retry.transient(1, "HTTP 503"))
         self.assertFalse(ci_retry.transient(1, "syntax error"))
@@ -269,7 +271,6 @@ class CoberturaGrindflow01Tests(unittest.TestCase):
         """AC-03: only class methods and checked-in safe synthetic strings."""
         import os
         from unittest.mock import patch
-        from workers.config import Config, ConfigError
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ConfigError):
                 Config.from_env()
