@@ -19,6 +19,8 @@ FONT = ROOT / "public" / "fonts" / "archivo-latin-standard-normal.woff2"
 LICENSE = ROOT / "public" / "fonts" / "LICENSE-OFL-archivo.txt"
 DOC = ROOT / "docs" / "DISENO-PARRILLA.md"
 LOGIN = ROOT / "resources" / "views" / "auth" / "login.blade.php"
+WORKSPACE_CSS = ROOT / "public" / "css" / "grindflow-workspace.css"
+VIEWS = ROOT / "resources" / "views"
 
 # Archivo 5.3.0 tal cual del paquete npm @fontsource-variable/archivo.
 FONT_SHA256 = "e3a28eade21a900c7155a247757f4b2834c07bb7ef07ad7efa55cebaac1e8f5e"
@@ -263,6 +265,77 @@ class LoginParrillaDesignTests(unittest.TestCase):
             for color in re.findall(r"(?:^|;)\s*color\s*:\s*var\(--(gp-[\w-]+)\)\s*;", rule)
         ], "La prueba debe detectar la ausencia del color de texto")
 
+
+class WorkspaceShellParrillaTests(unittest.TestCase):
+    def test_every_workspace_view_loads_the_parrilla_shell_after_the_base_css(self) -> None:
+        names = (
+            "admin/diagnostics.blade.php", "admin/system.blade.php",
+            "dashboard.blade.php", "distribution/index.blade.php",
+            "errors/500.blade.php", "finance/index.blade.php",
+            "scheduling/index.blade.php", "traffic/index.blade.php",
+            "vault/guest-upload.blade.php", "vault/index.blade.php",
+        )
+        views = [VIEWS / name for name in names]
+        for view in views:
+            with self.subTest(view=str(view.relative_to(ROOT))):
+                html = text(view)
+                self.assertLess(html.index("css/grindflow.css"), html.index("css/grindflow-parrilla.css"))
+                self.assertLess(html.index("css/grindflow-parrilla.css"), html.index("css/grindflow-workspace.css"))
+
+    def test_shell_css_is_light_flat_and_free_of_third_party_resources(self) -> None:
+        css = text(WORKSPACE_CSS)
+        self.assertIn("color-scheme: light;", css)
+        self.assertNotIn("!important", css)
+        self.assertNotIn("http", css)
+        self.assertNotIn("@import", css)
+        self.assertNotRegex(css, r"box-shadow:\s*\d")
+        self.assertNotRegex(css, r"transition:\s*all\b")
+        self.assertIn("--gf-shadow: none;", css)
+
+    def test_guest_upload_card_is_light_so_its_ink_text_keeps_contrast(self) -> None:
+        css = text(WORKSPACE_CSS)
+        self.assertIn(".gf-guest-upload__card { background: #ffffff;", css)
+        self.assertIn(".gf-upload-picker__label { background: var(--gf-bg);", css)
+
+    def test_shell_text_colors_meet_wcag_aa_on_their_surfaces(self) -> None:
+        css = text(WORKSPACE_CSS)
+        tokens = dict(re.findall(r"(--gf-[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;", css))
+        rules = re.findall(r"(?m)^\s*([^{\n]+)\{([^{}]*)\}", css)
+        selectors = (
+            ".gf-navitem:hover", ".gf-navitem--active", ".gf-diagnostic__code",
+            ".gf-button--primary", ".gf-button--ghost", ".gf-kicker",
+            ".gf-badge", ".gf-avatar", ".gf-state--ok", ".gf-state--error",
+            ".gf-state--neutral", ".gf-notice--success",
+            ".gf-upload-alert--danger", ".gf-sidebar .gf-brand__mark",
+        )
+        for selector in selectors:
+            with self.subTest(selector=selector):
+                candidates = [
+                    body for names, body in rules
+                    if selector in [name.strip() for name in names.split(",")]
+                ]
+                self.assertTrue(candidates, "Regla CSS ausente")
+                properties = {}
+                for body in candidates:
+                    properties.update(re.findall(
+                        r"(?:^|;)\s*(color|background)\s*:\s*(var\(--gf-[\w-]+\)|#[0-9a-fA-F]{6})\s*(?=;)",
+                        body,
+                    ))
+                self.assertIn("color", properties)
+                self.assertIn("background", properties)
+                def actual_color(name: str) -> str:
+                    value = properties[name]
+                    if value.startswith("var("):
+                        token = value[4:-1]
+                        self.assertIn(token, tokens)
+                        return tokens[token]
+                    return value
+                foreground = actual_color("color")
+                background = actual_color("background")
+                self.assertGreaterEqual(
+                    contrast(foreground, background), 4.5,
+                    f"{selector}: {foreground} sobre {background}, WCAG AA",
+                )
 
 if __name__ == "__main__":
     unittest.main()
