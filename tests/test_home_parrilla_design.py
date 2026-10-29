@@ -13,6 +13,7 @@ CSS = ROOT / "public" / "css" / "grindflow-parrilla.css"
 FONT = ROOT / "public" / "fonts" / "archivo-latin-standard-normal.woff2"
 LICENSE = ROOT / "public" / "fonts" / "LICENSE-OFL-archivo.txt"
 DOC = ROOT / "docs" / "DISENO-PARRILLA.md"
+LOGIN = ROOT / "resources" / "views" / "auth" / "login.blade.php"
 
 # Archivo 5.3.0 tal cual del paquete npm @fontsource-variable/archivo.
 FONT_SHA256 = "e3a28eade21a900c7155a247757f4b2834c07bb7ef07ad7efa55cebaac1e8f5e"
@@ -118,6 +119,29 @@ class HomeParrillaDesignTests(unittest.TestCase):
         for token in tokens():
             with self.subTest(token=token):
                 self.assertIn(f"`--{token}`", doc)
+
+
+class LoginParrillaDesignTests(unittest.TestCase):
+    def test_login_uses_the_parrilla_system_and_keeps_its_form_contract(self) -> None:
+        html = text(LOGIN)
+        self.assertIn("css/grindflow-parrilla.css", html)
+        self.assertEqual(html.count("<h1"), 2)
+        for stage in ("Biblioteca", "Reglas", "Distribución", "Tráfico"):
+            with self.subTest(stage=stage):
+                self.assertIn(f">{stage}</li>", html)
+        for field in ('name="email"', 'name="password"', 'name="remember"', "@csrf", "route('login')"):
+            with self.subTest(field=field):
+                self.assertIn(field, html)
+        self.assertNotIn("style=", html)
+        self.assertNotIn("gf-kicker", html)
+
+    def test_login_card_text_and_fields_meet_wcag_aa_on_the_parrilla_colors(self) -> None:
+        t = tokens()
+        for foreground, background in (("gp-ink", "gp-ground"), ("gp-ink-2", "gp-paper"), ("gp-paper", "gp-lib")):
+            with self.subTest(pair=f"{foreground} sobre {background}"):
+                self.assertGreaterEqual(contrast(t[foreground], t[background]), 4.5)
+        border = re.search(r"\.gp-login__card \.gf-input \{[^}]*border: 1px solid (#[0-9a-f]{6})", text(CSS)).group(1)
+        self.assertGreaterEqual(contrast(border, t["gp-ground"]), 3.0, "Borde de campo, WCAG 1.4.11")
 
 
 if __name__ == "__main__":
