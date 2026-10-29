@@ -318,7 +318,7 @@ class WorkspaceShellParrillaTests(unittest.TestCase):
                 properties = {}
                 for body in candidates:
                     properties.update(re.findall(
-                        r"(?:^|;)\s*(color|background)\s*:\s*(var\(--gf-[\w-]+\)|#[0-9a-fA-F]{6})\s*;",
+                        r"(?:^|;)\s*(color|background)\s*:\s*(var\(--gf-[\w-]+\)|#[0-9a-fA-F]{6})\s*(?=;)",
                         body,
                     ))
                 self.assertIn("color", properties)
