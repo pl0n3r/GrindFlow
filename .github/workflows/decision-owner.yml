@@ -37,6 +37,101 @@ jobs:
           sparse-checkout: decisiones.yml
           persist-credentials: false
 
+      - name: Reject unsafe candidate policy before calling the owner gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          #!/usr/bin/env python3
+          """Validate candidate decisions as restricted JSON/YAML before trusted processing."""
+          import json
+          import re
+          import stat
+          from pathlib import Path
+          
+          MAX_BYTES = 256 * 1024
+          DECISION_ID = re.compile(r"D-[0-9]{3,}\Z", re.ASCII)
+          
+          
+          def reject_duplicates(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise ValueError("duplicate policy key")
+                  result[key] = value
+              return result
+          
+          
+          def reject_constant(_):
+              raise ValueError("nonfinite number")
+          
+          
+          def validate(raw):
+              if len(raw) > MAX_BYTES:
+                  raise ValueError("candidate policy too large")
+              data = json.loads(
+                  raw.decode("utf-8"),
+                  object_pairs_hook=reject_duplicates,
+                  parse_constant=reject_constant,
+              )
+              if type(data) is not dict or set(data) != {"version", "review_round_limit", "decisions"}:
+                  raise ValueError("invalid root fields")
+              if type(data["version"]) is not int or data["version"] != 1:
+                  raise ValueError("invalid version")
+              if type(data["review_round_limit"]) is not int or data["review_round_limit"] != 3:
+                  raise ValueError("invalid review limit")
+              decisions = data["decisions"]
+              if type(decisions) is not list or not 1 <= len(decisions) <= 200:
+                  raise ValueError("invalid decisions list")
+              seen = set()
+              for decision in decisions:
+                  if type(decision) is not dict or set(decision) != {"id", "status", "text"}:
+                      raise ValueError("invalid decision fields")
+                  ident, status, content = decision["id"], decision["status"], decision["text"]
+                  if type(ident) is not str or DECISION_ID.fullmatch(ident) is None or ident in seen:
+                      raise ValueError("invalid decision id")
+                  seen.add(ident)
+                  if type(status) is not str or status not in ("active", "superseded"):
+                      raise ValueError("invalid decision status")
+                  if type(content) is not str or not 1 <= len(content.strip()) <= 1000:
+                      raise ValueError("invalid decision text")
+              return data
+          
+          
+          def self_test():
+              good = b'{"version":1,"review_round_limit":3,"decisions":[{"id":"D-100","status":"active","text":"A"}]}'
+              validate(good)
+              attacks = {
+                  "oversized": good + b" " * MAX_BYTES,
+                  "YAML alias": b"version: 1\nreview_round_limit: 3\ndecisions: &d []\ncopy: *d\n",
+                  "YAML tag": b"!python/object/apply:os.system [id]",
+                  "unknown field": good.replace(b'"version":1', b'"unknown":1,"version":1'),
+                  "wrong type": good.replace(b'"version":1', b'"version":true'),
+                  "wrong decision type": good.replace(b'"status":"active"', b'"status":123'),
+                  "duplicate key": good.replace(b'"version":1', b'"version":1,"version":1'),
+              }
+              for label, payload in attacks.items():
+                  try:
+                      validate(payload)
+                  except (ValueError, UnicodeDecodeError):
+                      continue
+                  raise AssertionError(f"candidate input unexpectedly accepted: {label}")
+              print("DECISION_INPUT_TESTS=passed")
+          
+          
+          if __name__ == "__main__":
+              self_test()
+              candidate = Path(".candidate/decisiones.yml")
+              metadata = candidate.lstat()
+              if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_BYTES:
+                  raise SystemExit("DECISION_INPUT=blocked: candidate not regular or too large")
+              try:
+                  validate(candidate.read_bytes())
+              except (ValueError, UnicodeDecodeError) as exc:
+                  raise SystemExit(f"DECISION_INPUT=blocked: invalid candidate policy: {exc}") from exc
+              print("DECISION_INPUT=ok")
+          PY
+
       - name: Enforce owner decisions from trusted code
         env:
           GH_TOKEN: ${{ github.token }}
