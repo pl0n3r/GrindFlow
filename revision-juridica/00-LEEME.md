@@ -1,4 +1,4 @@
-Última actualización automática de las fuentes: 2026-10-24 · SHA-256 de origen: `18df720581e722d88d36f7675a80dd9a1a461eb149a2fd19c0d11860e01afec5`
+Última actualización automática de las fuentes: 2026-10-29 · SHA-256 de origen: `8b3dafa94f20b12ef704020f82a975cfaf94c1b9f5e23acdc75ecc8499d05bef`
 
 # Documentos para revisión jurídica · GrindFlow
 
@@ -6,8 +6,8 @@
 
 ## Procedencia
 
-- Proyecto: `pl0n3r/GrindFlow` · versión declarada: `0.1.219`.
-- Fuentes: `docs/privacidad/`, `datos.yml` y `config/version.php`; huella SHA-256 verificable: `18df720581e722d88d36f7675a80dd9a1a461eb149a2fd19c0d11860e01afec5`. Fecha de generación del contenido: 2026-10-24. La huella se calcula sobre bytes y rutas de origen, no sobre el commit del paquete; permanece válida después de squash.
+- Proyecto: `pl0n3r/GrindFlow` · versión declarada: `0.1.220`.
+- Fuentes: `docs/privacidad/`, `datos.yml` y `config/version.php`; huella SHA-256 verificable: `8b3dafa94f20b12ef704020f82a975cfaf94c1b9f5e23acdc75ecc8499d05bef`. Fecha de generación del contenido: 2026-10-29. La huella se calcula sobre bytes y rutas de origen, no sobre el commit del paquete; permanece válida después de squash.
 - Las copias de los siete documentos son byte-exactas; no se editan en esta carpeta. Las correcciones del abogado deben aplicarse primero a las fuentes.
 
 ## Documentos para el abogado
