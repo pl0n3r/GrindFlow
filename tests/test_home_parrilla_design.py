@@ -359,16 +359,24 @@ class HomeImageSlotsTests(unittest.TestCase):
         self.assertEqual(len(slots), 3)
         for slot in slots:
             with self.subTest(slot=slot.strip()[:40]):
-                self.assertIn('aria-hidden="true"', slot)
+                self.assertIn('<div class="gp-img__frame" aria-hidden="true">', slot)
+                self.assertIn('<figcaption aria-hidden="true">', slot)
                 self.assertRegex(slot, r"Espacio para imagen · \d:\d · ")
         self.assertNotIn("<img", html)
 
     def test_slots_keep_a_fixed_ratio_so_real_images_cause_no_layout_shift(self) -> None:
         css = text(CSS)
         self.assertIn("aspect-ratio: var(--gp-img-ratio", css)
-        for ratio in ("4 / 5", "4 / 3"):
-            with self.subTest(ratio=ratio):
-                self.assertIn(f"--gp-img-ratio: {ratio};", css)
+        expected = {".gp-img--hero": "4 / 5", ".gp-img--card": "4 / 3"}
+        for selector, ratio in expected.items():
+            with self.subTest(selector=selector):
+                rule = re.search(
+                    rf"^{re.escape(selector)}\s*\{{([^}}]*)\}}",
+                    css,
+                    flags=re.MULTILINE,
+                )
+                self.assertIsNotNone(rule)
+                self.assertIn(f"--gp-img-ratio: {ratio};", rule.group(1))
 
 
 if __name__ == "__main__":
