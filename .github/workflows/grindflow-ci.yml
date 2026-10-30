@@ -257,6 +257,8 @@ jobs:
           [[ -f tests/test_media_pilot_readiness_contract.py ]] && python3 -m unittest tests/test_media_pilot_readiness_contract.py
            python3 -m unittest tests/test_media_storage_cors_preflight.py
           python3 -m unittest tests/test_s4_database_url_percent_encoding.py
+          # GF731: execute all four adversarial test cases in fast/validate.
+          python3 -m unittest -v tests/test_brechas_grindflow_05.py
 
       - name: Contrato offline CORS en fast
         shell: bash
