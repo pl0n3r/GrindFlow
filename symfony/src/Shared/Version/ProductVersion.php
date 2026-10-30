@@ -23,4 +23,15 @@ final readonly class ProductVersion
             ? $release['number']
             : 'unavailable';
     }
+
+    public function releaseSha(): ?string
+    {
+        $file = $this->repositoryDir.'/.release-sha';
+        if (!is_file($file) || is_link($file)) {
+            return null;
+        }
+        $sha = trim((string) file_get_contents($file));
+
+        return preg_match('/^[0-9a-f]{40}$/D', $sha) === 1 ? $sha : null;
+    }
 }
