@@ -48,9 +48,24 @@ class CookieConsentTest(unittest.TestCase):
                 self.assertNotRegex(template, r"(?i)<input[^>]+(?:checked|type=['\"]checkbox)")
                 self.assertIn('data-gf-cookie-action="close"', template)
                 self.assertIn('aria-label="Cerrar aviso y rechazar"', template)
-                self.assertRegex(template, r'cookie-consent\.css')
-                self.assertRegex(template, r'cookie-consent\.js')
+                if template is self.twig:
+                    inline_css = re.search(r"<style data-gf-cookie-inline-css>(.*?)</style>", template, re.S)
+                    inline_js = re.search(r"<script data-gf-cookie-inline-js>(.*?)</script>", template, re.S)
+                    self.assertIsNotNone(inline_css)
+                    self.assertIsNotNone(inline_js)
+                    self.assertEqual(inline_css.group(1).strip(), self.css.strip())
+                    self.assertEqual(inline_js.group(1).strip(), self.js.strip())
+                else:
+                    self.assertRegex(template, r"cookie-consent\.css")
+                    self.assertRegex(template, r"cookie-consent\.js")
                 self.assertNotRegex(template, r'(?i)<script[^>]+src=["\']https?://')
+
+        # AC-01 covers both markup and behavioral privacy regressions.
+        self.test_no_optional_scripts_or_consent_by_default()
+        self.test_cookie_has_expiry_and_safe_flags()
+        self.test_a11y_and_reduced_motion()
+        if shutil.which("node"):
+            self.test_runtime_reject_default_accept_reopen_escape()
 
     def test_no_optional_scripts_or_consent_by_default(self) -> None:
         self.assertIn('storedChoice() || "rejected"', self.js)
