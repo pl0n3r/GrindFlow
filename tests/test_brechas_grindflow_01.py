@@ -97,6 +97,8 @@ def parse_matrix(raw: str) -> dict[str, tuple[str, ...]]:
 
 def requirement_section(raw: str, identifier: str) -> str | None:
     """Una sección no vacía, única y con encabezado exacto GF-FR-* ."""
+    # Los comentarios HTML no son texto normativo ejecutable/visible.
+    raw = re.sub(r"<!--.*?(?:-->|\Z)", " ", raw, flags=re.DOTALL)
     heading = r"(?m)^### " + re.escape(identifier) + r"\s+[—-]\s+[^\n]+$"
     matches = list(re.finditer(heading, raw))
     if len(matches) != 1:
@@ -128,6 +130,22 @@ def php_executable_text(source: str) -> str:
                     j += 1
                     break
                 j += 1
+        elif source.startswith('<<<', i):
+            # Heredoc/nowdoc son literales, no PHP ejecutable. Un cierre
+            # ilegible enmascara hasta EOF en lugar de acreditar aserciones.
+            opener = re.match(
+                r"""<<<[ \t]*(?:'([A-Za-z_]\w*)'|"([A-Za-z_]\w*)"|([A-Za-z_]\w*))""",
+                source[i:],
+            )
+            if opener is None:
+                i += 1
+                continue
+            label = next(part for part in opener.groups() if part is not None)
+            terminator = re.search(
+                r"(?m)^[ \t]*" + re.escape(label) + r"[;,]?[ \t]*\r?$",
+                source[i + opener.end():],
+            )
+            j = i + opener.end() + terminator.end() if terminator else n
         elif source.startswith('/*', i):
             k = source.find('*/', i + 2)
             j = k + 2 if k != -1 else n
@@ -174,6 +192,19 @@ def _single_phpunit_class(source: str) -> str | None:
     return body
 
 
+def _brace_depth_before(masked: str, offset: int) -> int:
+    """Una firma anidada dentro de otro método/clase no es un test top-level."""
+    depth = 0
+    for char in masked[:offset]:
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth < 0:
+                return -1
+    return depth
+
+
 def method_body(source: str, name: str) -> str | None:
     """Aserción dentro del método y de la misma clase TestCase balanceada."""
     body = _single_phpunit_class(source)
@@ -181,7 +212,8 @@ def method_body(source: str, name: str) -> str | None:
         return None
     pattern = (r'\bpublic\s+(?:static\s+)?function\s+' + re.escape(name)
                + r'\s*\(\s*\)\s*:\s*void\s*\{')
-    matches = list(re.finditer(pattern, body))
+    matches = [match for match in re.finditer(pattern, body)
+               if _brace_depth_before(body, match.start()) == 0]
     if len(matches) != 1:
         return None
     return _balanced_body(body, matches[0].end() - 1)
@@ -195,6 +227,16 @@ def phpunit_executed_test_count(output: str) -> int | None:
         return None
     count = int(lines[0])
     return count if count > 0 else None
+
+
+def phpunit_summary_is_acceptable(output: str, required: int) -> bool:
+    """Un resumen con omitidos o estados anómalos no acredita ejecución."""
+    count = phpunit_executed_test_count(output)
+    issues = re.search(
+        r"\b(?:Skipped|Incomplete|Risky|Errors|Failures):\s*[1-9]\d*\b",
+        output,
+    )
+    return count is not None and count >= required and issues is None
 
 
 def phpunit_executed_for_file(root: Path, file: str, names: tuple[str, ...]) -> bool | None:
@@ -214,8 +256,8 @@ def phpunit_executed_for_file(root: Path, file: str, names: tuple[str, ...]) -> 
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
-    count = phpunit_executed_test_count(result.stdout + '\n' + result.stderr)
-    return result.returncode == 0 and count is not None and count >= len(names)
+    output = result.stdout + '\n' + result.stderr
+    return result.returncode == 0 and phpunit_summary_is_acceptable(output, len(names))
 
 
 def assertion_present(body: str | None) -> bool:
@@ -255,7 +297,9 @@ class BrechasGrindflow01Tests(unittest.TestCase):
         """AC-01: cinco IDs, fuente, 21 métodos PHPUnit con aserción real."""
         self.assertEqual(len(GAPS), 5)
         self.assertEqual(set(self.rows), set(IDS))
-        self.assertEqual(sum(len(names) for gap in GAPS for _, names in gap.methods), 21)
+        pairs = [(path, name) for gap in GAPS for path, names in gap.methods for name in names]
+        self.assertEqual(len(pairs), 21)
+        self.assertEqual(len(set(pairs)), 21)
         for gap in GAPS:
             with self.subTest(requirement=gap.identifier):
                 for path, names in gap.methods:
@@ -287,6 +331,14 @@ class BrechasGrindflow01Tests(unittest.TestCase):
         first = next(line for line in self.sources[MATRIX].splitlines() if line.startswith("| " + IDS[0] + " |"))
         with self.assertRaises(ValueError):
             parse_matrix(self.sources[MATRIX] + "\n  " + first)
+        # Las frases normativas solo pueden existir fuera de comentarios.
+        commented_req = ("### GF-FR-001 — Ejemplo\n"
+                         "<!-- cross-organization reads, cross-organization writes, "
+                         "queue jobs carry -->\n")
+        self.assertIsNone(requirement_section(commented_req, "GF-FR-001"))
+        self.assertIsNone(requirement_section(
+            "<!--\n### GF-FR-001 — Encabezado falso\n" +
+            "cross-organization reads\n-->\n", "GF-FR-001"))
         self.assertFalse(assertion_present(" // $this->assertTrue();\n"))
         self.assertFalse(assertion_present(' $sample = "->assertOk()";'))
         self.assertFalse(assertion_present(" $value = 1; // $this->assertSame(1, 1);"))
@@ -309,6 +361,24 @@ class BrechasGrindflow01Tests(unittest.TestCase):
                 "        $value = 'https://example.invalid/test'; // comment\n"
                 "        $this->assertSame(1, 1);\n    }\n}\n")
         self.assertTrue(assertion_present(method_body(live, "test_real")))
+        # Una aserción escrita dentro de un literal heredoc/nowdoc es ficticia.
+        for opener in ("<<<'NOW'", '<<<"NOW"', "<<<NOW"):
+            literal = ("<?php\nclass TestExample extends TestCase {\n"
+                       "use RefreshDatabase;\n"
+                       "public function test_literal(): void {\n"
+                       f"  $value = {opener};\n"
+                       "  ->assertTrue(true);\n"
+                       "NOW;\n"
+                       "}\n}\n")
+            self.assertFalse(assertion_present(method_body(literal, "test_literal")))
+        nested = ("<?php\nclass TestExample extends TestCase {\n"
+                  "use RefreshDatabase;\n"
+                  "public function test_outer(): void {\n"
+                  "  $anonymous = new class {\n"
+                  "    public function test_nested(): void { self::assertTrue(true); }\n"
+                  "  };\n"
+                  "}\n}\n")
+        self.assertIsNone(method_body(nested, "test_nested"))
         self.assertEqual([None, None, None, 1, 3], [
             phpunit_executed_test_count(text) for text in (
                 "Tests: 0, Assertions: 0", "OK (0 tests, 0 assertions)",
@@ -317,6 +387,11 @@ class BrechasGrindflow01Tests(unittest.TestCase):
             )
         ])
         self.assertIsNone(phpunit_executed_test_count("Tests: 2, Assertions: 5\nTests: 3, Assertions: 7"))
+        self.assertTrue(phpunit_summary_is_acceptable("Tests: 3, Assertions: 7", 3))
+        for extra in ("Skipped", "Incomplete", "Risky", "Errors", "Failures"):
+            self.assertFalse(phpunit_summary_is_acceptable(
+                f"Tests: 3, Assertions: 7, {extra}: 1", 3))
+        self.assertFalse(phpunit_summary_is_acceptable("Tests: 0, Assertions: 0", 1))
         source = ("<?php\nclass Real extends TestCase {\nuse RefreshDatabase;\n"
                   " public function test_empty(): void {}\n}\n"
                   "class Other { public function test_empty(): void { self::assertTrue(true); } }")
