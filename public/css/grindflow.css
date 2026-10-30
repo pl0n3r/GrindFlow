@@ -469,7 +469,7 @@ a {
   border-color: rgba(56, 232, 255, 0.6);
   background: rgba(56, 232, 255, 0.035);
   box-shadow: 0 0 0 4px rgba(56, 232, 255, 0.07);
-  outline: none;
+  outline:2px solid currentColor;outline-offset:2px;
 }
 
 .gf-check {
@@ -525,7 +525,7 @@ a {
 .gf-sidebar__label {
   margin: 18px 10px 7px;
   color: #657088;
-  font-size: 10px;
+  font-size:11px;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -727,7 +727,7 @@ a {
   overflow: hidden;
   color: #69748d;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size:11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1024,7 +1024,7 @@ a {
   padding: 5px 8px;
   color: var(--gf-muted);
   background: rgba(255,255,255,0.025);
-  font-size: 10px;
+  font-size:11px;
   font-weight: 760;
 }
 
@@ -1107,7 +1107,7 @@ a {
   max-width: 220px;
   overflow: hidden;
   color: var(--gf-cyan);
-  font-size: 10px;
+  font-size:11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1333,7 +1333,7 @@ a {
 
 .gf-table th {
   color: #718099;
-  font-size: 10px;
+  font-size:11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1360,12 +1360,12 @@ a {
 .gf-media-meta {
   margin-top: 4px;
   color: var(--gf-muted);
-  font-size: 10px;
+  font-size:11px;
 }
 
 .gf-hash {
   color: #a9bbd6;
-  font-size: 10px;
+  font-size:11px;
 }
 
 @media (max-width: 680px) {

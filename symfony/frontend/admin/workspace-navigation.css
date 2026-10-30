@@ -2,7 +2,7 @@
 .workspace-navigation{min-width:0;width:100%;padding:28px 20px;background:#11131e;border-right:1px solid #292b3b;display:flex;flex-direction:column;gap:0}
 .workspace-navigation .workspace-brand{font-size:23px;font-weight:900;line-height:1.15;letter-spacing:-1.2px;text-decoration:none;white-space:nowrap;color:#f8f8ff}
 .workspace-navigation .workspace-brand>span:first-child{color:#b896ff}
-.workspace-navigation .workspace-navigation-label{margin-top:42px;margin-bottom:14px;color:#a7a8bc;font-size:10px;font-weight:800;letter-spacing:1.6px}
+.workspace-navigation .workspace-navigation-label{margin-top:42px;margin-bottom:14px;color:#a7a8bc;font-size:11px;font-weight:800;letter-spacing:1.6px}
 .workspace-navigation-scroll-hint{display:none}
 .workspace-navigation nav{display:grid;min-width:0;gap:8px}
 .workspace-navigation nav>.workspace-nav-item{box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;min-width:0;min-height:52px;padding:10px 13px;border:1px solid transparent;border-radius:12px;background:transparent;color:#bdc0d0;text-decoration:none;font:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer}
@@ -10,7 +10,7 @@
 .workspace-navigation nav>.workspace-nav-item.active,.workspace-navigation nav>.workspace-nav-item.selected{background:#2b2744;border-color:#575070;color:#fff}
 .workspace-navigation nav .workspace-nav-number{flex:0 0 22px;font-size:11px;font-weight:800;color:#a9a0c4}
 .workspace-navigation nav .workspace-nav-title{min-width:0;overflow-wrap:anywhere}
-.workspace-navigation nav .workspace-nav-stage{margin-left:auto;font-size:10px;color:#8affcb}
+.workspace-navigation nav .workspace-nav-stage{margin-left:auto;font-size:11px;color:#8affcb}
 .workspace-navigation nav>.workspace-nav-item:focus-visible,.workspace-navigation .workspace-brand:focus-visible{outline:3px solid #a8ffd5;outline-offset:3px}
 .workspace-navigation-footer{margin-top:auto;padding-top:28px;min-width:0}
 .workspace-navigation-footer .admin-tenant{margin-top:0;overflow-wrap:anywhere}
