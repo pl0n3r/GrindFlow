@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#101019">
     <title>{% block title %}GrindFlow · Crea y sigue creando{% endblock %}</title>
     <link rel="stylesheet" href="/assets/grindflow.css?v={{ app_version|url_encode }}">
+    <link rel="stylesheet" href="/css/cookie-consent.css?v={{ app_version|url_encode }}">
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -15,6 +16,20 @@
         <a class="brand brand-small" href="{{ path('grindflow_home') }}">GRIND<span>FLOW</span></a>
         <span>Versión {{ app_version }}</span>
         <span>S1 · Acceso y organizaciones aisladas; sin migración productiva</span>
+        <a href="#gf-cookie-consent" data-gf-cookie-open>Cambiar preferencias de cookies</a>
     </footer>
+    <section id="gf-cookie-consent" class="gf-cookie-consent" data-gf-cookie-banner
+             role="region" aria-labelledby="gf-cookie-consent-title">
+        <h2 class="gf-cookie-consent__title" id="gf-cookie-consent-title">Preferencias de cookies</h2>
+        <p class="gf-cookie-consent__text">Las cookies opcionales permanecen desactivadas hasta que elijas Aceptar.</p>
+        <small class="gf-cookie-consent__legal" data-gf-cookie-legal-pending>Texto legal pendiente de aprobación profesional.</small>
+        <div class="gf-cookie-consent__actions">
+            <button type="button" class="gf-cookie-consent__action" data-gf-cookie-action="accept">Aceptar</button>
+            <button type="button" class="gf-cookie-consent__action" data-gf-cookie-action="reject">Rechazar</button>
+        </div>
+        <button type="button" class="gf-cookie-consent__close" data-gf-cookie-action="close"
+                aria-label="Cerrar aviso y rechazar">Cerrar</button>
+    </section>
+    <script src="/js/cookie-consent.js?v={{ app_version|url_encode }}" defer></script>
 </body>
 </html>
