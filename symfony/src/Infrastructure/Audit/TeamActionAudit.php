@@ -109,7 +109,9 @@ final class TeamActionAudit
         } catch (Throwable) {
             throw new RuntimeException('AUDIT_IDENTITY_UNAVAILABLE');
         }
-        if (!is_array($identity) || array_keys($identity) !== ['organization_id', 'actor_id', 'role']
+        $keys = is_array($identity) ? array_keys($identity) : [];
+        sort($keys);
+        if (!is_array($identity) || $keys !== ['actor_id', 'organization_id', 'role']
             || !is_string($identity['organization_id']) || !self::isUuid($identity['organization_id'])
             || !is_string($identity['actor_id']) || !self::isUuid($identity['actor_id'])
             || !is_string($identity['role']) || !in_array($identity['role'], ['owner', 'admin', 'editor', 'viewer'], true)) {
@@ -126,9 +128,14 @@ final class TeamActionAudit
     /** @param array<mixed> $row */
     private static function validRow(array $row, string $organization): bool
     {
-        if (array_keys($row) !== self::FIELDS || !is_string($row['event_id'])
+        $keys = array_keys($row);
+        $expected = self::FIELDS;
+        sort($keys);
+        sort($expected);
+        if ($keys !== $expected || !is_string($row['event_id'])
             || !preg_match('/^[a-f0-9]{32}$/D', $row['event_id'])
-            || !is_string($row['organization_id']) || $row['organization_id'] !== $organization
+            || !is_string($row['organization_id']) || !self::isUuid($row['organization_id'])
+            || strcasecmp($row['organization_id'], $organization) !== 0
             || !is_string($row['actor_id']) || !self::isUuid($row['actor_id'])
             || !is_string($row['kind']) || !in_array($row['kind'], self::EVENTS, true)
             || !is_string($row['target_id']) || !self::isUuid($row['target_id'])

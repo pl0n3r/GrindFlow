@@ -22,13 +22,19 @@ final class TeamActionAuditTest extends TestCase
         $rows = [];
         $audit = $this->audit('admin', $rows);
         foreach (['role_changed', 'destination_changed', 'rule_changed'] as $kind) {
+            $before = time();
             $event = $audit->record($kind, self::TARGET);
+            $after = time();
             self::assertSame(self::TENANT, $event['organization_id']);
             self::assertSame(self::ACTOR, $event['actor_id']);
             self::assertSame($kind, $event['kind']);
             self::assertSame(self::TARGET, $event['target_id']);
             self::assertMatchesRegularExpression('/^[a-f0-9]{32}$/D', $event['event_id']);
             self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $event['occurred_at']);
+            $instant = \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $event['occurred_at'], new \DateTimeZone('UTC'));
+            self::assertInstanceOf(\DateTimeImmutable::class, $instant);
+            self::assertGreaterThanOrEqual($before, $instant->getTimestamp());
+            self::assertLessThanOrEqual($after, $instant->getTimestamp());
             self::assertSame(['event_id', 'organization_id', 'actor_id', 'kind', 'target_id', 'occurred_at'], array_keys($event));
         }
         self::assertCount(3, $rows);
@@ -83,9 +89,13 @@ final class TeamActionAuditTest extends TestCase
         self::assertCount(25, $first['events']);
         self::assertCount(25, $second['events']);
         self::assertCount(12, $third['events']);
-        foreach (array_merge($first['events'], $second['events'], $third['events']) as $event) {
+        $events = array_merge($first['events'], $second['events'], $third['events']);
+        foreach ($events as $event) {
             self::assertSame(self::TENANT, $event['organization_id']);
         }
+        $ids = array_column($events, 'event_id');
+        self::assertCount(62, array_unique($ids));
+        self::assertSame(array_column($rows, 'event_id'), $ids);
         foreach ([[0, 1], [1, 0], [1, 51], [100001, 2]] as [$page, $size]) {
             $this->expectSafeError('INVALID_AUDIT_PAGE', static fn () => $audit->forOwner($page, $size));
         }
@@ -117,6 +127,41 @@ final class TeamActionAuditTest extends TestCase
         }
     }
 
+
+    public function testAcceptsUnorderedIdentityAndRowKeysAndCanonicalTenantCase(): void
+    {
+        $tenantId = 'aabbccdd-eeff-4abc-8def-abcdefabcdef';
+        $rows = [];
+        $audit = new TeamActionAudit(
+            static fn (): array => [
+                'role' => 'owner',
+                'actor_id' => self::ACTOR,
+                'organization_id' => strtoupper($tenantId),
+            ],
+            static function (array $row) use (&$rows): bool {
+                $rows[] = $row;
+                return true;
+            },
+            static function (string $tenant, int $page, int $limit) use (&$rows, $tenantId): array {
+                self::assertSame(strtoupper($tenantId), $tenant);
+                return array_map(
+                    static function (array $row): array {
+                        $reordered = array_reverse($row, true);
+                        $reordered['organization_id'] = strtolower($reordered['organization_id']);
+                        return $reordered;
+                    },
+                    array_slice($rows, ($page - 1) * ($limit - 1), $limit),
+                );
+            },
+        );
+        $written = $audit->record('role_changed', self::TARGET);
+        self::assertSame(strtoupper($tenantId), $written['organization_id']);
+        $results = $audit->forOwner();
+        self::assertSame(1, count($results['events']));
+        self::assertSame($tenantId, $results['events'][0]['organization_id']);
+        self::assertSame('role_changed', $results['events'][0]['kind']);
+    }
+
     public function testAdapterFailureAndInvalidIdentityHidePrivateErrors(): void
     {
         $principal = static fn (): array => [
@@ -126,6 +171,8 @@ final class TeamActionAuditTest extends TestCase
             throw new RuntimeException('private synthetic connection password');
         }, static fn (): array => []);
         $this->expectSafeError('AUDIT_STORAGE_FAILED', static fn () => $storage->record('rule_changed', self::TARGET));
+        $rejected = new TeamActionAudit($principal, static fn (): bool => false, static fn (): array => []);
+        $this->expectSafeError('AUDIT_STORAGE_FAILED', static fn () => $rejected->record('rule_changed', self::TARGET));
         $read = new TeamActionAudit($principal, static fn (): bool => true, static function (): array {
             throw new RuntimeException('private synthetic database secret');
         });
