@@ -115,6 +115,10 @@ grindflow_ci_classify_files() {
         grindflow_ci_scope_add_area "Symfony HTTP negative acceptance"
         GRINDFLOW_SCOPE_RUN_SYMFONY=true
         ;;
+      tests/test_legacy_retirement_guard.py)
+        grindflow_ci_scope_add_area "Symfony GF350 legacy retirement Python contract"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
+        ;;
       tests/*)
         grindflow_ci_scope_add_area "Laravel tests"
         GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
