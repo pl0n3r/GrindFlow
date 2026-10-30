@@ -94,7 +94,7 @@ def parse_rows(text: str) -> dict[str, tuple[str, ...]]:
     """Fail closed on duplicates or malformed matrix rows."""
     found: dict[str, tuple[str, ...]] = {}
     for line in text.splitlines():
-        if not any(line.startswith("| " + row_id + " |") for row_id in IDS):
+        if not any(line.lstrip().startswith("| " + row_id + " |") for row_id in IDS):
             continue
         fields = tuple(x.strip() for x in line.strip().strip("|").split("|"))
         if len(fields) != 8 or fields[0] in found:
@@ -104,17 +104,20 @@ def parse_rows(text: str) -> dict[str, tuple[str, ...]]:
 
 
 def section_text(source: str, header: str) -> str | None:
+    """Extract a nonblank section; whitespace-only is not evidence."""
     hits = list(re.finditer(
-        r"(?m)^### " + re.escape(header) + r"\s+[^\n]*$", source
+        r"(?m)^### " + re.escape(header) + r"[ \t]+[^\n]*$", source
     ))
     if len(hits) != 1:
         return None
     rest = source[hits[0].end():]
-    return re.split(r"(?m)^#{2,3}\s+", rest, maxsplit=1)[0]
+    section = re.split(r"(?m)^#{2,3}\s+", rest, maxsplit=1)[0]
+    return section if section.strip() else None
 
 
 def inspect(item: Evidence, rows: dict[str, tuple[str, ...]],
             requirements: str, sources: dict[str, str]) -> dict[str, str]:
+    """Accredit local source evidence without claiming live readiness."""
     result = {"code": UNKNOWN, "production": UNKNOWN, "branch_rule": UNKNOWN}
     row = rows.get(item.row_id)
     if row is None or row[2] != "NO_VERIFICABLE":
@@ -132,6 +135,7 @@ def inspect(item: Evidence, rows: dict[str, tuple[str, ...]],
 
 
 def synthetic_signals() -> dict[str, object]:
+    """Build deterministic synthetic health signals without secrets."""
     sha = "a" * 40
     return {
         "version": 1,
@@ -227,6 +231,19 @@ class BrechasGrindflow05Tests(unittest.TestCase):
                       if x.startswith("| " + IDS[0] + " |"))
         with self.assertRaises(ValueError):
             parse_rows(self.sources[MATRIX] + "\n" + sample)
+        with self.assertRaises(ValueError):
+            parse_rows(self.sources[MATRIX] + "\n    " + sample)
+        for item in EVIDENCE:
+            with self.subTest(blank_section=item.section):
+                whitespace = (
+                    f"### {item.section} · prueba\n \t \n\n"
+                    "### Siguiente sección\ntexto"
+                )
+                self.assertIsNone(section_text(whitespace, item.section))
+                self.assertEqual(
+                    UNKNOWN,
+                    inspect(item, self.rows, whitespace, self.sources)["code"],
+                )
 
         # La salud operativa real no debe exponer ni aceptar datos arbitrarios.
         payload = synthetic_signals()
