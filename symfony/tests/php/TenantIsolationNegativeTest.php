@@ -103,6 +103,12 @@ final class TenantIsolationNegativeTest extends WebTestCase
                 $this->jsonRequest($client, 'POST', '/api/admin/vault/'.$assets[$other].'/trash',
                     null, $tokens[$side]);
                 $this->assertDenied($client, 404, 'file_not_found', $side.'-trash');
+                if ($side === 'beta') {
+                    // A tenant admin cannot permanently purge a foreign asset.
+                    $this->jsonRequest($client, 'POST', '/api/admin/vault/'.$assets[$other].'/purge',
+                        ['confirm_asset_id' => $assets[$other]], $tokens[$side]);
+                    $this->assertDenied($client, 404, 'file_not_found', 'admin-cross-purge');
+                }
                 self::assertSame('gf793-'.$other.'.png', $db->fetchOne(
                     'SELECT original_name FROM gf_vault_assets WHERE id = ? AND organization_id = ?',
                     [$assets[$other], $orgs[$other]],
@@ -148,6 +154,14 @@ final class TenantIsolationNegativeTest extends WebTestCase
             $this->jsonRequest($client, 'POST', '/api/admin/vault/'.$assets['alpha'].'/trash',
                 null, $tokens['alpha']);
             $this->assertDenied($client, 403, 'vault_manage_forbidden', 'model-trash');
+
+            // Editor can prepare content, but is denied permanent deletion.
+            $db->update('gf_identity_memberships', ['role' => 'editor'], [
+                'user_id' => $users['alpha'], 'organization_id' => $orgs['alpha'],
+            ]);
+            $this->jsonRequest($client, 'POST', '/api/admin/vault/'.$assets['alpha'].'/purge',
+                ['confirm_asset_id' => $assets['alpha']], $tokens['alpha']);
+            $this->assertDenied($client, 403, 'purge_forbidden', 'editor-purge');
 
             // Studio may prepare content but cannot permanently purge it.
             $db->update('gf_identity_memberships', ['role' => 'studio'], [

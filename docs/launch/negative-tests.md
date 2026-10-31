@@ -26,10 +26,12 @@ El nombre del test en el Issue de origen contenía un identificador inválido (T
 | GET /api/admin/vault/export | Export no implementado en el router actual | 404; no acredita un export activo |
 | POST /api/admin/vault/{id}/name | Editar recurso ajeno con token propio válido | 404/file_not_found, sin cambio |
 | POST /api/admin/vault/{id}/trash | Archivar recurso ajeno con token propio válido | 404/file_not_found, sin cambio |
+| POST /api/admin/vault/{id}/purge | Admin de B intenta purgar recurso de A | 404/file_not_found, ni borrado lógico ni físico |
 | POST /api/admin/vault/{id}/name y /trash | CSRF ausente, inventado o de sesión ajena | 403/invalid_csrf |
 | PUT /api/admin/library/collections/{id}/assets/{id} | Ruta real, CSRF ausente, inventado o de sesión ajena | 403/invalid_csrf |
 | DELETE /api/admin/vault/{id} | Método DELETE no implementado | 404 o 405; la prueba no afirma cobertura de CSRF de DELETE |
 | POST /api/admin/vault/{id}/name y /trash | Rol model sin permisos, token válido anterior | 403/vault_manage_forbidden |
+| POST /api/admin/vault/{id}/purge | Rol editor con token válido, sin privilegio delete | 403/purge_forbidden |
 | POST /api/admin/vault/{id}/purge | Rol studio con token válido, sin privilegio delete | 403/purge_forbidden |
 
 La aserción final consulta ambos activos en la base para demostrar que original_name, deleted_at y purged_at no cambiaron. Solo se borran las fixtures generadas por este caso en el MariaDB desechable.
