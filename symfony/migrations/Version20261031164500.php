@@ -17,6 +17,8 @@ final class Version20261031164500 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // Pair each request kind with its only permitted state. Keep SQL
+        // free of inline comments for the schema-parity parser.
         $this->addSql(<<<'SQL'
             CREATE TABLE gf_data_subject_requests (
                 id CHAR(36) NOT NULL,
@@ -28,8 +30,6 @@ final class Version20261031164500 extends AbstractMigration
                 KEY ix_gf_dsr_actor_kind (actor_ref, kind, status, created_at),
                 CONSTRAINT ck_gf_dsr_kind CHECK (kind IN ('export', 'deletion')),
                 CONSTRAINT ck_gf_dsr_status CHECK (status IN ('partial', 'pending')),
-                -- Never record a partial deletion or a pending export: a
-                -- status must be meaningful for its specific request kind.
                 CONSTRAINT ck_gf_dsr_kind_status CHECK (
                     (kind = 'export' AND status = 'partial') OR
                     (kind = 'deletion' AND status = 'pending')
