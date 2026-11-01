@@ -40,8 +40,12 @@ final class Version20261031164500 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        // Audit retention needs an explicit owner/legal decision. Do not
-        // destroy request evidence through an automatic rollback.
-        throw new \RuntimeException('DSR ledger cannot be dropped without retention authorization');
+        // CI may reverse the ledger only in its disposable synthetic database.
+        // Production retention is never a generic migration rollback permit.
+        if (getenv('APP_ENV') !== 'test'
+            || $this->connection->getDatabase() !== 'grindflow_symfony_ci') {
+            throw new \RuntimeException('DSR ledger cannot be dropped without retention authorization');
+        }
+        $this->addSql('DROP TABLE gf_data_subject_requests');
     }
 }
