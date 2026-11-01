@@ -42,7 +42,8 @@ jobs:
           import os
           import re
 
-          body = os.environ["COMMENT_BODY"].strip()
+          raw_body = os.environ["COMMENT_BODY"]
+          body = raw_body.strip()
           exactos = {"/tomar", "/liberar-forzado", "/adoptar-contrato-huerfana"}
           prefijos = ("/liberar ", "/transferir ", "/migrar-contrato ", "/renovar-contrato ")
           uuid = re.compile(
@@ -52,8 +53,8 @@ jobs:
           sha40 = re.compile(r"^[0-9a-f]{40}$")
           recuperar = "/recuperar-lock-huerfano "
           valido = (
-              body.startswith(recuperar)
-              and sha40.fullmatch(body[len(recuperar):]) is not None
+              raw_body.startswith(recuperar)
+              and sha40.fullmatch(raw_body[len(recuperar):]) is not None
           ) or body in exactos or any(
               body.startswith(prefix)
               and uuid.fullmatch(body[len(prefix):].strip().lower()) is not None
