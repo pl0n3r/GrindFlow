@@ -12,13 +12,15 @@ SHA = "0148bec975ea3fcb93e9957e9ee0c2d599db494f"
 class WorkCoordinationRecoveryTests(unittest.TestCase):
     def test_comando_exacto(self):
         self.assertTrue(Adoption.classify(f"/recuperar-lock-huerfano {SHA}"))
-        self.assertTrue(Adoption.classify(f"  /recuperar-lock-huerfano {SHA}\n"))
         for ya_valido in ("/tomar", "/liberar-forzado", "/adoptar-contrato-huerfana"):
             self.assertTrue(Adoption.classify(ya_valido))
 
     def test_rechaza_comandos_inseguros(self):
         for body in (
             "/recuperar-lock-huerfano",
+            f"  /recuperar-lock-huerfano {SHA}",
+            f"/recuperar-lock-huerfano {SHA}  ",
+            f"/recuperar-lock-huerfano {SHA}\n",
             f"/recuperar-lock-huerfano {SHA[:39]}",
             f"/recuperar-lock-huerfano {SHA}0",
             f"/recuperar-lock-huerfano {SHA.upper()}",
