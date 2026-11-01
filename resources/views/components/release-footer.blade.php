@@ -5,6 +5,7 @@
     <span>GrindFlow · <strong>v{{ config('version.number', 'unknown') }}</strong></span>
     <span>{{ $context === 'public' ? 'Tu contenido, en movimiento.' : 'Workspace · GrindFlow' }}</span>
     <a href="#gf-cookie-consent" data-gf-cookie-open>Cambiar preferencias de cookies</a>
+    <a href="{{ route('privacy.rights') }}">Privacidad y mis derechos</a>
 </footer>
 
 @once
