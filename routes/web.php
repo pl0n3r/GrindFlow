@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::view('/', 'welcome')->name('home');
+Route::view('/privacidad-y-mis-derechos', 'privacy.rights')->name('privacy.rights');
 
 Route::get('/health', static function (CheckoutIdentity $identity): JsonResponse {
     $commit = $identity->commit();
