@@ -1,4 +1,5 @@
 import { WorkspaceNavigation } from './WorkspaceNavigation';
+import { PlanLimitsPanel } from './PlanLimitsPanel';
 import { useEffect, useState, type FormEvent } from 'react';
 import { VaultPanel } from './VaultPanel';
 import { LibraryCollectionsPanel } from './LibraryCollectionsPanel';
@@ -11,6 +12,7 @@ type Context = {
   user: { display_name: string };
   organization_name_csrf: string | null;
   profile_name_csrf: string | null;
+  platform_plan_limits_manage?: boolean;
   profile_password_csrf: string | null;
   vault_upload_csrf: string | null;
   vault_manage_csrf: string | null;
@@ -65,6 +67,7 @@ export function AdminApp() {
     if (window.location.hash === '#entregas-manuales') return 'entregas-manuales';
     if (window.location.hash === '#reglas') return 'reglas';
     if (window.location.hash === '#piloto') return 'piloto';
+    if (window.location.hash === '#planes') return 'planes';
     return 'resumen';
   });
 
@@ -259,6 +262,9 @@ export function AdminApp() {
           ...(context.weekly_rule_csrf !== undefined
             ? [{ id: 'piloto', number: '07', label: 'Piloto', href: '#piloto', stage: 'S5' }]
             : []),
+          ...(context.platform_plan_limits_manage
+            ? [{ id: 'planes', number: '08', label: 'Límites de planes', href: '#planes' }]
+            : []),
         ]}
         footer={<div className="admin-tenant">
           <small>ORGANIZACIÓN ACTUAL</small>
@@ -356,6 +362,7 @@ export function AdminApp() {
               : <a className="admin-signin-link" href="/login">Volver a iniciar sesión</a>}
             {passwordFeedback && <p role="status">{passwordFeedback}</p>}
           </section>
+          {context.platform_plan_limits_manage && <PlanLimitsPanel permitted={true} />}
           {context.permissions.workspace_view && <LibraryCollectionsPanel />}
           <VaultPanel canUpload={context.permissions.content_prepare} csrf={context.vault_upload_csrf}
             manageCsrf={context.vault_manage_csrf} />

@@ -18,7 +18,7 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 final class AdminContextController extends AbstractController
 {
     #[Route('/api/admin/context', name: 'grindflow_admin_context', methods: ['GET'])]
-    public function __invoke(Request $request, MembershipContext $memberships, ProductVersion $version, CsrfTokenManagerInterface $csrf): JsonResponse
+    public function __invoke(Request $request, MembershipContext $memberships, ProductVersion $version, CsrfTokenManagerInterface $csrf, Connection $db): JsonResponse
     {
         $user = $this->getUser();
         if (!$user instanceof IdentityUser || !$user->isActive()) {
@@ -46,6 +46,7 @@ final class AdminContextController extends AbstractController
         return $this->privateJson([
             'data' => [
                 'user' => ['display_name' => $liveName],
+                'platform_plan_limits_manage' => $this->isGlobalPlanAdmin($db, $user),
                 'profile_name_csrf' => (string) $csrf->getToken('grindflow_profile_name')->getValue(),
                 'profile_password_csrf' => (string) $csrf->getToken('grindflow_profile_password')->getValue(),
                 'vault_upload_csrf' => $permissions['content_prepare']
@@ -150,6 +151,19 @@ final class AdminContextController extends AbstractController
         }
 
         return $this->privateJson(['data' => ['organization' => $updated]]);
+    }
+
+    /** The organization admin role alone never grants platform-wide plan access. */
+    private function isGlobalPlanAdmin(Connection $db, IdentityUser $user): bool
+    {
+        try {
+            return $db->fetchOne(
+                'SELECT platform_role FROM gf_identity_users WHERE id = :id AND is_active = 1',
+                ['id' => $user->id()],
+            ) === 'admin';
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function error(int $status, string $code, string $message): JsonResponse
