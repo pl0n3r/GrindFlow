@@ -237,7 +237,7 @@ jobs:
           # The probe step is deliberately absent until separately authorized.
           ready_count="$(grep -Fxc 'MEDIA_STORAGE_READY=1' production-smoke.log || true)"
           not_ready_count="$(grep -Fxc 'MEDIA_STORAGE_READY=0' production-smoke.log || true)"
-          marker_count="$(grep -Ec '^MEDIA_STORAGE_READY=' production-smoke.log || true)"
+          marker_count="$(grep -Fc 'MEDIA_STORAGE_READY=' production-smoke.log || true)"
 
           if [[ "$ready_count" == "1" && "$marker_count" == "1" &&
                 "$MEDIA_LIVE_PROBE_OUTCOME" == "success" &&
