@@ -2,6 +2,17 @@
 
 Fuentes: `docs/REQUIREMENTS.md`, `docs/MIGRATION-LARAVEL.md` (históricos GF-MIG), `docs/STACK-TRANSITION-SYMFONY.md`, `docs/GRINDFLOW-SPEC.md` y roadmaps #342–#358.
 
+## Contraste SPEC #662
+
+Las **40 filas** SPEC con contrato comprobable conservan estado `NO_VERIFICABLE`
+en este corte; ninguna fila cambia a `CUBIERTO` solo por existir código o PR.
+El [contraste-gf_spec.md](contraste-gf_spec.md) documenta veredicto y fuente por
+fila, identifica **13 candidatos** con PR fusionado + prueba localizada que aún
+requieren contrastar cada cláusula, y explica evidencia faltante en los 27
+restantes. No se crearon issues de `SIN_COBERTURA` sin brecha confirmada,
+ni se alteraron conteos, código, CI o estado de producción. Este enlace es
+**trazabilidad parcial** y no acredita por sí solo los AC de #662.
+
 Corte exacto: `main@af275aef3ae1e0b8d4bd2eca6a1a646cac312795` (27-oct-2026). Fase `construccion`. Esta matriz registra **cobertura verificable**; `NO_VERIFICABLE` **no significa funcionalidad ausente** y EN_CURSO exige una hoja ejecutable verificable o un PR abierto; un roadmap no cuenta como trabajo.
 
 **Criterios:** `CUBIERTO` solo con ruta/test y PR fusionado (puede ser exclusivamente offline); EN_CURSO solo con hoja ejecutable y PR o evidencia de trabajo; SIN_COBERTURA cuando un roadmap no tiene hoja real y se crea una hoja canónica con contrato; `DESCARTADO` con motivo; `NO_VERIFICABLE` cuando faltan pruebas o correlación. En código, CI y Hostinger, `NO_ACREDITADO` significa que falta evidencia para la fila. Ruta presente no implica implementación probada, CI verde no implica deploy y un despliegue no demuestra operación ni aprobación legal.
