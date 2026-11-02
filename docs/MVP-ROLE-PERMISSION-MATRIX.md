@@ -1,6 +1,6 @@
 # GF342 · Matriz HTTP de permisos del MVP — Library, Scheduling y Distribution
 
-**Estado:** NO ENSAYADO en `symfony-preview`; preparación offline de [GrindFlow #665](https://github.com/pl0n3r/GrindFlow/issues/665). Esta matriz define expectativas, no acredita CI, servicios externos, paridad productiva ni `VALIDATED_IN_PRODUCTION`.
+**Estado:** contrato E2E implementado para [GrindFlow #665](https://github.com/pl0n3r/GrindFlow/issues/665). Antes del PR se ejecutaron 5 pruebas HTTP y 132 aserciones con MariaDB local descartable. Esa evidencia local no sustituye los checks terminales sobre el HEAD exacto, no acredita servicios externos ni `VALIDATED_IN_PRODUCTION`.
 
 ## Cobertura y fuente
 
@@ -38,11 +38,11 @@ El recorrido acredita **solo cuando se ejecute realmente en CI** que la autoriza
 
 ## Puertas de entrega y límites
 
-- **AC-01:** `validate` terminal success sobre el HEAD exacto, pendiente.
-- **AC-02:** `symfony-preview` terminal success sobre el HEAD exacto, pendiente. El workflow invoca `php vendor/bin/simple-phpunit -c phpunit.xml.dist` y este XML descubre `tests/php` de forma automática.
+- **AC-01:** consultar en GitHub el check `validate` terminal `success` del HEAD exacto; no inferir su estado a partir del documento.
+- **AC-02:** consultar en GitHub el check `symfony-preview` terminal `success` del HEAD exacto. El workflow invoca `php vendor/bin/simple-phpunit -c phpunit.xml.dist` y este XML descubre `tests/php` automáticamente.
 - **Revocación/regresión:** permisos y tenant se prueban con HTTP y base de datos real **descartable**, no por asserts nominales o un stub de autorización.
 - **Sin efectos reales:** no contactar proveedores, publicar en redes, mover hosting, escribir en producción, introducir PII o secretos; ninguna cuenta `example.test` corresponde a un usuario real.
 - **Reversión:** revertir el squash elimina exclusivamente los dos archivos de este issue y deja los controladores intactos.
 - **Autoridad:** publicación remota requiere reserva V3 verdadera para los dos paths, validación de cuota autenticada >=1200 antes de `/tomar`, kill switch `RUNNING`, freeze ausente, revisión CodeRabbit FINAL una sola vez después de CI verde y los gates D-069 aplicables. El documento NO autoriza omitirlos.
 
-**Resultado:** `NO ENSAYADO` en CI, no `READY` ni GO hasta que exista prueba autenticada del HEAD publicado y las puertas completas.
+**Resultado:** cinco pruebas HTTP y 132 aserciones exitosas en preparación local descartable. La entrega solo queda acreditada por CI auténtico y gates de seguridad del HEAD final en GitHub; este documento no declara `READY`, despliegue ni GO.
