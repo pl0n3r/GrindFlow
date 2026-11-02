@@ -42,6 +42,23 @@ final class PrivateMediaS3ConfigTest extends TestCase
         rmdir($this->directory);
     }
 
+    public function testSymlinkedParentDirectoryFailsClosed(): void
+    {
+        // The final file is real and private, but an alias parent must never
+        // allow an operator path to cross the configured private boundary.
+        $alias = $this->directory.'-alias';
+        if (!@symlink($this->directory, $alias)) {
+            self::markTestSkipped('This filesystem does not permit symlinks.');
+        }
+        try {
+            $paths = $this->paths;
+            $paths['MEDIA_STORAGE_ENDPOINT_FILE'] = $alias.'/MEDIA_STORAGE_ENDPOINT_FILE';
+            self::assertNull(PrivateMediaS3Config::fromPathVariables($paths));
+        } finally {
+            unlink($alias);
+        }
+    }
+
     public function testReadsOnlyPrivateB2Files(): void
     {
         $config = PrivateMediaS3Config::fromPathVariables($this->paths);
