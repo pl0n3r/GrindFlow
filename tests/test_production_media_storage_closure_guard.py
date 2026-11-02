@@ -148,6 +148,14 @@ class ProductionMediaClosureGuardTests(unittest.TestCase):
         )
         self.assertFalse(self.mutating(cmds))
 
+    def test_embedded_contradictory_marker_blocks_closure(self):
+        cmds, summary, _ = self.run_gate(
+            "MEDIA_STORAGE_READY=1\nWARNING MEDIA_STORAGE_READY=0\n",
+            outcome="success", verified="true",
+        )
+        self.assertFalse(self.mutating(cmds))
+        self.assertIn("ambiguous", summary)
+
     def test_duplicate_not_ready_is_ambiguous(self):
         cmds, _, _ = self.run_gate("MEDIA_STORAGE_READY=0\nMEDIA_STORAGE_READY=0\n")
         self.assertFalse(self.mutating(cmds))
