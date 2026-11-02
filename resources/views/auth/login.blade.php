@@ -91,5 +91,7 @@
             </div>
         </section>
     </main>
+
+    <x-release-footer context="public" />
 </body>
 </html>
