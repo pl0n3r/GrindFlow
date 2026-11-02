@@ -2109,6 +2109,217 @@ namespace {
 }
 """
 
+# SPEC:035 (PARTIAL): call real Laravel SchedulerController::index against
+# disposable Eloquent-shaped queries; no genuine SQL, HTTP or auth middleware.
+SCHEDULER_PAGINATION_PROBE = r"""
+namespace Illuminate\View {
+    class View {
+        public function __construct(public array $data) {}
+    }
+}
+namespace Illuminate\Support {
+    class Collection {
+        public function __construct(public array $items=[]) {}
+        public function where(string $key, mixed $value): self {
+            return new self(array_values(array_filter($this->items,
+                static fn($x) => $x->$key === $value)));
+        }
+        public function values(): self { return new self(array_values($this->items)); }
+        public function count(): int { return count($this->items); }
+        public function groupBy(callable $key): self {
+            $groups=[];
+            foreach ($this->items as $item) { $groups[$key($item)][] = $item; }
+            return new self($groups);
+        }
+    }
+}
+namespace Illuminate\Database\Eloquent { class Builder {} }
+namespace Illuminate\Http {
+    class Request {
+        public object $attributes;
+        public array $rules=[];
+        public function __construct(public array $data, private object $org) {
+            $this->attributes = new class($org) {
+                public function __construct(private object $org) {}
+                public function get(string $key): object { return $this->org; }
+            };
+        }
+        public function validate(array $rules): array {
+            $this->rules = $rules;
+            return array_intersect_key($this->data,$rules);
+        }
+        public function user(): object { return new \App\Models\User(); }
+    }
+}
+namespace Illuminate\Validation {
+    class Rule {
+        public static function in(array $opts): array { return $opts; }
+    }
+}
+namespace Illuminate\Support\Facades {
+    class Schema {
+        public static function hasTable(string $table): bool {
+            return in_array($table,['publishing_destinations','scheduled_publications'],true);
+        }
+    }
+}
+namespace App\Http\Controllers { abstract class Controller {} }
+namespace App\Models {
+    class Organization {}
+    class User {
+        public function canScheduleOrganization(object $organization): bool { return true; }
+    }
+    class PublishingDestination {
+        public const STATUS_ACTIVE = 'active';
+        public function __construct(public string $status) {}
+        public static function query(): DestinationQuery { return new DestinationQuery(); }
+    }
+    class DestinationQuery {
+        public function orderBy(string $column): self { return $this; }
+        public function get(): \Illuminate\Support\Collection {
+            return new \Illuminate\Support\Collection([
+                new PublishingDestination('active'),
+                new PublishingDestination('disabled'),
+            ]);
+        }
+    }
+    class ScheduledPublication {
+        public \DateTimeImmutable $scheduled_for_utc;
+        public function __construct(public string $id, public string $status='scheduled') {
+            $this->scheduled_for_utc = new \DateTimeImmutable('2031-04-05T12:00:00Z');
+        }
+        public static function query(): ScheduleQuery { return new ScheduleQuery(); }
+    }
+    class SchedulePaginator {
+        public array $appended=[];
+        public function __construct(
+            public \Illuminate\Support\Collection $page,
+            public int $total,
+            public int $perPage,
+        ) {}
+        public function appends(array $data): self { $this->appended=$data; return $this; }
+        public function getCollection(): \Illuminate\Support\Collection { return $this->page; }
+    }
+    class ScheduleQuery {
+        public array $filters=[];
+        public array $ordering=[];
+        public function with(array $relations): self {
+            if (!in_array('delivery',$relations,true)) {
+                throw new \RuntimeException('MISSING_EAGER_DELIVERY');
+            }
+            return $this;
+        }
+        public function when(mixed $value, callable $callback): self {
+            if ($value !== null && $value !== '') { $callback($this,$value); }
+            return $this;
+        }
+        public function where(string $name, mixed $value): self {
+            $this->filters[$name]=$value; return $this;
+        }
+        public function whereDate(string $name, string $operator, string $value): self {
+            $this->filters[$name.$operator]=$value; return $this;
+        }
+        public function orderBy(string $name): self { $this->ordering[]=$name; return $this; }
+        public function paginate(int $size): SchedulePaginator {
+            $GLOBALS['captured_query']=$this;
+            if ($size !== 25 || $this->ordering !== ['scheduled_for_utc','id']) {
+                throw new \RuntimeException('UNSTABLE_CALENDAR_PAGINATION');
+            }
+            $all=[];
+            for($i=1;$i<=52;$i++) {
+                $all[] = new ScheduledPublication(sprintf('schedule-%03d',$i));
+            }
+            $page=$GLOBALS['page'];
+            return new SchedulePaginator(
+                new \Illuminate\Support\Collection(array_slice($all,($page-1)*$size,$size)),
+                count($all),$size,
+            );
+        }
+    }
+    class MediaAsset {}
+    class TrackedLink {}
+}
+namespace App\Services\Scheduling {
+    class AssetQuery extends \Illuminate\Database\Eloquent\Builder {
+        public function count(): int { return 0; }
+        public function with(string $relation): self { return $this; }
+        public function latest(): self { return $this; }
+        public function orderByDesc(string $column): self { return $this; }
+        public function limit(int $size): self { return $this; }
+        public function get(): \Illuminate\Support\Collection {
+            return new \Illuminate\Support\Collection();
+        }
+    }
+    class ContentScheduler {
+        public function eligibleAssetsQuery(): \Illuminate\Database\Eloquent\Builder {
+            return new AssetQuery();
+        }
+    }
+}
+namespace {
+    function collect(array $items=[]): \Illuminate\Support\Collection {
+        return new \Illuminate\Support\Collection($items);
+    }
+    function old(string $key): mixed { return null; }
+    function config(string $name, mixed $fallback): mixed { return $fallback; }
+    function abort_unless(bool $condition, int $code): void {
+        if (!$condition) { throw new \RuntimeException('ABORT_'.$code); }
+    }
+    function view(string $name, array $data): \Illuminate\View\View {
+        if ($name !== 'scheduling.index') { throw new \RuntimeException('WRONG_VIEW'); }
+        return new \Illuminate\View\View($data);
+    }
+    require_once 'app/Http/Controllers/Scheduling/SchedulerController.php';
+    $assert = static function (bool $good,string $message): void {
+        if (!$good) { throw new \RuntimeException('CALENDAR_PAGINATION:'.$message); }
+    };
+    $pages=[];
+    for($page=1;$page<=3;$page++) {
+        $GLOBALS['page']=$page;
+        $input=['status'=>'scheduled','destination_id'=>'destA',
+            'from'=>'2031-04-01','to'=>'2031-04-30',
+            'page'=>$page, 'irrelevant_actor'=>'synthetic-forged'];
+        $request=new \Illuminate\Http\Request($input,new \App\Models\Organization());
+        $controller=new \App\Http\Controllers\Scheduling\SchedulerController();
+        $view=$controller->index($request,new \App\Services\Scheduling\ContentScheduler());
+        $paginator=$view->data['publications'];
+        $assert($paginator->total===52,'complete_total_'.$page);
+        $assert($paginator->perPage===25,'fixed_page_size_'.$page);
+        $ids=array_map(static fn($row)=>$row->id,$paginator->getCollection()->items);
+        $pages[]=$ids;
+        $assert(count($ids)===($page<3?25:2),'page_length_'.$page);
+        $assert(!array_key_exists('page',$paginator->appended)
+            && !array_key_exists('irrelevant_actor',$paginator->appended),
+            'no_unvalidated_filter_leak_'.$page);
+        $assert($paginator->appended===[
+            'status'=>'scheduled','destination_id'=>'destA',
+            'from'=>'2031-04-01','to'=>'2031-04-30'],
+            'preserved_validated_filters_'.$page);
+        $filters=$GLOBALS['captured_query']->filters;
+        $assert($filters['status']==='scheduled'
+            && $filters['publishing_destination_id']==='destA'
+            && $filters['scheduled_for_utc>=']==='2031-04-01'
+            && $filters['scheduled_for_utc<=']==='2031-04-30',
+            'filter_semantics_'.$page);
+        $assert($view->data['filterDestinations']->count()===2
+            && $view->data['destinations']->count()===1,
+            'disabled_destination_remains_filterable_'.$page);
+        $assert($view->data['calendarDays']->count()===1,'current_page_grouping_'.$page);
+        $assert($request->rules['page'] === ['nullable','integer','min:1','max:10000'],
+            'bounded_page_validation_declared_'.$page);
+    }
+    $flat=array_merge(...$pages);
+    $assert(count($flat)===52 && count(array_unique($flat))===52,
+        'no_duplicates_or_missing_under_identical_timestamps');
+    $assert($flat===array_map(
+        static fn(int $i)=>sprintf('schedule-%03d',$i),range(1,52)),
+        'ordered_by_utc_then_id_across_pages');
+    echo json_encode(['pages'=>3,'total'=>52,'source'=>'real-Controller-index',
+        'database'=>'synthetic-Eloquent','network'=>'disabled',
+        'production'=>'UNKNOWN'],JSON_THROW_ON_ERROR);
+}
+"""
+
 class CoberturaGrindflow03Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         probes = run_php('principal')['probes']
@@ -2348,7 +2559,30 @@ echo json_encode(['checks'=>8,'network'=>'disabled','production'=>'UNKNOWN'], JS
         self.assertEqual(response['database'], 'synthetic-queries')
         self.assertEqual(response['production'], 'UNKNOWN')
 
+    def test_scheduler_calendar_paginacion_real_y_filtros(self) -> None:
+        # SPEC:035 partial: actual Laravel SchedulerController::index method,
+        # with synthetic query/paginator. SQL/HTTP and middleware not executed.
+        php = shutil.which('php')
+        if php is None:
+            raise AssertionError('UNKNOWN: PHP CLI missing')
+        result = subprocess.run(
+            [php, '-d', 'display_errors=stderr', '-r', SCHEDULER_PAGINATION_PROBE],
+            cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f'UNKNOWN: Scheduler calendar index failed: {result.stderr}',
+        )
+        data = json.loads(result.stdout)
+        self.assertEqual((data['pages'], data['total']), (3, 52))
+        self.assertEqual(data['source'], 'real-Controller-index')
+        self.assertEqual(data['database'], 'synthetic-Eloquent')
+        self.assertEqual(data['production'], 'UNKNOWN')
+
     def test_sin_datos_reales(self) -> None:
+        self.assertNotIn('matriz-cobertura', SCHEDULER_PAGINATION_PROBE)
+        self.assertNotIn('curl_exec(', SCHEDULER_PAGINATION_PROBE)
+
         self.assertNotIn('matriz-cobertura', SCHEDULER_LINK_ASSIGNMENT_PROBE)
         self.assertNotIn('curl_exec(', SCHEDULER_LINK_ASSIGNMENT_PROBE)
         self.assertNotIn('file_get_contents(', SCHEDULER_LINK_ASSIGNMENT_PROBE)
