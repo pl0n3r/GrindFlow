@@ -127,8 +127,6 @@ const PLUGINS = [
   "TextPlugin",
 ] as const;
 
-type Plugins = (typeof PLUGINS)[number];
-
 // In order to dynamically load all the GSAP plugins
 const pluginMap = {
   CustomEase: () => import("gsap/CustomEase"),
