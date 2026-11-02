@@ -1577,6 +1577,174 @@ def run_traffic_link_php(mode: str) -> dict:
     return data
 
 
+MEDIA_ELIGIBILITY_PROBE = r'''
+declare(strict_types=1);
+
+namespace Illuminate\Database\Eloquent {
+    class Builder {
+        public array $calls = [];
+        public function where($key, $value) {
+            $this->calls[] = ['where', $key, $value];
+            return $this;
+        }
+        public function whereNull($key) {
+            $this->calls[] = ['whereNull', $key];
+            return $this;
+        }
+    }
+}
+namespace App\Models {
+    class MediaAsset {
+        public const STATUS_READY = 'ready';
+        public function __construct(
+            public string $status,
+            public ?string $duplicate_of,
+            public mixed $metadata
+        ) {}
+        public static function query(): \Illuminate\Database\Eloquent\Builder {
+            return new \Illuminate\Database\Eloquent\Builder();
+        }
+        public function getAttribute(string $name): mixed {
+            return $name === 'metadata' ? $this->metadata : null;
+        }
+    }
+}
+namespace App\Support\Tenancy {
+    class TenantContext {}
+}
+namespace App\Services\Media {
+    class MediaAssetProcessor {
+        public function currentVersion(): int { return 7; }
+    }
+}
+namespace {
+    require_once 'app/Services/Scheduling/ContentScheduler.php';
+    $scheduler = new \App\Services\Scheduling\ContentScheduler(
+        new \App\Support\Tenancy\TenantContext(),
+        new \App\Services\Media\MediaAssetProcessor()
+    );
+    $ok = ['processing' => ['status' => 'completed', 'version' => 7]];
+    $cases = [
+        ['ready', null, $ok, true],
+        ['pending', null, $ok, false],
+        ['duplicate', null, $ok, false],
+        ['ready', 'another-id', $ok, false],
+        ['ready', null, null, false],
+        ['ready', null, 'invalid', false],
+        ['ready', null, [], false],
+        ['ready', null, ['processing' => null], false],
+        ['ready', null, ['processing' => ['status'=>'pending','version'=>7]], false],
+        ['ready', null, ['processing' => ['status'=>'completed','version'=>6]], false],
+        ['ready', null, ['processing' => ['status'=>'completed']], false],
+        ['ready', null, ['processing' => ['version'=>7]], false],
+    ];
+    foreach ($cases as $index=>$case) {
+        [$status,$duplicate,$metadata,$expected] = $case;
+        $actual = $scheduler->isAssetEligible(new \App\Models\MediaAsset($status,$duplicate,$metadata));
+        if ($actual !== $expected) {
+            throw new \RuntimeException('ELIGIBILITY_FAIL:'.$index);
+        }
+    }
+    $query = $scheduler->eligibleAssetsQuery();
+    if ($query->calls !== [
+        ['where','status','ready'],
+        ['whereNull','duplicate_of'],
+        ['where','metadata->processing->status','completed'],
+        ['where','metadata->processing->version',7],
+    ]) {
+        throw new \RuntimeException('ELIGIBILITY_QUERY_FAIL');
+    }
+    echo json_encode(['cases'=>count($cases),'query_filters'=>count($query->calls),
+        'source'=>'real-PHP','database'=>'synthetic-query','production'=>'UNKNOWN'],
+        JSON_THROW_ON_ERROR);
+}
+'''
+
+
+def run_media_eligibility_php() -> dict:
+    """Call real ContentScheduler eligibility checks with isolated synthetic models."""
+    php = shutil.which('php')
+    if php is None:
+        raise AssertionError('UNKNOWN: PHP CLI unavailable for eligibility')
+    result = subprocess.run(
+        [php, '-d', 'display_errors=stderr', '-r', MEDIA_ELIGIBILITY_PROBE],
+        cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+    )
+    if result.returncode or result.stderr.strip():
+        raise AssertionError('UNKNOWN: real PHP eligibility failed: '
+                             + (result.stderr + result.stdout)[-1300:])
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as exc:
+        raise AssertionError('UNKNOWN: malformed eligibility output') from exc
+    if data != {'cases': 12, 'query_filters': 4, 'source': 'real-PHP',
+                'database': 'synthetic-query', 'production': 'UNKNOWN'}:
+        raise AssertionError('UNKNOWN: eligibility provenance mismatch')
+    return data
+
+
+CSV_EXPORT_PROBE = r'''
+declare(strict_types=1);
+namespace App\Http\Controllers {
+    class Controller {}
+}
+namespace {
+    require_once 'app/Http/Controllers/Traffic/TrafficController.php';
+    require_once 'app/Http/Controllers/Finance/FinanceController.php';
+    $traffic = new \ReflectionMethod(
+        \App\Http\Controllers\Traffic\TrafficController::class, 'csvCell');
+    $finance = new \ReflectionMethod(
+        \App\Http\Controllers\Finance\FinanceController::class, 'safeCsvText');
+    $cases = [
+        ['safe text', 'safe text'],
+        ['=2+3', "'=2+3"],
+        ['+cmd', "'+cmd"],
+        ['-1+2', "'-1+2"],
+        ['@now', "'@now"],
+        [" \t=SUM(A1:A2)", "' \t=SUM(A1:A2)"],
+        ["\n=HYPERLINK(0)", "'\n=HYPERLINK(0)"],
+        ["\x00=secret", "'\x00=secret"],
+        ['literal =not-first', 'literal =not-first'],
+        ['', ''],
+        ['8,9', '8,9']
+    ];
+    foreach ($cases as $idx=>[$input,$expected]) {
+        foreach ([$traffic,$finance] as $method) {
+            $actual = $method->invoke(null,$input);
+            if ($actual !== $expected) {
+                throw new \RuntimeException('CSV_FORMULA_FAIL:'.$idx.':'.$method->getName());
+            }
+        }
+    }
+    echo json_encode(['cases'=>count($cases),'helpers'=>2,
+        'source'=>'real-PHP', 'database'=>'disabled', 'production'=>'UNKNOWN'],
+        JSON_THROW_ON_ERROR);
+}
+'''
+
+
+def run_csv_export_guards_php() -> dict:
+    """Exercise real Traffic/Finance CSV escaping without real database/HTTP."""
+    php = shutil.which('php')
+    if php is None:
+        raise AssertionError('UNKNOWN: PHP CLI unavailable for CSV safety')
+    result = subprocess.run(
+        [php, '-d', 'display_errors=stderr', '-r', CSV_EXPORT_PROBE],
+        cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+    )
+    if result.returncode or result.stderr.strip():
+        raise AssertionError('UNKNOWN: real PHP CSV protection failed: '
+                             + (result.stderr + result.stdout)[-1300:])
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as exc:
+        raise AssertionError('UNKNOWN: malformed CSV safety result') from exc
+    if data != {'cases': 11, 'helpers': 2, 'source': 'real-PHP',
+                'database': 'disabled', 'production': 'UNKNOWN'}:
+        raise AssertionError('UNKNOWN: CSV probe provenance mismatch')
+    return data
+
+
 class CoberturaGrindflow03Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         probes = run_php('principal')['probes']
@@ -1705,7 +1873,23 @@ class CoberturaGrindflow03Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_traffic_link_php('unknown')
 
+    def test_media_eligibility_real_y_falla_cerrado(self) -> None:
+        # SPEC:038 partial: real eligibility predicate and query filters;
+        # synthetic query, no real Eloquent scopes or pagination.
+        self.assertEqual(run_media_eligibility_php()['cases'], 12)
+
+    def test_csv_traffic_finance_formula_guards_reales(self) -> None:
+        # SPEC:031/036 partial: real CSV formula sanitizers in both controllers.
+        # Does not attest filters, query completeness, streaming or HTTP headers.
+        self.assertEqual(run_csv_export_guards_php()['cases'], 11)
+
     def test_sin_datos_reales(self) -> None:
+        self.assertNotIn('matriz-cobertura', CSV_EXPORT_PROBE)
+        self.assertNotIn('curl_exec(', CSV_EXPORT_PROBE)
+        self.assertNotIn('file_get_contents(', CSV_EXPORT_PROBE)
+        self.assertNotIn('matriz-cobertura', MEDIA_ELIGIBILITY_PROBE)
+        self.assertNotIn('curl_exec(', MEDIA_ELIGIBILITY_PROBE)
+        self.assertNotIn('file_get_contents(', MEDIA_ELIGIBILITY_PROBE)
         self.assertNotIn('matriz-cobertura', TRAFFIC_LINK_PROBE)
         self.assertNotIn('curl_exec(', TRAFFIC_LINK_PROBE)
         self.assertNotIn('file_get_contents(', TRAFFIC_LINK_PROBE)
