@@ -53,8 +53,7 @@ gsap.to(scrollContainer, { duration: 1, scrollTo: { x: "max" } });
 
 | Option | Description |
 |--------|-------------|
-| `x`, `y` | Target scroll position (number), or `"max"` for maximum |
-| `element` | Selector or element to scroll to (for scroll-into-view) |
+| `x`, `y` | Target scroll coordinate (number), `"max"`, or a selector/element to scroll into view on that axis |
 | `offsetX`, `offsetY` | Offset in pixels from the target position |
 
 ### ScrollSmoother
@@ -92,7 +91,7 @@ Flip.from(state, { duration: 0.5, ease: "power2.inOut" });
 |--------|-------------|
 | `absolute` | Use `position: absolute` during the flip (default: `false`) |
 | `nested` | When true, only the first level of children is measured (better for nested transforms) |
-| `scale` | When true, scale elements to fit (avoids stretch); default `true` |
+| `scale` | When true, animate scaleX/scaleY to fit; default `false` (animates width/height instead) |
 | `simple` | When true, only position/scale are animated (faster, less accurate) |
 | `duration`, `ease` | Standard tween options |
 
