@@ -2055,6 +2055,76 @@ class CoberturaGrindflow03Tests(unittest.TestCase):
         # tests organization predicates, not actual Eloquent SQL/DB isolation.
         self.assertEqual(run_tenant_scope_php()['cases'], 4)
 
+    def test_vault_manifest_private_note_restore_integrity_real(self) -> None:
+        # SPEC:024 partial: genuine VaultManifest canonicalization/digest
+        # includes a private working note even for retained trash. This is a
+        # synthetic catalog check, not authorization/CSRF/DB/restore I/O.
+        php = shutil.which('php')
+        if php is None:
+            raise AssertionError('UNKNOWN: PHP CLI is not installed')
+        script = r"""
+declare(strict_types=1);
+require_once 'symfony/src/Infrastructure/Storage/VaultManifest.php';
+use GrindFlow\Infrastructure\Storage\VaultManifest;
+$assert = static function (bool $ok, string $label): void {
+    if (!$ok) { throw new RuntimeException('VAULT_MANIFEST:' . $label); }
+};
+$asset = [
+    'id'=>'synthetic-asset-1', 'uploaded_by'=>'synthetic-user',
+    'original_name'=>'synthetic-image.webp', 'mime_type'=>'image/webp',
+    'size_bytes'=>123, 'sha256'=>str_repeat('a', 64),
+    'storage_key'=>'synthetic/asset', 'created_at'=>'2026-01-01T00:00:00Z',
+    'deleted_at'=>null, 'deleted_by'=>null,
+    'private_note'=>'synthetic-private-note', 'usage_scope'=>'organization',
+];
+$canonical = VaultManifest::canonical($asset);
+$assert($canonical['private_note'] === 'synthetic-private-note',
+    'private note preserved in canonical catalog');
+$base = VaultManifest::digest([$asset]);
+$changed = $asset;
+$changed['private_note'] = 'synthetic-altered-note';
+$assert($base !== VaultManifest::digest([$changed]),
+    'note tampering must alter catalog fingerprint');
+$cleared = $asset;
+$cleared['private_note'] = null;
+$assert(VaultManifest::canonical($cleared)['private_note'] === null,
+    'null note stays null');
+$assert($base !== VaultManifest::digest([$cleared]),
+    'note clearing must alter fingerprint');
+$trashed = $asset;
+$trashed['deleted_at'] = '2026-02-01T00:00:00Z';
+$trashed['deleted_by'] = 'synthetic-user';
+$assert(VaultManifest::canonical($trashed)['private_note'] === 'synthetic-private-note',
+    'trash still retains private note');
+$assert(VaultManifest::digest([$trashed]) !== VaultManifest::digest([$changed] ),
+    'distinct note and trash metadata must remain distinguishable');
+$restored = $trashed;
+$restored['deleted_at'] = null;
+$restored['deleted_by'] = null;
+$assert(VaultManifest::digest([$restored]) === $base,
+    'restoring unchanged source returns identical fingerprint');
+set_error_handler(static function (int $severity, string $message): never {
+    throw new ErrorException($message, 0, $severity);
+});
+$incomplete = $asset;
+unset($incomplete['private_note']);
+$denied = false;
+try { VaultManifest::canonical($incomplete); }
+catch (Throwable $e) { $denied = true; }
+restore_error_handler();
+$assert($denied, 'missing private note must not be treated as empty');
+echo json_encode(['checks'=>8,'network'=>'disabled','production'=>'UNKNOWN'], JSON_THROW_ON_ERROR);
+"""
+        result = subprocess.run(
+            [php, '-d', 'display_errors=stderr', '-r', script],
+            cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f'UNKNOWN: VaultManifest real PHP failed: {result.stderr}',
+        )
+        self.assertEqual(json.loads(result.stdout)['checks'], 8)
+
     def test_sin_datos_reales(self) -> None:
         self.assertNotIn('matriz-cobertura', TENANT_SCOPE_PROBE)
         self.assertNotIn('curl_exec(', TENANT_SCOPE_PROBE)
