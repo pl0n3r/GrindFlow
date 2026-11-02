@@ -2,6 +2,17 @@
 
 **Estado:** prueba local automatizada; no constituye lanzamiento, publicación social real ni aprobación del piloto humano #271.
 
+## Evidencia ejecutada el 2-nov-2026 (offline)
+
+- Checkout del issue #795 con \`PHP 8.5 / Symfony 7.4\`; Composer instalado desde lock.
+- MariaDB 13.0.2 con \`--skip-networking\`, base aislada y 25 migraciones Doctrine.
+- \`php -l symfony/tests/php/PilotJourneySimulationTest.php\`: sin errores.
+- \`./vendor/bin/simple-phpunit tests/php/PilotJourneySimulationTest.php\`: **OK (1 test, 54 assertions)**.
+- \`GF795-SIM\` informó OK en ocho pasos, incluidos \`programacion\` y \`publicacion_simulada\`.
+- El callback de publicación devuelve solo \`SIMULATED-NOT-EXTERNAL-GF795\`; nunca hubo envío a Facebook/Instagram.
+- Esta evidencia offline no sustituye el CI remoto \`validate\`, Factory CI o \`symfony-preview\` exact-HEAD.
+
+
 ## Entorno y límites
 
 - Symfony, WebTestCase y MariaDB desechable con las migraciones correspondientes.
