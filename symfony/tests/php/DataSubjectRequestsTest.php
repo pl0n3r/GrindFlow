@@ -130,7 +130,7 @@ final class DataSubjectRequestsTest extends WebTestCase
                 ['ref' => $auditRef],
             ));
             self::assertSame(1, (int) $db->fetchOne(
-                "SELECT COUNT(*) FROM gf_data_subject_requests WHERE actor_ref = :ref AND kind = 'export' AND status = 'completed'",
+                "SELECT COUNT(*) FROM gf_data_subject_requests WHERE actor_ref = :ref AND kind = 'export' AND status = 'partial'",
                 ['ref' => $auditRef],
             ));
             self::assertSame(2, (int) $db->fetchOne(
