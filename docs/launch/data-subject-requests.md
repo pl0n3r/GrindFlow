@@ -28,7 +28,7 @@ Los nombres de rutas son **provisionales** y están sujetos a la ratificación d
 ## Prueba de aceptación principal
 
 La ruta reclamada por #799 es `symfony/tests/php/DataSubjectRequestsTest.php` y su método público `test_criterio_principal`.
-El test solo usa cuentas y organizaciones `@example.test` con MariaDB descartable, verifica autenticación, CSRF, aislamiento de tenant, bitácora sin payload personal, no borrado y reintentos idempotentes. Requiere el código/migración de #814.
+El test solo usa cuentas y organizaciones `@example.test` con MariaDB descartable, verifica autenticación, CSRF, rechazo de `organization_id` elegido por el cliente dentro de un único tenant sintético, bitácora sin payload personal, no borrado y reintentos idempotentes; no prueba accesos cruzados entre organizaciones. Requiere el código/migración de #814.
 
 El texto de #799 contiene el identificador generado `Datasubjectrequeststest.Tests::test_criterio_principal`, que no coincide con la convención de clases PHP del repositorio. Antes del PR, confirmar con el validador efectivo que reconoce `GrindFlow\\Tests\\DataSubjectRequestsTest::test_criterio_principal` sin modificar compuertas ni inventar un resultado verde.
 
