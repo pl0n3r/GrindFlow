@@ -226,18 +226,31 @@ jobs:
         if: steps.smoke.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          MEDIA_LIVE_PROBE_OUTCOME: ${{ steps.media_live_storage_probe.outcome }}
+          MEDIA_LIVE_PROBE_VERIFIED: ${{ steps.media_live_storage_probe.outputs.verified }}
         shell: bash
         run: |
+          set -euo pipefail
           issue_number="$(gh issue list --state open --search "$MEDIA_STORAGE_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
 
-          if grep -Fq 'MEDIA_STORAGE_READY=1' production-smoke.log; then
+          # A configuration flag is not independent proof of B2 PUT/HEAD/CORS.
+          # The probe step is deliberately absent until separately authorized.
+          ready_count="$(grep -Fxc 'MEDIA_STORAGE_READY=1' production-smoke.log || true)"
+          not_ready_count="$(grep -Fxc 'MEDIA_STORAGE_READY=0' production-smoke.log || true)"
+          marker_count="$(grep -Ec '^MEDIA_STORAGE_READY=' production-smoke.log || true)"
+
+          if [[ "$ready_count" == "1" && "$marker_count" == "1" &&
+                "$MEDIA_LIVE_PROBE_OUTCOME" == "success" &&
+                "$MEDIA_LIVE_PROBE_VERIFIED" == "true" ]]; then
             echo "Media object storage is configured." >> "$GITHUB_STEP_SUMMARY"
 
             if [[ -n "$issue_number" ]]; then
               gh issue comment "$issue_number" --body "Media object storage is now configured on production commit $GITHUB_SHA. Closing this automatic notice."
               gh issue close "$issue_number"
             fi
-          else
+          elif [[ "$ready_count" == "1" && "$marker_count" == "1" ]]; then
+            echo "Media storage configuration detected; independent live verification pending. #146 stays open." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$not_ready_count" == "1" && "$marker_count" == "1" ]]; then
             {
               echo "## Media object storage setup required"
               echo
@@ -258,6 +271,8 @@ jobs:
             else
               gh issue create --title "$MEDIA_STORAGE_ISSUE_TITLE" --body-file /tmp/grindflow-media-storage.md
             fi
+          else
+            echo "Media storage readiness state ambiguous; #146 unchanged." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Reconcile media web-runtime readiness
