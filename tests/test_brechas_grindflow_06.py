@@ -133,11 +133,20 @@ def inspect(clause: Clause, rows: dict[str, tuple[str, ...]],
         try:
             composer = json.loads(sources[COMPOSER])
             front = json.loads(sources[FRONT])
-            assert composer["require"]["symfony/framework-bundle"].startswith("7.4")
-            assert "doctrine/orm" in composer["require"]
-            assert "doctrine/dbal" in composer["require"]
-            assert front["dependencies"]["react"].startswith("^19")
-        except (KeyError, TypeError, ValueError, AssertionError):
+            required = composer["require"]
+            dependencies = front["dependencies"]
+            if not (
+                isinstance(required, dict)
+                and isinstance(dependencies, dict)
+                and isinstance(required.get("symfony/framework-bundle"), str)
+                and required["symfony/framework-bundle"].startswith("7.4")
+                and "doctrine/orm" in required
+                and "doctrine/dbal" in required
+                and isinstance(dependencies.get("react"), str)
+                and dependencies["react"].startswith("^19")
+            ):
+                return result
+        except (KeyError, TypeError, ValueError):
             return result
         # El contrato objetivo existe; se mantiene UNKNOWN sobre el requisito
         # global hasta medir segmentación, aislamiento y escalabilidad reales.
