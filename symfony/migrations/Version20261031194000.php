@@ -42,8 +42,8 @@ final class Version20261031194000 extends AbstractMigration
                 id CHAR(36) NOT NULL,
                 plan_key VARCHAR(128) NOT NULL,
                 actor_id CHAR(36) NOT NULL,
-                before_json JSON NOT NULL,
-                after_json JSON NOT NULL,
+                before_json LONGTEXT NOT NULL,
+                after_json LONGTEXT NOT NULL,
                 before_revision BIGINT UNSIGNED NOT NULL,
                 after_revision BIGINT UNSIGNED NOT NULL,
                 changed_at DATETIME(6) NOT NULL,
@@ -52,6 +52,8 @@ final class Version20261031194000 extends AbstractMigration
                 INDEX ix_gf_plan_limit_changes_actor (actor_id, changed_at),
                 CONSTRAINT fk_gf_plan_change_actor FOREIGN KEY (actor_id)
                     REFERENCES gf_identity_users(id) ON DELETE RESTRICT,
+                CONSTRAINT ck_gf_plan_before_json CHECK (JSON_VALID(before_json)),
+                CONSTRAINT ck_gf_plan_after_json CHECK (JSON_VALID(after_json)),
                 CONSTRAINT ck_gf_plan_change_revision
                     CHECK (after_revision = before_revision + 1)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
