@@ -1745,6 +1745,167 @@ def run_csv_export_guards_php() -> dict:
     return data
 
 
+MANUAL_WORKFLOW_PROBE = r'''
+declare(strict_types=1);
+namespace Symfony\Bundle\FrameworkBundle\Controller {
+    class AbstractController {}
+}
+namespace {
+    require_once 'symfony/src/Http/Controller/ManualHandoffController.php';
+    require_once 'symfony/src/Http/Controller/ManualDestinationController.php';
+    $handoff = new \GrindFlow\Http\Controller\ManualHandoffController();
+    $destinations = new \GrindFlow\Http\Controller\ManualDestinationController();
+    $status = new \ReflectionMethod($handoff, 'publicStatus');
+    foreach ([
+        'prepare' => 'prepared', 'complete' => 'completed',
+        'fail' => 'failed', 'unknown' => 'none',
+        '' => 'none',
+    ] as $action=>$expected) {
+        if ($status->invoke($handoff, $action) !== $expected) {
+            throw new \RuntimeException('HANDOFF_STATUS_FAIL:'.$action);
+        }
+    }
+    $normalize = new \ReflectionMethod($destinations, 'normalizeLabel');
+    $labels = [
+        ['  Stage   Ops  ', 'Stage Ops'],
+        ['Main stage', 'Main stage'],
+        [' x ', null], ['   ', null],
+        [str_repeat('a',80), str_repeat('a',80)],
+        [str_repeat('a',81), null],
+        ["one\n  two", 'one two'],
+        ["foo\x00bar", null],
+    ];
+    foreach ($labels as $i=>[$value,$expected]) {
+        $actual = $normalize->invoke($destinations,$value);
+        if ($actual !== $expected) {
+            throw new \RuntimeException('DESTINATION_LABEL_FAIL:'.$i);
+        }
+    }
+    $toPublic = new \ReflectionMethod($destinations, 'publicDestination');
+    $source = [
+        'id'=>'id-synthetic', 'label'=>'Stage Ops',
+        'created_at'=>'2026-10-30 12:00:00', 'disabled_at'=>null,
+        'secret'=>'never-expose', 'provider_id'=>'not-exposed'
+    ];
+    $a = $toPublic->invoke($destinations,$source);
+    if ($a !== [
+        'id'=>'id-synthetic','label'=>'Stage Ops','active'=>true,
+        'created_at'=>'2026-10-30 12:00:00', 'disabled_at'=>null
+    ]) {
+        throw new \RuntimeException('DESTINATION_EXPOSURE_FAIL');
+    }
+    $source['disabled_at']='2026-10-31 12:00:00';
+    $b = $toPublic->invoke($destinations,$source);
+    if ($b['active'] !== false || $b['disabled_at'] !== '2026-10-31 12:00:00'
+        || array_key_exists('secret',$b)) {
+        throw new \RuntimeException('DESTINATION_DISABLED_FAIL');
+    }
+    echo json_encode([
+       'handoff_states'=>5,'destination_labels'=>count($labels),
+       'public_states'=>2,'source'=>'real-PHP',
+       'database'=>'disabled','production'=>'UNKNOWN'
+    ],JSON_THROW_ON_ERROR);
+}
+'''
+
+
+def run_manual_workflow_php() -> dict:
+    """Call real Symfony controller state/label/public-projection helpers."""
+    php = shutil.which('php')
+    if php is None:
+        raise AssertionError('UNKNOWN: PHP CLI unavailable for manual handoff')
+    result = subprocess.run(
+        [php, '-d', 'display_errors=stderr', '-r', MANUAL_WORKFLOW_PROBE],
+        cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+    )
+    if result.returncode or result.stderr.strip():
+        raise AssertionError('UNKNOWN: real manual controllers failed: '
+                             + (result.stderr + result.stdout)[-1300:])
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as exc:
+        raise AssertionError('UNKNOWN: malformed manual controller output') from exc
+    if data != {'handoff_states': 5, 'destination_labels': 8,
+                'public_states': 2, 'source': 'real-PHP',
+                'database': 'disabled', 'production': 'UNKNOWN'}:
+        raise AssertionError('UNKNOWN: manual controller provenance mismatch')
+    return data
+
+
+TENANT_SCOPE_PROBE = r'''
+declare(strict_types=1);
+namespace Illuminate\Database\Eloquent {
+    interface Scope { public function apply(Builder $builder, Model $model): void; }
+    class Builder {
+        public array $conditions = [];
+        public function whereRaw(string $raw): void {$this->conditions[]=['raw',$raw];}
+        public function where(string $column, string $value): void {
+            $this->conditions[]=['where',$column,$value];
+        }
+    }
+    class Model {
+        public function qualifyColumn(string $key): string {return 'synthetic_assets.'.$key;}
+    }
+}
+namespace App\Support\Tenancy {
+    class TenantContext {
+        public ?string $active = null;
+        public function organizationId(): ?string {return $this->active;}
+    }
+}
+namespace {
+    $GLOBALS['synthetic_context'] = new \App\Support\Tenancy\TenantContext();
+    function resolve(string $class): object {
+        if ($class !== \App\Support\Tenancy\TenantContext::class) {
+            throw new \RuntimeException('UNEXPECTED_RESOLVE');
+        }
+        return $GLOBALS['synthetic_context'];
+    }
+    require_once 'app/Models/Scopes/TenantScope.php';
+    $scope=new \App\Models\Scopes\TenantScope();
+    $model=new \Illuminate\Database\Eloquent\Model();
+    $cases=[
+        [null,[['raw','1 = 0']]],
+        ['org-a',[['where','synthetic_assets.organization_id','org-a']]],
+        ['org-b',[['where','synthetic_assets.organization_id','org-b']]],
+        [null,[['raw','1 = 0']]],
+    ];
+    foreach ($cases as $i=>[$tenant,$expected]) {
+        $GLOBALS['synthetic_context']->active=$tenant;
+        $q=new \Illuminate\Database\Eloquent\Builder();
+        $scope->apply($q,$model);
+        if ($q->conditions !== $expected) {
+            throw new \RuntimeException('TENANT_SCOPE_FAIL:'.$i);
+        }
+    }
+    echo json_encode(['cases'=>count($cases),'source'=>'real-PHP',
+        'database'=>'synthetic-query','production'=>'UNKNOWN'],JSON_THROW_ON_ERROR);
+}
+'''
+
+
+def run_tenant_scope_php() -> dict:
+    """Exercise real Laravel TenantScope against synthetic query objects."""
+    php = shutil.which('php')
+    if php is None:
+        raise AssertionError('UNKNOWN: PHP CLI unavailable for tenant scope')
+    result = subprocess.run(
+        [php, '-d', 'display_errors=stderr', '-r', TENANT_SCOPE_PROBE],
+        cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+    )
+    if result.returncode or result.stderr.strip():
+        raise AssertionError('UNKNOWN: real TenantScope failed: '
+                             + (result.stderr + result.stdout)[-1300:])
+    try:
+        data = json.loads(result.stdout)
+    except ValueError as exc:
+        raise AssertionError('UNKNOWN: malformed TenantScope result') from exc
+    if data != {'cases': 4, 'source': 'real-PHP',
+                'database': 'synthetic-query', 'production': 'UNKNOWN'}:
+        raise AssertionError('UNKNOWN: tenant scope provenance mismatch')
+    return data
+
+
 class CoberturaGrindflow03Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         probes = run_php('principal')['probes']
@@ -1883,7 +2044,24 @@ class CoberturaGrindflow03Tests(unittest.TestCase):
         # Does not attest filters, query completeness, streaming or HTTP headers.
         self.assertEqual(run_csv_export_guards_php()['cases'], 11)
 
+    def test_handoff_y_destino_manual_reales_y_seguridad(self) -> None:
+        # SPEC:019/020 partial: real state representation, destination labels,
+        # public projection and omission of secrets. Does not attest ledger,
+        # transaction locking, tenant SQL or external publication.
+        self.assertEqual(run_manual_workflow_php()['destination_labels'], 8)
+
+    def test_laravel_tenant_scope_real_y_falla_cerrado(self) -> None:
+        # SPEC:021/022 partial: real TenantScope fail-closed without context;
+        # tests organization predicates, not actual Eloquent SQL/DB isolation.
+        self.assertEqual(run_tenant_scope_php()['cases'], 4)
+
     def test_sin_datos_reales(self) -> None:
+        self.assertNotIn('matriz-cobertura', TENANT_SCOPE_PROBE)
+        self.assertNotIn('curl_exec(', TENANT_SCOPE_PROBE)
+        self.assertNotIn('file_get_contents(', TENANT_SCOPE_PROBE)
+        self.assertNotIn('matriz-cobertura', MANUAL_WORKFLOW_PROBE)
+        self.assertNotIn('curl_exec(', MANUAL_WORKFLOW_PROBE)
+        self.assertNotIn('file_get_contents(', MANUAL_WORKFLOW_PROBE)
         self.assertNotIn('matriz-cobertura', CSV_EXPORT_PROBE)
         self.assertNotIn('curl_exec(', CSV_EXPORT_PROBE)
         self.assertNotIn('file_get_contents(', CSV_EXPORT_PROBE)
