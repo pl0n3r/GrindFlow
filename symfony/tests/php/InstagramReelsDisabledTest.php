@@ -83,6 +83,7 @@ final class Tests extends TestCase
         $configuration = new InstagramReelConfiguration(
             self::ORGANIZATION, '1234567890', 'test-token-never-sent', 'v26.0',
             'instagram_content_publish',
+            vaultRoot: sys_get_temp_dir(),
         );
         try {
             $configuration->assertAvailableFor(self::ORGANIZATION);
