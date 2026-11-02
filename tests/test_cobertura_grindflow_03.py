@@ -1906,6 +1906,209 @@ def run_tenant_scope_php() -> dict:
     return data
 
 
+# SPEC:034 (PARTIAL): execute ContentScheduler::updateTrackedLink itself with
+# synthetic scoped row locks. No Eloquent, SQL transaction or HTTP is inferred.
+SCHEDULER_LINK_ASSIGNMENT_PROBE = r"""
+namespace Illuminate\Auth\Access {
+    class AuthorizationException extends \RuntimeException {}
+}
+namespace Illuminate\Validation {
+    class ValidationException extends \RuntimeException {
+        public static function withMessages(array $messages): self { return new self('DENIED'); }
+    }
+}
+namespace App\Support\Tenancy {
+    class TenantContext {
+        public function __construct(private ?string $tenant) {}
+        public function organizationId(): ?string { return $this->tenant; }
+    }
+}
+namespace App\Services\Media { class MediaAssetProcessor {} }
+namespace App\Models\Scopes { class TenantScope {} }
+namespace Illuminate\Support\Facades {
+    class Schema {
+        public static bool $ready = true;
+        public static function hasTable(string $name): bool { return self::$ready; }
+    }
+    class DB {
+        public static int $transactions = 0;
+        public static function transaction(callable $fn): mixed {
+            ++self::$transactions; return $fn();
+        }
+    }
+}
+namespace App\Models {
+    class FakeFuture {
+        public function __construct(private bool $future) {}
+        public function isFuture(): bool { return $this->future; }
+    }
+    class User {
+        public function __construct(private bool $permission = true) {}
+        public function canScheduleOrganization(string $tenant): bool {
+            return $this->permission && $tenant === 'tenantA';
+        }
+    }
+    class ScheduledPublication {
+        public const STATUS_SCHEDULED = 'scheduled';
+        public string $organization_id = 'tenantA';
+        public string $status = 'scheduled';
+        public FakeFuture $scheduled_for_utc;
+        public function __construct() { $this->scheduled_for_utc = new FakeFuture(true); }
+        public function getKey(): string { return 'scheduleA'; }
+        public function delivery(): object {
+            return new class {
+                public function exists(): bool { return $GLOBALS['delivered']; }
+            };
+        }
+        public static function query(): ScheduleQuery { return new ScheduleQuery(); }
+    }
+    class ScheduleQuery {
+        private bool $tenantScoped = false;
+        private bool $locked = false;
+        private string $id = '';
+        public function withoutGlobalScope(string $scope): self { return $this; }
+        public function where(string $col, mixed $val): self {
+            if ($col !== 'organization_id' || $val !== 'tenantA') {
+                throw new \RuntimeException('UNSCOPED_SCHEDULE');
+            }
+            $this->tenantScoped = true; return $this;
+        }
+        public function whereKey(string $key): self { $this->id = $key; return $this; }
+        public function lockForUpdate(): self { $this->locked = true; return $this; }
+        public function firstOrFail(): ScheduledPublication {
+            if (!$this->tenantScoped || !$this->locked) {
+                throw new \RuntimeException('MISSING_SCHEDULE_LOCK');
+            }
+            if ($this->id !== 'scheduleA') { throw new \RuntimeException('NOT_FOUND'); }
+            return $GLOBALS['schedule'];
+        }
+    }
+    class TrackedLink {
+        public const STATUS_ACTIVE = 'active';
+        public string $organization_id = 'tenantA';
+        public string $status = 'active';
+        public string $token = 'synthetic-public-token';
+        public array $clicks = [3, 5];
+        public function getKey(): string { return 'linkA'; }
+        public static function query(): TrackedLinkQuery { return new TrackedLinkQuery(); }
+    }
+    class TrackedLinkQuery {
+        private string $id = '';
+        private bool $locked = false;
+        public function whereKey(string $key): self { $this->id = $key; return $this; }
+        public function lockForUpdate(): self { $this->locked = true; return $this; }
+        public function firstOrFail(): TrackedLink {
+            if (!$this->locked) { throw new \RuntimeException('MISSING_LINK_LOCK'); }
+            if ($this->id !== 'linkA') { throw new \RuntimeException('NOT_FOUND'); }
+            return $GLOBALS['link'];
+        }
+    }
+    class FakeAssignment {
+        public string $tracked_link_id = 'linkOld';
+        public function delete(): void { ++ScheduledPublicationLink::$writes; }
+        public function forceFill(array $changes): self {
+            $this->tracked_link_id = $changes['tracked_link_id'];
+            return $this;
+        }
+        public function save(): void { ++ScheduledPublicationLink::$writes; }
+    }
+    class ScheduledPublicationLink {
+        public static int $writes = 0;
+        public static function query(): AssignmentQuery { return new AssignmentQuery(); }
+    }
+    class AssignmentQuery {
+        private bool $scoped = false;
+        private bool $locked = false;
+        public function where(string $col, mixed $val): self {
+            $this->scoped = $col === 'scheduled_publication_id' && $val === 'scheduleA';
+            return $this;
+        }
+        public function lockForUpdate(): self { $this->locked = true; return $this; }
+        public function first(): ?FakeAssignment {
+            if (!$this->scoped || !$this->locked) {
+                throw new \RuntimeException('UNLOCKED_ASSIGNMENT');
+            }
+            return $GLOBALS['assignment'];
+        }
+        public function create(array $attrs): void {
+            if ($attrs !== ['scheduled_publication_id'=>'scheduleA','tracked_link_id'=>'linkA']) {
+                throw new \RuntimeException('UNSAFE_CREATION');
+            }
+            ++ScheduledPublicationLink::$writes;
+        }
+    }
+}
+namespace {
+    function abort(int $code, string $message): never { throw new \RuntimeException('HTTP_'.$code); }
+    require_once 'app/Services/Scheduling/ContentScheduler.php';
+    use App\Services\Scheduling\ContentScheduler;
+    use App\Services\Media\MediaAssetProcessor;
+    use App\Support\Tenancy\TenantContext;
+    use App\Models\User;
+    use App\Models\ScheduledPublication;
+    use App\Models\TrackedLink;
+    use App\Models\FakeAssignment;
+    use App\Models\ScheduledPublicationLink;
+    use Illuminate\Support\Facades\DB;
+    use Illuminate\Support\Facades\Schema;
+    $assert = static function(bool $ok, string $reason): void {
+        if (!$ok) { throw new \RuntimeException('SCHED_ASSIGN:'.$reason); }
+    };
+    $cases = ['create','replace','same','detach','detach_empty',
+        'no_tenant','wrong_tenant','no_permission','no_schema',
+        'cancelled','due','delivered','foreign_link','disabled_link','missing_link'];
+    $success = ['create','replace','same','detach','detach_empty'];
+    foreach ($cases as $mode) {
+        DB::$transactions=0; ScheduledPublicationLink::$writes=0; Schema::$ready=true;
+        $GLOBALS['delivered'] = false;
+        $GLOBALS['schedule'] = new ScheduledPublication();
+        $GLOBALS['link'] = new TrackedLink();
+        $GLOBALS['assignment'] = null;
+        $permission = true;
+        $tenant='tenantA';
+        $linkId='linkA';
+        if ($mode === 'replace') { $GLOBALS['assignment'] = new FakeAssignment(); }
+        if ($mode === 'same') {
+            $GLOBALS['assignment'] = new FakeAssignment();
+            $GLOBALS['assignment']->tracked_link_id='linkA';
+        }
+        if ($mode === 'detach') {
+            $GLOBALS['assignment'] = new FakeAssignment();
+            $linkId = null;
+        }
+        if ($mode === 'detach_empty') { $linkId = null; }
+        if ($mode === 'no_tenant') { $tenant = null; }
+        if ($mode === 'wrong_tenant') { $GLOBALS['schedule']->organization_id = 'tenantB'; }
+        if ($mode === 'no_permission') { $permission = false; }
+        if ($mode === 'no_schema') { Schema::$ready = false; }
+        if ($mode === 'cancelled') { $GLOBALS['schedule']->status = 'cancelled'; }
+        if ($mode === 'due') { $GLOBALS['schedule']->scheduled_for_utc = new \App\Models\FakeFuture(false); }
+        if ($mode === 'delivered') { $GLOBALS['delivered'] = true; }
+        if ($mode === 'foreign_link') { $GLOBALS['link']->organization_id = 'tenantB'; }
+        if ($mode === 'disabled_link') { $GLOBALS['link']->status = 'disabled'; }
+        if ($mode === 'missing_link') { $linkId = 'missing-link'; }
+        $manager = new ContentScheduler(new TenantContext($tenant), new MediaAssetProcessor());
+        $rejected = false;
+        try {
+            $manager->updateTrackedLink($GLOBALS['schedule'],new User($permission),$linkId);
+        } catch (\Illuminate\Auth\Access\AuthorizationException|\Illuminate\Validation\ValidationException|\RuntimeException $e) {
+            $rejected = true;
+        }
+        $assert($rejected === !in_array($mode,$success,true), 'acceptance_'.$mode);
+        $expectedWrites = in_array($mode,['create','replace','detach'],true) ? 1 : 0;
+        $assert(ScheduledPublicationLink::$writes === $expectedWrites, 'writes_'.$mode);
+        $assert($GLOBALS['link']->token === 'synthetic-public-token'
+            && $GLOBALS['link']->clicks === [3,5], 'link_history_'.$mode);
+        if (in_array($mode,['no_tenant','wrong_tenant','no_permission','no_schema'],true)) {
+            $assert(DB::$transactions === 0, 'preauth_must_not_transact_'.$mode);
+        }
+    }
+    echo json_encode(['cases'=>count($cases),'source'=>'real-PHP',
+        'database'=>'synthetic-queries','network'=>'disabled',
+        'production'=>'UNKNOWN'],JSON_THROW_ON_ERROR);
+}
+"""
+
 class CoberturaGrindflow03Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         probes = run_php('principal')['probes']
@@ -2125,7 +2328,30 @@ echo json_encode(['checks'=>8,'network'=>'disabled','production'=>'UNKNOWN'], JS
         )
         self.assertEqual(json.loads(result.stdout)['checks'], 8)
 
+    def test_scheduler_tracked_link_assignment_real_y_falla_cerrado(self) -> None:
+        # SPEC:034 partial: calls the actual ContentScheduler manager for
+        # add, replace, detach and negative gates under synthetic locks.
+        php = shutil.which('php')
+        if php is None:
+            raise AssertionError('UNKNOWN: PHP CLI is not installed')
+        result = subprocess.run(
+            [php, '-d', 'display_errors=stderr', '-r', SCHEDULER_LINK_ASSIGNMENT_PROBE],
+            cwd=ROOT, text=True, capture_output=True, timeout=20, check=False,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f'UNKNOWN: real Scheduler assignment probe failed: {result.stderr}',
+        )
+        response = json.loads(result.stdout)
+        self.assertEqual(response['cases'], 15)
+        self.assertEqual(response['source'], 'real-PHP')
+        self.assertEqual(response['database'], 'synthetic-queries')
+        self.assertEqual(response['production'], 'UNKNOWN')
+
     def test_sin_datos_reales(self) -> None:
+        self.assertNotIn('matriz-cobertura', SCHEDULER_LINK_ASSIGNMENT_PROBE)
+        self.assertNotIn('curl_exec(', SCHEDULER_LINK_ASSIGNMENT_PROBE)
+        self.assertNotIn('file_get_contents(', SCHEDULER_LINK_ASSIGNMENT_PROBE)
         self.assertNotIn('matriz-cobertura', TENANT_SCOPE_PROBE)
         self.assertNotIn('curl_exec(', TENANT_SCOPE_PROBE)
         self.assertNotIn('file_get_contents(', TENANT_SCOPE_PROBE)
