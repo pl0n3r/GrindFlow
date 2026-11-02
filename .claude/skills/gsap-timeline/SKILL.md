@@ -25,7 +25,7 @@ By default, tweens are **appended** one after another. Use the **position parame
 
 ## Position Parameter
 
-Third argument (or position property in vars) controls placement:
+The **third argument** of `timeline.to(targets, vars, position)` controls placement; `position` is **not** a property in tween vars:
 
 - **Absolute**: `1` — start at 1 second.
 - **Relative (default)**: `"+=0.5"` — 0.5s after end; `"-=0.2"` — 0.2s before end.
