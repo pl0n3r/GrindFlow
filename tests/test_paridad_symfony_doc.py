@@ -65,6 +65,11 @@ class DocContractTests(unittest.TestCase):
                 self.assertIn("PENDIENTE", row)
                 self.assertIn("NO ENSAYADO", row)
                 self.assertIn("REQUIREMENTS.md", row)
+                self.assertNotRegex(
+                    row,
+                    r"\|\s*(?:VALIDADO|APROBADO|EJECUTADO|EN_PRODUCCION)\s*\|",
+                    "El checklist no puede proclamar paridad o cutover verificados",
+                )
         self.assertIn("no prueba paridad real", content)
         self.assertIn("sin producción", content.lower())
 
