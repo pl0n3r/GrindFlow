@@ -12,6 +12,8 @@ return [
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
     'cipher' => 'AES-256-CBC',
     'key' => env('APP_KEY'),
+    // Owner-controlled contact; never hardcode personal details in the repository.
+    'privacy_contact_email' => env('GRINDFLOW_PRIVACY_CONTACT_EMAIL', ''),
     'previous_keys' => array_filter(
         explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
     ),

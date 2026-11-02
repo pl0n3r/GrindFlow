@@ -1,0 +1,60 @@
+/* GrindFlow cookie choice: equal prominence, keyboard and reduced-motion safe. */
+.gf-cookie-consent[hidden] { display: none !important; }
+.gf-cookie-consent {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 10000;
+  inset-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  max-width: 38rem;
+  margin-inline: auto;
+  padding: 1.1rem;
+  border: 2px solid currentColor;
+  border-radius: .75rem;
+  background: #101019;
+  color: #fff;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 35%);
+  font: inherit;
+}
+.gf-cookie-consent *, .gf-cookie-consent *::before, .gf-cookie-consent *::after {
+  box-sizing: border-box;
+}
+.gf-cookie-consent__title { margin: 0 0 .4rem; font-size: 1.1rem; color: inherit; }
+.gf-cookie-consent__text { margin: .3rem 0 .8rem; line-height: 1.45; }
+.gf-cookie-consent__legal { display: block; margin-block: .5rem; opacity: .85; font-size: .85rem; }
+.gf-cookie-consent__actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .75rem; }
+.gf-cookie-consent__action {
+  min-height: 44px;
+  min-width: 112px;
+  flex: 1 1 9rem;
+  padding: .65rem 1rem;
+  border: 2px solid #fff;
+  border-radius: .4rem;
+  background: #fff;
+  color: #101019;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gf-cookie-consent__action:hover { background: #e6e6e6; }
+.gf-cookie-consent__action:focus-visible,
+[data-gf-cookie-open]:focus-visible { outline: 3px solid #c3ff4b; outline-offset: 3px; }
+.gf-cookie-consent__close {
+  min-height: 44px;
+  min-width: 44px;
+  padding: .25rem;
+  border: 1px solid #fff;
+  background: transparent;
+  color: inherit;
+  border-radius: .4rem;
+  cursor: pointer;
+}
+.gf-cookie-consent__close:focus-visible { outline: 3px solid #c3ff4b; outline-offset: 3px; }
+[data-gf-cookie-open] { display: inline-flex; align-items: center; min-height: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  .gf-cookie-consent, .gf-cookie-consent *, .gf-cookie-consent *::before, .gf-cookie-consent *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

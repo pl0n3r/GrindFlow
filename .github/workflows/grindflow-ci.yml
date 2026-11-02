@@ -257,6 +257,8 @@ jobs:
           [[ -f tests/test_media_pilot_readiness_contract.py ]] && python3 -m unittest tests/test_media_pilot_readiness_contract.py
            python3 -m unittest tests/test_media_storage_cors_preflight.py
           python3 -m unittest tests/test_s4_database_url_percent_encoding.py
+          # GF731: execute all four adversarial test cases in fast/validate.
+          python3 -m unittest -v tests/test_brechas_grindflow_05.py
 
       - name: Contrato offline CORS en fast
         shell: bash
@@ -833,6 +835,11 @@ jobs:
         if: ${{ hashFiles('tests/test_parity_matrix_executable.py') != '' }}
         working-directory: .
         run: python3 -m unittest tests/test_parity_matrix_executable.py -v
+      - name: Ejecutar guardia GF350 de retiro legacy cuando esté en el HEAD
+        # #682 aporta este test; sin su archivo el skip NO acredita AC-02 de #682.
+        if: ${{ hashFiles('tests/test_legacy_retirement_guard.py') != '' }}
+        working-directory: .
+        run: python3 -m unittest tests/test_legacy_retirement_guard.py -v
       - name: Verify migration reversibility on disposable MariaDB
         working-directory: symfony
         run: |

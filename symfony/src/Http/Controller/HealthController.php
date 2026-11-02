@@ -20,6 +20,7 @@ final class HealthController
         return new JsonResponse([
             'status' => $compatible ? 'ok' : 'degraded',
             'version' => $version->human(),
+            'release_sha' => $version->releaseSha(),
             'stage' => 's0-preview',
             'runtime' => $runtimeSummary,
         ], $compatible ? 200 : 503, ['Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);

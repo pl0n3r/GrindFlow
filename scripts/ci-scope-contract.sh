@@ -89,6 +89,18 @@ expect_flag "$release100_mixed" "$RUN_SYMFONY_ENABLED" "GF356 Python test cannot
 release100_docs="$(run_scope pull_request docs/launch/release-100-gate.md)"
 expect_flag "$release100_docs" "run_symfony=false" "GF356 docs alone do not trigger Symfony"
 
+legacy_retirement="$(run_scope pull_request tests/test_legacy_retirement_guard.py)"
+expect_flag "$legacy_retirement" "$RUN_SYMFONY_ENABLED" "GF350 retirement regression selects Symfony preview"
+expect_flag "$legacy_retirement" "run_php_quality=false" "GF350 regression does not broaden PHP quality"
+expect_flag "$legacy_retirement" "run_tests=false" "GF350 regression does not broaden Laravel tests"
+expect_flag "$legacy_retirement" "run_legacy=false" "GF350 regression does not broaden legacy Node"
+retirement_unrelated="$(run_scope pull_request tests/test_legacy_retirement_guard_fixture.py)"
+expect_flag "$retirement_unrelated" "run_symfony=false" "unrelated Python test does not select Symfony"
+retirement_docs="$(run_scope pull_request docs/LEGACY-DEPENDENCY-INVENTORY.md)"
+expect_flag "$retirement_docs" "run_symfony=false" "GF350 inventory docs alone do not select Symfony"
+retirement_mixed="$(run_scope pull_request docs/LEGACY-DEPENDENCY-INVENTORY.md tests/test_legacy_retirement_guard.py)"
+expect_flag "$retirement_mixed" "$RUN_SYMFONY_ENABLED" "GF350 Python regression cannot be masked by docs"
+
 schema_tooling="$(run_scope pull_request scripts/mariadb-structure-snapshot.php)"
 expect_flag "$schema_tooling" $RUN_SYMFONY_ENABLED "schema snapshot tooling selects Symfony parity gate"
 
