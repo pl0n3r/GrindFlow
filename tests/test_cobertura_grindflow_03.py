@@ -2320,6 +2320,261 @@ namespace {
 }
 """
 
+# SPEC:025 (PARTIAL): exercise the genuine Symfony AccountSecurityController
+# changePassword method with synthetic identities, a fake DB row and no server.
+PASSWORD_ROTATION_PROBE = r"""
+namespace Doctrine\DBAL {
+    class Connection {
+        public int $transactions=0;
+        public int $writes=0;
+        public int $audits=0;
+        public int $outbox=0;
+        public function transactional(callable $fn): mixed {
+            ++$this->transactions; return $fn($this);
+        }
+        public function fetchAssociative(string $query,array $params): array|false {
+            if (!str_contains($query,'FOR UPDATE') || $params !== ['id'=>'synthetic-user']) {
+                throw new \RuntimeException('UNLOCKED_OR_FOREIGN_ACCOUNT');
+            }
+            if ($GLOBALS['mode']==='revoked') { return false; }
+            return ['password_hash'=>$GLOBALS['current_hash'],'is_active'=>1];
+        }
+        public function executeStatement(string $query,array $params): int {
+            if (str_contains($query,'INSERT INTO gf_password_recovery_outbox')) {
+                ++$this->outbox; return 1;
+            }
+            if (!str_contains($query,'UPDATE gf_identity_users')
+                || $params['id']!=='synthetic-user'
+                || $params['old_hash']!==$GLOBALS['current_hash']) {
+                throw new \RuntimeException('UNSCOPED_PASSWORD_UPDATE');
+            }
+            if ($GLOBALS['mode']==='stale') { return 0; }
+            $GLOBALS['current_hash']=$params['new_hash'];
+            ++$this->writes; return 1;
+        }
+        public function insert(string $table,array $params): void {
+            if ($table!=='gf_identity_security_audit'
+                || $params['user_id']!=='synthetic-user'
+                || $params['event']!=='password_changed') {
+                throw new \RuntimeException('INVALID_AUDIT');
+            }
+            ++$this->audits;
+        }
+    }
+}
+namespace Psr\Log {
+    interface LoggerInterface { public function warning(string $message): void; }
+    class TestLogger implements LoggerInterface {
+        public function warning(string $message): void {
+            if (!in_array($message,['password_changed_notification_deferred',
+                'password_changed_notification_queue_failed'],true)) {
+                throw new \RuntimeException('UNSAFE_LOGGING');
+            }
+        }
+    }
+}
+namespace Symfony\Component\Uid {
+    class Uuid {
+        public static function v7(): self { return new self(); }
+        public function toRfc4122(): string { return 'synthetic-audit-uuid'; }
+    }
+}
+namespace Symfony\Component\HttpFoundation {
+    class TestBag {
+        public function __construct(private array $data=[]) {}
+        public function get(string $key,mixed $default=null): mixed {
+            return $this->data[$key] ?? $default;
+        }
+        public function all(): array { return $this->data; }
+        public function set(string $key,string $value): void {
+            $this->data[$key]=$value;
+        }
+    }
+    class TestSession {
+        public bool $invalidated=false;
+        public function invalidate(): void { $this->invalidated=true; }
+    }
+    class Request {
+        public TestBag $headers;
+        public TestBag $request;
+        public TestBag $files;
+        public TestSession $session;
+        public function __construct(private string $json) {
+            $this->headers=new TestBag([
+                'X-CSRF-Token'=>'synthetic-csrf',
+                'Content-Length'=>(string)strlen($json),
+            ]);
+            $this->request=new TestBag();
+            $this->files=new TestBag();
+            $this->session=new TestSession();
+        }
+        public function getContent(bool $stream=false): mixed {
+            if (!$stream) { return $this->json; }
+            $buffer=fopen('php://memory','w+');
+            fwrite($buffer,$this->json);rewind($buffer);
+            return $buffer;
+        }
+        public function getSession(): TestSession { return $this->session; }
+    }
+    class JsonResponse {
+        public TestBag $headers;
+        public function __construct(public array $payload,public int $status=200) {
+            $this->headers=new TestBag();
+        }
+    }
+}
+namespace GrindFlow\Identity\Entity {
+    class IdentityUser {
+        public function __construct(private bool $active=true) {}
+        public function isActive(): bool { return $this->active; }
+        public function id(): string { return 'synthetic-user'; }
+        public function email(): string { return 'synthetic@example.test'; }
+        public function displayName(): string { return 'Synthetic Test'; }
+    }
+}
+namespace GrindFlow\Identity\Security {
+    interface PasswordRecoveryNotifier {
+        public function sendReset(string $email,string $displayName,string $token): bool;
+        public function sendPasswordChanged(string $email,string $displayName): bool;
+    }
+    class TestNotifier implements PasswordRecoveryNotifier {
+        public function sendReset(string $email,string $displayName,string $token): bool {
+            throw new \RuntimeException('NOT_APPLICABLE');
+        }
+        public function sendPasswordChanged(string $email,string $displayName): bool {
+            if ($email!=='synthetic@example.test') {
+                throw new \RuntimeException('WRONG_ACCOUNT_NOTIFIED');
+            }
+            return $GLOBALS['mode']!=='notifier_down';
+        }
+    }
+}
+namespace Symfony\Component\PasswordHasher\Hasher {
+    interface UserPasswordHasherInterface { public function hashPassword(object $user,string $plain): string; }
+    class FakePasswordHasher implements UserPasswordHasherInterface {
+        public function hashPassword(object $user,string $plain): string {
+            if ($user->id()!=='synthetic-user') {
+                throw new \RuntimeException('HASH_WRONG_ACCOUNT');
+            }
+            return password_hash($plain,PASSWORD_DEFAULT);
+        }
+    }
+}
+namespace Symfony\Component\Security\Core\Authentication\Token\Storage {
+    interface TokenStorageInterface { public function setToken(mixed $token): void; }
+    class FakeTokenStorage implements TokenStorageInterface {
+        public bool $cleared=false;
+        public function setToken(mixed $token): void {
+            if ($token!==null) { throw new \RuntimeException('UNEXPECTED_AUTH_TOKEN'); }
+            $this->cleared=true;
+        }
+    }
+}
+namespace Symfony\Component\RateLimiter {
+    interface RateLimiterFactoryInterface { public function create(string $key): object; }
+    class FakeLimiterFactory implements RateLimiterFactoryInterface {
+        public function create(string $key): object {
+            if ($key!=='synthetic-user') { throw new \RuntimeException('RATE_LIMIT_UNSCOPED'); }
+            return new class {
+                public function consume(): object {
+                    return new class {
+                        public function isAccepted(): bool {
+                            return $GLOBALS['mode']!=='rate_limited';
+                        }
+                        public function getRetryAfter(): \DateTimeImmutable {
+                            return new \DateTimeImmutable('+10 seconds');
+                        }
+                    };
+                }
+            };
+        }
+    }
+}
+namespace Symfony\Bundle\FrameworkBundle\Controller {
+    class AbstractController {
+        public function getUser(): mixed { return $GLOBALS['user']; }
+        public function isCsrfTokenValid(string $key,string $value): bool {
+            return $key==='grindflow_profile_password'
+                && $value==='synthetic-csrf'
+                && $GLOBALS['mode']!=='bad_csrf';
+        }
+        public function json(array $payload,int $status=200): \Symfony\Component\HttpFoundation\JsonResponse {
+            return new \Symfony\Component\HttpFoundation\JsonResponse($payload,$status);
+        }
+    }
+}
+namespace {
+    require_once 'symfony/src/Http/BoundedJsonBody.php';
+    require_once 'symfony/src/Identity/Security/PasswordPolicy.php';
+    require_once 'symfony/src/Http/Controller/AccountSecurityController.php';
+    $assert=static function(bool $condition,string $message):void {
+        if (!$condition) {throw new \RuntimeException('PASSWORD_ROTATION:'.$message);}
+    };
+    $cases=[
+        'success'=>200,'notifier_down'=>200,'no_user'=>401,'inactive'=>401,
+        'bad_csrf'=>403,'rate_limited'=>429,'missing_fields'=>422,
+        'actor_field'=>422,'weak'=>422,'confirmation'=>422,
+        'wrong_current'=>422,'reuse'=>422,'revoked'=>403,'stale'=>403,
+        'oversize'=>422,
+    ];
+    $initialHash=password_hash('Synthetic-Old-Passphrase',PASSWORD_DEFAULT);
+    foreach($cases as $mode=>$expected) {
+        $GLOBALS['mode']=$mode;
+        $old='Synthetic-Old-Passphrase';
+        $fresh='Synthetic-New-Passphrase';
+        $GLOBALS['current_hash']=$initialHash;
+        $GLOBALS['user']=$mode==='no_user'?null:new \GrindFlow\Identity\Entity\IdentityUser($mode!=='inactive');
+        $payload=['current_password'=>$old,'new_password'=>$fresh,
+            'confirm_password'=>$fresh];
+        if($mode==='missing_fields') {unset($payload['confirm_password']);}
+        if($mode==='actor_field') {$payload['user_id']='another-synthetic-user';}
+        if($mode==='weak') {$payload['new_password']='short';$payload['confirm_password']='short';}
+        if($mode==='confirmation') {$payload['confirm_password']='mismatch';}
+        if($mode==='wrong_current') {$payload['current_password']='Wrong-Old-Synthetic';}
+        if($mode==='reuse') {$payload['new_password']=$old;$payload['confirm_password']=$old;}
+        $json=$mode==='oversize'?str_repeat('X',5000):json_encode($payload,JSON_THROW_ON_ERROR);
+        $request=new \Symfony\Component\HttpFoundation\Request($json);
+        $db=new \Doctrine\DBAL\Connection();
+        $tokenStorage=new \Symfony\Component\Security\Core\Authentication\Token\Storage\FakeTokenStorage();
+        $controller=new \GrindFlow\Http\Controller\AccountSecurityController();
+        $response=$controller->changePassword(
+            $request,$db,new \Symfony\Component\PasswordHasher\Hasher\FakePasswordHasher(),
+            $tokenStorage,new \GrindFlow\Identity\Security\PasswordPolicy(),
+            new \GrindFlow\Identity\Security\TestNotifier(),
+            new \Psr\Log\TestLogger(),
+            new \Symfony\Component\RateLimiter\FakeLimiterFactory(),
+        );
+        $assert($response->status===$expected,'status_'.$mode);
+        $assert($response->headers->get('Cache-Control')==='no-store, private',
+            'no_store_'.$mode);
+        $success=in_array($mode,['success','notifier_down'],true);
+        $assert($tokenStorage->cleared===$success
+            && $request->session->invalidated===$success,
+            'session_revocation_'.$mode);
+        $assert($db->writes===($success?1:0)
+            && $db->audits===($success?1:0),'append_audit_'.$mode);
+        if($success) {
+            $assert(password_verify($fresh,$GLOBALS['current_hash']),
+                'new_hash_'.$mode);
+            $assert($db->outbox===($mode==='notifier_down'?1:0),
+                'secret_free_retry_'.$mode);
+            $assert($response->payload['data']['reauthentication_required']===true,
+                'reauth_required_'.$mode);
+        } else {
+            $assert($GLOBALS['current_hash']===$initialHash,
+                'old_hash_unchanged_'.$mode);
+        }
+        if($mode==='rate_limited') {
+            $assert((int)$response->headers->get('Retry-After')>=1,
+                'retry_after_'.$mode);
+        }
+    }
+    echo json_encode(['cases'=>count($cases),'source'=>'real-AccountSecurityController',
+        'database'=>'synthetic-Connection','network'=>'disabled',
+        'production'=>'UNKNOWN'],JSON_THROW_ON_ERROR);
+}
+"""
+
 class CoberturaGrindflow03Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         probes = run_php('principal')['probes']
@@ -2579,7 +2834,30 @@ echo json_encode(['checks'=>8,'network'=>'disabled','production'=>'UNKNOWN'], JS
         self.assertEqual(data['database'], 'synthetic-Eloquent')
         self.assertEqual(data['production'], 'UNKNOWN')
 
+    def test_password_rotation_personal_real_y_falla_cerrado(self) -> None:
+        # SPEC:025 partial: authentic AccountSecurityController::changePassword
+        # and BoundedJsonBody with synthetic account, fake rate cache and DB.
+        # No real session backend, notifications or persistent transactions.
+        php = shutil.which('php')
+        if php is None:
+            raise AssertionError('UNKNOWN: PHP CLI is absent')
+        result = subprocess.run(
+            [php, '-d', 'display_errors=stderr', '-r', PASSWORD_ROTATION_PROBE],
+            cwd=ROOT, text=True, capture_output=True, timeout=30, check=False,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f'UNKNOWN: real identity password rotation failed: {result.stderr}',
+        )
+        data = json.loads(result.stdout)
+        self.assertEqual(data['cases'], 15)
+        self.assertEqual(data['source'], 'real-AccountSecurityController')
+        self.assertEqual(data['database'], 'synthetic-Connection')
+        self.assertEqual(data['production'], 'UNKNOWN')
+
     def test_sin_datos_reales(self) -> None:
+        self.assertNotIn('matriz-cobertura', PASSWORD_ROTATION_PROBE)
+        self.assertNotIn('curl_exec(', PASSWORD_ROTATION_PROBE)
         self.assertNotIn('matriz-cobertura', SCHEDULER_PAGINATION_PROBE)
         self.assertNotIn('curl_exec(', SCHEDULER_PAGINATION_PROBE)
 
