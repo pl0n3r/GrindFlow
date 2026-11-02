@@ -65,7 +65,9 @@ class ActionEventLoadTests(unittest.TestCase):
             "1200 solicitudes",
             "cupo restante de la API de GitHub autenticada",
             "si el PLAN-AGENTES global impone un límite menor, prevalece",
-            "Un cupo UNKNOWN no autoriza nuevas reservas",
+            "Si el cupo no se puede medir (UNKNOWN",
+            "no bloquea las reservas: continuar y dejar constancia",
+            "el orquestador local mide el cupo y pausa GrindFlow cuando es inferior a 1200",
             "claims de archivo disjuntos",
             "sin tope fijo de agentes por repo",
             "El cupo GitHub y cualquier límite menor del PLAN-AGENTES global prevalecen",
@@ -73,6 +75,7 @@ class ActionEventLoadTests(unittest.TestCase):
         for rule in required:
             with self.subTest(rule=rule):
                 self.assertIn(rule, agents)
+        self.assertNotIn("Un cupo UNKNOWN no autoriza nuevas reservas", agents)
         self.assertNotIn("No exceder dos agentes simultáneos en GrindFlow", agents)
         self.assertNotIn("Se permiten hasta **4 lineas de trabajo concurrentes**", agents)
         # Veta variantes de topes locales aun cuando cambie su redacción.
