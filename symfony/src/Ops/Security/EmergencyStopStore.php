@@ -41,6 +41,33 @@ final readonly class EmergencyStopStore
         return $revision;
     }
 
+    /**
+     * Serialize the external side effect with STOP on the singleton row.
+     * STOP cannot commit between the revision check and callback completion.
+     * Provider transports must enforce bounded network timeouts.
+     *
+     * @template T
+     * @param \Closure():T $callback
+     * @return T
+     */
+    public function withEffectPermit(\Closure $callback, ?int $expectedRevision = null): mixed
+    {
+        return $this->db->transactional(function (Connection $db) use ($callback, $expectedRevision): mixed {
+            $row = $db->fetchAssociative(
+                'SELECT state, revision, revocation_complete FROM gf_emergency_stop WHERE id = 1 FOR UPDATE'
+            );
+            if ($row === false || $row['state'] !== 'RUNNING'
+                || (int) $row['revocation_complete'] !== 1
+                || (int) $row['revision'] < 1) {
+                throw new \RuntimeException('emergency_stop');
+            }
+            if ($expectedRevision !== null && $expectedRevision !== (int) $row['revision']) {
+                throw new \RuntimeException('emergency_stop_stale_revision');
+            }
+            return $callback();
+        });
+    }
+
     /** STOP is committed before any revocation begins, even if revocation fails. */
     public function stop(string $actor, string $reason): int
     {

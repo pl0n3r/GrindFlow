@@ -146,15 +146,20 @@ final readonly class PublishingAutomationRuleScheduler
                 }
                 foreach ($candidates as $assetId) {
                     try {
-                        $fence->assertRunning($revision);
-                    } catch (\Throwable) {
-                        return $result('emergency_stop', $created, $existing, $blocked);
+                        $attempt = $fence->withEffectPermit(
+                            fn (): array => $this->drafts->reserve(
+                                $organizationId, (string) $rule['updated_by'],
+                                (string) $assetId, $slot['scheduled_at_utc'], true,
+                                (string) $rule['automation_destination_id'],
+                            ),
+                            $revision,
+                        );
+                    } catch (\RuntimeException $exception) {
+                        if (str_starts_with($exception->getMessage(), 'emergency_stop')) {
+                            return $result('emergency_stop', $created, $existing, $blocked);
+                        }
+                        throw $exception;
                     }
-                    $attempt = $this->drafts->reserve(
-                        $organizationId, (string) $rule['updated_by'],
-                        (string) $assetId, $slot['scheduled_at_utc'], true,
-                        (string) $rule['automation_destination_id'],
-                    );
                     if ($attempt['status'] === 'ok') {
                         if ($attempt['changed']) {
                             ++$created;

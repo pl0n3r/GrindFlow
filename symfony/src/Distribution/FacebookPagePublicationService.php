@@ -45,8 +45,7 @@ final readonly class FacebookPagePublicationService
         }
 
         try {
-            $fence->assertRunning($revision);
-            $outcome = $this->provider->publish($command);
+            $outcome = $fence->withEffectPermit(fn (): DistributionOutcome => $this->provider->publish($command), $revision);
         } catch (DistributionProviderException $exception) {
             $this->recordFailure($command, $exception);
             throw $exception;

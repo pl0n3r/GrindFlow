@@ -52,8 +52,7 @@ final readonly class ExternalPublicationLedger
         }
 
         try {
-            $fence->assertRunning($revision);
-            $outcome = $send();
+            $outcome = $fence->withEffectPermit(\Closure::fromCallable($send), $revision);
         } catch (DistributionProviderException $exception) {
             $this->recordFailure($command, $exception, $provider);
             throw $exception;

@@ -109,6 +109,33 @@ final class EmergencyStopRuntimeTest extends KernelTestCase
         ));
     }
 
+    public function test_effect_permit_cannot_send_after_stop_or_stale_revision(): void
+    {
+        $attempts = 0;
+        $callback = function () use (&$attempts): string {
+            ++$attempts;
+            return 'fake-effect';
+        };
+        try {
+            $this->stop->withEffectPermit($callback);
+            self::fail('Absent emergency state must fail before any effect');
+        } catch (\RuntimeException $error) {
+            self::assertSame('emergency_stop', $error->getMessage());
+        }
+        self::assertSame(0, $attempts);
+        $this->initialRunning();
+        self::assertSame('fake-effect', $this->stop->withEffectPermit($callback, 100));
+        self::assertSame(1, $attempts);
+        $this->stop->stop('synthetic-admin', 'abort_publication');
+        try {
+            $this->stop->withEffectPermit($callback, 100);
+            self::fail('STOP must veto any side effect');
+        } catch (\RuntimeException $error) {
+            self::assertSame('emergency_stop', $error->getMessage());
+        }
+        self::assertSame(1, $attempts);
+    }
+
     public function test_absent_or_stale_stop_state_fails_closed(): void
     {
         try {
