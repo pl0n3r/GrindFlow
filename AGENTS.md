@@ -168,7 +168,7 @@ continúa siendo el archivo operativo canónico para todos los agentes.
 - Agrupar cambios locales y hacer un solo push por bloque lógico; no empujar cada microajuste por separado.
 - Publicar un solo comentario por hito; evitar comentarios de progreso intermedio que disparen automatización sin aportar evidencia durable.
 - **Capacidad por claims, sin tope fijo de agentes por repo:** se admiten tantas líneas simultáneas en GrindFlow como hojas elegibles con reserva V3 `active:true` y claims exactos de archivos disjuntos permitan; nunca tomar una ruta ya reclamada ni reservar un directorio completo para ampliar concurrencia.
-- **Cupo GitHub:** pausar el despacho de trabajo nuevo cuando el cupo restante de la API de GitHub autenticada sea inferior a 1200 solicitudes; si el PLAN-AGENTES global impone un límite menor, prevalece el límite global. Un cupo UNKNOWN no autoriza nuevas reservas.
+- **Cupo GitHub:** pausar el despacho de trabajo nuevo cuando el cupo restante de la API de GitHub autenticada sea inferior a 1200 solicitudes; si el PLAN-AGENTES global impone un límite menor, prevalece el límite global. Si el cupo no se puede medir (UNKNOWN, por ejemplo porque el conector rechaza `rate_limit`), no bloquea las reservas: continuar y dejar constancia; el orquestador local mide el cupo y pausa GrindFlow cuando es inferior a 1200.
 - La telemetría CI se muestrea una vez por hora, no en cada ejecución; se mantienen los pushes agrupados y comentarios solo por hito.
 
 - El selector `scripts/ci-scope.sh` adapta gates según rutas modificadas. Documentación Symfony no dispara el stack pesado por sí sola; una mezcla de docs y código conserva **unión** de gates. Cambios al core del CI y ejecución manual disparan matriz completa.
