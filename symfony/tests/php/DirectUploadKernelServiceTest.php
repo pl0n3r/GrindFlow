@@ -84,14 +84,19 @@ final class DirectUploadKernelServiceTest extends KernelTestCase
      */
     private function withBootIsolatedPointers(array $paths, callable $assertStorage): void
     {
+        // Container warmers require a DB URL; it is purely synthetic and no
+        // connection is established by these service-ID assertions.
+        $variables = [...self::POINTERS, 'DATABASE_URL'];
         $original = [];
-        foreach (self::POINTERS as $name) {
+        foreach ($variables as $name) {
             $original[$name] = [
                 getenv($name),
                 array_key_exists($name, $_ENV), $_ENV[$name] ?? null,
                 array_key_exists($name, $_SERVER), $_SERVER[$name] ?? null,
             ];
-            $value = $paths[$name];
+            $value = $name === 'DATABASE_URL'
+                ? 'mysql://synthetic:synthetic@127.0.0.1:3306/gf839_test'
+                : $paths[$name];
             putenv($name.'='.$value);
             $_ENV[$name] = $value;
             $_SERVER[$name] = $value;
