@@ -80,7 +80,7 @@ final class DirectUploadCompletionVerifier
                 $head .= $chunk;
             }
             if (strlen($head) > $payload['byte_size']) {
-                throw new \InvalidArgumentException('Direct upload object stream exceeds approved size.');
+                throw new \InvalidArgumentException('Direct upload object stream size does not match the approved upload.');
             }
             if (!$this->matchesDeclaredMediaSignature($head, $payload['mime_type'])) {
                 throw new \InvalidArgumentException('Direct upload object signature does not match declared MIME.');
