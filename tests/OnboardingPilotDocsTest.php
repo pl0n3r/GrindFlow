@@ -28,7 +28,7 @@ final class OnboardingPilotDocsTest extends TestCase
             '[COMPLETAR POR EL DUEÑO]', 'tenant', 'soporte',
             'casilla inicialmente desmarcada', 'retirada de consentimiento',
         ] as $required) {
-            self::assertStringContainsString($required, $doc, 'Falta control: ' . $required);
+            self::assertStringContainsString($required, $doc, 'Falta control: '.$required);
         }
 
         preg_match_all('/^\\| PILOTO-0([1-5]) \\| NO \\| PENDIENTE \\| PENDIENTE \\| PENDIENTE \\| NO-GO \\|$/m', $doc, $matches);
