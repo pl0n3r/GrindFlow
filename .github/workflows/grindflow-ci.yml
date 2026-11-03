@@ -262,6 +262,8 @@ jobs:
           # GF870: SPEC:024..028 — run once in fast when #717 suite exists.
           if [[ -f tests/test_brechas_grindflow_10.py ]]; then
             python3 -m unittest -v tests/test_brechas_grindflow_10.py
+          else
+            echo "GF870: SPEC:024..028 suite absent; conditional fast test skipped."
           fi
           python3 -m unittest -v tests/test_grindflow_ci_action_pins.py
 
