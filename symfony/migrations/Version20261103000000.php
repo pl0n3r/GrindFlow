@@ -59,6 +59,22 @@ final class Version20261103000000 extends AbstractMigration
                 SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'emergency audit is append-only';
             END
             SQL);
+        // An explicit RUNNING fixture is permitted ONLY in disposable CI.
+        // No production/default state is ever implicitly enabled.
+        if (getenv('APP_ENV') === 'test'
+            && $this->connection->getDatabase() === 'grindflow_symfony_ci') {
+            $this->addSql(<<<'SQL'
+                INSERT INTO gf_emergency_stop
+                    (id, state, revision, revocation_complete, actor, reason, changed_at)
+                VALUES (1, 'RUNNING', 1, 1, 'ci-fixture', 'synthetic_ci_only', UTC_TIMESTAMP(6))
+                SQL);
+            $this->addSql(<<<'SQL'
+                INSERT INTO gf_emergency_stop_audit
+                    (id, state, revision, actor, reason, occurred_at)
+                VALUES ('00000000-0000-4000-8000-000000000877',
+                        'RUNNING', 1, 'ci-fixture', 'synthetic_ci_only', UTC_TIMESTAMP(6))
+                SQL);
+        }
     }
 
     public function down(Schema $schema): void
