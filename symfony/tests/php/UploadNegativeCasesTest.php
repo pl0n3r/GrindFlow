@@ -48,6 +48,8 @@ final class UploadNegativeCasesTest extends WebTestCase
     {
         parent::setUp();
         $this->client = static::createClient();
+        // Preserve the injected test provider across BrowserKit HTTP requests.
+        $this->client->disableReboot();
         $this->client->catchExceptions(false);
         // Force fail-closed storage regardless of CI/host provider environment.
         static::getContainer()->set(DirectUploadStorage::class, new UnavailableDirectUploadStorage());
