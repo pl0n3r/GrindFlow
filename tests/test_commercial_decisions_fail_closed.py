@@ -29,7 +29,7 @@ spec.loader.exec_module(gate)
 # No son endpoints autorizados: estas rutas sintéticas servirían de alarma.
 COMMERCIAL_SEGMENT = re.compile(
     r"(?:^|/)(?:trial(?:s)?|pricing|checkout|billing|payments?|"
-    r"subscriptions?|subscribe|purchase|paywall)(?:/|$|\?|[{}])",
+    r"subscriptions?|subscribe|purchase|buy|paywall)(?:/|$|\?|[{}])",
     re.IGNORECASE,
 )
 LARAVEL_ROUTE = re.compile(
@@ -186,6 +186,7 @@ class CommercialDecisionsFailClosedTests(unittest.TestCase):
         """#352: variantes get/post/match/group/prefix no eluden la alarma."""
         examples = (
             "Route::get('/trial', Dummy::class);",
+            "Route::post('/buy', Dummy::class);",
             "Route::post('/pricing/activate', Dummy::class);",
             "Route::match(['GET', 'POST'], '/checkout', Dummy::class);",
             "Route::redirect('/buy', '/billing');",
