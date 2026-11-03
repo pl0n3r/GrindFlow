@@ -19,3 +19,5 @@ conectadas hasta que los tests PHP reales y el CI exact-SHA lo demuestren.
 Rollback: revertir el commit de código; en una base **desechable** con
 \`APP_ENV=test\` y nombre \`grindflow_symfony_ci\`, se permite revertir la
 migración. En un entorno real se conserva el audit y no se borra automáticamente.
+
+Administración: las rutas Ops STOP/RESUME requieren autenticación HMAC, TLS e IP permitida **y** un ID de clave en `GRINDFLOW_EMERGENCY_ADMIN_KEY_IDS` (lista separada por comas). Sin lista configurada, ambas rutas devuelven `emergency_admin_required` (403) y nadie puede reanudar por accidente. La clave secreta nunca se registra; configurar los IDs únicamente mediante gestión autorizada fuera del código. Esta preparación no habilita secretos reales ni operación en producción.

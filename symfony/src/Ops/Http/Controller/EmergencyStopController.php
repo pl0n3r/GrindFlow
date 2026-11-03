@@ -24,6 +24,7 @@ final class EmergencyStopController extends Loader
         private readonly StaffOpsRouteLoader $inner,
         private readonly EmergencyStopStore $store,
         private readonly StaffOpsRequestAuthenticator $authenticator,
+        private readonly string $adminKeyIds = '',
     ) {}
 
     public function supports(mixed $resource, ?string $type = null): bool
@@ -52,6 +53,7 @@ final class EmergencyStopController extends Loader
     {
         try {
             $actor = $this->authenticator->authenticate($request);
+            $this->assertAdmin($actor);
             $reason = $this->reason($request);
             $revision = $this->store->stop($actor, $reason);
             // Failures are intentionally not recovered by switching to RUNNING.
@@ -68,6 +70,7 @@ final class EmergencyStopController extends Loader
     {
         try {
             $actor = $this->authenticator->authenticate($request);
+            $this->assertAdmin($actor);
             $revision = $this->store->resume($actor, $this->reason($request));
             return new JsonResponse(['data' => ['state' => 'RUNNING', 'revision' => $revision]]);
         } catch (StaffOpsAuthException $exception) {
@@ -75,6 +78,19 @@ final class EmergencyStopController extends Loader
         } catch (\Throwable) {
             return new JsonResponse(['error' => ['code' => 'emergency_resume_denied']], 409);
         }
+    }
+
+    private function assertAdmin(string $actor): void
+    {
+        // HMAC signing alone authenticates an Ops key, not its authorization.
+        // An empty/missing allowlist grants nobody administrative authority.
+        $allowed = array_filter(array_map('trim', explode(',', $this->adminKeyIds)));
+        foreach ($allowed as $keyId) {
+            if (hash_equals($keyId, $actor)) {
+                return;
+            }
+        }
+        throw new StaffOpsAuthException(403, 'emergency_admin_required');
     }
 
     private function reason(Request $request): string

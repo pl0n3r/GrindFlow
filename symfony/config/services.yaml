@@ -7,6 +7,7 @@ parameters:
   grindflow_ops_keys_json_default: '{}'
   grindflow_ops_allowlist_default: ''
   grindflow_ops_rate_limit_default: 60
+  grindflow_emergency_admin_keys_default: ''
   grindflow_facebook_pilot_organization_default: ''
   grindflow_facebook_page_id_default: ''
   grindflow_facebook_page_access_token_default: ''
@@ -128,4 +129,5 @@ services:
     decorates: GrindFlow\Ops\Routing\StaffOpsRouteLoader
     arguments:
       $inner: '@GrindFlow\Ops\Http\Controller\EmergencyStopController.inner'
+      $adminKeyIds: '%env(default:grindflow_emergency_admin_keys_default:GRINDFLOW_EMERGENCY_ADMIN_KEY_IDS)%'
     tags: ['routing.loader', 'controller.service_arguments']
