@@ -12,10 +12,11 @@ final class OnboardingPilotDocsTest extends TestCase
 {
     private static function document(): string
     {
-        $path = dirname(__DIR__) . '/docs/launch/onboarding-pilot-five.md';
+        $path = dirname(__DIR__).'/docs/launch/onboarding-pilot-five.md';
         self::assertFileExists($path);
         $content = file_get_contents($path);
         self::assertIsString($content);
+
         return $content;
     }
 
