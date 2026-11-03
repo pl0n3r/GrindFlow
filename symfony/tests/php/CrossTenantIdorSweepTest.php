@@ -208,6 +208,20 @@ final class CrossTenantIdorSweepTest extends WebTestCase
             $cookies[] = $serialized;
         }
         sort($cookies);
+        // Expires is derived from the response Date; comparing absolute
+        // clock seconds is flaky if equivalent denials cross a second boundary.
+        // Compare cache lifetime while retaining other security headers.
+        if (isset($headers['expires'])) {
+            $date = $response->headers->get('Date');
+            $expires = $response->headers->get('Expires');
+            self::assertNotNull($date);
+            self::assertNotNull($expires);
+            $dateEpoch = strtotime($date);
+            $expiresEpoch = strtotime($expires);
+            self::assertNotFalse($dateEpoch);
+            self::assertNotFalse($expiresEpoch);
+            $headers['expires'] = [(string) ($expiresEpoch - $dateEpoch)];
+        }
         foreach (['date', 'set-cookie', 'x-request-id', 'x-correlation-id', 'traceparent', 'tracestate', 'server-timing'] as $volatile) {
             unset($headers[$volatile]);
         }
