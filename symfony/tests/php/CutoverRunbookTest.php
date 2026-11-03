@@ -50,6 +50,7 @@ final class CutoverRunbookTest extends TestCase
         self::assertStringContainsString('WEB_PHP_FPM=UNVERIFIED', $checker);
         self::assertStringContainsString('php_cli_minimum_8_3', $checker);
         self::assertStringContainsString('composer_cli', $checker);
+        self::assertStringContainsString('COMPOSER_VERSION=', $checker);
         self::assertStringContainsString('for extension in ctype iconv pdo_mysql openssl mbstring', $checker);
     }
 

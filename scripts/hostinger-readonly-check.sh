@@ -57,7 +57,13 @@ else
 fi
 
 if command -v composer >/dev/null 2>&1; then
-  report composer_cli true
+  composer_line="$(composer --version --no-ansi 2>/dev/null || true)"
+  if [[ "$composer_line" =~ Composer[[:space:]]version[[:space:]]([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    printf 'COMPOSER_VERSION=%s\n' "${BASH_REMATCH[1]}"
+    report composer_cli true
+  else
+    report composer_cli false
+  fi
 else
   report composer_cli false
 fi
