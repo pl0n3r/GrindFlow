@@ -110,17 +110,48 @@ def parity_contract(text: str) -> bool:
     if len(classes) != 1:
         return False
     methods = {x.name: x for x in classes[0].body if isinstance(x, ast.FunctionDef)}
-    required = ("test_matching_snapshot_is_compatible", "test_missing_source_table_fails",
-                "test_snapshot_must_prohibit_row_data")
-    if not all(x in methods for x in required):
+    required = {
+        "test_matching_snapshot_is_compatible": {"assertTrue", "assertEqual"},
+        "test_missing_source_table_fails": {"assertFalse", "assertEqual"},
+        "test_snapshot_must_prohibit_row_data": {"assertRaisesRegex"},
+    }
+    if not all(name in methods for name in required):
         return False
-    evidence = []
-    for name in required:
-        calls = [x for x in ast.walk(methods[name])
-                 if isinstance(x, ast.Call) and isinstance(x.func, ast.Attribute)
-                 and x.func.attr in ("assertTrue", "assertFalse", "assertEqual")]
-        evidence.append(bool(calls))
-    return all(evidence) and "metadata_only" in text and "contains_row_data" in text
+    for name, assertions in required.items():
+        calls = {node.func.attr for node in ast.walk(methods[name])
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)}
+        if not assertions <= calls:
+            return False
+    # A negative test must corrupt a synthetic snapshot and assert the rejection.
+    negative = methods["test_snapshot_must_prohibit_row_data"]
+    corrupts = any(
+        isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant)
+        and node.value.value is True
+        and any(isinstance(target, ast.Subscript)
+                and isinstance(target.slice, ast.Constant)
+                and target.slice.value == "contains_row_data"
+                for target in node.targets)
+        for node in ast.walk(negative)
+    )
+    rejects = any(
+        isinstance(node, ast.With)
+        and any(isinstance(item.context_expr, ast.Call)
+                and isinstance(item.context_expr.func, ast.Attribute)
+                and item.context_expr.func.attr == "assertRaisesRegex"
+                and len(item.context_expr.args) >= 2
+                and isinstance(item.context_expr.args[0], ast.Name)
+                and item.context_expr.args[0].id == "ValueError"
+                and isinstance(item.context_expr.args[1], ast.Constant)
+                and item.context_expr.args[1].value == "contains_row_data=false"
+                for item in node.items)
+        and any(isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "build_report"
+                for child in node.body for call in ast.walk(child))
+        for node in ast.walk(negative)
+    )
+    return (corrupts and rejects and "metadata_only" in text
+            and "contains_row_data" in text)
 
 def inspect(rid: str, rows: dict[str, tuple[str, ...]], files: dict[str, str]) -> dict[str, str]:
     outcome = {"code": UNKNOWN, "ci": UNKNOWN, "hostinger": UNKNOWN, "production": UNKNOWN}
@@ -146,7 +177,7 @@ def inspect(rid: str, rows: dict[str, tuple[str, ...]], files: dict[str, str]) -
     if rid == "SPEC:026" and not active_shell_gate(files.get(CI, "")):
         return outcome
     if rid == "SPEC:027" and not (
-        "dueño único" in files.get(TRANSITION, "").lower()
+        "propietario de escritura por módulo" in files.get(TRANSITION, "").lower()
         and parity_contract(files.get(PARITY, ""))):
         return outcome
     outcome["code"] = LOCAL
@@ -192,6 +223,14 @@ class BrechasGrindflow10Tests(unittest.TestCase):
         self.assertEqual(UNKNOWN, inspect("SPEC:026", self.rows, files)["code"])
         files = dict(self.files)
         files[PARITY] = "class DataSchemaParityTest: pass"
+        self.assertEqual(UNKNOWN, inspect("SPEC:027", self.rows, files)["code"])
+        files[PARITY] = self.files[PARITY].replace(
+            'self.assertRaisesRegex(ValueError, "contains_row_data=false")',
+            'self.assertTrue(True)', 1)
+        self.assertEqual(UNKNOWN, inspect("SPEC:027", self.rows, files)["code"])
+        files = dict(self.files)
+        files[TRANSITION] = files[TRANSITION].replace(
+            "propietario de escritura por módulo", "varios escritores", 1)
         self.assertEqual(UNKNOWN, inspect("SPEC:027", self.rows, files)["code"])
 
     def test_sin_datos_reales(self):
