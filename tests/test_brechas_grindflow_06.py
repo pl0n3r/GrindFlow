@@ -86,7 +86,7 @@ def parse_matrix(raw: str) -> dict[str, tuple[str, ...]]:
     """Una fila inequívoca de ocho columnas por ID; duplicado => fail-closed."""
     rows: dict[str, tuple[str, ...]] = {}
     for line in raw.splitlines():
-        if not any(line.lstrip().startswith("| " + key + " |") for key in IDS):
+        if not any(re.match(r"\|\s*" + re.escape(key) + r"\s*\|", line.lstrip()) for key in IDS):
             continue
         columns = tuple(value.strip() for value in line.strip().strip("|").split("|"))
         if len(columns) != 8 or columns[0] in rows:
@@ -106,6 +106,31 @@ def section(raw: str, heading: str) -> str | None:
     return result if result.strip() else None
 
 
+PHP_COMMENTS_FILTER = r'''
+    $source = stream_get_contents(STDIN);
+    if ($source === false || !function_exists('token_get_all')) { exit(1); }
+    foreach (token_get_all($source) as $token) {
+        if (is_array($token) &&
+            ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT)) {
+            continue;
+        }
+        echo is_array($token) ? $token[1] : $token;
+    }
+'''
+
+
+def php_without_comments(source: str) -> str | None:
+    """Do not count commented-out PHP tests as local-contract evidence."""
+    try:
+        process = subprocess.run(
+            ["php", "-r", PHP_COMMENTS_FILTER], input=source, text=True,
+            capture_output=True, timeout=15, check=False,
+        )
+        return process.stdout if process.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
 def inspect(clause: Clause, rows: dict[str, tuple[str, ...]],
             sources: dict[str, str], policy_results: list[str] | None) -> dict[str, str]:
     """Evidencia local de fuente; toda dimensión no demostrada queda UNKNOWN."""
@@ -122,6 +147,8 @@ def inspect(clause: Clause, rows: dict[str, tuple[str, ...]],
         return result
     for path, tokens in clause.evidence:
         code = sources.get(path, "")
+        if clause.identifier in IDS[:2]:
+            code = php_without_comments(code) if code else None
         if not code or not all(token in code for token in tokens):
             return result
     if clause.identifier == IDS[2] and policy_results != EXPECTED_POLICY:
@@ -258,9 +285,20 @@ class BrechasGrindflow06Tests(unittest.TestCase):
                          if line.startswith("| " + IDS[0] + " |"))
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
             parse_matrix(self.sources[MATRIX] + "\n" + duplicate)
+        padded = duplicate.replace("| " + IDS[0] + " |",
+                                   "|  " + IDS[0] + "   |", 1)
+        with self.assertRaisesRegex(ValueError, "UNKNOWN"):
+            parse_matrix(self.sources[MATRIX] + "\n" + padded)
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
             parse_matrix("| " + IDS[0] + " | truncated |")
         self.assertIsNone(run_policy(ROOT / "not-a-real-policy.php"))
+        active = php_without_comments(
+            "<?php /** ghost_assertion */ function active_test() {} // ghost_method\n"
+        )
+        self.assertIsNotNone(active)
+        self.assertIn("active_test", active)
+        self.assertNotIn("ghost_assertion", active)
+        self.assertNotIn("ghost_method", active)
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: no requiere datos de usuario, endpoints ni claves reales."""
