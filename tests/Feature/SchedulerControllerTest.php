@@ -46,8 +46,9 @@ class SchedulerControllerTest extends TestCase
         app(TenantContext::class)->runWithinOrganization(
             $editor,
             (string) $organization->getKey(),
-            function () use ($asset, $destination, $expectedUtc): void {
+            function () use ($asset, $destination, $expectedUtc, $organization): void {
                 $publication = ScheduledPublication::query()->sole();
+                $this->assertSame((string) $organization->getKey(), (string) $publication->organization_id);
                 $this->assertSame((string) $asset->getKey(), (string) $publication->media_asset_id);
                 $this->assertSame((string) $destination->getKey(), (string) $publication->publishing_destination_id);
                 $this->assertSame('America/Bogota', $publication->timezone);
