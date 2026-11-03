@@ -1,6 +1,6 @@
 # Interruptor de emergencia — contrato seguro de construcción (#792)
 
-**Estado (2 nov 2026): referencia de pruebas offline solamente. NO implementado en el runtime de Symfony ni en producción.** Este documento y `symfony/tests/php/KillSwitchTest.php` son las únicas rutas reclamadas por la reserva V3 del issue. No configuran ni conectan ninguna integración real, no alteran tokens de clientes y no son una aprobación para publicar.
+**Estado (3 nov 2026): esta prueba y esta guía son una referencia offline; la integración de runtime Symfony fue incorporada por #877 / PR #878 (squash `e749b0242f9f163269c5fcf5a930688678a27049`). No se acredita despliegue, activación ni prueba en producción.** Este documento y `symfony/tests/php/KillSwitchTest.php` son las únicas rutas reclamadas por la reserva V3 del issue. No configuran ni conectan ninguna integración real, no alteran tokens de clientes y no son una aprobación para publicar.
 
 ## Operación esperada
 
@@ -33,12 +33,12 @@ php bin/phpunit tests/php/KillSwitchTest.php
 
 **AC-01:** los tests deben ejecutarse en el CI real; un método presente o `php -l` no equivalen a PHPUnit verde. **AC-02:** el check `Factory CI reusable / Validar` y `GrindFlow CI / validate` deben finalizar en `success` sobre el commit HEAD exacto del PR. Las verificaciones SonarCloud, CodeQL y la revisión CodeRabbit FINAL se evalúan bajo las reglas actuales de Factory; no solicitar CodeRabbit antes de CI verde. La referencia no acredita un despliegue, revocación real ni E2E productivo.
 
-## Integración pendiente bajo reservas independientes
+## Integración runtime realizada bajo reserva independiente
 
-La parte operacional pedida en #792 **no se puede afirmar implementada** por solo estos dos archivos: requiere otra hoja con aceptación y claims específicos sobre los puntos de salida de Distribution, planificador/cola/reintentos, entidad de estado durable, servicio de identidad/refresh tokens, auditoría y rutas administrativas protegidas. Sus pruebas deberán inyectar fallos de persistencia, carreras y workers antiguos para demostrar que **ningún** publisher o tarea supera `STOP`. La coordinación debe registrar la hoja y reserva V3 antes de editar rutas externas a #792.
+Estos dos archivos **por sí solos** no implementan el interruptor operativo. La hoja independiente [#877](https://github.com/pl0n3r/GrindFlow/issues/877), con reserva V3 y claims de runtime separados, ya se integró mediante [PR #878](https://github.com/pl0n3r/GrindFlow/pull/878). La cobertura de publicación, planificador, estado durable, auditoría y revocación debe verificarse contra ese código y sus pruebas; esta referencia offline no constituye evidencia de funcionamiento productivo. La coordinación debe mantener disjuntos los claims de #792 y #877.
 
 La implementación real necesita evaluación de sesión activa/refresh token, minimización de datos personales y decisión explícita de live; esta referencia no toca cron, Hostinger, secrets ni datos de clientes. No activar publicaciones ni programar trabajo real a partir de este documento.
 
 ## Reversión
 
-Revertir el squash que añade estas dos rutas elimina únicamente la referencia y documentación. No modifica esquema, procesos, hosting, cuentas ni tokens. El interruptor productivo deberá tener su propia reversión y pruebas antes de activarse.
+Revertir el squash que añade estas dos rutas elimina únicamente la referencia y documentación. No modifica esquema, procesos, hosting, cuentas ni tokens. La implementación runtime de #877 tiene su propia reversión y pruebas; su activación productiva requiere la aprobación y las verificaciones operativas correspondientes.
