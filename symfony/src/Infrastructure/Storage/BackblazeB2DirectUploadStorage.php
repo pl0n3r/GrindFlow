@@ -113,7 +113,9 @@ final class BackblazeB2DirectUploadStorage implements DirectUploadStorage
             ]);
             return new self($config, $client);
         } catch (\Throwable) {
-            // Do not expose vendor exception text: credentials may be embedded.
+            // Never log the SDK exception: it can contain credentials, endpoint,
+            // region or bucket. This fixed category is safe for operations.
+            \error_log('media_b2.sdk_client_initialization_failed');
             return new UnavailableDirectUploadStorage();
         }
     }
