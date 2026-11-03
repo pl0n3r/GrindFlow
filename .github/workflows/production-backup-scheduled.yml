@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   database-backup:
+    # GitHub evaluates job if before environment: use a repository/org variable.
     if: ${{ github.event_name == 'schedule' && vars.GRINDFLOW_DAILY_BACKUP_ENABLED == 'true' }}
     environment: production-backup
     runs-on: ubuntu-latest
@@ -139,8 +140,11 @@ jobs:
               old_name="$(basename -- "$old_file")"
               [[ "$old_name" =~ ^pre-migration-[A-Za-z0-9._-]+\.sql\.gz$ ]]
               old_receipt="$old_file.sha256"
-              [[ -f "$old_receipt" && ! -L "$old_receipt" ]]
-              (cd "$directory" && sha256sum -c -- "$old_name.sha256") >/dev/null
+              [[ -f "$old_receipt" && ! -L "$old_receipt" ]] || continue
+              # Match both the stored checksum and the exact filename before pruning.
+              if ! (cd "$directory" && sha256sum -- "$old_name") | cmp -s - "$old_receipt"; then
+                continue
+              fi
               rm -f -- "$old_file" "$old_receipt"
             done
           REMOTE

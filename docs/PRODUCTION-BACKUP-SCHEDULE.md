@@ -15,14 +15,17 @@ Por ello ni el merge ni la ejecucion manual activan un backup o SSH productivo.
    valores, passwords, claves de restore o SQL al repositorio o artefactos.
 3. Definir variables HOSTINGER_SSH_HOST, HOSTINGER_SSH_USER,
    HOSTINGER_SSH_PORT, HOSTINGER_RELEASE_ROOT, BACKUP_EXPECTED_SHA
-   (40 hex del release desplegado) y BACKUP_EXPECTED_PENDING (entero
+   (40 hex del release desplegado; actualizar despues de cada despliegue
+   antes del siguiente backup) y BACKUP_EXPECTED_PENDING (entero
    positivo que coincida con las migraciones realmente pendientes).
    El script canónico run-production-backup.sh rechaza EXPECTED_PENDING=0
    en modo base de datos. Si hay **cero** pendientes, NO-GO: resolver
    esta limitacion con un PR y claim separados antes de activar cron;
    no falsear el contador para obtener un PASS.
 4. Descomentar schedule con cron '17 3 * * *' UTC, mediante PR revisado,
-   y solo entonces configurar GRINDFLOW_DAILY_BACKUP_ENABLED=true.
+   y solo entonces configurar GRINDFLOW_DAILY_BACKUP_ENABLED=true
+   como variable de REPOSITORIO u ORGANIZACION, nunca solo en el ambiente
+   production-backup: GitHub evalua el guard antes de cargar ese ambiente.
    Supervisar tambien ausencia de ejecucion: Actions puede retrasar u
    omitir eventos programados y no constituye garantia de respaldo diario.
 
@@ -39,7 +42,9 @@ Luego se hace gzip -t, checksum SHA-256 con sidecar privado 0600 y
 sha256sum -c. La retención de 30 días elimina solo archivos
 pre-migration-*.sql.gz de más de 43200 minutos con sidecar SHA-256
 válido; ignora recovery .gfrec, Vault, latest, receipts internos y
-archivos antiguos sin sidecar. No se suben respaldos a GitHub.
+archivos antiguos sin sidecar o con checksum no verificable. Antes de
+ eliminar una copia verifica el hash y el nombre exacto en el sidecar.
+ No se suben respaldos a GitHub.
 La ausencia de artefacto, SHA incorrecto, checksum alterado, credenciales
 faltantes, cambio de release o UNKNOWN = NO-GO y alerta.
 

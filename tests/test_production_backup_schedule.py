@@ -41,8 +41,8 @@ class ProductionBackupScheduleTests(unittest.TestCase):
         w = self.workflow
         guard = re.search(r"(?m)^    if: (.*)$", w)
         self.assertIsNotNone(guard)
-        self.assertIn("github.event_name == 'schedule'", guard.group(1))
-        self.assertIn("vars.GRINDFLOW_DAILY_BACKUP_ENABLED == 'true'", guard.group(1))
+        self.assertEqual(guard.group(1).strip(),
+                         "${{ github.event_name == 'schedule' && vars.GRINDFLOW_DAILY_BACKUP_ENABLED == 'true' }}")
         self.assertNotIn("\n  push:", w)
         self.assertNotIn("\n  pull_request:", w)
         self.assertRegex(w.replace("  # schedule:", "  schedule:", 1),
@@ -58,6 +58,9 @@ class ProductionBackupScheduleTests(unittest.TestCase):
             "cancel-in-progress: false", "find \"$directory\"",
         ):
             self.assertIn(token, w, token)
+        self.assertIn('[[ -f "$old_receipt" && ! -L "$old_receipt" ]] || continue', w)
+        self.assertIn('sha256sum -- "$old_name") | cmp -s - "$old_receipt"', w)
+        self.assertNotIn('sha256sum -c -- "$old_name.sha256"', w)
         self.assertIn("operations:record-db-backup", self.script)
         self.assertIn("EXPECTED_PENDING", self.manual)
         self.assertNotIn("actions/upload-artifact", w)
@@ -78,6 +81,8 @@ class ProductionBackupScheduleTests(unittest.TestCase):
         self.assertIn("No backup payload", w)
         self.assertIn("cero", self.docs)
         self.assertIn("PR revisado", self.docs)
+        self.assertIn("REPOSITORIO u ORGANIZACION", self.docs)
+        self.assertIn("actualizar despues de cada despliegue", self.docs)
 
 
 if __name__ == "__main__":
