@@ -142,7 +142,7 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
             $db->insert('gf_identity_memberships', [
                 'id' => Uuid::v7()->toRfc4122(),
                 'user_id' => $user, 'organization_id' => $organization,
-                'role' => 'editor', 'created_at' => $now, 'updated_at' => $now,
+                'role' => 'studio', 'created_at' => $now, 'updated_at' => $now,
             ]);
 
             $login = $client->request('GET', '/login');
