@@ -612,3 +612,11 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
 - **GF-LIB-054:** el borrado es reversible (actor y fecha) y la restauración conserva el historial. La eliminación definitiva exige la capacidad `delete` (admin), confirmación explícita y un asset ya en la papelera; borra el original privado pero conserva la fila, los eventos y las métricas históricas.
 - **GF-LIB-044-DELIVERY:** migración aditiva, sin publicación, proveedores ni datos reales. Detalles: `docs/AGENT-LIBRARY-LIFECYCLE.md`.
 
+### GF-DSR-852 — Solicitudes de derechos de datos personales
+
+- **GF-DSR-01:** la identidad y organización del solicitante se deducen de su sesión autenticada; cualquier user_id, organization_id o role elegido por el cliente se rechaza. Las mutaciones requieren CSRF y autorización; no se filtran datos de otros usuarios u organizaciones.
+- **GF-DSR-02:** exportación privada inicial limitada al registro de identidad propia (id, display_name, email), con scope=identity_only y complete=false; NO representa exportación completa de otros módulos.
+- **GF-DSR-03:** la petición de supresión retorna HTTP 202 y estado pending: confirma recepción, jamás eliminación efectiva. No borrar cuentas, contenido compartido ni registros productivos. Bitácora mínima con actor HMAC, acción, estado y UTC, sin PII en logs.
+- **GF-DSR-04:** antes de afirmar aislamiento inter-tenant deben existir pruebas de acceso cruzado usando dos organizaciones sintéticas. Rechazar organization_id del cliente en un tenant no demuestra aislamiento. Ante propiedad dudosa, legal hold o relaciones compartidas, no borrar y escalar.
+- **GF-DSR-05:** endpoints DSR disponibles únicamente con APP_ENV=test; fuera de test fallan cerrado con 404. Sin producción, datos reales, borrado efectivo, migraciones destructivas o go-live sin autorización explícita y revisión jurídica externa (#457).
+- **GF-DSR-06:** plazos, responsable y retención quedan pendientes de decisión y canales efectivos; no inventar SLA. Referencias: backend #814, pruebas #799 y runbook docs/launch/data-subject-requests.md. El runbook no reemplaza esta especificación durable.
