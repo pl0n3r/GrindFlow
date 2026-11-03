@@ -1,0 +1,173 @@
+name: GrindFlow Daily Production Backup (disabled)
+
+# Issue #780: no cron until a separate OWNER-approved live PR.
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: grindflow-production-backup
+  cancel-in-progress: false
+
+jobs:
+  database-backup:
+    if: ${{ github.event_name == 'schedule' && vars.GRINDFLOW_DAILY_BACKUP_ENABLED == 'true' }}
+    environment: production-backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HOSTINGER_SSH_HOST: ${{ vars.HOSTINGER_SSH_HOST }}
+      HOSTINGER_SSH_USER: ${{ vars.HOSTINGER_SSH_USER }}
+      HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
+      HOSTINGER_RELEASE_ROOT: ${{ vars.HOSTINGER_RELEASE_ROOT }}
+      EXPECTED_PENDING: ${{ vars.BACKUP_EXPECTED_PENDING }}
+      EXPECTED_SHA: ${{ vars.BACKUP_EXPECTED_SHA }}
+      RECOVERY_BACKUP_ENABLED: 'false'
+      RECOVERY_WRITES_STOPPED_CONFIRMED: 'false'
+      RECOVERY_SYMFONY_CRON_DISABLED_CONFIRMED: 'false'
+      BACKUP_RETENTION_DAYS: '30'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Fail closed before connecting
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == "schedule" ]]
+          [[ "$BACKUP_RETENTION_DAYS" == "30" ]]
+          [[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]] || {
+            echo '::error::BACKUP_EXPECTED_PENDING must be a verified positive integer; canonical script rejects zero'
+            exit 2
+          }
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          [[ "$HOSTINGER_SSH_HOST" =~ ^[A-Za-z0-9.-]{1,253}$ ]] || exit 2
+          [[ "$HOSTINGER_SSH_USER" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || exit 2
+          [[ "$HOSTINGER_SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 2
+          [[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]] || exit 2
+          [[ "$HOSTINGER_RELEASE_ROOT" != *".."* ]] || exit 2
+          bash -n scripts/run-production-backup.sh
+
+      - name: Install strict private SSH material
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$HOSTINGER_KNOWN_HOSTS" ]] || exit 2
+          umask 077
+          key="$RUNNER_TEMP/grindflow-schedule-ssh-key"
+          hosts="$RUNNER_TEMP/grindflow-schedule-known-hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$hosts"
+          chmod 0600 "$key" "$hosts"
+          printf 'SSH_KEY_PATH=%s\nKNOWN_HOSTS_PATH=%s\n' "$key" "$hosts" >> "$GITHUB_ENV"
+
+      - name: Check deployed release SHA before backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_KEY_PATH" -p "$HOSTINGER_SSH_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$KNOWN_HOSTS_PATH" \
+            "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST" \
+            bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_SHA" <<'REMOTE'
+          set -euo pipefail
+          root="$1"; sha="$2"
+          [[ "$root" =~ ^(/[A-Za-z0-9._-]+)+$ && "$root" != *".."* ]]
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ -L "$root/current" ]]
+          deployed="$(readlink -f "$root/current")"
+          [[ "$deployed" == "$root/releases/$sha" ]]
+          [[ -f "$deployed/.release-sha" && ! -L "$deployed/.release-sha" ]]
+          [[ "$(cat "$deployed/.release-sha")" == "$sha" ]]
+          REMOTE
+
+      - name: Backup, SHA-256 receipt and 30-day retention
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$(mktemp)"
+          trap 'rm -f -- "$output"' EXIT
+          bash scripts/run-production-backup.sh > "$output"
+          [[ "$(wc -l < "$output")" -eq 2 ]]
+          fingerprint="$(sed -n 's/^MIGRATION_FINGERPRINT=//p' "$output")"
+          archive="$(sed -n 's/^BACKUP_ARCHIVE=//p' "$output")"
+          [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$archive" =~ ^operations/database-backups/pre-migration-[A-Za-z0-9._-]+\.sql\.gz$ ]]
+          ssh -i "$SSH_KEY_PATH" -p "$HOSTINGER_SSH_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$KNOWN_HOSTS_PATH" \
+            "$HOSTINGER_SSH_USER@$HOSTINGER_SSH_HOST" \
+            bash -s -- "$HOSTINGER_RELEASE_ROOT" "$EXPECTED_SHA" "$archive" "$BACKUP_RETENTION_DAYS" <<'REMOTE'
+          set -euo pipefail
+          root="$1"; sha="$2"; relative="$3"; days="$4"
+          [[ "$root" =~ ^(/[A-Za-z0-9._-]+)+$ && "$root" != *".."* ]]
+          [[ "$sha" =~ ^[0-9a-f]{40}$ && "$days" == "30" ]]
+          [[ "$relative" =~ ^operations/database-backups/pre-migration-[A-Za-z0-9._-]+\.sql\.gz$ ]]
+          deployed="$(readlink -f "$root/current")"
+          [[ "$deployed" == "$root/releases/$sha" ]]
+          [[ -f "$deployed/.release-sha" && ! -L "$deployed/.release-sha" ]]
+          [[ "$(cat "$deployed/.release-sha")" == "$sha" ]]
+          directory="$deployed/storage/app/private/operations/database-backups"
+          [[ -d "$directory" && ! -L "$directory" ]]
+          name="$(basename -- "$relative")"
+          file="$directory/$name"
+          [[ -s "$file" && -f "$file" && ! -L "$file" ]]
+          gzip -t -- "$file"
+          receipt="$file.sha256"
+          [[ ! -e "$receipt" && ! -L "$receipt" ]]
+          umask 077
+          staged="$(mktemp "$directory/.tmp-backup-sha256-XXXXXXXX")"
+          trap 'rm -f -- "$staged"' EXIT
+          (cd "$directory" && sha256sum -- "$name") > "$staged"
+          chmod 0600 "$staged"
+          ln -- "$staged" "$receipt"
+          (cd "$directory" && sha256sum -c -- "$name.sha256") >/dev/null
+          rm -f -- "$staged"
+          # Irreversible prune only after new checksum succeeds; requires future live approval.
+          find "$directory" -maxdepth 1 -type f -name 'pre-migration-*.sql.gz' -mmin +43200 -print0 |
+            while IFS= read -r -d '' old_file; do
+              [[ "$old_file" != "$file" && ! -L "$old_file" ]]
+              old_name="$(basename -- "$old_file")"
+              [[ "$old_name" =~ ^pre-migration-[A-Za-z0-9._-]+\.sql\.gz$ ]]
+              old_receipt="$old_file.sha256"
+              [[ -f "$old_receipt" && ! -L "$old_receipt" ]]
+              (cd "$directory" && sha256sum -c -- "$old_name.sha256") >/dev/null
+              rm -f -- "$old_file" "$old_receipt"
+            done
+          REMOTE
+          echo 'Verified private DB backup and SHA-256 receipt; 30-day retention.'
+          echo 'No backup payload, host paths, or credentials uploaded.'
+
+      - name: Alert without secrets on failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: '[AUTO] GrindFlow Scheduled Backup Failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          msg="$(mktemp)"
+          trap 'rm -f -- "$msg"' EXIT
+          {
+            echo '## Scheduled DB backup: NO-GO'
+            echo
+            echo 'Database backup or checksum/retention verification failed.'
+            printf 'Workflow: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            echo 'No raw logs, secrets, SQL, remote paths or payloads included.'
+          } > "$msg"
+          cat "$msg" >> "$GITHUB_STEP_SUMMARY"
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$msg"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$msg"
+          fi
