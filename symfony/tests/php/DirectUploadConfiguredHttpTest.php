@@ -14,6 +14,7 @@ use GrindFlow\Infrastructure\Storage\DirectUploadStorage;
 use GrindFlow\Infrastructure\Storage\DirectUploadTokenCipher;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Uid\Uuid;
 
 /** Synthetic HTTP contract with a disposable object-store adapter, never real provider I/O. */
@@ -42,7 +43,10 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
             public string $stagingKey = '';
             public int $readCalls = 0;
             public bool $revokeOnRead = false;
+            public bool $invalidSignature = false;
             private readonly string $bytes;
+
+            public function expectedSha256(): string { return hash('sha256', $this->bytes); }
 
             public function __construct(
                 private readonly Connection $db,
@@ -50,7 +54,8 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
                 private readonly string $organization,
                 int $size,
             ) {
-                $this->bytes = str_repeat('x', $size);
+                $header = pack('N', 24).'ftyp'.'isom'.pack('N', 0).'isom'.'mp41';
+                $this->bytes = $header.str_repeat('x', $size - strlen($header));
             }
 
             public function available(): bool { return true; }
@@ -91,7 +96,9 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
                 if ($stream === false) {
                     return null;
                 }
-                fwrite($stream, $this->bytes);
+                fwrite($stream, $this->invalidSignature
+                    ? substr_replace($this->bytes, 'xxxx', 4, 4)
+                    : $this->bytes);
                 rewind($stream);
 
                 return $stream;
@@ -153,6 +160,41 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
             $csrf = json_decode((string) $client->getResponse()->getContent(), true)['data']['vault_upload_csrf'];
             self::assertIsString($csrf);
 
+            // Reject dangerous compound extensions before issuing any upload URL.
+            foreach (['unsafe.exe.mp4', 'payload.php.mp4', 'clip.cgi.mp4'] as $badName) {
+                $this->postJson($client, '/api/admin/vault/direct-upload/intent', [
+                    'filename' => $badName, 'mime_type' => 'video/mp4', 'byte_size' => $size,
+                ], $csrf);
+                self::assertResponseStatusCodeSame(422);
+            }
+            self::assertSame('', $storage->stagingKey);
+
+            // Quick upload must reject the original path/name before writing a blob or row.
+            $png = tempnam(sys_get_temp_dir(), 'gf697-');
+            if ($png === false) {
+                throw new \RuntimeException('Cannot create disposable PNG fixture.');
+            }
+            try {
+                file_put_contents($png, base64_decode(
+                    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a21cAAAAASUVORK5CYII=',
+                    true,
+                ));
+                foreach (['payload.php.png', 'clip.exe.png', '../traversal.png', 'clip.pht.png'] as $badName) {
+                    $client->request('POST', '/api/admin/vault', [], [
+                        'file' => new UploadedFile($png, $badName, 'image/png', null, true),
+                    ], ['HTTP_X_CSRF_TOKEN' => $csrf]);
+                    self::assertResponseStatusCodeSame(422);
+                    self::assertSame('invalid_filename',
+                        json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+                }
+            } finally {
+                @unlink($png);
+            }
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = :organization',
+                ['organization' => $organization],
+            ));
+
             for ($attempt = 0; $attempt < 2; $attempt++) {
                 $this->postJson($client, '/api/admin/vault/direct-upload/intent', [
                     'filename' => 'synthetic.mp4',
@@ -167,6 +209,16 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
                 self::assertStringContainsString($organization.'/staging/', $storage->stagingKey);
 
                 $storage->revokeOnRead = ($attempt === 1);
+                if ($attempt === 0) {
+                    $storage->invalidSignature = true;
+                    $this->postJson($client, '/api/admin/vault/direct-upload/complete', [
+                        'upload_token' => $intent['upload_token'],
+                    ], $csrf);
+                    self::assertResponseStatusCodeSame(422);
+                    self::assertSame('invalid_upload_token',
+                        json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+                    $storage->invalidSignature = false;
+                }
                 $this->postJson($client, '/api/admin/vault/direct-upload/complete', [
                     'upload_token' => $intent['upload_token'],
                 ], $csrf);
@@ -183,14 +235,14 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
                 $verified = json_decode((string) $client->getResponse()->getContent(), true)['data'];
                 self::assertSame('verified_staging_only', $verified['status']);
                 self::assertFalse($verified['registered']);
-                self::assertSame(hash('sha256', str_repeat('x', $size)), $verified['sha256']);
+                self::assertSame($storage->expectedSha256(), $verified['sha256']);
                 self::assertSame($size, $verified['size_bytes']);
                 self::assertSame('video/mp4', $verified['mime_type_declared']);
                 self::assertStringContainsString('no-store',
                     (string) $client->getResponse()->headers->get('Cache-Control'));
                 self::assertSame('nosniff', $client->getResponse()->headers->get('X-Content-Type-Options'));
             }
-            self::assertSame(2, $storage->readCalls);
+            self::assertSame(3, $storage->readCalls);
         } finally {
             $db->delete('gf_identity_memberships', ['user_id' => $user]);
             $db->delete('gf_identity_organizations', ['id' => $organization]);

@@ -190,8 +190,19 @@ final class VaultController extends AbstractController
             return $this->error(422, 'invalid_type', 'Solo se aceptan JPEG, PNG, WebP, MP4 o WebM válidos.');
         }
 
-        $filename = basename(str_replace('\\', '/', $file->getClientOriginalName()));
-        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '_', $filename) ?: 'archivo';
+        // Validate the unmodified client path before basename or any filesystem write.
+        $clientPath = $file->getClientOriginalPath();
+        $originalName = $file->getClientOriginalName();
+        if ($clientPath !== $originalName
+            || strpbrk($clientPath, "/\\") !== false
+            || $originalName === '.' || $originalName === '..'
+            || trim($originalName) === ''
+            || preg_match('//u', $originalName) !== 1
+            || preg_match('/[\x00-\x1F\x7F]/', $originalName) === 1
+            || preg_match('/\.(?:php[0-9]*|pht|phtml|phps|exe|bat|cmd|com|sh|bash|cgi|jsp|js|jar|ps1|vbs)(?:\.|$)/i', $originalName) === 1) {
+            return $this->error(422, 'invalid_filename', 'El nombre del archivo no es seguro.');
+        }
+        $filename = $originalName;
         $filename = mb_substr(trim($filename), 0, 180);
         if ($filename === '') {
             $filename = 'archivo';
