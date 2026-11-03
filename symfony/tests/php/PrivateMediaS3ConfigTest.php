@@ -65,27 +65,35 @@ final class PrivateMediaS3ConfigTest extends TestCase
         // is renameable by other UIDs: symlink replacement can race fopen().
         $ancestor = $this->directory.'-mutable';
         $private = $ancestor.'/operator';
-        self::assertTrue(mkdir($ancestor, 0700));
-        self::assertTrue(mkdir($private, 0700));
         $paths = [];
-        foreach ($this->paths as $key => $original) {
-            $copy = $private.'/'.basename($original);
-            self::assertTrue(copy($original, $copy));
-            chmod($copy, 0600);
-            $paths[$key] = $copy;
-        }
         try {
+            self::assertTrue(mkdir($ancestor, 0700));
+            self::assertTrue(mkdir($private, 0700));
+            foreach ($this->paths as $key => $original) {
+                $copy = $private.'/'.basename($original);
+                self::assertTrue(copy($original, $copy));
+                chmod($copy, 0600);
+                $paths[$key] = $copy;
+            }
             self::assertNotNull(PrivateMediaS3Config::fromPathVariables($paths));
             chmod($ancestor, 0777);
             self::assertNull(PrivateMediaS3Config::fromPathVariables($paths),
                 'A writable ancestor must disable B2 before opening secrets.');
         } finally {
-            chmod($ancestor, 0700);
-            foreach ($paths as $copy) {
-                @unlink($copy);
+            if (is_dir($ancestor)) {
+                chmod($ancestor, 0700);
             }
-            rmdir($private);
-            rmdir($ancestor);
+            if (is_dir($private)) {
+                foreach (glob($private.'/*') ?: [] as $copy) {
+                    if (is_file($copy)) {
+                        unlink($copy);
+                    }
+                }
+                rmdir($private);
+            }
+            if (is_dir($ancestor)) {
+                rmdir($ancestor);
+            }
         }
     }
 
@@ -94,16 +102,16 @@ final class PrivateMediaS3ConfigTest extends TestCase
         $outer = $this->directory.'-swap';
         $child = $outer.'/operator';
         $renamed = $outer.'/operator-original';
-        self::assertTrue(mkdir($outer, 0700));
-        self::assertTrue(mkdir($child, 0700));
         $paths = [];
-        foreach ($this->paths as $key => $original) {
-            $copy = $child.'/'.basename($original);
-            self::assertTrue(copy($original, $copy));
-            chmod($copy, 0600);
-            $paths[$key] = $copy;
-        }
         try {
+            self::assertTrue(mkdir($outer, 0700));
+            self::assertTrue(mkdir($child, 0700));
+            foreach ($this->paths as $key => $original) {
+                $copy = $child.'/'.basename($original);
+                self::assertTrue(copy($original, $copy));
+                chmod($copy, 0600);
+                $paths[$key] = $copy;
+            }
             self::assertNotNull(PrivateMediaS3Config::fromPathVariables($paths));
             self::assertTrue(rename($child, $renamed));
             if (!@symlink($renamed, $child)) {
@@ -115,17 +123,19 @@ final class PrivateMediaS3ConfigTest extends TestCase
             if (is_link($child)) {
                 unlink($child);
             }
-            foreach ($paths as $copy) {
-                @unlink($renamed.'/'.basename($copy));
-                @unlink($child.'/'.basename($copy));
+            foreach ([$renamed, $child] as $directory) {
+                if (is_dir($directory)) {
+                    foreach (glob($directory.'/*') ?: [] as $copy) {
+                        if (is_file($copy)) {
+                            unlink($copy);
+                        }
+                    }
+                    rmdir($directory);
+                }
             }
-            if (is_dir($renamed)) {
-                rmdir($renamed);
+            if (is_dir($outer)) {
+                rmdir($outer);
             }
-            if (is_dir($child)) {
-                rmdir($child);
-            }
-            rmdir($outer);
         }
     }
 
