@@ -171,14 +171,18 @@ final class UploadNegativeCasesTest extends WebTestCase
     {
         $atLimit = str_pad($this->png(), self::QUICK_MAX, "\0");
         self::assertSame(self::QUICK_MAX, strlen($atLimit));
+        $beforeAllowed = $this->vaultBlobs();
         $this->quickUpload('limit.png', $atLimit);
         self::assertResponseStatusCodeSame(201);
         $json = $this->responseJson();
         self::assertSame(self::QUICK_MAX, $json['data']['asset']['size_bytes']);
         self::assertSame('image/png', $json['data']['asset']['mime_type']);
-        $this->assertNoArtifacts(1, $this->vaultBlobs());
-
+        self::assertSame(hash('sha256', $atLimit), $this->db->fetchOne(
+            'SELECT sha256 FROM gf_vault_assets WHERE organization_id = ?', [$this->organization],
+        ));
         $afterAllowed = $this->vaultBlobs();
+        self::assertCount(count($beforeAllowed) + 1, $afterAllowed);
+        $this->assertNoArtifacts(1, $afterAllowed);
         $this->quickUpload('too-large.png', $atLimit."\0");
         $this->assertRejected(422, 'invalid_size', 1, $afterAllowed);
         self::assertSame(1, (int) $this->db->fetchOne(
