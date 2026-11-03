@@ -41,6 +41,10 @@ LARAVEL_MATCH = re.compile(
     r"(?P<path>[^'\"]+)['\"]",
     re.DOTALL,
 )
+LARAVEL_REDIRECT_TARGET = re.compile(
+    r"\bRoute::redirect\s*\(\s*['\"][^'\"]+['\"]\s*,\s*['\"]"
+    r"(?P<path>[^'\"]+)['\"]"
+)
 LARAVEL_PREFIX = re.compile(
     r"\bRoute::prefix\s*\(\s*['\"](?P<path>[^'\"]+)['\"]"
 )
@@ -92,7 +96,8 @@ def commercial_route_paths(source: str) -> list[str]:
     candidates = [
         match.group("path")
         for expression in (
-            LARAVEL_ROUTE, LARAVEL_MATCH, LARAVEL_PREFIX, SYMFONY_ROUTE
+            LARAVEL_ROUTE, LARAVEL_MATCH, LARAVEL_REDIRECT_TARGET,
+            LARAVEL_PREFIX, SYMFONY_ROUTE
         )
         for match in expression.finditer(cleaned)
     ]
