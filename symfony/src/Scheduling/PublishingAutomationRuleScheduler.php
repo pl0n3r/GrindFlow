@@ -7,6 +7,7 @@ namespace GrindFlow\Scheduling;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
+use GrindFlow\Ops\Security\EmergencyStopStore;
 
 /**
  * S4 local materializer. Never contacts Facebook, publishes a post, or
@@ -33,6 +34,13 @@ final readonly class PublishingAutomationRuleScheduler
     {
         $result = static fn (string $status, int $created = 0, int $existing = 0, int $blocked = 0): array =>
             compact('status', 'created', 'existing', 'blocked');
+
+        $fence = new EmergencyStopStore($this->db);
+        try {
+            $revision = $fence->runningRevision();
+        } catch (\Throwable) {
+            return $result('emergency_stop');
+        }
 
         if (!$this->db->createSchemaManager()->tablesExist(['gf_content_rules', 'gf_schedule_drafts'])) {
             return $result('schema_unavailable');
@@ -137,11 +145,21 @@ final readonly class PublishingAutomationRuleScheduler
                         ((string) $a === $last ? 1 : 0) <=> ((string) $b === $last ? 1 : 0));
                 }
                 foreach ($candidates as $assetId) {
-                    $attempt = $this->drafts->reserve(
-                        $organizationId, (string) $rule['updated_by'],
-                        (string) $assetId, $slot['scheduled_at_utc'], true,
-                        (string) $rule['automation_destination_id'],
-                    );
+                    try {
+                        $attempt = $fence->withEffectPermit(
+                            fn (): array => $this->drafts->reserve(
+                                $organizationId, (string) $rule['updated_by'],
+                                (string) $assetId, $slot['scheduled_at_utc'], true,
+                                (string) $rule['automation_destination_id'],
+                            ),
+                            $revision,
+                        );
+                    } catch (\RuntimeException $exception) {
+                        if (str_starts_with($exception->getMessage(), 'emergency_stop')) {
+                            return $result('emergency_stop', $created, $existing, $blocked);
+                        }
+                        throw $exception;
+                    }
                     if ($attempt['status'] === 'ok') {
                         if ($attempt['changed']) {
                             ++$created;
