@@ -16,11 +16,11 @@ REQUIRED_KINDS = {"laravel", "nextjs", "worker", "supabase"}
 MINIMUM_ENTRIES = 26
 
 ROW = re.compile(
-    r"^\\| (?P<path>[A-Za-z0-9_./-]+) \\| "
-    r"(?P<kind>laravel|nextjs|worker|supabase) \\| "
-    r"(?P<parity>[A-Z]+) \\| "
-    r"(?P<retirement>[A-Z]+) \\| "
-    r"(?P<evidence>[^|]+) \\|$"
+    r"^\| (?P<path>[A-Za-z0-9_./-]+) \| "
+    r"(?P<kind>laravel|nextjs|worker|supabase) \| "
+    r"(?P<parity>[A-Z]+) \| "
+    r"(?P<retirement>[A-Z]+) \| "
+    r"(?P<evidence>[^|]+) \|$"
 )
 
 
@@ -110,7 +110,7 @@ class LegacyRetirementGuardTest(unittest.TestCase):
             document = root / INVENTORY
             text = document.read_text(encoding="utf-8")
             row = next(line for line in text.splitlines() if ROW.fullmatch(line))
-            document.write_text(text + "\\n" + row + "\\n", encoding="utf-8")
+            document.write_text(text + "\n" + row + "\n", encoding="utf-8")
             with self.assertRaisesRegex(AssertionError, "duplicate legacy dependency"):
                 assert_legacy_retirement_guard(root)
 
