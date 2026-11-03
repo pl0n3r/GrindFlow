@@ -36,5 +36,9 @@
             </div>
         </section>
     </main>
+
+    <footer class="gf-release-footer gf-release-footer--public">
+        <a href="/privacidad-y-mis-derechos">Privacidad y mis derechos</a>
+    </footer>
 </body>
 </html>

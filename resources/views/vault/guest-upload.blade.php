@@ -122,6 +122,8 @@
         </p>
     </main>
 
+    <x-release-footer context="public" />
+
     @if ($available)
         <script>
             (() => {
