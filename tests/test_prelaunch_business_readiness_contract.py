@@ -7,7 +7,6 @@ CI success nor a readiness document can authorize commercialization or go-live.
 from __future__ import annotations
 
 from contextlib import redirect_stderr
-from copy import deepcopy
 from importlib.util import module_from_spec, spec_from_file_location
 from io import StringIO
 from pathlib import Path
