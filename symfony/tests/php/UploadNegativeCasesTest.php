@@ -7,7 +7,9 @@ namespace GrindFlow\Tests;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Http\Controller\VaultController;
+use GrindFlow\Infrastructure\Storage\DirectUploadStorage;
 use GrindFlow\Infrastructure\Storage\PrivateVaultDirectory;
+use GrindFlow\Infrastructure\Storage\UnavailableDirectUploadStorage;
 use GrindFlow\Kernel;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -36,8 +38,6 @@ final class UploadNegativeCasesTest extends WebTestCase
     private string $vaultRoot;
     /** @var list<string> */
     private array $temporary = [];
-    /** @var list<string> */
-    private array $initialBlobs = [];
 
     protected static function getKernelClass(): string
     {
@@ -49,6 +49,8 @@ final class UploadNegativeCasesTest extends WebTestCase
         parent::setUp();
         $this->client = static::createClient();
         $this->client->catchExceptions(false);
+        // Force fail-closed storage regardless of CI/host provider environment.
+        static::getContainer()->set(DirectUploadStorage::class, new UnavailableDirectUploadStorage());
         $this->db = static::getContainer()->get(Connection::class);
         $this->actor = Uuid::v7()->toRfc4122();
         $this->organization = Uuid::v7()->toRfc4122();
@@ -103,20 +105,27 @@ final class UploadNegativeCasesTest extends WebTestCase
         /** @var PrivateVaultDirectory $directory */
         $directory = static::getContainer()->get(PrivateVaultDirectory::class);
         $this->vaultRoot = $directory->root();
-        $this->initialBlobs = $this->vaultBlobs();
     }
 
     protected function tearDown(): void
     {
+        $ownedStorageKeys = [];
         if (isset($this->db, $this->organization)) {
+            // Capture only this synthetic tenant's keys before deleting its rows.
+            $ownedStorageKeys = $this->db->fetchFirstColumn(
+                'SELECT storage_key FROM gf_vault_assets WHERE organization_id = ?', [$this->organization],
+            );
             $this->db->delete('gf_vault_assets', ['organization_id' => $this->organization]);
             $this->db->delete('gf_identity_memberships', ['user_id' => $this->actor]);
             $this->db->delete('gf_identity_organizations', ['id' => $this->organization]);
             $this->db->delete('gf_identity_users', ['id' => $this->actor]);
         }
         if (isset($this->vaultRoot)) {
-            foreach (array_diff($this->vaultBlobs(), $this->initialBlobs) as $blob) {
-                @unlink($blob);
+            foreach ($ownedStorageKeys as $key) {
+                // Never delete a blob outside the tenant-owned UUID namespace.
+                if (is_string($key) && Uuid::isValid($key)) {
+                    @unlink($this->vaultRoot.'/'.$key.'.blob');
+                }
             }
         }
         foreach ($this->temporary as $path) {
@@ -184,9 +193,14 @@ final class UploadNegativeCasesTest extends WebTestCase
         $json = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(self::QUICK_MAX, $json['data']['asset']['size_bytes']);
         self::assertSame('image/png', $json['data']['asset']['mime_type']);
-        self::assertSame(hash('sha256', $atLimit), $this->db->fetchOne(
-            'SELECT sha256 FROM gf_vault_assets WHERE organization_id = ?', [$this->organization],
-        ));
+        $stored = $this->db->fetchAssociative(
+            'SELECT sha256, storage_key FROM gf_vault_assets WHERE organization_id = ?', [$this->organization],
+        );
+        self::assertIsArray($stored);
+        self::assertSame(hash('sha256', $atLimit), $stored['sha256']);
+        self::assertIsString($stored['storage_key']);
+        self::assertTrue(Uuid::isValid($stored['storage_key']));
+        self::assertSame($atLimit, file_get_contents($this->vaultRoot.'/'.$stored['storage_key'].'.blob'));
         $afterAllowed = $this->vaultBlobs();
         self::assertCount(count($beforeAllowed) + 1, $afterAllowed);
         $this->assertNoArtifacts(1, $afterAllowed);
