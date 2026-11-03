@@ -152,7 +152,8 @@ test('private admin is not accidentally exposed through S0', async ({ request })
   expect(health.status()).toBe(200);
   const state = await health.json();
   expect(state.stage).toBe('s0-preview');
-  expect(state).not.toHaveProperty('release_sha');
+  expect(state).toHaveProperty('release_sha');
+  expect(state.release_sha === null || (typeof state.release_sha === 'string' && /^[0-9a-f]{40}$/.test(state.release_sha))).toBe(true);
 });
 
 test('Symfony login entrypoint has CSRF and accessible error states on mobile', async ({ page }) => {

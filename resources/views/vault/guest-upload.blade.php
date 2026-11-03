@@ -6,6 +6,8 @@
     <meta name="color-scheme" content="dark">
     <title>Carga móvil · GrindFlow</title>
     <link rel="stylesheet" href="{{ asset('css/grindflow.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/grindflow-parrilla.css') }}?v={{ config('version.number') }}">
+    <link rel="stylesheet" href="{{ asset('css/grindflow-workspace.css') }}?v={{ config('version.number') }}">
 </head>
 <body class="gf-guest-upload">
     <div class="gf-grid" aria-hidden="true"></div>

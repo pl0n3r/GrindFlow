@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Privacidad y mis derechos · GrindFlow{% endblock %}
+
+{% block body %}
+<main id="contenido" class="container" aria-labelledby="titulo-privacidad">
+    <h1 id="titulo-privacidad">Privacidad y mis derechos</h1>
+    <p><strong>Estado:</strong> documento informativo provisional. Texto jurídico pendiente de aprobación del abogado.</p>
+    <h2>¿Quién es el responsable?</h2>
+    <p>[COMPLETAR POR EL DUEÑO]</p>
+    <h2>¿Cómo solicito acceso, corrección o borrado?</h2>
+    <p>El procedimiento, la comprobación de identidad y el canal aprobado están pendientes de validación profesional.</p>
+    <p>Contacto del responsable:
+        {% if contact_email %}
+            <a href="mailto:{{ contact_email|url_encode }}">{{ contact_email }}</a>
+        {% else %}
+            <span>[COMPLETAR POR EL DUEÑO]</span>
+        {% endif %}
+    </p>
+    <h2>¿En cuánto tiempo se responde?</h2>
+    <p>[COMPLETAR POR EL DUEÑO] — pendiente de confirmación jurídica, sin prometer un plazo no aprobado.</p>
+    <p>La publicación de este borrador no autoriza solicitudes con datos reales ni activa servicios nuevos.</p>
+</main>
+{% endblock %}

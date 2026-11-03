@@ -1,7 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests/e2e',
+  // Keep existing E2E suites and the focused Browser contracts discoverable.
+  // Files under tests/php and tests/contract are not Playwright test modules.
+  testDir: './tests',
   timeout: 30000,
   workers: 1,
   retries: 0,

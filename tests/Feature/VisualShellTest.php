@@ -30,6 +30,24 @@ class VisualShellTest extends TestCase
         $this->assertFileExists(public_path('css/grindflow.css'));
     }
 
+    public function test_home_is_a_programming_grid_with_honest_example_states(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('<link rel="stylesheet" href="'.asset('css/grindflow-parrilla.css').'?v='.config('version.number').'">', false)
+            ->assertSee('Parrilla de ejemplo')
+            ->assertSee('Son datos ilustrativos, no de una cuenta real.')
+            ->assertSee('Programado 09:00')
+            ->assertSee('En revisión')
+            ->assertSee('Plataforma en desarrollo · Piloto inicial en preparación')
+            ->assertDontSee('CONTENT OPERATIONS, SIMPLIFIED')
+            ->assertDontSee('gf-landing');
+
+        $this->assertFileExists(public_path('css/grindflow-parrilla.css'));
+        $this->assertFileExists(public_path('fonts/archivo-latin-standard-normal.woff2'));
+        $this->assertFileExists(public_path('fonts/LICENSE-OFL-archivo.txt'));
+    }
+
     public function test_release_footer_is_identical_on_public_login_and_authenticated_workspace(): void
     {
         $this->get('/')

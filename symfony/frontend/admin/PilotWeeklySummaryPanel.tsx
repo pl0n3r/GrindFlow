@@ -106,7 +106,6 @@ export function PilotWeeklySummaryPanel() {
 
   const current = currentMondayUtc();
   const oldest = shiftWeek(current, -77);
-  const first = state.kind === 'ready' ? state.summary.week_start_utc : week;
   return (
     <section className="pilot-summary" id="piloto" aria-labelledby="pilot-summary-title">
       <span className="admin-kicker">S5 · PILOTO · SOLO LECTURA</span>
@@ -116,7 +115,7 @@ export function PilotWeeklySummaryPanel() {
       <nav className="pilot-week-controls" aria-label="Semanas del piloto">
         <button type="button" disabled={week <= oldest}
           onClick={() => setWeek(shiftWeek(week, -7))}>Semana anterior</button>
-        <strong>Semana del {first} (UTC)</strong>
+        <strong role="status" aria-live="polite" aria-atomic="true">Semana del {week} (UTC)</strong>
         <button type="button" disabled={week >= current}
           onClick={() => setWeek(shiftWeek(week, 7))}>Semana siguiente</button>
       </nav>

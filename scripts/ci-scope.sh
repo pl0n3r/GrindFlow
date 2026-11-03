@@ -99,8 +99,24 @@ grindflow_ci_classify_files() {
         grindflow_ci_scope_add_area "Browser tests"
         GRINDFLOW_SCOPE_RUN_BROWSER=true
         ;;
+      tests/test_parity_matrix_executable.py)
+        grindflow_ci_scope_add_area "Symfony parity Python contract"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
+        GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
+        GRINDFLOW_SCOPE_RUN_TESTS=true
+        ;;
+      tests/test_release_100_evidence.py)
+        grindflow_ci_scope_add_area "Symfony release GF356 Python acceptance"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
+        GRINDFLOW_SCOPE_RUN_PHP_QUALITY=true
+        GRINDFLOW_SCOPE_RUN_TESTS=true
+        ;;
       tests/test_mvp_symfony_http_negatives.py)
         grindflow_ci_scope_add_area "Symfony HTTP negative acceptance"
+        GRINDFLOW_SCOPE_RUN_SYMFONY=true
+        ;;
+      tests/test_legacy_retirement_guard.py)
+        grindflow_ci_scope_add_area "Symfony GF350 legacy retirement Python contract"
         GRINDFLOW_SCOPE_RUN_SYMFONY=true
         ;;
       tests/*)

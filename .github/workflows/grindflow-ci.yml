@@ -257,6 +257,23 @@ jobs:
           [[ -f tests/test_media_pilot_readiness_contract.py ]] && python3 -m unittest tests/test_media_pilot_readiness_contract.py
            python3 -m unittest tests/test_media_storage_cors_preflight.py
           python3 -m unittest tests/test_s4_database_url_percent_encoding.py
+          # GF731: execute all four adversarial test cases in fast/validate.
+          python3 -m unittest -v tests/test_brechas_grindflow_05.py
+
+      - name: Contrato offline CORS en fast
+        shell: bash
+        run: |
+          set -euo pipefail
+          guion=docs/launch/cors-operator-script.md
+          contrato=tests/test_cors_guion_doc.py
+          if [[ -f "$guion" && -f "$contrato" ]]; then
+            python3 -m unittest discover -s tests -p test_cors_guion_doc.py -v
+          elif [[ -f "$guion" || -f "$contrato" ]]; then
+            echo "::error::Contrato CORS incompleto: guion y prueba deben existir juntos." >&2
+            exit 1
+          else
+            echo "Contrato CORS no integrado: se omite prueba offline."
+          fi
 
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
@@ -808,6 +825,21 @@ jobs:
         # La fuente del test está en tests/, pero usa Symfony/MariaDB de este job.
         working-directory: .
         run: python3 -m unittest tests/test_mvp_symfony_http_negatives.py -v
+      - name: Ejecutar evidencia GF356 cuando el test forma parte del HEAD
+        # #684 aporta este test; una ejecución sin su archivo nunca equivale a PASS.
+        if: ${{ hashFiles('tests/test_release_100_evidence.py') != '' }}
+        working-directory: .
+        run: python3 -m unittest tests/test_release_100_evidence.py -v
+      - name: Ejecutar matriz GF-MIG-003 cuando el test forma parte del HEAD
+        # #681 aporta la matriz; no informar éxito si el test no existe aquí.
+        if: ${{ hashFiles('tests/test_parity_matrix_executable.py') != '' }}
+        working-directory: .
+        run: python3 -m unittest tests/test_parity_matrix_executable.py -v
+      - name: Ejecutar guardia GF350 de retiro legacy cuando esté en el HEAD
+        # #682 aporta este test; sin su archivo el skip NO acredita AC-02 de #682.
+        if: ${{ hashFiles('tests/test_legacy_retirement_guard.py') != '' }}
+        working-directory: .
+        run: python3 -m unittest tests/test_legacy_retirement_guard.py -v
       - name: Verify migration reversibility on disposable MariaDB
         working-directory: symfony
         run: |

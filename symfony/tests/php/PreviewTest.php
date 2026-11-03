@@ -24,7 +24,8 @@ final class PreviewTest extends WebTestCase
         self::assertSame('s0-preview', $data['stage']);
         self::assertSame((new ProductVersion(dirname(__DIR__, 3)))->human(), $data['version']);
         self::assertSame(['compatible' => true, 'contract' => 'symfony-mariadb-v1'], $data['runtime']);
-        self::assertArrayNotHasKey('release_sha', $data);
+        self::assertArrayHasKey('release_sha', $data);
+        self::assertSame((new ProductVersion(dirname(__DIR__, 3)))->releaseSha(), $data['release_sha']);
         self::assertArrayNotHasKey('php_version', $data);
         self::assertArrayNotHasKey('extensions', $data);
         self::assertArrayNotHasKey('sapi', $data);

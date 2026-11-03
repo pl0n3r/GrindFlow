@@ -1,5 +1,6 @@
 parameters:
   grindflow_vault_root_default: ''
+  grindflow_media_storage_pointer_default: ''
   grindflow_direct_upload_secret_default: ''
   grindflow_mail_from_default: ''
   grindflow_public_base_url_default: 'https://www.grindflow.com.co'
@@ -27,6 +28,9 @@ services:
     resource: '../src/'
     exclude:
       - '../src/Kernel.php'
+      # Factory-managed: config has a private constructor, adapter needs an S3 client.
+      - '../src/Infrastructure/Storage/PrivateMediaS3Config.php'
+      - '../src/Infrastructure/Storage/BackblazeB2DirectUploadStorage.php'
 
   GrindFlow\Shared\Version\ProductVersion:
     arguments:
@@ -41,8 +45,17 @@ services:
       $projectDir: '%kernel.project_dir%'
       $rootOverride: '%env(default:grindflow_vault_root_default:GRINDFLOW_VAULT_ROOT)%'
 
+  # A missing/invalid private *_FILE configuration or absent SDK returns the
+  # existing Unavailable implementation; the factory performs no provider I/O.
   GrindFlow\Infrastructure\Storage\DirectUploadStorage:
-    alias: GrindFlow\Infrastructure\Storage\UnavailableDirectUploadStorage
+    factory: ['GrindFlow\Infrastructure\Storage\BackblazeB2DirectUploadStorage', 'fromPathVariables']
+    arguments:
+      $paths:
+        MEDIA_STORAGE_ENDPOINT_FILE: '%env(default:grindflow_media_storage_pointer_default:MEDIA_STORAGE_ENDPOINT_FILE)%'
+        MEDIA_STORAGE_REGION_FILE: '%env(default:grindflow_media_storage_pointer_default:MEDIA_STORAGE_REGION_FILE)%'
+        MEDIA_STORAGE_BUCKET_FILE: '%env(default:grindflow_media_storage_pointer_default:MEDIA_STORAGE_BUCKET_FILE)%'
+        MEDIA_STORAGE_ACCESS_KEY_ID_FILE: '%env(default:grindflow_media_storage_pointer_default:MEDIA_STORAGE_ACCESS_KEY_ID_FILE)%'
+        MEDIA_STORAGE_SECRET_ACCESS_KEY_FILE: '%env(default:grindflow_media_storage_pointer_default:MEDIA_STORAGE_SECRET_ACCESS_KEY_FILE)%'
 
   GrindFlow\Infrastructure\Storage\DirectUploadTokenCipher:
     arguments:

@@ -1,6 +1,207 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# GrindFlow #794: opt-in, loopback-only synthetic smoke. The existing production
+# smoke and its environment contract remain untouched when no flag is supplied.
+if [[ "${1:-}" == "--local-tenant" ]]; then
+  exec python3 - <<'PY_LOCAL_SMOKE'
+"""Fail-closed local Symfony /health + login + cross-tenant smoke.
+
+Only private synthetic fixture files and loopback endpoints are permitted.
+"""
+from __future__ import annotations
+
+import http.cookiejar
+import json
+import os
+import re
+import stat
+import sys
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlsplit
+from urllib.request import (
+    HTTPRedirectHandler, HTTPCookieProcessor, ProxyHandler,
+    Request, build_opener,
+)
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
+class FormReader(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.forms = []
+        self.current = None
+
+    def handle_starttag(self, tag, attrs):
+        props = dict(attrs)
+        if tag == "form":
+            self.current = {"action": props.get("action", ""),
+                            "method": props.get("method", "").lower(),
+                            "inputs": {}}
+        if tag == "input" and self.current is not None:
+            key = props.get("name", "")
+            if key:
+                if key in self.current["inputs"]:
+                    raise ValueError("duplicate form field")
+                self.current["inputs"][key] = props.get("value", "")
+
+    def handle_endtag(self, tag):
+        if tag == "form" and self.current is not None:
+            self.forms.append(self.current)
+            self.current = None
+
+
+def abort(stage):
+    # Never print secrets, remote responses, URLs or tenant identifiers.
+    print("NO-GO: " + stage, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def required_json(data):
+    def strict_pairs(pairs):
+        d = {}
+        for key, value in pairs:
+            if key in d:
+                raise ValueError("duplicate JSON key")
+            d[key] = value
+        return d
+    return json.loads(data, object_pairs_hook=strict_pairs)
+
+
+def get_forms(body):
+    form = FormReader()
+    form.feed(body.decode("utf-8", "strict"))
+    if form.current is not None:
+        abort("form is truncated")
+    return form.forms
+
+
+def select_form(forms, path, organization=None):
+    candidates = [form for form in forms
+                  if form["method"] == "post" and form["action"] == path]
+    if organization is not None:
+        candidates = [form for form in candidates
+                      if form["inputs"].get("organization_id") == organization]
+    if len(candidates) != 1:
+        abort("required login or tenant form unavailable")
+    token = candidates[0]["inputs"].get("_csrf_token")
+    if not isinstance(token, str) or not token:
+        abort("CSRF token unavailable")
+    return token
+
+
+base = os.environ.get("BASE_URL", "")
+try:
+    url = urlsplit(base)
+    port = url.port
+except ValueError:
+    abort("local-only origin required")
+if (url.scheme != "http" or url.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or not port or url.path not in {"", "/"} or url.query or url.fragment
+        or url.username is not None or url.password is not None):
+    abort("local-only origin required")
+base = base.rstrip("/")
+sha = os.environ.get("EXPECTED_SHA", "")
+release = os.environ.get("EXPECTED_RELEASE", "")
+if re.fullmatch(r"[0-9a-f]{40}", sha) is None or re.fullmatch(r"\d+\.\d+\.\d+", release) is None:
+    abort("exact release identity required")
+
+credential_file = os.environ.get("NAME_FILE", "")
+try:
+    path = Path(credential_file)
+    info = path.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+            or info.st_mode & 0o077 or info.st_size > 4096):
+        abort("private synthetic credential file required")
+    fixture = required_json(path.read_text(encoding="utf-8"))
+except (OSError, ValueError, TypeError, UnicodeError):
+    abort("private synthetic credential file required")
+if not isinstance(fixture, dict) or set(fixture) != {"email", "password", "own_tenant_id", "foreign_tenant_id"}:
+    abort("invalid synthetic fixture")
+email, password = fixture["email"], fixture["password"]
+own, foreign = fixture["own_tenant_id"], fixture["foreign_tenant_id"]
+if (not isinstance(email, str) or not email.endswith("@example.test")
+        or not isinstance(password, str) or not password
+        or not isinstance(own, str) or not isinstance(foreign, str)
+        or not re.fullmatch(r"[0-9a-f-]{36}", own)
+        or not re.fullmatch(r"[0-9a-f-]{36}", foreign) or own == foreign):
+    abort("synthetic tenant fixture required")
+
+client = build_opener(ProxyHandler({}), HTTPCookieProcessor(http.cookiejar.CookieJar()), NoRedirect())
+
+
+def send(path, method="GET", fields=None):
+    if path not in {"/health", "/login", "/organizations", "/organizations/select", "/admin", "/api/admin/context"}:
+        abort("non-allowlisted request")
+    payload = urlencode(fields).encode("utf-8") if fields is not None else None
+    request = Request(base + path, data=payload, method=method)
+    try:
+        response = client.open(request, timeout=5)
+    except HTTPError as err:
+        response = err
+    except (URLError, TimeoutError, OSError):
+        abort("local request unavailable")
+    with response:
+        body = response.read(262145)
+        if len(body) > 262144:
+            abort("local response too large")
+        return response.status, response.headers.get("Location", ""), body
+
+
+try:
+    status, location, body = send("/health")
+    if status != 200:
+        abort("health not OK")
+    health = required_json(body)
+    if (not isinstance(health, dict) or health.get("status") != "ok"
+            or health.get("version") != release or health.get("release_sha") != sha):
+        abort("release identity UNKNOWN or mismatched")
+
+    status, location, body = send("/login")
+    if status != 200:
+        abort("login form unavailable")
+    token = select_form(get_forms(body), "/login")
+    status, location, _ = send("/login", "POST", {"email": email, "password": password, "_csrf_token": token})
+    if status != 302 or location != "/organizations":
+        abort("login failed or unexpected redirect")
+
+    status, location, body = send("/organizations")
+    if status != 200:
+        abort("tenant selector unavailable")
+    forms = get_forms(body)
+    token = select_form(forms, "/organizations/select", own)
+    if any(f["inputs"].get("organization_id") == foreign for f in forms):
+        abort("foreign tenant leaked in selector")
+    status, location, _ = send("/organizations/select", "POST", {"organization_id": own, "_csrf_token": token})
+    if status != 302 or location != "/admin":
+        abort("own tenant selection failed")
+    status, location, body = send("/admin")
+    if status != 200 or ("data-organization=\"" + own + "\"").encode() not in body:
+        abort("own tenant panel not proven")
+    status, location, body = send("/api/admin/context")
+    context = required_json(body)
+    if status != 200 or context.get("data", {}).get("organization", {}).get("id") != own:
+        abort("tenant context not proven")
+
+    status, location, _ = send("/organizations/select", "POST", {"organization_id": foreign, "_csrf_token": token})
+    if status not in {403, 404}:
+        abort("cross-tenant selection not denied")
+    status, location, body = send("/api/admin/context")
+    context = required_json(body)
+    if status != 200 or context.get("data", {}).get("organization", {}).get("id") != own:
+        abort("tenant context changed after forbidden access")
+except (ValueError, KeyError, TypeError, UnicodeError, AttributeError, IndexError):
+    abort("invalid or incomplete local evidence")
+print("PASS: local synthetic release, login and tenant isolation")
+PY_LOCAL_SMOKE
+fi
+
 BASE_URL="${BASE_URL:-https://www.grindflow.com.co}"
 E2E_USER_EMAIL="${E2E_USER_EMAIL:-e2e-oidc-smoke@grindflow.test}"
 : "${E2E_USER_PASSWORD:?E2E_USER_PASSWORD is required}"
