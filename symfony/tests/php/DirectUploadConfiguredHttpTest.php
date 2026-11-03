@@ -6,6 +6,7 @@ namespace GrindFlow\Tests;
 
 use Doctrine\DBAL\Connection;
 use GrindFlow\Http\Controller\DirectUploadController;
+use GrindFlow\Http\Controller\VaultController;
 use GrindFlow\Infrastructure\Storage\DirectUploadCompletionVerifier;
 use GrindFlow\Infrastructure\Storage\DirectUploadIntentIssuer;
 use GrindFlow\Infrastructure\Storage\DirectUploadObjectKeys;
@@ -179,7 +180,7 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
                     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a21cAAAAASUVORK5CYII=',
                     true,
                 ));
-                foreach (['payload.php.png', 'clip.exe.png', '../traversal.png', 'clip.pht.png'] as $badName) {
+                foreach (['payload.php.png', 'clip.exe.png', 'clip.pht.png'] as $badName) {
                     $client->request('POST', '/api/admin/vault', [], [
                         'file' => new UploadedFile($png, $badName, 'image/png', null, true),
                     ], ['HTTP_X_CSRF_TOKEN' => $csrf]);
@@ -187,6 +188,15 @@ final class DirectUploadConfiguredHttpTest extends WebTestCase
                     self::assertSame('invalid_filename',
                         json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
                 }
+                // BrowserKit strips directory segments while synthesizing $_FILES.
+                // Exercise the raw UploadedFile path directly to guard the pre-normalization check.
+                $rawNameValidator = new \ReflectionMethod(VaultController::class, 'hasUnsafeClientFilename');
+                self::assertTrue($rawNameValidator->invoke(null,
+                    new UploadedFile($png, '../traversal.png', 'image/png', null, true)));
+                self::assertTrue($rawNameValidator->invoke(null,
+                    new UploadedFile($png, 'folder\\traversal.png', 'image/png', null, true)));
+                self::assertFalse($rawNameValidator->invoke(null,
+                    new UploadedFile($png, 'safe-photo.png', 'image/png', null, true)));
             } finally {
                 @unlink($png);
             }

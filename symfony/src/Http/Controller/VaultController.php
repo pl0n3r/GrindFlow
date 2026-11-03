@@ -191,18 +191,10 @@ final class VaultController extends AbstractController
         }
 
         // Validate the unmodified client path before basename or any filesystem write.
-        $clientPath = $file->getClientOriginalPath();
-        $originalName = $file->getClientOriginalName();
-        if ($clientPath !== $originalName
-            || strpbrk($clientPath, "/\\") !== false
-            || $originalName === '.' || $originalName === '..'
-            || trim($originalName) === ''
-            || preg_match('//u', $originalName) !== 1
-            || preg_match('/[\x00-\x1F\x7F]/', $originalName) === 1
-            || preg_match('/\.(?:php[0-9]*|pht|phtml|phps|exe|bat|cmd|com|sh|bash|cgi|jsp|js|jar|ps1|vbs)(?:\.|$)/i', $originalName) === 1) {
+        if (self::hasUnsafeClientFilename($file)) {
             return $this->error(422, 'invalid_filename', 'El nombre del archivo no es seguro.');
         }
-        $filename = $originalName;
+        $filename = $file->getClientOriginalName();
         $filename = mb_substr(trim($filename), 0, 180);
         if ($filename === '') {
             $filename = 'archivo';
@@ -1079,6 +1071,21 @@ final class VaultController extends AbstractController
      * Quick upload stays capped at 8 MiB; deeper inspection/transcoding belongs
      * to the asynchronous media-processing pipeline.
      */
+    /** Check the raw upload path before Symfony's basename normalization hides traversal. */
+    private static function hasUnsafeClientFilename(UploadedFile $file): bool
+    {
+        $clientPath = $file->getClientOriginalPath();
+        $originalName = $file->getClientOriginalName();
+
+        return $clientPath !== $originalName
+            || strpbrk($clientPath, "/\\") !== false
+            || $originalName === '.' || $originalName === '..'
+            || trim($originalName) === ''
+            || preg_match('//u', $originalName) !== 1
+            || preg_match('/[\x00-\x1F\x7F]/', $originalName) === 1
+            || preg_match('/\.(?:php[0-9]*|pht|phtml|phps|exe|bat|cmd|com|sh|bash|cgi|jsp|js|jar|ps1|vbs)(?:\.|$)/i', $originalName) === 1;
+    }
+
     private function hasSupportedMediaSignature(string $path, string $mime): bool
     {
         if (str_starts_with($mime, 'image/')) {
