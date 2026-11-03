@@ -54,6 +54,9 @@ final class EmergencyStopController extends Loader
         try {
             $actor = $this->authenticator->authenticate($request);
             $this->assertAdmin($actor);
+            if (!$this->isCsrfTokenValid($actor, $request)) {
+                throw new StaffOpsAuthException(403, 'emergency_signed_nonce_required');
+            }
             $reason = $this->reason($request);
             $revision = $this->store->stop($actor, $reason);
             // Failures are intentionally not recovered by switching to RUNNING.
@@ -71,6 +74,9 @@ final class EmergencyStopController extends Loader
         try {
             $actor = $this->authenticator->authenticate($request);
             $this->assertAdmin($actor);
+            if (!$this->isCsrfTokenValid($actor, $request)) {
+                throw new StaffOpsAuthException(403, 'emergency_signed_nonce_required');
+            }
             $revision = $this->store->resume($actor, $this->reason($request));
             return new JsonResponse(['data' => ['state' => 'RUNNING', 'revision' => $revision]]);
         } catch (StaffOpsAuthException $exception) {
@@ -78,6 +84,23 @@ final class EmergencyStopController extends Loader
         } catch (\Throwable) {
             return new JsonResponse(['error' => ['code' => 'emergency_resume_denied']], 409);
         }
+    }
+
+    /**
+     * The Ops API has no browser session: its anti-CSRF proof is the HMAC
+     * authenticated, one-use nonce, consumed by authenticate() first.
+     * Rechecking the authenticated key/nonce pair here prevents unsigned
+     * browser form requests from reaching a state mutation.
+     */
+    private function isCsrfTokenValid(string $actor, Request $request): bool
+    {
+        $keyId = $request->headers->get('X-Factory-Key-Id');
+        $nonce = $request->headers->get('X-Factory-Nonce');
+        return $request->isSecure()
+            && is_string($keyId)
+            && hash_equals($actor, $keyId)
+            && is_string($nonce)
+            && preg_match('/\A[A-Za-z0-9_-]{22,172}\z/D', $nonce) === 1;
     }
 
     private function assertAdmin(string $actor): void
