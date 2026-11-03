@@ -33,7 +33,22 @@ export function responsiveDefects(): ResponsiveDefect[] {
         el.getAttribute('aria-hidden') === 'true') continue;
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height) continue;
-    if (rect.left < -1 || rect.right > width + 1) defects.add('control-inaccesible');
+    if (rect.left < -1 || rect.right > width + 1) {
+      // Controls in a deliberately horizontally scrollable region remain reachable.
+      // An ordinary off-screen button (without that scrollport) must still fail.
+      let scrollport: HTMLElement | null = el.parentElement;
+      let horizontallyReachable = false;
+      while (scrollport && scrollport !== document.body) {
+        const css = getComputedStyle(scrollport);
+        if (/(auto|scroll)/.test(css.overflowX) &&
+            scrollport.scrollWidth > scrollport.clientWidth + 1) {
+          horizontallyReachable = true;
+          break;
+        }
+        scrollport = scrollport.parentElement;
+      }
+      if (!horizontallyReachable) defects.add('control-inaccesible');
+    }
   }
   for (const el of document.querySelectorAll<HTMLElement>(
     'h1, h2, h3, label, button, [role="heading"]',
@@ -92,7 +107,7 @@ for (const width of widths) {
       wide.textContent = 'overflow'; el.append(wide);
     });
     expect(await page.evaluate(responsiveDefects)).toContain('overflow');
-    await page.locator('#synthetic-overflow').remove();
+    await page.locator('#synthetic-overflow').evaluate((el) => el.remove());
 
     await page.locator('body').evaluate((el) => {
       const heading = document.createElement('h2');
@@ -102,7 +117,7 @@ for (const width of widths) {
       el.append(heading);
     });
     expect(await page.evaluate(responsiveDefects)).toContain('texto-cortado');
-    await page.locator('#synthetic-clipped').remove();
+    await page.locator('#synthetic-clipped').evaluate((el) => el.remove());
 
     await page.locator('body').evaluate((el) => {
       const button = document.createElement('button');
