@@ -61,7 +61,7 @@ final class DirectUploadCompletionVerifierTest extends TestCase
         $organization = Uuid::v7()->toRfc4122();
         $user = Uuid::v7()->toRfc4122();
         $stagingKey = 'organizations/'.$organization.'/staging/'.Uuid::v7()->toRfc4122();
-        $bytes = 'verified direct upload bytes';
+        $bytes = pack('N', 24).'ftyp'.'isom'.pack('N', 0).'isom'.'mp41'.'verified direct upload bytes';
         $storage = $this->storage($stagingKey, $bytes);
         $tokens = new DirectUploadTokenCipher(str_repeat('s', 32));
         $token = $tokens->issue(
@@ -161,7 +161,7 @@ final class DirectUploadCompletionVerifierTest extends TestCase
         $organization = Uuid::v7()->toRfc4122();
         $user = Uuid::v7()->toRfc4122();
         $stagingKey = 'organizations/'.$organization.'/staging/'.Uuid::v7()->toRfc4122();
-        $storage = $this->storage($stagingKey, 'short', 99);
+        $storage = $this->storage($stagingKey, pack('N', 24).'ftyp'.'isom'.pack('N', 0).'isom'.'mp41', 99);
         $tokens = new DirectUploadTokenCipher(str_repeat('s', 32));
         $token = $tokens->issue(
             $organization,
