@@ -37,7 +37,7 @@ ROWS = {
             ("self::assertResponseStatusCodeSame(403);",
              "self::assertResponseStatusCodeSame(404);",
              "self::assertSame('Para revisar antes de usar',")),
-         (AUDIT, "testVaultAuditAndRestore", ("private_note",)))),
+         (AUDIT, "testAuditReportsTenantScopedIntegrityAndRejectsIncompleteRestore", ("private_note",)))),
     "SPEC:025": ("### Identidad Symfony: cambio de contraseña personal", 275,
         ("clave actual", "429", "Retry-After"),
         ((ACCOUNT, "testAuthenticatedUserCanChangeOnlyOwnPasswordAndMustSignInAgain",
