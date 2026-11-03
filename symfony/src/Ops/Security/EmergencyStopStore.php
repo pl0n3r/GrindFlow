@@ -47,7 +47,7 @@ final readonly class EmergencyStopStore
         $actor = $this->validateActor($actor);
         $reason = $this->validateReason($reason);
         return $this->db->transactional(function (Connection $db) use ($actor, $reason): int {
-            $this->seedStoppedRow($db);
+            $this->seedStoppedRow($db, $actor, $reason);
             $row = $db->fetchAssociative('SELECT state, revision FROM gf_emergency_stop WHERE id = 1 FOR UPDATE');
             if ($row === false) {
                 throw new \RuntimeException('emergency_stop_unavailable');
@@ -116,14 +116,19 @@ final readonly class EmergencyStopStore
         });
     }
 
-    private function seedStoppedRow(Connection $db): void
+    private function seedStoppedRow(Connection $db, string $actor, string $reason): void
     {
-        $db->executeStatement(
+        // Establish STOP and the matching audit record atomically when the
+        // singleton row has not yet been initialized.
+        $inserted = $db->executeStatement(
             "INSERT IGNORE INTO gf_emergency_stop
               (id, state, revision, revocation_complete, actor, reason, changed_at)
-             VALUES (1, 'STOP', 1, 0, 'system', 'missing_state', :now)",
-            ['now' => gmdate('Y-m-d H:i:s')]
+             VALUES (1, 'STOP', 1, 0, :actor, :reason, :now)",
+            ['actor' => $actor, 'reason' => $reason, 'now' => gmdate('Y-m-d H:i:s')]
         );
+        if ($inserted === 1) {
+            $this->audit($db, 'STOP', 1, $actor, $reason);
+        }
     }
 
     private function audit(Connection $db, string $state, int $revision, string $actor, string $reason): void
