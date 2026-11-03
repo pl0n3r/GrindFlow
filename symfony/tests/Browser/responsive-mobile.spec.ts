@@ -49,7 +49,7 @@ export function responsiveDefects(): ResponsiveDefect[] {
 }
 
 async function isolateTraffic(page: Page) {
-  page.on('websocket', (socket) => socket.close());
+  await page.routeWebSocket('**/*', (socket) => socket.close());
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
