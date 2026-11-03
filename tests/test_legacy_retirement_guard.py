@@ -88,7 +88,7 @@ class LegacyRetirementGuardTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(AssertionError, "legacy inventory missing protected entries"):
+            with self.assertRaisesRegex(AssertionError, "legacy parity requires independent evidence"):
                 assert_legacy_retirement_guard(root)
 
     def test_unproven_retirement_authorization_is_a_regression(self) -> None:
@@ -101,7 +101,7 @@ class LegacyRetirementGuardTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(AssertionError, "legacy inventory missing protected entries"):
+            with self.assertRaisesRegex(AssertionError, "legacy retirement authorization not established"):
                 assert_legacy_retirement_guard(root)
 
     def test_duplicate_entry_is_a_regression(self) -> None:
