@@ -97,36 +97,57 @@ final class PrivateMediaS3Config
             || str_contains($path, '//') || str_ends_with($path, '/')) {
             return null;
         }
-        // Checking every component (rather than only the final file) prevents
-        // traversing a symlinked parent into a different private directory.
+        // PHP has no portable openat(O_NOFOLLOW) walk. Never open a secret
+        // through an ancestor that an unrelated user can rename: a writable
+        // ancestor enables a symlink-swap TOCTOU even with lstat/fstat on
+        // the final file. Root-owned sticky directories (e.g. /tmp) are the
+        // sole exception: sticky bit prevents other UIDs from renaming the
+        // operator-owned private child. Same-UID processes remain trusted.
+        $directories = ['/'];
         $cursor = '';
-        $components = explode('/', ltrim($path, '/'));
-        foreach ($components as $part) {
+        foreach (explode('/', ltrim(dirname($path), '/')) as $part) {
             if ($part === '') {
                 return null;
             }
             $cursor .= '/'.$part;
-            if (is_link($cursor)) {
+            $directories[] = $cursor;
+        }
+        $parents = [];
+        foreach ($directories as $directory) {
+            clearstatcache(true, $directory);
+            $entry = @lstat($directory);
+            if (!is_array($entry) || ($entry['mode'] & 0170000) !== 0040000) {
                 return null;
             }
+            $worldOrGroupWritable = ($entry['mode'] & 0022) !== 0;
+            $rootOwnedSticky = $entry['uid'] === 0 && ($entry['mode'] & 01000) !== 0;
+            if ($worldOrGroupWritable && !$rootOwnedSticky) {
+                return null;
+            }
+            $parents[$directory] = $entry;
         }
-
-        // The containing directory is an operator-owned private boundary.
-        // A mode-0600 secret in a traversable directory is not a complete
-        // private configuration; deny group/other access (0700 max).
+        // The immediate directory is private even when a trusted ancestor
+        // permits traversal. Its owner must be the owner of the secret.
         $directory = dirname($path);
-        clearstatcache(true, $directory);
-        $directoryStat = @lstat($directory);
-        if (!is_array($directoryStat) || ($directoryStat['mode'] & 0170000) !== 0040000
-            || ($directoryStat['mode'] & 0077) !== 0) {
+        $directoryStat = $parents[$directory];
+        if (($directoryStat['mode'] & 0077) !== 0) {
             return null;
         }
         clearstatcache(true, $path);
         $stat = @lstat($path);
         if (!is_array($stat) || ($stat['mode'] & 0170000) !== 0100000
             || ($stat['mode'] & 0077) !== 0
-            || $stat['size'] < 1 || $stat['size'] > self::MAX_FILE_BYTES + 1) {
+            || $stat['size'] < 1 || $stat['size'] > self::MAX_FILE_BYTES + 1
+            || $directoryStat['uid'] !== $stat['uid']) {
             return null;
+        }
+        // An attacker-owned ancestor can rename the child even without
+        // group/world write on the directory itself. Restrict all ancestors
+        // to the secret owner or trusted root.
+        foreach ($parents as $entry) {
+            if ($entry['uid'] !== 0 && $entry['uid'] !== $stat['uid']) {
+                return null;
+            }
         }
         $handle = @fopen($path, 'rb');
         if (!is_resource($handle)) {
@@ -138,6 +159,17 @@ final class PrivateMediaS3Config
                 || $opened['dev'] !== $stat['dev'] || ($opened['mode'] & 0170000) !== 0100000
                 || ($opened['mode'] & 0077) !== 0) {
                 return null;
+            }
+            // Detect any ancestor replacement after opening. This is a
+            // defense-in-depth check, not a substitute for non-mutable parents.
+            foreach ($parents as $directory => $before) {
+                clearstatcache(true, $directory);
+                $after = @lstat($directory);
+                if (!is_array($after) || $after['ino'] !== $before['ino']
+                    || $after['dev'] !== $before['dev']
+                    || ($after['mode'] & 0170000) !== 0040000) {
+                    return null;
+                }
             }
             $value = @fread($handle, self::MAX_FILE_BYTES + 2);
             if (!is_string($value) || $value === '' || strlen($value) > self::MAX_FILE_BYTES + 1) {
