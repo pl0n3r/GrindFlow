@@ -63,7 +63,7 @@ final class Version20261103000000 extends AbstractMigration
 
     /**
      * CI fixture only: postUp executes after the schema exists, so dry-run
-     * cannot write fixture rows before CREATE TABLE executes.
+     * cannot write fixture rows until the schema is installed.
      */
     public function postUp(Schema $schema): void
     {
