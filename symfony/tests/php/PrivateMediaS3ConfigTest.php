@@ -59,6 +59,76 @@ final class PrivateMediaS3ConfigTest extends TestCase
         }
     }
 
+    public function testRejectsAttackerWritableAncestorWithPrivateChild(): void
+    {
+        // A 0700 immediate directory alone is insufficient when an ancestor
+        // is renameable by other UIDs: symlink replacement can race fopen().
+        $ancestor = $this->directory.'-mutable';
+        $private = $ancestor.'/operator';
+        self::assertTrue(mkdir($ancestor, 0700));
+        self::assertTrue(mkdir($private, 0700));
+        $paths = [];
+        foreach ($this->paths as $key => $original) {
+            $copy = $private.'/'.basename($original);
+            self::assertTrue(copy($original, $copy));
+            chmod($copy, 0600);
+            $paths[$key] = $copy;
+        }
+        try {
+            self::assertNotNull(PrivateMediaS3Config::fromPathVariables($paths));
+            chmod($ancestor, 0777);
+            self::assertNull(PrivateMediaS3Config::fromPathVariables($paths),
+                'A writable ancestor must disable B2 before opening secrets.');
+        } finally {
+            chmod($ancestor, 0700);
+            foreach ($paths as $copy) {
+                @unlink($copy);
+            }
+            rmdir($private);
+            rmdir($ancestor);
+        }
+    }
+
+    public function testSwappedAncestorSymlinkFailsClosed(): void
+    {
+        $outer = $this->directory.'-swap';
+        $child = $outer.'/operator';
+        $renamed = $outer.'/operator-original';
+        self::assertTrue(mkdir($outer, 0700));
+        self::assertTrue(mkdir($child, 0700));
+        $paths = [];
+        foreach ($this->paths as $key => $original) {
+            $copy = $child.'/'.basename($original);
+            self::assertTrue(copy($original, $copy));
+            chmod($copy, 0600);
+            $paths[$key] = $copy;
+        }
+        try {
+            self::assertNotNull(PrivateMediaS3Config::fromPathVariables($paths));
+            self::assertTrue(rename($child, $renamed));
+            if (!@symlink($renamed, $child)) {
+                self::markTestSkipped('Symlinks unavailable for adversarial ancestor test.');
+            }
+            self::assertNull(PrivateMediaS3Config::fromPathVariables($paths),
+                'A replaced ancestor must fail closed, not follow the symlink.');
+        } finally {
+            if (is_link($child)) {
+                unlink($child);
+            }
+            foreach ($paths as $copy) {
+                @unlink($renamed.'/'.basename($copy));
+                @unlink($child.'/'.basename($copy));
+            }
+            if (is_dir($renamed)) {
+                rmdir($renamed);
+            }
+            if (is_dir($child)) {
+                rmdir($child);
+            }
+            rmdir($outer);
+        }
+    }
+
     public function testReadsOnlyPrivateB2Files(): void
     {
         $config = PrivateMediaS3Config::fromPathVariables($this->paths);
