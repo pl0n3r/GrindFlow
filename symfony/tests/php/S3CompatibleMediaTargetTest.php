@@ -128,7 +128,7 @@ final class S3compatiblemediatargettest extends TestCase
     {
         $organization = Uuid::v7()->toRfc4122();
         $actor = Uuid::v7()->toRfc4122();
-        $bytes = 'synthetic media bytes - never a real customer file';
+        $bytes = pack('N', 24).'ftyp'.'isom'.pack('N', 0).'isom'.'mp41'.'synthetic media bytes - never a real customer file';
         $storage = new SimulatedB2ObjectStore();
         $cipher = new DirectUploadTokenCipher(str_repeat('q', 32));
         $keys = new DirectUploadObjectKeys();
