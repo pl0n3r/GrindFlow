@@ -202,7 +202,9 @@ final class UploadNegativeCasesTest extends WebTestCase
         self::assertSame(hash('sha256', $atLimit), $stored['sha256']);
         self::assertIsString($stored['storage_key']);
         self::assertTrue(Uuid::isValid($stored['storage_key']));
-        self::assertSame($atLimit, file_get_contents($this->vaultRoot.'/'.$stored['storage_key'].'.blob'));
+        $persistedBlob = $this->vaultRoot.'/'.$stored['storage_key'].'.blob';
+        self::assertFileExists($persistedBlob);
+        self::assertSame($atLimit, file_get_contents($persistedBlob));
         $afterAllowed = $this->vaultBlobs();
         self::assertCount(count($beforeAllowed) + 1, $afterAllowed);
         $this->assertNoArtifacts(1, $afterAllowed);
