@@ -166,7 +166,8 @@ final class DirectUploadController extends AbstractController
         return $filename !== '.' && $filename !== '..'
             && trim($filename) !== '' && strlen($filename) <= 180
             && preg_match('//u', $filename) === 1
-            && preg_match('/[\x00-\x1F\x7F\/\\\\]/u', $filename) !== 1;
+            && preg_match('/[\x00-\x1F\x7F\/\\\\]/u', $filename) !== 1
+            && preg_match('/\.(?:php[0-9]*|pht|phtml|phps|exe|bat|cmd|com|sh|bash|cgi|jsp|js|jar|ps1|vbs)(?:\.|$)/i', $filename) !== 1;
     }
 
     private function error(int $status, string $code, string $message): JsonResponse
