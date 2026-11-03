@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,15 +165,18 @@ class LoginParrillaDesignTests(unittest.TestCase):
         self.assertNotIn("gf-kicker", html)
 
     def test_login_stages_render_without_overflow_at_320_and_360(self) -> None:
-        """Chromium real: CSS del Blade, viewport interno exacto, sin red ni sesiones."""
-        browser = os.environ.get("GRINDFLOW_BROWSER_CHROME")
-        if not browser:
+        """Chromium obligatorio: visibilidad, geometría y mutantes CSS a 320/360."""
+        configured = os.environ.get("GRINDFLOW_BROWSER_CHROME")
+        if configured:
+            browser = shutil.which(configured)
+        else:
             browser = next(
-                (path for name in ("google-chrome", "chromium", "chromium-browser")
-                 if (path := shutil.which(name))), None,
+                (found for name in ("google-chrome", "chromium", "chromium-browser")
+                 if (found := shutil.which(name))), None,
             )
-        if not browser:
-            self.skipTest("Chromium no disponible; el gate browser debe cubrirlo")
+        self.assertIsNotNone(
+            browser, "Chromium obligatorio para el probe de etapas a 320/360 px",
+        )
         html = text(LOGIN)
         stages = re.search(r'<ol class="gp-login__stages"[^>]*>.*?</ol>', html,
                            flags=re.DOTALL)
@@ -186,6 +190,17 @@ class LoginParrillaDesignTests(unittest.TestCase):
             '<div class="gp-login__statement">' + stages.group(0) + '</div>'
             '</section></main></body></html>'
         )
+        # Se inyectan solo en el DOM sintético; el CSS del producto no cambia.
+        css_mutants = [
+            (".gp-login__stages", "visibility: hidden !important"),
+            (".gp-login__stages", "display: none !important"),
+            (".gp-login__stages", "opacity: 0 !important"),
+            (".gp-login__stages > li:first-child", "visibility: hidden !important"),
+            (".gp-login__stages > li:first-child", "opacity: 0 !important"),
+            (".gp-login__statement", "visibility: hidden !important"),
+            (".gp-login__statement", "opacity: 0 !important"),
+            (".gp-login__band", "display: none !important"),
+        ]
         probe = (
             '<!doctype html><html><body>'
             '<iframe id="mobile320" width="320" height="800"></iframe>'
@@ -196,19 +211,44 @@ class LoginParrillaDesignTests(unittest.TestCase):
             'let finished=0;'
             'frames.forEach(frame=>{'
             'frame.addEventListener("load",()=>{'
-            'const doc=frame.contentDocument;'
+            'const doc=frame.contentDocument, win=frame.contentWindow;'
             'const grid=doc.querySelector(".gp-login__stages");'
-            'const columns=frame.contentWindow.getComputedStyle(grid).gridTemplateColumns'
-            '.trim().split(/\\s+/);'
-            'const ok=doc.documentElement.scrollWidth<=frame.contentWindow.innerWidth+1'
+            'function visiblePath(element){'
+            'for(let node=element;node;node=node.parentElement){'
+            'const style=win.getComputedStyle(node);'
+            'const rect=node.getBoundingClientRect();'
+            'if(style.visibility!=="visible" || style.display==="none"'
+            ' || !(Number.parseFloat(style.opacity)>0)'
+            ' || !(rect.width>0 && rect.height>0))return false;'
+            '}return true;}'
+            'function valid(){'
+            'const style=win.getComputedStyle(grid);'
+            'const columns=style.gridTemplateColumns.trim().split(/\\s+/);'
+            'return style.display==="grid"'
+            ' && doc.documentElement.scrollWidth<=win.innerWidth+1'
             ' && grid.scrollWidth<=grid.clientWidth+1'
-            ' && [...grid.children].every(li=>li.scrollWidth<=li.clientWidth+1)'
+            ' && visiblePath(grid)'
+            ' && [...grid.children].every(li=>'
+            ' li.scrollWidth<=li.clientWidth+1 && visiblePath(li))'
             ' && columns.length===2;'
-            'frame.dataset.result=ok?"PASS":"FAIL";'
+            '}'
+            'const misses=[];'
+            'if(!valid())misses.push("baseline");'
+            'const mutants=' + json.dumps(css_mutants) + ';'
+            'for(let index=0;index<mutants.length;index++){'
+            'const style=doc.createElement("style");'
+            'style.textContent=mutants[index][0]+"{"+mutants[index][1]+"}";'
+            'doc.head.appendChild(style);'
+            'if(valid())misses.push("mutant"+index);'
+            'style.remove();'
+            '}'
+            'frame.dataset.result=misses.length?misses.join(","):"PASS";'
             'finished++;'
             'if(finished===frames.length){'
             'document.getElementById("mobile-probe").dataset.result='
-            'frames.every(frame=>frame.dataset.result==="PASS")?"PASS":"FAIL";'
+            'frames.every(f=>f.dataset.result==="PASS")?"PASS":"FAIL";'
+            'document.getElementById("mobile-probe").dataset.detail='
+            'frames.map(f=>f.dataset.result).join(";");'
             '}'
             '});'
             'frame.srcdoc=' + json.dumps(inner) + ';'
@@ -229,8 +269,19 @@ class LoginParrillaDesignTests(unittest.TestCase):
         check = re.search(r'<output id="mobile-probe" data-result="([^"]+)"',
                           result.stdout)
         self.assertIsNotNone(check, "Chromium no ejecutó el probe")
-        self.assertEqual(check.group(1), "PASS",
-                         "A 320/360 px la lista de etapas debe encajar en dos columnas")
+        detail = re.search(r'data-detail="([^"]+)"', result.stdout)
+        self.assertEqual(
+            check.group(1), "PASS",
+            f"Etapas invisibles, fuera del viewport o mutante CSS no detectado: "
+            f"{detail.group(1) if detail else 'sin diagnóstico'}",
+        )
+
+    def test_login_stages_fail_closed_without_chromium(self) -> None:
+        """La ausencia de navegador jamás convierte esta prueba en skipped."""
+        with mock.patch.dict(os.environ, {"GRINDFLOW_BROWSER_CHROME": ""}):
+            with mock.patch("shutil.which", return_value=None):
+                with self.assertRaisesRegex(AssertionError, "Chromium obligatorio"):
+                    self.test_login_stages_render_without_overflow_at_320_and_360()
 
     def test_login_card_text_and_fields_meet_wcag_aa_on_the_parrilla_colors(self) -> None:
         t = tokens()
