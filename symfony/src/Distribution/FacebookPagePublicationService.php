@@ -10,6 +10,7 @@ use DateTimeZone;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use JsonException;
+use GrindFlow\Ops\Security\EmergencyStopStore;
 use Symfony\Component\Uid\Uuid;
 
 final readonly class FacebookPagePublicationService
@@ -24,6 +25,8 @@ final readonly class FacebookPagePublicationService
 
     public function publish(DistributionCommand $command): DistributionOutcome
     {
+        $fence = new EmergencyStopStore($this->db);
+        $revision = $fence->assertRunning();
         $this->provider->assertAvailableFor($command->organizationId);
 
         if ($this->db->getTransactionNestingLevel() > 0) {
@@ -42,6 +45,7 @@ final readonly class FacebookPagePublicationService
         }
 
         try {
+            $fence->assertRunning($revision);
             $outcome = $this->provider->publish($command);
         } catch (DistributionProviderException $exception) {
             $this->recordFailure($command, $exception);

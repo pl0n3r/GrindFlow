@@ -122,3 +122,10 @@ services:
 
   GrindFlow\Ops\Routing\StaffOpsRouteLoader:
     tags: ['routing.loader']
+
+  # The ops route loader is decorated, retaining its existing HMAC/IP/TLS gate.
+  GrindFlow\Ops\Http\Controller\EmergencyStopController:
+    decorates: GrindFlow\Ops\Routing\StaffOpsRouteLoader
+    arguments:
+      $inner: '@GrindFlow\Ops\Http\Controller\EmergencyStopController.inner'
+    tags: ['routing.loader', 'controller.service_arguments']

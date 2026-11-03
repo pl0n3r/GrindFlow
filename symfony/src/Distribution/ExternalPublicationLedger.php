@@ -10,6 +10,7 @@ use DateTimeZone;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use JsonException;
+use GrindFlow\Ops\Security\EmergencyStopStore;
 use Symfony\Component\Uid\Uuid;
 
 final readonly class ExternalPublicationLedger
@@ -26,6 +27,9 @@ final readonly class ExternalPublicationLedger
         string $destinationId,
         callable $send,
     ): DistributionOutcome {
+        $fence = new EmergencyStopStore($this->db);
+        $revision = $fence->assertRunning();
+
         if (!in_array($provider, ['instagram_reels', 'facebook_page'], true)
             || !in_array($destinationKey, ['instagram_user_id', 'page_id'], true)
             || !preg_match('/^\d{1,32}$/D', $destinationId)) {
@@ -48,6 +52,7 @@ final readonly class ExternalPublicationLedger
         }
 
         try {
+            $fence->assertRunning($revision);
             $outcome = $send();
         } catch (DistributionProviderException $exception) {
             $this->recordFailure($command, $exception, $provider);
