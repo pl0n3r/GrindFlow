@@ -63,13 +63,34 @@ else
 fi
 
 cache='symfony/var/cache/prod'
-if [[ -d "$cache" && ! -L "$cache" ]]; then
-  printf 'S4_DIAG_CACHE=MATCH\n'
-  # Inspect only compiled PHP router files, never unrelated cached configuration.
-  router_files=()
-  while IFS= read -r -d '' router_file; do
-    router_files+=("$router_file")
-  done < <(find "$cache" -type f \( -iname '*route*.php' -o -iname '*matcher*.php' \) -print0 2>/dev/null)
+cache_route_labels=(COLLECTIONS PLANS AUTOMATION PRIVACY DSR)
+
+cache_routes_unknown() {
+  local label
+  for label in "${cache_route_labels[@]}"; do
+    printf 'S4_DIAG_CACHE_ROUTE_%s=UNKNOWN\n' "$label"
+  done
+}
+
+# Capture enumeration and inspection atomically: do not print partial batches.
+scan_cache_routes() (
+  set -euo pipefail
+  local router_file entry label route state grep_rc
+  local -a router_files=()
+  # Older Bash without lastpipe fails closed rather than losing the array.
+  shopt -s lastpipe || return 1
+  find "$cache" -type f \( -iname '*route*.php' -o -iname '*matcher*.php' \) -print0 2>/dev/null |
+    while IFS= read -r -d '' router_file || [[ -n "${router_file:-}" ]]; do
+      router_files+=("$router_file")
+    done || return 1
+
+  if [[ -n "${router_files[0]+present}" ]]; then
+    for router_file in "${router_files[@]}"; do
+      [[ "$router_file" == "$cache/"* && "$router_file" != *"/../"* &&
+         -f "$router_file" && -r "$router_file" && ! -L "$router_file" ]] || return 1
+    done
+  fi
+
   for entry in \
     'COLLECTIONS|/api/admin/library/collections' \
     'PLANS|/api/admin/plans' \
@@ -78,16 +99,42 @@ if [[ -d "$cache" && ! -L "$cache" ]]; then
     'DSR|/api/admin/privacy/data-subject-requests/csrf'; do
     label="${entry%%|*}"
     route="${entry#*|}"
-    if (( ${#router_files[@]} > 0 )) && LC_ALL=C grep -Fq -- "$route" "${router_files[@]}" 2>/dev/null; then
-      printf 'S4_DIAG_CACHE_ROUTE_%s=MATCH\n' "$label"
-    else
-      printf 'S4_DIAG_CACHE_ROUTE_%s=UNKNOWN\n' "$label"
+    state=UNKNOWN
+    if [[ -n "${router_files[0]+present}" ]]; then
+      if LC_ALL=C grep -Fq -- "$route" "${router_files[@]}" 2>/dev/null; then
+        state=MATCH
+      else
+        grep_rc=$?
+        (( grep_rc == 1 )) || return 1
+      fi
     fi
+    printf 'S4_DIAG_CACHE_ROUTE_%s=%s\n' "$label" "$state"
   done
+)
+
+# Reject unexpected stdout even if a command returns zero.
+valid_cache_routes() {
+  local output="$1" label line index=0
+  while IFS= read -r line; do
+    (( index < ${#cache_route_labels[@]} )) || return 1
+    label="${cache_route_labels[index]}"
+    [[ "$line" == "S4_DIAG_CACHE_ROUTE_${label}=MATCH" ||
+       "$line" == "S4_DIAG_CACHE_ROUTE_${label}=UNKNOWN" ]] || return 1
+    index=$((index + 1))
+  done <<< "$output"
+  (( index == ${#cache_route_labels[@]} ))
+}
+
+if [[ -d "$cache" && ! -L "$cache" ]]; then
+  printf 'S4_DIAG_CACHE=MATCH\n'
+  if cache_routes="$(scan_cache_routes 2>/dev/null)" &&
+     valid_cache_routes "$cache_routes"; then
+    printf '%s\n' "$cache_routes"
+  else
+    cache_routes_unknown
+  fi
 else
   printf 'S4_DIAG_CACHE=MISSING\n'
-  for label in COLLECTIONS PLANS AUTOMATION PRIVACY DSR; do
-    printf 'S4_DIAG_CACHE_ROUTE_%s=UNKNOWN\n' "$label"
-  done
+  cache_routes_unknown
 fi
 printf 'S4_DIAG_READ_ONLY=MATCH\n'
