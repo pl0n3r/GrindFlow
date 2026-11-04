@@ -76,14 +76,23 @@ jobs:
           chmod 0600 "$secret_dir/key" "$secret_dir/known_hosts"
           # SSH stderr may contain host/user metadata. Never publish it.
           # Capture stdout privately and reject anything outside a fixed schema.
-          if ! diagnostics="$(ssh -T -p "$SSH_PORT" -i "$secret_dir/key" \
+          if diagnostics="$(ssh -T -p "$SSH_PORT" -i "$secret_dir/key" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             -o "UserKnownHostsFile=$secret_dir/known_hosts" \
             -o ClearAllForwardings=yes -o ConnectTimeout=10 \
             "$SSH_USER@$SSH_HOST" \
             "cd '$GIT_ROOT' && EXPECTED_SHA='$EXPECTED_SHA' bash -s -- --read-only" \
             < scripts/s4-router-diagnostics.sh 2>/dev/null)"; then
-            echo '::error::S4 read-only inspection failed; details withheld.'
+            :
+          else
+            ssh_rc=$?
+            case "$ssh_rc" in
+              255) category=TRANSPORT_OR_REMOTE_255 ;;
+              1) category=REMOTE_EXIT_1 ;;
+              2) category=REMOTE_EXIT_2 ;;
+              *) category=REMOTE_EXIT_OTHER ;;
+            esac
+            printf '::error::S4 read-only inspection failed (%s); details withheld.\n' "$category"
             exit 1
           fi
 
