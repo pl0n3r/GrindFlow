@@ -63,6 +63,7 @@ jobs:
           [[ "$SSH_HOST" =~ ^[A-Za-z0-9.-]+$ && "$SSH_HOST" != -* ]] || exit 1
           [[ "$SSH_USER" =~ ^[A-Za-z0-9._-]+$ && "$SSH_USER" != -* ]] || exit 1
           [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 1
+          SSH_PORT="$((10#$SSH_PORT))"
           (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || exit 1
           [[ "$GIT_ROOT" =~ ^/[A-Za-z0-9._/-]+$ && "$GIT_ROOT" != '/' && "$GIT_ROOT" != *..* && "$GIT_ROOT" != *//* ]] || exit 1
           [[ -n "$DEPLOY_SSH_KEY" && -n "$HOSTINGER_KNOWN_HOSTS" ]] || {
