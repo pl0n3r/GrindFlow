@@ -65,6 +65,11 @@ fi
 cache='symfony/var/cache/prod'
 if [[ -d "$cache" && ! -L "$cache" ]]; then
   printf 'S4_DIAG_CACHE=MATCH\n'
+  # Inspect only compiled PHP router files, never unrelated cached configuration.
+  router_files=()
+  while IFS= read -r -d '' router_file; do
+    router_files+=("$router_file")
+  done < <(find "$cache" -type f \( -iname '*route*.php' -o -iname '*matcher*.php' \) -print0 2>/dev/null)
   for entry in \
     'COLLECTIONS|/api/admin/library/collections' \
     'PLANS|/api/admin/plans' \
@@ -73,7 +78,7 @@ if [[ -d "$cache" && ! -L "$cache" ]]; then
     'DSR|/api/admin/privacy/data-subject-requests/csrf'; do
     label="${entry%%|*}"
     route="${entry#*|}"
-    if LC_ALL=C grep -r -F -q -- "$route" "$cache" 2>/dev/null; then
+    if (( ${#router_files[@]} > 0 )) && LC_ALL=C grep -Fq -- "$route" "${router_files[@]}" 2>/dev/null; then
       printf 'S4_DIAG_CACHE_ROUTE_%s=MATCH\n' "$label"
     else
       printf 'S4_DIAG_CACHE_ROUTE_%s=UNKNOWN\n' "$label"
