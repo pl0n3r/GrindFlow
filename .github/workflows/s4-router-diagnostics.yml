@@ -73,12 +73,43 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$secret_dir/key"
           printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$secret_dir/known_hosts"
           chmod 0600 "$secret_dir/key" "$secret_dir/known_hosts"
-          ssh -p "$SSH_PORT" -i "$secret_dir/key" \
+          # SSH stderr may contain host/user metadata. Never publish it.
+          # Capture stdout privately and reject anything outside a fixed schema.
+          if ! diagnostics="$(ssh -T -p "$SSH_PORT" -i "$secret_dir/key" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o "UserKnownHostsFile=$secret_dir/known_hosts" -o ConnectTimeout=10 \
+            -o "UserKnownHostsFile=$secret_dir/known_hosts" \
+            -o ClearAllForwardings=yes -o ConnectTimeout=10 \
             "$SSH_USER@$SSH_HOST" \
             "cd '$GIT_ROOT' && EXPECTED_SHA='$EXPECTED_SHA' bash -s -- --read-only" \
-            < scripts/s4-router-diagnostics.sh
+            < scripts/s4-router-diagnostics.sh 2>/dev/null)"; then
+            echo '::error::S4 read-only inspection failed; details withheld.'
+            exit 1
+          fi
+
+          mapfile -t observed <<< "$diagnostics"
+          expected=(
+            CHECKOUT ROUTE_IMPORT CONTROLLER_COLLECTIONS CONTROLLER_PLANS
+            CONTROLLER_AUTOMATION CONTROLLER_PRIVACY CONTROLLER_DSR
+            CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
+            CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
+            CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
+            READ_ONLY
+          )
+          [[ "${#observed[@]}" == "${#expected[@]}" ]] || {
+            echo '::error::Unexpected diagnostics shape'; exit 1;
+          }
+          for idx in "${!expected[@]}"; do
+            if [[ ! "${observed[$idx]}" =~ ^S4_DIAG_${expected[$idx]}=(MATCH|DRIFT|MISSING|UNKNOWN)$ ]]; then
+              echo '::error::Unexpected diagnostics category'; exit 1
+            fi
+          done
+          {
+            echo '## S4 router inspection (read-only)'
+            echo
+            printf '%s\n' "${observed[@]}"
+            echo
+            echo 'Categories only: this report is not production acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Revalidate exact main after remote read-only inspection
         shell: bash
@@ -95,6 +126,6 @@ jobs:
           {
             echo '## S4 router inspection (read-only)'
             echo
-            echo 'The command only compared tracked files, checked cache route strings and read the release marker.'
+            echo 'Source hashes, cache route hints and release marker were inspected without writes.'
             echo 'Read-only inspection is not a deploy, route repair or production acceptance.'
           } >> "$GITHUB_STEP_SUMMARY"
