@@ -176,10 +176,19 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         )
         for exit_code, expected, output in (
             (255, "TRANSPORT_OR_REMOTE_255", "UNSAFE_SYNTHETIC_STDOUT"),
+            (1, "REMOTE_EXIT_1_EMPTY_STDOUT", ""),
             (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT"),
             (1, "CHECKOUT_DRIFT", "S4_DIAG_CHECKOUT=DRIFT"),
-            (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\nUNSAFE_SYNTHETIC_STDOUT"),
+            (1, "CHECKOUT_DRIFT_EXTRA_STDOUT",
+             "S4_DIAG_CHECKOUT=DRIFT\nUNSAFE_SYNTHETIC_STDOUT"),
             (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=DRIFT"),
+            (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT_FAKE"),
+            (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\rUNSAFE_SYNTHETIC_STDOUT"),
+            (1, "HELPER_STARTED_EXIT_1", "S4_DIAG_CHECKOUT=MATCH"),
+            (1, "HELPER_STARTED_EXIT_1",
+             "S4_DIAG_CHECKOUT=MATCH\nUNSAFE_SYNTHETIC_STDOUT"),
+            (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=MATCH"),
+            (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=MATCH_FAKE"),
             (2, "REMOTE_EXIT_2", "UNSAFE_SYNTHETIC_STDOUT"),
             (17, "REMOTE_EXIT_OTHER", "UNSAFE_SYNTHETIC_STDOUT"),
         ):
@@ -207,6 +216,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 public = result.stdout + result.stderr
                 self.assertNotIn("UNSAFE_SYNTHETIC", public)
                 self.assertNotIn("S4_DIAG_CHECKOUT=DRIFT", public)
+                self.assertNotIn("S4_DIAG_CHECKOUT=MATCH", public)
                 self.assertNotIn("synthetic-private-key", public)
                 self.assertNotIn("synthetic-known-hosts", public)
                 self.assertNotIn("synthetic.invalid", public)

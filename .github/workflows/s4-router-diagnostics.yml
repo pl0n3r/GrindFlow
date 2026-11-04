@@ -89,10 +89,17 @@ jobs:
             case "$ssh_rc" in
               255) category=TRANSPORT_OR_REMOTE_255 ;;
               1)
-                # Detect the helper's single safe marker without publishing stdout.
-                # Anything else remains a generic remote exit-one error.
-                if [[ "$diagnostics" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
+                # Determine only the first line; keep all remote stdout private.
+                first_line=''
+                IFS= read -r first_line <<< "$diagnostics"
+                if [[ -z "$diagnostics" ]]; then
+                  category=REMOTE_EXIT_1_EMPTY_STDOUT
+                elif [[ "$diagnostics" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
                   category=CHECKOUT_DRIFT
+                elif [[ "$first_line" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
+                  category=CHECKOUT_DRIFT_EXTRA_STDOUT
+                elif [[ "$first_line" == 'S4_DIAG_CHECKOUT=MATCH' ]]; then
+                  category=HELPER_STARTED_EXIT_1
                 else
                   category=REMOTE_EXIT_1
                 fi
