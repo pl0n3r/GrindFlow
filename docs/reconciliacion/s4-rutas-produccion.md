@@ -82,3 +82,30 @@ Se ejecutaron **diez GET públicos de solo lectura**, sin cookies, credenciales,
 4. Pasar `GrindFlow CI / validate` sobre HEAD exacto y la revisión final CodeRabbit **una sola vez**, únicamente cuando el cambio esté completo y los gates aplicables estén en verde.
 
 **Estado de aceptación actual:** AC-01 pendiente (7/7 rutas 404); AC-02 pendiente (hipótesis sin causa raíz autenticada y sin reparación); AC-03 explicación de `release_sha=null` documentada, sin declarar marca de release real; AC-04 condicionado a `validate` terminal en el HEAD exacto del PR (sin sustituir AC-01 ni AC-02). Mantener #903 abierto y cualquier PR de preparación en DRAFT hasta superar los gates.
+
+## Medición posterior al último `main` — 2026-11-04 11:29 UTC
+
+<!-- GF903-PUBLIC-GET-112917-20261104 -->
+
+**Sondeo nuevo de solo lectura en equipo autorizado** a las `2026-11-04T11:29:17Z`: diez peticiones GET públicas, `Cache-Control: no-cache`, sin credenciales, cookies, seguimiento de redirecciones ni escritura. La herramienta registró solo HTTP y MIME. La lectura acotada de los tres JSON de salud fue posterior y publicó exclusivamente las claves permitidas. No hubo acceso SSH ni mutación en Hostinger.
+
+| Ruta GET | HTTP | Tipo |
+| --- | ---: | --- |
+| `/health` | 200 | application/json |
+| `/s4/health` | 200 | application/json |
+| `/s4/_bridge-readiness` | 200 | application/json |
+| `/s4/api/admin/library/collections` | **404** | text/html |
+| `/s4/api/admin/library/permissions` | **404** | text/html |
+| `/s4/api/admin/plans` | **404** | text/html |
+| `/s4/api/admin/rules/automation` | **404** | text/html |
+| `/s4/api/admin/reports/cross-module` | **404** | text/html |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | text/html |
+| `/s4/privacidad-y-mis-derechos` | **404** | text/html |
+
+Identidades públicas verificadas: Laravel `/health` afirma `exact=true`, `commit=3165f487b2fe705a9e55f59834732cb0fdafd62f`, `version=0.1.225`; Symfony `/s4/health` indica `version=0.1.225`, `release_sha=null`; bridge `data.state=ready_for_web_probe`.
+
+Última preparación observada para este `main`: [S4 Runtime Prepare #41820162988](https://github.com/pl0n3r/GrindFlow/actions/runs/41820162988), `completed/success` sobre `3165f487b2fe705a9e55f59834732cb0fdafd62f` (iniciada 11:21 UTC). El resultado de GET 11:29 demuestra **7/7 HTTP 404 posteriores**; el prepare no acredita registro efectivo de rutas. [#920](https://github.com/pl0n3r/GrindFlow/issues/920) ya entregó y fusionó en [#921](https://github.com/pl0n3r/GrindFlow/pull/921) el workflow manual owner-only `S4 Router Diagnostics`, que permite diagnóstico SSH categórico usando credenciales solo en el runner. [#922](https://github.com/pl0n3r/GrindFlow/issues/922) también quedó integrado con tests de puertos/cache; **no existe en esta evidencia una ejecución de `S4 Router Diagnostics` sobre el host**. No interpretar el prepare, ni un smoke 200, como prueba de reparación.
+
+**AC-01: NO CUMPLIDO.** Las siete respuestas siguen siendo HTML 404; Reports `/api/admin/reports/cross-module` permanece fuera del import de rutas por decisión de producto [#348](https://github.com/pl0n3r/GrindFlow/issues/348), mientras DSR-CSRF requiere conservar 404 JSON `feature_unavailable` por la puerta [#457](https://github.com/pl0n3r/GrindFlow/issues/457) aun tras arreglar el router. El literal «siete no-404» no puede imponerse sin alterar alcance/producto/privacidad. **AC-02: NO CUMPLIDO:** todavía no hay causa raíz de runtime autenticada ni repair autorizado con backup y sondeo posterior. **AC-03:** se explica `release_sha=null`, pero falta corroborar marcador remoto. **AC-04:** CI del PR deberá corresponder al HEAD reconciliado final.
+
+Próxima comprobación segura: un disparo owner-only de `S4 Router Diagnostics` en el `main` exacto, con autorización específica para diagnóstico SSH de lectura. Contrastar indicadores `CHECKOUT`, hashes `CONTROLLER_*`, `AUTOLOAD`, `CACHE_ROUTE_*` y `RELEASE_MARKER` con este sondeo; no tocar `.env`, datos, migraciones, cachés ni secretos. Mantener PR #907 DRAFT y sin CodeRabbit hasta satisfacer la puerta operativa independiente y un contrato de aceptación legítimo.
