@@ -345,3 +345,31 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 - **Checks del PR #907 anteriores a esta actualización documental:** `trabajo/issue-903@d33d77da3abd84a2ffc8ef4be5b3b6a0995de207` (`main` reconciliado, `behind=0`): `GrindFlow CI`, `CI Factory v1`, `Privacidad`, `Aceptación ejecutable` y `Etiquetas` completaron `success`. `Coordinación` [run #41866765437](https://github.com/pl0n3r/GrindFlow/actions/runs/41866765437) terminó `failure` por `Lock V3 ocupado para Issue #903; mutación denegada.`; `Política Factory v1` [run #41866765460](https://github.com/pl0n3r/GrindFlow/actions/runs/41866765460), reintentada una vez con checks terminales, terminó `failure` por `Check no verde: pr / Sincronizar PR=failure.`. No atribuir checks anteriores al HEAD generado por esta actualización: exigir evaluación exact-HEAD nueva.
 - **Criterios reales:** AC-01 = **NO** (7/7 rutas 404), AC-02 = **NO** (causa en host sin confirmar y ningún workflow reparador autorizado ejecutado en este frente); AC-03 = `release_sha=null` explicado, no dar identidad Symfony como verificada; AC-04 depende de `validate` exact-HEAD y política de merge aplicable. El check automático `Aceptación ejecutable=success` no reemplaza la aceptación humana/productiva.
 - **Puertas:** PR #907 permanece DRAFT, sin CodeRabbit FINAL ni squash. El workflow `S4 Router Diagnostics` es owner-only sobre `main` y requiere autorización operativa específica; no se hizo SSH ni se tocó Hostinger. Antes de cualquier operación de escritura exige autorización diferenciada, backup/restore y rollback verificados (D-059). Reports #348 requiere decisión de producto, DSR #457 dictamen jurídico verificable; no cambiar semántica de estas rutas sin esas autoridades. El lock de coordinación no se recupera con lease V3 activa; no forzar ni ocultar la colisión.
+
+
+## Contraste de rutas legacy frente a S4 recientes — medición pública 4-nov-2026 18:10:41 UTC
+
+<!-- GF903-RECON-NEW-OLD-ROUTE-1810-20261104 -->
+
+**Objeto:** discriminar un 404 universal de Symfony de un posible router/caché/checkout selectivamente desactualizado. GET anónimos sin cookies, credenciales ni seguimiento de redirecciones, desde dispositivo autorizado hacia `https://www.grindflow.com.co`, con `Cache-Control: no-cache`. No se leyó ni modificó el host mediante SSH. Evidencia de sondeo y clasificación publicada en [#903, comentario operativo](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6633437029).
+
+| GET relativo a `/s4` | HTTP | Tipo observado | Declaración en `main@e74497a7` |
+| --- | ---: | --- | --- |
+| `/` | 200 | HTML | `HomeController` |
+| `/login` | 200 | HTML | `LoginController` |
+| `/preview` | 503 | HTML | `PreviewController`; no demuestra éxito funcional |
+| `/api/admin/context` | 500 | HTML | `AdminContextController`; error de backend, no concluir causa |
+| `/api/admin/vault` | 500 | HTML | `VaultController`; error de backend, no concluir causa |
+| `/api/admin/library/collections` | 404 | HTML | `LibraryCollectionsController`: sí declarada |
+| `/api/admin/library/permissions` | 404 | HTML | `LibraryHistoryController`: sí declarada |
+| `/api/admin/plans` | 404 | HTML | `PlanLimitsAdminController`: sí declarada |
+| `/api/admin/rules/automation` | 404 | HTML | `PublishingAutomationController`: sí declarada |
+| `/api/admin/reports/cross-module` | 404 | HTML | **No importada** por `symfony/config/routes.yaml`; decisión de producto #348 |
+| `/api/admin/privacy/data-subject-requests/csrf` | 404 | HTML | `DataSubjectRequestsController`: sí declarada; con feature deshabilitada retorna **404 JSON** intencional |
+| `/privacidad-y-mis-derechos` | 404 | HTML | `PrivacyRightsController`: sí declarada; vista 200 prevista |
+
+**Control positivo:** `/s4/_bridge-readiness` devuelve HTTP 200 JSON, `data.state=ready_for_web_probe`; esto confirma acceso al bridge, no identidad de `symfony/vendor`, caché compilada ni release de controladores.
+
+**Interpretación verificable:** las rutas S4 antiguas pueden resolver o alcanzar el controlador (200/503/500), pero las seis rutas nuevas declaradas en código siguen respondiendo 404 HTML. La hipótesis de diferencia entre checkout publicado, registro de rutas compilado y fuente actual merece una inspección remota owner-only; ninguna de las observaciones permite concluir **causa confirmada** ni ejecutar Composer/caché/deploy como reparación probada. No inferir éxito de endpoints 500/503, ni alterar funcionalidad DSR/Reports para forzar el 200 del AC-01.
+
+**Semáforo del incidente:** AC-01 **NO** (7/7 siguen HTTP 404), AC-02 **NO** (causa de host no comprobada; reparación autorizada no ejecutada), AC-03 `release_sha=null` **explicado, no validado**, AC-04 sujeto a la ejecución canónica `validate` del HEAD definitivo. Requiere autorización owner específica de diagnóstico (lectura), decisión expresa de criterio A/B para Reports/DSR, permiso de escritura independiente con backup/restore y rollback verificables D-059, y resolución del lock V3 por protocolo sin fuerza manual. PR #907 se mantiene **DRAFT**, sin revisión FINAL CodeRabbit ni squash.
