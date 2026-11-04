@@ -164,7 +164,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         fake_ssh = bindir / "ssh"
         fake_ssh.write_text(
             "#!/bin/bash\n"
-            "printf '%s\\n' 'UNSAFE_SYNTHETIC_STDOUT'\n"
+            "printf '%s\\n' \"${MOCK_SSH_STDOUT:-UNSAFE_SYNTHETIC_STDOUT}\"\n"
             "printf '%s\\n' 'UNSAFE_SYNTHETIC_STDERR' >&2\n"
             "exit \"${MOCK_SSH_EXIT}\"\n", encoding="utf8"
         )
@@ -174,17 +174,21 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         (scripts / "s4-router-diagnostics.sh").write_text(
             SCRIPT.read_text(encoding="utf8"), encoding="utf8"
         )
-        for exit_code, expected in (
-            (255, "TRANSPORT_OR_REMOTE_255"),
-            (1, "REMOTE_EXIT_1"),
-            (2, "REMOTE_EXIT_2"),
-            (17, "REMOTE_EXIT_OTHER"),
+        for exit_code, expected, output in (
+            (255, "TRANSPORT_OR_REMOTE_255", "UNSAFE_SYNTHETIC_STDOUT"),
+            (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT"),
+            (1, "CHECKOUT_DRIFT", "S4_DIAG_CHECKOUT=DRIFT"),
+            (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\nUNSAFE_SYNTHETIC_STDOUT"),
+            (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=DRIFT"),
+            (2, "REMOTE_EXIT_2", "UNSAFE_SYNTHETIC_STDOUT"),
+            (17, "REMOTE_EXIT_OTHER", "UNSAFE_SYNTHETIC_STDOUT"),
         ):
-            with self.subTest(exit_code=exit_code):
+            with self.subTest(exit_code=exit_code, output=output):
                 env = {
                     **os.environ,
                     "PATH": str(bindir) + os.pathsep + os.environ.get("PATH", ""),
                     "MOCK_SSH_EXIT": str(exit_code),
+                    "MOCK_SSH_STDOUT": output,
                     "EXPECTED_SHA": self.sha,
                     "SSH_HOST": "synthetic.invalid",
                     "SSH_USER": "synthetic",
@@ -200,9 +204,13 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn(f"failed ({expected}); details withheld.", result.stdout)
-                self.assertNotIn("UNSAFE_SYNTHETIC", result.stdout + result.stderr)
-                self.assertNotIn("synthetic-private-key", result.stdout + result.stderr)
-                self.assertNotIn("/synthetic/checkout", result.stdout + result.stderr)
+                public = result.stdout + result.stderr
+                self.assertNotIn("UNSAFE_SYNTHETIC", public)
+                self.assertNotIn("S4_DIAG_CHECKOUT=DRIFT", public)
+                self.assertNotIn("synthetic-private-key", public)
+                self.assertNotIn("synthetic-known-hosts", public)
+                self.assertNotIn("synthetic.invalid", public)
+                self.assertNotIn("/synthetic/checkout", public)
 
 if __name__ == "__main__":
     unittest.main()
