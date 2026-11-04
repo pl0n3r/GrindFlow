@@ -76,6 +76,14 @@ jobs:
           chmod 0600 "$secret_dir/key" "$secret_dir/known_hosts"
           # SSH stderr may contain host/user metadata. Never publish it.
           # Capture stdout privately and reject anything outside a fixed schema.
+          expected=(
+            CHECKOUT ROUTE_IMPORT CONTROLLER_COLLECTIONS CONTROLLER_PLANS
+            CONTROLLER_AUTOMATION CONTROLLER_PRIVACY CONTROLLER_DSR
+            CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
+            CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
+            CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
+            READ_ONLY
+          )
           if diagnostics="$(ssh -T -p "$SSH_PORT" -i "$secret_dir/key" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             -o "UserKnownHostsFile=$secret_dir/known_hosts" \
@@ -99,7 +107,25 @@ jobs:
                 elif [[ "$first_line" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
                   category=CHECKOUT_DRIFT_EXTRA_STDOUT
                 elif [[ "$first_line" == 'S4_DIAG_CHECKOUT=MATCH' ]]; then
-                  category=HELPER_STARTED_EXIT_1
+                  # Accept only an ordered, fully valid prefix of the fixed schema.
+                  # Publish its controlled length, never the remote content.
+                  mapfile -t prefix_lines <<< "$diagnostics"
+                  valid_prefix=true
+                  if (( ${#prefix_lines[@]} > ${#expected[@]} )); then
+                    valid_prefix=false
+                  else
+                    for idx in "${!prefix_lines[@]}"; do
+                      if [[ ! "${prefix_lines[$idx]}" =~ ^S4_DIAG_${expected[$idx]}=(MATCH|DRIFT|MISSING|UNKNOWN)$ ]]; then
+                        valid_prefix=false
+                        break
+                      fi
+                    done
+                  fi
+                  if [[ "$valid_prefix" == true ]]; then
+                    printf -v category 'HELPER_VALID_PREFIX_%02d_OF_18' "${#prefix_lines[@]}"
+                  else
+                    category=HELPER_STARTED_EXIT_1
+                  fi
                 else
                   category=REMOTE_EXIT_1
                 fi
@@ -112,14 +138,6 @@ jobs:
           fi
 
           mapfile -t observed <<< "$diagnostics"
-          expected=(
-            CHECKOUT ROUTE_IMPORT CONTROLLER_COLLECTIONS CONTROLLER_PLANS
-            CONTROLLER_AUTOMATION CONTROLLER_PRIVACY CONTROLLER_DSR
-            CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
-            CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
-            CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
-            READ_ONLY
-          )
           [[ "${#observed[@]}" == "${#expected[@]}" ]] || {
             echo '::error::Unexpected diagnostics shape'; exit 1;
           }
