@@ -460,3 +460,33 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 **Aceptación honesta:** AC-01 = NO (7/7 rutas todavía 404 HTML); AC-02 = NO (falta causa confirmada del host y corrección desplegada); AC-03 = `release_sha=null` previamente documentado y Symfony sin identidad de release confirmada; AC-04 = repetir validaciones sobre el **nuevo HEAD documental**. La ruta Reports depende de producto #348 y el 404 previsto para DSR deshabilitada es JSON, no el 404 HTML actual: exigir decisión explícita del dueño antes de variar el contrato. La ejecución read-only del workflow S4 #41899802049 no publica sus 18 categorías de diagnóstico en las APIs accesibles; no inventar su contenido.
 
 **No-go:** este commit solo incorpora pruebas obtenidas y causa de CI; no modifica Hostinger ni valida producción. Antes de cualquier escritura S4 siguen obligatorios autorización operativa diferenciada, respaldo/restauración y rollback acreditados (D-059); no pasar el PR a Ready, no solicitar CodeRabbit FINAL y no fusionar hasta aceptación real, CI exact-HEAD y gates auténticos D-069/D-043.
+
+
+## Última observación HTTP pública — 2026-11-04T22:56:31Z
+
+<!-- GF903-S4-HTTP-225631-20261104 -->
+
+Nuevo sondeo **solo lectura** (12 GET HTTPS anónimos, sin credenciales, cookies, mutaciones ni seguir redirecciones) contra `https://www.grindflow.com.co`, desde el dispositivo de diagnóstico autorizado. No autentica el estado interno de Hostinger, ni valida el route map con `debug:router`.
+
+| Ruta | HTTP | MIME |
+| --- | ---: | --- |
+| `/health` | 200 | `application/json` |
+| `/s4/health` | 200 | `application/json` |
+| `/s4/_bridge-readiness` | 200 | `application/json` |
+| `/s4/` | 200 | `text/html` |
+| `/s4/login` | 200 | `text/html` |
+| `/s4/api/admin/library/collections` | **404** | `text/html` |
+| `/s4/api/admin/library/permissions` | **404** | `text/html` |
+| `/s4/api/admin/plans` | **404** | `text/html` |
+| `/s4/api/admin/rules/automation` | **404** | `text/html` |
+| `/s4/api/admin/reports/cross-module` | **404** | `text/html` |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | `text/html` |
+| `/s4/privacidad-y-mis-derechos` | **404** | `text/html` |
+
+La respuesta pública `/health` anunció `commit=e74497a7c4112c58516b6b3c8886870cade6c243`, `version=0.1.225` y `exact=true`; `/s4/health` anunció `version=0.1.225` y `release_sha=null`. El `200` de health y bridge no prueba rutas registradas. El `404 text/html` en DSR tampoco equivale al `404 JSON feature_unavailable` intencional del controlador si estuviera montado.
+
+**Resultado:** AC-01=NO; AC-02=NO; AC-03 sigue sin identidad de release Symfony; AC-04 requiere gates exact-HEAD después de cualquier commit nuevo. La causa de los seis 404 candidatos a runtime sigue sin diagnóstico autenticado. Reports #348 y DSR #457 requieren mantener sus decisiones de producto/privacidad.
+
+**Dependencia protegida comprobada:** [Factory #2016](https://github.com/pl0n3r/Factory/issues/2016) está `OPEN` sin comentarios de decisión a la última consulta; solicita `/decidir A` o `/decidir B` exclusivamente al OWNER para `Factory/main@67aeb1e4381664860de0cbca2915c0b2a1e2d276` (1.0.49). Su ventana registrada vence `2026-11-04T23:43:11Z`. `Factory@v1` sigue en el SHA publicado de 1.0.48; no usar la puerta abierta como aprobación. Sin release protegido y sin la integración gobernada de #935/PR #937, no operar CAS V3 real sobre el lock de #903.
+
+No se han hecho escrituras en producción, movimientos de `v1`, cambios de lock/lease ni solicitud FINAL de CodeRabbit.
