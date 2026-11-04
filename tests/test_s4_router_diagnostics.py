@@ -29,11 +29,13 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         subprocess.run(["git", "commit", "-qm", "fixture"], cwd=self.root, check=True)
         self.sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.root, text=True).strip()
 
-    def run_inspection(self, sha: str | None, *args: str):
+    def run_inspection(self, sha: str | None, *args: str, extra_env=None):
         env = os.environ.copy()
         env.pop("EXPECTED_SHA", None)
         if sha is not None:
             env["EXPECTED_SHA"] = sha
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(["bash", str(SCRIPT), *args], cwd=self.root, env=env,
                               text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=15, check=False)
@@ -143,6 +145,64 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=UNKNOWN", out.stdout)
 
+
+
+    def test_cache_scan_failures_are_atomic_and_private(self):
+        """Enumeration failures, grep errors and hostile stdout fail closed."""
+        cache = self.root / "symfony/var/cache/prod"
+        cache.mkdir(parents=True)
+        (cache / "routes.php").write_text(
+            "<?php // /api/admin/library/collections\n", encoding="utf8"
+        )
+        bin_dir = self.root / "scan-stubs"
+        bin_dir.mkdir()
+        fake_find, fake_grep = bin_dir / "find", bin_dir / "grep"
+        cases = (
+            ("find_fails_after_partial",
+             "#!/bin/bash\nprintf '%s\\0' 'symfony/var/cache/prod/routes.php'\n"
+             "printf 'UNSAFE_SYNTHETIC_FIND\\n'\nexit 7\n",
+             "#!/bin/bash\nexit 0\n"),
+            ("grep_fails_after_first_match",
+             "#!/bin/bash\nprintf '%s\\0' 'symfony/var/cache/prod/routes.php'\n",
+             "#!/bin/bash\nfor arg in \"$@\"; do\n"
+             "  if [[ \"$arg\" == '/api/admin/library/collections' ]]; then exit 0; fi\n"
+             "done\nprintf 'UNSAFE_SYNTHETIC_GREP\\n'\nexit 2\n"),
+            ("grep_injects_stdout",
+             "#!/bin/bash\nprintf '%s\\0' 'symfony/var/cache/prod/routes.php'\n",
+             "#!/bin/bash\nprintf 'UNSAFE_SYNTHETIC_GREP\\n'\nexit 0\n"),
+            ("find_injects_invalid_path",
+             "#!/bin/bash\nprintf 'UNSAFE_SYNTHETIC_FIND\\n'\nexit 0\n",
+             "#!/bin/bash\nexit 0\n"),
+        )
+        expected = [
+            f"S4_DIAG_CACHE_ROUTE_{label}=UNKNOWN"
+            for label in ("COLLECTIONS", "PLANS", "AUTOMATION", "PRIVACY", "DSR")
+        ]
+        for case_name, find_code, grep_code in cases:
+            with self.subTest(case=case_name):
+                fake_find.write_text(find_code, encoding="utf8")
+                fake_grep.write_text(grep_code, encoding="utf8")
+                fake_find.chmod(0o700)
+                fake_grep.chmod(0o700)
+                before = subprocess.check_output(
+                    ["git", "status", "--porcelain"], cwd=self.root, text=True
+                )
+                out = self.run_inspection(
+                    self.sha, "--read-only",
+                    extra_env={"PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", "")},
+                )
+                after = subprocess.check_output(
+                    ["git", "status", "--porcelain"], cwd=self.root, text=True
+                )
+                self.assertEqual(out.returncode, 0, out.stderr)
+                self.assertEqual(before, after)
+                lines = out.stdout.splitlines()
+                self.assertEqual(len(lines), 18, out.stdout)
+                self.assertEqual(lines[11], "S4_DIAG_CACHE=MATCH")
+                self.assertEqual(lines[12:17], expected)
+                self.assertEqual(lines[-1], "S4_DIAG_READ_ONLY=MATCH")
+                self.assertNotIn("UNSAFE_SYNTHETIC", out.stdout + out.stderr)
+                self.assertNotIn(str(self.root), out.stdout + out.stderr)
 
 
     def test_ssh_failure_exit_categories_are_sanitized(self):
