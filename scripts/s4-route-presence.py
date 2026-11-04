@@ -26,7 +26,6 @@ ATTRIBUTE = re.compile(r"#\[\s*Route\s*\(")
 PATH = re.compile(r"\s*(?:path\s*:\s*)?(['\"])(/[^'\"]*)\1", re.DOTALL)
 METHODS = re.compile(r"\bmethods\s*:\s*(\[[^\]]*\]|['\"][^'\"]+['\"])", re.DOTALL)
 MAX_RESPONSE_BYTES = 8192
-USER_AGENT = "GrindFlow-S4-RoutePresence/1.0"
 
 
 def route_attributes(source: str) -> list[str]:
@@ -123,7 +122,7 @@ class NoRedirects(urllib.request.HTTPRedirectHandler):
 def fetch_status(url: str, timeout: float) -> tuple[int, bytes]:
     """GET anónimo; nunca reenvía cookies, Authorization ni sigue redirects."""
     request = urllib.request.Request(
-        url, method="GET", headers={"User-Agent": USER_AGENT, "Accept": "text/html, application/json"},
+        url, method="GET", headers={"Accept": "text/html, application/json"},
     )
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirects())
     try:
