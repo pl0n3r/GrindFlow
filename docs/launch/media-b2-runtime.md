@@ -1,26 +1,26 @@
-# GrindFlow — Backblaze B2 S3 runtime (preparación local #823 / padre #146)
+# GrindFlow — Backblaze B2 S3 runtime (preparación previa a live #146)
 
-**Estado: integración build-ahead de #823 en rama canónica, sin activar B2 productivo.** El adaptador utiliza exclusivamente el SDK AWS S3 (PHP) declarado en Composer, con `composer.lock` generado mediante Composer auténtico y plataforma reproducible PHP 8.3; la reserva V3 de ocho rutas es `3ebafcca-997b-4a2c-9876-63ebe5993c94`. La preparación no crea cuenta/bucket, no prueba CORS ni credenciales reales, no despliega y **nunca acredita `MEDIA_STORAGE_READY=1`**. Quick Upload y el fallback no configurado permanecen disponibles. Las notas «offline v16–v23» son el historial de QA anterior a esta integración, no evidencia productiva.
+**Alcance: preparación de código, sin activar B2 productivo.** El adaptador utiliza exclusivamente el SDK AWS S3 (PHP) declarado en Composer. Esta guía no crea cuenta/bucket, no prueba CORS ni credenciales reales, no despliega y **nunca acredita `MEDIA_STORAGE_READY=1`**. Quick Upload y el fallback no configurado permanecen disponibles.
 
 ## Implementación y guardas
 
-`PrivateMediaS3Config` lee exclusivamente cinco `MEDIA_STORAGE_*_FILE` desde archivos privados del operador con rutas absolutas, permisos `0600`, tamaño acotado, ningún componente symlink, ni control characters y endpoint HTTPS de Backblaze asociado a su región. Rechaza configuración incompleta, valores inseguros, proveedor distinto, URLs internas/SSRF, región incompatible y cualquier fallback `AWS_*` / `R2_*`. Los valores privados se conservan en un `WeakMap`, nunca como propiedades del objeto: `var_export()`, `serialize()`, `print_r()` y `__debugInfo()` no revelan claves, bucket ni endpoint. Clonar/deserializar el objeto no recupera credenciales. Solo `clientOptions()` accede explícitamente a los valores en proceso del servidor; nunca registrarlos en logs.
+`PrivateMediaS3Config` lee exclusivamente cinco `MEDIA_STORAGE_*_FILE` desde archivos privados del operador con rutas absolutas, permisos `0600`, tamaño acotado, ningún componente symlink, ni control characters y endpoint HTTPS de Backblaze asociado a su región. Requiere que todos los ancestros del archivo privado sean propiedad del operador del secreto o de root y no puedan ser renombrados por actores no confiables: se rechazan ancestros con escritura de grupo/otros salvo directorios sticky propiedad de root (como `/tmp`). Esta política fail-closed reduce la carrera de sustitución de ancestro mediante symlink, no promete `openat(O_NOFOLLOW)` ni protege frente a procesos del mismo UID del operador. Después de `fopen`, revalida identidad de los directorios y del archivo. El operador **debe mantener un árbol de secretos estable, sin procesos no confiables del mismo UID**. Rechaza configuración incompleta, valores inseguros, proveedor distinto, URLs internas/SSRF, región incompatible y cualquier fallback `AWS_*` / `R2_*`. Los valores privados se conservan en un `WeakMap`, nunca como propiedades del objeto: `var_export()`, `serialize()`, `print_r()` y `__debugInfo()` no revelan claves, bucket ni endpoint. Clonar/deserializar el objeto no recupera credenciales. Solo `clientOptions()` accede explícitamente a los valores en proceso del servidor; nunca registrarlos en logs.
 
 El cliente AWS S3 también se retiene en un `WeakMap` y no como propiedad de la instancia `BackblazeB2DirectUploadStorage`: volcar el adaptador con `var_export()` / `serialize()` tampoco expone la configuración del SDK. Un adaptador clonado/deserializado no puede acceder a una sesión S3 válida: `available()` y `__debugInfo()['configured']` devuelven `false`, evitando anunciar un transporte roto en Admin/System. El constructor también rechaza una `PrivateMediaS3Config` clonada o deserializada que haya perdido su almacén privado.
 
 `BackblazeB2DirectUploadStorage` implementa la interfaz `DirectUploadStorage` de Symfony utilizando operaciones del cliente `Aws\S3\S3Client`: `PutObject` temporal firmado (máximo 900 s), `HeadObject` (404 `NoSuchKey`/`NotFound` únicamente; `NoSuchBucket` bloquea), `GetObject` como stream, `CopyObject` y `DeleteObject`. Restringe todas las claves a `organizations/<tenant-uuid>/staging/<upload-uuid>` o `organizations/<tenant-uuid>/blobs/<2hex>/<sha256>`; la promoción rechaza tenants diferentes y **no elimina el origen si la copia falla**. La URL firmada exige método PUT, scope SigV4 de key/región/S3, fecha y headers firmados válidos, host B2 esperado y clave concreta; nunca se devuelven claves S3 permanentes. El SDK debe ligar el `Content-Length` decimal exacto a los headers de la firma SigV4, pero la respuesta hacia JavaScript **no** lo incluye entre los headers configurables: `Content-Length` es una cabecera prohibida para scripts en Fetch/XHR y la asigna el navegador a partir del `File`/`Blob` exacto. Si el transporte/SDK no permite este contrato, la subida falla cerrada; no se elimina el límite ni se falsea la evidencia de B2. Además, se exige exactamente una cabecera `Content-Type` con el MIME autorizado, se rechazan nombres de cabecera malformados o duplicados por mayúsculas/minúsculas, cada `x-amz-*` devuelto debe pertenecer a `X-Amz-SignedHeaders`, el `Host` firmado debe coincidir exactamente con el host B2 de la URL y no admitir duplicados o aliases, y todas las cabeceras firmadas distintas de `host` deben acompañar al navegador para evitar firmas incompletas. Para el navegador, la aplicación entrega solo la URL temporal y cabeceras prefirmadas, y la finalización vuelve a comprobar el tamaño y el SHA-256 del stream.
 
-El método estático `fromEnvironment()` usa exclusivamente las rutas `*_FILE` disponibles; `fromPathVariables()` devuelve `UnavailableDirectUploadStorage` si faltan archivos seguros o SDK. Cuando existe el SDK, el cliente recibe *credenciales explícitas*, endpoint HTTPS fijo, firma v4, tiempo de conexión acotado y ningún fallback a credenciales ambientales. **No se verifica conectividad real hasta el gate operativo autorizado.**
+El método estático `fromEnvironment()` usa exclusivamente las rutas `*_FILE` disponibles; `fromPathVariables()` devuelve `UnavailableDirectUploadStorage` si faltan archivos seguros o SDK. Cuando existe el SDK, el cliente recibe *credenciales explícitas*, endpoint HTTPS fijo, firma v4, tiempo de conexión acotado y ningún fallback a credenciales ambientales. Si falla la construcción del cliente SDK, solo se registra la categoría estática `media_b2.sdk_client_initialization_failed` y se usa `UnavailableDirectUploadStorage`: nunca se registran el mensaje de excepción ni valores privados. **No se verifica conectividad real hasta el gate operativo autorizado.**
 
-## Compatibilidad del firmador PHP: hallazgo QA v16
+## Compatibilidad del firmador PHP
 
 El AWS SDK PHP v3 excluye por defecto `content-length` y `content-type` de
 `X-Amz-SignedHeaders` en SigV4 (referencias: aws/aws-sdk-php#3108 y #3283).
-Eso invalida el candidato anterior: el validador seguro exige ambos campos,
+Eso invalida cualquier presignatura sin los dos campos: el validador seguro exige ambos campos,
 por lo que la presignatura real fallaría cerrada aunque el fake sintético pasara.
-QA v17: la inspección del código real de `SignatureV4::moveHeadersToQuery()`
+Además, la inspección del código real de `SignatureV4::moveHeadersToQuery()`
 reveló que **además de** `getHeaderBlacklist()` se aplica una segunda lista
-`getPresignHeaderDenyList()`, que contiene `content-type`. Por ello v16 aún
+`getPresignHeaderDenyList()`, que contiene `content-type`. Por ello una mitigación parcial aún
 dejaría el MIME fuera de la firma. Este candidato configura
 `signature_provider` con un `S3SignatureV4` específico para B2 que retira
 `content-length` y `content-type` de la lista negra y únicamente
@@ -36,11 +36,11 @@ antes de anunciar Direct Upload activo.
 
 ## Integración y verificaciones de construcción
 
-1. **Reserva V3**: #823 usa únicamente ocho paths exactos y dependencia #796 integrada. Factory #767 fue verificado RUNNING; cuota CORE GitHub autenticada 4593 (mínimo 1200). Ningún otro path está autorizado en este PR.
-2. **Composer auténtico**: `aws/aws-sdk-php:^3.0` resuelto a 3.402.5 con sus dependencias, `symfony/composer.lock` actualizado por `composer update -W` con `config.platform.php=8.3.0` para evitar dependencias que exijan PHP 8.4 en CI. El SDK se utiliza solo con fixtures privados sintéticos, sin conexiones B2.
-3. **Wiring reversible**: `symfony/config/services.yaml` configura `DirectUploadStorage` mediante `BackblazeB2DirectUploadStorage::fromPathVariables`, con cinco apuntadores privados `*_FILE` y fallback `UnavailableDirectUploadStorage`. `lint:container` aprobó en entorno de test con URL de DB ficticia y sin conexión a proveedor.
-4. **Pruebas locales**: PHPUnit focalizado de ambas clases — 40 tests / 208 assertions PASS, incluidos dos casos con firmador AWS SDK real **sin hacer I/O de proveedor**. Se ajustó solo el directorio temporal de los tests a `realpath(sys_get_temp_dir())` para evitar el alias simbólico `/var` de macOS, que está correctamente prohibido para secretos. `composer validate --strict` y `php -l` de los cuatro PHP pasan. Esto no sustituye CI `validate`, Factory `Validar`, análisis de seguridad ni comprobación de firmware/cors en B2.
-5. **Puertas para fusionar**: CI exact-HEAD, Sonar/CodeQL y CodeRabbit solamente FINAL con CI verde. Squash solo bajo D-069. Fusionar el código no cierra #146 ni implica despliegue; habilitación B2/CORS/secretos y smoke productivo requieren acción y aprobación del operador.
+1. **Dependencias reproducibles**: instalar las dependencias declaradas en `symfony/composer.lock` con Composer y verificar `composer validate --strict`; el SDK B2 se usa solo con datos sintéticos y sin peticiones de red.
+2. **Wiring reversible**: `symfony/config/services.yaml` enlaza el ID exacto `GrindFlow\Infrastructure\Storage\DirectUploadStorage` con la fábrica `BackblazeB2DirectUploadStorage::fromPathVariables`, usando cinco punteros privados `*_FILE` y fallback `UnavailableDirectUploadStorage`.
+3. **Pruebas offline**: ejecutar PHPUnit para `PrivateMediaS3ConfigTest`, `BackblazeB2DirectUploadStorageTest` y `DirectUploadKernelServiceTest`; la prueba de kernel valida el ID de servicio con y sin cinco archivos sintéticos, sin acceder al proveedor. Comprobar también el rechazo de directorios ancestros escribibles o sustituidos por symlink, `php -l` y `lint:container`.
+4. **Puertas para fusionar**: exigir CI `validate`/`symfony-preview`/`preflight` exact-HEAD, Factory `Validar`, análisis de seguridad y una única revisión CodeRabbit FINAL con CI verde (o excepción D-070 autenticada). Squash solo bajo D-069. La integración de código no cierra #146 ni autoriza despliegue.
+5. **Puerta de seguridad pre-live**: QA/seguridad deben evaluar la topología real de propietarios/permisos de los ancestros, validar adversarialmente el riesgo de cambio de symlinks y revisar los hallazgos de #839. La ausencia de un API PHP portable por componente equivalente a `openat(O_NOFOLLOW)` hace obligatorio un árbol estable y propiedad confiable; **no activar `MEDIA_STORAGE_READY=1` por pasar las pruebas offline**.
 
 ## Provisionamiento y reversión (autoridad del operador)
 
@@ -52,24 +52,24 @@ Validación adicional: solo se presignan los cinco MIME admitidos por `DirectUpl
 
 SigV4 exige coherencia entre día del scope `X-Amz-Credential` y `X-Amz-Date`: una URL con día distinto se rechaza aunque la fecha firmada parezca actual. Esta verificación es sintética, no un test contra Backblaze.
 
-## QA v18 — orden canónico SigV4
+## Orden canónico SigV4
 
 La implementación real `SignatureV4::getPresignHeaders()` ordena los nombres
 firmados con `sort()` (y `createContext()` canonicaliza con `ksort()`).
 Una lista `X-Amz-SignedHeaders` con el mismo conjunto de nombres pero en orden
 diferente, como `host;content-type;content-length`, no es un resultado
 canónico y debe rechazarse. El adapter compara los campos con su copia
-ordenada y una regresión sintética demuestra RED en v17 y GREEN en v18.
+ordenada; se exige una regresión sintética que rechace el orden incorrecto.
 Ningún test offline constituye evidencia de firma B2 real.
 
 The presigner must also reject uppercase or mixed-case `X-Amz-SignedHeaders` values: the SDK normalizes signed names to lowercase before calculating the signature. A synthetic URL containing `Content-Length;Content-Type;Host` is therefore an invalid signing result, even if lowercasing it recovers the correct names.
 
 
-## HEAD 404 ambiguo (QA offline v21; pendiente de B2 real)
+## HEAD 404 ambiguo (pendiente de validación B2 real)
 
 AWS documenta que `HeadObject` devuelve un 404 genérico sin identificar la
-causa exacta. Una política que solo reconoce `NoSuchKey` (candidato v20)
-puede bloquear la consulta legítima de objetos ausentes. El candidato v21
+causa exacta. Una política que solo reconoce `NoSuchKey`
+puede bloquear la consulta legítima de objetos ausentes. El adaptador
 reconoce `NoSuchKey` explícito y solo trata `NotFound` como ausencia **después**
 de un `ListObjectsV2` exitoso del bucket exacto y prefijo exacto con listado
 vacío, no truncado y con `KeyCount=0`. Un fallo de permisos `listFiles`, un
@@ -81,7 +81,7 @@ cambiar credenciales ni CORS desde CI. **No acredita `MEDIA_STORAGE_READY`.**
 Referencia: https://www.backblaze.com/apidocs/s3-list-objects-v2
 
 
-## Case-insensitive HTTP header collision (offline QA v22)
+## Case-insensitive HTTP header collision
 
 An SDK/fake transport may represent signed header names with separate PHP
 keys `x-amz-meta-*` and `X-Amz-Meta-*`. HTTP field names are case-insensitive;
@@ -91,6 +91,6 @@ canonicalization and unexpected metadata. The direct-upload adapter now rejects
 unsigned fields. Regression test injects two case variants and proves
 fail-closed without exposing their values. This is not proof of B2 readiness.
 
-#### Guard for signed HTTP metadata fields (offline QA v23)
+#### Guard for signed HTTP metadata fields
 
-The browser-visible signed header values reject ASCII control bytes (including NUL, TAB, CR/LF, and DEL) before returning any presigned PUT contract, even for syntactically valid x-amz-* header names. This adds a hermetic negative test to v22; it does not prove actual AWS SDK/B2 wire behavior.
+The browser-visible signed header values reject ASCII control bytes (including NUL, TAB, CR/LF, and DEL) before returning any presigned PUT contract, even for syntactically valid x-amz-* header names. This adds a hermetic negative test; it does not prove actual AWS SDK/B2 wire behavior.
