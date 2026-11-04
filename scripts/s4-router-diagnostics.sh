@@ -4,18 +4,18 @@ set -euo pipefail
 umask 077
 
 if (( $# != 1 )) || [[ "$1" != '--read-only' ]]; then
-  printf 'S4_DIAG_MODE=INVALID\n'
+  printf 'S4_DIAG_MODE=UNKNOWN\n'
   exit 2
 fi
 expected="${EXPECTED_SHA:-}"
 if [[ ! "$expected" =~ ^[0-9a-f]{40}$ ]]; then
-  printf 'S4_DIAG_SHA=INVALID\n'
+  printf 'S4_DIAG_SHA=UNKNOWN\n'
   exit 2
 fi
 root="$(pwd -P)"
 checkout="$(git -C "$root" rev-parse HEAD 2>/dev/null || true)"
 if [[ "$checkout" != "$expected" ]]; then
-  printf 'S4_DIAG_CHECKOUT=MISMATCH\n'
+  printf 'S4_DIAG_CHECKOUT=DRIFT\n'
   exit 1
 fi
 printf 'S4_DIAG_CHECKOUT=MATCH\n'
@@ -47,7 +47,7 @@ check_tracked CONTROLLER_REPORTS symfony/src/Http/Reports/CrossModuleReportContr
 check_tracked COMPOSER_LOCK symfony/composer.lock
 
 if [[ -f symfony/vendor/autoload.php && -r symfony/vendor/autoload.php && ! -L symfony/vendor/autoload.php ]]; then
-  printf 'S4_DIAG_AUTOLOAD=PRESENT\n'
+  printf 'S4_DIAG_AUTOLOAD=MATCH\n'
 else
   printf 'S4_DIAG_AUTOLOAD=MISSING\n'
 fi
@@ -64,7 +64,7 @@ fi
 
 cache='symfony/var/cache/prod'
 if [[ -d "$cache" && ! -L "$cache" ]]; then
-  printf 'S4_DIAG_CACHE=PRESENT\n'
+  printf 'S4_DIAG_CACHE=MATCH\n'
   for entry in \
     'COLLECTIONS|/api/admin/library/collections' \
     'PLANS|/api/admin/plans' \
@@ -74,9 +74,9 @@ if [[ -d "$cache" && ! -L "$cache" ]]; then
     label="${entry%%|*}"
     route="${entry#*|}"
     if LC_ALL=C grep -r -F -q -- "$route" "$cache" 2>/dev/null; then
-      printf 'S4_DIAG_CACHE_ROUTE_%s=PRESENT\n' "$label"
+      printf 'S4_DIAG_CACHE_ROUTE_%s=MATCH\n' "$label"
     else
-      printf 'S4_DIAG_CACHE_ROUTE_%s=ABSENT\n' "$label"
+      printf 'S4_DIAG_CACHE_ROUTE_%s=UNKNOWN\n' "$label"
     fi
   done
 else
@@ -85,4 +85,4 @@ else
     printf 'S4_DIAG_CACHE_ROUTE_%s=UNKNOWN\n' "$label"
   done
 fi
-printf 'S4_DIAG_RESULT=READ_ONLY_INSPECTION\n'
+printf 'S4_DIAG_READ_ONLY=MATCH\n'
