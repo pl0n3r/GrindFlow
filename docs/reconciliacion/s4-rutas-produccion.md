@@ -220,3 +220,27 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 - Una lectura pública a 2026-11-04T13:14:07Z indicó /health commit=98af3115c42ea2aa45018ff78cebb98977c2075c y exact=true mientras GitHub main avanzó a 20f15882…; /s4/health continúa release_sha=null. Esta observación **NO** corresponde al nuevo main, por lo cual no se ejecuta un nuevo workflow SSH hasta confirmar identidad exacta de producción.
 - Última prueba exhaustiva de rutas aún es 2026-11-04T12:44:02Z: 7/7 HTTP 404 HTML sobre el main anterior. No atribuir el resultado al commit nuevo ni declarar el incidente reparado; AC-01 y AC-02 siguen incumplidos.
 - Mantener Reports (#348) fuera del router mientras el producto lo define, y DSR (#457) fail-closed hasta revisión jurídica. PR #907 permanece DRAFT, sin revisión CodeRabbit FINAL ni merge hasta causa confirmada, backup/rollback y validación de producción.
+
+## Inspección OWNER-only confirma etapa del fallo S4 — 4-nov-2026, 13:16–13:17 UTC
+
+<!-- GF903-SSH-41836592312-HELPER-STARTED-131701-20261104 -->
+
+- Producción /health (GET público, 13:15:36Z) reportó `commit=20f158826b1b532524beb3e465bada4eb5ce1b3e`, `exact=true`; `/s4/health` siguió con `release_sha=null`. [S4 Runtime Prepare #41836292219](https://github.com/pl0n3r/GrindFlow/actions/runs/41836292219) había completado success sobre ese main; esto no prueba aceptación de rutas.
+- [S4 Router Diagnostics #41836592312](https://github.com/pl0n3r/GrindFlow/actions/runs/41836592312), `workflow_dispatch` OWNER=pl0n3r, `run_attempt=1`, SHA exacto `20f158826b1b532524beb3e465bada4eb5ce1b3e`: preflight, checkout y `bash -n` success; SSH read-only failure a 13:16:33Z, categoría fija `HELPER_STARTED_EXIT_1`. Se alcanzó la primera línea `S4_DIAG_CHECKOUT=MATCH` del helper, pero una operación posterior devolvió exit 1. No se conoce el último paso: **no atribuir la causa a archivos, vendor, caché o despliegue sin marcador adicional autenticado**.
+- GET públicos a 2026-11-04T13:17:01Z, `Cache-Control: no-cache`, sin cookies/credenciales ni redirecciones:
+
+| Ruta GET | HTTP | MIME |
+| --- | ---: | --- |
+| `/health` | 200 | application/json |
+| `/s4/health` | 200 | application/json |
+| `/s4/_bridge-readiness` | 200 | application/json |
+| `/s4/api/admin/library/collections` | **404** | text/html |
+| `/s4/api/admin/library/permissions` | **404** | text/html |
+| `/s4/api/admin/plans` | **404** | text/html |
+| `/s4/api/admin/rules/automation` | **404** | text/html |
+| `/s4/api/admin/reports/cross-module` | **404** | text/html |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | text/html |
+| `/s4/privacidad-y-mis-derechos` | **404** | text/html |
+
+- Resultado: AC-01 **NO** (7/7 404), AC-02 **NO** (falta causa remota y reparación verificable), AC-03 documenta `release_sha=null` sin prueba del marker remoto; AC-04 requiere CI terminal del HEAD documental final. Workflow de solo lectura no ejecutó producción, cachés, SQL, migraciones ni obtuvo datos reales.
+- Cambiar el enfoque de diagnosis: instrumentar de manera puramente read-only la etapa precisa donde se interrumpe el helper; nunca repetir `#41836592312` sin código observacional nuevo. Mantener PR #907 en DRAFT, con reserva V3 y lock existentes.
