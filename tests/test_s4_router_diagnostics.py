@@ -144,5 +144,65 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=UNKNOWN", out.stdout)
 
 
+
+    def test_ssh_failure_exit_categories_are_sanitized(self):
+        """Run the actual workflow's SSH step with a synthetic local ssh stub."""
+        source = WORKFLOW.read_text(encoding="utf8").splitlines()
+        step = source.index("      - name: Inspect Hostinger without production writes")
+        run = next(i for i in range(step + 1, len(source))
+                   if source[i] == "        run: |")
+        stop = next(i for i in range(run + 1, len(source))
+                    if source[i].startswith("      - name: "))
+        shell = "\n".join(line[10:] if line.startswith("          ") else line
+                          for line in source[run + 1:stop])
+        self.assertIn("StrictHostKeyChecking=yes", shell)
+        self.assertIn("BatchMode=yes", shell)
+        self.assertIn("-- --read-only", shell)
+
+        bindir = self.root / "synthetic-bin"
+        bindir.mkdir()
+        fake_ssh = bindir / "ssh"
+        fake_ssh.write_text(
+            "#!/bin/bash\n"
+            "printf '%s\\n' 'UNSAFE_SYNTHETIC_STDOUT'\n"
+            "printf '%s\\n' 'UNSAFE_SYNTHETIC_STDERR' >&2\n"
+            "exit \"${MOCK_SSH_EXIT}\"\n", encoding="utf8"
+        )
+        fake_ssh.chmod(0o700)
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        (scripts / "s4-router-diagnostics.sh").write_text(
+            SCRIPT.read_text(encoding="utf8"), encoding="utf8"
+        )
+        for exit_code, expected in (
+            (255, "TRANSPORT_OR_REMOTE_255"),
+            (1, "REMOTE_EXIT_1"),
+            (2, "REMOTE_EXIT_2"),
+            (17, "REMOTE_EXIT_OTHER"),
+        ):
+            with self.subTest(exit_code=exit_code):
+                env = {
+                    **os.environ,
+                    "PATH": str(bindir) + os.pathsep + os.environ.get("PATH", ""),
+                    "MOCK_SSH_EXIT": str(exit_code),
+                    "EXPECTED_SHA": self.sha,
+                    "SSH_HOST": "synthetic.invalid",
+                    "SSH_USER": "synthetic",
+                    "SSH_PORT": "22",
+                    "GIT_ROOT": "/synthetic/checkout",
+                    "DEPLOY_SSH_KEY": "synthetic-private-key",
+                    "HOSTINGER_KNOWN_HOSTS": "synthetic-known-hosts",
+                    "GITHUB_STEP_SUMMARY": str(self.root / "summary"),
+                }
+                result = subprocess.run(
+                    ["bash", "-c", shell], cwd=self.root, env=env,
+                    text=True, capture_output=True, timeout=10, check=False
+                )
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(f"failed ({expected}); details withheld.", result.stdout)
+                self.assertNotIn("UNSAFE_SYNTHETIC", result.stdout + result.stderr)
+                self.assertNotIn("synthetic-private-key", result.stdout + result.stderr)
+                self.assertNotIn("/synthetic/checkout", result.stdout + result.stderr)
+
 if __name__ == "__main__":
     unittest.main()

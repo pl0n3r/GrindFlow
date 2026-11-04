@@ -123,3 +123,16 @@ Se despachó **una vez** [S4 Router Diagnostics #41821996322](https://github.com
 - Dos fallos repetidos con idéntico preflight verde desaconsejan más reruns sin una corrección dirigida. La herramienta requiere un diagnóstico de transporte/autorización sanitizado adicional o acceso de operador autorizado; no extraer llaves ni realizar cambios productivos desde esta sesión.
 
 La evidencia HTTP pública de las **siete respuestas 404** al 11:29:17Z permanece válida e independiente de la falta de salida SSH. **AC-01/AC-02 permanecen NO CUMPLIDOS**. El ticket y PR deben seguir abiertos, el PR en DRAFT, y CodeRabbit se reserva para el HEAD definitivo con las puertas operativas satisfechas.
+
+
+## Conciliación de rama con el último main y diagnóstico SSH (4 de noviembre de 2026)
+
+<!-- GF903-S4-MAIN-RECONCILED-177300B2-20261104 -->
+
+- **Main de código verificado:** \`177300b29249b9deea5e5100967e56b8dd1758e9\`, squash del [PR #925](https://github.com/pl0n3r/GrindFlow/pull/925), que dejó cerrado/completado el blocker [#924](https://github.com/pl0n3r/GrindFlow/issues/924). Ese cambio solamente clasifica fallos SSH (255/1/2/otro) en el workflow de diagnóstico owner-only y amplía pruebas sintéticas; **no se realizó reparación del router S4**.
+- [S4 Runtime Prepare #41826197735](https://github.com/pl0n3r/GrindFlow/actions/runs/41826197735) terminó \`success\` con ese main según GitHub Actions, pero no existe en este corte una medición HTTP independiente posterior al nuevo SHA ni evidencia \`VALIDATED_IN_PRODUCTION\`. **No se afirma que las siete rutas hayan cambiado.**
+- La última medición HTTP categórica documentada sigue siendo la de **2026-11-04T11:29:17Z** sobre el main anterior \`3165f487…\`: 7/7 HTTP 404 HTML genéricos, \`/health\` exact=true, bridge listo y \`release_sha=null\`. Esa medición se conserva como **histórica** y no se imputa al main \`177300b2…\`.
+- La ejecución previa [S4 Router Diagnostics #41821996322](https://github.com/pl0n3r/GrindFlow/actions/runs/41821996322) falló dos veces antes de producir categorías remotas autenticadas. No repetirla de manera indiscriminada ni adjudicar causa de autenticación/caché. La nueva clasificación de #925 solo aumenta observabilidad en **una futura ejecución específicamente autorizada**.
+- La ruta Reports continúa fuera de \`symfony/config/routes.yaml\` por el alcance de producto #348, y DSR-CSRF debe seguir fallando cerrado fuera de tests por la puerta legal #457. **AC-01 literal (7 rutas no-404) requiere una decisión explícita del propietario**, no activar funciones deshabilitadas para falsear resultados.
+- **Puertas sin superar:** AC-01/AC-02 productivos, diagnóstico real autorizado, recibo previo de backup/restore y rollback para cualquier escritura en Hostinger, y aceptación de producto/privacidad. Mantener Issue #903 abierto y PR #907 DRAFT; la reconciliación de la rama **no es un despliegue ni valida producción**.
+- **Coordinación:** reserva V3 auténtica \`cbb53f02-a68b-4d1d-b118-4dfc4efea06d\` de \`trabajo/issue-903\`; referencia \`coordinacion/lock-issue-903\` preexistente. No borrar ni forzar la referencia; resolver con protocolo V3 si llega a reunirse evidencia de recuperación.
