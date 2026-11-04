@@ -39,7 +39,7 @@ Un HTTP `200` de readiness y un workflow verde **no** satisfacen AC-01: las siet
 
 ## AC-03: por qué `release_sha` continúa nulo
 
-En `symfony/src/Http/Controller/HealthController.php`, el campo `release_sha` procede de `GrindFlow\\Shared\\Version\\ProductVersion::releaseSha()`. El método lee el marcador privado `.release-sha` desde la raíz del checkout y devuelve `null` si falta, es un enlace simbólico o su contenido no es un SHA hexadecimal de 40 caracteres válido. **No se ha inspeccionado el fichero remoto para distinguir esas causas**. El SHA observado en `/health` corresponde al contrato de Laravel y no se transporta automáticamente como prueba de release de Symfony.
+En `symfony/src/Http/Controller/HealthController.php`, el campo `release_sha` procede de `GrindFlow\Shared\Version\ProductVersion::releaseSha()`. El método lee el marcador privado `.release-sha` desde la raíz del checkout y devuelve `null` si falta, es un enlace simbólico o su contenido no es un SHA hexadecimal de 40 caracteres válido. **No se ha inspeccionado el fichero remoto para distinguir esas causas**. El SHA observado en `/health` corresponde al contrato de Laravel y no se transporta automáticamente como prueba de release de Symfony.
 
 ## Reentrada, controles y rollback
 
@@ -48,4 +48,4 @@ En `symfony/src/Http/Controller/HealthController.php`, el campo `release_sha` pr
 3. Tras una reparación auténtica, tomar otro sondeo GET de las siete rutas y documentar los estados HTTP antes/después, el SHA exacto, comando/workflow, recibo del backup y resultado del rollback si fuera necesario. El objetivo es 401/302/200 en las siete; un 404 residual es NO GO.
 4. Pasar `GrindFlow CI / validate` sobre HEAD exacto y la revisión final CodeRabbit **una sola vez**, únicamente cuando el cambio esté completo y los gates aplicables estén en verde.
 
-**Estado de aceptación actual:** AC-01 pendiente (7/7 rutas 404); AC-02 pendiente (hipótesis sin causa raíz autenticada y sin reparación); AC-03 explicación de `release_sha=null` documentada, sin declarar marca de release real; AC-04 `validate` pendiente del HEAD de este documento. Mantener #903 abierto y cualquier PR de preparación en DRAFT hasta superar los gates.
+**Estado de aceptación actual:** AC-01 pendiente (7/7 rutas 404); AC-02 pendiente (hipótesis sin causa raíz autenticada y sin reparación); AC-03 explicación de `release_sha=null` documentada, sin declarar marca de release real; AC-04 condicionado a `validate` terminal en el HEAD exacto del PR (sin sustituir AC-01 ni AC-02). Mantener #903 abierto y cualquier PR de preparación en DRAFT hasta superar los gates.
