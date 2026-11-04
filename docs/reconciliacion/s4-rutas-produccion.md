@@ -432,3 +432,31 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 **Aclaración de aceptación:** Reports #348 permanece fuera del import del router por decisión de producto; DSR #457 alcanza un 404 JSON `feature_unavailable` cuando el controlador deshabilitado es alcanzado, distinto del 404 HTML visto. No habilitar esos módulos para maquillar AC-01. Se mantiene el contrato original: **AC-01 NO, AC-02 NO; AC-03 nulo explicado, no SHA de Symfony confirmado; AC-04 requiere validate exact-HEAD nuevo**. La decisión A/B solicitada al owner y la comprobación de backup/restauración/rollback siguen pendientes. No se ha cambiado ni desplegado producción.
 
 **Secuencia mínima de desbloqueo (sin falsos positivos):** obtener los 18 indicadores sanitizados de diagnóstico, confirmar con ellos la causa y elegir el cambio operativo mínimo; antes de cualquier mutación del host cumplir D-059 y el permiso de reparación necesario; aplicar reparación con reversión verificada, volver a sondear siete rutas con la semántica aprobada; resolver el lock por comando owner-only serializado *publicado y autorizado*; registrar antes/después y causa confirmada; ejecutar `validate`/ `Validar` exact-HEAD y seguridad; pedir **una sola revisión FINAL de CodeRabbit** y fusionar squash solo con los gates esenciales realmente acreditados. Mantener #907 DRAFT y abierta mientras falten.
+
+
+## Actualización de aceptación y trazabilidad CI — 4-nov-2026 22:19–22:25 UTC
+
+<!-- GF903-HTTP-POLICY-20261104T222542Z -->
+
+**Ejecución reproducible de solo lectura.** Sondeo GET anónimo del 2026-11-04T22:25:42Z, con Cache-Control: no-cache y sin cookies, credenciales ni operaciones de escritura, a https://www.grindflow.com.co. Resultado público:
+
+| Ruta | HTTP | MIME |
+| --- | ---: | --- |
+| \`/health\` | 200 | \`application/json\` |
+| \`/s4/health\` | 200 | \`application/json\` |
+| \`/s4/_bridge-readiness\` | 200 | \`application/json\` |
+| \`/s4/api/admin/library/collections\` | **404** | \`text/html\` |
+| \`/s4/api/admin/library/permissions\` | **404** | \`text/html\` |
+| \`/s4/api/admin/plans\` | **404** | \`text/html\` |
+| \`/s4/api/admin/rules/automation\` | **404** | \`text/html\` |
+| \`/s4/api/admin/reports/cross-module\` | **404** | \`text/html\` |
+| \`/s4/api/admin/privacy/data-subject-requests/csrf\` | **404** | \`text/html\` |
+| \`/s4/privacidad-y-mis-derechos\` | **404** | \`text/html\` |
+
+**Reintento único de Policy con causa diferenciada.** El job original \`Factory policy / Validar decisiones y límite de revisión\`, [#126842396704](https://github.com/pl0n3r/GrindFlow/actions/runs/41906486071/job/126842396704), falló por \`Check-runs sin dos snapshots completos y estables\`. Se reejecutó exclusivamente ese job; el intento [#126904500038](https://github.com/pl0n3r/GrindFlow/actions/runs/41906486071/job/126904500038) terminó \`failure\` tras superar los snapshots y reportó el error concreto \`Check no verde: pr / Sincronizar PR=failure.\`. Su dependencia es [Coordinación / pr / Sincronizar PR #126842443545](https://github.com/pl0n3r/GrindFlow/actions/runs/41906486099/job/126842443545), denegada por \`Lock V3 ocupado para Issue #903; mutación denegada.\` No hay base para otro reintento ciego de Policy. [Evidencia completa en issue](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6643612195).
+
+**Reserva y dependencia de release.** El PR #907 antes de esta actualización documental estaba \`OPEN/DRAFT\` en \`6faf759c646cecaa830bf1602f92c2cfe7259bfd\`, \`behind=0\`, con claim exclusivo sobre este archivo y V3 activa \`cbb53f02-a68b-4d1d-b118-4dfc4efea06d\`. El lock \`coordinacion/lock-issue-903@1a1f22412b4e81cc74bfe52603b61b1147497bb1\` no se alteró. \`Factory/main@67aeb1e4381664860de0cbca2915c0b2a1e2d276\` prepara 1.0.49, pero el tag distribuido protegido \`Factory@v1@1e809674854ae9e9d3426f32413834709ab0c42d\` aún corresponde a 1.0.48. La recuperación same-OWNER CAS V3 requiere publicación protegida exact-SHA y habilitación del consumidor reservado en #935/PR #937; jamás borrar el lock por fuerza ni volver a tomar la reserva activa.
+
+**Aceptación honesta:** AC-01 = NO (7/7 rutas todavía 404 HTML); AC-02 = NO (falta causa confirmada del host y corrección desplegada); AC-03 = \`release_sha=null\` previamente documentado y Symfony sin identidad de release confirmada; AC-04 = repetir validaciones sobre el **nuevo HEAD documental**. La ruta Reports depende de producto #348 y el 404 previsto para DSR deshabilitada es JSON, no el 404 HTML actual: exigir decisión explícita del dueño antes de variar el contrato. La ejecución read-only del workflow S4 #41899802049 no publica sus 18 categorías de diagnóstico en las APIs accesibles; no inventar su contenido.
+
+**No-go:** este commit solo incorpora pruebas obtenidas y causa de CI; no modifica Hostinger ni valida producción. Antes de cualquier escritura S4 siguen obligatorios autorización operativa diferenciada, respaldo/restauración y rollback acreditados (D-059); no pasar el PR a Ready, no solicitar CodeRabbit FINAL y no fusionar hasta aceptación real, CI exact-HEAD y gates auténticos D-069/D-043.
