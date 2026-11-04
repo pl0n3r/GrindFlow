@@ -275,3 +275,29 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 - **Deuda Minor pre-live:** CodeRabbit observó que un `find -print0` simulado puede entregar una última ruta **sin byte NUL**, que el escáner podría aceptar como válida. Antes de fase `live`, validar explícitamente el NUL final y añadir fixture `find_valid_path_without_final_nul` para asegurar cinco `UNKNOWN`, sin volver a solicitar CodeRabbit para el PR ya revisado. No se declara corregida esa deuda, ni se otorgan permisos para operar el host.
 - El último sondeo público GET de las siete rutas ocurrió 2026-11-04T14:09:26Z, con `/health commit=3f5d7755… exact=true`, y reportó **7/7 HTTP 404 text/html** (evidencia y tabla en el comentario del issue #903, 2026-11-04). Es un SHA previo: no atribuir ese resultado a `671bf8f3…` sin un nuevo sondeo público exacto.
 - PR #907 permanece **DRAFT**. AC-01/AC-02 no cumplidos. La próxima lectura owner-only del workflow requiere verificar primero que producción `/health` reporta el SHA actual de main y que no exista run duplicado; no ejecutar cambios de caché, datos, SSH escrituras ni Composer sin gates D-059.
+
+
+## Evidencia HTTP exact-main tras PR #934 — 4-nov-2026 14:20–14:22 UTC
+
+<!-- GF903-HTTP-20261104-142155-671BF8 -->
+
+- GitHub `main@671bf8f3828f75a631243abb5964ec1a5625087f` (PR #934 fusionado) coincide con `GET https://www.grindflow.com.co/health` a **2026-11-04T14:20:25Z**: `commit=671bf8f3828f75a631243abb5964ec1a5625087f`, `exact=true`, `version=0.1.225`. `GET /s4/health` devuelve `release_sha=null`, `version=0.1.225`.
+- Sonda HTTP pública (sin autenticación, cookies, redirecciones, datos personales ni escrituras) a **2026-11-04T14:21:55Z** con `Cache-Control: no-cache`:
+
+| Ruta | HTTP | MIME |
+| --- | ---: | --- |
+| `/health` | 200 | application/json |
+| `/s4/health` | 200 | application/json |
+| `/s4/_bridge-readiness` | 200 | application/json |
+| `/s4/api/admin/library/collections` | **404** | text/html |
+| `/s4/api/admin/library/permissions` | **404** | text/html |
+| `/s4/api/admin/plans` | **404** | text/html |
+| `/s4/api/admin/rules/automation` | **404** | text/html |
+| `/s4/api/admin/reports/cross-module` | **404** | text/html |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | text/html |
+| `/s4/privacidad-y-mis-derechos` | **404** | text/html |
+
+- **AC-01 no cumplido:** siete rutas siguen 404 aun después de integrar #934; #934 solo endurece el diagnóstico read-only, no modifica la configuración del router. **AC-02 no cumplido:** no hay causa productiva confirmada ni reparación efectiva. El SHA coincide pero `release_sha` de Symfony permanece nulo (AC-03 pendiente de reconciliación definitiva).
+- Se verificó `S4 Runtime Prepare` `success` sobre el nuevo SHA (run #41846325392); esta conclusión por sí sola no acredita rutas productivas reparadas ni el estado terminal D-043.
+- El intento de iniciar la inspección OWNER-only del workflow `s4-router-diagnostics.yml` sobre `671bf8f3828f75a631243abb5964ec1a5625087f` **fue rechazado por los controles del entorno antes de la ejecución**; no se generó un run nuevo desde esa acción. No se reintentó por otra vía y no se hicieron cambios de host/caché/Composer/BD.
+- Persisten decisiones de producto y privacidad: Reports (#348) y DSR (#457) tienen comportamiento 404 previsto en ciertas condiciones. Se exige decisión del propietario para AC-01 antes de alterar esa semántica, más autorización/backup/rollback para cualquier reparación productiva según D-059. Mantener PR #907 DRAFT hasta evidencia auténtica.
