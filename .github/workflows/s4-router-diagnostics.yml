@@ -89,10 +89,122 @@ jobs:
             case "$ssh_rc" in
               255) category=TRANSPORT_OR_REMOTE_255 ;;
               1)
-                # Detect the helper's single safe marker without publishing stdout.
-                # Anything else remains a generic remote exit-one error.
-                if [[ "$diagnostics" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
+                # Classify only constant prefixes; never display SSH stdout/stderr.
+                # Command substitution strips trailing newlines, so check exact marker
+                # before longer first-line signatures (including extra stdout).
+                if [[ -z "$diagnostics" ]]; then
+                  category=REMOTE_EXIT_1_EMPTY_STDOUT
+                elif [[ "$diagnostics" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
                   category=CHECKOUT_DRIFT
+                elif [[ "$diagnostics" == 
+                ;;
+              2) category=REMOTE_EXIT_2 ;;
+              *) category=REMOTE_EXIT_OTHER ;;
+            esac
+            printf '::error::S4 read-only inspection failed (%s); details withheld.\n' "$category"
+            exit 1
+          fi
+
+          mapfile -t observed <<< "$diagnostics"
+          expected=(
+            CHECKOUT ROUTE_IMPORT CONTROLLER_COLLECTIONS CONTROLLER_PLANS
+            CONTROLLER_AUTOMATION CONTROLLER_PRIVACY CONTROLLER_DSR
+            CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
+            CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
+            CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
+            READ_ONLY
+          )
+          [[ "${#observed[@]}" == "${#expected[@]}" ]] || {
+            echo '::error::Unexpected diagnostics shape'; exit 1;
+          }
+          for idx in "${!expected[@]}"; do
+            if [[ ! "${observed[$idx]}" =~ ^S4_DIAG_${expected[$idx]}=(MATCH|DRIFT|MISSING|UNKNOWN)$ ]]; then
+              echo '::error::Unexpected diagnostics category'; exit 1
+            fi
+          done
+          {
+            echo '## S4 router inspection (read-only)'
+            echo
+            printf '%s\n' "${observed[@]}"
+            echo
+            echo 'Categories only: this report is not production acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Revalidate exact main after remote read-only inspection
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.trusted.outputs.sha }}
+        run: |
+          set -euo pipefail
+          remote="$(git ls-remote --heads "https://github.com/$GITHUB_REPOSITORY.git" refs/heads/main)"
+          name="$(awk 'NR == 1 {print $2}' <<<"$remote")"
+          observed="$(awk 'NR == 1 {print $1}' <<<"$remote")"
+          [[ "$name" == 'refs/heads/main' && "$observed" == "$EXPECTED_SHA" ]] || {
+            echo '::error::main moved during read-only diagnostics'; exit 1;
+          }
+          {
+            echo '## S4 router inspection (read-only)'
+            echo
+            echo 'Source hashes, cache route hints and release marker were inspected without writes.'
+            echo 'Read-only inspection is not a deploy, route repair or production acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+S4_DIAG_CHECKOUT=DRIFT\n'* ]]; then
+                  category=CHECKOUT_DRIFT_EXTRA_STDOUT
+                elif [[ "$diagnostics" == 'S4_DIAG_CHECKOUT=MATCH' ||
+                        "$diagnostics" == 
+                ;;
+              2) category=REMOTE_EXIT_2 ;;
+              *) category=REMOTE_EXIT_OTHER ;;
+            esac
+            printf '::error::S4 read-only inspection failed (%s); details withheld.\n' "$category"
+            exit 1
+          fi
+
+          mapfile -t observed <<< "$diagnostics"
+          expected=(
+            CHECKOUT ROUTE_IMPORT CONTROLLER_COLLECTIONS CONTROLLER_PLANS
+            CONTROLLER_AUTOMATION CONTROLLER_PRIVACY CONTROLLER_DSR
+            CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
+            CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
+            CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
+            READ_ONLY
+          )
+          [[ "${#observed[@]}" == "${#expected[@]}" ]] || {
+            echo '::error::Unexpected diagnostics shape'; exit 1;
+          }
+          for idx in "${!expected[@]}"; do
+            if [[ ! "${observed[$idx]}" =~ ^S4_DIAG_${expected[$idx]}=(MATCH|DRIFT|MISSING|UNKNOWN)$ ]]; then
+              echo '::error::Unexpected diagnostics category'; exit 1
+            fi
+          done
+          {
+            echo '## S4 router inspection (read-only)'
+            echo
+            printf '%s\n' "${observed[@]}"
+            echo
+            echo 'Categories only: this report is not production acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Revalidate exact main after remote read-only inspection
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.trusted.outputs.sha }}
+        run: |
+          set -euo pipefail
+          remote="$(git ls-remote --heads "https://github.com/$GITHUB_REPOSITORY.git" refs/heads/main)"
+          name="$(awk 'NR == 1 {print $2}' <<<"$remote")"
+          observed="$(awk 'NR == 1 {print $1}' <<<"$remote")"
+          [[ "$name" == 'refs/heads/main' && "$observed" == "$EXPECTED_SHA" ]] || {
+            echo '::error::main moved during read-only diagnostics'; exit 1;
+          }
+          {
+            echo '## S4 router inspection (read-only)'
+            echo
+            echo 'Source hashes, cache route hints and release marker were inspected without writes.'
+            echo 'Read-only inspection is not a deploy, route repair or production acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+S4_DIAG_CHECKOUT=MATCH\n'* ]]; then
+                  category=HELPER_STARTED_EXIT_1
                 else
                   category=REMOTE_EXIT_1
                 fi
