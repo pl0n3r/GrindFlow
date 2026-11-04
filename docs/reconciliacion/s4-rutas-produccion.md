@@ -373,3 +373,30 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 **Interpretación verificable:** las rutas S4 antiguas pueden resolver o alcanzar el controlador (200/503/500), pero las seis rutas nuevas declaradas en código siguen respondiendo 404 HTML. La hipótesis de diferencia entre checkout publicado, registro de rutas compilado y fuente actual merece una inspección remota owner-only; ninguna de las observaciones permite concluir **causa confirmada** ni ejecutar Composer/caché/deploy como reparación probada. No inferir éxito de endpoints 500/503, ni alterar funcionalidad DSR/Reports para forzar el 200 del AC-01.
 
 **Semáforo del incidente:** AC-01 **NO** (7/7 siguen HTTP 404), AC-02 **NO** (causa de host no comprobada; reparación autorizada no ejecutada), AC-03 `release_sha=null` **explicado, no validado**, AC-04 sujeto a la ejecución canónica `validate` del HEAD definitivo. Requiere autorización owner específica de diagnóstico (lectura), decisión expresa de criterio A/B para Reports/DSR, permiso de escritura independiente con backup/restore y rollback verificables D-059, y resolución del lock V3 por protocolo sin fuerza manual. PR #907 se mantiene **DRAFT**, sin revisión FINAL CodeRabbit ni squash.
+
+
+## Diagnóstico remoto seguro y verificación HTTP — 4-nov-2026 19:42–19:47 UTC
+
+<!-- GF903-READONLY-RUN41899802049-1942UTC -->
+
+**Ejecución real:** [S4 Router Diagnostics run #41899802049](https://github.com/pl0n3r/GrindFlow/actions/runs/41899802049), `workflow_dispatch` owner-only, `main@e74497a7c4112c58516b6b3c8886870cade6c243`, creado 19:44:09 UTC; `completed/success` al 19:44:19 UTC, primer intento. El job [#126818885383](https://github.com/pl0n3r/GrindFlow/actions/runs/41899802049/job/126818885383) pasó `Fail closed unless the dispatch is exact current-main`, `Validate allowlisted read-only helper`, `Inspect Hostinger without production writes` y `Revalidate exact main after remote read-only inspection`. No se ejecutaron Composer, cache clear/warmup, despliegues ni escritura en Hostinger. Fue un intento causalmente nuevo: el helper que falló en #41840557961 (`HELPER_VALID_PREFIX_12_OF_18`, blob `f3791fa5…`) cambió en `main` al blob `7f03fd19…`.
+
+**Límite de evidencia:** el job exitoso publicaba 18 indicadores categóricos `S4_DIAG_*` únicamente en `GITHUB_STEP_SUMMARY`. Ni la API del check-run (campo `output.summary=null`), ni logs del job ni los artefactos recuperables exponen aquí los valores. **No se atribuye `CHECKOUT=MATCH`, `AUTOLOAD=MATCH`, `CACHE_ROUTE_*=MATCH`, causa confirmada ni reparación** a partir del éxito del job. Antes de cualquier cambio productivo se deben leer los indicadores mediante el resumen autorizado del run.
+
+**Sonda real GET pública** de **19:42:45 UTC**, sin cookies, autenticación, seguimiento de redirecciones ni escritura, `Cache-Control: no-cache`. La comprobación de campos públicos a las **19:46:50 UTC** estableció `/health` = `200 application/json`, `commit=e74497a7c4112c58516b6b3c8886870cade6c243`, `exact=true`, versión `0.1.225`; `/s4/health` = `200 application/json`, `release_sha=null`; `/s4/_bridge-readiness` = `200 application/json`, `data.state=ready_for_web_probe`. Eso demuestra identidad Laravel, no el SHA de Symfony.
+
+| Ruta GET pública | HTTP | MIME |
+| --- | ---: | --- |
+| `/s4/` | 200 | text/html |
+| `/s4/login` | 200 | text/html |
+| `/s4/api/admin/library/collections` | **404** | text/html |
+| `/s4/api/admin/library/permissions` | **404** | text/html |
+| `/s4/api/admin/plans` | **404** | text/html |
+| `/s4/api/admin/rules/automation` | **404** | text/html |
+| `/s4/api/admin/reports/cross-module` | **404** | text/html |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | text/html |
+| `/s4/privacidad-y-mis-derechos` | **404** | text/html |
+
+**Dictamen de aceptación:** AC-01 = NO, siete rutas 404 HTML; AC-02 = NO, no consta causa productiva confirmada ni corrección aplicada; AC-03 = `release_sha=null` explicado pero identidad Symfony no demostrada; AC-04 requiere `validate` terminal sobre el HEAD definitivo de esta rama. La [evidencia registrada en el Issue #903](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6640450516) conserva los metadatos íntegros. El 404 HTML de DSR no debe confundirse con el 404 JSON deliberado del controlador; Reports no está importada en el router, según #348. Pendiente decisión del dueño sobre contrato AC-01; no habilitar funcionalidad por inferencia.
+
+**Continuación segura:** obtener los 18 valores del resumen del run, identificar raíz real y dejar respaldos/restauración y rollback verificables antes de cualquier escritura autorizada. Conservar reserva V3 autenticada y lock tal cual; no alterar claims, forzar ref, repetir `/tomar` ni usar `/liberar-forzado` para fabricar las precondiciones. PR #907 continúa DRAFT sin CodeRabbit FINAL ni squash hasta aceptación productiva y validación exact-HEAD.
