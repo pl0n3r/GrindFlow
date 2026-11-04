@@ -44,6 +44,15 @@ class S4RoutePresenceTests(unittest.TestCase):
             public function query() {}
             #[Route('/a/../private', methods: ['GET'])]
             public function traversal() {}
+            #[Route(name: 'after_name', path: '/named', methods: ['GET'])]
+            public function named() {}
+            // #[Route('/line-comment', methods: ['GET'])]
+            # #[Route('/hash-comment', methods: ['GET'])]
+            /**
+             * Ejemplo: #[Route('/docblock-route', methods: ['GET'])]
+             */
+            /* #[Route('/block-comment', methods: ['GET'])] */
+            const SAMPLE = "#[Route('/literal-string', methods: ['GET'])]";
         }
         """
         with tempfile.TemporaryDirectory() as directory:
@@ -54,10 +63,34 @@ class S4RoutePresenceTests(unittest.TestCase):
             )
             self.assertEqual(
                 S4.get_routes(controllers),
-                ["/", "/both", "/extra", "/first", "/unrestricted"],
+                ["/", "/both", "/extra", "/first", "/named", "/unrestricted"],
             )
         with self.assertRaises(ValueError):
             S4.get_routes(Path(directory) / "absent")
+
+    def test_comment_example_is_not_probed(self) -> None:
+        php = """<?php
+        /**
+         * Example: #[Route('/phantom', methods: ['GET'])]
+         */
+        final class ExampleController {
+            #[Route(name: 'real', path: '/real', methods: ['GET'])]
+            public function real() {}
+        }
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "ExampleController.php").write_text(php, encoding="utf-8")
+            self.assertEqual(["/real"], S4.get_routes(Path(directory)))
+            seen = []
+            def fake_inspect(routes, base_url, **kwargs):
+                seen.extend(routes)
+                return [{"path": path, "status": 200, "result": "present"} for path in routes]
+            with mock.patch.object(S4, "inspect_routes", side_effect=fake_inspect), (
+                mock.patch.object(S4.urllib.request, "build_opener", side_effect=AssertionError("network"))
+            ), contextlib.redirect_stdout(io.StringIO()):
+                code = S4.main(["--controllers", directory, "--base-url", "https://example.org/s4"])
+            self.assertEqual(0, code)
+            self.assertEqual(["/real"], seen)
 
     def test_real_symfony_routes_are_inventoryable_without_network(self) -> None:
         routes = S4.get_routes()
@@ -164,15 +197,28 @@ class S4RoutePresenceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 S4.inspect_routes([], "https://example.org/s4", delay=bad_delay, timeout=bad_timeout)
 
+    def test_main_returns_inconclusive_for_500_and_503(self) -> None:
+        for status, result in ((500, "http_status"), (503, "service_unavailable")):
+            with self.subTest(status=status):
+                responses = [{"path": "/unavailable", "status": status, "result": result}]
+                output = io.StringIO()
+                with mock.patch.object(S4, "get_routes", return_value=["/unavailable"]), (
+                    mock.patch.object(S4, "inspect_routes", return_value=responses)
+                ), contextlib.redirect_stdout(output):
+                    code = S4.main(["--base-url", "https://example.org/s4"])
+                self.assertEqual(2, code)
+                self.assertEqual(["/unavailable"], json.loads(output.getvalue())["inconclusive"])
+
     def test_cli_list_only_never_opens_network(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             controller = Path(directory) / "ExampleController.php"
             controller.write_text("<?php #[Route('/ok', methods: ['GET'])]", encoding="utf-8")
             output = io.StringIO()
-            with mock.patch.object(S4, "fetch_status", side_effect=AssertionError("network")), (
+            with mock.patch.object(S4.urllib.request, "build_opener", side_effect=AssertionError("network")) as network, (
                 contextlib.redirect_stdout(output)
             ):
                 exit_code = S4.main(["--list-only", "--controllers", directory])
+            network.assert_not_called()
             self.assertEqual(0, exit_code)
             self.assertEqual({"routes": ["/ok"], "count": 1}, json.loads(output.getvalue()))
 
