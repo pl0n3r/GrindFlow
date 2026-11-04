@@ -136,3 +136,32 @@ La evidencia HTTP pública de las **siete respuestas 404** al 11:29:17Z permanec
 - La ruta Reports continúa fuera de \`symfony/config/routes.yaml\` por el alcance de producto #348, y DSR-CSRF debe seguir fallando cerrado fuera de tests por la puerta legal #457. **AC-01 literal (7 rutas no-404) requiere una decisión explícita del propietario**, no activar funciones deshabilitadas para falsear resultados.
 - **Puertas sin superar:** AC-01/AC-02 productivos, diagnóstico real autorizado, recibo previo de backup/restore y rollback para cualquier escritura en Hostinger, y aceptación de producto/privacidad. Mantener Issue #903 abierto y PR #907 DRAFT; la reconciliación de la rama **no es un despliegue ni valida producción**.
 - **Coordinación:** reserva V3 auténtica \`cbb53f02-a68b-4d1d-b118-4dfc4efea06d\` de \`trabajo/issue-903\`; referencia \`coordinacion/lock-issue-903\` preexistente. No borrar ni forzar la referencia; resolver con protocolo V3 si llega a reunirse evidencia de recuperación.
+
+
+## HTTP público post-merge confirmado — 4 de noviembre de 2026, 12:12–12:13 UTC
+
+<!-- GF903-PUBLIC-GET-121206-EXACTMAIN-177300B2-20261104 -->
+
+Sondeo GET de solo lectura desde un dispositivo autorizado con acceso público, sin cookies, credenciales, redirecciones seguidas, escritura ni invocación SSH. Se usó \`Cache-Control: no-cache\` y únicamente se conservaron método/ruta, status y MIME; la lectura JSON de tres endpoints de salud fue filtrada a \`commit/exact/version/release_sha/data.state\`.
+
+| Ruta GET pública | HTTP | MIME |
+| --- | ---: | --- |
+| \`/health\` | **200** | \`application/json\` |
+| \`/s4/health\` | **200** | \`application/json\` |
+| \`/s4/_bridge-readiness\` | **200** | \`application/json\` |
+| \`/s4/api/admin/library/collections\` | **404** | \`text/html\` |
+| \`/s4/api/admin/library/permissions\` | **404** | \`text/html\` |
+| \`/s4/api/admin/plans\` | **404** | \`text/html\` |
+| \`/s4/api/admin/rules/automation\` | **404** | \`text/html\` |
+| \`/s4/api/admin/reports/cross-module\` | **404** | \`text/html\` |
+| \`/s4/api/admin/privacy/data-subject-requests/csrf\` | **404** | \`text/html\` |
+| \`/s4/privacidad-y-mis-derechos\` | **404** | \`text/html\` |
+
+Identidad JSON pública obtenida en segunda consulta a las **12:13:22Z**:
+- \`/health\`: \`{"commit":"177300b29249b9deea5e5100967e56b8dd1758e9","exact":true,"version":"0.1.225"}\`.
+- \`/s4/health\`: \`{"release_sha":null,"version":"0.1.225"}\`.
+- \`/s4/_bridge-readiness\`: \`{"state":"ready_for_web_probe"}\`.
+
+Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es posterior al [S4 Runtime Prepare #41826197735](https://github.com/pl0n3r/GrindFlow/actions/runs/41826197735) en \`success\`. Confirma que el flujo de preparación no hizo disponibles las rutas AC-01; **no** certifica la causa del 404 ni un release SHA válido de Symfony. Dos rutas siguen ligadas a decisiones de producto y privacidad (#348 Reports no importado, #457 DSR protegido test-only) y no se deben abrir para simular un éxito.
+
+**Criterios al cierre de esta medición:** AC-01 = NO CUMPLIDO (7/7 HTTP 404); AC-02 = NO CUMPLIDO (causa S4 remota no diagnosticada y no existe repair autenticado); AC-03 = explicación documental de \`release_sha=null\`, no comprobación de archivo remoto; AC-04 = revalidar sobre HEAD definitivo de PR #907. **No se ejecutó SSH ni se tocó producción** desde este cambio documental; no se usaron secretos ni datos reales. El PR sigue DRAFT.
