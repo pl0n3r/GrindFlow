@@ -46,7 +46,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertIn("S4_DIAG_CONTROLLER_COLLECTIONS=MATCH", out.stdout)
         self.assertIn("S4_DIAG_CONTROLLER_PLANS=MISSING", out.stdout)
         self.assertIn("S4_DIAG_CACHE=MISSING", out.stdout)
-        self.assertIn("S4_DIAG_RESULT=READ_ONLY_INSPECTION", out.stdout)
+        self.assertIn("S4_DIAG_READ_ONLY=MATCH", out.stdout)
         self.assertNotIn(str(self.root), out.stdout + out.stderr)
         self.assertNotIn(self.sha, out.stdout + out.stderr)
         after = subprocess.check_output(["git", "status", "--porcelain"], cwd=self.root, text=True)
@@ -65,6 +65,36 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("S4_DIAG_ROUTE_IMPORT=DRIFT", result.stdout)
         self.assertEqual(content_before, file.read_bytes())
+
+
+    def test_each_diagnostic_value_is_in_the_approved_four_categories(self):
+        """Every output line is categorical, even on negative paths."""
+        import re
+
+        for case in (
+            (self.sha, ("--read-only",)),
+            ("0" * 40, ("--read-only",)),
+            (None, ("--read-only",)),
+            (self.sha, ("--not-allowed",)),
+        ):
+            with self.subTest(case=case):
+                result = self.run_inspection(case[0], *case[1])
+                for line in result.stdout.splitlines():
+                    self.assertRegex(
+                        line, r"^S4_DIAG_[A-Z_]+=(MATCH|DRIFT|MISSING|UNKNOWN)$"
+                    )
+                self.assertNotIn(self.sha, result.stdout + result.stderr)
+                self.assertNotIn(str(self.root), result.stdout + result.stderr)
+
+    def test_missing_route_literals_are_unknown_not_runtime_failure(self):
+        """Compiled Symfony routes may omit literal names after optimization."""
+        cache = self.root / "symfony/var/cache/prod"
+        cache.mkdir(parents=True)
+        (cache / "cached.php").write_text("<?php // optimized routes\n", encoding="utf8")
+        out = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(out.returncode, 0)
+        self.assertIn("S4_DIAG_CACHE=MATCH", out.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=UNKNOWN", out.stdout)
 
 
 if __name__ == "__main__":
