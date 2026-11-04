@@ -187,3 +187,26 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 - **GET público nuevo a 12:41:55 UTC** sin credenciales: \`/health\` indicó \`commit=177300b29249b9deea5e5100967e56b8dd1758e9\`, \`exact=true\`, \`version=0.1.225\`, mientras GitHub \`main=98af3115c42ea2aa45018ff78cebb98977c2075c\`. **El nuevo commit no estaba observado en salud productiva en ese instante.** No se atribuye causa; la próxima inspección SSH exact-main solo tendrá valor diagnóstico tras correlación de identidad productiva.
 - La última medición íntegra de endpoints posterior al main anterior sigue siendo 12:12–12:13Z: siete respuestas 404 HTML genérico y S4 \`release_sha=null\`. No se afirma resultado nuevo de esas siete rutas sobre \`98af3115…\`.
 - AC-01/AC-02 siguen **NO CUMPLIDOS**, y Reports (#348)/DSR (#457) conservan sus puertas de producto/privacidad. Sin cambio en Hostinger, caché, BD, archivos de configuración, datos reales ni credenciales. \`PR #907\` debe seguir \`DRAFT\` hasta causa, reparación con autorización/backups y HTTP posterior.
+
+
+## Confirmación post-merge de #927: HEALTH exact-main y SSH genérico — 4-nov-2026
+
+<!-- GF903-HTTP98AF-124344-ROUTER-FAIL-RUN41831886987 -->
+
+**Identidad productiva recuperada** mediante GET de solo lectura, sin credenciales, \`2026-11-04T12:43:44Z\`: \`/health\` JSON \`commit=98af3115c42ea2aa45018ff78cebb98977c2075c\`, \`exact=true\`, \`version=0.1.225\`; \`/s4/health\` JSON \`release_sha=null\`, \`version=0.1.225\`. [S4 Runtime Prepare #41831615257](https://github.com/pl0n3r/GrindFlow/actions/runs/41831615257) terminó \`success\` sobre ese main. **Éxito de prepare y salud no son validación de rutas.**
+
+**Siete GET públicos a \`2026-11-04T12:44:02Z\`, \`Cache-Control: no-cache\`, sin redirecciones ni credenciales:**
+
+| GET bajo \`/s4\` | HTTP | MIME |
+| --- | ---: | --- |
+| \`/api/admin/library/collections\` | 404 | \`text/html\` |
+| \`/api/admin/library/permissions\` | 404 | \`text/html\` |
+| \`/api/admin/plans\` | 404 | \`text/html\` |
+| \`/api/admin/rules/automation\` | 404 | \`text/html\` |
+| \`/api/admin/reports/cross-module\` | 404 | \`text/html\` |
+| \`/api/admin/privacy/data-subject-requests/csrf\` | 404 | \`text/html\` |
+| \`/privacidad-y-mis-derechos\` | 404 | \`text/html\` |
+
+**Diagnóstico SSH read-only posterior:** ejecución owner-only [#41831886987](https://github.com/pl0n3r/GrindFlow/actions/runs/41831886987), \`workflow_dispatch\`, \`run_attempt=1\`, \`actor=triggering_actor=pl0n3r\`, \`head_sha=98af3115c42ea2aa45018ff78cebb98977c2075c\`. Preflight exact-main, checkout y validación \`bash -n\` pasaron. Paso SSH \`Inspect Hostinger without production writes\` falló a 12:44:40Z con clasificación exacta **\`REMOTE_EXIT_1\`**, **no \`CHECKOUT_DRIFT\`**. Eso significa que la salida remota capturada **no era exactamente** el único marcador permitido \`S4_DIAG_CHECKOUT=DRIFT\`; NO permite concluir si fue \`cd\`, \`bash\`, salida adicional en stdout u otro exit remoto. \`stderr\` y stdout no fueron publicados. No repetir el mismo diagnóstico sin cambio dirigido.
+
+**Estado de aceptación:** AC-01 NO CUMPLIDO (7/7 404 HTML), AC-02 NO CUMPLIDO (sin causa remota ni reparación), AC-03 documentado \`release_sha=null\` sin marker validado, AC-04 sujeto al HEAD documental final. Conservar Reports fuera del alcance de #348 y DSR fail-closed de #457. No se efectuó SSH local directo, no hubo escritura productiva, modificación de caché, migraciones, datos reales ni exposición de secretos. PR #907 sigue DRAFT y NO MERGE.
