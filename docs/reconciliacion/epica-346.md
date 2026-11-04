@@ -16,6 +16,8 @@
 
 La única brecha demostrada de estos cinco criterios en el alcance **transversal offline** es el criterio **4**: la existencia de pruebas negativas en superficies específicas no demuestra que *todas* las rutas de logs/evidencia eliminen secretos y PII. Se abrió [#899](https://github.com/pl0n3r/GrindFlow/issues/899) para inventariar productores sensibles y probarlos sin usar valores reales. No duplicar #569, #668 ni #572, que ya acreditan sus superficies limitadas.
 
+La hoja #899 declara explícitamente `depends_on=[896]` y por ello no debe tomarse ni implementar pruebas bajo otra reserva hasta que esta auditoría se haya fusionado. Esto mantiene disjuntos los claims y preserva el orden de coordinación.
+
 **No proponer todavía el cierre de #346**: no se cumplen los cinco criterios, y el propio issue de auditoría excluye cerrarla sin aprobación del dueño. Cuando #899 esté fusionado con CI/Sonar/CodeQL y revisión final aplicable, releer `main`, contrastar la nueva cobertura, confirmar las puertas del HEAD exacto y solicitar la decisión explícita del dueño sobre la épica. Las verificaciones en live siguen siendo independientes.
 
 ## Validación de esta auditoría
