@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/s4-router-diagnostics.sh"
+WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/s4-router-diagnostics.yml"
 
 
 class S4RouterDiagnosticsTests(unittest.TestCase):
@@ -69,7 +70,6 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
 
     def test_each_diagnostic_value_is_in_the_approved_four_categories(self):
         """Every output line is categorical, even on negative paths."""
-        import re
 
         for case in (
             (self.sha, ("--read-only",)),
@@ -94,6 +94,53 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         out = self.run_inspection(self.sha, "--read-only")
         self.assertEqual(out.returncode, 0)
         self.assertIn("S4_DIAG_CACHE=MATCH", out.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=UNKNOWN", out.stdout)
+
+
+    def test_decimal_ssh_port_boundaries_from_workflow(self):
+        """Exercise the literal workflow validation without SSH or secrets."""
+        source = WORKFLOW.read_text(encoding="utf8").splitlines()
+        start = next((index for index, line in enumerate(source)
+                      if '[[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]]' in line), None)
+        self.assertIsNotNone(start, "The workflow must validate port characters")
+        end = next((index for index in range(start, len(source))
+                    if "(( SSH_PORT >= 1 && SSH_PORT <= 65535 ))" in source[index]), None)
+        self.assertIsNotNone(end, "The workflow must enforce port bounds")
+        commands = "\n".join(line.removeprefix("          ") for line in source[start:end + 1])
+        script = 'set -euo pipefail\n' + commands + '\nprintf "%s\\n" "$SSH_PORT"\n'
+        for value, expected in (("1", "1"), ("00001", "1"), ("080", "80"),
+                                ("09", "9"), ("65535", "65535"), ("0", None),
+                                ("65536", None), ("00000", None), ("09x", None),
+                                ("-1", None), ("", None), ("000001", None)):
+            with self.subTest(port=value):
+                result = subprocess.run(["bash", "-c", script], env={**os.environ, "SSH_PORT": value},
+                                        text=True, capture_output=True, timeout=5, check=False)
+                self.assertEqual(result.returncode == 0, expected is not None, result.stderr)
+                if expected is not None:
+                    self.assertEqual(result.stdout.strip(), expected)
+                else:
+                    self.assertEqual(result.stdout, "")
+
+    def test_compiled_route_cache_match_only_in_router_file(self):
+        """A synthetic router literal matches; unrelated files and absent routes do not."""
+        cache = self.root / "symfony/var/cache/prod"
+        cache.mkdir(parents=True)
+        route_literal = "/api/admin/library/collections"
+        (cache / "cached.php").write_text(f"<?php // {route_literal}\n", encoding="utf8")
+        out = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=UNKNOWN", out.stdout)
+
+        router_file = cache / "routes.php"
+        router_file.write_text(f"<?php return ['{route_literal}' => []];\n", encoding="utf8")
+        out = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=MATCH", out.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_PLANS=UNKNOWN", out.stdout)
+
+        router_file.write_text("<?php // other fixture route\n", encoding="utf8")
+        out = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("S4_DIAG_CACHE_ROUTE_COLLECTIONS=UNKNOWN", out.stdout)
 
 
