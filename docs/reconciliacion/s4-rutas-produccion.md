@@ -165,3 +165,14 @@ Identidad JSON pública obtenida en segunda consulta a las **12:13:22Z**:
 Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es posterior al [S4 Runtime Prepare #41826197735](https://github.com/pl0n3r/GrindFlow/actions/runs/41826197735) en \`success\`. Confirma que el flujo de preparación no hizo disponibles las rutas AC-01; **no** certifica la causa del 404 ni un release SHA válido de Symfony. Dos rutas siguen ligadas a decisiones de producto y privacidad (#348 Reports no importado, #457 DSR protegido test-only) y no se deben abrir para simular un éxito.
 
 **Criterios al cierre de esta medición:** AC-01 = NO CUMPLIDO (7/7 HTTP 404); AC-02 = NO CUMPLIDO (causa S4 remota no diagnosticada y no existe repair autenticado); AC-03 = explicación documental de \`release_sha=null\`, no comprobación de archivo remoto; AC-04 = revalidar sobre HEAD definitivo de PR #907. **No se ejecutó SSH ni se tocó producción** desde este cambio documental; no se usaron secretos ni datos reales. El PR sigue DRAFT.
+
+
+## Diagnóstico SSH owner-only exact-main ejecutado (4-nov-2026, 12:22 UTC)
+
+<!-- GF903-SSH-RUN-41828650940-REMOTE_EXIT_1-20261104 -->
+
+- **Acción autorizada de solo lectura:** se disparó el workflow [S4 Router Diagnostics #41828650940](https://github.com/pl0n3r/GrindFlow/actions/runs/41828650940) vía GitHub CLI autenticado como \`pl0n3r\`, sobre \`main@177300b29249b9deea5e5100967e56b8dd1758e9\` con \`workflow_dispatch\`; \`actor\` y \`triggering_actor\` del run son ambos \`pl0n3r\`.
+- **Pasos verificados en GitHub:** preflight owner+SHA exacto \`success\`; checkout \`success\`; \`bash -n scripts/s4-router-diagnostics.sh\` \`success\`; \`Inspect Hostinger without production writes\` **failure**, categoría de error sanitizada \`REMOTE_EXIT_1\` (log del job \`126569829977\` a 12:22:12 UTC). La revalidación de main posterior quedó \`skipped\` por el fallo. \`run_attempt=1\`; no se reintentó.
+- **Interpretación limitada:** salida SSH remota y stderr permanecen ocultos. Un exit 1 es compatible con \`S4_DIAG_CHECKOUT=DRIFT\` por el helper, pero también con otros fallos remotos; **NO se confirma deriva del checkout ni fallo de caché ni autenticación**. La herramienta actual descarta el texto categórico seguro del helper al fallar; un nuevo blocker [#926](https://github.com/pl0n3r/GrindFlow/issues/926) busca discriminar únicamente el marker exacto sin filtrar stdout arbitrario.
+- **Alcance:** no hubo migración, SQL, deploy, limpieza de caché, escritura sobre Hostinger, lectura de \`.env\`, datos reales, impresión de secretos ni cambio de runtime. El workflow es de inspección.
+- **Aceptación:** AC-01 sigue 7/7 HTTP 404 en la última comprobación exact-main de 12:12 UTC; AC-02 aún carece de causa autenticada y reparación certificada; AC-03 explica \`release_sha=null\` sin marker remoto verificado. **No fusionar ni solicitar CodeRabbit FINAL** sobre una matriz aún sin validación productiva.
