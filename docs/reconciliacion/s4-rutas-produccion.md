@@ -400,3 +400,35 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 **Dictamen de aceptación:** AC-01 = NO, siete rutas 404 HTML; AC-02 = NO, no consta causa productiva confirmada ni corrección aplicada; AC-03 = `release_sha=null` explicado pero identidad Symfony no demostrada; AC-04 requiere `validate` terminal sobre el HEAD definitivo de esta rama. La [evidencia registrada en el Issue #903](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6640450516) conserva los metadatos íntegros. El 404 HTML de DSR no debe confundirse con el 404 JSON deliberado del controlador; Reports no está importada en el router, según #348. Pendiente decisión del dueño sobre contrato AC-01; no habilitar funcionalidad por inferencia.
 
 **Continuación segura:** obtener los 18 valores del resumen del run, identificar raíz real y dejar respaldos/restauración y rollback verificables antes de cualquier escritura autorizada. Conservar reserva V3 autenticada y lock tal cual; no alterar claims, forzar ref, repetir `/tomar` ni usar `/liberar-forzado` para fabricar las precondiciones. PR #907 continúa DRAFT sin CodeRabbit FINAL ni squash hasta aceptación productiva y validación exact-HEAD.
+
+
+## Evidencia SRE exact-main y contrato de desbloqueo — 2026-11-04 20:24 UTC
+
+<!-- GF903-PROBE-20261104T202406Z -->
+
+**Medición ejecutada realmente:** `2026-11-04T20:24:06Z`, GET públicos anónimos de solo lectura contra `https://www.grindflow.com.co`, `Cache-Control: no-cache`, `--max-redirs 0`, sin cookies ni secretos y sin escribir en el host.
+
+| Endpoint completo (ruta relativa al dominio) | HTTP | MIME |
+| --- | ---: | --- |
+| `/health` | 200 | `application/json` |
+| `/s4/health` | 200 | `application/json` |
+| `/s4/_bridge-readiness` | 200 | `application/json` |
+| `/s4/` | 200 | `text/html` |
+| `/s4/login` | 200 | `text/html` |
+| `/s4/api/admin/library/collections` | **404** | `text/html` |
+| `/s4/api/admin/library/permissions` | **404** | `text/html` |
+| `/s4/api/admin/plans` | **404** | `text/html` |
+| `/s4/api/admin/rules/automation` | **404** | `text/html` |
+| `/s4/api/admin/reports/cross-module` | **404** | `text/html` |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | `text/html` |
+| `/s4/privacidad-y-mis-derechos` | **404** | `text/html` |
+
+**Consistencia:** el sondeo anterior de 20:18 UTC también reprodujo los siete 404 HTML. La identidad de Laravel previamente verificada en `/health` era `commit=e74497a7c4112c58516b6b3c8886870cade6c243`, `exact=true`, `version=0.1.225`; `/s4/health` seguía con `release_sha=null`. Estos datos no identifican el checkout/caché de Symfony. El [diagnóstico owner-only read-only #41899802049](https://github.com/pl0n3r/GrindFlow/actions/runs/41899802049) completó sus pasos correctamente, pero el output de las 18 categorías `S4_DIAG_*` fue escrito en `GITHUB_STEP_SUMMARY`, no aparece en logs/check-run API ni en artefactos descargables. No inferir su contenido, un fallo de autoload, ni un parche.
+
+**Bloqueador de coordinación comprobado en código, sin acción prohibida:** [Factory #2009](https://github.com/pl0n3r/Factory/issues/2009) está fusionado y cerrado; `factory/main/scripts/coordinar_trabajo.py` contiene `recover_live_owner_v3_orphaned_issue_lock` pero lo define literalmente como **offline-only; deliberately not wired to commands**. La etiqueta distribuida `Factory@v1`, ref `1e809674854ae9e9d3426f32413834709ab0c42d`, no contiene esa rutina. El consumer `GrindFlow/main/.github/workflows/work-coordination.yml` utiliza `coordinacion.yml@v1` y solamente acepta `/recuperar-lock-huerfano <sha40>`, que por diseño rechaza una reserva V3 todavía activa. La ref firmada `coordinacion/lock-issue-903@1a1f22412b4e81cc74bfe52603b61b1147497bb1` y la reserva legítima `cbb53f02-a68b-4d1d-b118-4dfc4efea06d` se preservan. Sin publicación protegida y habilitación serializada de ese nuevo protocolo, no hay comando seguro para quitar este lock sin cerrar el PR ni falsificar autoridad.
+
+**CI terminal exact-HEAD documental anterior `725ead1c723b2f6e2e805e2d2b27578a52b93fb1`:** `GrindFlow CI / validate`, `Factory CI reusable / Validar`, SonarCloud y CodeQL success. El run de Coordinación [#41904105288](https://github.com/pl0n3r/GrindFlow/actions/runs/41904105288) terminó failure (`Lock V3 ocupado para Issue #903; mutación denegada`). El run de Política [#41904105825](https://github.com/pl0n3r/GrindFlow/actions/runs/41904105825) acabó en `Check no verde: pr / Sincronizar PR=failure` (no error de snapshots en ese intento). Tras **este commit documental**, los checks deben evaluarse otra vez en el **nuevo HEAD**; nunca atribuir al HEAD nuevo resultados del anterior.
+
+**Aclaración de aceptación:** Reports #348 permanece fuera del import del router por decisión de producto; DSR #457 alcanza un 404 JSON `feature_unavailable` cuando el controlador deshabilitado es alcanzado, distinto del 404 HTML visto. No habilitar esos módulos para maquillar AC-01. Se mantiene el contrato original: **AC-01 NO, AC-02 NO; AC-03 nulo explicado, no SHA de Symfony confirmado; AC-04 requiere validate exact-HEAD nuevo**. La decisión A/B solicitada al owner y la comprobación de backup/restauración/rollback siguen pendientes. No se ha cambiado ni desplegado producción.
+
+**Secuencia mínima de desbloqueo (sin falsos positivos):** obtener los 18 indicadores sanitizados de diagnóstico, confirmar con ellos la causa y elegir el cambio operativo mínimo; antes de cualquier mutación del host cumplir D-059 y el permiso de reparación necesario; aplicar reparación con reversión verificada, volver a sondear siete rutas con la semántica aprobada; resolver el lock por comando owner-only serializado *publicado y autorizado*; registrar antes/después y causa confirmada; ejecutar `validate`/ `Validar` exact-HEAD y seguridad; pedir **una sola revisión FINAL de CodeRabbit** y fusionar squash solo con los gates esenciales realmente acreditados. Mantener #907 DRAFT y abierta mientras falten.
