@@ -301,3 +301,24 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 - Se verificó `S4 Runtime Prepare` `success` sobre el nuevo SHA (run #41846325392); esta conclusión por sí sola no acredita rutas productivas reparadas ni el estado terminal D-043.
 - El intento de iniciar la inspección OWNER-only del workflow `s4-router-diagnostics.yml` sobre `671bf8f3828f75a631243abb5964ec1a5625087f` **fue rechazado por los controles del entorno antes de la ejecución**; no se generó un run nuevo desde esa acción. No se reintentó por otra vía y no se hicieron cambios de host/caché/Composer/BD.
 - Persisten decisiones de producto y privacidad: Reports (#348) y DSR (#457) tienen comportamiento 404 previsto en ciertas condiciones. Se exige decisión del propietario para AC-01 antes de alterar esa semántica, más autorización/backup/rollback para cualquier reparación productiva según D-059. Mantener PR #907 DRAFT hasta evidencia auténtica.
+
+
+## Confirmación HTTP externa posterior — 4-nov-2026, 14:35:05 UTC
+<!-- GF903-HTTP-20261104-143505-671BF8 -->
+
+- **Sondeo GET público, solo lectura**, desde dispositivo conectado, con `Cache-Control: no-cache`, sin cookie, sesión, credencial, redirección manual ni envío de datos personales. Se recogieron únicamente estado HTTP, MIME y campos públicos acotados de `/health` / `/s4/health`; no se ejecutó SSH ni workflow de diagnóstico.
+- GitHub `main@671bf8f3828f75a631243abb5964ec1a5625087f` coincide con `GET /health` (**200 application/json**, `exact=true`). `GET /s4/health` = **200 application/json**, `release_sha=null`; `GET /s4/_bridge-readiness` = **200 application/json**.
+
+| GET bajo `/s4` | HTTP | MIME |
+| --- | ---: | --- |
+| `/api/admin/library/collections` | **404** | text/html |
+| `/api/admin/library/permissions` | **404** | text/html |
+| `/api/admin/plans` | **404** | text/html |
+| `/api/admin/rules/automation` | **404** | text/html |
+| `/api/admin/reports/cross-module` | **404** | text/html |
+| `/api/admin/privacy/data-subject-requests/csrf` | **404** | text/html |
+| `/privacidad-y-mis-derechos` | **404** | text/html |
+
+- **Veredicto QA/SRE:** incidente sin reparar: AC-01 7/7 rutas aún 404 HTML; AC-02 sin causa remota autenticada ni comando correctivo probado; AC-03 `release_sha` nulo comprobado, no inferir release Symfony por identidad Laravel. Esto **no valida producción** ni sustituye los gates operativos.
+- **Autoridad pendiente:** inspección owner-only productiva específica y reconciliación de aceptación para Reports #348 / DSR #457 (opciones A/B en el [comentario #6633307984](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6633307984)). Ninguna modificación Hostinger, rutas de producto o privacidad se autoriza por este documento. Backups/rollback verificados siguen siendo necesarios antes de escribir, incluso si `S4 Runtime Prepare` figura verde.
+- **Concurrencia:** conservar PR #907 DRAFT y reserva V3 `cbb53f02-a68b-4d1d-b118-4dfc4efea06d`; el lock `coordinacion/lock-issue-903` no debe forzarse/borrarse ni recuperarse mientras no se satisfaga el contrato del recuperador. CodeRabbit se solicita solo una vez sobre HEAD final con CI verde y aceptación auténtica.
