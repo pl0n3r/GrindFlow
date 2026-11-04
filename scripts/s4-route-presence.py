@@ -24,19 +24,49 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTROLLERS = ROOT / "symfony" / "src" / "Http" / "Controller"
 ATTRIBUTE = re.compile(r"#\[\s*Route\s*\(")
 PATH = re.compile(r"\s*(?:path\s*:\s*)?(['\"])(/[^'\"]*)\1", re.DOTALL)
+NAMED_PATH = re.compile(r"\bpath\s*:\s*(['\"])(/[^'\"]*)\1", re.DOTALL)
 METHODS = re.compile(r"\bmethods\s*:\s*(\[[^\]]*\]|['\"][^'\"]+['\"])", re.DOTALL)
 MAX_RESPONSE_BYTES = 8192
 
 
 def route_attributes(source: str) -> list[str]:
-    """Lee #[Route(...)] sin cortar en los corchetes de methods o requirements."""
+    """Extrae solo atributos PHP reales, nunca ejemplos en strings/comentarios."""
     attributes: list[str] = []
-    for marker in ATTRIBUTE.finditer(source):
+    cursor = 0
+    while cursor < len(source):
+        if source.startswith("//", cursor) or (
+            source[cursor] == "#" and not source.startswith("#[", cursor)
+        ):
+            end = source.find("\n", cursor)
+            cursor = len(source) if end < 0 else end + 1
+            continue
+        if source.startswith("/*", cursor):
+            end = source.find("*/", cursor + 2)
+            cursor = len(source) if end < 0 else end + 2
+            continue
+        if source[cursor] in ("'", '"'):
+            quote = source[cursor]
+            cursor += 1
+            while cursor < len(source):
+                if source[cursor] == "\\":
+                    cursor += 2
+                elif source[cursor] == quote:
+                    cursor += 1
+                    break
+                else:
+                    cursor += 1
+            continue
+        marker = ATTRIBUTE.match(source, cursor)
+        if marker is None:
+            cursor += 1
+            continue
+
         start = marker.end()
         depth = 1
         quote = None
         escaped = False
-        for position in range(start, len(source)):
+        position = start
+        while position < len(source):
             char = source[position]
             if quote is not None:
                 if escaped:
@@ -55,8 +85,9 @@ def route_attributes(source: str) -> list[str]:
                     if source[position + 1:].lstrip().startswith("]"):
                         attributes.append(source[start:position])
                     break
+            position += 1
+        cursor = position + 1
     return attributes
-
 
 def get_routes(controller_dir: Path = CONTROLLERS) -> list[str]:
     """Devuelve rutas GET literales sin parámetros, duplicados ni rutas mutantes."""
@@ -65,7 +96,7 @@ def get_routes(controller_dir: Path = CONTROLLERS) -> list[str]:
     routes: set[str] = set()
     for file in sorted(controller_dir.rglob("*.php")):
         for attribute in route_attributes(file.read_text(encoding="utf-8")):
-            match = PATH.match(attribute)
+            match = NAMED_PATH.search(attribute) or PATH.match(attribute)
             if match is None:
                 continue
             path = match.group(2)
@@ -178,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("Se exige --base-url salvo con --list-only.")
         results = inspect_routes(routes, args.base_url, delay=args.delay, timeout=args.timeout)
         missing = [row["path"] for row in results if row["result"] == "missing"]
-        inconclusive = [row["path"] for row in results if row["result"] in ("network_error", "unknown_404")]
+        inconclusive = [row["path"] for row in results if row["result"] not in ("present", "missing")]
         print(json.dumps({
             "base_url": validate_base_url(args.base_url),
             "checked": len(results),
