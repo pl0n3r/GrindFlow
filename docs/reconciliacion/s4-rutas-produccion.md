@@ -244,3 +244,14 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 
 - Resultado: AC-01 **NO** (7/7 404), AC-02 **NO** (falta causa remota y reparación verificable), AC-03 documenta `release_sha=null` sin prueba del marker remoto; AC-04 requiere CI terminal del HEAD documental final. Workflow de solo lectura no ejecutó producción, cachés, SQL, migraciones ni obtuvo datos reales.
 - Cambiar el enfoque de diagnosis: instrumentar de manera puramente read-only la etapa precisa donde se interrumpe el helper; nunca repetir `#41836592312` sin código observacional nuevo. Mantener PR #907 en DRAFT, con reserva V3 y lock existentes.
+
+
+## Localización del fallo en caché S4 — 4-nov-2026 13:41–13:43 UTC
+
+<!-- GF903-41840557961-PREFIX12-MAIN4BCDF-20261104 -->
+
+- [PR #931](https://github.com/pl0n3r/GrindFlow/pull/931) fusionado por squash; [#930](https://github.com/pl0n3r/GrindFlow/issues/930) cerrado. GitHub `main@4bcdf37f2d2e11e49fc68f6b306c6f8ef34b7191`, comprobado también en producción GET `/health` a 13:41:50 UTC con `exact=true`, `version=0.1.225`. GET `/s4/health` continúa `release_sha=null`.
+- [S4 Router Diagnostics #41840557961](https://github.com/pl0n3r/GrindFlow/actions/runs/41840557961), owner-only `pl0n3r`, dispatch exact-main, `run_attempt=1`. Preflight, checkout y `bash -n` exitosos; inspección SSH read-only falló a 13:42:37 UTC con categoría **`HELPER_VALID_PREFIX_12_OF_18`**. Esto confirma los doce primeros marcadores completos y correctamente ordenados (incluye `S4_DIAG_CACHE`), sin revelar valores reales; el fallo ocurre antes del campo 13, `S4_DIAG_CACHE_ROUTE_COLLECTIONS`, durante la enumeración/inspección de rutas compiladas.
+- La hipótesis de compatibilidad Bash de arreglos vacíos **no está confirmada**: en prueba sintética de Bash 3.2 con `set -euo pipefail`, el contador vacío y rama corta de grep finalizaron sin error. No se concluye falta de archivos cacheados, causa Composer o configuración de hPanel.
+- El nuevo resultado no demuestra reparación: último sondeo público integral 13:17 UTC sobre `main@20f15882…` seguía 7/7 HTTP 404 text/html. Sobre `4bcdf37f…` aún no se ha vuelto a medir esa matriz. AC-01/AC-02 **NO CUMPLIDOS** y #907 permanece DRAFT. No se han realizado modificaciones sobre Hostinger, SQL, caché, secretos, migraciones ni datos reales.
+- Próximo paso técnico admisible: endurecer el barrido del caché del helper de solo lectura con una salida fallback categórica controlada, probarla offline y solo entonces reejecutar una inspección owner-only para diagnosticar el router. Reports (#348) y DSR (#457) siguen condicionados por producto y revisión legal.
