@@ -109,3 +109,17 @@ Identidades públicas verificadas: Laravel `/health` afirma `exact=true`, `commi
 **AC-01: NO CUMPLIDO.** Las siete respuestas siguen siendo HTML 404; Reports `/api/admin/reports/cross-module` permanece fuera del import de rutas por decisión de producto [#348](https://github.com/pl0n3r/GrindFlow/issues/348), mientras DSR-CSRF requiere conservar 404 JSON `feature_unavailable` por la puerta [#457](https://github.com/pl0n3r/GrindFlow/issues/457) aun tras arreglar el router. El literal «siete no-404» no puede imponerse sin alterar alcance/producto/privacidad. **AC-02: NO CUMPLIDO:** todavía no hay causa raíz de runtime autenticada ni repair autorizado con backup y sondeo posterior. **AC-03:** se explica `release_sha=null`, pero falta corroborar marcador remoto. **AC-04:** CI del PR deberá corresponder al HEAD reconciliado final.
 
 Próxima comprobación segura: un disparo owner-only de `S4 Router Diagnostics` en el `main` exacto, con autorización específica para diagnóstico SSH de lectura. Contrastar indicadores `CHECKOUT`, hashes `CONTROLLER_*`, `AUTOLOAD`, `CACHE_ROUTE_*` y `RELEASE_MARKER` con este sondeo; no tocar `.env`, datos, migraciones, cachés ni secretos. Mantener PR #907 DRAFT y sin CodeRabbit hasta satisfacer la puerta operativa independiente y un contrato de aceptación legítimo.
+
+
+## Ejecución autenticada del workflow owner-only — 2026-11-04 11:34–11:36 UTC
+
+<!-- GF903-DIAGNOSTIC-RUN-41821996322-20261104 -->
+
+Se despachó **una vez** [S4 Router Diagnostics #41821996322](https://github.com/pl0n3r/GrindFlow/actions/runs/41821996322) mediante la cuenta GitHub owner `pl0n3r`, en `workflow_dispatch` contra el `main` exacto `3165f487b2fe705a9e55f59834732cb0fdafd62f`. El workflow está limitado a **SSH de solo lectura** y nunca solicita `bin/console`, Composer, reinicio, migraciones, caché ni despliegue.
+
+- Intento 1: `completed/failure`. En job `owner-only-s4-router-readonly`, los pasos de preflight exact-main, checkout y `bash -n` del helper fueron `success`. El paso `Inspect Hostinger without production writes` fue `failure` con error sanitizado `S4 read-only inspection failed; details withheld.`.
+- Se reintentaron **una sola vez** los jobs fallidos mediante GitHub Actions; intento 2: `completed/failure` en el **mismo** paso; el resto de preflights permaneció verde. No hay reporte categórico `S4_DIAG_*` confiable del remoto.
+- El workflow suprime intencionalmente stderr y contenido remoto no validado, por lo que **no se puede deducir** si el fallo ocurrió por autenticación, red, checkout remoto desactualizado, ejecución del helper o alguna condición segura de rechazo. No inventar `DRIFT` ni `MATCH`. Tampoco se imprimieron rutas privadas ni secretos en los resultados del incidente.
+- Dos fallos repetidos con idéntico preflight verde desaconsejan más reruns sin una corrección dirigida. La herramienta requiere un diagnóstico de transporte/autorización sanitizado adicional o acceso de operador autorizado; no extraer llaves ni realizar cambios productivos desde esta sesión.
+
+La evidencia HTTP pública de las **siete respuestas 404** al 11:29:17Z permanece válida e independiente de la falta de salida SSH. **AC-01/AC-02 permanecen NO CUMPLIDOS**. El ticket y PR deben seguir abiertos, el PR en DRAFT, y CodeRabbit se reserva para el HEAD definitivo con las puertas operativas satisfechas.
