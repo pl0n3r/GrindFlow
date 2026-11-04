@@ -52,6 +52,28 @@ En `symfony/src/Http/Controller/HealthController.php`, el campo `release_sha` pr
 - **Acceso y límites:** la sesión solo tiene GitHub de lectura/escritura, **no un canal autenticado aprobado de diagnóstico SSH/hPanel** para #903 ni constancia de backup/restore anterior a intervención. Las consultas públicas desde este entorno no resuelven DNS de `www.grindflow.com.co` y el lector web no obtiene la URL; no se efectuó una lectura actual de las rutas. Un workflow `success` o CI `validate` verde no convierte esa ausencia en `VALIDATED_IN_PRODUCTION`. No repetir el prepare productivo ni alterar Symfony/Hostinger/caché sin permiso/backup; no abrir otra hoja duplicada para #348.
 - **Próxima acción ejecutable:** obtener autorización específica para `debug:router` y lectura sanitaria de SHA, controladores y caché en el checkout actual; separar seis 404 de la exclusión intencional de Reports. Tras un cambio reversible expresamente aprobado, repetir GET y anotar hora, SHA, los seis HTTP y su causa; tramitar AC-01 conforme al contrato renovado **con autoridad**, luego pasar CI exact-HEAD y una sola revisión CodeRabbit FINAL antes de quitar DRAFT.
 
+## Sondeo público nuevo y discriminación del router — 2026-11-04T09:38:48Z
+<!-- GF903-S4-GET-9H38-20261104 -->
+
+Se ejecutaron **diez GET públicos de solo lectura**, sin cookies, credenciales, seguimientos de redirecciones ni persistencia del HTML, sobre `https://www.grindflow.com.co` desde un equipo conectado y autorizado. El código de diagnóstico limitó la lectura a 16 KiB por respuesta y registró solo ruta, HTTP, clase MIME y el indicador de página genérica Symfony. El instante es UTC del equipo que efectuó la comprobación; el sondeo no autentica acceso privado a Hostinger.
+
+| GET | HTTP nuevo | MIME | Evidencia acotada |
+| --- | --- | --- | --- |
+| `/health` | 200 | `application/json` | `exact=true`, `commit=main@a1e985b39b31211a48eeddbcaaa78cd2101011b1` |
+| `/s4/health` | 200 | `application/json` | `version=0.1.225`, `release_sha=null` |
+| `/s4/_bridge-readiness` | 200 | `application/json` | `data.state=ready_for_web_probe` |
+| `/s4/api/admin/library/collections` | **404** | `text/html` | Symfony genérico = true |
+| `/s4/api/admin/library/permissions` | **404** | `text/html` | Symfony genérico = true |
+| `/s4/api/admin/plans` | **404** | `text/html` | Symfony genérico = true |
+| `/s4/api/admin/rules/automation` | **404** | `text/html` | Symfony genérico = true |
+| `/s4/api/admin/reports/cross-module` | **404** | `text/html` | Symfony genérico = true; ruta fuera de import en fuente |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | `text/html` | Symfony genérico = true; **no** es el JSON `feature_unavailable` que produciría el controlador test-only |
+| `/s4/privacidad-y-mis-derechos` | **404** | `text/html` | Symfony genérico = true |
+
+**Comparación con 02:05:18Z:** las siete rutas siguen devolviendo un 404 genérico tras [`S4 Runtime Prepare` #41792542574](https://github.com/pl0n3r/GrindFlow/actions/runs/41792542574), ejecutado sobre `main@a1e985b…` a las 07:28 UTC. La coincidencia temporal demuestra que la preparación de dependencias **no reparó el registro HTTP**, pero **no identifica por sí sola** caché, PHP OPcache, archivos del checkout o configuración como causa raíz. Las cinco rutas funcionales y el endpoint DSR deben ser diagnosticados en el mapa de rutas efectivo de producción; el controlador Reports permanece excluido **por diseño**. Un `release_sha=null` no permite atribuir la identidad exacta del proceso Symfony aunque Laravel coincida con `main`.
+
+**Resultado de aceptación:** AC-01 sigue **NO CUMPLIDO**; AC-02 sigue **NO CUMPLIDO** mientras no exista diagnóstico autenticado y reparación verificada; AC-03 tiene explicación de código pero no marcador remoto válido; AC-04 debe revalidarse sobre el HEAD documental definitivo. No se ejecutó escritura, limpieza de caché, migración, cambio de entorno ni despliegue.
+
 ## Reentrada, controles y rollback
 
 1. Antes de una consulta autenticada por SSH/hPanel o cualquier escritura, obtener autorización específica y evidencia de backup/restore y reversión según [AGENTS.md](../../AGENTS.md), [docs/DEPLOY-HOSTINGER.md](../DEPLOY-HOSTINGER.md), D-043/D-059 y el alcance explícito de #903. **No se ha otorgado ni usado ese acceso en esta conciliación.**
