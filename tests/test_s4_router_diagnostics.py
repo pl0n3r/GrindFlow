@@ -108,9 +108,10 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertIsNotNone(end, "The workflow must enforce port bounds")
         commands = "\n".join(line.removeprefix("          ") for line in source[start:end + 1])
         script = 'set -euo pipefail\n' + commands + '\nprintf "%s\\n" "$SSH_PORT"\n'
-        for value, expected in (("080", "80"), ("09", "9"), ("65535", "65535"),
-                                ("0", None), ("65536", None), ("00000", None),
-                                ("09x", None), ("-1", None)):
+        for value, expected in (("1", "1"), ("00001", "1"), ("080", "80"),
+                                ("09", "9"), ("65535", "65535"), ("0", None),
+                                ("65536", None), ("00000", None), ("09x", None),
+                                ("-1", None), ("", None), ("000001", None)):
             with self.subTest(port=value):
                 result = subprocess.run(["bash", "-c", script], env={**os.environ, "SSH_PORT": value},
                                         text=True, capture_output=True, timeout=5, check=False)
