@@ -164,7 +164,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         fake_ssh = bindir / "ssh"
         fake_ssh.write_text(
             "#!/bin/bash\n"
-            "printf '%s\\n' \"${MOCK_SSH_STDOUT:-UNSAFE_SYNTHETIC_STDOUT}\"\n"
+            "printf '%s\\n' \"${MOCK_SSH_STDOUT-UNSAFE_SYNTHETIC_STDOUT}\"\n"
             "printf '%s\\n' 'UNSAFE_SYNTHETIC_STDERR' >&2\n"
             "exit \"${MOCK_SSH_EXIT}\"\n", encoding="utf8"
         )
@@ -174,6 +174,19 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         (scripts / "s4-router-diagnostics.sh").write_text(
             SCRIPT.read_text(encoding="utf8"), encoding="utf8"
         )
+        # A complete remote helper emits precisely these 18 ordered fields.
+        valid_lines = tuple(
+            f"S4_DIAG_{label}=MATCH" for label in (
+                "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_COLLECTIONS",
+                "CONTROLLER_PLANS", "CONTROLLER_AUTOMATION", "CONTROLLER_PRIVACY",
+                "CONTROLLER_DSR", "CONTROLLER_REPORTS", "COMPOSER_LOCK",
+                "AUTOLOAD", "RELEASE_MARKER", "CACHE",
+                "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
+                "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
+                "CACHE_ROUTE_DSR", "READ_ONLY",
+            )
+        )
+        self.assertEqual(len(valid_lines), 18)
         for exit_code, expected, output in (
             (255, "TRANSPORT_OR_REMOTE_255", "UNSAFE_SYNTHETIC_STDOUT"),
             (1, "REMOTE_EXIT_1_EMPTY_STDOUT", ""),
@@ -184,15 +197,23 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
             (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=DRIFT"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT_FAKE"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\rUNSAFE_SYNTHETIC_STDOUT"),
-            (1, "HELPER_STARTED_EXIT_1", "S4_DIAG_CHECKOUT=MATCH"),
+            (1, "HELPER_VALID_PREFIX_01_OF_18", valid_lines[0]),
+            (1, "HELPER_VALID_PREFIX_03_OF_18", "\n".join(valid_lines[:3])),
+            (1, "HELPER_VALID_PREFIX_18_OF_18", "\n".join(valid_lines)),
             (1, "HELPER_STARTED_EXIT_1",
              "S4_DIAG_CHECKOUT=MATCH\nUNSAFE_SYNTHETIC_STDOUT"),
+            (1, "HELPER_STARTED_EXIT_1",
+             "\n".join((valid_lines[0], valid_lines[2]))),
+            (1, "HELPER_STARTED_EXIT_1", "\n".join(valid_lines) +
+             "\nUNSAFE_SYNTHETIC_STDOUT"),
             (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=MATCH"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=MATCH_FAKE"),
             (2, "REMOTE_EXIT_2", "UNSAFE_SYNTHETIC_STDOUT"),
             (17, "REMOTE_EXIT_OTHER", "UNSAFE_SYNTHETIC_STDOUT"),
         ):
             with self.subTest(exit_code=exit_code, output=output):
+                summary = self.root / "summary"
+                summary.unlink(missing_ok=True)
                 env = {
                     **os.environ,
                     "PATH": str(bindir) + os.pathsep + os.environ.get("PATH", ""),
@@ -205,7 +226,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                     "GIT_ROOT": "/synthetic/checkout",
                     "DEPLOY_SSH_KEY": "synthetic-private-key",
                     "HOSTINGER_KNOWN_HOSTS": "synthetic-known-hosts",
-                    "GITHUB_STEP_SUMMARY": str(self.root / "summary"),
+                    "GITHUB_STEP_SUMMARY": str(summary),
                 }
                 result = subprocess.run(
                     ["bash", "-c", shell], cwd=self.root, env=env,
@@ -213,7 +234,8 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn(f"failed ({expected}); details withheld.", result.stdout)
-                public = result.stdout + result.stderr
+                summary_text = summary.read_text(encoding="utf8") if summary.exists() else ""
+                public = result.stdout + result.stderr + summary_text
                 self.assertNotIn("UNSAFE_SYNTHETIC", public)
                 self.assertNotIn("S4_DIAG_CHECKOUT=DRIFT", public)
                 self.assertNotIn("S4_DIAG_CHECKOUT=MATCH", public)
