@@ -1,0 +1,100 @@
+name: S4 Router Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grindflow-s4-router-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: owner-only-s4-router-readonly
+    if: >-
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SSH_HOST: ${{ vars.HOSTINGER_SSH_HOST }}
+      SSH_USER: ${{ vars.HOSTINGER_SSH_USER }}
+      SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT }}
+      GIT_ROOT: ${{ vars.HOSTINGER_GIT_ROOT }}
+    steps:
+      - id: trusted
+        name: Fail closed unless the dispatch is exact current-main
+        shell: bash
+        env:
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          remote="$(git ls-remote --heads "https://github.com/$GITHUB_REPOSITORY.git" refs/heads/main)"
+          [[ "$(printf '%s\n' "$remote" | grep -c .)" == '1' ]] || exit 1
+          observed="$(awk 'NR == 1 {print $1}' <<<"$remote")"
+          name="$(awk 'NR == 1 {print $2}' <<<"$remote")"
+          [[ "$name" == 'refs/heads/main' && "$observed" == "$EVENT_SHA" ]] || {
+            echo '::error::Dispatch is not exact current-main'; exit 1;
+          }
+          echo "sha=$observed" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ steps.trusted.outputs.sha }}
+
+      - name: Validate allowlisted read-only helper
+        shell: bash
+        run: bash -n scripts/s4-router-diagnostics.sh
+
+      - name: Inspect Hostinger without production writes
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.trusted.outputs.sha }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$SSH_HOST" =~ ^[A-Za-z0-9.-]+$ && "$SSH_HOST" != -* ]] || exit 1
+          [[ "$SSH_USER" =~ ^[A-Za-z0-9._-]+$ && "$SSH_USER" != -* ]] || exit 1
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] || exit 1
+          (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || exit 1
+          [[ "$GIT_ROOT" =~ ^/[A-Za-z0-9._/-]+$ && "$GIT_ROOT" != '/' && "$GIT_ROOT" != *..* && "$GIT_ROOT" != *//* ]] || exit 1
+          [[ -n "$DEPLOY_SSH_KEY" && -n "$HOSTINGER_KNOWN_HOSTS" ]] || {
+            echo '::error::SSH material is not configured'; exit 1;
+          }
+          secret_dir="$(mktemp -d)"
+          trap 'rm -rf "$secret_dir"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$secret_dir/key"
+          printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$secret_dir/known_hosts"
+          chmod 0600 "$secret_dir/key" "$secret_dir/known_hosts"
+          ssh -p "$SSH_PORT" -i "$secret_dir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$secret_dir/known_hosts" -o ConnectTimeout=10 \
+            "$SSH_USER@$SSH_HOST" \
+            "cd '$GIT_ROOT' && EXPECTED_SHA='$EXPECTED_SHA' bash -s -- --read-only" \
+            < scripts/s4-router-diagnostics.sh
+
+      - name: Revalidate exact main after remote read-only inspection
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.trusted.outputs.sha }}
+        run: |
+          set -euo pipefail
+          remote="$(git ls-remote --heads "https://github.com/$GITHUB_REPOSITORY.git" refs/heads/main)"
+          name="$(awk 'NR == 1 {print $2}' <<<"$remote")"
+          observed="$(awk 'NR == 1 {print $1}' <<<"$remote")"
+          [[ "$name" == 'refs/heads/main' && "$observed" == "$EXPECTED_SHA" ]] || {
+            echo '::error::main moved during read-only diagnostics'; exit 1;
+          }
+          {
+            echo '## S4 router inspection (read-only)'
+            echo
+            echo 'The command only compared tracked files, checked cache route strings and read the release marker.'
+            echo 'Read-only inspection is not a deploy, route repair or production acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
