@@ -322,3 +322,26 @@ Esta medición **sí** corresponde al nuevo main de código \`177300b2…\` y es
 - **Veredicto QA/SRE:** incidente sin reparar: AC-01 7/7 rutas aún 404 HTML; AC-02 sin causa remota autenticada ni comando correctivo probado; AC-03 `release_sha` nulo comprobado, no inferir release Symfony por identidad Laravel. Esto **no valida producción** ni sustituye los gates operativos.
 - **Autoridad pendiente:** inspección owner-only productiva específica y reconciliación de aceptación para Reports #348 / DSR #457 (opciones A/B en el [comentario #6633307984](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6633307984)). Ninguna modificación Hostinger, rutas de producto o privacidad se autoriza por este documento. Backups/rollback verificados siguen siendo necesarios antes de escribir, incluso si `S4 Runtime Prepare` figura verde.
 - **Concurrencia:** conservar PR #907 DRAFT y reserva V3 `cbb53f02-a68b-4d1d-b118-4dfc4efea06d`; el lock `coordinacion/lock-issue-903` no debe forzarse/borrarse ni recuperarse mientras no se satisfaga el contrato del recuperador. CodeRabbit se solicita solo una vez sobre HEAD final con CI verde y aceptación auténtica.
+
+
+## Evidencia de QA/SRE sobre main exacto y CI — 4-nov-2026, 16:39 UTC
+
+<!-- GF903-OFFLINE-EXACTMAIN-1639-20261104 -->
+
+- **Origen verificable:** sondeo GET público anónimo del 4-nov-2026 a las **16:39:12 UTC**, ya registrado en [issue #903, comentario de reconciliación](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6633437029). Solicitudes de solo lectura con `Cache-Control: no-cache`; sin login, cookies, redirecciones, secretos ni acciones de host.
+- **Identidad productiva comprobada:** GitHub `main@e74497a7c4112c58516b6b3c8886870cade6c243` coincide con `GET /health` HTTP **200 JSON**, `commit=e74497a7c4112c58516b6b3c8886870cade6c243`, `exact=true`, `version=0.1.225`. Esto demuestra identidad del runtime Laravel, **no** del release Symfony.
+- `GET /s4/health` = **200 JSON**, `release_sha=null`, `version=0.1.225`; `GET /s4/_bridge-readiness` = **200 JSON**. El estado de Symfony sigue sin identidad de release verificable.
+
+| GET público en `https://www.grindflow.com.co` | HTTP | MIME |
+| --- | ---: | --- |
+| `/s4/api/admin/library/collections` | **404** | text/html |
+| `/s4/api/admin/library/permissions` | **404** | text/html |
+| `/s4/api/admin/plans` | **404** | text/html |
+| `/s4/api/admin/rules/automation` | **404** | text/html |
+| `/s4/api/admin/reports/cross-module` | **404** | text/html |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | text/html |
+| `/s4/privacidad-y-mis-derechos` | **404** | text/html |
+
+- **Checks del PR #907 anteriores a esta actualización documental:** `trabajo/issue-903@d33d77da3abd84a2ffc8ef4be5b3b6a0995de207` (`main` reconciliado, `behind=0`): `GrindFlow CI`, `CI Factory v1`, `Privacidad`, `Aceptación ejecutable` y `Etiquetas` completaron `success`. `Coordinación` [run #41866765437](https://github.com/pl0n3r/GrindFlow/actions/runs/41866765437) terminó `failure` por `Lock V3 ocupado para Issue #903; mutación denegada.`; `Política Factory v1` [run #41866765460](https://github.com/pl0n3r/GrindFlow/actions/runs/41866765460), reintentada una vez con checks terminales, terminó `failure` por `Check no verde: pr / Sincronizar PR=failure.`. No atribuir checks anteriores al HEAD generado por esta actualización: exigir evaluación exact-HEAD nueva.
+- **Criterios reales:** AC-01 = **NO** (7/7 rutas 404), AC-02 = **NO** (causa en host sin confirmar y ningún workflow reparador autorizado ejecutado en este frente); AC-03 = `release_sha=null` explicado, no dar identidad Symfony como verificada; AC-04 depende de `validate` exact-HEAD y política de merge aplicable. El check automático `Aceptación ejecutable=success` no reemplaza la aceptación humana/productiva.
+- **Puertas:** PR #907 permanece DRAFT, sin CodeRabbit FINAL ni squash. El workflow `S4 Router Diagnostics` es owner-only sobre `main` y requiere autorización operativa específica; no se hizo SSH ni se tocó Hostinger. Antes de cualquier operación de escritura exige autorización diferenciada, backup/restore y rollback verificados (D-059). Reports #348 requiere decisión de producto, DSR #457 dictamen jurídico verificable; no cambiar semántica de estas rutas sin esas autoridades. El lock de coordinación no se recupera con lease V3 activa; no forzar ni ocultar la colisión.
