@@ -88,7 +88,15 @@ jobs:
             ssh_rc=$?
             case "$ssh_rc" in
               255) category=TRANSPORT_OR_REMOTE_255 ;;
-              1) category=REMOTE_EXIT_1 ;;
+              1)
+                # Detect the helper's single safe marker without publishing stdout.
+                # Anything else remains a generic remote exit-one error.
+                if [[ "$diagnostics" == 'S4_DIAG_CHECKOUT=DRIFT' ]]; then
+                  category=CHECKOUT_DRIFT
+                else
+                  category=REMOTE_EXIT_1
+                fi
+                ;;
               2) category=REMOTE_EXIT_2 ;;
               *) category=REMOTE_EXIT_OTHER ;;
             esac
