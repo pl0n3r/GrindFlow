@@ -132,7 +132,7 @@ class VerificacionGrindflow02Tests(unittest.TestCase):
                 source_evidence(row, files)
             if row[3]:
                 altered = dict(self.files)
-                altered[row[3]] = altered[row[3]].replace(row[4], "", 1)
+                altered[row[3]] = altered[row[3]].replace(row[4], "")
                 with self.subTest(proof=row[0]), self.assertRaisesRegex(AssertionError, "UNKNOWN"):
                     source_evidence(row, altered)
 
@@ -142,7 +142,7 @@ class VerificacionGrindflow02Tests(unittest.TestCase):
                      {"owner_approved": True}, {"deployment": "healthy"}):
             self.assertEqual(promote(fake), "NO_ACREDITADO")
         own = Path(__file__).read_text(encoding="utf-8")
-        self.assertNotRegex(own, r"(?m)^\\s*(?:import|from)\\s+(?:requests|urllib|socket|httpx)\\b")
+        self.assertNotRegex(own, r"(?m)^\s*(?:import|from)\s+(?:requests|urllib|socket|httpx)\b")
         self.assertNotIn("subprocess.run", own)
         self.assertNotRegex(own, r"-----BEGIN (?:RSA |OPENSSH )?PRIVATE KEY-----")
 
