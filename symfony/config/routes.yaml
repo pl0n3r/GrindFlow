@@ -4,6 +4,12 @@ controllers:
     namespace: GrindFlow\Http\Controller
   type: attribute
 
+reports:
+  resource:
+    path: ../src/Http/Reports/
+    namespace: GrindFlow\Http\Reports
+  type: attribute
+
 staff_ops:
   resource: .
   type: grindflow_ops
