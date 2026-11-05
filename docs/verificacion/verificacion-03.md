@@ -40,7 +40,7 @@ Dictamen `PARCIAL`: hay una aserción de contrato local, aún no está probado e
 
 ## Pruebas y reversión
 
-- `python3 -m unittest -v tests/test_verificacion_grindflow_03.py` inspecciona 25 IDs únicos de matriz/informe, textos delimitados por sección, aserciones ejecutables de cada suite y conservadurismo de estados. Incluye mutaciones negativas y ejecuta los seis tests de fallo cerrado existentes.
+- `python3 -m unittest -v tests/test_verificacion_grindflow_03.py` inspecciona 25 IDs únicos de matriz/informe, textos delimitados por sección, aserciones ejecutables de cada suite y conservadurismo de estados. Incluye mutaciones negativas y ejecuta doce tests previos: seis `test_contrato_principal` positivos y seis `test_falla_cerrado` negativos, todos con fuentes versionadas y datos sintéticos.
 - Los suites existentes validan contratos de código y ejemplos sintéticos; no se declara que hayan pasado en producción. `SPEC:030` requiere observar la identidad real servida, y `SPEC:033` exige un smoke autorizado y autenticado de los módulos sin mutaciones.
 - AC-03: exigir `Factory CI reusable / Validar` y `GrindFlow CI / validate` exact-HEAD terminales `success`, SonarCloud y CodeQL, y una sola revisión CodeRabbit FINAL cuando el CI esté verde.
 - Fuera de alcance: go-live, permisos, datos reales, proveedor, secretos, pagos, jobs externos, publicación, borrar legado, modificar la matriz o declarar producción validada.
