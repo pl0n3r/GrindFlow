@@ -496,25 +496,25 @@ No se han hecho escrituras en producción, movimientos de `v1`, cambios de lock/
 
 <!-- GF903-POSTPREPARE-EVIDENCE-20261105T014500Z -->
 
-La [corrida S4 Runtime Prepare #41867363828](https://github.com/pl0n3r/GrindFlow/actions/runs/41867363828) se disparó a partir de [GrindFlow Deploy Observer #41866216795](https://github.com/pl0n3r/GrindFlow/actions/runs/41866216795) del \`push\` de \`main@e74497a7c4112c58516b6b3c8886870cade6c243\`. En la corrida \`S4 Runtime Prepare\` el job \`exact-s4-runtime-prepare\` terminó en \`success\`, con éxito comprobado para los pasos de SHA exacto, obtención del helper desde ese SHA, **preparación de dependencias Symfony en el checkout hPanel**, segunda verificación de SHA y prueba del bridge. No se deduce de ello que el mapa de rutas Symfony se haya reconstruido ni que las rutas estén operativas.
+La [corrida S4 Runtime Prepare #41867363828](https://github.com/pl0n3r/GrindFlow/actions/runs/41867363828) se disparó a partir de [GrindFlow Deploy Observer #41866216795](https://github.com/pl0n3r/GrindFlow/actions/runs/41866216795) del `push` de `main@e74497a7c4112c58516b6b3c8886870cade6c243`. En la corrida `S4 Runtime Prepare` el job `exact-s4-runtime-prepare` terminó en `success`, con éxito comprobado para los pasos de SHA exacto, obtención del helper desde ese SHA, **preparación de dependencias Symfony en el checkout hPanel**, segunda verificación de SHA y prueba del bridge. No se deduce de ello que el mapa de rutas Symfony se haya reconstruido ni que las rutas estén operativas.
 
-Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa preparación, registró el siguiente resultado a las **2026-11-05T01:45:00Z** contra \`https://www.grindflow.com.co\`:
+Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa preparación, registró el siguiente resultado a las **2026-11-05T01:45:00Z** contra `https://www.grindflow.com.co`:
 
 | Ruta | HTTP observado | Tipo de respuesta |
 | --- | ---: | --- |
-| \`/health\` | 200 | JSON |
-| \`/s4/health\` | 200 | JSON |
-| \`/s4/_bridge-readiness\` | 200 | JSON |
-| \`/s4/api/admin/library/collections\` | **404** | HTML |
-| \`/s4/api/admin/library/permissions\` | **404** | HTML |
-| \`/s4/api/admin/plans\` | **404** | HTML |
-| \`/s4/api/admin/rules/automation\` | **404** | HTML |
-| \`/s4/api/admin/reports/cross-module\` | **404** | HTML |
-| \`/s4/api/admin/privacy/data-subject-requests/csrf\` | **404** | HTML |
-| \`/s4/privacidad-y-mis-derechos\` | **404** | HTML |
+| `/health` | 200 | JSON |
+| `/s4/health` | 200 | JSON |
+| `/s4/_bridge-readiness` | 200 | JSON |
+| `/s4/api/admin/library/collections` | **404** | HTML |
+| `/s4/api/admin/library/permissions` | **404** | HTML |
+| `/s4/api/admin/plans` | **404** | HTML |
+| `/s4/api/admin/rules/automation` | **404** | HTML |
+| `/s4/api/admin/reports/cross-module` | **404** | HTML |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | HTML |
+| `/s4/privacidad-y-mis-derechos` | **404** | HTML |
 
-**Conclusión delimitada:** ejecutar de nuevo Composer mediante el mismo \`S4 Runtime Prepare\`, sin evidencia nueva, no tiene una justificación causal: **ya se ejecutó correctamente sobre el SHA observado, pero las siete rutas persistieron en 404**. El resultado no distingue por sí solo entre caché obsoleta, falta de registro de controladores, configuración de imports u otra causa. Una corrida \`success\` no equivale a aceptación productiva.
+**Conclusión delimitada:** ejecutar de nuevo Composer mediante el mismo `S4 Runtime Prepare`, sin evidencia nueva, no tiene una justificación causal: **ya se ejecutó correctamente sobre el SHA observado, pero las siete rutas persistieron en 404**. El resultado no distingue por sí solo entre caché obsoleta, falta de registro de controladores, configuración de imports u otra causa. Una corrida `success` no equivale a aceptación productiva.
 
-**Siguiente diagnóstico seguro:** inspeccionar de forma autenticada y **solo lectura** el mapa de \`debug:router\`, la importación de rutas por atributos, el autoload real, la caché Symfony efectiva y la identidad del checkout remoto. Si se requiere reconstruir caché, hacerlo únicamente con destino y SHA verificables, respaldo previo y procedimiento de reversión autorizado. Respetar los límites funcionales de Reports #348 y DSR #457: no habilitar prestaciones retiradas por producto o privacidad solo para producir códigos HTTP diferentes.
+**Siguiente diagnóstico seguro:** inspeccionar de forma autenticada y **solo lectura** el mapa de `debug:router`, la importación de rutas por atributos, el autoload real, la caché Symfony efectiva y la identidad del checkout remoto. Si se requiere reconstruir caché, hacerlo únicamente con destino y SHA verificables, respaldo previo y procedimiento de reversión autorizado. Respetar los límites funcionales de Reports #348 y DSR #457: no habilitar prestaciones retiradas por producto o privacidad solo para producir códigos HTTP diferentes.
 
-**Gobernanza:** evidencia asimismo registrada en [comentario #6647378363 de #903](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6647378363). Factory #2016 mantiene pendiente su decisión OWNER para publicar 1.0.49 y activar el caller CAS V3 de #935/PR #937; por tanto no se ha recuperado el lock de #903. El presente cambio es **documental y offline**: no se tocó producción, caché, secretos, locks, \`Factory@v1\`, SQL ni datos. **AC-01 y AC-02 siguen incumplidos**, y CodeRabbit FINAL permanece sin solicitar.
+**Gobernanza:** evidencia asimismo registrada en [comentario #6647378363 de #903](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6647378363). Factory #2016 mantiene pendiente su decisión OWNER para publicar 1.0.49 y activar el caller CAS V3 de #935/PR #937; por tanto no se ha recuperado el lock de #903. El presente cambio es **documental y offline**: no se tocó producción, caché, secretos, locks, `Factory@v1`, SQL ni datos. **AC-01 y AC-02 siguen incumplidos**, y CodeRabbit FINAL permanece sin solicitar.
