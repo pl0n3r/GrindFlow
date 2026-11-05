@@ -47,8 +47,10 @@ def report_rows(raw: str) -> dict[str, list[str]]:
     )[0]
     found = {}
     for line in section.splitlines():
-        if not line.startswith("| REQ:GF-"):
+        if not re.match(r"^\|\s*REQ:GF-", line.lstrip()):
             continue
+        if not line.startswith("| REQ:GF-"):
+            raise ValueError("UNKNOWN: fila indentada o malformada")
         cells = [part.strip() for part in line.strip("|").split("|")]
         if (len(cells) != 7 or cells[0] in found or
                 cells[0] not in EXPECTED):
@@ -76,15 +78,39 @@ def method_has_assertion(path: str, source: str) -> bool:
                and node.name == method_name and node.name.startswith("test_")]
     if len(methods) != 1:
         return False
-    return any(
-        isinstance(node, ast.Assert) or (
-            isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "self"
-            and node.func.attr.startswith(("assert", "expectException"))
-        )
-        for node in ast.walk(methods[0])
-    )
+    class DirectAssertions(ast.NodeVisitor):
+        """No descender en definiciones locales que no acreditan ejecución."""
+
+        def __init__(self) -> None:
+            self.found = False
+
+        def visit_Assert(self, node: ast.Assert) -> None:
+            self.found = True
+
+        def visit_Call(self, node: ast.Call) -> None:
+            if (isinstance(node.func, ast.Attribute) and
+                    isinstance(node.func.value, ast.Name) and
+                    node.func.value.id == "self" and
+                    node.func.attr.startswith(("assert", "expectException"))):
+                self.found = True
+            self.generic_visit(node)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            pass
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            pass
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            pass
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            pass
+
+    checker = DirectAssertions()
+    for statement in methods[0].body:
+        checker.visit(statement)
+    return checker.found
 
 
 def validate(report: str, matrix: str, files: dict[str, str]) -> None:
@@ -215,6 +241,41 @@ class VerificacionGrindflow01Tests(unittest.TestCase):
         self.assertTrue(method_has_assertion(
             probe, phantom.replace("helper.assertTrue(True)",
                                    "self.assertTrue(True)")))
+
+    def test_nested_assertions_without_execution_are_not_witnesses(self) -> None:
+        """Aserciones en helpers no invocados, lambda o clase interna no cuentan."""
+        probe = "tests/fake.py::EvidenceTests.test_contrato_principal"
+        intro = ("class EvidenceTests:\n"
+                 "    def test_contrato_principal(self):\n")
+        for nested in (
+            "        def never_called():\n"
+            "            self.assertTrue(True)\n",
+            "        async def never_called():\n"
+            "            self.assertTrue(True)\n",
+            "        callback = lambda: self.assertTrue(True)\n",
+            "        class NeverInstantiated:\n"
+            "            def unused(self):\n"
+            "                self.assertTrue(True)\n",
+        ):
+            with self.subTest(nested=nested):
+                self.assertFalse(method_has_assertion(probe, intro + nested))
+        self.assertTrue(method_has_assertion(
+            probe, intro + "        if True:\n"
+                          "            self.assertFalse(False)\n"
+        ))
+
+    def test_indented_and_duplicate_rows_are_rejected(self) -> None:
+        """Una fila tabular indentada no evita el control de unicidad."""
+        line = next(row for row in self.report.splitlines()
+                    if row.startswith("| REQ:GF-FR-001 |"))
+        for changed in (
+            self.report.replace(line, line + "\n  " + line, 1),
+            self.report.replace(line, "  " + line, 1),
+            self.report.replace(line, line.replace("| REQ:", "|   REQ:", 1), 1),
+        ):
+            with self.subTest(change=changed[:100]):
+                with self.assertRaises(ValueError):
+                    report_rows(changed)
 
     def test_regresiones_negativas_preexistentes(self) -> None:
         """Ejecutar fixtures de las seis brechas y del veto real GF-MIG-003/004."""

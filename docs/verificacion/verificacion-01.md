@@ -8,6 +8,23 @@ Este lote confronta **25 requisitos exactos** con sus fuentes canónicas y méto
 
 **PARCIAL** significa prueba de subcontrato offline, no acreditación del requisito integral. **EXTERNO** exige recibo del entorno real. **BRECHA** exige cerrar paridad/corte histórico bajo su hoja existente. Los 25 casos dejan CI exact-HEAD, despliegue y Hostinger en `NO_ACREDITADO` hasta prueba autenticada independiente; no se inventan resultados de producción.
 
+
+### Enunciados recortados y nivel de evidencia
+
+La columna «Requisito de matriz» reproduce el **extracto truncado** de la matriz de cobertura y no equivale al enunciado contractual íntegro. La fuente de los Statements completos es docs/REQUIREMENTS.md. En concreto:
+
+- GF-FR-004: programar para destinos configurados (configured destinations).
+- GF-FR-005: distribuir a integraciones soportadas (supported platform integrations).
+- GF-FR-006A: enlace trazado de la misma organización, sin alterar publicación cuando falta la migración de atribución.
+- GF-FR-006B: CSV diario agregado y filtrado sin identificadores de visitantes.
+- GF-FR-006C: pausar o reanudar un enlace sin borrar historial de atribución ni cambiar la URL.
+- GF-FR-004C: cambiar o desvincular enlaces antes de comenzar la entrega.
+- GF-OPS-009: verificar rutas de módulos read-only, no solo el login del dashboard.
+
+**Alcance del testigo Python:** method_has_assertion inspecciona el AST de un método para detectar una aserción sintáctica en su cuerpo; no ejecuta los positivos citados, no demuestra semántica de las aserciones ni acredita una obligación completa. Las funciones locales no ejecutadas no son testigos. La suite sí ejecuta seis test_falla_cerrado y dos pruebas negativas de paridad; no ejecuta en ese paso los seis test_contrato_principal positivos.
+
+**Evidencia conductual separada para REQ:GF-FR-001:** symfony/tests/php/TenantIsolationNegativeTest.php::test_criterio_principal y symfony/tests/php/CrossTenantIdorSweepTest.php::test_criterio_principal son tests Symfony/PHPUnit con dos organizaciones sintéticas y MariaDB descartable. El primero verifica listados propios, rechazo 404 de GET y POST cross-tenant y persistencia intacta del recurso ajeno; el segundo compara recursos ajenos con IDs inexistentes para evitar revelar existencia. Son evidencias de aserciones conductuales en código PHP, no resultados de ejecución de esta suite Python ni comprobaciones productivas. Solo una corrida PHPUnit auténtica acredita su ejecución.
+
 ## Evidencia por fila
 
 | ID | Estado original | Dictamen | Requisito de matriz | Fuente canónica | Método testigo real | Brecha pendiente |
@@ -45,7 +62,7 @@ Este lote confronta **25 requisitos exactos** con sus fuentes canónicas y méto
 
 ## QA, ejecución y reversión
 
-- `python3 -m unittest -v tests/test_verificacion_grindflow_01.py`: valida trazabilidad de todas las filas contra la matriz, existencia del encabezado normativo, clase/método de prueba real y aserción ejecutable; rechaza ID omitido, repetido, inventado, fila malformada, testigo falso, brecha ficticia y promociones.
+- `python3 -m unittest -v tests/test_verificacion_grindflow_01.py`: valida trazabilidad de todas las filas contra la matriz, existencia del encabezado normativo, clase/método y aserción sintáctica en AST (sin certificar semántica ni ejecución positiva); rechaza ID omitido, repetido, inventado, fila malformada, testigo falso, brecha ficticia y promociones.
 - La nueva suite invoca además negativas ya existentes sobre entradas sintéticas (`tests/test_brechas_grindflow_01.py`…`06.py` y `tests/test_migration_parity_exit_gate.py`). Estas pruebas locales no realizan smoke de producción ni sustituyen los recibos reales.
 - **AC-03:** exigir `Factory CI reusable / Validar` terminal `success` sobre el SHA final y auditoría SonarCloud/CodeQL/CodeRabbit de seguridad; una configuración de CI no equivale a un check ejecutado.
 - **Fuera de alcance:** producción, proveedores, cuentas o datos reales, secretos, gasto, cambios a `docs/matriz-cobertura.md`, permisos ampliados, deploy, cutover, cambios runtime, borrados irreversibles o reclasificar filas como `CUBIERTO`.
