@@ -541,3 +541,26 @@ Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa prep
 **AC-02 = PARCIAL:** caché obsoleta confirmada por el operador para cinco rutas; import faltante de Reports confirmado en código. Falta evidencia posterior al despliegue de #939 y decisión de aceptación sobre DSR. **AC-03 = PENDIENTE:** `/s4/health.release_sha=null` continúa sin identidad certificada del release Symfony; `.release-sha` ausente es solo hipótesis. **AC-04** debe validarse sobre el HEAD final de #907.
 
 **Gobernanza:** #903 y su PR #907 siguen abiertos/DRAFT, reserva V3 `cbb53f02-a68b-4d1d-b118-4dfc4efea06d`; persiste la colisión del lock V3 de Coordinación. No borrar/forzar refs. La opción A registrada por el dueño en Factory #2016 no mueve por sí sola el tag protegido `Factory@v1`. Cualquier nueva reparación Hostinger, cambio semántico DSR o movimiento de release requiere su autorización específica. No pedir CodeRabbit FINAL ni fusionar antes de aceptación y gates auténticos.
+
+## Sondeo público independiente tras fusionar #939 — 5-nov-2026
+<!-- GF903-POST939-HTTP-A4461BC-20261105 -->
+
+**Alcance:** comprobación externa de solo lectura mediante HTTPS GET anónimo, sin sesión, datos privados, cookies aportadas ni mutaciones. La herramienta devolvió códigos HTTP para errores 401/404 pero no los cuerpos ni sus MIME; no se infiere el formato de esos errores.
+
+- GitHub `main@a4461bc9066feca598116889bdbb62c0f0da29a2` contiene el squash de Reports #939 (PR #950) y el cambio posterior de destinos #940.
+- `/health` respondió JSON `{"status":"ok","version":"0.1.225","commit":"a4461bc9066feca598116889bdbb62c0f0da29a2","exact":true}`. Acredita la identidad Laravel y no el SHA del proceso Symfony.
+- `/s4/health` respondió `status=ok`, `release_sha=null`, `version=0.1.225`; `/s4/_bridge-readiness` informó `ready_for_web_probe`. `/s4/` devolvió una página pública.
+  
+| Ruta S4 (GET sin sesión) | HTTP observado 5-nov-2026 | Interpretación limitada |
+| --- | ---: | --- |
+| `/api/admin/library/collections` | **401** | La ruta responde; sin probar contenido privado |
+| `/api/admin/library/permissions` | **401** | La ruta responde |
+| `/api/admin/plans` | **401** | La ruta responde |
+| `/api/admin/rules/automation` | **401** | La ruta responde |
+| `/api/admin/reports/cross-module` | **404** | Sigue sin cumplir AC-01 pese al fix #939 fusionado; el SHA Symfony desplegado es desconocido |
+| `/api/admin/privacy/data-subject-requests/csrf` | **404** | Consistente con la deshabilitación jurídica intencional #457; no habilitar por inferencia |
+| `/privacidad-y-mis-derechos` | **200** | Página informativa provisional, sin aprobación legal de funcionalidad |
+
+**Resultado:** cinco de siete rutas satisfacen el código HTTP literal de AC-01; **AC-01 sigue NO**. Una importación en `main` y `/health exact=true` no prueban que Symfony haya recibido/recompilado el cambio #939. **AC-02 es PARCIAL**: caché obsoleta acreditada en reparación del dueño y causa de import Reports en fuente, pero no hay recibo productivo de Reports reparado. **AC-03** conserva `release_sha=null` y la identidad Symfony sin verificar. **AC-04** se revalida sobre el HEAD final de PR #907.
+
+**Desbloqueo seguro:** diagnosticar de modo autorizado y solo lectura el router compilado del host tras #939, publicar recibo de producción y el permiso/backups D-059 antes de cualquier escritura; obtener decisión explícita del dueño sobre el 404 deliberado de DSR y el alcance AC-01. La reserva V3 y el lock no se fuerzan ni se sueltan artificialmente. Mantener PR #907 en DRAFT, sin petición CodeRabbit FINAL ni squash hasta que Coordinación/Policy y las puertas productivas sean auténticas.
