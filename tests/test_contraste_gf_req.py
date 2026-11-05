@@ -83,9 +83,9 @@ class ContrasteTests(unittest.TestCase):
         self.assertEqual(len(rows), 140)
         actual = Counter(rows)
         fields = re.search(
-            r"Resumen: CUBIERTO=(\\d+); EN_CURSO=(\\d+); "
-            r"SIN_COBERTURA=(\\d+); DESCARTADO=(\\d+); "
-            r"NO_VERIFICABLE=(\\d+); total=(\\d+);",
+            r"Resumen: CUBIERTO=([0-9]+); EN_CURSO=([0-9]+); "
+            r"SIN_COBERTURA=([0-9]+); DESCARTADO=([0-9]+); "
+            r"NO_VERIFICABLE=([0-9]+); total=([0-9]+);",
             self.matrix,
         )
         self.assertIsNotNone(fields)
