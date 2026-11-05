@@ -39,7 +39,9 @@ Las nuevas capacidades se implementan en Symfony; Laravel permanece como runtime
 actual hasta paridad, staging, migración, corte y rollback demostrados.
 
 Requisitos locales: PHP 8.3+ compatible con Symfony 7.4, Composer 2, Node **22**,
-Python 3, curl y Docker local con socket `/var/run/docker.sock` disponible. PHP requiere `ctype`, `iconv`,
+Python 3 y curl. El modo predeterminado requiere Docker local con socket
+`/var/run/docker.sock`; el modo nativo explícito requiere `mariadbd`,
+`mariadb-install-db`, `mariadb` y `mariadb-admin` (MariaDB 11.4+). PHP requiere `ctype`, `iconv`,
 `mbstring`, `pdo_mysql`, `dom` y `gd` (CI prueba PHP 8.5). En Linux, instalar
 previamente las bibliotecas de sistema de Chromium. El script usa solo el CLI
 Playwright instalado por `npm ci`; no usa un fallback `npx` sin dependencias.
@@ -48,29 +50,36 @@ Desde un checkout sin archivos `.env` activos:
 
 ```bash
 composer --working-dir=symfony test:baseline
+# Alternativa sin Docker: MariaDB nativa propia, nunca un servidor existente.
+GF_BASELINE_DB=native composer --working-dir=symfony test:baseline
 ```
 
 Este comando elimina las variables de entorno heredadas antes de ejecutar los
 contratos, instala con `composer install` y `npm ci`, ejecuta la matriz offline,
 `npm run check` (TypeScript y Vite), crea una MariaDB **propia** en tmpfs con puerto
-loopback asignado por Docker, migra únicamente esa DB y ejecuta PHPUnit. Luego
+loopback asignado por Docker (serie 11.4), migra únicamente esa DB y ejecuta PHPUnit.
+En modo nativo inicializa un directorio nuevo con `--no-defaults`, abre su propio
+socket/puerto loopback y declara la versión instalada real en `DATABASE_URL`; no
+reutiliza configuración, datadir, socket ni credenciales de otro servidor. Luego
 levanta el HTTP Symfony local, ejecuta `composer test:contract` y todo Playwright
 con Chromium. Al salir, incluso por error, detiene su servidor y elimina su
-contenedor y datos temporales. Las dependencias, assets y cachés de herramientas
-quedan en los directorios ignorados del checkout; no modifica Laravel ni consume
+contenedor o proceso MariaDB nativo y datos temporales, incluidas cachés de instalación
+y navegador. Las dependencias y assets quedan en los directorios ignorados del
+checkout; no modifica Laravel ni consume
 un `DATABASE_URL` recibido del operador. No conectar este comando a una DB ya existente.
 
 `composer.lock` y `package-lock.json` fijan las dependencias de aplicación y CLI;
-no ejecutar `composer update` ni `npm install` como sustituto. El bridge PHPUnit
-está bloqueado y su runner aparte se fija a `SYMFONY_PHPUNIT_VERSION=11.5.56` en
-baseline y CI. **Límite de reproducibilidad pendiente:** las transitivas que el
-bridge instala para ese runner no tienen un lock propio en este repositorio.
+no ejecutar `composer update` ni `npm install` como sustituto. PHPUnit se instala
+directamente como dependencia de desarrollo: `phpunit/phpunit`
+y toda su clausura transitiva están versionados en `composer.lock` (runner
+11.5.57 en esta revisión). CI, baseline y guardias usan `vendor/bin/phpunit`;
+no hay resolución ni descarga adicional de tooling al ejecutar la suite.
 La imagen `mariadb:11.4`, PHP y Node se seleccionan por serie, no por digest de
 entorno; no se promete una imagen binaria inmutable. La instalación inicial
 requiere red para los artefactos de dependencias/Chromium y la imagen; los tests
 usan fixtures descartables, sin proveedores sociales ni servicios productivos.
 
-El job `symfony-preview` declara la misma serie MariaDB, PHP 8.5/extensiones,
+El job `symfony-preview` declara MariaDB 11.4, PHP 8.5/extensiones,
 Node 22, instalación desde locks, React, PHPUnit, matriz obligatoria, HTTP y
 Chromium. También verifica reversibilidad de migraciones y esquema. CI es
 evidencia de código y runtime descartable del SHA probado, no de Hostinger.
@@ -83,7 +92,7 @@ python3 -m unittest tests/test_parity_matrix_executable.py -v # desde la raíz
 cd symfony
 npm run check
 composer test:contract
-SYMFONY_PHPUNIT_VERSION=11.5.56 php vendor/bin/simple-phpunit -c phpunit.xml.dist
+php vendor/bin/phpunit -c phpunit.xml.dist
 npm run test:e2e
 ```
 

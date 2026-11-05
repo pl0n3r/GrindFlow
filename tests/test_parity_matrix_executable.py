@@ -223,6 +223,26 @@ class ParityMatrixExecutableTests(unittest.TestCase):
         step = workflow.split("- name: Ejecutar matriz GF-MIG-003", 1)[1].split("- name:", 1)[0]
         self.assertNotIn("if:", step)
 
+    def test_phpunit_runner_and_transitives_are_in_the_application_lock(self) -> None:
+        composer = json.loads(file_text("symfony/composer.json"))
+        lock = json.loads(file_text("symfony/composer.lock"))
+        self.assertIn("phpunit/phpunit", composer["require-dev"])
+        packages = {p["name"]: p for p in lock["packages"] + lock["packages-dev"]}
+        pending, visited = ["phpunit/phpunit"], set()
+        while pending:
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            self.assertIn(name, packages, "runner dependency absent from lock: " + name)
+            for dependency in packages[name].get("require", {}):
+                if dependency == "php" or dependency.startswith(("ext-", "composer-")):
+                    continue
+                pending.append(dependency)
+        for consumer in (".github/workflows/grindflow-ci.yml", "symfony/tests/contract/baseline.sh"):
+            self.assertNotIn("simple-phpunit", file_text(consumer))
+            self.assertIn("vendor/bin/phpunit -c phpunit.xml.dist", file_text(consumer))
+
     def test_bad_routes_status_and_inventory_fail_closed(self) -> None:
         changed = deepcopy(self.manifest)
         changed["capabilities"][0]["symfony"]["route"] = "/nonexistent"
