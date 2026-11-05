@@ -10,7 +10,7 @@ Regla: **PARCIAL** indica una regresión local trazable, no implementación inte
 | REQ:GF-FR-007B | PARCIAL | `docs/REQUIREMENTS.md`; `tests/test_brechas_grindflow_04.py` | ledger/CSV multimoneda y aislamiento; falta observación integral |
 | REQ:GF-FR-006D | PARCIAL | `docs/REQUIREMENTS.md`; `tests/test_brechas_grindflow_03.py` | enlaces Traffic >100, edición y filtros; falta ejecución completa |
 | REQ:GF-FR-004E | PARCIAL | `docs/REQUIREMENTS.md`; `tests/test_brechas_grindflow_02.py` | buscadores profundos y old IDs; falta cobertura final de navegador |
-| REQ:GF-NFR-006 | BRECHA | `docs/REQUIREMENTS.md`; `tests/test_cross_module_security_e2e_contract.py` | el contrato HTTP/browser existe; confirmar ejecución Chromium end-to-end con receipt exact-SHA y resolver hoja existente #636 |
+| REQ:GF-NFR-006 | BRECHA | `docs/REQUIREMENTS.md`; `tests/test_cross_module_security_e2e_contract.py` | hoja #636 ya completada con prueba parcial; falta receipt Chromium exact-SHA y reconciliación por consolidación, sin reabrir la hoja |
 | REQ:GF-FR-005D | PARCIAL | `docs/REQUIREMENTS.md`; `tests/test_brechas_grindflow_02.py` | entregas paginadas por tenant; falta observación desplegada |
 | STACK:GF-ARCH-001 | EXTERNO | `docs/STACK-TRANSITION-SYMFONY.md`; `tests/test_cobertura_grindflow_04.py` | paridad Symfony/Hostinger y PHP observado aún no acreditados |
 | STACK:GF-UX-003 | PARCIAL | `docs/STACK-TRANSITION-SYMFONY.md`; `tests/test_brechas_grindflow_17.py` | nav React/preview y CSS; falta recepción Chromium conjunta exact-SHA |
@@ -35,7 +35,7 @@ Regla: **PARCIAL** indica una regresión local trazable, no implementación inte
 ## Ejecución y límites
 
 - Suite de este lote: `python3 -m unittest tests/test_verificacion_grindflow_02.py -v` (comprueba 25 claves únicas, estado conservador, pruebas rastreables, mutaciones de fuente y rechazo de recibos falsos). Los tests preexistentes se citan como evidencia **declarada** y deben ejecutarse por sus gates correspondientes; no se afirma haberlos ejecutado mediante este inventario.
-- La fila `REQ:GF-NFR-006` ya enlaza una hoja específica [#636](https://github.com/pl0n3r/GrindFlow/issues/636); `tests/test_cross_module_security_e2e_contract.py` y `scripts/browser-workflow.sh` ofrecen pruebas parciales. No abrir un duplicado ni declarar `CUBIERTO` sin un recibo real del job Chromium y comprobación de aislamiento/CSRF.
+- La fila `REQ:GF-NFR-006` ya enlaza la hoja [#636](https://github.com/pl0n3r/GrindFlow/issues/636), cerrada como completada (prueba local, no certificación integral); `tests/test_cross_module_security_e2e_contract.py` y `scripts/browser-workflow.sh` ofrecen pruebas parciales. No abrir un duplicado ni declarar `CUBIERTO` sin un recibo real del job Chromium y comprobación de aislamiento/CSRF.
 - Los requisitos comerciales `SPEC:007/008/009` y `STACK:GF-FR-009` requieren operación/decisiones humanas: los fixtures offline no los hacen verdaderos.
 - Gates de aceptación: `Factory CI reusable / Validar` exacto al HEAD del PR, revisión de seguridad, CodeRabbit solo FINAL con CI verde y reserva V3 vigente. Sin CI/PR final, resultado UNKNOWN; no go-live, secretos, cobros, proveedor ni despliegue.
 
