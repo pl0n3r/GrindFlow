@@ -170,8 +170,9 @@ class LegacyRetirementEligibilityTests(unittest.TestCase):
             (DECISION, "RETIRABLE"),
         )
         for field, value in attempts:
+            mutated = self._replace_row(route, field, value)
             with self.subTest(field=COLUMNS[field]), self.assertRaisesRegex(ValueError, "Unverified"):
-                verify_registry(report=self._replace_row(route, field, value))
+                verify_registry(report=mutated)
 
     def test_active_code_unobserved_rollback_and_double_writer_block(self):
         route = "workers/main.py"
@@ -183,8 +184,9 @@ class LegacyRetirementEligibilityTests(unittest.TestCase):
             (WRITER, "SI"),
             (WRITER, "DOS_ESCRITORES"),
         ):
+            mutated = self._replace_row(route, field, value)
             with self.subTest(field=COLUMNS[field], value=value), self.assertRaises(ValueError):
-                verify_registry(report=self._replace_row(route, field, value))
+                verify_registry(report=mutated)
 
     def test_fake_symfony_equivalence_and_category_drift_block(self):
         route = "src/middleware.ts"
@@ -193,8 +195,9 @@ class LegacyRetirementEligibilityTests(unittest.TestCase):
             (KIND, "laravel"),
             (FUNCTION, ""),
         ):
+            mutated = self._replace_row(route, field, value)
             with self.subTest(field=COLUMNS[field]), self.assertRaises(ValueError):
-                verify_registry(report=self._replace_row(route, field, value))
+                verify_registry(report=mutated)
 
     def test_document_is_explicitly_offline_and_links_existing_gates(self):
         self.assertIn("Estado: NO-GO", self.document)
