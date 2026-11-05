@@ -403,6 +403,22 @@ jobs:
       - run: python3 scripts/ci_retry.py --label "Composer dependencies" -- composer install --prefer-dist --no-progress
       - name: S4 production bridge contract
         run: python3 -m unittest tests/test_s4_production_bridge.py
+      - name: Required Chromium stages visibility at 320/360 px (GF750)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for candidate in google-chrome chromium chromium-browser; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              GRINDFLOW_BROWSER_CHROME="$(command -v "$candidate")"
+              export GRINDFLOW_BROWSER_CHROME
+              break
+            fi
+          done
+          if [[ -z "${GRINDFLOW_BROWSER_CHROME:-}" ]]; then
+            echo "::error::Chrome/Chromium obligatorio para etapas login 320/360" >&2
+            exit 1
+          fi
+          python3 -m unittest discover -s tests -p test_home_parrilla_design.py -v
       - name: Prepare Laravel environment
         shell: bash
         run: |
