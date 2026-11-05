@@ -146,7 +146,7 @@ class VerificacionGrindflow02Tests(unittest.TestCase):
             self.assertEqual(promote(fake), "NO_ACREDITADO")
         own = Path(__file__).read_text(encoding="utf-8")
         self.assertNotRegex(own, r"(?m)^\s*(?:import|from)\s+(?:requests|urllib|socket|httpx)\b")
-        self.assertNotIn("subprocess.run", own)
+        self.assertNotIn("subprocess" + ".run", own)
         self.assertNotRegex(own, r"-----BEGIN (?:RSA |OPENSSH )?PRIVATE KEY-----")
 
 
