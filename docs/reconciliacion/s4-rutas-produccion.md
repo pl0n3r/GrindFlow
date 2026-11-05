@@ -518,3 +518,26 @@ Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa prep
 **Siguiente diagnóstico seguro:** inspeccionar de forma autenticada y **solo lectura** el mapa de `debug:router`, la importación de rutas por atributos, el autoload real, la caché Symfony efectiva y la identidad del checkout remoto. Si se requiere reconstruir caché, hacerlo únicamente con destino y SHA verificables, respaldo previo y procedimiento de reversión autorizado. Respetar los límites funcionales de Reports #348 y DSR #457: no habilitar prestaciones retiradas por producto o privacidad solo para producir códigos HTTP diferentes.
 
 **Gobernanza:** evidencia asimismo registrada en [comentario #6647378363 de #903](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6647378363). Factory #2016 mantiene pendiente su decisión OWNER para publicar 1.0.49 y activar el caller CAS V3 de #935/PR #937; por tanto no se ha recuperado el lock de #903. El presente cambio es **documental y offline**: no se tocó producción, caché, secretos, locks, `Factory@v1`, SQL ni datos. **AC-01 y AC-02 siguen incumplidos**, y CodeRabbit FINAL permanece sin solicitar.
+
+## Reparación productiva comunicada por el dueño · 5-nov-2026
+<!-- GF903-REPAIR-CACHE-OWNER-20261105 -->
+
+**Fuente:** [comentario del propietario #6651765531](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6651765531). Esta sección reproduce su evidencia. Este agente no ejecutó SSH, Composer, cache:clear, deploy ni otras escrituras productivas.
+
+**Causa acreditada para las rutas recuperadas:** el dueño verificó que el checkout remoto era `main@e74497a7c4112c58516b6b3c8886870cade6c243`, pero `symfony/var/cache/prod` y `var/cache/production` conservaban fecha 6-oct-2026, anterior a los controladores agregados el 11-oct. `S4 Runtime Prepare` había finalizado correctamente y no reconstruyó esa caché. El operador informó respaldo `var/cache/prod.bak-20261105` y ejecución de `APP_ENV=prod php bin/console cache:clear --env=prod --no-debug`, sin alterar `.env`, datos ni migraciones. El backup declarado no demuestra por sí solo un restore ensayado ni un recibo D-059 terminal.
+
+| Ruta S4 sin sesión | Antes | Después comunicado por el propietario |
+| --- | --- | --- |
+| `/s4/api/admin/plans` | 404 HTML | **401 JSON** |
+| `/s4/api/admin/library/collections` | 404 HTML | **401 JSON** |
+| `/s4/api/admin/library/permissions` | 404 HTML | **401 JSON** |
+| `/s4/api/admin/rules/automation` | 404 HTML | **401 JSON** |
+| `/s4/privacidad-y-mis-derechos` | 404 HTML | **200 HTML** |
+| `/s4/api/admin/reports/cross-module` | 404 HTML | **404 HTML**, ruta no importada |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | 404 HTML | **404 JSON** `feature_unavailable`, deshabilitación intencional |
+
+**AC-01 = NO (5/7 resueltas según el propietario):** la ruta Reports no se importa porque `symfony/config/routes.yaml` solo incluye `src/Http/Controller/`; `CrossModuleReportController` está en `src/Http/Reports/`. Bloqueador técnico [#939](https://github.com/pl0n3r/GrindFlow/issues/939); [PR #950](https://github.com/pl0n3r/GrindFlow/pull/950) con parche y regresión offline, sin atribuirle CI, squash, deploy ni reparación productiva aún. La ruta DSR sí alcanza ahora un controlador que responde `404 JSON feature_unavailable` por su protección legal/test-only [#457](https://github.com/pl0n3r/GrindFlow/issues/457). No modificar DSR solo para forzar un 401/302/200.
+
+**AC-02 = PARCIAL:** caché obsoleta confirmada por el operador para cinco rutas; import faltante de Reports confirmado en código. Falta evidencia posterior al despliegue de #939 y decisión de aceptación sobre DSR. **AC-03 = PENDIENTE:** `/s4/health.release_sha=null` continúa sin identidad certificada del release Symfony; `.release-sha` ausente es solo hipótesis. **AC-04** debe validarse sobre el HEAD final de #907.
+
+**Gobernanza:** #903 y su PR #907 siguen abiertos/DRAFT, reserva V3 `cbb53f02-a68b-4d1d-b118-4dfc4efea06d`; persiste la colisión del lock V3 de Coordinación. No borrar/forzar refs. La opción A registrada por el dueño en Factory #2016 no mueve por sí sola el tag protegido `Factory@v1`. Cualquier nueva reparación Hostinger, cambio semántico DSR o movimiento de release requiere su autorización específica. No pedir CodeRabbit FINAL ni fusionar antes de aceptación y gates auténticos.
