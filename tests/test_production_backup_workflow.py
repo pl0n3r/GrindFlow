@@ -515,6 +515,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
             ok = run_remote("0", "0")
             self.assertEqual(ok.returncode, 0, ok.stderr)
             self.assertIn(f"MIGRATION_FINGERPRINT={fingerprint}", ok.stdout)
+            self.assertIn("BACKUP_ARCHIVE=", ok.stdout)
 
             mismatch = run_remote("0", "2")
             self.assertEqual(mismatch.returncode, 26)
