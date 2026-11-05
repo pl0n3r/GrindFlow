@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GrindFlow\Http\Controller;
 
+use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DestinationHealthService;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Identity\Entity\IdentityUser;
@@ -22,6 +23,7 @@ final class DestinationHealthController extends AbstractController
         Request $request,
         MembershipContext $memberships,
         DestinationHealthService $health,
+        Connection $db,
         ?string $organizationId = null,
     ): JsonResponse {
         $user = $this->getUser();
@@ -53,7 +55,8 @@ final class DestinationHealthController extends AbstractController
         return $this->privateJson(['data' => [
             'scope' => 'selected_organization',
             'organization' => ['id' => $membership['id'], 'name' => $membership['name']],
-            'view' => $membership['role'] === 'studio' ? 'studio' : 'independent',
+            'view' => $db->fetchOne('SELECT type FROM gf_identity_organizations WHERE id = :organization', ['organization' => $membership['id']]) === 'studio'
+                ? 'studio' : 'independent',
             'destinations' => $health->forOrganization($membership['id']),
             'provider_calls' => false,
             'verified_provider_connection' => false,

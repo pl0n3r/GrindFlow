@@ -179,6 +179,7 @@ final class DestinationHealthHttpTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $body = json_decode((string) $client->getResponse()->getContent(), true, 32, JSON_THROW_ON_ERROR);
         self::assertSame('selected_organization', $body['data']['scope']);
+        self::assertSame('independent', $body['data']['view']);
         self::assertSame($mine, $body['data']['organization']['id']);
         self::assertFalse($body['data']['provider_calls']);
         self::assertFalse($body['data']['verified_provider_connection']);
@@ -186,5 +187,9 @@ final class DestinationHealthHttpTest extends WebTestCase
         self::assertNotContains('connected', array_column($body['data']['destinations'], 'state'));
         self::assertStringNotContainsString($other, (string) $client->getResponse()->getContent());
         self::assertSame('private, no-store', $client->getResponse()->headers->get('Cache-Control'));
+        $db->update('gf_identity_organizations', ['type' => 'studio'], ['id' => $mine]);
+        $client->request('GET', '/api/admin/destination-health');
+        self::assertResponseIsSuccessful();
+        self::assertSame('studio', json_decode((string) $client->getResponse()->getContent(), true)['data']['view']);
     }
 }

@@ -116,7 +116,7 @@ export function DestinationHealthPanel() {
   }
 
   const { data } = state;
-  return <section aria-labelledby="destination-health-title" style={{ maxWidth: '100%', minWidth: 0 }}>
+  return <section id="salud-destinos" aria-labelledby="destination-health-title" style={{ maxWidth: '100%', minWidth: 0 }}>
     <h2 id="destination-health-title">Salud de cuentas y destinos</h2>
     <p>{data.view === 'studio'
       ? 'Vista Studio: redes vinculadas a la organización seleccionada; no incluye otros creadores sin autorización.'

@@ -6,6 +6,7 @@ namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DistributionCommand;
+use GrindFlow\Distribution\DestinationHealthService;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
 use GrindFlow\Distribution\FacebookPagePublicationService;
@@ -434,6 +435,7 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         Connection $db,
         FacebookPageProvider $facebookPage,
+        DestinationHealthService $destinationHealth,
         FacebookPagePublicationService $publication,
         VaultBlobVerifier $vaultVerifier,
         PrivateVaultDirectory $vaultDirectory,
@@ -625,6 +627,15 @@ final class ScheduleDraftController extends AbstractController
         );
 
         try {
+            // No external I/O without current verified authorization. One
+            // unhealthy provider cannot block independent healthy destinations.
+            $facebookHealth = array_values(array_filter(
+                $destinationHealth->forOrganization($context['organization']['id']),
+                static fn (array $item): bool => $item['provider'] === 'facebook_page',
+            ))[0] ?? null;
+            if (!is_array($facebookHealth) || $facebookHealth['can_enqueue'] !== true) {
+                return $this->error(409, 'destination_health_unverified', 'No hay evidencia vigente de autorización para este destino. Revisa la conexión antes de publicar.');
+            }
             try {
                 $outcome = $publication->publish($command);
             } catch (DistributionProviderException $exception) {
