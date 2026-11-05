@@ -186,3 +186,7 @@ Las 35 filas STACK se contrastaron: 22 CUBIERTO con código, test y PR MERGED, 1
 Resumen: CUBIERTO=41; EN_CURSO=0; SIN_COBERTURA=17; DESCARTADO=1; NO_VERIFICABLE=81; total=140; porcentaje=29.29%.
 
 El porcentaje es de **filas estrictamente acreditadas con PR y evidencia**, no del código implementado o del avance comercial. Las filas `CUBIERTO` recogen PRs fusionados y pruebas de alcance offline; no autorizan producción ni acreditan Hostinger. Para reducir `NO_VERIFICABLE`, obtener por criterio prueba y PR fusionado sobre SHA concreto, CI aplicable y recibo independiente de Hostinger. Los roadmaps sin hoja ejecutable se registran como SIN_COBERTURA y están enlazados a hojas nuevas con AC/claims propios. No crear tickets especulativos, copiar PII ni declarar `UNKNOWN=OK`.
+
+## Reconciliación de 28 filas REQ:GF-* (#832)
+
+Las 28 filas enlazadas a [contraste-gf_req.md](contraste-gf_req.md) conservan **NO_VERIFICABLE**. La reconciliación #832 enumera por requisito la fuente, implementación parcial, método testigo versionado, PR de contraste fusionado y brecha integral. #945/#946 aportan evidencia sintética parcial y #759 solo promovió filas independientemente justificadas. No hay evidencia de Hostinger/live, proveedores o paridad integral. La suite tests/test_contraste_gf_req.py protege esta relación sin exigir un hash de toda la matriz anterior a #759.
