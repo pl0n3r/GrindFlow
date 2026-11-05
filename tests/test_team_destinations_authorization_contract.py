@@ -192,6 +192,14 @@ def audit_real_http_negatives(s: dict[str, str]) -> None:
                "'provider' => 'sandbox'", "'metadata' => ['mode' => 'sandbox']")
 
 
+def audit_mutated_contract(snapshot: dict[str, str], changed_source: str) -> None:
+    """Exactly one audit invocation so exception tests remain unambiguous."""
+    if changed_source.endswith("_test"):
+        audit_real_http_negatives(snapshot)
+    else:
+        audit_runtime(snapshot)
+
+
 class TeamDestinationsAuthorizationTests(unittest.TestCase):
     def test_team_role_destination_isolation(self) -> None:
         """AC-01: real Laravel gates plus their real HTTP/tenant negatives."""
@@ -218,10 +226,7 @@ class TeamDestinationsAuthorizationTests(unittest.TestCase):
                 modified = dict(snapshot)
                 modified[key] = snapshot[key].replace(token, "/* missing gate */", 1)
                 with self.assertRaises(AssertionError):
-                    if key.endswith("_test"):
-                        audit_real_http_negatives(modified)
-                    else:
-                        audit_runtime(modified)
+                    audit_mutated_contract(modified, key)
 
     def test_role_and_tenant_fixture_matrix_cannot_promote_model(self) -> None:
         """Synthetic cross-product checks don't claim to substitute PHP HTTP."""
