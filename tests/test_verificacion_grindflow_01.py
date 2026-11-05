@@ -76,9 +76,15 @@ def method_has_assertion(path: str, source: str) -> bool:
                and node.name == method_name and node.name.startswith("test_")]
     if len(methods) != 1:
         return False
-    return any(isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-               and node.func.attr.startswith(("assert", "expectException"))
-               for node in ast.walk(methods[0]))
+    return any(
+        isinstance(node, ast.Assert) or (
+            isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "self"
+            and node.func.attr.startswith(("assert", "expectException"))
+        )
+        for node in ast.walk(methods[0])
+    )
 
 
 def validate(report: str, matrix: str, files: dict[str, str]) -> None:
@@ -188,6 +194,27 @@ class VerificacionGrindflow01Tests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             validate(self.report, self.matrix, corrupted)
+
+    def test_probe_ignora_afirmaciones_ficticias(self) -> None:
+        """Comentarios, cadenas y métodos de clases ajenas no acreditan prueba."""
+        probe = "tests/fake.py::EvidenceTests.test_contrato_principal"
+        phantom = (
+            "class EvidenceTests:\n"
+            "    def test_contrato_principal(self):\n"
+            "        value = 'self.assertTrue(True)'\n"
+            "        # self.assertTrue(True)\n"
+            "        helper.assertTrue(True)\n"
+        )
+        self.assertFalse(method_has_assertion(probe, phantom))
+        self.assertFalse(method_has_assertion(probe,
+                         phantom.replace("class EvidenceTests", "class Other")))
+        self.assertFalse(method_has_assertion(probe,
+                         "class EvidenceTests:\n"
+                         "    def test_other(self):\n"
+                         "        self.assertTrue(True)\n"))
+        self.assertTrue(method_has_assertion(
+            probe, phantom.replace("helper.assertTrue(True)",
+                                   "self.assertTrue(True)")))
 
     def test_regresiones_negativas_preexistentes(self) -> None:
         """Ejecutar fixtures de las seis brechas y del veto real GF-MIG-003/004."""
