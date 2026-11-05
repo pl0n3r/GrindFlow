@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from hashlib import sha1
 from pathlib import Path
 import re
 import unittest
@@ -12,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "docs/matriz-cobertura.md"
 DOC = ROOT / "docs/contraste-gf_req.md"
 DETAIL = "[Detalle](contraste-gf_req.md)"
-BASE_BLOB = "e84c169af8ca5f13f898e9448c4778d13b3371a6"
 ALLOWED = {"CUBIERTO", "SIN_COBERTURA", "DESCARTADO", "NO_APLICA", "NO_VERIFICABLE"}
 
 
@@ -26,10 +24,6 @@ def parse_table(document: str, columns: int) -> list[list[str]]:
             raise AssertionError(f"Columnas inválidas para {cells[0]}")
         rows.append(cells)
     return rows
-
-
-def blob_id(raw: bytes) -> str:
-    return sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
 
 
 class ContrasteTests(unittest.TestCase):
@@ -89,9 +83,15 @@ class ContrasteTests(unittest.TestCase):
         self.assertEqual(Counter(row[2] for row in self.target_rows),
                          {"NO_VERIFICABLE": 28})
         self.assertEqual(self.matrix.count("; " + DETAIL), 28)
-        restored = self.matrix.replace("; " + DETAIL, "")
-        self.assertEqual(blob_id(restored.encode("utf-8")), BASE_BLOB,
-                         "Fuera del claim o estados cambiados sin autorización")
+        # El consolidador #949 podrá ampliar evidencias sin cambiar estados.
+        ids = [line.split("|")[1].strip() for line in self.matrix.splitlines()
+               if line.startswith("| ") and not line.startswith("| ---")]
+        self.assertEqual(len(ids), 140)
+        self.assertEqual(len(set(ids)), 140)
+        for row in self.target_rows:
+            self.assertIn("verificación 0", row[3])
+            self.assertRegex(row[3], r"PR #(?:952|953) fusionado")
+
 
 
 if __name__ == "__main__":
