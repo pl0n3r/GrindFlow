@@ -507,41 +507,41 @@ final class ScheduleDraftTest extends WebTestCase
         $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/publish-facebook', server: [
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ]);
-        self::assertResponseIsSuccessful();
-        $published = json_decode((string) $client->getResponse()->getContent(), true)['data'];
-        self::assertSame('published', $published['status']);
-        self::assertSame('page_photo_123', $published['external_publication_id']);
-        self::assertFalse($published['automatic_retry']);
-        self::assertSame(1, $transport->calls);
-        self::assertNotNull($db->fetchOne(
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame(
+            'destination_health_unverified',
+            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
+        );
+        self::assertSame(0, $transport->calls, 'No provider I/O without verified account authorization.');
+        self::assertNull($db->fetchOne(
             'SELECT delivery_locked_at FROM gf_schedule_drafts WHERE id = :id',
             ['id' => $activeDraftId],
+        ));
+        self::assertSame(0, (int) $db->fetchOne(
+            'SELECT COUNT(*) FROM gf_external_publication_attempts WHERE organization_id = :organization',
+            ['organization' => $mine],
         ));
 
         $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/publish-facebook', server: [
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ]);
-        self::assertResponseIsSuccessful();
-        self::assertSame(1, $transport->calls, 'An identical replay must not perform second provider I/O.');
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('destination_health_unverified',
+            json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
+        self::assertSame(0, $transport->calls, 'Replay without verification must not perform provider I/O.');
 
         $client->request('PUT', '/api/admin/schedules/'.$activeDraftId.'/delivery-intent', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ], content: json_encode(['caption' => 'Intento de mutación'], JSON_THROW_ON_ERROR));
-        self::assertResponseStatusCodeSame(409);
-        self::assertSame(
-            'delivery_intent_locked',
-            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
-        );
+        self::assertResponseIsSuccessful();
+        self::assertFalse(json_decode((string) $client->getResponse()->getContent(), true)['data']['publishes']);
 
         $client->request('POST', '/api/admin/schedules/'.$activeDraftId.'/cancel', server: [
             'HTTP_X_CSRF_TOKEN' => $csrf,
         ]);
-        self::assertResponseStatusCodeSame(409);
-        self::assertSame(
-            'delivery_intent_locked',
-            json_decode((string) $client->getResponse()->getContent(), true)['error']['code'],
-        );
+        self::assertResponseIsSuccessful();
+        self::assertSame('cancelled', json_decode((string) $client->getResponse()->getContent(), true)['data']['draft']['status']);
 
         $client->request('GET', '/api/admin/schedules');
         self::assertResponseIsSuccessful();
@@ -551,9 +551,10 @@ final class ScheduleDraftTest extends WebTestCase
             static fn (array $draft): bool => $draft['id'] === $activeDraftId,
         ));
         self::assertIsArray($externalDraft);
-        self::assertSame('published', $externalDraft['external_delivery_status']);
-        self::assertSame('page_photo_123', $externalDraft['external_publication_id']);
-        self::assertNotNull($externalDraft['published_at']);
+        self::assertNull($externalDraft['external_delivery_status']);
+        self::assertNull($externalDraft['external_publication_id']);
+        self::assertNull($externalDraft['published_at']);
+        self::assertSame(0, $transport->calls);
 
         @unlink($blobPath);
 
