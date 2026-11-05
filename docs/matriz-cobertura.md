@@ -15,6 +15,8 @@ ni se alteraron conteos, código, CI o estado de producción. Este enlace es
 
 Corte exacto: `main@af275aef3ae1e0b8d4bd2eca6a1a646cac312795` (27-oct-2026). Fase `construccion`. Esta matriz registra **cobertura verificable**; `NO_VERIFICABLE` **no significa funcionalidad ausente** y EN_CURSO exige una hoja ejecutable verificable o un PR abierto; un roadmap no cuenta como trabajo.
 
+**Etapa 3/3 (#725, 21 filas):** los contratos de brechas #720–#724 quedaron en PRs fusionados #737, #751, #788, #742 y #741; cada fila vinculada documenta su evidencia sintética y la brecha operativa residual. Este corte mantiene las 21 filas `NO_VERIFICABLE` y los indicadores `NO_ACREDITADO`: ni prueba offline ni PR fusionado certifican E2E real, permisos tenant, aprobación comercial, CI de producción o Hostinger.
+
 **Criterios:** `CUBIERTO` solo con ruta/test y PR fusionado (puede ser exclusivamente offline); EN_CURSO solo con hoja ejecutable y PR o evidencia de trabajo; SIN_COBERTURA cuando un roadmap no tiene hoja real y se crea una hoja canónica con contrato; `DESCARTADO` con motivo; `NO_VERIFICABLE` cuando faltan pruebas o correlación. En código, CI y Hostinger, `NO_ACREDITADO` significa que falta evidencia para la fila. Ruta presente no implica implementación probada, CI verde no implica deploy y un despliegue no demuestra operación ni aprobación legal.
 
 | ID/fuente | Requisito resumido | Estado | Evidencia / qué falta | Issue | Código | CI | Hostinger |
