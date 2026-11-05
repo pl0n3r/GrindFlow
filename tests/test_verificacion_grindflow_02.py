@@ -116,10 +116,13 @@ class VerificacionGrindflow02Tests(unittest.TestCase):
         rows = matrix_rows(self.matrix)
         item = next(line for line in self.matrix.splitlines()
                     if line.startswith("| REQ:GF-NFR-006 |"))
-        for altered in (self.matrix.replace(item + "\n", "", 1),
-                        self.matrix + "\n" + item,
-                        self.matrix.replace(item, item.replace("SIN_COBERTURA", "CUBIERTO"), 1)):
-            if "CUBIERTO" in altered:
+        mutations = (
+            (self.matrix.replace(item + "\n", "", 1), False),
+            (self.matrix + "\n" + item, False),
+            (self.matrix.replace(item, item.replace("SIN_COBERTURA", "CUBIERTO"), 1), True),
+        )
+        for altered, status_changed in mutations:
+            if status_changed:
                 self.assertEqual(matrix_rows(altered)["REQ:GF-NFR-006"][2], "CUBIERTO")
                 self.assertNotEqual(matrix_rows(altered)["REQ:GF-NFR-006"][2], rows["REQ:GF-NFR-006"][2])
             else:
