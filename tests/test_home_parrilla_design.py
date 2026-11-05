@@ -276,6 +276,27 @@ class LoginParrillaDesignTests(unittest.TestCase):
             f"{detail.group(1) if detail else 'sin diagnóstico'}",
         )
 
+    def test_login_stages_are_executed_by_required_ci_tests_job(self) -> None:
+        """El probe Chromium es una barrera de tests, no solo un script suelto."""
+        workflow = text(ROOT / ".github/workflows/grindflow-ci.yml")
+        job = re.search(
+            r"(?ms)^  tests:\n(.*?)(?=^  [a-z][\w-]*:\n|\Z)", workflow,
+        )
+        self.assertIsNotNone(job, "Falta el job requerido tests")
+        body = job.group(1)
+        for required in (
+            "name: Required Chromium stages visibility at 320/360 px (GF750)",
+            "set -euo pipefail",
+            'GRINDFLOW_BROWSER_CHROME="$(command -v "$candidate")"',
+            'if [[ -z "${GRINDFLOW_BROWSER_CHROME:-}" ]]',
+            "exit 1",
+            "python3 -m unittest discover -s tests -p test_home_parrilla_design.py -v",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, body)
+        chromium_step = body.split("name: Required Chromium stages visibility at 320/360 px (GF750)", 1)[1].split("      - name:", 1)[0]
+        self.assertNotIn("|| true", chromium_step)
+
     def test_login_stages_fail_closed_without_chromium(self) -> None:
         """La ausencia de navegador jamás convierte esta prueba en skipped."""
         with mock.patch.dict(os.environ, {"GRINDFLOW_BROWSER_CHROME": ""}):

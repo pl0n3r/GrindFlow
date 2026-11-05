@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import re
 import runpy
 import unittest
 
@@ -34,6 +35,21 @@ PROOFS = DIMENSIONS + (
     "independent_observer",
     "owner_cutover_authorization",
 )
+
+
+def valid_migration_receipt(value: object) -> bool:
+    """Accept only the version/file/class tuple emitted by the offline planner."""
+    if not isinstance(value, dict) or set(value) != {"version", "file", "class"}:
+        return False
+    version, filename, classname = value["version"], value["file"], value["class"]
+    return (
+        type(version) is str
+        and re.fullmatch(r"[0-9]{14}", version) is not None
+        and type(filename) is str
+        and filename == f"Version{version}.php"
+        and type(classname) is str
+        and classname == f"GrindFlow\\Migrations\\Version{version}"
+    )
 
 
 def offline_retirement_gate(
@@ -72,10 +88,11 @@ def offline_retirement_gate(
         or reversal.get("direction") != "down"
         or reversal.get("source_only") is not False
         or reversal.get("database_contacted") is not True
-        or not isinstance(reversal.get("count"), int)
+        or type(reversal.get("count")) is not int
         or reversal["count"] < 1
         or not isinstance(reversal.get("migrations"), list)
         or reversal["count"] != len(reversal["migrations"])
+        or not all(valid_migration_receipt(row) for row in reversal["migrations"])
     ):
         return False
 
@@ -92,6 +109,87 @@ class MigrationParityExitGateTests(unittest.TestCase):
         cls.manifest = PARITY["load_manifest"](MATRIX.read_text(encoding="utf-8"))
         cls.reversal = REVERSAL["build_plan"]()
         PARITY["validate"](cls.manifest, cls.source)
+
+    def synthetic_model_go(self) -> tuple[dict, dict, dict]:
+        """Fabricate ONLY an offline-model GO, never real parity or cutover.
+
+        Cloning one valid static route across domains is intentional synthetic
+        data; it is not evidence that those domains are actually equivalent.
+        """
+        manifest = deepcopy(self.manifest)
+        sample = next(
+            row for row in manifest["capabilities"]
+            if row["status"] == PARITY["CODE"]
+        )
+        for row in manifest["capabilities"]:
+            if row["status"] == PARITY["DEFERRED"]:
+                for field in ("laravel", "symfony", "evidence"):
+                    row[field] = deepcopy(sample[field])
+                row["status"] = PARITY["CODE"]
+                row["deferred_reason"] = None
+        reversal = deepcopy(self.reversal)
+        reversal.update(
+            source_only=False,
+            database_contacted=True,
+            count=1,
+            migrations=[deepcopy(self.reversal["migrations"][0])],
+        )
+        return manifest, reversal, dict.fromkeys(PROOFS, True)
+
+    def test_synthetic_model_go_rejects_each_broken_receipt(self) -> None:
+        """A gate that always returns False must fail this regression test."""
+        manifest, reversal, receipts = self.synthetic_model_go()
+
+        def gate(
+            m: object = manifest, r: object = reversal,
+            p: object = receipts, s: str = self.source,
+        ) -> bool:
+            return offline_retirement_gate(m, s, r, p)
+
+        self.assertTrue(gate(), "synthetic offline model baseline must be GO")
+        self.assertFalse(gate(m=self.manifest, r=self.reversal))  # Real state is still NO GO.
+
+        for receipt in PROOFS:
+            with self.subTest(missing_proof=receipt):
+                changed = dict(receipts)
+                changed[receipt] = False
+                self.assertFalse(gate(p=changed))
+
+        for change in (
+            {},
+            {**receipts, "extra": True},
+            {**receipts, "rollback_observed": "true"},
+        ):
+            with self.subTest(proof_shape=change):
+                self.assertFalse(gate(p=change))
+
+        invalid_fields = (
+            ("contract", "invalid"), ("direction", "up"),
+            ("source_only", True), ("database_contacted", False),
+            ("count", True), ("count", "1"), ("count", 0), ("count", 2),
+            ("migrations", []), ("migrations", [{}]),
+            ("migrations", [None]), ("migrations", {}),
+        )
+        for field, invalid in invalid_fields:
+            with self.subTest(plan_field=field, value=invalid):
+                changed = deepcopy(reversal)
+                changed[field] = invalid
+                self.assertFalse(gate(r=changed))
+
+        for field, invalid in (
+            ("version", True), ("version", "invalid"),
+            ("file", 1), ("file", "other.php"),
+            ("class", None), ("class", "Another\\Migration"),
+        ):
+            with self.subTest(migration_field=field, value=invalid):
+                changed = deepcopy(reversal)
+                changed["migrations"][0][field] = invalid
+                self.assertFalse(gate(r=changed))
+
+        malformed_manifest = deepcopy(manifest)
+        malformed_manifest["capabilities"][0]["status"] = PARITY["DEFERRED"]
+        self.assertFalse(gate(m=malformed_manifest))
+        self.assertFalse(gate(s=""))
 
     def test_incomplete_parity_forbids_legacy_retirement(self) -> None:
         """GF-MIG-003/004: partial parity and untested rollback are NO GO."""

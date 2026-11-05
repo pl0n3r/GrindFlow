@@ -99,7 +99,7 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
                       code="${2:-}"
                       shift 2
                       if [[ "$code" == *"MigrationReadiness::class"* ]]; then
-                        printf '1|%s' "$FAKE_FINGERPRINT"
+                        printf '%s|%s' "${FAKE_PENDING:-1}" "$FAKE_FINGERPRINT"
                         exit 0
                       fi
                       if [[ "$code" == *"database.connections."* ]]; then
@@ -401,6 +401,145 @@ class ProductionBackupWorkflowTests(unittest.TestCase):
         self.assertIn('artisan up --no-interaction', script)
         self.assertIn('grindflow:vault:audit', script)
         self.assertIn('--expect="$manifest_sha"', script)
+
+    def test_normal_mode_accepts_exact_zero_pending_and_rejects_malformed_counts(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        base_env = {
+            **os.environ,
+            "HOSTINGER_SSH_HOST": "example.test",
+            "HOSTINGER_SSH_USER": "deploy",
+            "HOSTINGER_SSH_PORT": "22",
+            "HOSTINGER_RELEASE_ROOT": "/home/deploy/domain",
+            "SSH_KEY_PATH": "/nonexistent/grindflow-test-key",
+            "KNOWN_HOSTS_PATH": "/nonexistent/grindflow-test-known-hosts",
+        }
+
+        def run_local(pending: str):
+            return subprocess.run(
+                ["/bin/bash", str(SCRIPT)],
+                env={**base_env, "EXPECTED_PENDING": pending},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        # Zero and positive counts pass the count guard and stop at the next
+        # local precondition (missing key), before any SSH is attempted.
+        for valid in ("0", "1", "12"):
+            result = run_local(valid)
+            self.assertEqual(result.returncode, 2, valid)
+            self.assertIn("SSH private key is unavailable", result.stderr, valid)
+            self.assertNotIn("invalid expected pending count", result.stderr, valid)
+
+        for invalid in ("abc", "-1", "00", "01", "1.5", " 1", "1 "):
+            result = run_local(invalid)
+            self.assertEqual(result.returncode, 2, invalid)
+            self.assertIn("invalid expected pending count", result.stderr, invalid)
+
+        empty = run_local("")
+        self.assertNotEqual(empty.returncode, 0)
+        self.assertIn("EXPECTED_PENDING is required", empty.stderr)
+
+        # Exact comparison and fingerprint validation stay in the remote step.
+        self.assertIn('[[ "$pending_count" == "$expected_pending" ]]', script)
+        self.assertIn('[[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]]', script)
+
+    def test_remote_zero_pending_runs_only_on_exact_snapshot_match(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        remote = script.split("<<'REMOTE'\n", 1)[1].rsplit("\nREMOTE", 1)[0]
+        fingerprint = "c" * 64
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp).resolve()
+            root = tmp_path / "release-root"
+            release = root / "releases" / "r1"
+            (release / "bootstrap").mkdir(parents=True)
+            (release / "vendor").mkdir()
+            for relative in ("artisan", "bootstrap/app.php", "vendor/autoload.php"):
+                (release / relative).write_text("fixture\n", encoding="utf-8")
+            (root / "current").symlink_to(release, target_is_directory=True)
+
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_php = fake_bin / "php"
+            fake_php.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    set -euo pipefail
+                    if [[ "${1:-}" == "-r" ]]; then
+                      code="${2:-}"
+                      shift 2
+                      if [[ "$code" == *"MigrationReadiness::class"* ]]; then
+                        printf '%s|%s' "$FAKE_PENDING" "$FAKE_FINGERPRINT"
+                        exit 0
+                      fi
+                      if [[ "$code" == *"database.connections."* ]]; then
+                        printf '[client]\\nhost="localhost"\\n' > "$1"
+                        printf 'grindflow_test' > "$2"
+                        chmod 600 "$1" "$2"
+                        exit 0
+                      fi
+                    fi
+                    if [[ "${1:-}" == "artisan" && "${2:-}" == "operations:record-db-backup" ]]; then
+                      printf '%s\\n' "$(printf 'd%.0s' {1..64})"
+                      exit 0
+                    fi
+                    exit 76
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake_php.chmod(0o755)
+            fake_dump = fake_bin / "mariadb-dump"
+            fake_dump.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' '-- fixture'\n", encoding="utf-8"
+            )
+            fake_dump.chmod(0o755)
+
+            def run_remote(expected: str, actual: str, fp: str = fingerprint):
+                return subprocess.run(
+                    ["/bin/bash", "-s", "--", str(root), expected, "false", "false", "false", "", "", str(fake_php)],
+                    input=remote,
+                    env={
+                        **os.environ,
+                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                        "FAKE_PENDING": actual,
+                        "FAKE_FINGERPRINT": fp,
+                    },
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+            ok = run_remote("0", "0")
+            self.assertEqual(ok.returncode, 0, ok.stderr)
+            self.assertIn(f"MIGRATION_FINGERPRINT={fingerprint}", ok.stdout)
+            self.assertIn("BACKUP_ARCHIVE=", ok.stdout)
+
+            mismatch = run_remote("0", "2")
+            self.assertEqual(mismatch.returncode, 26)
+            self.assertIn("pending migration count changed", mismatch.stderr)
+            mismatch = run_remote("1", "0")
+            self.assertEqual(mismatch.returncode, 26)
+
+            lost = run_remote("0", "0", fp="")
+            self.assertEqual(lost.returncode, 25)
+            self.assertIn("migration fingerprint is invalid", lost.stderr)
+            lost = run_remote("0", "0", fp="XYZ")
+            self.assertEqual(lost.returncode, 25)
+
+    def test_scheduled_workflow_accepts_zero_but_stays_off(self):
+        workflow = (ROOT / ".github/workflows/production-backup-scheduled.yml").read_text(encoding="utf-8")
+
+        self.assertIn('[[ "$EXPECTED_PENDING" =~ ^(0|[1-9][0-9]*)$ ]]', workflow)
+        self.assertNotIn("canonical script rejects zero", workflow)
+        self.assertIn("vars.GRINDFLOW_DAILY_BACKUP_ENABLED == 'true'", workflow)
+        self.assertNotRegex(workflow, r"(?m)^\s*schedule:")
+        self.assertNotRegex(workflow, r"(?m)^\s+- cron:")
+        script = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('RECOVERY_BACKUP_ENABLED="${RECOVERY_BACKUP_ENABLED:-false}"', script)
+        self.assertIn("StrictHostKeyChecking=yes", script)
 
     def test_workflow_is_manual_owner_only_and_never_runs_migrations(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
