@@ -76,6 +76,27 @@ class ContrasteTests(unittest.TestCase):
                 linked = {int(n) for n in re.findall(r"(?<!\w)#(\d+)", row[4])}
                 self.assertTrue(linked - {2, 664}, "Falta hoja GAP propia")
 
+    def test_resumen_global_coincide_con_140_filas(self) -> None:
+        rows = [line.split("|")[3].strip()
+                for line in self.matrix.splitlines()
+                if line.startswith(("| REQ:", "| STACK:", "| SPEC:", "| RM-"))]
+        self.assertEqual(len(rows), 140)
+        actual = Counter(rows)
+        fields = re.search(
+            r"Resumen: CUBIERTO=(\\d+); EN_CURSO=(\\d+); "
+            r"SIN_COBERTURA=(\\d+); DESCARTADO=(\\d+); "
+            r"NO_VERIFICABLE=(\\d+); total=(\\d+);",
+            self.matrix,
+        )
+        self.assertIsNotNone(fields)
+        expected = dict(zip(
+            ("CUBIERTO", "EN_CURSO", "SIN_COBERTURA",
+             "DESCARTADO", "NO_VERIFICABLE"),
+            map(int, fields.groups()[:5]),
+        ))
+        self.assertEqual(dict(actual), {k: v for k, v in expected.items() if v})
+        self.assertEqual(sum(actual.values()), int(fields.group(6)))
+
     def test_matriz_actualizada(self) -> None:
         self.assertEqual(sum(line.startswith("| ") for line in self.matrix.splitlines()) - 2, 140)
         self.assertEqual(len(self.target_rows), 28)
@@ -85,7 +106,7 @@ class ContrasteTests(unittest.TestCase):
         self.assertEqual(self.matrix.count("; " + DETAIL), 28)
         # El consolidador #949 podrá ampliar evidencias sin cambiar estados.
         ids = [line.split("|")[1].strip() for line in self.matrix.splitlines()
-               if line.startswith("| ") and not line.startswith("| ---")]
+               if line.startswith(("| REQ:", "| STACK:", "| SPEC:", "| RM-"))]
         self.assertEqual(len(ids), 140)
         self.assertEqual(len(set(ids)), 140)
         for row in self.target_rows:
