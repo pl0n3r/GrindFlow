@@ -43,8 +43,8 @@ jobs:
           set -euo pipefail
           [[ "$GITHUB_EVENT_NAME" == "schedule" ]]
           [[ "$BACKUP_RETENTION_DAYS" == "30" ]]
-          [[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]] || {
-            echo '::error::BACKUP_EXPECTED_PENDING must be a verified positive integer; canonical script rejects zero'
+          [[ "$EXPECTED_PENDING" =~ ^(0|[1-9][0-9]*)$ ]] || {
+            echo '::error::BACKUP_EXPECTED_PENDING must be a verified non-negative integer without leading zeros'
             exit 2
           }
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 2

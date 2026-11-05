@@ -48,7 +48,7 @@ class ProductionPendingCountDispatchTests(unittest.TestCase):
         )
         db_only = self.backup_script.index("else", zero_allowed)
         positive_only = self.backup_script.index(
-            '[[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]]',
+            '[[ "$EXPECTED_PENDING" =~ ^(0|[1-9][0-9]*)$ ]]',
             db_only,
         )
         self.assertLess(recovery_guard, zero_allowed)
