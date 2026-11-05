@@ -472,6 +472,7 @@ final class ScheduleDraftController extends AbstractController
             $vaultVerifier,
             $vaultDirectory,
             $photoSafety,
+            $destinationHealth,
         ): array {
             $organization = $context['organization']['id'];
             $user = $context['user']->id();
@@ -562,6 +563,18 @@ final class ScheduleDraftController extends AbstractController
                 return ['status' => 'media_unsafe'];
             }
 
+            // Validate the destination *before* locking the draft. A stale
+            // connection must not force an irrevocable locked intent.
+            $facebookHealth = array_values(array_filter(
+                $destinationHealth->forOrganization($organization),
+                static fn (array $item): bool => $item['provider'] === 'facebook_page',
+            ))[0] ?? null;
+            if (!is_array($facebookHealth) || $facebookHealth['can_enqueue'] !== true) {
+                $photoSafety->cleanup($safeMediaPath);
+
+                return ['status' => 'destination_unverified'];
+            }
+
             try {
                 if (($draft['delivery_locked_at'] ?? null) === null) {
                     $lockedAt = gmdate('Y-m-d H:i:s');
@@ -609,6 +622,9 @@ final class ScheduleDraftController extends AbstractController
         if ($result['status'] === 'media_unsafe') {
             return $this->error(409, 'media_not_safe_to_publish', 'La imagen privada no pudo prepararse de forma segura.');
         }
+        if ($result['status'] === 'destination_unverified') {
+            return $this->error(409, 'destination_health_unverified', 'No hay evidencia vigente de autorización para este destino. Revisa la conexión antes de publicar.');
+        }
 
         $draft = $result['draft'];
         $safeMediaPath = $result['safe_media_path'] ?? null;
@@ -627,15 +643,6 @@ final class ScheduleDraftController extends AbstractController
         );
 
         try {
-            // No external I/O without current verified authorization. One
-            // unhealthy provider cannot block independent healthy destinations.
-            $facebookHealth = array_values(array_filter(
-                $destinationHealth->forOrganization($context['organization']['id']),
-                static fn (array $item): bool => $item['provider'] === 'facebook_page',
-            ))[0] ?? null;
-            if (!is_array($facebookHealth) || $facebookHealth['can_enqueue'] !== true) {
-                return $this->error(409, 'destination_health_unverified', 'No hay evidencia vigente de autorización para este destino. Revisa la conexión antes de publicar.');
-            }
             try {
                 $outcome = $publication->publish($command);
             } catch (DistributionProviderException $exception) {

@@ -137,7 +137,7 @@ final class MvpEmptyAndErrorStatesE2eTest extends WebTestCase
     }
 
 
-    public function testSyntheticProviderFailureKeepsTheResponsePrivate(): void
+    public function testUnverifiedDestinationPreventsSyntheticProviderCallAndKeepsResponsePrivate(): void
     {
         [$client, $organization, $user] = $this->authenticatedClient();
         /** @var Connection $db */
@@ -216,8 +216,16 @@ final class MvpEmptyAndErrorStatesE2eTest extends WebTestCase
             $client->request('POST', '/api/admin/schedules/'.$draftId.'/publish-facebook', server: [
                 'HTTP_X_CSRF_TOKEN' => $context['schedule_draft_csrf'],
             ]);
-            self::assertError($client, 409, 'ambiguous', 'El resultado externo es incierto. No reintentes a ciegas.');
-            self::assertSame(1, $transport->calls);
+            self::assertError($client, 409, 'destination_health_unverified', 'No hay evidencia vigente de autorización para este destino. Revisa la conexión antes de publicar.');
+            self::assertSame(0, $transport->calls, 'An unverified account must not reach even the synthetic transport.');
+            self::assertNull($db->fetchOne(
+                'SELECT delivery_locked_at FROM gf_schedule_drafts WHERE id = :draft',
+                ['draft' => $draftId],
+            ));
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_external_publication_attempts WHERE organization_id = :organization',
+                ['organization' => $organization],
+            ));
             self::assertStringNotContainsString('fixture-secret-never-shared', (string) $client->getResponse()->getContent());
         } finally {
             if (is_file($blobPath)) {
