@@ -31,20 +31,69 @@
 
 Fuente del snapshot de release: [README principal](../README.md). Historial del producto y prioridades: [roadmap #2](https://github.com/pl0n3r/GrindFlow/issues/2). Los apartados con versiones antiguas más abajo describen el alcance **en aquella entrega**, no el estado vigente.
 
-## Ejecutar en entorno descartable
+## Base reproducible y entorno descartable
 
-Requisitos: PHP 8.3+ compatible con Symfony 7.4 (objetivo productivo PHP 8.5, verificar Hostinger), Composer, Node 22, extensiones PHP necesarias. S1 requiere una MariaDB **aislada**, expresamente NO la de Laravel ni Hostinger productivo, mediante `DATABASE_URL`. Migrar solo en un entorno descartable con `php bin/console doctrine:migrations:migrate --no-interaction`; probar reversión únicamente allí. No usar `doctrine:schema:update --force`.
+El contrato de esta fase vive en la [matriz ejecutable](../docs/PARITY-MATRIX-EXECUTABLE.md)
+y el [diseño de retirada](../docs/superpowers/specs/2026-11-03-retiro-laravel-migracion-symfony-design.md).
+Las nuevas capacidades se implementan en Symfony; Laravel permanece como runtime
+actual hasta paridad, staging, migración, corte y rollback demostrados.
+
+Requisitos locales: PHP 8.3+ compatible con Symfony 7.4, Composer 2, Node **22**,
+Python 3, curl y Docker local con socket `/var/run/docker.sock` disponible. PHP requiere `ctype`, `iconv`,
+`mbstring`, `pdo_mysql`, `dom` y `gd` (CI prueba PHP 8.5). En Linux, instalar
+previamente las bibliotecas de sistema de Chromium. El script usa solo el CLI
+Playwright instalado por `npm ci`; no usa un fallback `npx` sin dependencias.
+
+Desde un checkout sin archivos `.env` activos:
 
 ```bash
-cd symfony
-composer install --no-interaction --prefer-dist
-npm ci --no-audit --no-fund
-npm run typecheck
-npm run build
-APP_ENV=test APP_DEBUG=0 APP_SECRET="$(php -r 'echo bin2hex(random_bytes(32));')" php -S 127.0.0.1:8765 -t public public/router.php
+composer --working-dir=symfony test:baseline
 ```
 
-Visitar `http://127.0.0.1:8765/` (Twig), `/preview` (React) y `/health` (estado S0, solo versión humana). No publicar este directorio en `public_html` mientras Laravel continúe en producción. Desde otra terminal, con `APP_SECRET` de pruebas y servidor local, ejecutar `bash tests/contract/smoke.sh`, `php vendor/bin/simple-phpunit -c phpunit.xml.dist` y `npm run test:e2e` si Chromium está instalado.
+Este comando elimina las variables de entorno heredadas antes de ejecutar los
+contratos, instala con `composer install` y `npm ci`, ejecuta la matriz offline,
+`npm run check` (TypeScript y Vite), crea una MariaDB **propia** en tmpfs con puerto
+loopback asignado por Docker, migra únicamente esa DB y ejecuta PHPUnit. Luego
+levanta el HTTP Symfony local, ejecuta `composer test:contract` y todo Playwright
+con Chromium. Al salir, incluso por error, detiene su servidor y elimina su
+contenedor y datos temporales. Las dependencias, assets y cachés de herramientas
+quedan en los directorios ignorados del checkout; no modifica Laravel ni consume
+un `DATABASE_URL` recibido del operador. No conectar este comando a una DB ya existente.
+
+`composer.lock` y `package-lock.json` fijan las dependencias de aplicación y CLI;
+no ejecutar `composer update` ni `npm install` como sustituto. El bridge PHPUnit
+está bloqueado y su runner aparte se fija a `SYMFONY_PHPUNIT_VERSION=11.5.56` en
+baseline y CI. **Límite de reproducibilidad pendiente:** las transitivas que el
+bridge instala para ese runner no tienen un lock propio en este repositorio.
+La imagen `mariadb:11.4`, PHP y Node se seleccionan por serie, no por digest de
+entorno; no se promete una imagen binaria inmutable. La instalación inicial
+requiere red para los artefactos de dependencias/Chromium y la imagen; los tests
+usan fixtures descartables, sin proveedores sociales ni servicios productivos.
+
+El job `symfony-preview` declara la misma serie MariaDB, PHP 8.5/extensiones,
+Node 22, instalación desde locks, React, PHPUnit, matriz obligatoria, HTTP y
+Chromium. También verifica reversibilidad de migraciones y esquema. CI es
+evidencia de código y runtime descartable del SHA probado, no de Hostinger.
+
+Para comprobaciones acotadas, tras instalar desde locks y con el entorno
+Symfony local ya levantado:
+
+```bash
+python3 -m unittest tests/test_parity_matrix_executable.py -v # desde la raíz
+cd symfony
+npm run check
+composer test:contract
+SYMFONY_PHPUNIT_VERSION=11.5.56 php vendor/bin/simple-phpunit -c phpunit.xml.dist
+npm run test:e2e
+```
+
+No usar `doctrine:schema:update --force`. No publicar en `public_html` ni apuntar
+a MariaDB de Laravel/Hostinger. Antes del staging/corte siguen pendientes observar
+en Hostinger PHP y extensiones, Composer, cron/colas, storage privado fuera del
+release, backups/restauración y binarios de media. Node solo compila; `php -S`
+y los secretos sintéticos del baseline sirven exclusivamente para pruebas.
+Ni un build ni `/health` acreditan paridad funcional, despliegue, proveedores,
+migración de datos, escritor único, rollback o producción.
 
 ## Fronteras de seguridad
 

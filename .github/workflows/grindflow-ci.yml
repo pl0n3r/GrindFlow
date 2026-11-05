@@ -711,6 +711,8 @@ jobs:
       APP_ENV: test
       APP_DEBUG: '0'
       APP_SECRET: s0-ci-disposable-not-for-production
+      # Bridge is locked; pin its separately installed PHPUnit runner as well.
+      SYMFONY_PHPUNIT_VERSION: '11.5.56'
       DATABASE_URL: 'mysql://grindflow:grindflow@127.0.0.1:3306/grindflow_symfony_ci?serverVersion=mariadb-11.4.0&charset=utf8mb4'
       S0_BASE_URL: 'http://127.0.0.1:8765'
       # First-party and directly-called deprecated APIs are regressions.
@@ -815,8 +817,7 @@ jobs:
         working-directory: symfony
         run: |
           python3 ../scripts/ci_retry.py --label "Symfony frontend dependencies" -- npm ci --no-audit --no-fund
-          npm run typecheck
-          npm run build
+          npm run check
           test -s public/build/.vite/manifest.json
       - name: Symfony HTTP test suite
         working-directory: symfony
@@ -830,9 +831,8 @@ jobs:
         if: ${{ hashFiles('tests/test_release_100_evidence.py') != '' }}
         working-directory: .
         run: python3 -m unittest tests/test_release_100_evidence.py -v
-      - name: Ejecutar matriz GF-MIG-003 cuando el test forma parte del HEAD
-        # #681 aporta la matriz; no informar éxito si el test no existe aquí.
-        if: ${{ hashFiles('tests/test_parity_matrix_executable.py') != '' }}
+      - name: Ejecutar matriz GF-MIG-003 obligatoria
+        # Evidencia de código: este job descartable no acredita Hostinger ni corte.
         working-directory: .
         run: python3 -m unittest tests/test_parity_matrix_executable.py -v
       - name: Ejecutar guardia GF350 de retiro legacy cuando esté en el HEAD

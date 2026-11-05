@@ -2,7 +2,7 @@
 
 GrindFlow #681, dependiente del roadmap #350/#2. Fuente canónica: `docs/STACK-TRANSITION-SYMFONY.md`, apartado 2. El inventario contiene sus diez dominios completos; las rutas y evidencias apuntan solo a archivos del repositorio.
 
-**Límite de la evidencia:** `RUTA_Y_PRUEBA_EN_CODIGO` comprueba rutas declaradas y presencia de test Symfony; no implica equivalencia funcional, CI verde, despliegue o validación productiva. `DIFERIDA` exige razón explícita incluso si existen rutas parciales. `route: null` significa que no se acredita una ruta HTTP equivalente, no que la capacidad no exista.
+**Límite de la evidencia:** `RUTA_Y_PRUEBA_EN_CODIGO` comprueba un atributo `#[Route]` en controlador Symfony y un test PHP que contiene una petición HTTP a esa ruta; no implica equivalencia funcional, CI verde, despliegue o validación productiva. `DIFERIDA` exige razón explícita incluso si existen rutas parciales. `route: null` significa que no se acredita una ruta HTTP equivalente, no que la capacidad no exista.
 
 No se contactan APIs, redes, hosting ni usuarios. No se usan datos reales, claves ni proveedores. Laravel sigue operativo; esta prueba no autoriza GF-MIG-004, migraciones, cutover ni retiro del legado.
 
@@ -95,7 +95,8 @@ No se contactan APIs, redes, hosting ni usuarios. No se usan datos reales, clave
         "definition": "symfony/src/Http/Controller/ScheduleDraftController.php"
       },
       "evidence": [
-        "symfony/tests/php/MvpSchedulingStateTransitionsE2eTest.php"
+        "symfony/tests/php/MvpSchedulingStateTransitionsE2eTest.php",
+        "symfony/tests/php/ScheduleDraftTest.php"
       ],
       "status": "RUTA_Y_PRUEBA_EN_CODIGO",
       "deferred_reason": null
@@ -181,7 +182,8 @@ No se contactan APIs, redes, hosting ni usuarios. No se usan datos reales, clave
         "definition": "symfony/src/Http/Controller/HealthController.php"
       },
       "evidence": [
-        "symfony/tests/php/RuntimeReadinessTest.php"
+        "symfony/tests/php/RuntimeReadinessTest.php",
+        "symfony/tests/php/PreviewTest.php"
       ],
       "status": "RUTA_Y_PRUEBA_EN_CODIGO",
       "deferred_reason": null
@@ -192,6 +194,18 @@ No se contactan APIs, redes, hosting ni usuarios. No se usan datos reales, clave
 
 ## Prueba y reversión
 
-Ejecutar `python3 -m unittest tests/test_parity_matrix_executable.py`. Se contrastan cada dominio, ruta Laravel y prefijo, ruta Symfony, pruebas fuente y estados. Los casos negativos fallan con rutas revertidas, estados desconocidos, evidencia eliminada o diferimientos sin razón. La reversión de este PR retira únicamente matriz y tests.
+Ejecutar `python3 -m unittest tests/test_parity_matrix_executable.py`. Se contrastan cada dominio, ruta Laravel y prefijo, ruta Symfony, pruebas fuente y estados. Los casos negativos rechazan rutas revertidas, literales fuera de controladores, estados desconocidos, tests ajenos al dominio, evidencia eliminada y diferimientos sin razón. Para cada uno de los cinco dominios diferidos se comprueba por separado que una promoción sin ruta o sin test falla cerrada. Una ruta parcial de Reglas/Compliance o Distribution sigue diferida por su brecha funcional. La reversión de este PR retira únicamente matriz y tests.
 
 La condición de #350 para GF-MIG-004 continúa pendiente: paridad completa de roles, datos, estados, IDs, históricos, propietarios de escritura, reversión y validación por módulo. Tests de código, deploy y producción son evidencias distintas.
+
+
+## Base descartable de la migración definitiva
+
+El diseño rector es `docs/superpowers/specs/2026-11-03-retiro-laravel-migracion-symfony-design.md`.
+La matriz conserva los diez dominios canónicos de la transición; no cambia sus
+estados por instalar dependencias. `composer --working-dir=symfony test:baseline`
+instala desde los locks, compila React, levanta MariaDB propia, ejecuta PHPUnit,
+HTTP y Chromium, y destruye su contenedor al terminar. Requisitos y límites en
+`symfony/README.md`. La matriz es obligatoria en `symfony-preview`: no se omite
+si desaparece su test. Ningún resultado habilita escritores Symfony sobre
+MariaDB Laravel, proveedores, migración real, cutover o retirada.

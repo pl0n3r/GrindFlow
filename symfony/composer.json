@@ -36,5 +36,9 @@
   "config": {"sort-packages": true, "allow-plugins": {},
     "platform": {
       "php": "8.3.0"
-    }}
+    }},
+  "scripts": {
+    "test:contract": "bash tests/contract/smoke.sh",
+    "test:baseline": "bash tests/contract/baseline.sh"
+  }
 }
