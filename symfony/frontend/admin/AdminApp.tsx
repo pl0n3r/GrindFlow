@@ -384,7 +384,7 @@ export function AdminApp() {
               manualDestinationCsrf={context.manual_destination_csrf ?? null}
             />}
           {context.permissions.workspace_view && <ManualHandoffPanel />}
-          {context.permissions.workspace_view && <DestinationHealthPanel />}
+          {context.permissions.workspace_view && activeSection === 'salud-destinos' && <DestinationHealthPanel />}
           {context.permissions.workspace_view && <RulesPanel />}
           {context.weekly_rule_csrf !== undefined && <PilotWeeklySummaryPanel />}
           <section className="admin-notice" role="status">
