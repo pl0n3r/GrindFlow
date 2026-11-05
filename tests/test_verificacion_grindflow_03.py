@@ -200,11 +200,13 @@ class VerificacionGrindflow03Tests(unittest.TestCase):
                    "        # self.assertEqual(1, 1)\n")
         self.assertFalse(method_with_assertions(phantom, "07"))
 
-    def test_regresiones_negativas_existentes(self) -> None:
+    def test_contratos_anteriores_positivos_y_negativos(self) -> None:
+        """Acreditar ejecución local de cada suite y su predicado fail-closed."""
         names = [
             "test_brechas_grindflow_" + n + ".BrechasGrindflow" + n +
-            "Tests.test_falla_cerrado"
+            "Tests.test_" + kind
             for n in SUITES
+            for kind in ("contrato_principal", "falla_cerrado")
         ]
         suite = unittest.defaultTestLoader.loadTestsFromNames(names)
         result = unittest.TestResult()
