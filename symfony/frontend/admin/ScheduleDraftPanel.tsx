@@ -22,10 +22,35 @@ type ManualDestination = {
   disabled_at: string | null;
 };
 
+type FanoutDestination = { provider: 'facebook_page'; destination_id: string };
+
+type FanoutDelivery = {
+  id: string;
+  provider: string;
+  destination_id: string;
+  status: 'pending' | 'in_flight' | 'published' | 'rate_limited'
+    | 'authentication_failed' | 'rejected' | 'ambiguous';
+  external_publication_id: string | null;
+  updated_at: string | null;
+  automatic_retry: false;
+};
+
+type FanoutGroup = {
+  id: string;
+  draft_id: string;
+  total: number;
+  sent: number;
+  pending: number;
+  failed: number;
+  deliveries: FanoutDelivery[];
+  automatic_retry: false;
+};
+
 type Draft = {
   id: string;
   asset_id: string;
   asset_name: string;
+  fanout_groups?: FanoutGroup[];
   scheduled_at_utc: string;
   timezone: string;
   local_date: string;
@@ -87,6 +112,10 @@ export function ScheduleDraftPanel({
   const [total, setTotal] = useState(0);
   const [handoffReady, setHandoffReady] = useState(false);
   const [externalDeliveryReady, setExternalDeliveryReady] = useState(false);
+  const [fanoutReady, setFanoutReady] = useState(false);
+  const [fanoutDestinations, setFanoutDestinations] = useState<FanoutDestination[]>([]);
+  const [fanoutDestinationByDraft, setFanoutDestinationByDraft] = useState<Record<string, string[]>>({});
+  const [fanoutRequestByDraft, setFanoutRequestByDraft] = useState<Record<string, string>>({});
   const [externalDestinationId, setExternalDestinationId] = useState<string | null>(null);
   const [captionByDraft, setCaptionByDraft] = useState<Record<string, string>>({});
   const [destinations, setDestinations] = useState<ManualDestination[]>([]);
@@ -150,6 +179,11 @@ export function ScheduleDraftPanel({
       setTotal(scheduleBody.data.total as number);
       setHandoffReady(scheduleBody.data.manual_handoff_ready === true);
       setExternalDeliveryReady(scheduleBody.data.external_delivery_ready === true);
+      setFanoutReady(scheduleBody.data.fanout_ready === true);
+      setFanoutDestinations(
+        Array.isArray(scheduleBody.data.fanout_destinations)
+          ? (scheduleBody.data.fanout_destinations as FanoutDestination[]) : [],
+      );
       setExternalDestinationId(
         typeof scheduleBody.data.external_destination_id === 'string'
           ? scheduleBody.data.external_destination_id
@@ -369,8 +403,8 @@ export function ScheduleDraftPanel({
 
 
   async function saveDeliveryIntent(draft: Draft) {
-    if (!canEdit || !csrf || !externalDeliveryReady || busyId !== null
-      || draft.status !== 'draft' || draft.delivery_locked_at !== null) return;
+    if (!canEdit || !csrf || (!externalDeliveryReady && !(fanoutReady && fanoutDestinations.length > 0))
+      || busyId !== null || draft.status !== 'draft' || draft.delivery_locked_at !== null) return;
     const caption = (captionByDraft[draft.id] ?? draft.caption ?? '').trim();
     if (caption.length < 1 || caption.length > 5000) {
       setError('El caption debe contener entre 1 y 5000 caracteres.');
@@ -402,7 +436,9 @@ export function ScheduleDraftPanel({
         throw new Error('No se confirmó el límite de preparación segura.');
       }
       setFeedback(body.data.changed
-        ? 'Caption y Facebook Page guardados. Aún no se ha publicado nada.'
+        ? (externalDeliveryReady
+          ? 'Caption y Facebook Page guardados. Aún no se ha publicado nada.'
+          : 'Caption e intención guardados. Aún no se ha publicado nada.')
         : 'La intención de entrega ya estaba guardada.');
       await load();
     } catch (caught) {
@@ -451,6 +487,88 @@ export function ScheduleDraftPanel({
         ? caught.message
         : 'No se pudo completar la entrega externa.');
       await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+
+  async function prepareFanout(draft: Draft) {
+    const chosen = fanoutDestinations.filter((destination) =>
+      (fanoutDestinationByDraft[draft.id] ?? [])
+        .includes(destination.provider + ':' + destination.destination_id),
+    );
+    if (!canEdit || !csrf || !fanoutReady || chosen.length === 0
+      || !draft.caption || busyId !== null || draft.status !== 'draft'
+      || draft.delivery_locked_at !== null) return;
+
+    const requestKey = fanoutRequestByDraft[draft.id] || crypto.randomUUID();
+    setFanoutRequestByDraft((previous) => ({ ...previous, [draft.id]: requestKey }));
+    setBusyId('fanout-prepare-' + draft.id);
+    setError('');
+    setFeedback('');
+    try {
+      const response = await fetch(
+        '/api/admin/schedules/' + encodeURIComponent(draft.id) + '/fanout',
+        {
+          method: 'POST', credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrf,
+          },
+          body: JSON.stringify({
+            request_key: requestKey,
+            destinations: chosen,
+          }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message ?? 'No se pudo preparar el grupo.');
+      if (result?.data?.publishes !== false || result?.data?.provider_calls !== false
+        || result?.data?.group?.automatic_retry !== false) {
+        throw new Error('Falta confirmación de preparación sin publicación.');
+      }
+      setFanoutRequestByDraft((previous) => ({ ...previous, [draft.id]: '' }));
+      setFeedback('Grupo de distribución guardado. Ningún destino se ha publicado.');
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo preparar el grupo.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deliverFanout(draft: Draft, group: FanoutGroup, delivery: FanoutDelivery) {
+    if (!canEdit || !csrf || busyId !== null
+      || !['pending', 'rate_limited'].includes(delivery.status)) return;
+    setBusyId('fanout-deliver-' + delivery.id);
+    setError('');
+    setFeedback('');
+    try {
+      const response = await fetch(
+        '/api/admin/schedules/' + encodeURIComponent(draft.id)
+        + '/fanout/' + encodeURIComponent(group.id)
+        + '/deliver/' + encodeURIComponent(delivery.id),
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message ?? 'No se pudo entregar ese destino.');
+      if (result?.data?.automatic_retry !== false || result?.data?.group?.automatic_retry !== false) {
+        throw new Error('La respuesta no confirmó el modo sin reintentos automáticos.');
+      }
+      setFeedback('Destino procesado por el proveedor; verifica su recibo individual.');
+      await load();
+    } catch (caught) {
+      const deliveryError = caught instanceof Error ? caught.message : 'No se pudo entregar ese destino.';
+      await load();
+      setError((reloadError) => reloadError
+        ? deliveryError + ' · Además, falló la recarga: ' + reloadError
+        : deliveryError);
     } finally {
       setBusyId(null);
     }
@@ -621,6 +739,39 @@ export function ScheduleDraftPanel({
                     {draft.external_delivery_status === 'published' && draft.external_publication_id &&
                       <small>ID externo: {draft.external_publication_id}</small>}
                     {draft.published_at && <small>Confirmada: {draft.published_at}</small>}
+
+                    {(draft.fanout_groups ?? []).map((group) =>
+                      <section key={group.id} aria-label={'Grupo de distribución ' + group.id}>
+                        <strong>Grupo de distribución</strong>
+                        <small aria-live="polite">
+                          {group.total} destinos · {group.sent} enviados · {group.pending} pendientes
+                          · {group.failed} fallidos
+                        </small>
+                        <ul>
+                          {group.deliveries.map((delivery) =>
+                            <li key={delivery.id}>
+                              <span>{delivery.provider} · cuenta {delivery.destination_id}</span>
+                              <small>
+                                {delivery.status === 'pending' && 'Pendiente, sin publicar'}
+                                {delivery.status === 'in_flight' && 'En curso o resultado incierto: no reintentar'}
+                                {delivery.status === 'published' && 'Enviado, no reenviar'}
+                                {delivery.status === 'rate_limited' && 'Falló: límite temporal (reintento manual)'}
+                                {delivery.status === 'authentication_failed' && 'Falló: cuenta revocada o vencida'}
+                                {delivery.status === 'rejected' && 'Falló: rechazo terminal'}
+                                {delivery.status === 'ambiguous' && 'Resultado incierto: prohibido reintentar'}
+                              </small>
+                              {delivery.status === 'published' && delivery.external_publication_id &&
+                                <small>Recibo externo: {delivery.external_publication_id}</small>}
+                              {canEdit && csrf && draft.status === 'draft'
+                                && ['pending', 'rate_limited'].includes(delivery.status) &&
+                                <button type="button" disabled={busyId !== null}
+                                  onClick={() => void deliverFanout(draft, group, delivery)}>
+                                  {busyId === 'fanout-deliver-' + delivery.id
+                                    ? 'Procesando…' : 'Entregar solo este destino'}
+                                </button>}
+                            </li>)}
+                        </ul>
+                      </section>)}
                     {draft.manual_destination &&
                       <small>Destino: {draft.manual_destination.label}</small>}
                     {handoffReady &&
@@ -634,6 +785,7 @@ export function ScheduleDraftPanel({
 
                   <div className="schedule-draft-actions">
                     {canEdit && csrf && externalDeliveryReady && draft.status === 'draft'
+                      && (draft.fanout_groups?.length ?? 0) === 0
                       && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
                       <div className="external-delivery-actions">
                         {draft.delivery_locked_at === null
@@ -691,6 +843,59 @@ export function ScheduleDraftPanel({
                                 </button>}
                             </>}
                       </div>}
+
+                    {canEdit && csrf && fanoutReady && fanoutDestinations.length > 0
+                      && (draft.fanout_groups?.length ?? 0) === 0
+                      && draft.status === 'draft' && draft.delivery_locked_at === null
+                      && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
+                      <fieldset className="external-delivery-actions">
+                        <legend>Selecciona cuentas de distribución · sin conversión automática</legend>
+                        {!externalDeliveryReady &&
+                          <>
+                            <label>
+                              Caption para distribución
+                              <textarea
+                                aria-label={'Caption de distribución para ' + draft.asset_name}
+                                maxLength={5000}
+                                value={captionByDraft[draft.id] ?? draft.caption ?? ''}
+                                onChange={(event) => setCaptionByDraft((current) => ({
+                                  ...current, [draft.id]: event.target.value,
+                                }))} />
+                            </label>
+                            <button type="button"
+                              disabled={busyId !== null ||
+                                (captionByDraft[draft.id] ?? draft.caption ?? '').trim().length === 0}
+                              onClick={() => void saveDeliveryIntent(draft)}>
+                              {busyId === 'delivery-intent-' + draft.id ? 'Guardando…' : 'Guardar caption'}
+                            </button>
+                          </>}
+                        {fanoutDestinations.map((destination) => {
+                          const identity = destination.provider + ':' + destination.destination_id;
+                          return <label key={identity}>
+                            <input type="checkbox"
+                              checked={(fanoutDestinationByDraft[draft.id] ?? []).includes(identity)}
+                              onChange={(event) => setFanoutDestinationByDraft((current) => {
+                                const prior = current[draft.id] ?? [];
+                                return { ...current, [draft.id]: event.target.checked
+                                  ? [...prior.filter((item) => item !== identity), identity]
+                                  : prior.filter((item) => item !== identity) };
+                              })} />
+                            Facebook Page · {destination.destination_id}
+                          </label>;
+                        })}
+                        <small>
+                          Cada destino mantiene una clave y un recibo independientes. Preparar
+                          no publica; entregar después exige verificación actual de la cuenta.
+                        </small>
+                        <button type="button"
+                          disabled={busyId !== null || (fanoutDestinationByDraft[draft.id] ?? []).length === 0}
+                          onClick={() => void prepareFanout(draft)}>
+                          {busyId === 'fanout-prepare-' + draft.id
+                            ? 'Preparando…' : 'Preparar grupo sin publicar'}
+                        </button>
+                      </fieldset>}
+                    {canEdit && csrf && !fanoutReady && draft.status === 'draft'
+                      && <small>Grupos de distribución no disponibles hasta aplicar la migración.</small>}
                     {canManualHandoff && manualHandoffCsrf && handoffReady && draft.status === 'draft'
                       && draft.delivery_locked_at === null &&
                       <>
@@ -770,8 +975,9 @@ export function ScheduleDraftPanel({
         </section>}
 
       <p className="weekly-safety">
-        <strong>Solo agenda y handoff humano.</strong> Destinos y cola son organización interna.
-        No llaman proveedores, no mueven contenido fuera de GrindFlow y no prueban una publicación externa.
+        <strong>Destinos y cola manual: solo organización interna.</strong>
+        La salida manual no llama a proveedores ni acredita una publicación externa.
+        La acción «Entregar solo este destino» sí puede llamar al proveedor y publicar contenido.
       </p>
     </section>
   );

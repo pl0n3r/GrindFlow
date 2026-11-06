@@ -620,3 +620,37 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
 - **GF-DSR-04:** antes de afirmar aislamiento inter-tenant deben existir pruebas de acceso cruzado usando dos organizaciones sintéticas. Rechazar organization_id del cliente en un tenant no demuestra aislamiento. Ante propiedad dudosa, legal hold o relaciones compartidas, no borrar y escalar.
 - **GF-DSR-05:** endpoints DSR disponibles únicamente con APP_ENV=test; fuera de test fallan cerrado con 404. Sin producción, datos reales, borrado efectivo, migraciones destructivas o go-live sin autorización explícita y revisión jurídica externa (#457).
 - **GF-DSR-06:** plazos, responsable y retención quedan pendientes de decisión y canales efectivos; no inventar SLA. Referencias: backend #814, pruebas #799 y runbook docs/launch/data-subject-requests.md. El runbook no reemplaza esta especificación durable.
+
+
+### GF-FR-075 — Fan-out de una intención hacia N destinos Symfony S4 (#941)
+
+**Estado:** candidato en código, pendiente de gates exact-HEAD y migración; **no desplegado ni validado en producción**.
+
+- Una intención de borrador tiene un grupo durable identificado por tenant, borrador
+  y clave de petición. Las entregas por cuenta/proveedor conservan IDs y claves de
+  idempotencia únicos; reintentar la petición con el mismo contenido no duplica filas.
+- El grupo expone `total`, `sent`, `pending`, `failed` y evidencia por destino.
+  `pending` implica **ninguna publicación confirmada**. Solo el ledger externo
+  puede acreditar `published` y recibo; no inferirlo de un borrador o de la UI.
+- Tras A/B publicadas y C `rate_limited`, un reintento manual de C conserva
+  A/B. `ambiguous`, `in_flight` sin recibo, `rejected` o credencial revocada
+  nunca disparan retries automáticos.
+- Revalidar tenant, actor activo/rol, cuenta real del tenant, autorización del
+  recurso, emergencia y salud vigente **antes** de cada llamada al proveedor.
+  La selección del navegador no es fuente de autoridad para conexiones.
+- Migración reversible y lectura fail-closed: sin tablas no se anuncia fan-out.
+  En este incremento se usa caption explícito y adapter existente de Facebook;
+  Instagram y nuevos destinos solo se habilitan con cuenta/health verificables.
+  Sin transcodificación automática (#76/#77), cuotas (#78), datos reales ni go-live.
+
+- Para múltiples páginas Facebook de un tenant, el catálogo privado del
+  runtime (fuera del repo, modo `0600`) asocia cada página al tenant y sus
+  credenciales particulares. El frontend solo recibe IDs de destino, nunca
+  credenciales. Cada entrega verifica una identidad Page y la tarea
+  `CREATE_CONTENT` vigente por API autenticada antes de usar el adaptador.
+  Si no hay evidencia fresca no se publica. La preparación y la edición de
+  caption no ejecutan proveedores y la cuenta legacy no se supone habilitada
+  para fan-out sin el permiso de usuario verificable.
+
+- Verificación: `symfony/tests/php/DistributionFanoutTest.php`, control HTTP
+  del ScheduleDraftController, frontend React y `GrindFlow CI / validate`.
