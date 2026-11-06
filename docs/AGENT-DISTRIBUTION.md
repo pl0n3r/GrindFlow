@@ -130,3 +130,25 @@ Este documento concentra la guía operativa de Distribution que antes vivía en 
   datos de prueba. El rollback SQL no revierte publicaciones externas;
   en producción no se aplica ninguna migración ni publicación por este PR.
   Conservar la distinción IMPLEMENTADO / FUSIONADO / DESPLEGADO / VALIDADO EN PRODUCCIÓN.
+
+- Para fan-out de varias páginas del mismo tenant se usa
+  `FacebookPageConnectionRegistry` con `GRINDFLOW_FACEBOOK_CONNECTIONS_FILE`.
+  El archivo es **externo al repositorio**, ruta absoluta, sin symlinks, legible
+  solo por su propietario (modo `0600`), JSON como arreglo de hasta 32
+  conexiones. Cada fila contiene `organization_id`, `page_id`,
+  `access_token` (token de la Page), `user_access_token` (usuario autorizado)
+  y `graph_version`. No registrar, devolver, versionar ni imprimir esos tokens.
+  Un catálogo inválido no hace fallback al adaptador single-page.
+- Preparar permite seleccionar N páginas configuradas del tenant, sin red.
+  Antes de **cada entrega explícita**, un GET HTTPS autenticado de
+  `/me?fields=id` con el token de Page comprueba la identidad exacta y
+  `/me/accounts?fields=id,tasks&limit=100` con el usuario comprueba
+  `CREATE_CONTENT` o `PROFILE_PLUS_CREATE_CONTENT` vigentes para esa Page.
+  Errores, ausencia de permiso, página de otro tenant y más de 100 resultados
+  no demostrados se deniegan; un `DestinationHealthService::classify`
+  solo recibe las señales frescas verificadas, nunca el mero ledger histórico.
+- La verificación de conexiones es una capacidad de código para fase
+  `construccion`, no una afirmación de que se hayan instalado credenciales,
+  activado proveedores o comprobado producción. Tests en
+  `FacebookPageConnectionRegistryTest` usan identidades y transportes
+  sintéticos, sin llamadas de red.
