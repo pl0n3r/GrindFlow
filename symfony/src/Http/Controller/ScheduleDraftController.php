@@ -199,12 +199,13 @@ final class ScheduleDraftController extends AbstractController
 
         $publicDrafts = array_map($this->publicDraft(...), $rows);
         if ($fanout !== null && $memberships->permissions($context['organization']['role'])['content_prepare']) {
+            $byDraft = $fanout->groupsForDrafts(
+                $context['organization']['id'],
+                $context['user']->id(),
+                array_map(static fn (array $draft): string => (string) $draft['id'], $publicDrafts),
+            );
             foreach ($publicDrafts as $index => $draft) {
-                $publicDrafts[$index]['fanout_groups'] = $fanout->groupsForDraft(
-                    $context['organization']['id'],
-                    $context['user']->id(),
-                    (string) $draft['id'],
-                );
+                $publicDrafts[$index]['fanout_groups'] = $byDraft[(string) $draft['id']] ?? [];
             }
         }
 
