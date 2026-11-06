@@ -129,6 +129,15 @@ final class ManualHandoffController extends AbstractController
             if (($draft['delivery_locked_at'] ?? null) !== null) {
                 return ['status' => 'external_delivery_locked'];
             }
+            // An existing fan-out intent freezes this draft. The draft row is
+            // locked, serializing this check with fan-out preparation.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $draftId],
+                ) !== false) {
+                return ['status' => 'external_delivery_locked'];
+            }
 
             $latest = $db->fetchAssociative(
                 $destinationReady
