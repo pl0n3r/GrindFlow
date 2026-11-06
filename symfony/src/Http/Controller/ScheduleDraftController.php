@@ -99,6 +99,7 @@ final class ScheduleDraftController extends AbstractController
         $handoffReady = $schema->tablesExist(['gf_manual_handoff_events']);
         $destinationReady = $schema->tablesExist(['gf_manual_destinations']);
         $externalLedgerReady = $schema->tablesExist(['gf_external_publication_attempts']);
+        $fanoutReady = $schema->tablesExist(['gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries']);
         $externalDeliveryReady = false;
         $externalDestinationId = null;
         try {
@@ -214,6 +215,7 @@ final class ScheduleDraftController extends AbstractController
             'manual_handoff_ready' => $handoffReady,
             'manual_destination_ready' => $destinationReady,
             'external_delivery_ready' => $externalDeliveryReady,
+            'fanout_ready' => $fanoutReady,
             'external_destination_id' => $externalDestinationId,
             'mode' => 'review_only',
             'can_publish' => false,
