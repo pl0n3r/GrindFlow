@@ -159,6 +159,18 @@ final class DistributionFanoutTest extends TestCase
         self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
         self::assertSame(3, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_deliveries'));
 
+        try {
+            $this->fanout->prepare(
+                $this->organization, $this->actor, $this->draft,
+                'another-request-0001', $this->destinations(),
+                static fn (): bool => true,
+            );
+            self::fail('A different request key cannot create a second group for the same draft.');
+        } catch (\LogicException) {
+            // One durable fan-out group per draft; concurrent requests cannot duplicate it.
+        }
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
+
         $this->expectException(\LogicException::class);
         $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft, 'request-fanout-0001',
