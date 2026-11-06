@@ -6,9 +6,11 @@ namespace GrindFlow\Http\Controller;
 
 use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DistributionCommand;
+use GrindFlow\Distribution\DistributionFanoutService;
 use GrindFlow\Distribution\DestinationHealthService;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
+use GrindFlow\Distribution\FacebookPageConnectionRegistry;
 use GrindFlow\Distribution\FacebookPagePublicationService;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Library\AssetNetworkRules;
@@ -82,6 +84,8 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         Connection $db,
         FacebookPageProvider $facebookPage,
+        FacebookPageConnectionRegistry $connections,
+        ?DistributionFanoutService $fanout = null,
     ): JsonResponse
     {
         $context = $this->context($request, $memberships);
@@ -97,6 +101,7 @@ final class ScheduleDraftController extends AbstractController
         $handoffReady = $schema->tablesExist(['gf_manual_handoff_events']);
         $destinationReady = $schema->tablesExist(['gf_manual_destinations']);
         $externalLedgerReady = $schema->tablesExist(['gf_external_publication_attempts']);
+        $fanoutReady = $schema->tablesExist(['gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries', 'gf_external_publication_attempts']);
         $externalDeliveryReady = false;
         $externalDestinationId = null;
         try {
@@ -194,13 +199,33 @@ final class ScheduleDraftController extends AbstractController
         );
         $total = (int) $db->fetchOne('SELECT COUNT(*) '.$scope, $params);
 
+        $publicDrafts = array_map($this->publicDraft(...), $rows);
+        if ($fanout !== null && $memberships->permissions($context['organization']['role'])['content_prepare']) {
+            $byDraft = $fanout->groupsForDrafts(
+                $context['organization']['id'],
+                $context['user']->id(),
+                array_map(static fn (array $draft): string => (string) $draft['id'], $publicDrafts),
+            );
+            foreach ($publicDrafts as $index => $draft) {
+                $publicDrafts[$index]['fanout_groups'] = $byDraft[(string) $draft['id']] ?? [];
+            }
+        }
+
         return $this->privateJson(['data' => [
-            'drafts' => array_map($this->publicDraft(...), $rows),
+            'drafts' => $publicDrafts,
             'total' => $total,
             'limit' => 30,
             'manual_handoff_ready' => $handoffReady,
             'manual_destination_ready' => $destinationReady,
             'external_delivery_ready' => $externalDeliveryReady,
+            'fanout_ready' => $fanoutReady,
+            'fanout_destinations' => array_map(
+                static fn (string $pageId): array => [
+                    'provider' => 'facebook_page', 'destination_id' => $pageId,
+                ],
+                $fanoutReady && $memberships->permissions($context['organization']['role'])['content_prepare']
+                    ? $connections->pageIdsFor($context['organization']['id']) : [],
+            ),
             'external_destination_id' => $externalDestinationId,
             'mode' => 'review_only',
             'can_publish' => false,
@@ -291,6 +316,7 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         Connection $db,
         FacebookPageProvider $facebookPage,
+        FacebookPageConnectionRegistry $connections,
     ): JsonResponse {
         $context = $this->context($request, $memberships);
         if ($context instanceof JsonResponse) {
@@ -318,12 +344,18 @@ final class ScheduleDraftController extends AbstractController
             return $this->error(422, 'invalid_delivery_intent', 'El caption debe contener entre 1 y 5000 caracteres.');
         }
 
+        $pageId = null;
         try {
             $facebookPage->assertAvailableFor($context['organization']['id']);
+            $pageId = $facebookPage->destinationPageId();
         } catch (DistributionProviderException) {
-            return $this->error(409, 'facebook_page_unavailable', 'Facebook Page no está configurada para esta organización.');
+            // A fan-out-only tenant may have several server-owned Pages
+            // without the legacy single-page pilot configuration.
+            $pageId = $connections->pageIdsFor($context['organization']['id'])[0] ?? null;
         }
-        $pageId = $facebookPage->destinationPageId();
+        if ($pageId === null) {
+            return $this->error(409, 'facebook_page_unavailable', 'No hay cuenta configurada para esta organización.');
+        }
 
         $result = $db->transactional(function (Connection $db) use ($context, $id, $caption, $pageId): array {
             $organization = $context['organization']['id'];
@@ -361,6 +393,15 @@ final class ScheduleDraftController extends AbstractController
                 return ['status' => 'missing'];
             }
             if ($draft['status'] !== 'draft' || ($draft['delivery_locked_at'] ?? null) !== null) {
+                return ['status' => 'locked'];
+            }
+            // Fan-out freezes the source caption and destination set. Editing
+            // them after queuing would invalidate the durable fingerprint.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $id],
+                ) !== false) {
                 return ['status' => 'locked'];
             }
             if ($db->createSchemaManager()->tablesExist(['gf_manual_handoff_events'])) {
@@ -511,6 +552,16 @@ final class ScheduleDraftController extends AbstractController
                 return ['status' => 'missing'];
             }
             if ($draft['status'] !== 'draft') {
+                return ['status' => 'locked'];
+            }
+            // The legacy one-destination path and the S4 fan-out path use
+            // distinct immutable keys: never allow both to publish the same
+            // draft. Both transactions lock the draft row before proceeding.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $id],
+                ) !== false) {
                 return ['status' => 'locked'];
             }
             if ($draft['deleted_at'] !== null || !in_array($draft['mime_type'], ['image/jpeg', 'image/png'], true)) {
@@ -684,6 +735,189 @@ final class ScheduleDraftController extends AbstractController
         }
     }
 
+
+    /**
+     * Create an idempotent multi-destination intent. Never calls providers.
+     * The connection IDs are verified server-side, never trusted from JSON.
+     */
+    #[Route(
+        '/api/admin/schedules/{id}/fanout',
+        name: 'grindflow_schedule_fanout_prepare',
+        methods: ['POST'],
+    )]
+    public function prepareFanout(
+        string $id,
+        Request $request,
+        MembershipContext $memberships,
+        DistributionFanoutService $fanout,
+        FacebookPageConnectionRegistry $connections,
+        Connection $db,
+    ): JsonResponse {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'schedule_management_forbidden', 'Tu rol no puede preparar entregas.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_schedule_draft', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado.');
+        }
+        if (!Uuid::isValid($id)) {
+            return $this->error(422, 'invalid_schedule', 'Selecciona un borrador válido.');
+        }
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload) || array_keys($payload) !== ['request_key', 'destinations']
+            || !is_string($payload['request_key']) || !is_array($payload['destinations'])
+            || !array_is_list($payload['destinations'])) {
+            return $this->error(422, 'invalid_fanout', 'Selecciona destinos e identificador de petición válidos.');
+        }
+        foreach ($payload['destinations'] as $destination) {
+            if (!is_array($destination) || array_keys($destination) !== ['provider', 'destination_id']) {
+                return $this->error(422, 'invalid_fanout', 'Cada destino debe tener proveedor y cuenta.');
+            }
+        }
+        // Client IDs are only selectors. Server-owned connections determine
+        // the accounts that can be prepared for this tenant.
+        $owned = static fn (string $org, string $provider, string $destination): bool =>
+            $provider === 'facebook_page' && $connections->owns($org, $destination);
+
+        // Read current Vault authorization while the service holds the draft
+        // row lock, before persisting any irreversible publication intent.
+        $eligible = function (string $organization, string $assetId) use ($db): bool {
+            $asset = $db->fetchAssociative(
+                'SELECT id, usage_scope, deleted_at FROM gf_vault_assets WHERE organization_id = :organization AND id = :asset',
+                ['organization' => $organization, 'asset' => $assetId],
+            );
+            return $asset !== false && $asset['deleted_at'] === null
+                && $this->assetEligibility($db, $organization, $assetId, (string) $asset['usage_scope']) === [];
+        };
+        try {
+            $group = $fanout->prepare(
+                $context['organization']['id'], $context['user']->id(),
+                $id, $payload['request_key'], $payload['destinations'], $owned, $eligible,
+            );
+        } catch (\InvalidArgumentException) {
+            return $this->error(422, 'invalid_fanout', 'La selección de destinos es inválida.');
+        } catch (DistributionProviderException) {
+            return $this->error(409, 'destination_unverified', 'Una cuenta no pertenece a esta organización o ya no está autorizada.');
+        } catch (\Throwable) {
+            return $this->error(409, 'fanout_unavailable', 'No se pudo guardar el grupo; revisa permisos, borrador y migraciones.');
+        }
+
+        return $this->privateJson(['data' => [
+            'group' => $group, 'publishes' => false, 'provider_calls' => false,
+        ]]);
+    }
+
+    /**
+     * Explicit manual delivery of one previously prepared destination.
+     * Existing provider adapter + ledger own all external I/O and attempts.
+     */
+    #[Route(
+        '/api/admin/schedules/{id}/fanout/{groupId}/deliver/{deliveryId}',
+        name: 'grindflow_schedule_fanout_deliver',
+        methods: ['POST'],
+    )]
+    public function deliverFanout(
+        string $id,
+        string $groupId,
+        string $deliveryId,
+        Request $request,
+        MembershipContext $memberships,
+        Connection $db,
+        DistributionFanoutService $fanout,
+        FacebookPageConnectionRegistry $connections,
+        DestinationHealthService $destinationHealth,
+    ): JsonResponse {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'schedule_management_forbidden', 'Tu rol no puede entregar publicaciones.');
+        }
+        if (!$this->isCsrfTokenValid('grindflow_schedule_draft', (string) $request->headers->get('X-CSRF-Token', ''))) {
+            return $this->error(403, 'invalid_csrf', 'La solicitud ha caducado.');
+        }
+        if (!Uuid::isValid($id) || !Uuid::isValid($groupId) || !Uuid::isValid($deliveryId)
+            || $request->getContent() !== '') {
+            return $this->error(422, 'invalid_fanout', 'La entrega requiere identificadores válidos y cuerpo vacío.');
+        }
+        $org = $context['organization']['id'];
+        $actor = $context['user']->id();
+        try {
+            $group = $fanout->summary($org, $actor, $groupId);
+            if (!hash_equals((string) $group['draft_id'], $id)) {
+                return $this->error(404, 'draft_not_found', 'Ese grupo no pertenece al borrador.');
+            }
+            $asset = $db->fetchAssociative(
+                <<<'SQL'
+                    SELECT asset.id, asset.usage_scope, asset.deleted_at
+                    FROM gf_schedule_drafts draft
+                    INNER JOIN gf_vault_assets asset
+                      ON asset.id = draft.asset_id AND asset.organization_id = draft.organization_id
+                    WHERE draft.organization_id = :organization AND draft.id = :draft
+                      AND draft.status = 'draft'
+                    SQL,
+                ['organization' => $org, 'draft' => $id],
+            );
+            if ($asset === false || $asset['deleted_at'] !== null
+                || $this->assetEligibility($db, $org, (string) $asset['id'], (string) $asset['usage_scope']) !== []) {
+                return $this->error(409, 'asset_not_publishable', 'El recurso ya no está autorizado para distribución.');
+            }
+
+            // Resolve the selected tenant/page and prove current identity
+            // and publish task before any external publication attempt.
+            $verified = null;
+            $authorized = static function (string $organization, string $provider, string $destination) use (
+                $connections, $destinationHealth, &$verified
+            ): bool {
+                $verified = null;
+                if ($provider !== 'facebook_page') {
+                    return false;
+                }
+                $verified = $connections->verifiedProviderFor(
+                    $organization, $destination, $destinationHealth,
+                );
+                return $verified !== null;
+            };
+            $send = static function (DistributionCommand $command, string $provider, string $destination) use (
+                &$verified
+            ): \GrindFlow\Distribution\DistributionOutcome {
+                if ($provider !== 'facebook_page' || $verified === null
+                    || !hash_equals($verified->destinationPageId(), $destination)) {
+                    throw DistributionProviderException::authentication();
+                }
+                // The already verified page-bound provider retains its own
+                // credential for this invocation, not a global page token.
+                return $verified->publish($command);
+            };
+            $result = $fanout->deliver($org, $actor, $groupId, $deliveryId, $authorized, $send);
+        } catch (DistributionProviderException $exception) {
+            $safe = match ($exception->kind) {
+                DistributionProviderException::KIND_AUTHENTICATION =>
+                    [409, 'destination_unverified', 'La cuenta perdió autorización o verificación reciente.'],
+                DistributionProviderException::KIND_RATE_LIMIT =>
+                    [429, 'rate_limited', 'El proveedor limitó esta entrega; solo permite reintento manual posterior.'],
+                DistributionProviderException::KIND_REJECTED =>
+                    [409, 'rejected', 'El proveedor rechazó esta entrega; no se reintentará automáticamente.'],
+                default =>
+                    [409, 'ambiguous', 'Resultado incierto: no reintentes a ciegas.'],
+            };
+            $response = $this->error($safe[0], $safe[1], $safe[2]);
+            if ($exception->kind === DistributionProviderException::KIND_RATE_LIMIT
+                && $exception->retryAfterSeconds !== null) {
+                $response->headers->set('Retry-After', (string) $exception->retryAfterSeconds);
+            }
+            return $response;
+        } catch (\Throwable) {
+            return $this->error(409, 'fanout_unavailable', 'No se pudo validar la entrega, el grupo o los permisos.');
+        }
+
+        return $this->privateJson(['data' => ['group' => $result, 'automatic_retry' => false]]);
+    }
+
     /** Cancel in place without erasing the audit-relevant assignment. */
     #[Route(
         '/api/admin/schedules/{id}/cancel',
@@ -752,6 +986,14 @@ final class ScheduleDraftController extends AbstractController
                 return ['status' => 'ok', 'changed' => false, 'draft' => $draft];
             }
             if (($draft['delivery_locked_at'] ?? null) !== null) {
+                return ['status' => 'delivery_locked'];
+            }
+            // Must be checked under the same row lock as prepareFanout.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $id],
+                ) !== false) {
                 return ['status' => 'delivery_locked'];
             }
             if ($db->createSchemaManager()->tablesExist(['gf_manual_handoff_events'])) {
