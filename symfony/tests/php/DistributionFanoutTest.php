@@ -88,6 +88,7 @@ final class DistributionFanoutTest extends TestCase
         return $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft,
             'request-fanout-0001', $this->destinations(),
+            static fn (): bool => true,
         );
     }
 
@@ -152,6 +153,7 @@ final class DistributionFanoutTest extends TestCase
         $again = $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft,
             'request-fanout-0001', array_reverse($this->destinations()),
+            static fn (): bool => true,
         );
         self::assertSame($first, $again);
         self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
@@ -161,6 +163,7 @@ final class DistributionFanoutTest extends TestCase
         $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft, 'request-fanout-0001',
             [ $this->destinations()[0] ],
+            static fn (): bool => true,
         );
     }
 
