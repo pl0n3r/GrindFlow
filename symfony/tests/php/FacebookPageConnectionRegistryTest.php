@@ -36,9 +36,9 @@ final class FacebookPageConnectionRegistryTest extends TestCase
         $org = Uuid::v7()->toRfc4122();
         $other = Uuid::v7()->toRfc4122();
         file_put_contents($this->file, json_encode([
-            ['organization_id' => $org, 'page_id' => '101', 'access_token' => 'fake-page-101', 'graph_version' => 'v26.0'],
-            ['organization_id' => $org, 'page_id' => '102', 'access_token' => 'fake-page-102', 'graph_version' => 'v26.0'],
-            ['organization_id' => $other, 'page_id' => '201', 'access_token' => 'fake-page-201', 'graph_version' => 'v26.0'],
+            ['organization_id' => $org, 'page_id' => '101', 'access_token' => 'fake-page-101', 'user_access_token' => 'fake-user-101', 'graph_version' => 'v26.0'],
+            ['organization_id' => $org, 'page_id' => '102', 'access_token' => 'fake-page-102', 'user_access_token' => 'fake-user-102', 'graph_version' => 'v26.0'],
+            ['organization_id' => $other, 'page_id' => '201', 'access_token' => 'fake-page-201', 'user_access_token' => 'fake-user-201', 'graph_version' => 'v26.0'],
         ], JSON_THROW_ON_ERROR));
         chmod($this->file, 0600);
 
@@ -90,7 +90,7 @@ final class FacebookPageConnectionRegistryTest extends TestCase
         $legacyRegistry = new FacebookPageConnectionRegistry(
             $legacy, $transport, '', static fn (): bool => false,
         );
-        self::assertSame(['100'], $legacyRegistry->pageIdsFor($org));
+        self::assertSame([], $legacyRegistry->pageIdsFor($org));
         $health = new DestinationHealthService(DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]));
         self::assertNull($legacyRegistry->verifiedProviderFor($org, '100', $health));
         self::assertSame([], $transport->sent);
