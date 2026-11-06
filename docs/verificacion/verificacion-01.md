@@ -1,6 +1,6 @@
 # GrindFlow #945 · verificación de cobertura 01/04 (25 filas)
 
-**Base de contraste:** `main@a4461bc9066feca598116889bdbb62c0f0da29a2`. **Reserva V3:** `bd138cf8-2833-4e56-ada8-7f608f0bd812`. La evidencia GitHub del PR valida por separado el SHA final.
+**Base histórica de #945 (no autoridad vigente de #957):** `main@a4461bc9066feca598116889bdbb62c0f0da29a2`; **reserva V3 histórica de #945:** `bd138cf8-2833-4e56-ada8-7f608f0bd812`. El HEAD, el CI y la reserva V3 de #957 se acreditan únicamente con los recibos autenticados de su Issue y PR: nunca se transfieren desde esta referencia histórica.
 
 ## Alcance y límites
 
