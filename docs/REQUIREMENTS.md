@@ -642,5 +642,15 @@ Detalles: `docs/AGENT-LIBRARY-COLLECTIONS.md`.
   En este incremento se usa caption explícito y adapter existente de Facebook;
   Instagram y nuevos destinos solo se habilitan con cuenta/health verificables.
   Sin transcodificación automática (#76/#77), cuotas (#78), datos reales ni go-live.
+
+- Para múltiples páginas Facebook de un tenant, el catálogo privado del
+  runtime (fuera del repo, modo `0600`) asocia cada página al tenant y sus
+  credenciales particulares. El frontend solo recibe IDs de destino, nunca
+  credenciales. Cada entrega verifica una identidad Page y la tarea
+  `CREATE_CONTENT` vigente por API autenticada antes de usar el adaptador.
+  Si no hay evidencia fresca no se publica. La preparación y la edición de
+  caption no ejecutan proveedores y la cuenta legacy no se supone habilitada
+  para fan-out sin el permiso de usuario verificable.
+
 - Verificación: `symfony/tests/php/DistributionFanoutTest.php`, control HTTP
   del ScheduleDraftController, frontend React y `GrindFlow CI / validate`.
