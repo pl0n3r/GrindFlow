@@ -198,8 +198,8 @@ final readonly class FacebookPageConnectionRegistry
         $context = stream_context_create(['http' => [
             'method' => 'GET', 'timeout' => 5, 'ignore_errors' => true,
             'follow_location' => 0, 'max_redirects' => 0,
-            'header' => 'Authorization: Bearer '.$token."\\r\\n"
-                ."Accept: application/json\\r\\n",
+            'header' => 'Authorization: Bearer '.$token."\r\n"
+                ."Accept: application/json\r\n",
         ], 'ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
         $stream = @fopen('https://graph.facebook.com/'.$path, 'rb', false, $context);
         if ($stream === false) {
