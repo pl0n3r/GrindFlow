@@ -1,6 +1,6 @@
 # Guía de uso de GrindFlow para creadores y equipo del piloto
 
-Esta guía describe **pantallas que existen en el código**, no una promesa de que estén activas en el sitio público. GrindFlow está en preparación y conviven pantallas del sistema actual con una transición técnica en curso. El equipo del piloto debe comprobar qué está habilitado para cada organización antes de ofrecerlo. **No uses cuentas, datos ni archivos reales para ensayos sin aprobación.** Este documento no autoriza altas, publicaciones externas ni el inicio del piloto.
+Esta guía describe **pantallas que existen en el código**, no una promesa de que estén activas en el sitio público. GrindFlow está en preparación y conviven pantallas del sistema actual con una transición técnica en curso. El equipo del piloto debe comprobar qué está habilitado para cada organización antes de ofrecerlo. **En ensayos y pruebas utiliza únicamente datos y archivos ficticios: una aprobación no permite usar datos o archivos reales para probar.** Este documento no autoriza altas, publicaciones externas ni el inicio del piloto.
 
 ## 1. Entrar y consultar la actividad
 
@@ -28,7 +28,7 @@ Los contadores pueden mostrar que un módulo no está disponible. El resumen no 
 Ver las imágenes y videos registrados para una organización y, con el permiso necesario, añadir archivos.
 
 ### Antes de empezar
-Abre una organización desde el resumen y entra a «Biblioteca». Para ensayos usa archivos ficticios o expresamente autorizados.
+Abre una organización desde el resumen y entra a «Biblioteca». Para ensayos usa siempre archivos y datos ficticios, incluso si se autorizó el ejercicio; no pruebes con archivos reales.
 
 ### Cómo se usa (paso a paso)
 1. Revisa «Recent media» para ver los archivos y su estado.
@@ -54,8 +54,8 @@ Entra a «Programación». Deben existir archivos aptos, destinos activos y los 
 ### Cómo se usa (paso a paso)
 1. Abre «New schedule» si aparece el formulario.
 2. Selecciona un archivo en «Media» y un destino en «Destinations».
-3. Indica la fecha y hora en «Local date and time» y elige «Timezone» para evitar confusiones de horario.
-4. Revisa la agenda «Schedule calendar · UTC». Los horarios del calendario se presentan en horario universal.
+3. Indica la fecha y hora en «Local date and time», elige «Timezone» y pulsa «Schedule» para registrar la programación.
+4. Revisa la agenda «Schedule calendar · UTC». La vista previa usa el horario universal; en la tabla, «Local time» usa la zona indicada en «Timezone» para cada programación.
 5. Si necesitas cambiar una programación futura y el control está habilitado, usa «New local time» y «Save»; comprueba el resultado en la agenda.
 
 ### Avisos y mensajes
@@ -119,12 +119,13 @@ Abre «Finanzas» solo con autorización del responsable. Usa importes y concept
 3. Si tu permiso lo permite, abre «New revenue allocation» y completa «Source», «Amount (minor units)», «Currency», «Occurred on» y «Beneficiary».
 4. Antes de usar «Record allocation», confirma con el equipo que se trata de un ejercicio autorizado y de una instalación de pruebas.
 5. Revisa «Revenue ledger» para comprobar que el registro aparece.
+6. Si debes corregir un registro ficticio y el equipo lo autoriza, búscalo en «Revenue ledger», completa «Reversal reason» y pulsa «Reverse».
 
 ### Avisos y mensajes
 «Finance migration required.» señala que la sección aún no está preparada. «No currency totals yet.» indica que no hay totales visibles.
 
 ### Limitaciones
-Los movimientos no se editan ni borran: las correcciones crean una reversa. Un registro de prueba no es una factura, transferencia ni conciliación bancaria.
+Los movimientos no se editan ni borran: la reversa conserva el asiento original y se contabiliza en su propia fecha UTC. Un registro de prueba no es una factura, transferencia ni conciliación bancaria.
 
 ## 7. Carga de invitado por enlace
 
