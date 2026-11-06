@@ -42,7 +42,7 @@ La comparación del campo público `error.code` se hizo mediante parseo JSON loc
 1. **#903 sí tiene evidencia de caché obsoleta.** El OWNER observó `symfony/var/cache/prod` y `var/cache/production` fechados el **2026-10-06**, anteriores a rutas introducidas el 11-oct. Declaró backup `var/cache/prod.bak-20261105` y ejecución de `APP_ENV=prod php bin/console cache:clear --env=prod --no-debug` el **2026-11-05**. Cinco rutas nuevas dejaron el 404 HTML tras esa intervención; Reports y DSR tienen circunstancias independientes. Esta es evidencia comunicada por el dueño en [#903/#6651765531](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6651765531), **no una operación ejecutada o auditada de forma independiente en este PR**.
 2. **#917 se refiere a tres rutas previamente registradas que devolvían 500 HTML**, no al 404 de controladores recientes. Sus tres respuestas se convirtieron en 401 JSON tras la misma intervención temporal y continuaban correctas en el sondeo nuevo. Esto sostiene que el problema **estuvo correlacionado** con el estado del runtime y pudo compartir causa con la caché compilada antigua, **pero no permite identificar la excepción concreta de los tres 500**.
 3. **Hipótesis remanentes, no hechos probados:** caché/container Symfony anticuado, carga de servicios/definiciones de controlador, estado de PHP/OPCache u otra excepción previa al guard de autenticación. No se inspeccionaron logs sanitizados de excepciones del host. Evitar describir esa incertidumbre como causa raíz confirmada de #917.
-4. En código, la regresión del PR #916 ejercita kernel real y cuatro solicitudes anónimas (tres rutas y Vault con query inválida), exige `401`, `application/json`, `authentication_required`, `Cache-Control: private, no-store` y ausencia de HTML. Esta prueba distingue comportamiento **en código** de la observación del hosting; no ejecuta una prueba negativa tenant/rol **autenticado en entorno de ensayo**.
+4. En código, la regresión del PR #916 ejercita kernel real y cuatro solicitudes anónimas (tres rutas y Vault con query inválida), exige `401`, `application/json`, `authentication_required`, `Cache-Control: private, no-store` y ausencia de HTML. Esta prueba distingue comportamiento **en código** de la observación del hosting. La prueba **negativa autenticada** de aislamiento tenant/rol en ensayo, separada de #916, se acredita con la ejecución de `symfony-preview` indicada en la sección QA siguiente; no sustituye la observación del hosting.
 
 ## Diagnóstico S4 remoto owner-only, solo lectura — 2026-11-06
 
@@ -52,20 +52,32 @@ El helper `scripts/s4-router-diagnostics.sh --read-only` impide un resultado `su
 
 **Frontera de evidencia:** aunque el checkout remoto inspeccionado coincide con `main`, la API pública `/s4/health` continúa devolviendo `release_sha=null`; no se puede afirmar que la petición HTTP provenga inequívocamente del artefacto/checkout inspeccionado ni que se haya identificado la excepción original del 500. Esta ejecución fue una **lectura autorizada**, no un deploy, un `cache:clear`, una prueba de rollback ni un tratamiento de datos.
 
+## QA tenant/rol acreditada en ensayo aislado — 2026-11-06
+
+El [GrindFlow CI #42200060990](https://github.com/pl0n3r/GrindFlow/actions/runs/42200060990) fue `workflow_dispatch` en `d1bd945695e93beaefd1a70bac433aa42a4d1d14`, `completed/success`; el job [`symfony-preview` #127833165473](https://github.com/pl0n3r/GrindFlow/actions/runs/42200060990/job/127833165473) terminó `success`. Su registro acredita `php vendor/bin/simple-phpunit -c phpunit.xml.dist` sobre MariaDB 11.4 descartable: **388 tests, 7857 assertions, 1 risky** (`PlanLimitsTest`; no se oculta ese indicador). El mismo job ejecutó expresamente `VaultTest` con **1 test, 147 assertions, OK**. El archivo `symfony/phpunit.xml.dist` incluye todo `tests/php` en la suite `S0 Symfony`, sin excluir las clases siguientes.
+
+- [`TenantIsolationNegativeTest.php`](../../symfony/tests/php/TenantIsolationNegativeTest.php): dos tenants y activos ficticios en DB de CI, denegación `404 file_not_found` al acceder a activos ajenos; rechazos `403` por rol, CSRF y purge.
+- [`CrossTenantIdorSweepTest.php`](../../symfony/tests/php/CrossTenantIdorSweepTest.php): comparación de respuestas para ID ajeno/inexistente y protección contra filtración de existencia entre tenants sintéticos (`403/404`).
+- [`VaultTest.php`](../../symfony/tests/php/VaultTest.php) y [`WeeklyRulePreviewTest.php`](../../symfony/tests/php/WeeklyRulePreviewTest.php): guardas `401` sin sesión, restricciones de escritura y revocación de acceso `403`/conflicto `409` usando fixtures ficticios.
+
+La comparación GitHub autenticada entre `d1bd945…` y `main@4f62db7863771f32d4c6b16df5df7c3afa41d151` contiene **únicamente `docs/matriz-cobertura.md`**; por tanto, el código Symfony y estas pruebas son idénticos entre el run QA y el `main` base del PR #983. El PR cambia únicamente este informe, no las suites ni el runtime.
+
+**Alcance:** queda respaldada la parte de QA negativa de tenant/rol **en ensayo aislado**; no prueba identidad del checkout Symfony que atiende HTTP en producción, excepción histórica del 500 ni integridad/ensayo real del backup/rollback. Esos AC siguen parciales.
+
 ## Criterios de aceptación #917: evaluación estricta
 
 | Criterio | Evidencia | Estado |
 | --- | --- | --- |
 | **AC-01** HTTP sin sesión + SHA/versión | Tres 401 JSON autenticados por sondeo público, 2026-11-06. `/health` identifica main; `/s4/health.release_sha=null` impide correlación Symfony exacta. | **PARCIAL** (HTTP sí; identidad S4 no) |
 | **AC-02** causa del 500 respaldada por logs/diagnóstico | #903 demuestra la caché antigua y temporalidad de recuperación, pero no la excepción específica de los 500 de #917. La distinción 500 ≠ 404 queda acreditada. | **PARCIAL / causa específica UNKNOWN** |
-| **AC-03** 3×401 + respaldo/rollback del repair | Las tres respuestas **cumplen**. El OWNER declara un backup de caché antes del `cache:clear`, pero faltan recibos verificables de integridad/restore/rollback del runtime S4, alcance de autorización de esa escritura y prueba tenant/rol en ensayo. | **PARCIAL** |
+| **AC-03** 3×401 + respaldo/rollback del repair | Las tres respuestas **cumplen**. El OWNER declara un backup de caché antes del `cache:clear`, pero faltan recibos verificables de integridad/restore/rollback del runtime S4 y alcance de autorización de esa escritura. La prueba tenant/rol en ensayo aislado **sí** está acreditada arriba mediante CI real, sin suplantar la validación operativa. | **PARCIAL** |
 | **AC-04** `Factory CI reusable / Validar` del HEAD final | La regresión #916 ya fue fusionada; este archivo requiere CI **del SHA de su propio PR**, no heredar los checks de #916. | **PENDIENTE de HEAD final** |
 
 ## Desbloqueo operativo y riesgos
 
 - **Solo lectura permitida** por el OWNER: recoger desde canal autenticado autorizado, con sanitización previa y sin reproducir secretos o datos personales, error/stack mínimo de las tres peticiones históricas, timestamps, servicio/route matching, fecha/hash de caché y `git rev-parse HEAD` del checkout S4; si el log histórico ya expiró, registrar `NO_DISPONIBLE`, no inventar causa. No inspeccionar cuentas/tenants ni sesiones reales.
 - Para cualquier nueva escritura Hostinger, **exigir otra autorización específica**, backup realmente verificable, evidencia de restore/rollback, alcance exact-SHA y prueba posterior HTTP/health conforme a D-043/D-059. La autorización para lectura de 6-nov **no** basta.
-- En ensayo aislado y con fixtures ficticios, ejecutar la prueba negativa de tenant/rol con identidad controlada y registrar check/commit exactos. No extender el claim documental de #917 a código/test sin renovar legítimamente el contrato V3.
+- QA tenant/rol en ensayo con fixtures ficticios: evidencia enlazada arriba, `symfony-preview` terminal `success` en el mismo código Symfony. Una nueva modificación de tests/runtime requiere repetir QA exacto; no extender el claim documental de #917 a código/test sin renovar legítimamente el contrato V3.
 - Tras superar estas pruebas, comprobar el HEAD exacto del PR, `Factory CI reusable / Validar`, SonarCloud, CodeQL, revisión CodeRabbit **FINAL única** (solo con CI verde y PR definitivo) y protección de rama. Cualquier despliegue/producto queda fuera de este PR.
 
 **Dictamen:** HTTP anónimo **recuperado y revalidado**; causa puntual del 500 e identidad exacta de Symfony **no acreditadas**. Este expediente de preparación **no equivale** a cierre total del incidente, certificación de go-live, backup restaurado o autorización de merge/activación por inferencia.
