@@ -403,8 +403,8 @@ export function ScheduleDraftPanel({
 
 
   async function saveDeliveryIntent(draft: Draft) {
-    if (!canEdit || !csrf || !externalDeliveryReady || busyId !== null
-      || draft.status !== 'draft' || draft.delivery_locked_at !== null) return;
+    if (!canEdit || !csrf || (!externalDeliveryReady && !(fanoutReady && fanoutDestinations.length > 0))
+      || busyId !== null || draft.status !== 'draft' || draft.delivery_locked_at !== null) return;
     const caption = (captionByDraft[draft.id] ?? draft.caption ?? '').trim();
     if (caption.length < 1 || caption.length > 5000) {
       setError('El caption debe contener entre 1 y 5000 caracteres.');
@@ -436,7 +436,7 @@ export function ScheduleDraftPanel({
         throw new Error('No se confirmó el límite de preparación segura.');
       }
       setFeedback(body.data.changed
-        ? 'Caption y Facebook Page guardados. Aún no se ha publicado nada.'
+        ? 'Caption e intención guardados. Aún no se ha publicado nada.'
         : 'La intención de entrega ya estaba guardada.');
       await load();
     } catch (caught) {
@@ -845,9 +845,28 @@ export function ScheduleDraftPanel({
                     {canEdit && csrf && fanoutReady && fanoutDestinations.length > 0
                       && (draft.fanout_groups?.length ?? 0) === 0
                       && draft.status === 'draft' && draft.delivery_locked_at === null
-                      && draft.caption && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
+                      && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
                       <fieldset className="external-delivery-actions">
                         <legend>Selecciona cuentas de distribución · sin conversión automática</legend>
+                        {!externalDeliveryReady &&
+                          <>
+                            <label>
+                              Caption para distribución
+                              <textarea
+                                aria-label={'Caption de distribución para ' + draft.asset_name}
+                                maxLength={5000}
+                                value={captionByDraft[draft.id] ?? draft.caption ?? ''}
+                                onChange={(event) => setCaptionByDraft((current) => ({
+                                  ...current, [draft.id]: event.target.value,
+                                }))} />
+                            </label>
+                            <button type="button"
+                              disabled={busyId !== null ||
+                                (captionByDraft[draft.id] ?? draft.caption ?? '').trim().length === 0}
+                              onClick={() => void saveDeliveryIntent(draft)}>
+                              {busyId === 'delivery-intent-' + draft.id ? 'Guardando…' : 'Guardar caption'}
+                            </button>
+                          </>}
                         {fanoutDestinations.map((destination) => {
                           const identity = destination.provider + ':' + destination.destination_id;
                           return <label key={identity}>
