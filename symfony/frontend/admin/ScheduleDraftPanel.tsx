@@ -772,6 +772,7 @@ export function ScheduleDraftPanel({
 
                   <div className="schedule-draft-actions">
                     {canEdit && csrf && externalDeliveryReady && draft.status === 'draft'
+                      && (draft.fanout_groups?.length ?? 0) === 0
                       && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
                       <div className="external-delivery-actions">
                         {draft.delivery_locked_at === null
@@ -831,6 +832,7 @@ export function ScheduleDraftPanel({
                       </div>}
 
                     {canEdit && csrf && fanoutReady && externalDeliveryReady
+                      && (draft.fanout_groups?.length ?? 0) === 0
                       && externalDestinationId && draft.status === 'draft'
                       && draft.delivery_locked_at === null
                       && draft.caption && draft.delivery_provider === 'facebook_page'
