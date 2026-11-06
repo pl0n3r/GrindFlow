@@ -436,7 +436,9 @@ export function ScheduleDraftPanel({
         throw new Error('No se confirmó el límite de preparación segura.');
       }
       setFeedback(body.data.changed
-        ? 'Caption e intención guardados. Aún no se ha publicado nada.'
+        ? (externalDeliveryReady
+          ? 'Caption y Facebook Page guardados. Aún no se ha publicado nada.'
+          : 'Caption e intención guardados. Aún no se ha publicado nada.')
         : 'La intención de entrega ya estaba guardada.');
       await load();
     } catch (caught) {
