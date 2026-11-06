@@ -91,6 +91,7 @@ services:
   GrindFlow\Distribution\FacebookPageConnectionRegistry:
     arguments:
       $connectionsFile: '%env(default:grindflow_facebook_connections_file_default:GRINDFLOW_FACEBOOK_CONNECTIONS_FILE)%'
+      $identityProbe: null
 
   GrindFlow\Distribution\FacebookPageTransport:
     alias: GrindFlow\Distribution\StreamFacebookPageTransport
