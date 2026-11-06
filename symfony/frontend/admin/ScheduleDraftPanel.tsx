@@ -22,6 +22,8 @@ type ManualDestination = {
   disabled_at: string | null;
 };
 
+type FanoutDestination = { provider: 'facebook_page'; destination_id: string };
+
 type FanoutDelivery = {
   id: string;
   provider: string;
@@ -111,7 +113,8 @@ export function ScheduleDraftPanel({
   const [handoffReady, setHandoffReady] = useState(false);
   const [externalDeliveryReady, setExternalDeliveryReady] = useState(false);
   const [fanoutReady, setFanoutReady] = useState(false);
-  const [fanoutDestinationByDraft, setFanoutDestinationByDraft] = useState<Record<string, boolean>>({});
+  const [fanoutDestinations, setFanoutDestinations] = useState<FanoutDestination[]>([]);
+  const [fanoutDestinationByDraft, setFanoutDestinationByDraft] = useState<Record<string, string[]>>({});
   const [fanoutRequestByDraft, setFanoutRequestByDraft] = useState<Record<string, string>>({});
   const [externalDestinationId, setExternalDestinationId] = useState<string | null>(null);
   const [captionByDraft, setCaptionByDraft] = useState<Record<string, string>>({});
@@ -177,6 +180,10 @@ export function ScheduleDraftPanel({
       setHandoffReady(scheduleBody.data.manual_handoff_ready === true);
       setExternalDeliveryReady(scheduleBody.data.external_delivery_ready === true);
       setFanoutReady(scheduleBody.data.fanout_ready === true);
+      setFanoutDestinations(
+        Array.isArray(scheduleBody.data.fanout_destinations)
+          ? (scheduleBody.data.fanout_destinations as FanoutDestination[]) : [],
+      );
       setExternalDestinationId(
         typeof scheduleBody.data.external_destination_id === 'string'
           ? scheduleBody.data.external_destination_id
@@ -485,8 +492,11 @@ export function ScheduleDraftPanel({
 
 
   async function prepareFanout(draft: Draft) {
-    if (!canEdit || !csrf || !fanoutReady || !externalDeliveryReady
-      || !externalDestinationId || !fanoutDestinationByDraft[draft.id]
+    const chosen = fanoutDestinations.filter((destination) =>
+      (fanoutDestinationByDraft[draft.id] ?? [])
+        .includes(destination.provider + ':' + destination.destination_id),
+    );
+    if (!canEdit || !csrf || !fanoutReady || chosen.length === 0
       || !draft.caption || busyId !== null || draft.status !== 'draft'
       || draft.delivery_locked_at !== null) return;
 
@@ -507,9 +517,7 @@ export function ScheduleDraftPanel({
           },
           body: JSON.stringify({
             request_key: requestKey,
-            destinations: [
-              { provider: 'facebook_page', destination_id: externalDestinationId },
-            ],
+            destinations: chosen,
           }),
         },
       );
@@ -834,29 +842,32 @@ export function ScheduleDraftPanel({
                             </>}
                       </div>}
 
-                    {canEdit && csrf && fanoutReady && externalDeliveryReady
+                    {canEdit && csrf && fanoutReady && fanoutDestinations.length > 0
                       && (draft.fanout_groups?.length ?? 0) === 0
-                      && externalDestinationId && draft.status === 'draft'
-                      && draft.delivery_locked_at === null
-                      && draft.caption && draft.delivery_provider === 'facebook_page'
-                      && draft.delivery_destination_id === externalDestinationId
-                      && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
+                      && draft.status === 'draft' && draft.delivery_locked_at === null
+                      && draft.caption && !['prepared', 'completed'].includes(draft.manual_handoff_status) &&
                       <fieldset className="external-delivery-actions">
-                        <legend>Distribución por destinos · sin conversión automática</legend>
-                        <label>
-                          <input type="checkbox"
-                            checked={fanoutDestinationByDraft[draft.id] === true}
-                            onChange={(event) => setFanoutDestinationByDraft((current) => ({
-                              ...current, [draft.id]: event.target.checked,
-                            }))} />
-                          Facebook Page · {externalDestinationId}
-                        </label>
+                        <legend>Selecciona cuentas de distribución · sin conversión automática</legend>
+                        {fanoutDestinations.map((destination) => {
+                          const identity = destination.provider + ':' + destination.destination_id;
+                          return <label key={identity}>
+                            <input type="checkbox"
+                              checked={(fanoutDestinationByDraft[draft.id] ?? []).includes(identity)}
+                              onChange={(event) => setFanoutDestinationByDraft((current) => {
+                                const prior = current[draft.id] ?? [];
+                                return { ...current, [draft.id]: event.target.checked
+                                  ? [...prior.filter((item) => item !== identity), identity]
+                                  : prior.filter((item) => item !== identity) };
+                              })} />
+                            Facebook Page · {destination.destination_id}
+                          </label>;
+                        })}
                         <small>
-                          Cada destino tendrá estado y recibo propio. Solo se enviará
-                          el texto explícito; no se reutilizan claves ni se publican archivos automáticamente.
+                          Cada destino mantiene una clave y un recibo independientes. Preparar
+                          no publica; entregar después exige verificación actual de la cuenta.
                         </small>
                         <button type="button"
-                          disabled={busyId !== null || !fanoutDestinationByDraft[draft.id]}
+                          disabled={busyId !== null || (fanoutDestinationByDraft[draft.id] ?? []).length === 0}
                           onClick={() => void prepareFanout(draft)}>
                           {busyId === 'fanout-prepare-' + draft.id
                             ? 'Preparando…' : 'Preparar grupo sin publicar'}
