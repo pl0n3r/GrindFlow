@@ -230,6 +230,28 @@ final class DistributionFanoutTest extends TestCase
             $this->fanout->summary($this->organization, $this->actor, $group['id'])['deliveries'][0]['status']);
     }
 
+
+    public function testUnverifiedDestinationCannotPrepareAnyGroup(): void
+    {
+        $attempts = 0;
+        try {
+            $this->fanout->prepare(
+                $this->organization, $this->actor, $this->draft,
+                'denied-provider-0001', $this->destinations(),
+                static function (string $org, string $provider, string $destination) use (&$attempts): bool {
+                    ++$attempts;
+                    return false;
+                },
+            );
+            self::fail('A destination without proven ownership must not be queued.');
+        } catch (DistributionProviderException $exception) {
+            self::assertSame(DistributionProviderException::KIND_AUTHENTICATION, $exception->kind);
+        }
+        self::assertSame(1, $attempts);
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_deliveries'));
+    }
+
     public function testEmergencyStopPreventsEvenQueueCreation(): void
     {
         $this->db->update('gf_emergency_stop', ['state' => 'PAUSED', 'revision' => 2], ['id' => 1]);
