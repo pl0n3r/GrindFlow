@@ -145,15 +145,11 @@ final readonly class DistributionFanoutService
                     'created_at' => gmdate('Y-m-d H:i:s'),
                 ]);
             }
-            $updated = $db->update('gf_schedule_drafts', [
-                'delivery_locked_at' => gmdate('Y-m-d H:i:s'),
-            ], [
-                'id' => $draftId,
-                'organization_id' => $organizationId,
-            ]);
-            if ($updated !== 1) {
-                throw new LogicException('Draft lock was lost while preparing the group.');
-            }
+            // Do not use the legacy delivery_locked_at column here: its
+            // DB constraint requires a single Facebook account and must not
+            // constrain a fan-out group with independently owned targets.
+            // The draft row lock plus unique group index serialize creation;
+            // legacy publish and caption edits explicitly check this group.
             return $id;
         });
         return $this->summary($organizationId, $actorId, $groupId);
