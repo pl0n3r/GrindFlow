@@ -100,14 +100,14 @@ final readonly class DistributionFanoutService
             if (!$inserted) {
                 $existing = $db->fetchAssociative(
                     <<<'SQL'
-                        SELECT id, request_fingerprint FROM gf_distribution_fanout_groups
+                        SELECT id, request_key, request_fingerprint FROM gf_distribution_fanout_groups
                         WHERE organization_id = :organization AND draft_id = :draft
-                          AND request_key = :request
                         FOR UPDATE
                         SQL,
-                    ['organization' => $organizationId, 'draft' => $draftId, 'request' => $requestKey],
+                    ['organization' => $organizationId, 'draft' => $draftId],
                 );
-                if ($existing === false || !hash_equals((string) $existing['request_fingerprint'], $fingerprint)) {
+                if ($existing === false || !hash_equals((string) $existing['request_key'], $requestKey)
+                    || !hash_equals((string) $existing['request_fingerprint'], $fingerprint)) {
                     throw new LogicException('Idempotency key belongs to a different intent.');
                 }
                 return (string) $existing['id'];
