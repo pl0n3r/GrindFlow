@@ -32,6 +32,7 @@ final class Version20261106003000 extends AbstractMigration
                 created_at DATETIME NOT NULL,
                 PRIMARY KEY (id),
                 UNIQUE KEY uq_fanout_group_request (organization_id, draft_id, request_key),
+                UNIQUE KEY uq_fanout_one_group_per_draft (organization_id, draft_id),
                 UNIQUE KEY uq_fanout_group_tenant (id, organization_id),
                 INDEX ix_fanout_group_draft (organization_id, draft_id),
                 CONSTRAINT fk_fanout_group_org
