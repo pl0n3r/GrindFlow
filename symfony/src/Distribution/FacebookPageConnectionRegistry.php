@@ -26,12 +26,16 @@ final readonly class FacebookPageConnectionRegistry
     public function pageIdsFor(string $organizationId): array
     {
         $pages = [];
-        foreach ($this->connections() as $connection) {
+        foreach ($this->connections() as $entry) {
+            if ($entry['user_token'] === '') {
+                continue;
+            }
             try {
-                $connection->assertAvailableFor($organizationId);
-                $pages[] = $connection->pageId();
+                $config = $entry['configuration'];
+                $config->assertAvailableFor($organizationId);
+                $pages[] = $config->pageId();
             } catch (DistributionProviderException) {
-                // A connection from another tenant is not listed.
+                // Tenant mismatch or invalid credential.
             }
         }
         return array_values(array_unique($pages));
@@ -39,7 +43,7 @@ final readonly class FacebookPageConnectionRegistry
 
     public function owns(string $organizationId, string $pageId): bool
     {
-        return $this->configurationFor($organizationId, $pageId) !== null;
+        return $this->recordFor($organizationId, $pageId) !== null;
     }
 
     /** Never returns a sender without fresh provider identity and task evidence. */
@@ -48,10 +52,11 @@ final readonly class FacebookPageConnectionRegistry
         string $pageId,
         DestinationHealthService $health,
     ): ?FacebookPageProvider {
-        $config = $this->configurationFor($organizationId, $pageId);
-        if ($config === null || !$this->verify($config)) {
+        $entry = $this->recordFor($organizationId, $pageId);
+        if ($entry === null || !$this->verify($entry['configuration'], $entry['user_token'])) {
             return null;
         }
+        $config = $entry['configuration'];
         $result = $health->classify([
             'credential' => 'verified',
             'permission' => 'granted',
@@ -62,29 +67,35 @@ final readonly class FacebookPageConnectionRegistry
             ? new FacebookPageProvider($config, $this->transport) : null;
     }
 
-    private function configurationFor(string $organizationId, string $pageId): ?FacebookPageConfiguration
+    /** @return array{configuration:FacebookPageConfiguration,user_token:string}|null */
+    private function recordFor(string $organizationId, string $pageId): ?array
     {
-        if (!Uuid::isValid($organizationId) || preg_match('/^\d{1,32}$/D', $pageId) !== 1) {
+        if (!Uuid::isValid($organizationId) || preg_match('/^\\d{1,32}$/D', $pageId) !== 1) {
             return null;
         }
-        foreach ($this->connections() as $connection) {
+        foreach ($this->connections() as $entry) {
+            if ($entry['user_token'] === '') {
+                continue;
+            }
             try {
-                $connection->assertAvailableFor($organizationId);
-                if (hash_equals($connection->pageId(), $pageId)) {
-                    return $connection;
+                $config = $entry['configuration'];
+                $config->assertAvailableFor($organizationId);
+                if (hash_equals($config->pageId(), $pageId)) {
+                    return $entry;
                 }
             } catch (DistributionProviderException) {
-                continue;
+                // Another organization or unavailable configuration.
             }
         }
         return null;
     }
 
-    /** @return list<FacebookPageConfiguration> */
+    /** @return list<array{configuration:FacebookPageConfiguration,user_token:string}> */
     private function connections(): array
     {
         if ($this->connectionsFile === '') {
-            return [$this->legacy];
+            // Legacy pilot has no permission token; fan-out fails closed.
+            return [['configuration' => $this->legacy, 'user_token' => '']];
         }
         $file = $this->connectionsFile;
         // A configured but invalid catalog never silently falls back to a
@@ -116,9 +127,11 @@ final readonly class FacebookPageConnectionRegistry
         foreach ($rows as $row) {
             if (!is_array($row) || !isset(
                 $row['organization_id'], $row['page_id'],
-                $row['access_token'], $row['graph_version'],
+                $row['access_token'], $row['graph_version'], $row['user_access_token'],
             ) || !is_string($row['organization_id']) || !is_string($row['page_id'])
-                || !is_string($row['access_token']) || !is_string($row['graph_version'])) {
+                || !is_string($row['access_token']) || !is_string($row['graph_version'])
+                || !is_string($row['user_access_token'])
+                || trim($row['user_access_token']) === '' || strlen($row['user_access_token']) > 16384) {
                 return [];
             }
             $config = new FacebookPageConfiguration(
@@ -135,51 +148,77 @@ final readonly class FacebookPageConnectionRegistry
                 return [];
             }
             $seen[$key] = true;
-            $connections[] = $config;
+            $connections[] = ['configuration' => $config, 'user_token' => $row['user_access_token']];
         }
         return $connections;
     }
 
-    private function verify(FacebookPageConfiguration $config): bool
+    private function verify(FacebookPageConfiguration $config, string $userToken): bool
     {
-        try {
-            if ($this->identityProbe !== null) {
-                return ($this->identityProbe)($config) === true;
-            }
-            // The host is fixed; neither URL nor proof is supplied by the
-            // browser. Redirects and unreadable responses fail closed.
-            $url = 'https://graph.facebook.com/'.$config->graphVersion()
-                .'/me?fields=id%2Ctasks';
-            $ctx = stream_context_create(['http' => [
-                'method' => 'GET',
-                'header' => 'Authorization: Bearer '.$config->accessToken()."\r\n"
-                    ."Accept: application/json\r\n",
-                'timeout' => 5, 'ignore_errors' => true,
-                'follow_location' => 0, 'max_redirects' => 0,
-            ]]);
-            $stream = @fopen($url, 'rb', false, $ctx);
-            if ($stream === false) {
-                return false;
-            }
-            try {
-                $meta = stream_get_meta_data($stream);
-                $body = stream_get_contents($stream, 8193);
-            } finally {
-                fclose($stream);
-            }
-            $headers = $meta['wrapper_data'] ?? [];
-            if (!is_array($headers) || preg_match('/^HTTP\/\S+ 200\b/', (string) ($headers[0] ?? '')) !== 1
-                || !is_string($body) || strlen($body) > 8192) {
-                return false;
-            }
-            $decoded = json_decode($body, true, 8, JSON_THROW_ON_ERROR);
-            return is_array($decoded) && is_string($decoded['id'] ?? null)
-                && hash_equals($config->pageId(), $decoded['id'])
-                && is_array($decoded['tasks'] ?? null)
-                && (in_array('CREATE_CONTENT', $decoded['tasks'], true)
-                    || in_array('MANAGE', $decoded['tasks'], true));
-        } catch (Throwable) {
+        if ($userToken === '') {
             return false;
         }
+        try {
+            if ($this->identityProbe !== null) {
+                return ($this->identityProbe)($config, $userToken) === true;
+            }
+            // A Page token must identify exactly the selected Page.
+            $identity = $this->graphRead($config->graphVersion().'/me?fields=id', $config->accessToken());
+            if (!is_array($identity) || !is_string($identity['id'] ?? null)
+                || !hash_equals($config->pageId(), $identity['id'])) {
+                return false;
+            }
+            // Check the current user's Page tasks with an independent user
+            // credential. Historical delivery receipts cannot grant access.
+            $accounts = $this->graphRead(
+                $config->graphVersion().'/me/accounts?fields=id%2Ctasks&limit=100',
+                $userToken,
+            );
+            if (!is_array($accounts) || !is_array($accounts['data'] ?? null)) {
+                return false;
+            }
+            foreach ($accounts['data'] as $page) {
+                if (is_array($page) && is_string($page['id'] ?? null)
+                    && hash_equals($config->pageId(), $page['id'])
+                    && is_array($page['tasks'] ?? null)
+                    && (in_array('CREATE_CONTENT', $page['tasks'], true)
+                        || in_array('PROFILE_PLUS_CREATE_CONTENT', $page['tasks'], true))) {
+                    return true;
+                }
+            }
+        } catch (Throwable) {
+            // Reject unknown identity, revoked tasks, bad JSON and outages.
+        }
+        return false;
     }
+
+    /** @return array<string,mixed>|null */
+    private function graphRead(string $path, string $token): ?array
+    {
+        $context = stream_context_create(['http' => [
+            'method' => 'GET', 'timeout' => 5, 'ignore_errors' => true,
+            'follow_location' => 0, 'max_redirects' => 0,
+            'header' => 'Authorization: Bearer '.$token."\\r\\n"
+                ."Accept: application/json\\r\\n",
+        ], 'ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
+        $stream = @fopen('https://graph.facebook.com/'.$path, 'rb', false, $context);
+        if ($stream === false) {
+            return null;
+        }
+        try {
+            $meta = stream_get_meta_data($stream);
+            $body = stream_get_contents($stream, 8193);
+        } finally {
+            fclose($stream);
+        }
+        $headers = $meta['wrapper_data'] ?? [];
+        if (!is_array($headers)
+            || preg_match('/^HTTP\\/\\S+ 200\\b/', (string) ($headers[0] ?? '')) !== 1
+            || !is_string($body) || strlen($body) > 8192) {
+            return null;
+        }
+        $decoded = json_decode($body, true, 8, JSON_THROW_ON_ERROR);
+        return is_array($decoded) ? $decoded : null;
+    }
+
 }
