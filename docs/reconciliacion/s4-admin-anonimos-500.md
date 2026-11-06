@@ -44,6 +44,14 @@ La comparación del campo público `error.code` se hizo mediante parseo JSON loc
 3. **Hipótesis remanentes, no hechos probados:** caché/container Symfony anticuado, carga de servicios/definiciones de controlador, estado de PHP/OPCache u otra excepción previa al guard de autenticación. No se inspeccionaron logs sanitizados de excepciones del host. Evitar describir esa incertidumbre como causa raíz confirmada de #917.
 4. En código, la regresión del PR #916 ejercita kernel real y cuatro solicitudes anónimas (tres rutas y Vault con query inválida), exige `401`, `application/json`, `authentication_required`, `Cache-Control: private, no-store` y ausencia de HTML. Esta prueba distingue comportamiento **en código** de la observación del hosting; no ejecuta una prueba negativa tenant/rol **autenticado en entorno de ensayo**.
 
+## Diagnóstico S4 remoto owner-only, solo lectura — 2026-11-06
+
+Se ejecutó [S4 Router Diagnostics #42241179721](https://github.com/pl0n3r/GrindFlow/actions/runs/42241179721) con `workflow_dispatch` bajo el actor y triggering actor `pl0n3r`, exactamente en `main@d1bd945695e93beaefd1a70bac433aa42a4d1d14`. La ejecución terminó **`completed/success`**; el job `owner-only-s4-router-readonly` y todos sus pasos finalizaron en `success`: comprobación exact-main antes/después, validación sintáctica del helper, y lectura SSH categórica del checkout Hostinger sin escrituras.
+
+El helper `scripts/s4-router-diagnostics.sh --read-only` impide un resultado `success` cuando el `git rev-parse HEAD` remoto no coincide con el SHA esperado; el workflow valida además 18 campos `S4_DIAG_*` en formato cerrado. Por tanto, el **checkout inspeccionado** coincidía con `main@d1bd945…` durante esa ejecución. El informe por categorías `MATCH/DRIFT/MISSING/UNKNOWN` de los demás campos se publica en el **step summary de GitHub Actions**, no en el objeto público del check-run ni en los logs descargables consultados aquí; por eso **no** se declara el estado individual de `RELEASE_MARKER` ni `CACHE` desde un `success` global.
+
+**Frontera de evidencia:** aunque el checkout remoto inspeccionado coincide con `main`, la API pública `/s4/health` continúa devolviendo `release_sha=null`; no se puede afirmar que la petición HTTP provenga inequívocamente del artefacto/checkout inspeccionado ni que se haya identificado la excepción original del 500. Esta ejecución fue una **lectura autorizada**, no un deploy, un `cache:clear`, una prueba de rollback ni un tratamiento de datos.
+
 ## Criterios de aceptación #917: evaluación estricta
 
 | Criterio | Evidencia | Estado |
