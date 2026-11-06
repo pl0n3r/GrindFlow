@@ -94,3 +94,29 @@ Este documento concentra la guía operativa de Distribution que antes vivía en 
 - El transporte de CI es fake. La prueba real en Instagram requiere autorización del dueño, permisos en Meta y evidencia externa segura; ni un merge ni CI se consideran publicación live.
 
 - Límite de origen: `GRINDFLOW_INSTAGRAM_VAULT_ROOT` debe señalar el directorio privado permitido; sin raíz válida el provider no publica. La ruta canónica (`realpath`) rechaza archivos externos al Vault y escapes mediante enlaces simbólicos.
+
+
+### S4 · Grupos de fan-out Symfony (#75 / GrindFlow #941)
+
+- `DistributionFanoutService` mantiene **intención**, no otro ledger/proveedor:
+  `gf_distribution_fanout_groups` es la idempotencia de request+borrador por
+  organización, y `gf_distribution_fanout_deliveries` mantiene una fila por
+  identidad proveedor+cuenta con su propia clave estable. La tabla
+  `gf_external_publication_attempts` sigue siendo la única autoridad del
+  intento, recibo y resultado externo.
+- Para concurrencia, usar la restricción única de grupo y comparar fingerprint;
+  para cada entrega fallida reintentar **solo su** clave. Los estados
+  `ambiguous`/`in_flight` no autorizan resend. `rate_limited` exige ventana
+  cumplida y solicitud manual; `rejected` y `authentication_failed` son
+  terminales o requieren nueva autorización, nunca retry ciego.
+- El controlador exige sesión, pertenencia y rol actual, CSRF y catálogo de
+  conexión configurada para el tenant. La entrega comprueba nuevamente asset,
+  permisos y estado vigente de la cuenta; `UNKNOWN` no es saludable.
+  `EmergencyStopStore` cubre preparación y provider I/O.
+- La UI presenta contadores y estados por cuenta; no transforma formatos ni
+  interpreta que guardar el grupo sea publicar. Solo usa texto explícito del
+  borrador en el adapter Facebook existente, sin copiar tokens/respuestas.
+- La migración `Version20261106003000` es aditiva y reversible en base de
+  datos de prueba. El rollback SQL no revierte publicaciones externas;
+  en producción no se aplica ninguna migración ni publicación por este PR.
+  Conservar la distinción IMPLEMENTADO / FUSIONADO / DESPLEGADO / VALIDADO EN PRODUCCIÓN.
