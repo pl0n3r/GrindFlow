@@ -150,6 +150,10 @@ final class DistributionFanoutTest extends TestCase
     public function testDuplicateRequestPreservesGroupAndDeliveryIdentities(): void
     {
         $first = $this->group();
+        self::assertNotNull($this->db->fetchOne(
+            'SELECT delivery_locked_at FROM gf_schedule_drafts WHERE id = :id',
+            ['id' => $this->draft],
+        ), 'Queuing a group must prevent a competing single-destination publish.');
         $again = $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft,
             'request-fanout-0001', array_reverse($this->destinations()),
