@@ -223,7 +223,8 @@ final class ScheduleDraftController extends AbstractController
                 static fn (string $pageId): array => [
                     'provider' => 'facebook_page', 'destination_id' => $pageId,
                 ],
-                $fanoutReady ? $connections->pageIdsFor($context['organization']['id']) : [],
+                $fanoutReady && $memberships->permissions($context['organization']['role'])['content_prepare']
+                    ? $connections->pageIdsFor($context['organization']['id']) : [],
             ),
             'external_destination_id' => $externalDestinationId,
             'mode' => 'review_only',
