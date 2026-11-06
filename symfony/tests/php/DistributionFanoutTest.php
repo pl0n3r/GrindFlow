@@ -149,6 +149,40 @@ final class DistributionFanoutTest extends TestCase
         )));
     }
 
+    public function testBatchedGroupsPreserveReceiptsAndDegradeWhenLedgerIsUnmigrated(): void
+    {
+        $group = $this->group();
+        $anotherDraft = Uuid::v7()->toRfc4122();
+        $this->db->insert('gf_schedule_drafts', [
+            'id' => $anotherDraft, 'organization_id' => $this->organization,
+            'asset_id' => Uuid::v7()->toRfc4122(), 'caption' => 'Otro borrador',
+            'status' => 'draft', 'delivery_locked_at' => null,
+        ]);
+        $send = static fn (): DistributionOutcome => new DistributionOutcome('receipt-101');
+        $delivery = $group['deliveries'][0]['id'];
+        $this->fanout->deliver(
+            $this->organization, $this->actor, $group['id'], $delivery,
+            static fn (): bool => true, $send,
+        );
+        $batch = $this->fanout->groupsForDrafts(
+            $this->organization, $this->actor, [$this->draft, $anotherDraft],
+        );
+        self::assertArrayNotHasKey($anotherDraft, $batch);
+        self::assertCount(1, $batch[$this->draft]);
+        self::assertSame(3, $batch[$this->draft][0]['total']);
+        self::assertSame(1, $batch[$this->draft][0]['sent']);
+        self::assertSame(2, $batch[$this->draft][0]['pending']);
+        self::assertSame('receipt-101', $batch[$this->draft][0]['deliveries'][0]['external_publication_id']);
+        self::assertSame(
+            $this->fanout->summary($this->organization, $this->actor, $group['id']),
+            $batch[$this->draft][0],
+        );
+        $this->db->executeStatement('DROP TABLE gf_external_publication_attempts');
+        self::assertSame([], $this->fanout->groupsForDrafts(
+            $this->organization, $this->actor, [$this->draft],
+        ));
+    }
+
     public function testDuplicateRequestPreservesGroupAndDeliveryIdentities(): void
     {
         $first = $this->group();
