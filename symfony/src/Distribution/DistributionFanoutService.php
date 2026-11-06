@@ -150,7 +150,6 @@ final readonly class DistributionFanoutService
             ], [
                 'id' => $draftId,
                 'organization_id' => $organizationId,
-                'delivery_locked_at' => null,
             ]);
             if ($updated !== 1) {
                 throw new LogicException('Draft lock was lost while preparing the group.');
