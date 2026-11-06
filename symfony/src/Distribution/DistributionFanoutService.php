@@ -25,7 +25,7 @@ final readonly class DistributionFanoutService
      * @param list<array{provider:string,destination_id:string}> $destinations
      * @return array<string,mixed>
      */
-    public function prepare(string $organizationId, string $actorId, string $draftId, string $requestKey, array $destinations): array
+    public function prepare(string $organizationId, string $actorId, string $draftId, string $requestKey, array $destinations, callable $ownsDestination): array
     {
         if (!Uuid::isValid($organizationId) || !Uuid::isValid($actorId) || !Uuid::isValid($draftId)
             || preg_match('/^[A-Za-z0-9_-]{8,80}$/D', $requestKey) !== 1
@@ -45,6 +45,11 @@ final readonly class DistributionFanoutService
             $identity = $provider.':'.$id;
             if (isset($seen[$identity])) {
                 throw new InvalidArgumentException('Duplicated destination.');
+            }
+            // Resolve ownership against trusted server-side connection state.
+            // User-provided IDs alone never constitute authorization.
+            if ($ownsDestination($organizationId, $provider, $id) !== true) {
+                throw DistributionProviderException::authentication();
             }
             $seen[$identity] = true;
             $normalized[] = ['provider' => $provider, 'destination_id' => $id];
@@ -226,6 +231,28 @@ final readonly class DistributionFanoutService
         }
         return ['id' => (string) $group['id'], 'draft_id' => (string) $group['draft_id'],
             ...$counts, 'deliveries' => $items, 'automatic_retry' => false];
+    }
+
+
+    /** @return list<array<string,mixed>> */
+    public function groupsForDraft(string $organizationId, string $actorId, string $draftId): array
+    {
+        if (!$this->db->createSchemaManager()->tablesExist([
+            'gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries',
+        ])) {
+            return [];
+        }
+        $this->assertMembership($organizationId, $actorId);
+        $ids = $this->db->fetchFirstColumn(
+            <<<'SQL'
+                SELECT id FROM gf_distribution_fanout_groups
+                WHERE organization_id = :organization AND draft_id = :draft
+                ORDER BY created_at DESC, id DESC LIMIT 10
+                SQL,
+            ['organization' => $organizationId, 'draft' => $draftId],
+        );
+        return array_map(fn (string $id): array =>
+            $this->summary($organizationId, $actorId, $id), $ids);
     }
 
     private function assertSchema(): void
