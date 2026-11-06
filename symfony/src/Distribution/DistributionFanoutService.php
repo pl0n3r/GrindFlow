@@ -281,6 +281,30 @@ final readonly class DistributionFanoutService
     /** @return list<array<string,mixed>> */
     public function groupsForDraft(string $organizationId, string $actorId, string $draftId): array
     {
+        return $this->groupsForDrafts($organizationId, $actorId, [$draftId])[$draftId] ?? [];
+    }
+
+    /**
+     * Batch the visible drafts, their independent destinations and their
+     * authoritative ledger receipts in one tenant-scoped read. One membership
+     * check and one schema check serve the whole agenda, not each draft.
+     *
+     * @param list<string> $draftIds
+     * @return array<string,list<array<string,mixed>>>
+     */
+    public function groupsForDrafts(string $organizationId, string $actorId, array $draftIds): array
+    {
+        if ($draftIds === []) {
+            return [];
+        }
+        if (count($draftIds) > 100 || count(array_unique($draftIds)) !== count($draftIds)) {
+            throw new InvalidArgumentException('Invalid draft batch.');
+        }
+        foreach ($draftIds as $draftId) {
+            if (!is_string($draftId) || !Uuid::isValid($draftId)) {
+                throw new InvalidArgumentException('Invalid draft in batch.');
+            }
+        }
         if (!$this->db->createSchemaManager()->tablesExist([
             'gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries',
             'gf_external_publication_attempts',
@@ -288,16 +312,70 @@ final readonly class DistributionFanoutService
             return [];
         }
         $this->assertMembership($organizationId, $actorId);
-        $ids = $this->db->fetchFirstColumn(
+        $rows = $this->db->fetchAllAssociative(
             <<<'SQL'
-                SELECT id FROM gf_distribution_fanout_groups
-                WHERE organization_id = :organization AND draft_id = :draft
-                ORDER BY created_at DESC, id DESC LIMIT 10
+                SELECT batch.id AS group_id, batch.draft_id,
+                       delivery.id AS delivery_id, delivery.provider,
+                       delivery.destination_id, attempt.status,
+                       attempt.external_publication_id, attempt.updated_at
+                FROM gf_distribution_fanout_groups batch
+                LEFT JOIN gf_distribution_fanout_deliveries delivery
+                  ON delivery.group_id = batch.id
+                 AND delivery.organization_id = batch.organization_id
+                LEFT JOIN gf_external_publication_attempts attempt
+                  ON attempt.organization_id = delivery.organization_id
+                 AND attempt.provider = delivery.provider
+                 AND attempt.idempotency_key = delivery.idempotency_key
+                WHERE batch.organization_id = :organization AND batch.draft_id IN (:drafts)
+                ORDER BY batch.draft_id, batch.created_at DESC, batch.id DESC,
+                         delivery.provider, delivery.destination_id
                 SQL,
-            ['organization' => $organizationId, 'draft' => $draftId],
+            ['organization' => $organizationId, 'drafts' => $draftIds],
+            ['drafts' => \Doctrine\DBAL\ArrayParameterType::STRING],
         );
-        return array_map(fn (string $id): array =>
-            $this->summary($organizationId, $actorId, $id), $ids);
+        $grouped = [];
+        foreach ($rows as $row) {
+            $draftId = (string) $row['draft_id'];
+            $groupId = (string) $row['group_id'];
+            if (!isset($grouped[$draftId])) {
+                $grouped[$draftId] = [];
+            }
+            $position = array_key_last($grouped[$draftId]);
+            if ($position === null || $grouped[$draftId][$position]['id'] !== $groupId) {
+                $grouped[$draftId][] = [
+                    'id' => $groupId, 'draft_id' => $draftId,
+                    'total' => 0, 'sent' => 0, 'pending' => 0, 'failed' => 0,
+                    'deliveries' => [], 'automatic_retry' => false,
+                ];
+                $position = array_key_last($grouped[$draftId]);
+            }
+            if ($row['delivery_id'] === null) {
+                continue;
+            }
+            $status = $row['status'] === null ? 'pending' : (string) $row['status'];
+            $item = &$grouped[$draftId][$position];
+            ++$item['total'];
+            if ($status === 'published') {
+                ++$item['sent'];
+            } elseif (in_array($status, ['pending', 'in_flight'], true)) {
+                ++$item['pending'];
+            } else {
+                ++$item['failed'];
+            }
+            $item['deliveries'][] = [
+                'id' => (string) $row['delivery_id'],
+                'provider' => (string) $row['provider'],
+                'destination_id' => (string) $row['destination_id'],
+                'status' => $status,
+                'external_publication_id' => $status === 'published'
+                    ? (string) $row['external_publication_id'] : null,
+                'updated_at' => $row['updated_at'] === null ? null : (string) $row['updated_at'],
+                'automatic_retry' => false,
+            ];
+            unset($item);
+        }
+
+        return $grouped;
     }
 
     private function assertSchema(): void
