@@ -27,8 +27,11 @@ final readonly class FacebookPageConnectionRegistry
     {
         $pages = [];
         foreach ($this->connections() as $connection) {
-            if (hash_equals(strtolower($connection->organizationId()), strtolower($organizationId))) {
+            try {
+                $connection->assertAvailableFor($organizationId);
                 $pages[] = $connection->pageId();
+            } catch (DistributionProviderException) {
+                // A connection from another tenant is not listed.
             }
         }
         return array_values(array_unique($pages));
