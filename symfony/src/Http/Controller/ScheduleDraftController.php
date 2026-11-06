@@ -378,6 +378,15 @@ final class ScheduleDraftController extends AbstractController
             if ($draft['status'] !== 'draft' || ($draft['delivery_locked_at'] ?? null) !== null) {
                 return ['status' => 'locked'];
             }
+            // Fan-out freezes the source caption and destination set. Editing
+            // them after queuing would invalidate the durable fingerprint.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $id],
+                ) !== false) {
+                return ['status' => 'locked'];
+            }
             if ($db->createSchemaManager()->tablesExist(['gf_manual_handoff_events'])) {
                 $handoff = $db->fetchOne(
                     <<<'SQL'
