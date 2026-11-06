@@ -73,7 +73,6 @@ final readonly class DistributionFanoutService
                 ['organization' => $organizationId, 'draft' => $draftId],
             );
             if ($draft === false || $draft['status'] !== 'draft'
-                || $draft['delivery_locked_at'] !== null
                 || !is_string($draft['caption']) || trim($draft['caption']) === '') {
                 throw new LogicException('Draft is unavailable or missing its explicit caption.');
             }
@@ -83,6 +82,28 @@ final readonly class DistributionFanoutService
                 'caption' => $draft['caption'],
                 'destinations' => $normalized,
             ], JSON_THROW_ON_ERROR));
+            // The draft lock serializes prepare with the legacy publish,
+            // edit and cancellation paths. An identical request can replay
+            // even after the draft has been locked by this same fan-out.
+            $existing = $db->fetchAssociative(
+                <<<'SQL'
+                    SELECT id, request_key, request_fingerprint
+                    FROM gf_distribution_fanout_groups
+                    WHERE organization_id = :organization AND draft_id = :draft
+                    FOR UPDATE
+                    SQL,
+                ['organization' => $organizationId, 'draft' => $draftId],
+            );
+            if ($existing !== false) {
+                if (!hash_equals((string) $existing['request_key'], $requestKey)
+                    || !hash_equals((string) $existing['request_fingerprint'], $fingerprint)) {
+                    throw new LogicException('Idempotency key belongs to a different intent.');
+                }
+                return (string) $existing['id'];
+            }
+            if ($draft['delivery_locked_at'] !== null) {
+                throw new LogicException('Draft is already locked by another delivery flow.');
+            }
             $id = Uuid::v7()->toRfc4122();
             $inserted = true;
             try {
@@ -123,6 +144,16 @@ final readonly class DistributionFanoutService
                     'idempotency_key' => 'fanout:'.$deliveryId.':v1',
                     'created_at' => gmdate('Y-m-d H:i:s'),
                 ]);
+            }
+            $updated = $db->update('gf_schedule_drafts', [
+                'delivery_locked_at' => gmdate('Y-m-d H:i:s'),
+            ], [
+                'id' => $draftId,
+                'organization_id' => $organizationId,
+                'delivery_locked_at' => null,
+            ]);
+            if ($updated !== 1) {
+                throw new LogicException('Draft lock was lost while preparing the group.');
             }
             return $id;
         });
