@@ -23,9 +23,11 @@ final readonly class DistributionFanoutService
 
     /**
      * @param list<array{provider:string,destination_id:string}> $destinations
+     * @param callable(string,string,string):bool $ownsDestination
+     * @param callable(string,string):bool $assetEligible
      * @return array<string,mixed>
      */
-    public function prepare(string $organizationId, string $actorId, string $draftId, string $requestKey, array $destinations, callable $ownsDestination): array
+    public function prepare(string $organizationId, string $actorId, string $draftId, string $requestKey, array $destinations, callable $ownsDestination, callable $assetEligible): array
     {
         if (!Uuid::isValid($organizationId) || !Uuid::isValid($actorId) || !Uuid::isValid($draftId)
             || preg_match('/^[A-Za-z0-9_-]{8,80}$/D', $requestKey) !== 1
@@ -60,7 +62,7 @@ final readonly class DistributionFanoutService
         (new EmergencyStopStore($this->db))->assertRunning();
         $this->assertSchema();
         $groupId = $this->db->transactional(function (Connection $db) use (
-            $organizationId, $actorId, $draftId, $requestKey, $normalized
+            $organizationId, $actorId, $draftId, $requestKey, $normalized, $assetEligible
         ): string {
             $this->assertMembership($organizationId, $actorId);
             $draft = $db->fetchAssociative(
@@ -103,6 +105,22 @@ final readonly class DistributionFanoutService
             }
             if ($draft['delivery_locked_at'] !== null) {
                 throw new LogicException('Draft is already locked by another delivery flow.');
+            }
+            if ($db->createSchemaManager()->tablesExist(['gf_manual_handoff_events'])) {
+                $manual = $db->fetchOne(
+                    <<<'SQL'
+                        SELECT action FROM gf_manual_handoff_events
+                        WHERE organization_id = :organization AND draft_id = :draft
+                        ORDER BY created_at DESC, id DESC LIMIT 1
+                        SQL,
+                    ['organization' => $organizationId, 'draft' => $draftId],
+                );
+                if (in_array($manual, ['prepare', 'complete'], true)) {
+                    throw new LogicException('Active manual handoff forbids fan-out.');
+                }
+            }
+            if ($assetEligible($organizationId, (string) $draft['asset_id']) !== true) {
+                throw new LogicException('Asset is no longer eligible for distribution.');
             }
             $id = Uuid::v7()->toRfc4122();
             $inserted = true;
@@ -265,6 +283,7 @@ final readonly class DistributionFanoutService
     {
         if (!$this->db->createSchemaManager()->tablesExist([
             'gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries',
+            'gf_external_publication_attempts',
         ])) {
             return [];
         }

@@ -44,6 +44,7 @@ final class DistributionFanoutTest extends TestCase
             'CREATE TABLE gf_identity_organizations (id TEXT PRIMARY KEY)',
             'CREATE TABLE gf_identity_memberships (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, organization_id TEXT NOT NULL, role TEXT NOT NULL)',
             'CREATE TABLE gf_schedule_drafts (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, asset_id TEXT NOT NULL, caption TEXT, status TEXT NOT NULL, delivery_locked_at TEXT)',
+            'CREATE TABLE gf_manual_handoff_events (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, draft_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL)',
             'CREATE TABLE gf_distribution_fanout_groups (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, draft_id TEXT NOT NULL, request_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(organization_id, draft_id, request_key), UNIQUE(organization_id, draft_id))',
             'CREATE TABLE gf_distribution_fanout_deliveries (id TEXT PRIMARY KEY, group_id TEXT NOT NULL, organization_id TEXT NOT NULL, provider TEXT NOT NULL, destination_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(group_id, provider, destination_id), UNIQUE(organization_id, provider, idempotency_key))',
             'CREATE TABLE gf_external_publication_attempts (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, provider TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, status TEXT NOT NULL, external_publication_id TEXT, retry_after_seconds INTEGER, retry_not_before TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(organization_id, provider, idempotency_key))',
@@ -88,6 +89,7 @@ final class DistributionFanoutTest extends TestCase
         return $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft,
             'request-fanout-0001', $this->destinations(),
+            static fn (): bool => true,
             static fn (): bool => true,
         );
     }
@@ -154,6 +156,7 @@ final class DistributionFanoutTest extends TestCase
             $this->organization, $this->actor, $this->draft,
             'request-fanout-0001', array_reverse($this->destinations()),
             static fn (): bool => true,
+            static fn (): bool => true,
         );
         self::assertSame($first, $again);
         self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
@@ -164,6 +167,7 @@ final class DistributionFanoutTest extends TestCase
                 $this->organization, $this->actor, $this->draft,
                 'another-request-0001', $this->destinations(),
                 static fn (): bool => true,
+            static fn (): bool => true,
             );
             self::fail('A different request key cannot create a second group for the same draft.');
         } catch (\LogicException) {
@@ -175,6 +179,7 @@ final class DistributionFanoutTest extends TestCase
         $this->fanout->prepare(
             $this->organization, $this->actor, $this->draft, 'request-fanout-0001',
             [ $this->destinations()[0] ],
+            static fn (): bool => true,
             static fn (): bool => true,
         );
     }
@@ -254,6 +259,7 @@ final class DistributionFanoutTest extends TestCase
                     ++$attempts;
                     return false;
                 },
+                static fn (): bool => true,
             );
             self::fail('A destination without proven ownership must not be queued.');
         } catch (DistributionProviderException $exception) {
@@ -262,6 +268,36 @@ final class DistributionFanoutTest extends TestCase
         self::assertSame(1, $attempts);
         self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
         self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_deliveries'));
+    }
+
+    public function testActiveManualHandoffAndRevokedAssetCannotPrepare(): void
+    {
+        $this->db->insert('gf_manual_handoff_events', [
+            'id' => Uuid::v7()->toRfc4122(), 'organization_id' => $this->organization,
+            'draft_id' => $this->draft, 'action' => 'prepare',
+            'created_at' => '2026-11-05 12:00:00',
+        ]);
+        try {
+            $this->group();
+            self::fail('Manual prepare forbids fan-out.');
+        } catch (\LogicException) {
+            // The draft is locked before this state is inspected.
+        }
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
+        $this->db->delete('gf_manual_handoff_events', ['draft_id' => $this->draft]);
+
+        try {
+            $this->fanout->prepare(
+                $this->organization, $this->actor, $this->draft,
+                'asset-revoked-0001', $this->destinations(),
+                static fn (): bool => true,
+                static fn (): bool => false,
+            );
+            self::fail('Revoked asset must not leave an unpublishable group.');
+        } catch (\LogicException) {
+            // Expected: fail closed before insert.
+        }
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM gf_distribution_fanout_groups'));
     }
 
     public function testEmergencyStopPreventsEvenQueueCreation(): void

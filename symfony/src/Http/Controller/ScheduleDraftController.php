@@ -99,7 +99,7 @@ final class ScheduleDraftController extends AbstractController
         $handoffReady = $schema->tablesExist(['gf_manual_handoff_events']);
         $destinationReady = $schema->tablesExist(['gf_manual_destinations']);
         $externalLedgerReady = $schema->tablesExist(['gf_external_publication_attempts']);
-        $fanoutReady = $schema->tablesExist(['gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries']);
+        $fanoutReady = $schema->tablesExist(['gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries', 'gf_external_publication_attempts']);
         $externalDeliveryReady = false;
         $externalDestinationId = null;
         try {
@@ -734,6 +734,7 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         DistributionFanoutService $fanout,
         FacebookPageProvider $facebookPage,
+        Connection $db,
     ): JsonResponse {
         $context = $this->context($request, $memberships);
         if ($context instanceof JsonResponse) {
@@ -773,10 +774,20 @@ final class ScheduleDraftController extends AbstractController
             }
         };
 
+        // Read current Vault authorization while the service holds the draft
+        // row lock, before persisting any irreversible publication intent.
+        $eligible = function (string $organization, string $assetId) use ($db): bool {
+            $asset = $db->fetchAssociative(
+                'SELECT id, usage_scope, deleted_at FROM gf_vault_assets WHERE organization_id = :organization AND id = :asset',
+                ['organization' => $organization, 'asset' => $assetId],
+            );
+            return $asset !== false && $asset['deleted_at'] === null
+                && $this->assetEligibility($db, $organization, $assetId, (string) $asset['usage_scope']) === [];
+        };
         try {
             $group = $fanout->prepare(
                 $context['organization']['id'], $context['user']->id(),
-                $id, $payload['request_key'], $payload['destinations'], $owned,
+                $id, $payload['request_key'], $payload['destinations'], $owned, $eligible,
             );
         } catch (\InvalidArgumentException) {
             return $this->error(422, 'invalid_fanout', 'La selección de destinos es inválida.');
@@ -971,6 +982,14 @@ final class ScheduleDraftController extends AbstractController
                 return ['status' => 'ok', 'changed' => false, 'draft' => $draft];
             }
             if (($draft['delivery_locked_at'] ?? null) !== null) {
+                return ['status' => 'delivery_locked'];
+            }
+            // Must be checked under the same row lock as prepareFanout.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $id],
+                ) !== false) {
                 return ['status' => 'delivery_locked'];
             }
             if ($db->createSchemaManager()->tablesExist(['gf_manual_handoff_events'])) {

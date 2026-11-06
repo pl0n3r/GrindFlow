@@ -554,8 +554,11 @@ export function ScheduleDraftPanel({
       setFeedback('Destino procesado por el proveedor; verifica su recibo individual.');
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo entregar ese destino.');
+      const deliveryError = caught instanceof Error ? caught.message : 'No se pudo entregar ese destino.';
       await load();
+      setError((reloadError) => reloadError
+        ? deliveryError + ' · Además, falló la recarga: ' + reloadError
+        : deliveryError);
     } finally {
       setBusyId(null);
     }
@@ -940,8 +943,9 @@ export function ScheduleDraftPanel({
         </section>}
 
       <p className="weekly-safety">
-        <strong>Solo agenda y handoff humano.</strong> Destinos y cola son organización interna.
-        No llaman proveedores, no mueven contenido fuera de GrindFlow y no prueban una publicación externa.
+        <strong>Destinos y cola manual: solo organización interna.</strong>
+        La salida manual no llama a proveedores ni acredita una publicación externa.
+        La acción «Entregar solo este destino» sí puede llamar al proveedor y publicar contenido.
       </p>
     </section>
   );
