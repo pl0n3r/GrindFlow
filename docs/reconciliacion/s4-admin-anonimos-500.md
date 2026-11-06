@@ -1,0 +1,63 @@
+# GrindFlow #917 — 500 anónimos en API admin S4: conciliación de evidencia
+
+> **Corte: 2026-11-06 · recuperación HTTP observada, causa específica del 500 NO DEMOSTRADA.** Este expediente es solo documental. No declara un nuevo deploy, restore exitoso, ni validación productiva exact-SHA de Symfony. El issue #903 tiene alcance distinto (404 de rutas).
+
+## Autoridad, identidad y fuentes
+
+- Fuente contractual: [issue #917](https://github.com/pl0n3r/GrindFlow/issues/917); [handoff de auditoría #918](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6631139904).
+- Autorización OWNER de 2026-11-06: [comentario #6686368279](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6686368279), **solo lectura y sin datos privados**, limitada al diagnóstico de estas tres rutas; no habilita escritura, reinicio, deploy ni cambios Hostinger.
+- Evidencia histórica de los 500/401: [comentario #6651765795](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6651765795) (sondeo del dueño, 2026-11-05). Evidencia del runtime y cache: [#903 / comentario #6651765531](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6651765531).
+- Regresión de aplicación: [#905](https://github.com/pl0n3r/GrindFlow/issues/905) y [PR #916 fusionado](https://github.com/pl0n3r/GrindFlow/pull/916), squash `8f5b200289e2b53a94530b0d35b12eb83fb21f51`; prueba real de kernel `symfony/tests/php/AdminUnauthenticatedResponseTest.php`.
+- Sondeo independiente de esta sesión: HTTPS **GET anónimo**, sin cookies ni credenciales, desde dispositivo conectado autorizado, **2026-11-06 ~15:00 UTC**. El cliente descartó los cuerpos en la verificación de estado/MIME y extrajo **solo** `error.code` de los JSON públicos. Sin leer ni publicar información privada.
+
+| GET en `https://www.grindflow.com.co` | 4-nov, antes (reporte #917) | 5-nov, después (reporte OWNER) | 6-nov, verificación independiente |
+| --- | --- | --- | --- |
+| `/s4/api/admin/context` | **500** `text/html` | **401** `application/json` | **401** `application/json`; `authentication_required` |
+| `/s4/api/admin/vault` | **500** `text/html` | **401** `application/json` | **401** `application/json`; `authentication_required` |
+| `/s4/api/admin/rules/weekly/preview` | **500** `text/html` | **401** `application/json` | **401** `application/json`; `authentication_required` |
+
+Identidad en el mismo sondeo:
+
+- `GET /health`: HTTP **200**, `status=ok`, `version=0.1.227`, `commit=d1bd945695e93beaefd1a70bac433aa42a4d1d14`, `exact=true`; coincide con `GrindFlow/main` leído al iniciar este ciclo. Es identidad de **Laravel/raíz**, **no** una atestación exacta de Symfony.
+- `GET /s4/health`: HTTP **200**, JSON, `status=ok`, `version=0.1.227`, `stage=s0-preview`, **`release_sha=null`**. El runtime Symfony **no** acredita el mismo SHA. Una coincidencia de versión legible no prueba identidad exacta de S4.
+- No se realizó ningún cambio de código, instalación, comando de mantenimiento, actualización de caché, SSH, migración, manipulación de permisos ni escritura en el host durante este sondeo.
+
+### Reproducción segura de la observación HTTP
+
+Usar exclusivamente endpoints públicos, con `GET` sin sesión; no almacenar cuerpos ni cabeceras sensibles. Por ejemplo:
+
+```sh
+for path in /s4/api/admin/context /s4/api/admin/vault /s4/api/admin/rules/weekly/preview; do
+  printf '%s ' "$path"
+  curl --silent --show-error --location --output /dev/null \
+    --write-out 'HTTP %{http_code}; MIME %{content_type}\n' --max-time 15 \
+    "https://www.grindflow.com.co$path"
+done
+```
+
+La comparación del campo público `error.code` se hizo mediante parseo JSON local, imprimiendo únicamente el valor `authentication_required`, no el contenido integral. Para atestación de identidad: comparar la salida allowlisted de `/health` y `/s4/health` con la fuente exacta en GitHub; si `release_sha=null`, el resultado exact-SHA de Symfony sigue siendo **UNKNOWN**.
+
+## Análisis diferencial: #917 (500) frente a #903 (404)
+
+1. **#903 sí tiene evidencia de caché obsoleta.** El OWNER observó `symfony/var/cache/prod` y `var/cache/production` fechados el **2026-10-06**, anteriores a rutas introducidas el 11-oct. Declaró backup `var/cache/prod.bak-20261105` y ejecución de `APP_ENV=prod php bin/console cache:clear --env=prod --no-debug` el **2026-11-05**. Cinco rutas nuevas dejaron el 404 HTML tras esa intervención; Reports y DSR tienen circunstancias independientes. Esta es evidencia comunicada por el dueño en [#903/#6651765531](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6651765531), **no una operación ejecutada o auditada de forma independiente en este PR**.
+2. **#917 se refiere a tres rutas previamente registradas que devolvían 500 HTML**, no al 404 de controladores recientes. Sus tres respuestas se convirtieron en 401 JSON tras la misma intervención temporal y continuaban correctas en el sondeo nuevo. Esto sostiene que el problema **estuvo correlacionado** con el estado del runtime y pudo compartir causa con la caché compilada antigua, **pero no permite identificar la excepción concreta de los tres 500**.
+3. **Hipótesis remanentes, no hechos probados:** caché/container Symfony anticuado, carga de servicios/definiciones de controlador, estado de PHP/OPCache u otra excepción previa al guard de autenticación. No se inspeccionaron logs sanitizados de excepciones del host. Evitar describir esa incertidumbre como causa raíz confirmada de #917.
+4. En código, la regresión del PR #916 ejercita kernel real y cuatro solicitudes anónimas (tres rutas y Vault con query inválida), exige `401`, `application/json`, `authentication_required`, `Cache-Control: private, no-store` y ausencia de HTML. Esta prueba distingue comportamiento **en código** de la observación del hosting; no ejecuta una prueba negativa tenant/rol **autenticado en entorno de ensayo**.
+
+## Criterios de aceptación #917: evaluación estricta
+
+| Criterio | Evidencia | Estado |
+| --- | --- | --- |
+| **AC-01** HTTP sin sesión + SHA/versión | Tres 401 JSON autenticados por sondeo público, 2026-11-06. `/health` identifica main; `/s4/health.release_sha=null` impide correlación Symfony exacta. | **PARCIAL** (HTTP sí; identidad S4 no) |
+| **AC-02** causa del 500 respaldada por logs/diagnóstico | #903 demuestra la caché antigua y temporalidad de recuperación, pero no la excepción específica de los 500 de #917. La distinción 500 ≠ 404 queda acreditada. | **PARCIAL / causa específica UNKNOWN** |
+| **AC-03** 3×401 + respaldo/rollback del repair | Las tres respuestas **cumplen**. El OWNER declara un backup de caché antes del `cache:clear`, pero faltan recibos verificables de integridad/restore/rollback del runtime S4, alcance de autorización de esa escritura y prueba tenant/rol en ensayo. | **PARCIAL** |
+| **AC-04** `Factory CI reusable / Validar` del HEAD final | La regresión #916 ya fue fusionada; este archivo requiere CI **del SHA de su propio PR**, no heredar los checks de #916. | **PENDIENTE de HEAD final** |
+
+## Desbloqueo operativo y riesgos
+
+- **Solo lectura permitida** por el OWNER: recoger desde canal autenticado autorizado, con sanitización previa y sin reproducir secretos o datos personales, error/stack mínimo de las tres peticiones históricas, timestamps, servicio/route matching, fecha/hash de caché y `git rev-parse HEAD` del checkout S4; si el log histórico ya expiró, registrar `NO_DISPONIBLE`, no inventar causa. No inspeccionar cuentas/tenants ni sesiones reales.
+- Para cualquier nueva escritura Hostinger, **exigir otra autorización específica**, backup realmente verificable, evidencia de restore/rollback, alcance exact-SHA y prueba posterior HTTP/health conforme a D-043/D-059. La autorización para lectura de 6-nov **no** basta.
+- En ensayo aislado y con fixtures ficticios, ejecutar la prueba negativa de tenant/rol con identidad controlada y registrar check/commit exactos. No extender el claim documental de #917 a código/test sin renovar legítimamente el contrato V3.
+- Tras superar estas pruebas, comprobar el HEAD exacto del PR, `Factory CI reusable / Validar`, SonarCloud, CodeQL, revisión CodeRabbit **FINAL única** (solo con CI verde y PR definitivo) y protección de rama. Cualquier despliegue/producto queda fuera de este PR.
+
+**Dictamen:** HTTP anónimo **recuperado y revalidado**; causa puntual del 500 e identidad exacta de Symfony **no acreditadas**. Este expediente de preparación **no equivale** a cierre total del incidente, certificación de go-live, backup restaurado o autorización de merge/activación por inferencia.
