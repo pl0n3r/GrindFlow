@@ -116,6 +116,16 @@ Este documento concentra la guía operativa de Distribution que antes vivía en 
 - La UI presenta contadores y estados por cuenta; no transforma formatos ni
   interpreta que guardar el grupo sea publicar. Solo usa texto explícito del
   borrador en el adapter Facebook existente, sin copiar tokens/respuestas.
+- El catálogo Symfony actual expone **una sola** página configurada por
+  organización; todavía falta un resolver autenticado por cuenta para N
+  páginas y evidencia reciente de permisos del proveedor. El ledger histórico
+  no acredita conexión vigente: `DestinationHealthService::forOrganization`
+  permanece UNKNOWN sin una prueba independiente. No usar esa ausencia como
+  permiso para emitir requests a terceros ni declarar paridad productiva.
+- Un grupo fan-out bloquea la preparación de salida manual y la cancelación
+  del borrador mientras exista, bajo el mismo lock de borrador. El listado
+  de hasta 30 borradores obtiene grupos/recibos en lote y degrada a [] si
+  faltan tablas de fan-out o ledger.
 - La migración `Version20261106003000` es aditiva y reversible en base de
   datos de prueba. El rollback SQL no revierte publicaciones externas;
   en producción no se aplica ninguna migración ni publicación por este PR.
