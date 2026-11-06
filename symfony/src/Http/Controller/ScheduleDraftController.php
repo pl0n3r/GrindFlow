@@ -10,6 +10,7 @@ use GrindFlow\Distribution\DistributionFanoutService;
 use GrindFlow\Distribution\DestinationHealthService;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
+use GrindFlow\Distribution\FacebookPageConnectionRegistry;
 use GrindFlow\Distribution\FacebookPagePublicationService;
 use GrindFlow\Identity\Application\MembershipContext;
 use GrindFlow\Library\AssetNetworkRules;
@@ -83,6 +84,7 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         Connection $db,
         FacebookPageProvider $facebookPage,
+        FacebookPageConnectionRegistry $connections,
         ?DistributionFanoutService $fanout = null,
     ): JsonResponse
     {
@@ -217,6 +219,12 @@ final class ScheduleDraftController extends AbstractController
             'manual_destination_ready' => $destinationReady,
             'external_delivery_ready' => $externalDeliveryReady,
             'fanout_ready' => $fanoutReady,
+            'fanout_destinations' => array_map(
+                static fn (string $pageId): array => [
+                    'provider' => 'facebook_page', 'destination_id' => $pageId,
+                ],
+                $fanoutReady ? $connections->pageIdsFor($context['organization']['id']) : [],
+            ),
             'external_destination_id' => $externalDestinationId,
             'mode' => 'review_only',
             'can_publish' => false,
@@ -734,7 +742,7 @@ final class ScheduleDraftController extends AbstractController
         Request $request,
         MembershipContext $memberships,
         DistributionFanoutService $fanout,
-        FacebookPageProvider $facebookPage,
+        FacebookPageConnectionRegistry $connections,
         Connection $db,
     ): JsonResponse {
         $context = $this->context($request, $memberships);
@@ -761,19 +769,10 @@ final class ScheduleDraftController extends AbstractController
                 return $this->error(422, 'invalid_fanout', 'Cada destino debe tener proveedor y cuenta.');
             }
         }
-        $owned = static function (string $org, string $provider, string $destination) use ($facebookPage): bool {
-            if ($provider !== 'facebook_page') {
-                // Add another adapter only when there is a real tenant-scoped
-                // connection identity and evidence for that network.
-                return false;
-            }
-            try {
-                $facebookPage->assertAvailableFor($org);
-                return hash_equals($facebookPage->destinationPageId(), $destination);
-            } catch (DistributionProviderException) {
-                return false;
-            }
-        };
+        // Client IDs are only selectors. Server-owned connections determine
+        // the accounts that can be prepared for this tenant.
+        $owned = static fn (string $org, string $provider, string $destination): bool =>
+            $provider === 'facebook_page' && $connections->owns($org, $destination);
 
         // Read current Vault authorization while the service holds the draft
         // row lock, before persisting any irreversible publication intent.
@@ -820,7 +819,7 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         Connection $db,
         DistributionFanoutService $fanout,
-        FacebookPageProvider $facebookPage,
+        FacebookPageConnectionRegistry $connections,
         DestinationHealthService $destinationHealth,
     ): JsonResponse {
         $context = $this->context($request, $memberships);
@@ -860,35 +859,31 @@ final class ScheduleDraftController extends AbstractController
                 return $this->error(409, 'asset_not_publishable', 'El recurso ya no está autorizado para distribución.');
             }
 
+            // Resolve the selected tenant/page and prove current identity
+            // and publish task before any external publication attempt.
+            $verified = null;
             $authorized = static function (string $organization, string $provider, string $destination) use (
-                $facebookPage, $destinationHealth
+                $connections, $destinationHealth, &$verified
             ): bool {
+                $verified = null;
                 if ($provider !== 'facebook_page') {
                     return false;
                 }
-                try {
-                    $facebookPage->assertAvailableFor($organization);
-                    if (!hash_equals($facebookPage->destinationPageId(), $destination)) {
-                        return false;
-                    }
-                    $state = array_values(array_filter(
-                        $destinationHealth->forOrganization($organization),
-                        static fn (array $item): bool => $item['provider'] === 'facebook_page',
-                    ))[0] ?? null;
-                    return is_array($state) && $state['can_enqueue'] === true;
-                } catch (DistributionProviderException) {
-                    return false;
-                }
+                $verified = $connections->verifiedProviderFor(
+                    $organization, $destination, $destinationHealth,
+                );
+                return $verified !== null;
             };
             $send = static function (DistributionCommand $command, string $provider, string $destination) use (
-                $facebookPage
+                &$verified
             ): \GrindFlow\Distribution\DistributionOutcome {
-                if ($provider !== 'facebook_page' || !hash_equals($facebookPage->destinationPageId(), $destination)) {
+                if ($provider !== 'facebook_page' || $verified === null
+                    || !hash_equals($verified->destinationPageId(), $destination)) {
                     throw DistributionProviderException::authentication();
                 }
-                // Only the explicit caption is sent: this increment does not
-                // auto-convert an asset nor infer a video/photo format.
-                return $facebookPage->publish($command);
+                // The already verified page-bound provider retains its own
+                // credential for this invocation, not a global page token.
+                return $verified->publish($command);
             };
             $result = $fanout->deliver($org, $actor, $groupId, $deliveryId, $authorized, $send);
         } catch (DistributionProviderException $exception) {
