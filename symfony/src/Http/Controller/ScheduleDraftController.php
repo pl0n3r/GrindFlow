@@ -528,6 +528,16 @@ final class ScheduleDraftController extends AbstractController
             if ($draft['status'] !== 'draft') {
                 return ['status' => 'locked'];
             }
+            // The legacy one-destination path and the S4 fan-out path use
+            // distinct immutable keys: never allow both to publish the same
+            // draft. Both transactions lock the draft row before proceeding.
+            if ($db->createSchemaManager()->tablesExist(['gf_distribution_fanout_groups'])
+                && $db->fetchOne(
+                    'SELECT id FROM gf_distribution_fanout_groups WHERE organization_id = :organization AND draft_id = :draft LIMIT 1',
+                    ['organization' => $organization, 'draft' => $id],
+                ) !== false) {
+                return ['status' => 'locked'];
+            }
             if ($draft['deleted_at'] !== null || !in_array($draft['mime_type'], ['image/jpeg', 'image/png'], true)) {
                 return ['status' => 'asset_invalid'];
             }
