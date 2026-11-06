@@ -315,6 +315,7 @@ final class ScheduleDraftController extends AbstractController
         MembershipContext $memberships,
         Connection $db,
         FacebookPageProvider $facebookPage,
+        FacebookPageConnectionRegistry $connections,
     ): JsonResponse {
         $context = $this->context($request, $memberships);
         if ($context instanceof JsonResponse) {
@@ -342,12 +343,18 @@ final class ScheduleDraftController extends AbstractController
             return $this->error(422, 'invalid_delivery_intent', 'El caption debe contener entre 1 y 5000 caracteres.');
         }
 
+        $pageId = null;
         try {
             $facebookPage->assertAvailableFor($context['organization']['id']);
+            $pageId = $facebookPage->destinationPageId();
         } catch (DistributionProviderException) {
-            return $this->error(409, 'facebook_page_unavailable', 'Facebook Page no está configurada para esta organización.');
+            // A fan-out-only tenant may have several server-owned Pages
+            // without the legacy single-page pilot configuration.
+            $pageId = $connections->pageIdsFor($context['organization']['id'])[0] ?? null;
         }
-        $pageId = $facebookPage->destinationPageId();
+        if ($pageId === null) {
+            return $this->error(409, 'facebook_page_unavailable', 'No hay cuenta configurada para esta organización.');
+        }
 
         $result = $db->transactional(function (Connection $db) use ($context, $id, $caption, $pageId): array {
             $organization = $context['organization']['id'];
