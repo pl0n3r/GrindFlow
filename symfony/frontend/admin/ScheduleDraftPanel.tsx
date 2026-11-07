@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { DistributionAdaptationPreview, type NetworkAdaptationPlan } from './DistributionAdaptationPreview';
 
 type Slot = {
   local_date: string;
@@ -109,6 +110,11 @@ export function ScheduleDraftPanel({
   manualDestinationCsrf,
 }: Props) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [adaptationByDraft, setAdaptationByDraft] = useState<
+    Record<string, { plan: NetworkAdaptationPlan; role: 'studio' | 'independent' }>
+  >({});
+  const [adaptationLoading, setAdaptationLoading] = useState<string | null>(null);
+  const [adaptationErrors, setAdaptationErrors] = useState<Record<string, string>>({});
   const [total, setTotal] = useState(0);
   const [handoffReady, setHandoffReady] = useState(false);
   const [externalDeliveryReady, setExternalDeliveryReady] = useState(false);
@@ -139,6 +145,40 @@ export function ScheduleDraftPanel({
     () => destinations.filter((destination) => destination.active),
     [destinations],
   );
+
+  async function loadNetworkAdaptation(draft: Draft) {
+    if (!canEdit || adaptationLoading !== null || draft.status !== 'draft') return;
+    setAdaptationLoading(draft.id);
+    setAdaptationErrors((state) => ({ ...state, [draft.id]: '' }));
+    setAdaptationByDraft((state) => {
+      const next = { ...state };
+      delete next[draft.id];
+      return next;
+    });
+    try {
+      const response = await fetch(
+        '/api/admin/schedules/' + encodeURIComponent(draft.id) + '/network-adaptation-preview',
+        { credentials: 'same-origin', headers: { Accept: 'application/json' } },
+      );
+      if (!response.ok) throw new Error('preview_unavailable');
+      const body = await response.json();
+      if (body?.data?.provider_calls !== false || body?.data?.publishes !== false
+          || !body?.data?.plan || !Array.isArray(body.data.plan.destinations)
+          || body.data.plan.provider_calls !== false) {
+        throw new Error('invalid_preview');
+      }
+      const role = body.data.role === 'studio' ? 'studio' : 'independent';
+      setAdaptationByDraft((state) => ({
+        ...state, [draft.id]: { plan: body.data.plan as NetworkAdaptationPlan, role },
+      }));
+    } catch {
+      setAdaptationErrors((state) => ({
+        ...state, [draft.id]: 'No fue posible verificar la adaptación. Nada se publicará desde esta vista.',
+      }));
+    } finally {
+      setAdaptationLoading(null);
+    }
+  }
 
   async function load(signal?: AbortSignal) {
     setError('');
@@ -176,6 +216,8 @@ export function ScheduleDraftPanel({
 
       const nextDrafts = scheduleBody.data.drafts as Draft[];
       setDrafts(nextDrafts);
+      setAdaptationByDraft({});
+      setAdaptationErrors({});
       setTotal(scheduleBody.data.total as number);
       setHandoffReady(scheduleBody.data.manual_handoff_ready === true);
       setExternalDeliveryReady(scheduleBody.data.external_delivery_ready === true);
@@ -772,6 +814,22 @@ export function ScheduleDraftPanel({
                             </li>)}
                         </ul>
                       </section>)}
+                    {canEdit && draft.status === 'draft' &&
+                      <section aria-label={'Adaptación por red de ' + draft.asset_name}>
+                        <button type="button" disabled={adaptationLoading !== null || busyId !== null}
+                          onClick={() => void loadNetworkAdaptation(draft)}>
+                          {adaptationLoading === draft.id
+                            ? 'Verificando destinos…'
+                            : 'Ver adaptación por destino (sin publicar)'}
+                        </button>
+                        {adaptationErrors[draft.id] &&
+                          <p role="alert">{adaptationErrors[draft.id]}</p>}
+                        {adaptationByDraft[draft.id] &&
+                          <DistributionAdaptationPreview
+                            plan={adaptationByDraft[draft.id].plan}
+                            role={adaptationByDraft[draft.id].role}
+                            canEditCaption={false} />}
+                      </section>}
                     {draft.manual_destination &&
                       <small>Destino: {draft.manual_destination.label}</small>}
                     {handoffReady &&
