@@ -22,7 +22,7 @@ final readonly class DestinationFallbackResolver
     /**
      * @param list<array<string,mixed>> $variants Trusted candidate Library rows, not request input.
      * @param list<array<string,mixed>> $overrides Trusted Studio policy rows.
-     * @param callable(string,string,string):bool $ownsDestination
+     * @param callable(string,string,string,string):bool $ownsDestination
      * @param callable(string,string,string,string):bool $ownsVariant
      * @param callable(string,string,string,string):bool $canManageStudioPolicy
      * @return array<string,mixed>
@@ -58,7 +58,9 @@ final readonly class DestinationFallbackResolver
 
         // The destination gate runs against current trusted connection state,
         // not a provider or account identifier supplied by the browser.
-        if ($ownsDestination($organizationId, $provider, $destinationId) !== true) {
+        // The authorization callback MUST check actor membership/role as well
+        // as organization/account ownership against trusted server state.
+        if ($ownsDestination($organizationId, $actorId, $provider, $destinationId) !== true) {
             return $this->review('destination_not_authorized');
         }
 
@@ -147,7 +149,7 @@ final readonly class DestinationFallbackResolver
      *
      * @param list<array<string,mixed>> $variants
      * @param list<array<string,mixed>> $overrides
-     * @param callable(string,string,string):bool $ownsDestination
+     * @param callable(string,string,string,string):bool $ownsDestination
      * @param callable(string,string,string,string):bool $ownsVariant
      * @param callable(string,string,string,string):bool $canManageStudioPolicy
      * @param callable(array<string,mixed>):void $audit

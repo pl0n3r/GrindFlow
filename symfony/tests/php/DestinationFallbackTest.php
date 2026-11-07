@@ -160,6 +160,27 @@ final class DestinationFallbackTest extends TestCase
         )['reason_code']);
     }
 
+    public function testForeignActorCannotUseAnOtherwiseOwnedDestination(): void
+    {
+        $foreignActor = Uuid::v7()->toRfc4122();
+        $called = 0;
+        $authorize = function (string $org, string $actor, string $provider, string $id): bool {
+            return $org === $this->org && $actor === $this->actor
+                && $provider === 'facebook_page' && $id === '101';
+        };
+        $result = $this->resolver->dispatch(
+            $this->org, $foreignActor, $this->creator, $this->asset,
+            'facebook_page', '101', 'independent', 'ready', $this->variants(), [],
+            $authorize,
+            static fn (): bool => true,
+            static fn (): bool => false,
+            static function () use (&$called): void { ++$called; },
+            static function () use (&$called): void { ++$called; },
+        );
+        self::assertSame('review_required', $result['status']);
+        self::assertSame(0, $called);
+    }
+
     public function testAmbiguousInFlightAndUnknownStateNeverRetry(): void
     {
         foreach (['ambiguous', 'in_flight', 'unknown', 'published'] as $status) {
