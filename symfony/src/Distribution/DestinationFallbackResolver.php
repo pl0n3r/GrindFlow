@@ -142,16 +142,43 @@ final readonly class DestinationFallbackResolver
     }
 
     /**
-     * Authorized caller hands off to an existing provider adapter/Ledger.
-     * An audit writer exception denies I/O. Never claim published merely
-     * because the downstream callback returned.
+     * The public dispatch boundary MUST perform the ownership/policy check in
+     * this call: an untrusted caller cannot pass a forged 'ready' decision.
      *
-     * @param array<string,mixed> $resolution Output of resolve() on fresh evidence.
+     * @param list<array<string,mixed>> $variants
+     * @param list<array<string,mixed>> $overrides
+     * @param callable(string,string,string):bool $ownsDestination
+     * @param callable(string,string,string,string):bool $ownsVariant
+     * @param callable(string,string,string,string):bool $canManageStudioPolicy
      * @param callable(array<string,mixed>):void $audit
-     * @param callable(string):void $send  Must use existing Ledger idempotency key.
+     * @param callable(string):void $send Existing Ledger/provider adapter.
      * @return array{status:string,sent:bool,requires_human_review:bool,reason_code:string}
      */
-    public function dispatch(array $resolution, callable $audit, callable $send): array
+    public function dispatch(
+        string $organizationId, string $actorId, string $creatorId, string $assetId,
+        string $provider, string $destinationId, string $role, string $externalStatus,
+        array $variants, array $overrides,
+        callable $ownsDestination, callable $ownsVariant, callable $canManageStudioPolicy,
+        callable $audit, callable $send,
+    ): array {
+        $resolution = $this->resolve(
+            $organizationId, $actorId, $creatorId, $assetId, $provider,
+            $destinationId, $role, $externalStatus, $variants, $overrides,
+            $ownsDestination, $ownsVariant, $canManageStudioPolicy,
+        );
+        return $this->dispatchResolved($resolution, $audit, $send);
+    }
+
+    /**
+     * Private by design: only dispatch() can grant permission to invoke I/O.
+     * A failed audit or ambiguous adapter outcome always prevents blind retry.
+     *
+     * @param array<string,mixed> $resolution
+     * @param callable(array<string,mixed>):void $audit
+     * @param callable(string):void $send
+     * @return array{status:string,sent:bool,requires_human_review:bool,reason_code:string}
+     */
+    private function dispatchResolved(array $resolution, callable $audit, callable $send): array
     {
         if (($resolution['status'] ?? null) !== 'ready'
             || ($resolution['requires_human_review'] ?? null) !== false

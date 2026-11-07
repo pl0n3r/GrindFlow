@@ -81,6 +81,25 @@ final class DestinationFallbackTest extends TestCase
         );
     }
 
+    /** @param list<array<string,mixed>>|null $variants
+     *  @return array<string,mixed>
+     */
+    private function safeDispatch(
+        callable $audit,
+        callable $send,
+        ?array $variants = null,
+        string $provider = 'facebook_page',
+    ): array {
+        return $this->resolver->dispatch(
+            $this->org, $this->actor, $this->creator, $this->asset,
+            $provider, '101', 'independent', 'ready', $variants ?? $this->variants(), [],
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): bool => false,
+            $audit, $send,
+        );
+    }
+
     public function testSelectsFirstCompatibleFormatInPolicyOrderNotCatalogOrder(): void
     {
         $selected = $this->decide();
@@ -91,8 +110,7 @@ final class DestinationFallbackTest extends TestCase
         self::assertFalse($selected['requires_human_review']);
         $events = [];
         $sent = [];
-        $result = $this->resolver->dispatch(
-            $selected,
+        $result = $this->safeDispatch(
             static function (array $record) use (&$events): void { $events[] = $record; },
             static function (string $id) use (&$sent): void { $sent[] = $id; },
         );
@@ -119,9 +137,10 @@ final class DestinationFallbackTest extends TestCase
         self::assertSame('review_required', $instagram['status']);
         self::assertSame('no_compatible_variant', $instagram['reason_code']);
         $called = false;
-        $this->resolver->dispatch(
-            $instagram, static function () use (&$called): void { $called = true; },
+        $this->safeDispatch(
             static function () use (&$called): void { $called = true; },
+            static function () use (&$called): void { $called = true; },
+            $onlySquare, 'instagram_reels',
         );
         self::assertFalse($called, 'Fail closed: never invoke audit or provider.');
     }
@@ -206,23 +225,40 @@ final class DestinationFallbackTest extends TestCase
 
     public function testAuditFailureAndAmbiguousProviderOutcomePreventBlindRetry(): void
     {
-        $choice = $this->decide();
         $sendCalls = 0;
-        $notAudited = $this->resolver->dispatch(
-            $choice, static function (): void { throw new \RuntimeException('audit sink down'); },
+        $notAudited = $this->safeDispatch(
+            static function (): void { throw new \RuntimeException('audit sink down'); },
             static function () use (&$sendCalls): void { ++$sendCalls; },
         );
         self::assertSame('audit_unavailable', $notAudited['reason_code']);
         self::assertSame(0, $sendCalls);
 
-        $uncertain = $this->resolver->dispatch(
-            $choice,
+        $uncertain = $this->safeDispatch(
             static function (): void {},
             static function () use (&$sendCalls): void { ++$sendCalls; throw new \RuntimeException('unknown provider state'); },
         );
         self::assertSame('external_outcome_ambiguous', $uncertain['reason_code']);
         self::assertTrue($uncertain['requires_human_review']);
         self::assertSame(1, $sendCalls);
+    }
+
+    public function testDispatchRequiresFreshTenantAndProviderChecksRatherThanForgedResult(): void
+    {
+        $auditCalls = 0;
+        $sendCalls = 0;
+        $result = $this->resolver->dispatch(
+            $this->org, $this->actor, $this->creator, $this->asset,
+            'facebook_page', '101', 'independent', 'ready', $this->variants(), [],
+            static fn (): bool => false,
+            static fn (): bool => true,
+            static fn (): bool => false,
+            static function () use (&$auditCalls): void { ++$auditCalls; },
+            static function () use (&$sendCalls): void { ++$sendCalls; },
+        );
+        self::assertSame('review_required', $result['status']);
+        self::assertSame('review_required', $result['reason_code']);
+        self::assertSame(0, $auditCalls);
+        self::assertSame(0, $sendCalls);
     }
 
     public function testEmptyCatalogAlwaysRequiresHumanReview(): void
