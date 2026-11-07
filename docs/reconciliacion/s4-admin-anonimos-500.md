@@ -117,3 +117,20 @@ La comparación GitHub autenticada entre `d1bd945…` y `main@4f62db7863771f32d4
 | `/s4/_bridge-readiness` | **200** | `application/json` | sin campos de identidad en la allowlist `sha/commit/version/release_sha` |
 
 **Interpretación fail-closed:** el 500 anónimo no se reproduce en este corte (3/3 devuelven 401 JSON). **AC-01 sigue PARCIAL**: la identidad del servidor HTTP **Symfony** es `UNKNOWN` porque `release_sha=null`, aunque el commit Laravel coincida con `main`. **AC-02 sigue PARCIAL**: no se ha recuperado clase/stack sanitizado del error histórico; no extrapolar la causa del 404 de #903. **AC-03 sigue PARCIAL**: ninguna prueba de integridad o ensayo de restauración del backup ni autorización de escritura/rollback; este GET no es una reparación productiva. Los checks CI anteriores no certifican esos tres AC. No se pidió CodeRabbit; mantener PR DRAFT y NO MERGE hasta evidencia operacional y autorización real conforme al Issue.
+
+
+## Revalidación pública independiente — 2026-11-07 14:23:38 UTC
+<!-- GF917-READONLY-142338Z-B2A65836 -->
+
+Desde el dispositivo conectado se ejecutó otra lectura HTTPS GET, sin sesión ni cookies, usando cliente con validación TLS. Los cuerpos se procesaron en memoria y solo se imprimieron status, MIME y campos allowlisted; no se persistieron respuestas.
+
+| Endpoint | HTTP | MIME | Campo público permitido |
+| --- | ---: | --- | --- |
+| `/s4/api/admin/context` | **401** | `application/json` | `error.code=authentication_required` |
+| `/s4/api/admin/vault` | **401** | `application/json` | `error.code=authentication_required` |
+| `/s4/api/admin/rules/weekly/preview` | **401** | `application/json` | `error.code=authentication_required` |
+| `/health` | **200** | `application/json` | `status=ok; version=0.1.227; commit=f0da143fa242f202e03becea4c4aa5690e1ebbd9; exact=true` (**Laravel raíz**) |
+| `/s4/health` | **200** | `application/json` | `status=ok; version=0.1.227; stage=s0-preview; release_sha=null` |
+| `/s4/_bridge-readiness` | **200** | `application/json; charset=utf-8` | sin campos públicos de identidad en la allowlist |
+
+**Resultado incremental:** la recuperación superficial de las tres respuestas anónimas 401 JSON se mantiene. No cambia el dictamen de aceptación: AC-01 sigue parcial porque el proceso HTTP Symfony no publica un SHA exacto; AC-02 sigue parcial porque no hay excepción histórica sanitizada o recibo autorizado de indisponibilidad; AC-03 sigue parcial porque no existe prueba independiente de integridad/restauración/rollback del backup `var/cache/prod.bak-20261105`. La respuesta 200 de Laravel no prueba la identidad del proceso Symfony. Esta lectura no ejecutó SSH, escritura, reinicio, `cache:clear`, restore ni deploy. El permiso OWNER vigente sigue limitado a lectura; no se solicitó CodeRabbit ni se autorizó merge.
