@@ -7,6 +7,7 @@ namespace GrindFlow\Http\Controller;
 use Doctrine\DBAL\Connection;
 use GrindFlow\Distribution\DistributionCommand;
 use GrindFlow\Distribution\DistributionFanoutService;
+use GrindFlow\Distribution\NetworkAdaptationPlanner;
 use GrindFlow\Distribution\DestinationHealthService;
 use GrindFlow\Distribution\DistributionProviderException;
 use GrindFlow\Distribution\FacebookPageProvider;
@@ -229,6 +230,129 @@ final class ScheduleDraftController extends AbstractController
             'external_destination_id' => $externalDestinationId,
             'mode' => 'review_only',
             'can_publish' => false,
+        ]]);
+    }
+
+    /**
+     * Build a read-only, tenant-scoped adaptation preview. No provider I/O or
+     * writable caption overrides. The current Library catalog does not attest
+     * dimensions/format of variants, so a plan must fail closed until the
+     * server can prove that information from trusted media evidence.
+     */
+    #[Route(
+        '/api/admin/schedules/{id}/network-adaptation-preview',
+        name: 'grindflow_schedule_network_adaptation_preview',
+        methods: ['GET'],
+    )]
+    public function networkAdaptationPreview(
+        string $id,
+        Request $request,
+        MembershipContext $memberships,
+        Connection $db,
+        NetworkAdaptationPlanner $planner,
+    ): JsonResponse {
+        $context = $this->context($request, $memberships);
+        if ($context instanceof JsonResponse) {
+            return $context;
+        }
+        if (!$memberships->permissions($context['organization']['role'])['content_prepare']) {
+            return $this->error(403, 'schedule_management_forbidden', 'No puedes consultar esta adaptación.');
+        }
+        if (!Uuid::isValid($id)) {
+            return $this->error(422, 'invalid_schedule', 'Selecciona un borrador válido.');
+        }
+
+        $org = $context['organization']['id'];
+        $actor = $context['user']->id();
+        try {
+            if (!$db->createSchemaManager()->tablesExist(['gf_schedule_drafts', 'gf_vault_assets'])) {
+                return $this->error(409, 'preview_unavailable', 'La previsualización no está disponible.');
+            }
+            $draft = $db->fetchAssociative(
+                <<<'SQL'
+                    SELECT draft.id, draft.asset_id, draft.caption, draft.status AS draft_status,
+                           draft.delivery_provider, draft.delivery_destination_id,
+                           asset.uploaded_by, asset.usage_scope, asset.deleted_at
+                    FROM gf_schedule_drafts draft
+                    INNER JOIN gf_vault_assets asset
+                       ON asset.id = draft.asset_id AND asset.organization_id = draft.organization_id
+                    WHERE draft.id = :draft AND draft.organization_id = :organization
+                    LIMIT 1
+                    SQL,
+                ['draft' => $id, 'organization' => $org],
+            );
+            if ($draft === false) {
+                return $this->error(404, 'draft_not_found', 'El borrador no existe en tu organización.');
+            }
+            $eligible = $draft['draft_status'] === 'draft' && $draft['deleted_at'] === null
+                && $this->assetEligibility(
+                    $db, $org, (string) $draft['asset_id'], (string) $draft['usage_scope']
+                ) === [];
+
+            // Read only destinations already stored under this tenant/draft;
+            // a queued delivery is NOT verified provider readiness.
+            $destinations = [];
+            if ($db->createSchemaManager()->tablesExist([
+                'gf_distribution_fanout_groups', 'gf_distribution_fanout_deliveries',
+            ])) {
+                $rows = $db->fetchAllAssociative(
+                    <<<'SQL'
+                        SELECT delivery.provider, delivery.destination_id
+                        FROM gf_distribution_fanout_deliveries delivery
+                        INNER JOIN gf_distribution_fanout_groups grp
+                          ON grp.id = delivery.group_id AND grp.organization_id = delivery.organization_id
+                        WHERE grp.organization_id = :organization AND grp.draft_id = :draft
+                        ORDER BY delivery.provider, delivery.destination_id LIMIT 21
+                        SQL,
+                    ['organization' => $org, 'draft' => $id],
+                );
+                foreach ($rows as $row) {
+                    $destinations[] = [
+                        'provider' => (string) $row['provider'],
+                        'destination_id' => (string) $row['destination_id'],
+                        // Never label a queued/unverified destination as ready.
+                        'external_status' => 'not_ready',
+                    ];
+                }
+            }
+            // Preserve the authenticated legacy intent when no fan-out rows exist.
+            // Persisted identity is not evidence of a verified external connection.
+            if ($destinations === []
+                && ($draft['delivery_provider'] ?? null) === 'facebook_page'
+                && is_string($draft['delivery_destination_id'] ?? null)
+                && preg_match('/^\\d{1,32}$/D', $draft['delivery_destination_id']) === 1) {
+                $destinations[] = [
+                    'provider' => 'facebook_page',
+                    'destination_id' => $draft['delivery_destination_id'],
+                    'external_status' => 'not_ready',
+                ];
+            }
+            $role = in_array($context['organization']['role'], ['admin', 'studio'], true)
+                ? 'studio' : 'independent';
+
+            $plan = $planner->plan(
+                $org, $actor, (string) $draft['uploaded_by'], (string) $draft['asset_id'],
+                $eligible ? 'ready' : 'archived', (string) ($draft['caption'] ?? ''),
+                $role, $destinations, [],
+                static fn (string $organization, string $user, string $creator, string $asset): bool =>
+                    $organization === $org && $user === $actor
+                        && $creator === (string) $draft['uploaded_by']
+                        && $asset === (string) $draft['asset_id'],
+                static fn (): bool => false, // No unverified provider readiness.
+                static fn (): bool => false, // No invented variant dimensions.
+                static fn (): bool => false,
+                static fn (): bool => false, // No writable override in a GET.
+            );
+        } catch (\Throwable) {
+            return $this->error(409, 'preview_unavailable', 'La previsualización no está disponible.');
+        }
+
+        return $this->privateJson(['data' => [
+            'plan' => $plan,
+            'role' => $role,
+            'can_edit_caption' => false,
+            'provider_calls' => false,
+            'publishes' => false,
         ]]);
     }
 
