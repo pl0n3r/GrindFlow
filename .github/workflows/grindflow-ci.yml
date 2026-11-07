@@ -266,6 +266,8 @@ jobs:
             echo "GF870: SPEC:024..028 suite absent; conditional fast test skipped."
           fi
           python3 -m unittest -v tests/test_grindflow_ci_action_pins.py
+          # GF957: lote 01 ejecutado y negativo AST en fast/validate.
+          python3 -m unittest -v tests/test_verificacion_grindflow_01.py
 
       - name: Contrato offline CORS en fast
         shell: bash
