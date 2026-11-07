@@ -93,6 +93,32 @@ final class NetworkAdaptationAdminPreviewTest extends WebTestCase
         $selection = $client->request('GET', '/organizations');
         $client->submit($selection->filter('.identity-orgs form')->form());
 
+        // Authorized, eligible synthetic asset with a persisted delivery:
+        // storage format is unverified, so keep the destination in review.
+        $db->update('gf_vault_assets', ['usage_scope' => 'needs_review'], ['id' => $myAsset]);
+        $db->insert('gf_content_review_events', [
+            'id' => Uuid::v7()->toRfc4122(), 'organization_id' => $mine,
+            'asset_id' => $myAsset, 'actor_id' => $user,
+            'action' => 'approve', 'created_at' => $at,
+        ]);
+        $db->insert('gf_distribution_authorization_events', [
+            'id' => Uuid::v7()->toRfc4122(), 'organization_id' => $mine,
+            'asset_id' => $myAsset, 'actor_id' => $user,
+            'action' => 'grant', 'created_at' => $at,
+        ]);
+        $group = Uuid::v7()->toRfc4122();
+        $db->insert('gf_distribution_fanout_groups', [
+            'id' => $group, 'organization_id' => $mine, 'draft_id' => $myDraft,
+            'request_key' => 'preview-fixture', 'request_fingerprint' => hash('sha256', 'fixture'),
+            'created_at' => $at,
+        ]);
+        $db->insert('gf_distribution_fanout_deliveries', [
+            'id' => Uuid::v7()->toRfc4122(), 'group_id' => $group,
+            'organization_id' => $mine, 'provider' => 'facebook_page',
+            'destination_id' => '123456789', 'idempotency_key' => 'preview-fixture:1',
+            'created_at' => $at,
+        ]);
+
         $path = '/api/admin/schedules/'.$myDraft.'/network-adaptation-preview';
         $client->request('GET', $path, server: ['HTTP_ACCEPT' => 'application/json']);
         self::assertResponseIsSuccessful();
@@ -101,6 +127,13 @@ final class NetworkAdaptationAdminPreviewTest extends WebTestCase
         $raw = (string) $response->getContent();
         $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR)['data'];
         self::assertSame('needs_review', $data['plan']['status']);
+        self::assertSame('variant_catalog_unverifiable', $data['plan']['reason_code']);
+        self::assertCount(1, $data['plan']['destinations']);
+        self::assertSame('facebook_page', $data['plan']['destinations'][0]['provider']);
+        self::assertSame('123456789', $data['plan']['destinations'][0]['destination_id']);
+        self::assertSame('needs_review', $data['plan']['destinations'][0]['status']);
+        self::assertSame('variant_catalog_unverifiable', $data['plan']['destinations'][0]['reason_code']);
+        self::assertNull($data['plan']['destinations'][0]['variant_id']);
         self::assertTrue($data['plan']['requires_human_review']);
         self::assertFalse($data['plan']['provider_calls']);
         self::assertFalse($data['provider_calls']);
@@ -109,6 +142,26 @@ final class NetworkAdaptationAdminPreviewTest extends WebTestCase
         self::assertSame('independent', $data['role']);
         self::assertStringNotContainsString('Texto original confidencial', $raw);
         self::assertStringNotContainsString('private-asset', $raw);
+
+        // Legacy persisted intent must also survive when no fan-out rows exist.
+        $legacyDraft = Uuid::v7()->toRfc4122();
+        $db->insert('gf_schedule_drafts', [
+            'id' => $legacyDraft, 'organization_id' => $mine,
+            'asset_id' => $myAsset, 'created_by' => $user,
+            'scheduled_at_utc' => $at, 'timezone' => 'UTC',
+            'local_date' => substr($at, 0, 10), 'local_time' => '12:01',
+            'status' => 'draft', 'caption' => 'Caption de prueba',
+            'delivery_provider' => 'facebook_page', 'delivery_destination_id' => '987654321',
+            'created_at' => $at,
+        ]);
+        $client->request('GET', '/api/admin/schedules/'.$legacyDraft.'/network-adaptation-preview');
+        self::assertResponseIsSuccessful();
+        $legacyPlan = json_decode((string) $client->getResponse()->getContent(),
+            true, 512, JSON_THROW_ON_ERROR)['data']['plan'];
+        self::assertSame('needs_review', $legacyPlan['status']);
+        self::assertSame('variant_catalog_unverifiable', $legacyPlan['reason_code']);
+        self::assertSame('987654321', $legacyPlan['destinations'][0]['destination_id']);
+        self::assertNull($legacyPlan['destinations'][0]['variant_id']);
 
         $client->request('GET', '/api/admin/schedules/'.$otherDraft.'/network-adaptation-preview');
         self::assertResponseStatusCodeSame(404);
