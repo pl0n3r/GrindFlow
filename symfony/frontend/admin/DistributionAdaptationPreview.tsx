@@ -57,6 +57,8 @@ const reasons: Record<string, string> = {
   caption_invalid_or_too_long: 'El texto supera el límite comprobado o no es válido.',
   destination_not_authorized: 'El destino no está autorizado para esta cuenta.',
   fallback_unavailable: 'No se pudo determinar una alternativa segura.',
+  invalid_plan_context: 'El plan no puede verificarse; comprueba su contexto y sus destinos.',
+  asset_not_authorized_or_archived: 'El recurso no está autorizado o ya no es elegible.',
 };
 
 function reasonText(code: string): string {
