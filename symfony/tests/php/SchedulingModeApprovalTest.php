@@ -1,5 +1,21 @@
 <?php
 declare(strict_types=1);
+
+// Keep the standalone acceptance CLI and expose it to the locked PHPUnit runner.
+if (class_exists(\PHPUnit\Framework\TestCase::class)) {
+    final class SchedulingModeApprovalTest extends \PHPUnit\Framework\TestCase
+    {
+        public function testStandaloneAcceptanceCases(): void
+        {
+            $output = [];
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' 2>&1', $output, $status);
+            self::assertSame(0, $status, implode("\n", $output));
+            self::assertSame(['PASS hard_rules', 'PASS assisted', 'PASS studio', 'PASS insufficient_role'], $output);
+        }
+    }
+    return;
+}
+
 require dirname(__DIR__, 2) . '/src/Scheduling/Mode/AutomationMode.php';
 require dirname(__DIR__, 2) . '/src/Scheduling/Mode/ApprovalPolicy.php';
 

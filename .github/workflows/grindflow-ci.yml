@@ -838,12 +838,11 @@ jobs:
         working-directory: symfony
         run: |
           python3 ../scripts/ci_retry.py --label "Symfony frontend dependencies" -- npm ci --no-audit --no-fund
-          npm run typecheck
-          npm run build
+          npm run check
           test -s public/build/.vite/manifest.json
       - name: Symfony HTTP test suite
         working-directory: symfony
-        run: php vendor/bin/simple-phpunit -c phpunit.xml.dist
+        run: php vendor/bin/phpunit -c phpunit.xml.dist
       - name: Ejecutar aceptación HTTP negativa de MVP
         # La fuente del test está en tests/, pero usa Symfony/MariaDB de este job.
         working-directory: .
@@ -853,9 +852,8 @@ jobs:
         if: ${{ hashFiles('tests/test_release_100_evidence.py') != '' }}
         working-directory: .
         run: python3 -m unittest tests/test_release_100_evidence.py -v
-      - name: Ejecutar matriz GF-MIG-003 cuando el test forma parte del HEAD
-        # #681 aporta la matriz; no informar éxito si el test no existe aquí.
-        if: ${{ hashFiles('tests/test_parity_matrix_executable.py') != '' }}
+      - name: Ejecutar matriz GF-MIG-003 obligatoria
+        # Evidencia de código: este job descartable no acredita Hostinger ni corte.
         working-directory: .
         run: python3 -m unittest tests/test_parity_matrix_executable.py -v
       - name: Ejecutar guardia GF350 de retiro legacy cuando esté en el HEAD

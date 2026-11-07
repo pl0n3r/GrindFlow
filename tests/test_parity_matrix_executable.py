@@ -107,7 +107,9 @@ def validate(data: dict, source: str) -> None:
                 raise ValueError("invalid route: " + domain)
             code = file_text(path)
             if name == "symfony":
-                if re.search(r"['\"]" + re.escape(route) + r"['\"]", code) is None:
+                if not path.startswith("symfony/src/Http/Controller/") or re.search(
+                    r"#\[Route\(\s*(?:path\s*:\s*)?['\"]" + re.escape(route) + r"['\"]", code
+                ) is None:
                     raise ValueError("missing Symfony route: " + domain)
             else:
                 marker, parent = info["marker"], info["parent"]
@@ -127,6 +129,20 @@ def validate(data: dict, source: str) -> None:
                 path.startswith("symfony/tests/php/") and path.endswith("Test.php") for path in evidence
             ):
                 raise ValueError("missing code evidence: " + domain)
+            # Source evidence only: require an HTTP request to this domain's route.
+            # This does not execute PHP or establish functional equivalence.
+            route_prefix = row["symfony"]["route"].split("{", 1)[0]
+            request_pattern = (
+                r"->request\(\s*['\"](?:GET|POST|PUT|PATCH|DELETE)['\"]\s*,\s*['\"]"
+                + re.escape(route_prefix) + r"['\"]"
+            )
+            if not any(
+                path.startswith("symfony/tests/php/") and path.endswith("Test.php")
+                and re.search(r"function\s+test\w+\s*\(", file_text(path))
+                and re.search(request_pattern, file_text(path))
+                for path in evidence
+            ):
+                raise ValueError("missing domain HTTP evidence: " + domain)
         elif not isinstance(row["deferred_reason"], str) or len(row["deferred_reason"].strip()) < 30:
             raise ValueError("deferred row needs reason: " + domain)
 
@@ -158,6 +174,74 @@ class ParityMatrixExecutableTests(unittest.TestCase):
         item["deferred_reason"] = ""
         with self.assertRaisesRegex(ValueError, "reason"):
             validate(changed, self.source)
+
+    def test_each_deferred_domain_rejects_a_claim_without_route_and_test(self) -> None:
+        for row in self.manifest["capabilities"]:
+            if row["status"] != DEFERRED:
+                continue
+            for missing in ("route", "test"):
+                with self.subTest(domain=row["domain"], missing=missing):
+                    changed = deepcopy(self.manifest)
+                    item = next(r for r in changed["capabilities"] if r["domain"] == row["domain"])
+                    item["status"], item["deferred_reason"] = CODE, None
+                    if missing == "route":
+                        item["symfony"] = {"route": None, "definition": None}
+                    else:
+                        item["evidence"] = []
+                    with self.assertRaises(ValueError):
+                        validate(changed, self.source)
+
+    def test_unrelated_php_test_does_not_accredit_a_domain(self) -> None:
+        for row in self.manifest["capabilities"]:
+            if row["status"] != CODE:
+                continue
+            with self.subTest(domain=row["domain"]):
+                changed = deepcopy(self.manifest)
+                item = next(r for r in changed["capabilities"] if r["domain"] == row["domain"])
+                item["evidence"] = ["symfony/tests/php/RuntimeReadinessTest.php"]
+                with self.assertRaisesRegex(ValueError, "domain HTTP evidence"):
+                    validate(changed, self.source)
+
+    def test_non_controller_literal_is_not_a_symfony_route(self) -> None:
+        changed = deepcopy(self.manifest)
+        item = changed["capabilities"][0]
+        item["symfony"] = {"route": "/login", "definition": "symfony/tests/php/IdentityLoginTest.php"}
+        with self.assertRaisesRegex(ValueError, "Symfony route"):
+            validate(changed, self.source)
+
+    def test_reproducible_baseline_entrypoints_are_declared(self) -> None:
+        composer = json.loads(file_text("symfony/composer.json"))
+        package = json.loads(file_text("symfony/package.json"))
+        self.assertIn("scripts", composer, "missing reproducible baseline commands")
+        self.assertEqual(composer["scripts"]["test:contract"], "bash tests/contract/smoke.sh")
+        self.assertEqual(composer["scripts"]["test:baseline"], "bash tests/contract/baseline.sh")
+        self.assertEqual(package["scripts"]["check"], "npm run typecheck && npm run build")
+        self.assertEqual(package["engines"]["node"], ">=22 <23")
+        for lock in ("symfony/composer.lock", "symfony/package-lock.json"):
+            self.assertIsInstance(json.loads(file_text(lock)), dict)
+        workflow = file_text(".github/workflows/grindflow-ci.yml")
+        step = workflow.split("- name: Ejecutar matriz GF-MIG-003", 1)[1].split("- name:", 1)[0]
+        self.assertNotIn("if:", step)
+
+    def test_phpunit_runner_and_transitives_are_in_the_application_lock(self) -> None:
+        composer = json.loads(file_text("symfony/composer.json"))
+        lock = json.loads(file_text("symfony/composer.lock"))
+        self.assertIn("phpunit/phpunit", composer["require-dev"])
+        packages = {p["name"]: p for p in lock["packages"] + lock["packages-dev"]}
+        pending, visited = ["phpunit/phpunit"], set()
+        while pending:
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            self.assertIn(name, packages, "runner dependency absent from lock: " + name)
+            for dependency in packages[name].get("require", {}):
+                if dependency == "php" or dependency.startswith(("ext-", "composer-")):
+                    continue
+                pending.append(dependency)
+        for consumer in (".github/workflows/grindflow-ci.yml", "symfony/tests/contract/baseline.sh"):
+            self.assertNotIn("simple-phpunit", file_text(consumer))
+            self.assertIn("vendor/bin/phpunit -c phpunit.xml.dist", file_text(consumer))
 
     def test_bad_routes_status_and_inventory_fail_closed(self) -> None:
         changed = deepcopy(self.manifest)

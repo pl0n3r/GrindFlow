@@ -15,7 +15,7 @@ use LogicException;
 use PHPUnit\Framework\TestCase;
 
 /** Regression for GF #798: fail closed before ledger writes and Meta I/O. */
-final class Tests extends TestCase
+final class InstagramReelsDisabledTest extends TestCase
 {
     private const ORGANIZATION = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
