@@ -165,6 +165,12 @@ final class NetworkAdaptationPlannerTest extends TestCase
 
         $foreign = $this->variants();
         $foreign[1]['organization_id'] = Uuid::v7()->toRfc4122();
+        $unverified = $this->plan($dest, variants: []);
+        self::assertSame('variant_catalog_unverifiable', $unverified['reason_code']);
+        self::assertCount(count($dest), $unverified['destinations']);
+        self::assertSame('needs_review', $unverified['destinations'][0]['status']);
+        self::assertSame('variant_catalog_unverifiable', $unverified['destinations'][0]['reason_code']);
+        self::assertNull($unverified['destinations'][0]['variant_id']);
         self::assertSame('variant_catalog_unverifiable', $this->plan(
             $dest, variants: $foreign,
         )['reason_code']);
