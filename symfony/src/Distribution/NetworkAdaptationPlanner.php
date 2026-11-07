@@ -72,7 +72,39 @@ final readonly class NetworkAdaptationPlanner
             return $this->wholeReview('source_caption_missing');
         }
         if (!$this->validCatalog($organizationId, $creatorId, $assetId, $variants, $ownsVariant)) {
-            return $this->wholeReview('variant_catalog_unverifiable');
+            // Preserve each *validated* destination as a safe review row; an
+            // unverified catalog must never silently erase the saved intent.
+            $seenDestinations = [];
+            $reviewRows = [];
+            foreach ($destinations as $destination) {
+                if (!is_array($destination) || array_diff(array_keys($destination), [
+                    'provider', 'destination_id', 'external_status',
+                    'caption_override', 'policy_overrides',
+                ]) !== []) {
+                    return $this->wholeReview('invalid_destination_context');
+                }
+                $provider = $destination['provider'] ?? null;
+                $id = $destination['destination_id'] ?? null;
+                if (!is_string($provider) || $this->matrix->forProvider($provider) === null
+                    || !is_string($id) || preg_match('/^\\d{1,32}$/D', $id) !== 1
+                    || !is_string($destination['external_status'] ?? null)) {
+                    return $this->wholeReview('invalid_destination_context');
+                }
+                $key = $provider.':'.$id;
+                if (isset($seenDestinations[$key])) {
+                    return $this->wholeReview('duplicate_destination');
+                }
+                $seenDestinations[$key] = true;
+                $reviewRows[] = $this->review($provider, $id, 'variant_catalog_unverifiable');
+            }
+            return [
+                'status' => 'needs_review',
+                'requires_human_review' => true,
+                'matrix_version' => NetworkCapabilityMatrix::VERSION,
+                'destinations' => $reviewRows,
+                'reason_code' => 'variant_catalog_unverifiable',
+                'provider_calls' => false,
+            ];
         }
 
         $seen = [];
