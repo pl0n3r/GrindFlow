@@ -271,6 +271,7 @@ final class ScheduleDraftController extends AbstractController
             $draft = $db->fetchAssociative(
                 <<<'SQL'
                     SELECT draft.id, draft.asset_id, draft.caption, draft.status AS draft_status,
+                           draft.delivery_provider, draft.delivery_destination_id,
                            asset.uploaded_by, asset.usage_scope, asset.deleted_at
                     FROM gf_schedule_drafts draft
                     INNER JOIN gf_vault_assets asset
@@ -313,6 +314,18 @@ final class ScheduleDraftController extends AbstractController
                         'external_status' => 'not_ready',
                     ];
                 }
+            }
+            // Preserve the authenticated legacy intent when no fan-out rows exist.
+            // Persisted identity is not evidence of a verified external connection.
+            if ($destinations === []
+                && ($draft['delivery_provider'] ?? null) === 'facebook_page'
+                && is_string($draft['delivery_destination_id'] ?? null)
+                && preg_match('/^\\d{1,32}$/D', $draft['delivery_destination_id']) === 1) {
+                $destinations[] = [
+                    'provider' => 'facebook_page',
+                    'destination_id' => $draft['delivery_destination_id'],
+                    'external_status' => 'not_ready',
+                ];
             }
             $role = in_array($context['organization']['role'], ['admin', 'studio'], true)
                 ? 'studio' : 'independent';
