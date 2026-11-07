@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { DistributionAdaptationPreview, type NetworkAdaptationPlan } from './DistributionAdaptationPreview';
 
 type Slot = {
@@ -110,6 +110,7 @@ export function ScheduleDraftPanel({
   manualDestinationCsrf,
 }: Props) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const adaptationGeneration = useRef(0);
   const [adaptationByDraft, setAdaptationByDraft] = useState<
     Record<string, { plan: NetworkAdaptationPlan; role: 'studio' | 'independent' }>
   >({});
@@ -148,6 +149,7 @@ export function ScheduleDraftPanel({
 
   async function loadNetworkAdaptation(draft: Draft) {
     if (!canEdit || adaptationLoading !== null || draft.status !== 'draft') return;
+    const requestGeneration = adaptationGeneration.current;
     setAdaptationLoading(draft.id);
     setAdaptationErrors((state) => ({ ...state, [draft.id]: '' }));
     setAdaptationByDraft((state) => {
@@ -168,19 +170,26 @@ export function ScheduleDraftPanel({
         throw new Error('invalid_preview');
       }
       const role = body.data.role === 'studio' ? 'studio' : 'independent';
+      if (requestGeneration === adaptationGeneration.current) {
       setAdaptationByDraft((state) => ({
         ...state, [draft.id]: { plan: body.data.plan as NetworkAdaptationPlan, role },
-      }));
+      })); 
+      }
     } catch {
-      setAdaptationErrors((state) => ({
-        ...state, [draft.id]: 'No fue posible verificar la adaptación. Nada se publicará desde esta vista.',
-      }));
+      if (requestGeneration === adaptationGeneration.current) {
+        setAdaptationErrors((state) => ({
+          ...state, [draft.id]: 'No fue posible verificar la adaptación. Nada se publicará desde esta vista.',
+        }));
+      }
     } finally {
-      setAdaptationLoading(null);
+      if (requestGeneration === adaptationGeneration.current) setAdaptationLoading(null);
     }
   }
 
   async function load(signal?: AbortSignal) {
+    // A draft reload invalidates any pending preview response.
+    adaptationGeneration.current += 1;
+    setAdaptationLoading(null);
     setError('');
     setDestinationLoadError('');
     setQueueLoadError('');
@@ -303,7 +312,7 @@ export function ScheduleDraftPanel({
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
-    return () => controller.abort();
+    return () => { adaptationGeneration.current += 1; controller.abort(); };
   }, []);
 
   async function create(event: FormEvent<HTMLFormElement>) {
