@@ -1,5 +1,27 @@
 # GrindFlow #917 — 500 anónimos en API admin S4: conciliación de evidencia
 
+
+## Corte fresco S4 — 2026-11-07T23:19:54Z; reconciliación con main
+<!-- GF917-HTTPS-231954Z-MAIN1A6D -->
+
+**Observación nueva, ejecutada y limitada por autorización OWNER [#6686368279](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6686368279):** seis solicitudes HTTPS `GET` públicas desde el dispositivo conectado autorizado, TLS verificado, sin sesión, cookies, autenticación, SSH, POST ni escrituras. Se leyeron como máximo 10 KiB en memoria por respuesta; **solo** se expusieron estado, MIME y campos JSON allowlisted, sin cuerpos ni cabeceras privadas. Proceso `exit=0`, inicio `2026-11-07T23:19:54.388440Z`.
+
+| Endpoint | Resultado |
+| --- | --- |
+| `/s4/api/admin/context` | **401** `application/json`; `error.code=authentication_required` |
+| `/s4/api/admin/vault` | **401** `application/json`; `error.code=authentication_required` |
+| `/s4/api/admin/rules/weekly/preview` | **401** `application/json`; `error.code=authentication_required` |
+| `/health` (Laravel raíz) | **200 JSON**, `status=ok`, `version=0.1.227`, `commit=1a6d10fb82dd82de1afbda3ce3fc611c1553af8f`, `exact=true` |
+| `/s4/health` | **200 JSON**, `stage=s0-preview`, `version=0.1.227`, **`release_sha=null`** |
+| `/s4/_bridge-readiness` | **200 JSON**, sin `sha/commit/version/release_sha` en campos públicos allowlisted |
+
+En el mismo `main@1a6d10fb82dd82de1afbda3ce3fc611c1553af8f`, [S4 Runtime Prepare #42422504846](https://github.com/pl0n3r/GrindFlow/actions/runs/42422504846) terminó `completed/success`, con `S4_RUNTIME_PREPARE_OK` en log y verificación pública del bridge. **Este workflow no acredita qué proceso exacto sirve HTTP Symfony, la excepción histórica de los tres 500, ni integridad/restore/rollback del respaldo declarado.** El commit nuevo de `main` modifica archivos de distribución Symfony, no esta conciliación.
+
+**AC-01 PARCIAL:** tres HTTP correctos, identidad exact-SHA de S4 **UNKNOWN** por `release_sha=null` (el SHA anterior solo describe Laravel raíz). **AC-02 PARCIAL:** no hay stack/exception sanitizada de los 500 ni prueba primaria de su imposibilidad de recuperación, distinta de #903/404. **AC-03 PARCIAL:** 3×401 sí, backup `var/cache/prod.bak-20261105` sin recibo de integridad/restaurabilidad/rollback. **AC-04:** CI debe ejecutarse y verificarse en el HEAD de este documento, sin atribuirle credenciales de producción.
+
+**Acción no realizada:** acceso SSH, lectura de registros privados, modificación Hostinger, backup/restore, cache:clear, restart, deploy, cambio de roles/credenciales, CodeRabbit intermedia o merge. La autorización OWNER actual es exclusivamente de lectura sin datos privados; para operaciones de host hace falta permiso adicional específico y evidencia de respaldo/reversión. El expediente no puede pasar de `DRAFT` ni fusionarse como si el runtime fuese validado.
+
+
 > **Corte: 2026-11-07 · recuperación HTTP revalidada, causa específica del 500 NO DEMOSTRADA.** Este expediente es solo documental. No declara un nuevo deploy, restore exitoso, ni validación productiva exact-SHA de Symfony. El issue #903 tiene alcance distinto (404 de rutas).
 
 ## Autoridad, identidad y fuentes
