@@ -296,7 +296,7 @@ final class ScheduleDraftController extends AbstractController
             ])) {
                 $rows = $db->fetchAllAssociative(
                     <<<'SQL'
-                        SELECT delivery.provider, delivery.destination_id, delivery.status
+                        SELECT delivery.provider, delivery.destination_id
                         FROM gf_distribution_fanout_deliveries delivery
                         INNER JOIN gf_distribution_fanout_groups grp
                           ON grp.id = delivery.group_id AND grp.organization_id = delivery.organization_id
@@ -310,7 +310,7 @@ final class ScheduleDraftController extends AbstractController
                         'provider' => (string) $row['provider'],
                         'destination_id' => (string) $row['destination_id'],
                         // Never label a queued/unverified destination as ready.
-                        'external_status' => $row['status'] === 'ambiguous' ? 'ambiguous' : 'not_ready',
+                        'external_status' => 'not_ready',
                     ];
                 }
             }
