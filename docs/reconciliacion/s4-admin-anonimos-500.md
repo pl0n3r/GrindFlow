@@ -1,3 +1,25 @@
+## Corte HTTPS anónimo read-only — 2026-11-08T16:56:21Z–16:56:38Z
+<!-- GF917-READONLY-HTTPS-20261108T165621Z-MAINB935B62 -->
+
+**Ejecución nueva en esta sesión:** seis GET HTTPS anónimos a `https://www.grindflow.com.co`, TLS verificado, `Accept: application/json`, `Cache-Control: no-cache`, sin cookies/sesión/tokens/SSH/POST ni escritura. El cliente procesó cada cuerpo en memoria (máximo 10 KiB) y solo emitió HTTP, MIME y campos JSON allowlisted; no persistió ni publicó cuerpos o cabeceras privadas. Inicio `2026-11-08T16:56:21.884748Z`; fin `2026-11-08T16:56:38.268616Z`; proceso `exit=0`.
+
+| GET | Resultado observado |
+| --- | --- |
+| `/s4/api/admin/context` | **401** `application/json`; `error.code=authentication_required` |
+| `/s4/api/admin/vault` | **401** `application/json`; `error.code=authentication_required` |
+| `/s4/api/admin/rules/weekly/preview` | **401** `application/json`; `error.code=authentication_required` |
+| `/health` | **200** `application/json`; `status=ok`, `version=0.1.227`, `commit=b935b6204ea31eec3e3a8b962519e7ce3fb9af0b`, `exact=true` — identifica el Laravel raíz y coincide con GrindFlow `main` consultado durante esta ejecución |
+| `/s4/health` | **200** `application/json`; `status=ok`, `version=0.1.227`, `stage=s0-preview`, **`release_sha=null`** |
+| `/s4/_bridge-readiness` | **200** `application/json; charset=utf-8`; no expone identidad SHA entre los campos públicos inspeccionados |
+
+**Evaluación AC sin inferencias:** AC-01 sigue **PARCIAL**: las tres respuestas son 401 JSON y Laravel raíz acredita el SHA exacto de `main@b935b620`, pero la identidad del proceso HTTP Symfony continúa **UNKNOWN** por `release_sha=null`. AC-02 sigue **PARCIAL**: este sondeo no recupera la excepción/stack histórica del 500 ni establece su causa específica frente al 404 de #903. AC-03 sigue **PARCIAL**: el resultado 3×401 se mantiene, pero no aporta recibo verificable de integridad/restaurabilidad del backup `var/cache/prod.bak-20261105` ni ensayo de rollback. AC-04 requiere CI terminal en el HEAD final de este documento y no reemplaza AC-01..03.
+
+**Límites respetados:** no se accedió por SSH, no se leyeron logs privados, no se cambió Hostinger, no se ejecutaron backup/restore, `cache:clear`, reinicio, deploy ni modificación de roles/credenciales. La autorización OWNER [#6686368279](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6686368279) continúa limitada a lectura de evidencia sanitizada. Cualquier escritura en el host requiere permiso específico adicional, backup verificable y rollback.
+
+**Estado de GitHub observado en este corte:** GrindFlow `main@b935b6204ea31eec3e3a8b962519e7ce3fb9af0b`; PR [#983](https://github.com/pl0n3r/GrindFlow/pull/983) permanece OPEN/DRAFT sobre `trabajo/issue-917`, con un solo archivo reclamado. La V3 BOT vigente [recibo #6723542288](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6723542288) es `active:true`, UUID `a2fdd424-fda0-4f3e-967a-06c300c104d6`, claim único `docs/reconciliacion/s4-admin-anonimos-500.md`; el marcador del PR coincide. Esta anotación solo incorpora evidencia documental y no habilita READY, revisión FINAL ni merge mientras queden AC operativos incompletos.
+
+---
+
 # GrindFlow #917 — 500 anónimos en API admin S4: conciliación de evidencia
 
 
