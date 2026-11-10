@@ -16,10 +16,13 @@ final class CreatorStrategyBaselineService
      * @param list<array<string,mixed>> $publications Entradas sintéticas/autorizadas.
      * @return array<string,mixed> Métricas agregadas sin IDs ni contenido privado.
      */
-    public function summarize(string $tenantId, array $publications): array
+    public function summarize(string $tenantId, string $creatorId, array $publications): array
     {
         if ($tenantId === '' || strlen($tenantId) > 128 || preg_match('/[\x00-\x1f\x7f]/', $tenantId)) {
             throw new \InvalidArgumentException('Tenant inválido.');
+        }
+        if ($creatorId === '' || strlen($creatorId) > 128 || preg_match('/[\x00-\x1f\x7f]/', $creatorId)) {
+            throw new \InvalidArgumentException('Creador inválido.');
         }
         if (!array_is_list($publications) || count($publications) > 10000) {
             throw new \InvalidArgumentException('Lote inválido.');
@@ -28,7 +31,8 @@ final class CreatorStrategyBaselineService
         $seen = [];
         $groups = [];
         foreach ($publications as $publication) {
-            if (!is_array($publication) || ($publication['tenant_id'] ?? null) !== $tenantId) {
+            if (!is_array($publication) || ($publication['tenant_id'] ?? null) !== $tenantId
+                || ($publication['creator_id'] ?? null) !== $creatorId) {
                 continue;
             }
             $id = $publication['id'] ?? null;
