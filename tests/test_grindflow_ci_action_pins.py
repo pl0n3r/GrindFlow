@@ -76,6 +76,34 @@ def load_tests(loader: unittest.TestLoader, suite: unittest.TestSuite,
     if extra.countTestCases() < 8:
         raise AssertionError("GF957: suite incompleta en fast")
     suite.addTests(extra)
+
+    # GF975: conectar los cuatro escenarios GF348 al mismo fast canónico,
+    # sin editar el workflow compartido por las ramas de migración/Dependabot.
+    gf348 = Path(__file__).with_name("test_team_destinations_authorization_contract.py")
+    if not gf348.is_file():
+        raise FileNotFoundError("GF348: falta test_team_destinations_authorization_contract.py")
+    auth = loader.discover(start_dir=str(gf348.parent), pattern=gf348.name)
+    if auth.countTestCases() < 4:
+        raise AssertionError("GF348: suite incompleta en fast")
+    # Cuatro casos de relleno no sustituyen las regresiones de seguridad.
+    def test_names(items: unittest.TestSuite) -> set[str]:
+        found: set[str] = set()
+        for case in items:
+            if isinstance(case, unittest.TestSuite):
+                found.update(test_names(case))
+            else:
+                found.add(case.id().rsplit(".", 1)[-1])
+        return found
+
+    required = {
+        "test_team_role_destination_isolation",
+        "test_fail_closed_when_any_guard_or_http_negative_is_removed",
+        "test_role_and_tenant_fixture_matrix_cannot_promote_model",
+        "test_real_disposable_phpunit_scenarios_when_composer_is_available",
+    }
+    if not required.issubset(test_names(auth)):
+        raise AssertionError("GF348: faltan escenarios obligatorios en fast")
+    suite.addTests(auth)
     return suite
 
 
