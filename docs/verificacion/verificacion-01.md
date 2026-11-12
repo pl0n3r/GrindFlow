@@ -1,12 +1,29 @@
 # GrindFlow #945 · verificación de cobertura 01/04 (25 filas)
 
-**Base de contraste:** `main@a4461bc9066feca598116889bdbb62c0f0da29a2`. **Reserva V3:** `bd138cf8-2833-4e56-ada8-7f608f0bd812`. La evidencia GitHub del PR valida por separado el SHA final.
+**Base histórica de #945 (no autoridad vigente de #957):** `main@a4461bc9066feca598116889bdbb62c0f0da29a2`; **reserva V3 histórica de #945:** `bd138cf8-2833-4e56-ada8-7f608f0bd812`. El HEAD, el CI y la reserva V3 de #957 se acreditan únicamente con los recibos autenticados de su Issue y PR: nunca se transfieren desde esta referencia histórica.
 
 ## Alcance y límites
 
 Este lote confronta **25 requisitos exactos** con sus fuentes canónicas y métodos de regresión ya versionados. **23 filas `NO_VERIFICABLE`** tienen solo evidencia parcial o pendiente de entorno; **2 filas `SIN_COBERTURA`** (GF-MIG-003/004) conservan brechas de paridad/retiro histórico y ya cuentan con el trabajo canónico #350, #641, #705 y #913. **0 promociones** a `CUBIERTO`; la matriz es propiedad del lote de consolidación y aquí no se modifica.
 
 **PARCIAL** significa prueba de subcontrato offline, no acreditación del requisito integral. **EXTERNO** exige recibo del entorno real. **BRECHA** exige cerrar paridad/corte histórico bajo su hoja existente. Los 25 casos dejan CI exact-HEAD, despliegue y Hostinger en `NO_ACREDITADO` hasta prueba autenticada independiente; no se inventan resultados de producción.
+
+
+### Enunciados recortados y nivel de evidencia
+
+La columna «Requisito de matriz» reproduce el **extracto truncado** de la matriz de cobertura y no equivale al enunciado contractual íntegro. La fuente de los Statements completos es docs/REQUIREMENTS.md. En concreto:
+
+- GF-FR-004: programar para destinos configurados (configured destinations).
+- GF-FR-005: distribuir a integraciones soportadas (supported platform integrations).
+- GF-FR-006A: enlace trazado de la misma organización, sin alterar publicación cuando falta la migración de atribución.
+- GF-FR-006B: CSV diario agregado y filtrado sin identificadores de visitantes.
+- GF-FR-006C: pausar o reanudar un enlace sin borrar historial de atribución ni cambiar la URL.
+- GF-FR-004C: cambiar o desvincular enlaces antes de comenzar la entrega.
+- GF-OPS-009: verificar rutas de módulos read-only, no solo el login del dashboard.
+
+**Alcance del testigo Python:** method_has_assertion inspecciona el AST de un método para detectar una aserción sintáctica en su cuerpo; no ejecuta los positivos citados, no demuestra semántica de las aserciones ni acredita una obligación completa. Las funciones locales no ejecutadas no son testigos. La suite sí ejecuta seis test_falla_cerrado y dos pruebas negativas de paridad; no ejecuta en ese paso los seis test_contrato_principal positivos.
+
+**Evidencia conductual separada para REQ:GF-FR-001:** symfony/tests/php/TenantIsolationNegativeTest.php::test_criterio_principal y symfony/tests/php/CrossTenantIdorSweepTest.php::test_criterio_principal son tests Symfony/PHPUnit con dos organizaciones sintéticas y MariaDB descartable. El primero verifica listados propios, rechazo 404 de GET y POST cross-tenant y persistencia intacta del recurso ajeno; el segundo compara recursos ajenos con IDs inexistentes para evitar revelar existencia. Son evidencias de aserciones conductuales en código PHP, no resultados de ejecución de esta suite Python ni comprobaciones productivas. Solo una corrida PHPUnit auténtica acredita su ejecución.
 
 ## Evidencia por fila
 
@@ -45,8 +62,9 @@ Este lote confronta **25 requisitos exactos** con sus fuentes canónicas y méto
 
 ## QA, ejecución y reversión
 
-- `python3 -m unittest -v tests/test_verificacion_grindflow_01.py`: valida trazabilidad de todas las filas contra la matriz, existencia del encabezado normativo, clase/método de prueba real y aserción ejecutable; rechaza ID omitido, repetido, inventado, fila malformada, testigo falso, brecha ficticia y promociones.
+- `python3 -m unittest -v tests/test_verificacion_grindflow_01.py`: valida trazabilidad de todas las filas contra la matriz, existencia del encabezado normativo, clase/método y aserción sintáctica en AST (sin certificar semántica ni ejecución positiva); rechaza ID omitido, repetido, inventado, fila malformada, testigo falso, brecha ficticia y promociones.
 - La nueva suite invoca además negativas ya existentes sobre entradas sintéticas (`tests/test_brechas_grindflow_01.py`…`06.py` y `tests/test_migration_parity_exit_gate.py`). Estas pruebas locales no realizan smoke de producción ni sustituyen los recibos reales.
+- **CI `fast` verificado por contrato #957:** `.github/workflows/grindflow-ci.yml` ya ejecuta `python3 -m unittest -v tests/test_grindflow_ci_action_pins.py`; su hook estándar `load_tests` descubre e incorpora todos los ocho `VerificacionGrindflow01Tests` al mismo resultado de `fast`, además de las regresiones de SHA de GitHub Actions. El hook falla cerrado si falta la suite o se descubren menos de ocho pruebas. Esta vía elimina el delta de workflow que colisionaba con los PR #951/#1005; no se atribuye por ello un resultado positivo de CI o producción hasta obtener el recibo exact-HEAD.
 - **AC-03:** exigir `Factory CI reusable / Validar` terminal `success` sobre el SHA final y auditoría SonarCloud/CodeQL/CodeRabbit de seguridad; una configuración de CI no equivale a un check ejecutado.
 - **Fuera de alcance:** producción, proveedores, cuentas o datos reales, secretos, gasto, cambios a `docs/matriz-cobertura.md`, permisos ampliados, deploy, cutover, cambios runtime, borrados irreversibles o reclasificar filas como `CUBIERTO`.
-- **Reversión:** revert del squash de estos dos archivos nuevos; no altera comportamiento de producto ni estado de datos.
+- **Reversión:** revert del squash sobre documentación, test de verificación y puente `load_tests` del runner de pinning; el workflow compartido no cambia y no se altera comportamiento de producto ni estado de datos.

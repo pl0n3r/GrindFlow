@@ -61,5 +61,23 @@ class GrindflowCIActionPinsTests(unittest.TestCase):
             ))
 
 
+def load_tests(loader: unittest.TestLoader, suite: unittest.TestSuite,
+               pattern: str | None) -> unittest.TestSuite:
+    """GF957: ejecutar todas las regresiones de verificación en fast.
+
+    El workflow ya ejecuta este módulo con unittest. Este puente mantiene
+    la validación de pines y evita modificar el workflow reclamado por otros PR.
+    No implica acreditar producción ni cumplimiento de requisitos integrales.
+    """
+    target = Path(__file__).with_name("test_verificacion_grindflow_01.py")
+    if not target.is_file():
+        raise FileNotFoundError("GF957: falta test_verificacion_grindflow_01.py")
+    extra = loader.discover(start_dir=str(target.parent), pattern=target.name)
+    if extra.countTestCases() < 8:
+        raise AssertionError("GF957: suite incompleta en fast")
+    suite.addTests(extra)
+    return suite
+
+
 if __name__ == "__main__":
     unittest.main()
