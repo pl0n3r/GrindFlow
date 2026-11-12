@@ -1,41 +1,41 @@
 #!/usr/bin/env python3
-"""Contrato de seguridad del bump Next.js, procedencia Dependabot #410."""
+"""Contrato de seguridad del bump Next.js, procedencia Dependabot #1013."""
 import json
 import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SECURE_VERSION = "15.5.27"
-NEXT_HASH = "sha512-F82CrlPZ8GRxBH9RIIoR3qU1t5RT3dv1K8moe8SjlDEquiFipvEI13R1Om90TaUOEwShkWCMlg8+gvTNzfMhvg=="
-ENV_HASH = "sha512-WC5hvVqiuFOcRyz6gKPeJkiVvSMf3scNeAV49CdWtVqxmUlzh8UKR6YHt9yiNkh8LngtzqSlVz07/Ma3ZAzchA=="
+SECURE_VERSION = "15.5.29"
+NEXT_HASH = "sha512-93AMszTCdi9Az7fD5VzcWy46SHCdQF45+i53K0LpDc4dDXCwB9P1SxP1wBYZKW6dF3HJnz41jyEni1vmgCluiw=="
+ENV_HASH = "sha512-9SrTiTsgORa+KfhlXXAGC1eSs847E+d2MQTPUX+n7R5XA8g/B6ZitfL6GoYHNMLwG3Hzs1wjDH0/ME5WrGMqBQ=="
 
 
-# Referencia independiente: manifiesto de main@0760bc1c previo al parche Next.js.
+# Referencia independiente: manifiesto de main@bb4a2bc7 previo al parche Next.js.
 # No se calcula desde el mismo package.json/package-lock que se está validando.
 APPROVED_NON_NEXT_DEPENDENCIES = {
-    "@aws-sdk/client-s3": "^3.708.0",
-    "@aws-sdk/s3-request-presigner": "^3.708.0",
+    "@aws-sdk/client-s3": "^3.1149.0",
+    "@aws-sdk/s3-request-presigner": "^3.1149.0",
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.47.10",
+    "@supabase/supabase-js": "^2.117.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.468.0",
-    "next-intl": "^4.9.2",
+    "lucide-react": "^0.577.0",
+    "next-intl": "^4.14.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.6.0",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "zod": "^3.24.1",
 }
 APPROVED_DEV_DEPENDENCIES = {
     "@eslint/eslintrc": "^3.2.0",
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^22.10.5",
+    "@types/node": "^22.20.5",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
-    "eslint-config-next": "^15.1.3",
+    "eslint-config-next": "^15.5.27",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vitest": "^4.1.11",
@@ -87,7 +87,7 @@ class NextSecurityLockContractTests(unittest.TestCase):
         self.assertEqual(self.lock["lockfileVersion"], 3)
         self.assertEqual(self.lock["packages"][""]["dependencies"], dependencies)
         self.assertEqual(self.lock["packages"][""]["devDependencies"], dev)
-        # npm ci exige este peer opcional de SWC: el bot #410 lo omitía,
+        # npm ci exige este peer opcional de SWC: el bot #1013 lo omitía,
         # aunque @swc/core declara >=0.5.17 y el helper raíz es 0.5.15.
         core = self.lock["packages"]["node_modules/next-intl/node_modules/@swc/core"]
         self.assertEqual(core["peerDependencies"]["@swc/helpers"], ">=0.5.17")
