@@ -2,6 +2,22 @@
 
 declare(strict_types=1);
 
+// Keep the standalone acceptance CLI and expose it to the locked PHPUnit runner.
+if (class_exists(\PHPUnit\Framework\TestCase::class)) {
+    final class SchedulingTemplatesRetryTest extends \PHPUnit\Framework\TestCase
+    {
+        public function testStandaloneAcceptanceCases(): void
+        {
+            $output = [];
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' 2>&1', $output, $status);
+            self::assertSame(0, $status, implode("\n", $output));
+            self::assertSame(['PASS template', 'PASS campaign', 'PASS ambiguous', 'PASS idempotent'], $output);
+        }
+    }
+    return;
+}
+
+
 require_once dirname(__DIR__, 2) . '/src/Scheduling/Templates/CalendarTemplate.php';
 require_once dirname(__DIR__, 2) . '/src/Scheduling/Templates/CampaignCalendar.php';
 require_once dirname(__DIR__, 2) . '/src/Scheduling/Recovery/RetryClassifier.php';
