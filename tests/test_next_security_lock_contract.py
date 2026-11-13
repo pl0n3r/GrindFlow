@@ -11,34 +11,34 @@ NEXT_HASH = "sha512-93AMszTCdi9Az7fD5VzcWy46SHCdQF45+i53K0LpDc4dDXCwB9P1SxP1wBYZ
 ENV_HASH = "sha512-9SrTiTsgORa+KfhlXXAGC1eSs847E+d2MQTPUX+n7R5XA8g/B6ZitfL6GoYHNMLwG3Hzs1wjDH0/ME5WrGMqBQ=="
 
 
-# Referencia independiente: manifiesto de main@bb4a2bc7 previo al parche Next.js.
+# Baseline independiente: main@5ed5663d + grupo npm-minor Dependabot #1026, ocho rangos aprobados.
 # No se calcula desde el mismo package.json/package-lock que se está validando.
 APPROVED_NON_NEXT_DEPENDENCIES = {
-    "@aws-sdk/client-s3": "^3.1149.0",
-    "@aws-sdk/s3-request-presigner": "^3.1149.0",
+    "@aws-sdk/client-s3": "^3.1165.0",
+    "@aws-sdk/s3-request-presigner": "^3.1165.0",
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.117.3",
+    "@supabase/supabase-js": "^2.119.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
     "next-intl": "^4.14.9",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwind-merge": "^2.6.0",
     "tsx": "^4.23.15",
     "zod": "^3.24.1",
 }
 APPROVED_DEV_DEPENDENCIES = {
     "@eslint/eslintrc": "^3.2.0",
-    "@tailwindcss/postcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^22.20.5",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
-    "eslint-config-next": "^15.5.27",
+    "eslint-config-next": "^15.5.29",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vitest": "^4.1.11",
+    "vitest": "^4.1.12",
 }
 APPROVED_OVERRIDES = {
     "postcss": "8.5.28",
