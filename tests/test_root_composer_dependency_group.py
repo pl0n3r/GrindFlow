@@ -12,12 +12,15 @@ PACKAGES = {p["name"]: p for p in LOCK["packages"] + LOCK["packages-dev"]}
 
 class RootComposerDependencyGroupTests(unittest.TestCase):
     def test_laravel_and_livewire_versions(self):
-        self.assertEqual(PACKAGES["laravel/framework"]["version"], "v13.39.0")
+        self.assertEqual(PACKAGES["laravel/framework"]["version"], "v13.40.0")
         self.assertEqual(PACKAGES["livewire/livewire"]["version"], "v4.4.8")
 
     def test_larastan_and_phpunit_versions(self):
-        self.assertEqual(PACKAGES["larastan/larastan"]["version"], "v3.13.2")
-        self.assertEqual(PACKAGES["phpunit/phpunit"]["version"], "12.5.42")
+        self.assertEqual(PACKAGES["larastan/larastan"]["version"], "v3.14.0")
+        self.assertEqual(PACKAGES["phpunit/phpunit"]["version"], "12.5.43")
+
+    def test_symfony_console_version(self):
+        self.assertEqual(PACKAGES["symfony/console"]["version"], "v8.1.11")
 
     def test_lock_structure_is_consistent(self):
         installed = LOCK["packages"] + LOCK["packages-dev"]
