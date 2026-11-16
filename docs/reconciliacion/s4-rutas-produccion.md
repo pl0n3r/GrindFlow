@@ -564,3 +564,27 @@ Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa prep
 **Resultado:** cinco de siete rutas satisfacen el código HTTP literal de AC-01; **AC-01 sigue NO**. Una importación en `main` y `/health exact=true` no prueban que Symfony haya recibido/recompilado el cambio #939. **AC-02 es PARCIAL**: caché obsoleta acreditada en reparación del dueño y causa de import Reports en fuente, pero no hay recibo productivo de Reports reparado. **AC-03** conserva `release_sha=null` y la identidad Symfony sin verificar. **AC-04** se revalida sobre el HEAD final de PR #907.
 
 **Desbloqueo seguro:** diagnosticar de modo autorizado y solo lectura el router compilado del host tras #939, publicar recibo de producción y el permiso/backups D-059 antes de cualquier escritura; obtener decisión explícita del dueño sobre el 404 deliberado de DSR y el alcance AC-01. La reserva V3 y el lock no se fuerzan ni se sueltan artificialmente. Mantener PR #907 en DRAFT, sin petición CodeRabbit FINAL ni squash hasta que Coordinación/Policy y las puertas productivas sean auténticas.
+
+
+## Reconciliación 16-nov-2026 — decisión humana, CAS V3 y GET productivos
+<!-- GF903-GATE958-CAS-V3-PROBE-20261116 -->
+
+**Decisión auténtica de aceptación.** El OWNER votó `/decidir A` en [#958](https://github.com/pl0n3r/GrindFlow/issues/958), y `github-actions[bot]` registró el journal `factory-human-decision` versión 2. Se ajustó AC-01 de [#903](https://github.com/pl0n3r/GrindFlow/issues/903): solo DSR-CSRF puede devolver 404 **JSON `{"error":"feature_unavailable"}`** como bloqueo legal intencional, sin activar DSR; las otras seis rutas, incluida Reports, deben devolver 401/302/200. No habilita acceso al host, datos reales ni despliegue.
+
+**Lock y titularidad V3.** Se ejecutó el [comando de recuperación CAS](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6930348372) para el lock firmado `1a1f22412b4e81cc74bfe52603b61b1147497bb1` y lease `cbb53f02-a68b-4d1d-b118-4dfc4efea06d`. [Coordinación #43963424195](https://github.com/pl0n3r/GrindFlow/actions/runs/43963424195) terminó success y la ref anterior dejó de existir (404); no hubo force ni manipulación manual de la ref. Tras el cambio de AC-01, `/renovar-contrato` produjo el [recibo bot V3](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6930438284) activo con UUID `004d939d-a5ab-5c12-803a-73f0131da9ed`, misma rama y claim documental.
+
+**GET HTTPS públicos independientes del 16-nov-2026**, sin cookies, autenticación, SSH ni escritura, contra `www.grindflow.com.co`; los estados 401/404 son códigos HTTP observados sin acceso a cuerpos privados:
+
+| GET relativo a `/s4` | HTTP | Interpretación |
+| --- | ---: | --- |
+| `/api/admin/library/collections` | **401** | Protegida y servida |
+| `/api/admin/library/permissions` | **401** | Protegida y servida |
+| `/api/admin/plans` | **401** | Protegida y servida |
+| `/api/admin/rules/automation` | **401** | Protegida y servida |
+| `/privacidad-y-mis-derechos` | **200** | Página informativa provisional, no autorización legal |
+| `/api/admin/reports/cross-module` | **404** | Falta reparación/verificación real de Reports |
+| `/api/admin/privacy/data-subject-requests/csrf` | **404** | La sonda actual no expuso cuerpo/MIME; NO acredita otra vez el JSON `feature_unavailable` que sí consta en evidencia previa del dueño |
+
+`/health`: 200 JSON `status=ok`, `version=0.1.227`, `commit=5a6a2d139888aaec1a689e6a1c76e9f91b1270d5`, `exact=true` (**identidad Laravel, no Symfony**). `/s4/health`: 200 JSON `status=ok`, `version=0.1.227`, `release_sha=null`, `stage=s0-preview`. `/s4/_bridge-readiness`: `ready_for_web_probe`; esto no certifica que el router de Reports esté corregido.
+
+**Estado y puertas restantes:** AC-01 = NO (Reports 404), AC-02 = PARCIAL (caché histórica reparada por el dueño, Reports sigue sin causa productiva remediada), AC-03 = explicado `release_sha=null` sin identidad Symfony verificada; AC-04 = CI pendiente sobre HEAD definitivo. Diagnosticar router Symfony productivo y exigir autorización owner-only específica + backup/restore y rollback D-059 antes de cualquier nueva escritura Hostinger. Mantener PR #907 **DRAFT**, sin CodeRabbit FINAL ni squash mientras falte evidencia productiva. No se hicieron cambios al host, datos, secretos ni tag de release.

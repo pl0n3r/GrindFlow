@@ -11,6 +11,7 @@ parameters:
   grindflow_facebook_pilot_organization_default: ''
   grindflow_facebook_page_id_default: ''
   grindflow_facebook_page_access_token_default: ''
+  grindflow_facebook_connections_file_default: ''
   grindflow_facebook_graph_version_default: 'v26.0'
   grindflow_instagram_enabled_default: 'false'
   grindflow_instagram_vault_root_default: ''
@@ -84,6 +85,13 @@ services:
       $pageId: '%env(default:grindflow_facebook_page_id_default:GRINDFLOW_FACEBOOK_PAGE_ID)%'
       $accessToken: '%env(default:grindflow_facebook_page_access_token_default:GRINDFLOW_FACEBOOK_PAGE_ACCESS_TOKEN)%'
       $graphVersion: '%env(default:grindflow_facebook_graph_version_default:GRINDFLOW_FACEBOOK_GRAPH_VERSION)%'
+
+  # External private catalog (0600) of page credentials, scoped by tenant.
+  # An unset path retains only the existing single-page pilot adapter.
+  GrindFlow\Distribution\FacebookPageConnectionRegistry:
+    arguments:
+      $connectionsFile: '%env(default:grindflow_facebook_connections_file_default:GRINDFLOW_FACEBOOK_CONNECTIONS_FILE)%'
+      $identityProbe: null
 
   GrindFlow\Distribution\FacebookPageTransport:
     alias: GrindFlow\Distribution\StreamFacebookPageTransport

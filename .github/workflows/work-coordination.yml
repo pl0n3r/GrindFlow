@@ -35,6 +35,12 @@ jobs:
         shell: bash
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_SENDER: ${{ github.event.sender.login }}
+          COMMENT_ASSOCIATION: ${{ github.event.comment.author_association }}
+          COMMENT_REPOSITORY: ${{ github.repository }}
+          COMMENT_EVENT: ${{ github.event_name }}
+          COMMENT_IS_PR: ${{ github.event.issue.pull_request != null }}
         run: |
           # Clasificación sin interpretar como shell el comentario del usuario.
           # Gramática de SESSION_RE y parse_comment_command en Factory@v1.
@@ -51,8 +57,25 @@ jobs:
               r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
           )
           sha40 = re.compile(r"^[0-9a-f]{40}$")
+          # El protocolo same-OWNER CAS V3 solo se prepara offline hasta
+          # que Factory@v1 publique oficialmente el guard auditado.
+          # Nunca normalizar raw_body para este comando sensible.
+          parts_v3 = raw_body.split(" ")
+          recuperar_v3_valido = (
+              len(parts_v3) == 3
+              and parts_v3[0] == "/recuperar-lock-v3-activa"
+              and sha40.fullmatch(parts_v3[1]) is not None
+              and uuid.fullmatch(parts_v3[2]) is not None
+              and os.environ.get("COMMENT_ASSOCIATION") == "OWNER"
+              and os.environ.get("COMMENT_AUTHOR") == "pl0n3r"
+              and os.environ.get("COMMENT_SENDER") == "pl0n3r"
+              and os.environ.get("COMMENT_REPOSITORY") == "pl0n3r/GrindFlow"
+              and os.environ.get("COMMENT_EVENT") == "issue_comment"
+              and os.environ.get("COMMENT_IS_PR") == "false"
+          )
+
           recuperar = "/recuperar-lock-huerfano "
-          valido = (
+          valido = recuperar_v3_valido or (
               raw_body.startswith(recuperar)
               and sha40.fullmatch(raw_body[len(recuperar):]) is not None
           ) or body in exactos or any(

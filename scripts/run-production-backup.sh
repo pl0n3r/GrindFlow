@@ -40,7 +40,9 @@ fi
 if [[ "$RECOVERY_BACKUP_ENABLED" == "true" ]]; then
   [[ "$EXPECTED_PENDING" =~ ^[0-9]+$ ]] || { echo "invalid expected pending count" >&2; exit 2; }
 else
-  [[ "$EXPECTED_PENDING" =~ ^[1-9][0-9]*$ ]] || { echo "invalid expected pending count" >&2; exit 2; }
+  # Zero is a legitimate exact snapshot once every migration has run; the remote
+  # side still compares it with MigrationReadiness::snapshot and the fingerprint.
+  [[ "$EXPECTED_PENDING" =~ ^(0|[1-9][0-9]*)$ ]] || { echo "invalid expected pending count" >&2; exit 2; }
 fi
 [[ "$HOSTINGER_RELEASE_ROOT" =~ ^(/[A-Za-z0-9._-]+)+$ ]] || { echo "invalid release root" >&2; exit 2; }
 [[ "$HOSTINGER_RELEASE_ROOT" != *".."* ]] || { echo "invalid release root" >&2; exit 2; }
