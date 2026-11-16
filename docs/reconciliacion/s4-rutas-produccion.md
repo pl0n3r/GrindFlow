@@ -593,3 +593,26 @@ Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa prep
 ### Reparación de CI gobernado sobre la rama reconciliada — 16-nov-2026
 
 El primer run del HEAD reconciliado [GrindFlow CI #43964381678](https://github.com/pl0n3r/GrindFlow/actions/runs/43964381678) falló en `preflight / Validar título PR y versión objetivo`: el evento `pull_request.synchronize` conservaba título `(V 0.1.225)` mientras `config/version.php` en `main@5a6a2d13` contiene `0.1.227`. Se **corrigió el título del PR #907 a `(V 0.1.227)`** antes de este nuevo commit documental, cuyo `synchronize` debe producir una ejecución nueva, separada de la evidencia roja anterior. El job de Coordinación `pr / Sincronizar PR` ya terminó `success` sobre el HEAD reconciliado, confirmando que se eliminó el obstáculo CAS anterior. No heredar checks verdes ni solicitar CodeRabbit FINAL hasta confirmar el SHA definitivo. El bloqueo HTTP Reports 404 permanece independiente.
+
+## Diagnóstico remoto owner-only terminal y DSR JSON real — 16-nov-2026
+<!-- GF903-READONLY-DIAG-43967636541-20261116 -->
+
+**Acción ejecutada en la infraestructura de diagnóstico, sin escritura en Hostinger:** el usuario GitHub autenticado `pl0n3r` lanzó una única vez [S4 Router Diagnostics #43967636541](https://github.com/pl0n3r/GrindFlow/actions/runs/43967636541) mediante `workflow_dispatch` sobre `main@5a6a2d139888aaec1a689e6a1c76e9f91b1270d5`. Workflow y job `owner-only-s4-router-readonly` terminaron en **completed/success**. Fueron success tanto `Inspect Hostinger without production writes` como `Revalidate exact main after remote read-only inspection`; el helper `scripts/s4-router-diagnostics.sh` solo inspecciona archivos, autoload, cache y marcador sin ejecutar consola Symfony, Composer, cache:clear ni migraciones.
+
+**Valor probatorio acotado:** la ejecución completa y el contrato del helper (aborta si `git rev-parse HEAD` no coincide con `EXPECTED_SHA`) permiten comprobar que el **checkout remoto** corresponde a ese SHA; **NO** acreditan que el proceso PHP/Symfony activo lo esté ejecutando. El workflow redirige los estados `S4_DIAG_*` de cada controlador, la importación de Reports, la caché y el marcador de release a `GITHUB_STEP_SUMMARY`. El API de checks devuelve `output.summary=null`: **los valores categóricos restantes NO VERIFICADOS no se sustituyen por MATCH inferido de workflow success**. Falta su lectura auténtica y, si procede, un diagnóstico específico del router Reports antes de corregirlo.
+
+**GET público sin autenticación ni escrituras, verificado desde un equipo conectado el 16-nov:**
+
+| Ruta / prueba | HTTP | MIME y verificación acotada |
+| --- | ---: | --- |
+| `/health` | 200 | JSON `version=0.1.227`, `exact=true`, `commit=5a6a2d13…` (Laravel) |
+| `/s4/health` | 200 | JSON `release_sha=null`; identidad de Symfony pendiente |
+| `/s4/_bridge-readiness` | 200 | JSON `ready_for_web_probe` |
+| Cuatro rutas admin Collections, Permissions, Plans, Automation | 401 cada una | `application/json` |
+| `/s4/privacidad-y-mis-derechos` | 200 | `text/html` |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | `application/json`, campo real `error.code=feature_unavailable` |
+| `/s4/api/admin/reports/cross-module` | **404** | GET público externo independiente; el GET del equipo conectado tuvo un error de transporte y no se usa como prueba |
+
+**Reconciliación jurídica de forma JSON, sin ampliar autoridad:** el código `DataSubjectRequestsController::error` serializa `{"error":{"code":"feature_unavailable"}}`, no `{"error":"feature_unavailable"}`. #958 recibió voto OWNER `/decidir A` y journal v2, cuyo efecto exige 404 JSON con **código exacto** `feature_unavailable`. Se precisó en AC-01 el campo auténtico `error.code` y se redujo la línea a 455 caracteres para satisfacer el límite de `factory-acceptance` (`CRITERION_LINE`, 500). La primera renovación `/renovar-contrato` falló por superar esa longitud; tras corregir la causa, **solo** se reejecutaron jobs fallidos en [Coordinación #43968578081](https://github.com/pl0n3r/GrindFlow/actions/runs/43968578081). El bot emitió un nuevo [recibo V3](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6931096724) `active=true`, owner `pl0n3r`, UUID `f55ca2aa-e93b-589b-8203-ea3196830541`, mismo claim documental; no se creó otro PR ni se tocó el lock manualmente.
+
+**Gates independientes no satisfechos:** Reports HTTP 404 implica **AC-01=NO** y falta prueba de reparación efectiva y marcador Symfony. Cualquier modificación de caché/routing de Hostinger exige **autorización operativa específica** y backup/rollback D-059, distintos del permiso de diagnóstico read-only. PR [#907](https://github.com/pl0n3r/GrindFlow/pull/907) permanece DRAFT, sin CodeRabbit FINAL ni squash hasta aceptación productiva y gates de CI exact-HEAD.
