@@ -1,3 +1,23 @@
+## Sondeo HTTPS productivo de solo lectura — 2026-11-16 21:46:32 UTC
+<!-- GF917-GET-READONLY-20261116T214632Z-MAIN5A6A2D -->
+
+**Evidencia nueva ejecutada desde equipo autorizado:** seis GET HTTPS anónimos en `https://www.grindflow.com.co`, validación TLS estándar, `Accept: application/json`, `Cache-Control: no-cache`, timeout por petición y lectura limitada a 10 KiB. Sin sesión, cookies, tokens, SSH, escritura, restauración, reinicio ni despliegue. Solo se conservaron en la salida estado HTTP, MIME y claves públicas de JSON allowlisted; no se publicaron respuestas íntegramente.
+
+| Ruta | Estado observado |
+| --- | --- |
+| `/s4/api/admin/context` | **401 application/json**, `error.code=authentication_required` |
+| `/s4/api/admin/vault` | **401 application/json**, `error.code=authentication_required` |
+| `/s4/api/admin/rules/weekly/preview` | **401 application/json**, `error.code=authentication_required` |
+| `/health` | **200 application/json**; `version=0.1.227`, `commit=5a6a2d139888aaec1a689e6a1c76e9f91b1270d5`, `exact=true` (**identidad Laravel raíz**) |
+| `/s4/health` | **200 application/json**; `version=0.1.227`, `stage=s0-preview`, **`release_sha=null`** |
+| `/s4/_bridge-readiness` | **200 application/json**, sin `sha/commit/release_sha/version` públicos en el conjunto permitido |
+
+**Evaluación estricta:** AC-01 **parcial**, porque no se demuestra el SHA del **proceso Symfony HTTP**; AC-02 **parcial**, porque no se ha identificado la excepción histórica sanitizada que explica los 500 (independiente del 404 de #903); AC-03 **parcial**: 3×401 correctos, pero sin evidencia verificable de integridad, ensayo de restauración o rollback de `var/cache/prod.bak-20261105`. No concluir reparación definitiva, `VALIDATED_IN_PRODUCTION`, backup probado, READY o MERGE por los GET ni por CI. El permiso OWNER #6686368279 cubre lectura sin datos privados, no operaciones de escritura en Hostinger. Requiere operador con autoridad y recibos primarios de los AC todavía abiertos.
+
+**GitHub al cotejar:** `GrindFlow/main@5a6a2d139888aaec1a689e6a1c76e9f91b1270d5`. PR #983 sigue OPEN/DRAFT, reserva V3 BOT recuperada por el OWNER en comentario #6921359358 (`9c529d38-4ee9-4bc5-bf26-ccfc6c731092`, único claim documental). Se conserva la revisión CodeRabbit FINAL para un PR definitivo y con CI completo terminal verde.
+
+---
+
 ## Corte HTTPS anónimo read-only — 2026-11-08T16:56:21Z–16:56:38Z
 <!-- GF917-READONLY-HTTPS-20261108T165621Z-MAINB935B62 -->
 
