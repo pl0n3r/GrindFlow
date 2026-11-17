@@ -1,3 +1,28 @@
+## Diagnóstico de solo lectura — 17-nov-2026 01:24–01:27 UTC
+<!-- GF917-S4-DIAG-MATCH-MAIN35F-20261117 -->
+
+**Desbloqueo real del checkout (sin mutación del host).** GitHub `GrindFlow/main@35f716e997624082fb449f524644ca6da6cf00c0`. Tras la propagación de este SHA, la lectura pública anónima del 17-nov a las 01:25:39 UTC dio `/health` HTTP 200 JSON, `commit=35f716e997624082fb449f524644ca6da6cf00c0`, `exact=true` (marca del **Laravel raíz**). `/s4/health` HTTP 200 JSON, `version=0.1.227`, `stage=s0-preview`, pero **`release_sha=null`**; `/s4/_bridge-readiness` HTTP 200 JSON sin campos públicos SHA permitidos.
+
+**Inspección auténtica SSH read-only con credenciales de la propia GitHub Action, disparada en `main` por el OWNER.** [S4 Router Diagnostics run #43995591267](https://github.com/pl0n3r/GrindFlow/actions/runs/43995591267), `workflow_dispatch` sobre `35f716e9...`, actor/trigger `pl0n3r`, `completed/success`. Las categorías **sanitizadas y autenticadas**, visibles en logs del job `owner-only-s4-router-readonly`, son exactamente:
+
+| Estado categórico | Valor |
+| --- | --- |
+| `S4_DIAG_CHECKOUT` | `MATCH` |
+| `S4_DIAG_ROUTE_IMPORT` | `MATCH` |
+| `S4_DIAG_CONTROLLER_REPORTS` | `MATCH` |
+| `S4_DIAG_AUTOLOAD` | `MATCH` |
+| `S4_DIAG_RELEASE_MARKER` | `MISSING` |
+| `S4_DIAG_CACHE` | `MATCH` |
+| `S4_DIAG_CACHE_ROUTE_REPORTS` | `UNKNOWN` |
+
+El checkout rastreado coincide con el SHA esperado, sin acreditar el **proceso Symfony HTTP**; el archivo marcador de release no existe en la ruta comprobada y la categoría de la ruta Reports en caché no permite decidir su presencia. Ya existía una inspección exitosa independiente del mismo HEAD ([run #43995334179](https://github.com/pl0n3r/GrindFlow/actions/runs/43995334179)); el nuevo run repitió las mismas siete categorías. **No** se hizo Composer, caché regenerada, deploy, acceso a datos, backup ni cambio alguno en Hostinger.
+
+**HTTP anónimo actual:** en la lectura de las 01:25 UTC, `/s4/api/admin/vault` y `/s4/api/admin/rules/weekly/preview` devolvieron `401 application/json`, `error.code=authentication_required`; `/s4/api/admin/context` dio error transitorio de transporte del cliente. Una segunda lectura acotada con `curl` TLS verificado a las 01:27:26 UTC confirmó Context `401 application/json`, `error.code=authentication_required`. El endpoint distinto de #903 `GET /s4/api/admin/reports/cross-module` continúa `404 text/html`; el 404 no equivale ni explica automáticamente el antiguo 500 de #917. Salida restringida a HTTP/MIME/campos JSON permitidos; sin sesión, cookies, credenciales ni cuerpo privado.
+
+**Aceptación estricta:** AC-01 **parcial**: existe correlación del checkout Hostinger y las tres respuestas HTTP, pero no SHA del proceso que sirve Symfony (release marker ausente, `release_sha=null`). AC-02 **pendiente**: no existe recibo histórico sanitizado de la excepción 500 ni causa confirmada distinta de #903. AC-03 **parcial**: 3×401, sin recibo verificable de integridad/ensayo de restauración de `var/cache/prod.bak-20261105`, ni plan de rollback ejecutable y autorizado. AC-04 debe verificarse de nuevo sobre el HEAD que incluya esta nota, **sin heredar checks previos**. El consentimiento OWNER [#6686368279](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6686368279) permite solo lectura; no autoriza reparar, reiniciar o desplegar S4. **No READY, no CodeRabbit FINAL, no squash** mientras falte evidencia operativa.
+
+---
+
 ## Sondeo HTTPS productivo de solo lectura — 2026-11-16 21:46:32 UTC
 <!-- GF917-GET-READONLY-20261116T214632Z-MAIN5A6A2D -->
 
