@@ -1,3 +1,23 @@
+## Sondeo HTTPS público y contraste de recibos — 17-nov-2026 16:58–16:59 UTC
+<!-- GF917-READONLY-20261117T165945Z -->
+
+**Lectura ejecutada de solo lectura desde el equipo autorizado**, sin autenticación, cookies, sesión, tokens, credenciales, SSH, escrituras, cambios de entorno ni datos privados. TLS verificado; solicitudes GET con `Cache-Control: no-cache`, límite de lectura por respuesta y salida **exclusivamente** de estado HTTP, MIME y campos públicos de JSON incluidos en una allowlist.
+
+| Ruta | HTTP / MIME | Dato permitido |
+| --- | --- | --- |
+| `GET /s4/api/admin/context` | **401 / application/json** | `error.code=authentication_required`. La primera lectura sufrió `URLError`; un único reintento a las **16:59:45 UTC** obtuvo 401 JSON |
+| `GET /s4/api/admin/vault` | **401 / application/json** | `error.code=authentication_required` |
+| `GET /s4/api/admin/rules/weekly/preview` | **401 / application/json** | `error.code=authentication_required` |
+| `GET /health` | **200 / application/json** | `version=0.1.227`, `commit=4189a1862aab1beb61b6bdadb332106aa1edf110`, `exact=true` (**identifica solo Laravel raíz**) |
+| `GET /s4/health` | **200 / application/json** | `version=0.1.227`, `stage=s0-preview`, **`release_sha=null`**; el SHA del proceso Symfony S4 sigue **UNKNOWN** |
+| `GET /s4/api/admin/reports/cross-module` | **404 / text/html** | Incidente independiente #903, **no** una traza causal del 500 histórico de #917 |
+
+**Fuentes primarias adicionales revisadas:** [S4 Router Diagnostics #44024482543](https://github.com/pl0n3r/GrindFlow/actions/runs/44024482543) para `main@4189a1862aab1beb61b6bdadb332106aa1edf110`, `completed/success`, emitió `CHECKOUT=MATCH`, `ROUTE_IMPORT=MATCH`, `CONTROLLER_REPORTS=MATCH`, `AUTOLOAD=MATCH`, `CACHE=MATCH`, `RELEASE_MARKER=MISSING`, `CACHE_ROUTE_REPORTS=UNKNOWN`. No prueba qué proceso HTTP Symfony está atendiendo requests. La consulta autenticada del historial de Actions de `production-backup-scheduled.yml` no devolvió ejecuciones en el corte consultado; la última `production-backup.yml` encontrada, [#37154663705](https://github.com/pl0n3r/GrindFlow/actions/runs/37154663705), figura `failure`. Esto **no demuestra ausencia de backups fuera de Actions**, pero tampoco constituye recibo de integridad, restauración o rollback. El último `production-diagnostics.yml` encontrado, [#42501651674](https://github.com/pl0n3r/GrindFlow/actions/runs/42501651674), terminó `failure` y su captura quedó omitida al carecer de credenciales sintéticas configuradas: no hay de ahí excepción histórica verificada.
+
+**Resultado fail-closed:** AC-01 **parcial** (3×401 anónimos, correlación del checkout, pero sin SHA del proceso S4 HTTP); AC-02 **pendiente** (excepción histórica sanitizada y causa concluyente del 500 sin confundirla con el 404 de #903); AC-03 **parcial** (3×401, pero sin backup/restaurabilidad/rollback auténticos tras reparación autorizada). AC-04 se debe validar sobre el HEAD que incluya este apunte y no heredar CI anterior. La autorización OWNER [#6686368279](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6686368279) permite **solo lectura sin datos privados**: ninguna reparación, generación de `.release-sha`, `cache:clear`, deploy, restore o reinicio de Hostinger está autorizada. Mantener **NO MERGE**, PR `DRAFT`, sin CodeRabbit FINAL hasta que AC-01..03 sean verificables.
+
+---
+
 ## Diagnóstico de solo lectura — 17-nov-2026 01:24–01:27 UTC
 <!-- GF917-S4-DIAG-MATCH-MAIN35F-20261117 -->
 
