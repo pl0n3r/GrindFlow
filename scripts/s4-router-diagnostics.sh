@@ -63,7 +63,7 @@ else
 fi
 
 cache='symfony/var/cache/prod'
-cache_route_labels=(COLLECTIONS PLANS AUTOMATION PRIVACY DSR)
+cache_route_labels=(COLLECTIONS PLANS AUTOMATION PRIVACY DSR REPORTS)
 
 cache_routes_unknown() {
   local label
@@ -96,7 +96,8 @@ scan_cache_routes() (
     'PLANS|/api/admin/plans' \
     'AUTOMATION|/api/admin/rules/automation' \
     'PRIVACY|/privacidad-y-mis-derechos' \
-    'DSR|/api/admin/privacy/data-subject-requests/csrf'; do
+    'DSR|/api/admin/privacy/data-subject-requests/csrf' \
+    'REPORTS|/api/admin/reports/cross-module'; do
     label="${entry%%|*}"
     route="${entry#*|}"
     state=UNKNOWN
