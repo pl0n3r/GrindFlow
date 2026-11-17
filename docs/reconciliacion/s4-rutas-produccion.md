@@ -652,3 +652,35 @@ El primer run del HEAD reconciliado [GrindFlow CI #43964381678](https://github.c
 Además \`/health\` devolvió \`commit=35f716e997624082fb449f524644ca6da6cf00c0\`, \`exact=true\`, \`version=0.1.227\`; \`/s4/health\` devolvió \`version=0.1.227\`, \`release_sha=null\`, \`stage=s0-preview\`; \`/s4/_bridge-readiness\` mantuvo \`ready_for_web_probe\`.
 
 **Aceptación actual:** AC-01 **NO** por Reports 404; AC-02 **PARCIAL**, porque la causa del 404 en el router PHP efectivo todavía no se comprobó; AC-03 documenta el marcador \`MISSING\` y \`release_sha=null\` sin inventar identidad Symfony; AC-04 debe comprobarse sobre el HEAD final de PR #907. El inspector y \`S4 Runtime Prepare\` no autorizan tocar caché/OPcache, deploy ni reescrituras del host. Cualquier reparación adicional requiere consentimiento específico del propietario y evidencia backup/restore/rollback D-059 antes de ejecución. Se conserva el PR **DRAFT/NO MERGE** y la reserva V3 sobre el único claim documental; CodeRabbit FINAL se reserva para después de aceptación y CI definitivo.
+
+
+## Reconciliación adicional — 17-nov-2026, checkout exact-main \`4189a186\`
+
+<!-- GF903-MAIN-4189A186-EXACT-PROBE-20261117 -->
+
+Este apartado es un **sondeo productivo posterior a la sincronización de main**, no modifica ni sustituye retrospectivamente las mediciones anteriores. \`GrindFlow/main@4189a1862aab1beb61b6bdadb332106aa1edf110\` es el SHA público exacto visto en el \`/health\` de Laravel (\`200 application/json\`, \`exact=true\`, versión \`0.1.227\`). El cambio de \`main\` proviene de documentación no relacionada con Reports; no acredita una reparación del router Symfony.
+
+**Workflows reales del mismo SHA:**
+
+- [GrindFlow Deploy Observer #44022431813](https://github.com/pl0n3r/GrindFlow/actions/runs/44022431813): \`completed/success\`, incluida comprobación de health exact-main.
+- [Production Smoke #44022431844](https://github.com/pl0n3r/GrindFlow/actions/runs/44022431844): \`completed/success\`; no se interpreta como aceptación de Reports fuera del smoke cubierto.
+- [S4 Runtime Prepare #44022523866](https://github.com/pl0n3r/GrindFlow/actions/runs/44022523866): \`completed/success\` sobre el SHA actual; el log del job \`133835063195\` expone \`S4_RUNTIME_PREPARE_OK\`. El preparador verifica y prepara dependencias; no demuestra el estado del router de un proceso PHP ya activo ni que su caché haya incorporado Reports.
+
+**GET HTTPS públicos independientes, sin sesión ni cookies, con TLS y \`Cache-Control: no-cache\`; resultados estrictamente de status, MIME y campos públicos:**
+
+| Ruta relativa a \`https://www.grindflow.com.co\` | HTTP | Tipo y evidencia permitida |
+| --- | ---: | --- |
+| \`/health\` | 200 | JSON; \`commit=4189a1862aab1beb61b6bdadb332106aa1edf110\`, \`exact=true\` (Laravel) |
+| \`/s4/health\` | 200 | JSON; \`stage=s0-preview\`, \`release_sha=null\` |
+| \`/s4/_bridge-readiness\` | 200 | JSON |
+| \`/s4/api/admin/library/collections\` | 401 | JSON \`authentication_required\` |
+| \`/s4/api/admin/library/permissions\` | 401 | JSON \`authentication_required\` |
+| \`/s4/api/admin/plans\` | 401 | JSON \`authentication_required\`; repetición posterior confirmó el estado después de un error de red transitorio |
+| \`/s4/api/admin/rules/automation\` | 401 | JSON \`authentication_required\` |
+| \`/s4/api/admin/reports/cross-module\` | **404** | \`text/html\`, no satisface AC-01; repetido y confirmado |
+| \`/s4/api/admin/privacy/data-subject-requests/csrf\` | 404 | JSON \`error.code=feature_unavailable\`; excepción exclusivamente autorizada por #958 |
+| \`/s4/privacidad-y-mis-derechos\` | 200 | \`text/html\` |
+
+**Interpretación técnica acotada:** el código de \`main\` ya contiene el import de \`src/Http/Reports/\` mediante [PR #950](https://github.com/pl0n3r/GrindFlow/pull/950), con contrato PHP de 401 anónimo. En el último diagnóstico SSH read-only autorizado de [S4 Router Diagnostics #43995334179](https://github.com/pl0n3r/GrindFlow/actions/runs/43995334179), \`CHECKOUT\`, \`ROUTE_IMPORT\`, \`CONTROLLER_REPORTS\`, \`AUTOLOAD\` y \`CACHE\` fueron \`MATCH\`, mientras que \`CACHE_ROUTE_REPORTS=UNKNOWN\` y \`RELEASE_MARKER=MISSING\`. No hay diagnóstico nuevo del router PHP efectivo posterior a \`4189a186\`; la causa productiva precisa sigue **NO CONFIRMADA**. \`release_sha=null\` continúa explicado por marcador faltante en aquella inspección, sin atribuir una identidad Symfony no acreditada.
+
+**Puertas de aceptación a este corte:** AC-01 **NO** (Reports 404); AC-02 **PARCIAL** (checkout/workflow acreditados, causa del 404 todavía desconocida); AC-03 **EXPLICADO, NO IDENTIDAD SHA CERTIFICADA**; AC-04 debe cotejarse contra el HEAD final del PR. Se ha actualizado la rama documental mediante la operación nativa \`pulls/907/update-branch\` sin forzarla ni tocar Hostinger. No pedir CodeRabbit FINAL mientras AC-01 y los gates correspondientes sigan pendientes. Para cualquier reparación productiva se necesita autorización operativa específica del OWNER y backup/restore/rollback verificables según D-059.
