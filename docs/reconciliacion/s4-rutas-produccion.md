@@ -686,3 +686,23 @@ Este apartado es un **sondeo productivo posterior a la sincronización de main**
 **Interpretación técnica acotada:** el código de `main` ya contiene el import de `src/Http/Reports/` mediante [PR #950](https://github.com/pl0n3r/GrindFlow/pull/950), con contrato PHP de 401 anónimo. En el último diagnóstico SSH read-only autorizado de [S4 Router Diagnostics #43995334179](https://github.com/pl0n3r/GrindFlow/actions/runs/43995334179), `CHECKOUT`, `ROUTE_IMPORT`, `CONTROLLER_REPORTS`, `AUTOLOAD` y `CACHE` fueron `MATCH`, mientras que `CACHE_ROUTE_REPORTS=UNKNOWN` y `RELEASE_MARKER=MISSING`. El nuevo diagnóstico owner-only exact-main [#44024482543](https://github.com/pl0n3r/GrindFlow/actions/runs/44024482543), job `133841451270`, terminó en `success`: `S4_DIAG_CHECKOUT=MATCH`, `S4_DIAG_ROUTE_IMPORT=MATCH`, `S4_DIAG_CONTROLLER_REPORTS=MATCH`, `S4_DIAG_AUTOLOAD=MATCH`, `S4_DIAG_CACHE=MATCH`, `S4_DIAG_RELEASE_MARKER=MISSING` y **`S4_DIAG_CACHE_ROUTE_REPORTS=UNKNOWN`**. La categoría UNKNOWN no confirma presencia ni ausencia de Reports en el router PHP efectivo; la causa productiva precisa sigue **NO CONFIRMADA**. `release_sha=null` continúa explicado por marcador faltante en aquella inspección, sin atribuir una identidad Symfony no acreditada.
 
 **Puertas de aceptación a este corte:** AC-01 **NO** (Reports 404); AC-02 **PARCIAL** (checkout/workflow acreditados, causa del 404 todavía desconocida); AC-03 **EXPLICADO, NO IDENTIDAD SHA CERTIFICADA**; AC-04 debe cotejarse contra el HEAD final del PR. Se ha actualizado la rama documental mediante la operación nativa `pulls/907/update-branch` sin forzarla ni tocar Hostinger. No pedir CodeRabbit FINAL mientras AC-01 y los gates correspondientes sigan pendientes. Para cualquier reparación productiva se necesita autorización operativa específica del OWNER y backup/restore/rollback verificables según D-059.
+
+
+## Aislamiento adicional del HTTP 404 — 17-nov-2026 (sonda solo lectura)
+
+<!-- GF903-404-FINGERPRINT-20261117 -->
+
+En el dominio público se comparó la misma ruta Reports con una ruta inexistente deliberada y con una API admin conocida, mediante GET HTTPS anónimo, TLS verificado, `Cache-Control: no-cache`, sin cookies, SSH, escrituras ni lectura de respuestas privadas. Se guardaron solo status, MIME, cabeceras no sensibles, longitudes y prefijos SHA-256 de cuerpos públicos; los valores efímeros de `X-Request-Id` no se registran.
+
+| Prueba pública bajo `/s4` | HTTP | MIME | Huella SHA-256 de los primeros 10 KB de respuesta pública |
+| --- | ---: | --- | --- |
+| `/api/admin/reports/cross-module` | **404** | `text/html` | `25d3409669519dee` |
+| `/api/admin/reports/cross-module/?verify=gf903` | **404** | `text/html` | `25d3409669519dee` |
+| `/api/admin/nonexistent-gf903-probe` | 404 | `text/html` | `25d3409669519dee` |
+| `/index.php/api/admin/reports/cross-module` | **404** | `text/html` | `25d3409669519dee` |
+| `/foobar-gf903-404` | 404 | `text/html` | `25d3409669519dee` |
+| `/api/admin/plans` | 401 | `application/json` | `975ff789fad2406a` |
+
+Las cinco respuestas HTML de 404 midieron 993 bytes y devolvieron `X-Powered-By: PHP/8.5.12`, `Server: hcdn` y una cabecera `X-Request-Id` con patrón `req_...`, como la ruta administradora existente que responde 401 JSON. El título del documento HTML fue `An Error Occurred: Not Found`. Son indicios consistentes con que el 404 se produce en el flujo de la aplicación PHP y es indistinguible del 404 de una ruta inexistente. **No prueban** la identidad del proceso Symfony, la tabla de rutas efectiva, ni por qué falta Reports; no sustituyen `CACHE_ROUTE_REPORTS=UNKNOWN` del inspector owner-only.
+
+**Acción de desbloqueo pendiente, no autorizada por esta sonda:** corroborar con el propietario el estado efectivo del router del proceso PHP que atiende `/s4`, así como el vínculo con caché y marcador del release; realizar respaldo verificable y registrar restauración/rollback conforme a D-059 **antes** de cualquier operación productiva. No deducir de estos encabezados que un `cache:clear`, reinicio OPcache, despliegue o modificación de host esté permitido. AC-01 sigue incumplida mientras Reports devuelva 404 HTML. La reserva V3 fue recuperada por el bot en el [recibo #6964169556](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6964169556) con ID `49fc398f-3026-49d3-a04a-8a17b1b27712`, y el PR #907 ya lleva el mismo `condor-reserva-id`.
