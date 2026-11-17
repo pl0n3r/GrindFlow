@@ -569,7 +569,7 @@ Un sondeo HTTPS independiente, anónimo y **solo lectura**, posterior a esa prep
 ## Reconciliación 16-nov-2026 — decisión humana, CAS V3 y GET productivos
 <!-- GF903-GATE958-CAS-V3-PROBE-20261116 -->
 
-**Decisión auténtica de aceptación.** El OWNER votó `/decidir A` en [#958](https://github.com/pl0n3r/GrindFlow/issues/958), y `github-actions[bot]` registró el journal `factory-human-decision` versión 2. Se ajustó AC-01 de [#903](https://github.com/pl0n3r/GrindFlow/issues/903): solo DSR-CSRF puede devolver 404 **JSON `{"error":"feature_unavailable"}`** como bloqueo legal intencional, sin activar DSR; las otras seis rutas, incluida Reports, deben devolver 401/302/200. No habilita acceso al host, datos reales ni despliegue.
+**Decisión auténtica de aceptación.** El OWNER votó `/decidir A` en [#958](https://github.com/pl0n3r/GrindFlow/issues/958), y `github-actions[bot]` registró el journal `factory-human-decision` versión 2. Se ajustó AC-01 de [#903](https://github.com/pl0n3r/GrindFlow/issues/903): solo DSR-CSRF puede devolver 404 **JSON `{"error":{"code":"feature_unavailable"}}`** como bloqueo legal intencional, sin activar DSR; las otras seis rutas, incluida Reports, deben devolver 401/302/200. No habilita acceso al host, datos reales ni despliegue.
 
 **Lock y titularidad V3.** Se ejecutó el [comando de recuperación CAS](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6930348372) para el lock firmado `1a1f22412b4e81cc74bfe52603b61b1147497bb1` y lease `cbb53f02-a68b-4d1d-b118-4dfc4efea06d`. [Coordinación #43963424195](https://github.com/pl0n3r/GrindFlow/actions/runs/43963424195) terminó success y la ref anterior dejó de existir (404); no hubo force ni manipulación manual de la ref. Tras el cambio de AC-01, `/renovar-contrato` produjo el [recibo bot V3](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6930438284) activo con UUID `004d939d-a5ab-5c12-803a-73f0131da9ed`, misma rama y claim documental.
 
@@ -616,3 +616,39 @@ El primer run del HEAD reconciliado [GrindFlow CI #43964381678](https://github.c
 **Reconciliación jurídica de forma JSON, sin ampliar autoridad:** el código `DataSubjectRequestsController::error` serializa `{"error":{"code":"feature_unavailable"}}`, no `{"error":"feature_unavailable"}`. #958 recibió voto OWNER `/decidir A` y journal v2, cuyo efecto exige 404 JSON con **código exacto** `feature_unavailable`. Se precisó en AC-01 el campo auténtico `error.code` y se redujo la línea a 455 caracteres para satisfacer el límite de `factory-acceptance` (`CRITERION_LINE`, 500). La primera renovación `/renovar-contrato` falló por superar esa longitud; tras corregir la causa, **solo** se reejecutaron jobs fallidos en [Coordinación #43968578081](https://github.com/pl0n3r/GrindFlow/actions/runs/43968578081). El bot emitió un nuevo [recibo V3](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6931096724) `active=true`, owner `pl0n3r`, UUID `f55ca2aa-e93b-589b-8203-ea3196830541`, mismo claim documental; no se creó otro PR ni se tocó el lock manualmente.
 
 **Gates independientes no satisfechos:** Reports HTTP 404 implica **AC-01=NO** y falta prueba de reparación efectiva y marcador Symfony. Cualquier modificación de caché/routing de Hostinger exige **autorización operativa específica** y backup/rollback D-059, distintos del permiso de diagnóstico read-only. PR [#907](https://github.com/pl0n3r/GrindFlow/pull/907) permanece DRAFT, sin CodeRabbit FINAL ni squash hasta aceptación productiva y gates de CI exact-HEAD.
+
+
+## Inspección autenticada S4 y sondeo externo — 16-nov-2026 (UTC 17-nov)
+<!-- GF903-READONLY-REPORTS-SHA-35F716 -->
+
+**Nuevo hecho causal observado, sin mutación de host.** GitHub \`main@35f716e997624082fb449f524644ca6da6cf00c0\`, con el inspector de Reports del PR [#1036](https://github.com/pl0n3r/GrindFlow/pull/1036) incorporado, alcanzó el endpoint público Laravel \`/health.commit\` con \`exact=true\`. El [Deploy Observer #43994227970](https://github.com/pl0n3r/GrindFlow/actions/runs/43994227970), el [Production Smoke #43994227767](https://github.com/pl0n3r/GrindFlow/actions/runs/43994227767) y [S4 Runtime Prepare #43994322169](https://github.com/pl0n3r/GrindFlow/actions/runs/43994322169) terminaron \`success\` para ese HEAD; estos checks no prueban, por sí solos, el enrutamiento efectivo de Symfony ni una reparación de Reports.
+
+**Nueva inspección remota autorizada y solo lectura:** [S4 Router Diagnostics #43995334179](https://github.com/pl0n3r/GrindFlow/actions/runs/43995334179) se ejecutó una sola vez por la cuenta OWNER \`pl0n3r\` desde \`main@35f716e997624082fb449f524644ca6da6cf00c0\`; workflow y paso SSH de inspección terminaron \`success\`, y las siguientes categorías saneadas fueron visibles en el log del job \`133745861121\`:
+
+| Categoría S4 estrictamente allowlisted | Resultado autenticado |
+| --- | --- |
+| \`S4_DIAG_CHECKOUT\` | \`MATCH\` |
+| \`S4_DIAG_ROUTE_IMPORT\` | \`MATCH\` |
+| \`S4_DIAG_CONTROLLER_REPORTS\` | \`MATCH\` |
+| \`S4_DIAG_AUTOLOAD\` | \`MATCH\` |
+| \`S4_DIAG_RELEASE_MARKER\` | \`MISSING\` |
+| \`S4_DIAG_CACHE\` | \`MATCH\` |
+| \`S4_DIAG_CACHE_ROUTE_REPORTS\` | **\`UNKNOWN\`** |
+
+\`MATCH\` para fuente, import, autoload y existencia de caché **no certifica** que la ruta Reports esté registrada en el router efectivo de PHP. \`UNKNOWN\` no permite concluir que falta o existe en runtime. \`MISSING\` del marcador remoto es un hecho adicional compatible con \`/s4/health.release_sha=null\`, no prueba por sí solo qué proceso atiende las peticiones.
+
+**Sondeo HTTPS GET público independiente**, sin cookies, credenciales ni mutación, contra \`www.grindflow.com.co\`, con verificación TLS y \`Cache-Control: no-cache\`, inmediatamente antes del diagnóstico:
+
+| Ruta relativa a \`/s4\` | HTTP | Dato publicable |
+| --- | ---: | --- |
+| \`/api/admin/library/collections\` | 401 | JSON \`authentication_required\` |
+| \`/api/admin/library/permissions\` | 401 | JSON \`authentication_required\` |
+| \`/api/admin/plans\` | 401 | JSON \`authentication_required\` |
+| \`/api/admin/rules/automation\` | 401 | JSON \`authentication_required\` |
+| \`/api/admin/reports/cross-module\` | **404** | \`text/html\`; aún no satisface AC-01 |
+| \`/api/admin/privacy/data-subject-requests/csrf\` | 404 | JSON \`error.code=feature_unavailable\`, permitido exclusivamente por #958 |
+| \`/privacidad-y-mis-derechos\` | 200 | \`text/html\` |
+
+Además \`/health\` devolvió \`commit=35f716e997624082fb449f524644ca6da6cf00c0\`, \`exact=true\`, \`version=0.1.227\`; \`/s4/health\` devolvió \`version=0.1.227\`, \`release_sha=null\`, \`stage=s0-preview\`; \`/s4/_bridge-readiness\` mantuvo \`ready_for_web_probe\`.
+
+**Aceptación actual:** AC-01 **NO** por Reports 404; AC-02 **PARCIAL**, porque la causa del 404 en el router PHP efectivo todavía no se comprobó; AC-03 documenta el marcador \`MISSING\` y \`release_sha=null\` sin inventar identidad Symfony; AC-04 debe comprobarse sobre el HEAD final de PR #907. El inspector y \`S4 Runtime Prepare\` no autorizan tocar caché/OPcache, deploy ni reescrituras del host. Cualquier reparación adicional requiere consentimiento específico del propietario y evidencia backup/restore/rollback D-059 antes de ejecución. Se conserva el PR **DRAFT/NO MERGE** y la reserva V3 sobre el único claim documental; CodeRabbit FINAL se reserva para después de aceptación y CI definitivo.
