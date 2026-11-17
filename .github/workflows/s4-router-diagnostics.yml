@@ -82,7 +82,7 @@ jobs:
             CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
             CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
             CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
-            READ_ONLY
+            CACHE_ROUTE_REPORTS READ_ONLY
           )
           if diagnostics="$(ssh -T -p "$SSH_PORT" -i "$secret_dir/key" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
@@ -122,7 +122,7 @@ jobs:
                     done
                   fi
                   if [[ "$valid_prefix" == true ]]; then
-                    printf -v category 'HELPER_VALID_PREFIX_%02d_OF_18' "${#prefix_lines[@]}"
+                    printf -v category 'HELPER_VALID_PREFIX_%02d_OF_%02d' "${#prefix_lines[@]}" "${#expected[@]}"
                   else
                     category=HELPER_STARTED_EXIT_1
                   fi
@@ -145,6 +145,14 @@ jobs:
             if [[ ! "${observed[$idx]}" =~ ^S4_DIAG_${expected[$idx]}=(MATCH|DRIFT|MISSING|UNKNOWN)$ ]]; then
               echo '::error::Unexpected diagnostics category'; exit 1
             fi
+          done
+          # Only seven strictly validated categories are printed to workflow logs.
+          # All other remote output remains private; no host, SSH or identity fields.
+          for idx in "${!expected[@]}"; do
+            case "${expected[$idx]}" in
+              CHECKOUT|ROUTE_IMPORT|CONTROLLER_REPORTS|AUTOLOAD|RELEASE_MARKER|CACHE|CACHE_ROUTE_REPORTS)
+                printf '%s\n' "${observed[$idx]}" ;;
+            esac
           done
           {
             echo '## S4 router inspection (read-only)'

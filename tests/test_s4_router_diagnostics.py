@@ -176,7 +176,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         )
         expected = [
             f"S4_DIAG_CACHE_ROUTE_{label}=UNKNOWN"
-            for label in ("COLLECTIONS", "PLANS", "AUTOMATION", "PRIVACY", "DSR")
+            for label in ("COLLECTIONS", "PLANS", "AUTOMATION", "PRIVACY", "DSR", "REPORTS")
         ]
         for case_name, find_code, grep_code in cases:
             with self.subTest(case=case_name):
@@ -197,9 +197,9 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 self.assertEqual(out.returncode, 0, out.stderr)
                 self.assertEqual(before, after)
                 lines = out.stdout.splitlines()
-                self.assertEqual(len(lines), 18, out.stdout)
+                self.assertEqual(len(lines), 19, out.stdout)
                 self.assertEqual(lines[11], "S4_DIAG_CACHE=MATCH")
-                self.assertEqual(lines[12:17], expected)
+                self.assertEqual(lines[12:18], expected)
                 self.assertEqual(lines[-1], "S4_DIAG_READ_ONLY=MATCH")
                 self.assertNotIn("UNSAFE_SYNTHETIC", out.stdout + out.stderr)
                 self.assertNotIn(str(self.root), out.stdout + out.stderr)
@@ -234,7 +234,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         (scripts / "s4-router-diagnostics.sh").write_text(
             SCRIPT.read_text(encoding="utf8"), encoding="utf8"
         )
-        # A complete remote helper emits precisely these 18 ordered fields.
+        # A complete remote helper emits precisely these 19 ordered fields.
         valid_lines = tuple(
             f"S4_DIAG_{label}=MATCH" for label in (
                 "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_COLLECTIONS",
@@ -243,10 +243,10 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 "AUTOLOAD", "RELEASE_MARKER", "CACHE",
                 "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
                 "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
-                "CACHE_ROUTE_DSR", "READ_ONLY",
+                "CACHE_ROUTE_DSR", "CACHE_ROUTE_REPORTS", "READ_ONLY",
             )
         )
-        self.assertEqual(len(valid_lines), 18)
+        self.assertEqual(len(valid_lines), 19)
         for exit_code, expected, output in (
             (255, "TRANSPORT_OR_REMOTE_255", "UNSAFE_SYNTHETIC_STDOUT"),
             (1, "REMOTE_EXIT_1_EMPTY_STDOUT", ""),
@@ -257,9 +257,9 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
             (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=DRIFT"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT_FAKE"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\rUNSAFE_SYNTHETIC_STDOUT"),
-            (1, "HELPER_VALID_PREFIX_01_OF_18", valid_lines[0]),
-            (1, "HELPER_VALID_PREFIX_03_OF_18", "\n".join(valid_lines[:3])),
-            (1, "HELPER_VALID_PREFIX_18_OF_18", "\n".join(valid_lines)),
+            (1, "HELPER_VALID_PREFIX_01_OF_19", valid_lines[0]),
+            (1, "HELPER_VALID_PREFIX_03_OF_19", "\n".join(valid_lines[:3])),
+            (1, "HELPER_VALID_PREFIX_19_OF_19", "\n".join(valid_lines)),
             (1, "HELPER_STARTED_EXIT_1",
              "S4_DIAG_CHECKOUT=MATCH\nUNSAFE_SYNTHETIC_STDOUT"),
             (1, "HELPER_STARTED_EXIT_1",
@@ -303,6 +303,136 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 self.assertNotIn("synthetic-known-hosts", public)
                 self.assertNotIn("synthetic.invalid", public)
                 self.assertNotIn("/synthetic/checkout", public)
+
+    def test_reports_route_cache_match_and_unknown(self):
+        """The Reports 404 must be diagnosed through compiled router files."""
+        cache = self.root / "symfony/var/cache/prod"
+        cache.mkdir(parents=True)
+        router = cache / "matcher_routes.php"
+        route = "/api/admin/reports/cross-module"
+        router.write_text(f"<?php return ['{route}' => []];\n", encoding="utf8")
+        before = subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd=self.root, text=True
+        )
+        present = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(present.returncode, 0, present.stderr)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=MATCH", present.stdout)
+        self.assertIn("S4_DIAG_CONTROLLER_REPORTS=MISSING", present.stdout)
+        self.assertEqual(
+            subprocess.check_output(["git", "status", "--porcelain"], cwd=self.root, text=True),
+            before,
+        )
+        router.write_text("<?php // unrelated cached route\n", encoding="utf8")
+        absent = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(absent.returncode, 0, absent.stderr)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=UNKNOWN", absent.stdout)
+        router.unlink()
+        cache.rmdir()
+        missing = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(missing.returncode, 0, missing.stderr)
+        self.assertIn("S4_DIAG_CACHE=MISSING", missing.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=UNKNOWN", missing.stdout)
+
+    def _synthetic_workflow_inspection(self, remote_output, exit_code=0):
+        """Run the actual workflow SSH step with a synthetic, untrusted response."""
+        source = WORKFLOW.read_text(encoding="utf8").splitlines()
+        step = source.index("      - name: Inspect Hostinger without production writes")
+        run = next(i for i in range(step + 1, len(source))
+                   if source[i] == "        run: |")
+        stop = next(i for i in range(run + 1, len(source))
+                    if source[i].startswith("      - name: "))
+        shell = "\n".join(line[10:] if line.startswith("          ") else line
+                          for line in source[run + 1:stop])
+        bin_dir = self.root / "synthetic-workflow-bin"
+        bin_dir.mkdir(exist_ok=True)
+        fake_ssh = bin_dir / "ssh"
+        fake_ssh.write_text(
+            "#!/bin/bash\n"
+            'printf "%s\\n" "$MOCK_SSH_STDOUT"\n'
+            'printf "%s\\n" "UNSAFE_SYNTHETIC_STDERR" >&2\n'
+            'exit "$MOCK_SSH_EXIT"\n',
+            encoding="utf8",
+        )
+        fake_ssh.chmod(0o700)
+        scripts = self.root / "scripts"
+        scripts.mkdir(exist_ok=True)
+        (scripts / "s4-router-diagnostics.sh").write_text(
+            SCRIPT.read_text(encoding="utf8"), encoding="utf8"
+        )
+        summary = self.root / "diagnostics-summary"
+        summary.unlink(missing_ok=True)
+        env = {
+            **os.environ,
+            "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
+            "MOCK_SSH_EXIT": str(exit_code),
+            "MOCK_SSH_STDOUT": remote_output,
+            "EXPECTED_SHA": self.sha,
+            "SSH_HOST": "synthetic.invalid",
+            "SSH_USER": "synthetic",
+            "SSH_PORT": "22",
+            "GIT_ROOT": "/synthetic/checkout",
+            "DEPLOY_SSH_KEY": "synthetic-private-key",
+            "HOSTINGER_KNOWN_HOSTS": "synthetic-known-hosts",
+            "GITHUB_STEP_SUMMARY": str(summary),
+        }
+        result = subprocess.run(
+            ["bash", "-c", shell], cwd=self.root, env=env, text=True,
+            capture_output=True, timeout=10, check=False,
+        )
+        return result, summary.read_text(encoding="utf8") if summary.exists() else ""
+
+    def test_workflow_logs_only_validated_report_categories(self):
+        fields = (
+            "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_COLLECTIONS",
+            "CONTROLLER_PLANS", "CONTROLLER_AUTOMATION", "CONTROLLER_PRIVACY",
+            "CONTROLLER_DSR", "CONTROLLER_REPORTS", "COMPOSER_LOCK",
+            "AUTOLOAD", "RELEASE_MARKER", "CACHE",
+            "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
+            "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
+            "CACHE_ROUTE_DSR", "CACHE_ROUTE_REPORTS", "READ_ONLY",
+        )
+        remote = "\n".join(f"S4_DIAG_{field}=MATCH" for field in fields)
+        result, summary = self._synthetic_workflow_inspection(remote)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        exposed = (
+            "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_REPORTS",
+            "AUTOLOAD", "RELEASE_MARKER", "CACHE", "CACHE_ROUTE_REPORTS",
+        )
+        self.assertEqual(
+            result.stdout.splitlines(),
+            [f"S4_DIAG_{field}=MATCH" for field in exposed],
+        )
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=MATCH", summary)
+        public = result.stdout + result.stderr + summary
+        for private in ("UNSAFE_SYNTHETIC_STDERR", "synthetic-private-key",
+                        "synthetic-known-hosts", "synthetic.invalid", "/synthetic/checkout"):
+            self.assertNotIn(private, public)
+
+    def test_failure_never_echoes_untrusted_remote_output(self):
+        fields = (
+            "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_COLLECTIONS",
+            "CONTROLLER_PLANS", "CONTROLLER_AUTOMATION", "CONTROLLER_PRIVACY",
+            "CONTROLLER_DSR", "CONTROLLER_REPORTS", "COMPOSER_LOCK",
+            "AUTOLOAD", "RELEASE_MARKER", "CACHE",
+            "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
+            "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
+            "CACHE_ROUTE_DSR", "CACHE_ROUTE_REPORTS", "READ_ONLY",
+        )
+        valid = [f"S4_DIAG_{field}=MATCH" for field in fields]
+        for case in (
+            "\n".join(valid) + "\nUNSAFE_REMOTE_EXTRA",
+            "\n".join([valid[0], valid[2], valid[1], *valid[3:]]),
+            "\n".join(valid[:-1]) + "\nUNSAFE_REMOTE_FINAL",
+        ):
+            with self.subTest(case=case[-35:]):
+                result, summary = self._synthetic_workflow_inspection(case)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertEqual(summary, "")
+                public = result.stdout + result.stderr
+                self.assertNotIn("S4_DIAG_", public)
+                self.assertNotIn("UNSAFE_REMOTE_", public)
+                self.assertNotIn("UNSAFE_SYNTHETIC_STDERR", public)
+                self.assertNotIn("synthetic-private-key", public)
 
 if __name__ == "__main__":
     unittest.main()
