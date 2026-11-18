@@ -722,3 +722,26 @@ Las cinco respuestas HTML de 404 midieron 993 bytes y devolvieron `X-Powered-By:
 **Hipótesis prioritaria, no causa certificada:** el proceso PHP/OPcache o el matcher/router compilado que atiende `/s4` puede no haber incorporado el import de Reports después del PR #950. El 404 HTML idéntico a una ruta inexistente es consistente con ello, pero `CACHE_ROUTE_REPORTS=UNKNOWN` no confirma ni descarta el estado. Si se verifica en el runtime real, evaluar una regeneración mínima de caché **solo después de autorización específica actual del OWNER, respaldo comprobado y evidencia de restauración/rollback D-059 en el Issue**. No se autoriza por este documento `cache:clear`, reinicio de OPcache, cambios de entorno, datos, migraciones ni deploy. Registrar SHA Symfony real antes/después, comando realmente ejecutado, HTTP de Reports y reversión disponible.
 
 **Estado de criterios:** AC-01 **NO** por Reports 404; AC-02 **PARCIAL** porque la causa del defecto actual sigue sin demostrarse, aunque existe una cadena causal plausible respaldada por cambios y workflows; AC-03 explicado por `RELEASE_MARKER=MISSING` sin afirmar identidad PHP; AC-04 se verifica en el SHA exacto final del PR. No pedir CodeRabbit FINAL ni fusionar mientras falte la aceptación productiva.
+
+
+## Verificación HTTP pública completa — 18-nov-2026 01:29:51 UTC
+<!-- GF903-ANONYMOUS-AC01-20261118T012951Z -->
+
+**Prueba real de solo lectura, anónima:** diez `GET` HTTPS al dominio público con verificación TLS, `Accept: application/json`, `Cache-Control: no-cache`, sin cookies, sesión, credenciales, SSH, `POST`, datos privados ni escrituras en Hostinger. El cliente registró únicamente status, MIME y campos públicos JSON permitidos; no persistió cuerpos. El proceso finalizó `exit=0` y no requirió reintentos.
+
+| Ruta | HTTP | MIME / campo público permitido |
+| --- | ---: | --- |
+| `/health` | **200** | JSON `version=0.1.227`, `commit=4189a1862aab1beb61b6bdadb332106aa1edf110`, `exact=true` (**Laravel**, no Symfony) |
+| `/s4/health` | **200** | JSON `version=0.1.227`, `stage=s0-preview`, **`release_sha=null`** |
+| `/s4/_bridge-readiness` | **200** | `application/json`; no se infiere identidad de SHA |
+| `/s4/api/admin/library/collections` | **401** | JSON `error.code=authentication_required` |
+| `/s4/api/admin/library/permissions` | **401** | JSON `error.code=authentication_required` |
+| `/s4/api/admin/plans` | **401** | JSON `error.code=authentication_required` |
+| `/s4/api/admin/rules/automation` | **401** | JSON `error.code=authentication_required` |
+| `/s4/api/admin/reports/cross-module` | **404** | **`text/html`, fallo vigente de AC-01** |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | **404** | **JSON `error.code=feature_unavailable`**, excepción autorizada por OWNER #958 |
+| `/s4/privacidad-y-mis-derechos` | **200** | `text/html` |
+
+**Concordancia con fuente:** `main@4189a186...` incluye `symfony/config/routes.yaml` con import de `../src/Http/Reports/` y el controlador `CrossModuleReportController` con ruta GET `/api/admin/reports/cross-module`; `RouteImportCoverageTest` cubre el caso anónimo 401 en el kernel local. La lectura Hostinger owner-only [S4 Router Diagnostics #44024482543](https://github.com/pl0n3r/GrindFlow/actions/runs/44024482543) confirmó `CHECKOUT=MATCH`, `ROUTE_IMPORT=MATCH`, `CONTROLLER_REPORTS=MATCH`, `AUTOLOAD=MATCH` y `CACHE=MATCH`, pero **`CACHE_ROUTE_REPORTS=UNKNOWN`** y **`RELEASE_MARKER=MISSING`**. La diferencia entre código/checkout inspeccionado y servicio HTTP efectivo sigue **no demostrada causalmente**; no atribuir con certeza el 404 a OPcache, caché compilada u otra capa.
+
+**Estado de aceptación:** AC-01 **NO** (Reports 404 HTML); AC-02 **PARCIAL** (evidencia exact-main y diagnóstico, causa productiva aún desconocida y ningún comando nuevo ejecutado); AC-03 **explicado parcialmente** por marcador ausente, sin identidad SHA Symfony autenticada; AC-04 **pendiente de checks exact-HEAD de este nuevo commit**. La recuperación V3 por bot [#6966243217](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6966243217), `d87f61f1-4dfc-4854-b226-78d7d722b4dd`, solo habilita el claim documental. La autorización operativa de Hostinger **no está concedida**: cualquier inspección privada adicional/intervención requiere consentimiento específico del OWNER, backup actual verificable y restauración/rollback D-043/D-059. Mantener [PR #907](https://github.com/pl0n3r/GrindFlow/pull/907) **DRAFT/NO MERGE**, sin CodeRabbit FINAL antes del HEAD definitivo y aceptación.
