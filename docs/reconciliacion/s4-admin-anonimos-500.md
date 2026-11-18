@@ -243,3 +243,29 @@ Desde el dispositivo conectado se ejecutó otra lectura HTTPS GET, sin sesión n
 | `/s4/_bridge-readiness` | **200** | `application/json; charset=utf-8` | sin campos públicos de identidad en la allowlist |
 
 **Resultado incremental:** la recuperación superficial de las tres respuestas anónimas 401 JSON se mantiene. No cambia el dictamen de aceptación: AC-01 sigue parcial porque el proceso HTTP Symfony no publica un SHA exacto; AC-02 sigue parcial porque no hay excepción histórica sanitizada o recibo autorizado de indisponibilidad; AC-03 sigue parcial porque no existe prueba independiente de integridad/restauración/rollback del backup `var/cache/prod.bak-20261105`. La respuesta 200 de Laravel no prueba la identidad del proceso Symfony. Esta lectura no ejecutó SSH, escritura, reinicio, `cache:clear`, restore ni deploy. El permiso OWNER vigente sigue limitado a lectura; no se solicitó CodeRabbit ni se autorizó merge.
+
+
+## Categorías S4 autenticadas y sondeo anónimo — 18-nov-2026 01:01 UTC
+<!-- GF917-REMOTE-DIAGNOSTICS-20261118T0101Z -->
+
+**Proveniencia sin escrituras productivas.** En el workflow propietario [S4 Router Diagnostics #44024482543](https://github.com/pl0n3r/GrindFlow/actions/runs/44024482543), job [#133841451270](https://github.com/pl0n3r/GrindFlow/actions/runs/44024482543/job/133841451270) del 17-nov-2026 05:29 UTC, se verificó `main@4189a1862aab1beb61b6bdadb332106aa1edf110` y el helper publicó **solo siete categorías validadas**:
+
+| Categoría observada | Resultado |
+| --- | --- |
+| `S4_DIAG_CHECKOUT` | `MATCH` |
+| `S4_DIAG_ROUTE_IMPORT` | `MATCH` |
+| `S4_DIAG_CONTROLLER_REPORTS` | `MATCH` |
+| `S4_DIAG_AUTOLOAD` | `MATCH` |
+| `S4_DIAG_RELEASE_MARKER` | **`MISSING`** |
+| `S4_DIAG_CACHE` | `MATCH` |
+| `S4_DIAG_CACHE_ROUTE_REPORTS` | **`UNKNOWN`** |
+
+Estas señales acreditan **solo** el checkout remoto inspeccionado; `MATCH` de caché global no certifica su ruta Reports ni la identidad del proceso que sirve HTTP. El marcador de release ausente **no** autoriza instalarlo o reiniciar Symfony: la autorización OWNER [#6686368279](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6686368279) se limita a **lectura sin datos privados**.
+
+**Nueva comprobación HTTPS desde el equipo conectado autorizado, sin credenciales, cookies, sesión ni escritura:**
+- A las `2026-11-18T01:01:17Z`, `GET /s4/api/admin/vault` y `GET /s4/api/admin/rules/weekly/preview` devolvieron **401 `application/json`**, `error.code=authentication_required`.
+- El primer `GET /s4/api/admin/context` dio `URLError` de **transporte** (no HTTP 500). Un único reintento a las `01:01:42Z` devolvió **401 JSON** con el mismo `authentication_required`.
+- `GET /health`: **200 JSON**, `commit=4189a1862aab1beb61b6bdadb332106aa1edf110`, `exact=true` (**identidad Laravel raíz**). `GET /s4/health`: **200 JSON**, `stage=s0-preview`, `release_sha=null` (**identidad HTTP Symfony desconocida**).
+- El sondeo inspeccionó únicamente status, MIME y claves JSON públicas allowlisted; no guardó cuerpos, accesos privados ni datos de usuario.
+
+**Aceptación estricta tras este incremento:** AC-01 **PARCIAL** (3×401 pero no SHA HTTP Symfony); AC-02 **UNKNOWN** (falta excepción histórica 500 sanitizada, distinta del 404 Reports de #903); AC-03 **PARCIAL** (respuesta correcta pero sin evidencia independiente de integridad/restaurabilidad y rollback del respaldo `var/cache/prod.bak-20261105`). AC-04 debe revalidarse sobre el **nuevo HEAD de este commit**; ningún check verde anterior es heredable. Mantener #983 **DRAFT**, sin revisión CodeRabbit FINAL, merge, despliegue, `cache:clear` ni cualquier escritura Hostinger hasta conseguir autoridad específica D-043/D-059 y evidencia operativa primaria. La evidencia de solo lectura también queda registrada en [comentario #6965761468](https://github.com/pl0n3r/GrindFlow/issues/917#issuecomment-6965761468).
