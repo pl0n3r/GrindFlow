@@ -745,3 +745,27 @@ Las cinco respuestas HTML de 404 midieron 993 bytes y devolvieron `X-Powered-By:
 **Concordancia con fuente:** `main@4189a186...` incluye `symfony/config/routes.yaml` con import de `../src/Http/Reports/` y el controlador `CrossModuleReportController` con ruta GET `/api/admin/reports/cross-module`; `RouteImportCoverageTest` cubre el caso anónimo 401 en el kernel local. La lectura Hostinger owner-only [S4 Router Diagnostics #44024482543](https://github.com/pl0n3r/GrindFlow/actions/runs/44024482543) confirmó `CHECKOUT=MATCH`, `ROUTE_IMPORT=MATCH`, `CONTROLLER_REPORTS=MATCH`, `AUTOLOAD=MATCH` y `CACHE=MATCH`, pero **`CACHE_ROUTE_REPORTS=UNKNOWN`** y **`RELEASE_MARKER=MISSING`**. La diferencia entre código/checkout inspeccionado y servicio HTTP efectivo sigue **no demostrada causalmente**; no atribuir con certeza el 404 a OPcache, caché compilada u otra capa.
 
 **Estado de aceptación:** AC-01 **NO** (Reports 404 HTML); AC-02 **PARCIAL** (evidencia exact-main y diagnóstico, causa productiva aún desconocida y ningún comando nuevo ejecutado); AC-03 **explicado parcialmente** por marcador ausente, sin identidad SHA Symfony autenticada; AC-04 **pendiente de checks exact-HEAD de este nuevo commit**. La recuperación V3 por bot [#6966243217](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6966243217), `d87f61f1-4dfc-4854-b226-78d7d722b4dd`, solo habilita el claim documental. La autorización operativa de Hostinger **no está concedida**: cualquier inspección privada adicional/intervención requiere consentimiento específico del OWNER, backup actual verificable y restauración/rollback D-043/D-059. Mantener [PR #907](https://github.com/pl0n3r/GrindFlow/pull/907) **DRAFT/NO MERGE**, sin CodeRabbit FINAL antes del HEAD definitivo y aceptación.
+
+## Medición pública completa y recuperación V3 — 18-nov-2026, 14:53:09 UTC
+<!-- GF903-HTTP-PUBLIC-20261118T145309Z -->
+
+Se ejecutaron **diez GET HTTPS anónimos** desde el dispositivo conectado del propietario, sin cookies, cabeceras de autorización, SSH ni operaciones de escritura. Se pidió `Accept: application/json` y `Cache-Control: no-cache` y se usó validación TLS normal del cliente Python. El proceso remoto terminó con **exit code 0**. No se persistieron cuerpos ajenos a los JSON públicos de `health` y DSR. Resultados nuevos:
+
+| GET público | HTTP | MIME | Observación |
+| --- | ---: | --- | --- |
+| `/health` | 200 | `application/json` | `version=0.1.227`, `commit=4189a1862aab1beb61b6bdadb332106aa1edf110`, `exact=true`; identifica Laravel, no Symfony |
+| `/s4/health` | 200 | `application/json` | `version=0.1.227`, `stage=s0-preview`, `release_sha=null`; no identifica el binario Symfony |
+| `/s4/_bridge-readiness` | 200 | `application/json; charset=utf-8` | Bridge público disponible, sin atribuir SHA |
+| `/s4/api/admin/library/collections` | 401 | `application/json` | Ruta presente y protegida |
+| `/s4/api/admin/library/permissions` | 401 | `application/json` | Ruta presente y protegida |
+| `/s4/api/admin/plans` | 401 | `application/json` | Ruta presente y protegida |
+| `/s4/api/admin/rules/automation` | 401 | `application/json` | Ruta presente y protegida |
+| **`/s4/api/admin/reports/cross-module`** | **404** | **`text/html; charset=UTF-8`** | **Fallo de AC-01 sin resolver** |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | 404 | `application/json` | **`{"error":{"code":"feature_unavailable"}}`**, exactamente la excepción aprobada en #958 |
+| `/s4/privacidad-y-mis-derechos` | 200 | `text/html; charset=UTF-8` | Vista pública presente |
+
+**Aislamiento técnico, sin afirmar causa no probada:** `main@4189a1862aab1beb61b6bdadb332106aa1edf110` incluye el import de `../src/Http/Reports/` y la prueba `RouteImportCoverageTest::testCrossModuleReportRouteExistsAndRejectsAnonymousRequests` (401 local). La inspección remota ya ejecutada en [S4 Router Diagnostics #44240104046](https://github.com/pl0n3r/GrindFlow/actions/runs/44240104046) confirmó archivos/autoload, pero `CACHE_ROUTE_REPORTS=UNKNOWN` y `RELEASE_MARKER=MISSING`. Según el código del inspector `scripts/s4-router-diagnostics.sh`, **UNKNOWN no distingue** entre ausencia de ruta en archivos `*route*.php` / `*matcher*.php`, falta de esos archivos o inspección no concluyente; no acredita un `cache:clear` como reparación. `S4 Runtime Prepare` solo prepara `vendor`, tampoco reconstruye el matcher.
+
+**Reserva de continuidad:** última lease V3 por bot [#6982067218](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6982067218), `74f5cac4-f7e5-4044-8a61-b32b97db0272`, owner `pl0n3r`, claim exclusivo de este documento y PR [#907](https://github.com/pl0n3r/GrindFlow/pull/907). La ejecución pública no escribió en Hostinger ni usó datos privados. Es un diagnóstico nuevo, no un cambio funcional de S4.
+
+**Puerta conservada:** AC-01 **NO** por Reports 404; AC-02 **PARCIAL** (comandos y SHA conocidos, causa productiva sin prueba); AC-03 **EXPLICADO** con `release_sha=null` sin certificar identidad Symfony; AC-04 requiere CI exacto del nuevo HEAD documental. Intervenir caché/OPcache/host necesita permiso operativo OWNER específico y backup actual/restauración/rollback D-059 documentados. Mantener `DRAFT / NO MERGE` hasta verificar Reports 401/302/200, CI canónico y CodeRabbit FINAL una sola vez sobre PR definitivo.
