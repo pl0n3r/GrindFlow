@@ -32,11 +32,11 @@ HTTP_CASES = {
 @lru_cache(maxsize=1)
 def _execute_web_tests() -> dict[str, str]:
     php = shutil.which("php")
-    runner = SYMFONY / "vendor" / "bin" / "simple-phpunit"
+    runner = SYMFONY / "vendor" / "bin" / "phpunit"
     database_url = os.environ.get("DATABASE_URL", "")
     if php is None or not runner.is_file() or not database_url:
         raise AssertionError(
-            "PHP CLI, Symfony vendor/bin/simple-phpunit and an isolated DATABASE_URL "
+            "PHP CLI, Symfony vendor/bin/phpunit and an isolated DATABASE_URL "
             "are required; do not claim an HTTP pass from static source inspection"
         )
     if os.environ.get("APP_ENV") != "test":

@@ -113,7 +113,7 @@ def audit_ci_contract(ci: str, phpunit: str, smoke: str, requirements: str) -> N
     _need(requirements, "Scheduler → Traffic → Finance", "Missing browser requirement")
     _need(phpunit, '<directory>tests/php</directory>', "Real PHP scenario not discovered")
     _need(ci, "  symfony-preview:", "Symfony integration job missing")
-    _need(ci, "php vendor/bin/simple-phpunit -c phpunit.xml.dist",
+    _need(ci, "php vendor/bin/phpunit -c phpunit.xml.dist",
           "Disposable DB HTTP suite not executed")
     _need(ci, "  validate:", "Required aggregate gate missing")
     _need(ci, "symfony-preview", "Aggregate must account for Symfony")
@@ -155,7 +155,7 @@ class CrossModuleSecurityE2ETests(unittest.TestCase):
                     audit_browser_contract(browser.replace("'" + gate + "'", "'MISSING-GATE'", 1))
         with self.assertRaises(AssertionError):
             audit_ci_contract(
-                ci.replace("php vendor/bin/simple-phpunit -c phpunit.xml.dist", "true", 1),
+                ci.replace("php vendor/bin/phpunit -c phpunit.xml.dist", "true", 1),
                 PHPUNIT.read_text(encoding="utf-8"),
                 SMOKE.read_text(encoding="utf-8"),
                 REQUIREMENTS.read_text(encoding="utf-8"),
