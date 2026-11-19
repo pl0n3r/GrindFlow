@@ -335,6 +335,9 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertIn("S4_DIAG_CACHE_ROUTER_FILES=MATCH", literal.stdout)
         self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=MATCH", literal.stdout)
         for observed in (missing, empty, opaque, no_literal, literal):
+            self.assertEqual(len(observed.stdout.splitlines()), 20, observed.stdout)
+            self.assertIn("S4_DIAG_READ_ONLY=MATCH", observed.stdout)
+            self.assertNotIn("S4_DIAG_CACHE_ROUTE_REPORTS=MISSING", observed.stdout)
             self.assertNotIn(str(self.root), observed.stdout + observed.stderr)
             self.assertNotIn(self.sha, observed.stdout + observed.stderr)
 
