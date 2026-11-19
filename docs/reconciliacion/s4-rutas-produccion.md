@@ -769,3 +769,25 @@ Se ejecutaron **diez GET HTTPS anónimos** desde el dispositivo conectado del pr
 **Reserva de continuidad:** última lease V3 por bot [#6982067218](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-6982067218), `74f5cac4-f7e5-4044-8a61-b32b97db0272`, owner `pl0n3r`, claim exclusivo de este documento y PR [#907](https://github.com/pl0n3r/GrindFlow/pull/907). La ejecución pública no escribió en Hostinger ni usó datos privados. Es un diagnóstico nuevo, no un cambio funcional de S4.
 
 **Puerta conservada:** AC-01 **NO** por Reports 404; AC-02 **PARCIAL** (comandos y SHA conocidos, causa productiva sin prueba); AC-03 **EXPLICADO** con `release_sha=null` sin certificar identidad Symfony; AC-04 requiere CI exacto del nuevo HEAD documental. Intervenir caché/OPcache/host necesita permiso operativo OWNER específico y backup actual/restauración/rollback D-059 documentados. Mantener `DRAFT / NO MERGE` hasta verificar Reports 401/302/200, CI canónico y CodeRabbit FINAL una sola vez sobre PR definitivo.
+
+
+## Comprobación pública adicional — 2026-11-19 (lectura externa de este ciclo)
+<!-- GF903-GET-CHECKPOINT-20261119-EXTERNAL -->
+
+Se efectuó un sondeo anónimo, de **solo lectura**, de las diez URL públicas de `https://www.grindflow.com.co` mediante un lector HTTP externo. Se consultó la fuente pública en vivo con tolerancia de caché solicitada de cero, pero el servicio de extracción no proporcionó una hora UTC exacta ni cuerpo/MIME para respuestas HTTP no exitosas. Los estados 401/404 proceden del campo `status` de los errores HTTP del lector; no atribuirles un cuerpo o JSON no inspeccionado.
+
+| GET público | HTTP comunicado | Observación verificable |
+| --- | ---: | --- |
+| `/health` | 200 | JSON: `version=0.1.227`, `commit=bedd161b68e2f18b1eb9416503581c8893a89c9a`, `exact=true`; coincide con el SHA observado de `main` |
+| `/s4/health` | 200 | JSON: `version=0.1.227`, `release_sha=null`; identidad exacta del proceso Symfony sigue no acreditada |
+| `/s4/_bridge-readiness` | 200 | `state=ready_for_web_probe`; no acredita rutas Reports |
+| `/s4/api/admin/library/collections` | 401 | Requiere autenticación |
+| `/s4/api/admin/library/permissions` | 401 | Requiere autenticación |
+| `/s4/api/admin/plans` | 401 | Requiere autenticación |
+| `/s4/api/admin/rules/automation` | 401 | Requiere autenticación |
+| **`/s4/api/admin/reports/cross-module`** | **404** | **AC-01 sigue no conforme.** El lector no devolvió cuerpo ni MIME; no se infiere HTML de esta medición |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | 404 | El lector no devolvió el JSON; la excepción aprobada requiere comprobar de modo separado `error.code=feature_unavailable` |
+| `/s4/privacidad-y-mis-derechos` | 200 | Se obtuvo el texto de la página provisional pública |
+
+**Alcance:** sondeo público sin SSH, hPanel, credenciales, datos privados, caché modificada ni despliegue. El nuevo `main@bedd161b68e2f18b1eb9416503581c8893a89c9a` confirma por `/health` la identidad Laravel, no el router Symfony activo. Como Reports aún devuelve 404, falta la prueba de causa en el proceso PHP real y una reparación reversible amparada por acceso operativo y respaldo/rollback D-059 verificados. **No** marcar AC-01/AC-02 como satisfechos, no retirar DRAFT y no solicitar CodeRabbit FINAL antes de un GET productivo conforme y CI exact-HEAD.
+
