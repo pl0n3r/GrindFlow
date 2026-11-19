@@ -260,7 +260,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\rUNSAFE_SYNTHETIC_STDOUT"),
             (1, "HELPER_VALID_PREFIX_01_OF_20", valid_lines[0]),
             (1, "HELPER_VALID_PREFIX_03_OF_20", "\n".join(valid_lines[:3])),
-            (1, "HELPER_VALID_PREFIX_19_OF_20", "\n".join(valid_lines)),
+            (1, "HELPER_VALID_PREFIX_19_OF_20", "\n".join(valid_lines[:-1])),
             (1, "HELPER_STARTED_EXIT_1",
              "S4_DIAG_CHECKOUT=MATCH\nUNSAFE_SYNTHETIC_STDOUT"),
             (1, "HELPER_STARTED_EXIT_1",
