@@ -1,12 +1,29 @@
 name: S4 Runtime Prepare
 
 on:
-  workflow_run:
-    workflows: ["GrindFlow Deploy Observer"]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'Exact full SHA of current main to prepare'
+        required: true
+        type: string
+      vendor_backup_sha256:
+        description: 'SHA-256 of previously verified persistent vendor archive'
+        required: true
+        type: string
+      authorization_comment_id:
+        description: 'Owner approval comment on issue #903, bound to SHA and archive hash'
+        required: true
+        type: string
+      confirm_runtime_write:
+        description: 'I authorize this specific protected vendor replacement'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  issues: read
 
 concurrency:
   group: grindflow-s4-runtime-prepare
@@ -16,24 +33,60 @@ jobs:
   prepare:
     name: exact-s4-runtime-prepare
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == github.event.repository.default_branch &&
-      github.event.workflow_run.repository.full_name == github.repository
+      github.event_name == 'workflow_dispatch' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/main' &&
+      inputs.confirm_runtime_write == true
+    environment: production-s4-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      OBSERVED_SHA: ${{ github.event.workflow_run.head_sha }}
+      OBSERVED_SHA: ${{ inputs.expected_sha }}
+      EVENT_SHA: ${{ github.sha }}
+      BACKUP_SHA256: ${{ inputs.vendor_backup_sha256 }}
+      AUTH_COMMENT_ID: ${{ inputs.authorization_comment_id }}
       PRODUCTION_URL: https://www.grindflow.com.co
     steps:
+      - id: authorization
+        name: Require fresh OWNER decision bound to main and verified backup hash
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_ACTOR" == "$GITHUB_REPOSITORY_OWNER" ]] || exit 1
+          [[ "$GITHUB_TRIGGERING_ACTOR" == "$GITHUB_REPOSITORY_OWNER" ]] || exit 1
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]] || exit 1
+          [[ "$EVENT_SHA" =~ ^[0-9a-f]{40}$ && "$EVENT_SHA" == "$GITHUB_SHA" ]] || exit 1
+          [[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ && "$OBSERVED_SHA" == "$GITHUB_SHA" ]] || exit 1
+          [[ "$BACKUP_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          [[ "$AUTH_COMMENT_ID" =~ ^[1-9][0-9]{0,15}$ ]] || exit 1
+          approval="$(gh api "repos/$GITHUB_REPOSITORY/issues/comments/$AUTH_COMMENT_ID")" || exit 1
+          jq -e --arg owner "$GITHUB_REPOSITORY_OWNER" \
+                --arg repo "$GITHUB_REPOSITORY" \
+                --arg sha "$OBSERVED_SHA" \
+                --arg backup "$BACKUP_SHA256" '
+            .user.login == $owner and
+            .issue_url == ("https://api.github.com/repos/" + $repo + "/issues/903") and
+            .body == ("S4_RUNTIME_PREPARE_APPROVED\nSHA=" + $sha + "\nVENDOR_BACKUP_SHA256=" + $backup)
+          ' <<< "$approval" >/dev/null || exit 1
+          approved_at="$(jq -r '.created_at' <<< "$approval")"
+          approved_epoch="$(date -u -d "$approved_at" +%s)"
+          now_epoch="$(date -u +%s)"
+          (( now_epoch >= approved_epoch && now_epoch - approved_epoch <= 3600 )) || exit 1
+          echo 'authorized=true' >> "$GITHUB_OUTPUT"
+          echo 'Fresh exact-SHA owner approval recorded on #903; runtime guard continues.' >> "$GITHUB_STEP_SUMMARY"
+
       - id: current
         name: Resolve trusted current-main SHA before production I/O
+        if: steps.authorization.outputs.authorized == 'true'
         shell: bash
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          [[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ && "$OBSERVED_SHA" == "$GITHUB_SHA" ]] || exit 1
           [[ "$DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || exit 1
           [[ "$DEFAULT_BRANCH" != -* && "$DEFAULT_BRANCH" != *..* && "$DEFAULT_BRANCH" != *//* ]] || exit 1
 
@@ -86,6 +139,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$BACKUP_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
           [[ -f "$HELPER_PATH" ]] || { echo '::error::Trusted helper was not materialized'; exit 1; }
           [[ "$SSH_HOST" =~ ^[A-Za-z0-9.-]+$ && "$SSH_HOST" != -* ]] || { echo '::error::Invalid SSH host configuration'; exit 1; }
           [[ "$SSH_USER" =~ ^[A-Za-z0-9._-]+$ && "$SSH_USER" != -* ]] || { echo '::error::Invalid SSH user configuration'; exit 1; }
@@ -113,9 +167,37 @@ jobs:
             -o "UserKnownHostsFile=$known"
             -o ConnectTimeout=10
           )
-          ssh "${ssh_args[@]}" "$SSH_USER@$SSH_HOST" \
-            "cd '$GIT_ROOT' && EXPECTED_SHA='$TRUSTED_SHA' bash -s" \
-            < "$HELPER_PATH"
+          # The persistent archive must already exist. Never create/overwrite it here.
+          # Verify the SHA-256 and archive contents in the SAME remote shell
+          # immediately before running the authorized Composer helper.
+          {
+            cat <<'BACKUP_GUARD'
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$EXPECTED_BACKUP_SHA" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          [[ -n "${HOME:-}" && -d "$HOME/.grindflow/runtime-backups" &&
+             ! -L "$HOME/.grindflow/runtime-backups" ]] || exit 1
+          archive="$HOME/.grindflow/runtime-backups/vendor-prep-${EXPECTED_SHA}.tar.gz"
+          [[ -f "$archive" && ! -L "$archive" && -s "$archive" ]] || exit 1
+          [[ ! -L "symfony/vendor" ]] || exit 1
+          actual="$(sha256sum -- "$archive" | cut -d' ' -f1)"
+          [[ "$actual" == "$EXPECTED_BACKUP_SHA" ]] || exit 1
+          tar -tzf "$archive" 2>/dev/null | awk '
+            /^\// || /(^|\/)\.\.(\/|$)/ { unsafe = 1 }
+            $0 == "vendor/autoload.php" { autoload = 1 }
+            $0 != "vendor/" && $0 !~ /^vendor\// { unsafe = 1 }
+            END { exit unsafe || !autoload }
+          ' || exit 1
+          # Safe restore: forbid symlinks, hardlinks and special file types.
+          # No archive filenames are emitted to Actions logs.
+          tar -tvzf "$archive" 2>/dev/null | awk '
+            substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }
+          ' || exit 1
+          printf 'S4_RUNTIME_BACKUP_VERIFIED\n'
+          BACKUP_GUARD
+            cat "$HELPER_PATH"
+          } | ssh "${ssh_args[@]}" "$SSH_USER@$SSH_HOST" \
+            "cd '$GIT_ROOT' && EXPECTED_SHA='$TRUSTED_SHA' EXPECTED_BACKUP_SHA='$BACKUP_SHA256' bash -s"
 
       - name: Reconfirm trusted current-main SHA after preparation
         if: steps.current.outputs.current == 'true'
