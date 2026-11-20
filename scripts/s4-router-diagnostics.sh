@@ -72,6 +72,11 @@ cache_routes_unknown() {
   done
 }
 
+cache_inventory_fallback() {
+  printf 'S4_DIAG_CACHE_ROUTER_FILES=%s\n' "$1"
+  cache_routes_unknown
+}
+
 # Capture enumeration and inspection atomically: do not print partial batches.
 scan_cache_routes() (
   set -euo pipefail
@@ -84,13 +89,16 @@ scan_cache_routes() (
       router_files+=("$router_file")
     done || return 1
 
-  if [[ -n "${router_files[0]+present}" ]]; then
-    for router_file in "${router_files[@]}"; do
-      [[ "$router_file" == "$cache/"* && "$router_file" != *"/../"* &&
-         -f "$router_file" && -r "$router_file" && ! -L "$router_file" ]] || return 1
-    done
+  if [[ -z "${router_files[0]+present}" ]]; then
+    cache_inventory_fallback MISSING
+    exit 0
   fi
 
+  for router_file in "${router_files[@]}"; do
+    [[ "$router_file" == "$cache/"* && "$router_file" != *"/../"* &&
+       -f "$router_file" && -r "$router_file" && ! -L "$router_file" ]] || return 1
+  done
+  printf 'S4_DIAG_CACHE_ROUTER_FILES=MATCH\n'
   for entry in \
     'COLLECTIONS|/api/admin/library/collections' \
     'PLANS|/api/admin/plans' \
@@ -116,14 +124,16 @@ scan_cache_routes() (
 # Reject unexpected stdout even if a command returns zero.
 valid_cache_routes() {
   local output="$1" label line index=0
-  while IFS= read -r line; do
-    (( index < ${#cache_route_labels[@]} )) || return 1
-    label="${cache_route_labels[index]}"
+  local -a lines=()
+  mapfile -t lines <<< "$output"
+  (( ${#lines[@]} == ${#cache_route_labels[@]} + 1 )) || return 1
+  [[ "${lines[0]}" =~ ^S4_DIAG_CACHE_ROUTER_FILES=(MATCH|MISSING|UNKNOWN)$ ]] || return 1
+  for label in "${cache_route_labels[@]}"; do
+    index=$((index + 1))
+    line="${lines[index]}"
     [[ "$line" == "S4_DIAG_CACHE_ROUTE_${label}=MATCH" ||
        "$line" == "S4_DIAG_CACHE_ROUTE_${label}=UNKNOWN" ]] || return 1
-    index=$((index + 1))
-  done <<< "$output"
-  (( index == ${#cache_route_labels[@]} ))
+  done
 }
 
 if [[ -d "$cache" && ! -L "$cache" ]]; then
@@ -132,10 +142,10 @@ if [[ -d "$cache" && ! -L "$cache" ]]; then
      valid_cache_routes "$cache_routes"; then
     printf '%s\n' "$cache_routes"
   else
-    cache_routes_unknown
+    cache_inventory_fallback UNKNOWN
   fi
 else
   printf 'S4_DIAG_CACHE=MISSING\n'
-  cache_routes_unknown
+  cache_inventory_fallback MISSING
 fi
 printf 'S4_DIAG_READ_ONLY=MATCH\n'
