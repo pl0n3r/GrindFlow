@@ -197,9 +197,10 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 self.assertEqual(out.returncode, 0, out.stderr)
                 self.assertEqual(before, after)
                 lines = out.stdout.splitlines()
-                self.assertEqual(len(lines), 19, out.stdout)
+                self.assertEqual(len(lines), 20, out.stdout)
                 self.assertEqual(lines[11], "S4_DIAG_CACHE=MATCH")
-                self.assertEqual(lines[12:18], expected)
+                self.assertEqual(lines[12], "S4_DIAG_CACHE_ROUTER_FILES=UNKNOWN")
+                self.assertEqual(lines[13:19], expected)
                 self.assertEqual(lines[-1], "S4_DIAG_READ_ONLY=MATCH")
                 self.assertNotIn("UNSAFE_SYNTHETIC", out.stdout + out.stderr)
                 self.assertNotIn(str(self.root), out.stdout + out.stderr)
@@ -234,19 +235,19 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         (scripts / "s4-router-diagnostics.sh").write_text(
             SCRIPT.read_text(encoding="utf8"), encoding="utf8"
         )
-        # A complete remote helper emits precisely these 19 ordered fields.
+        # A complete remote helper emits precisely these 20 ordered fields.
         valid_lines = tuple(
             f"S4_DIAG_{label}=MATCH" for label in (
                 "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_COLLECTIONS",
                 "CONTROLLER_PLANS", "CONTROLLER_AUTOMATION", "CONTROLLER_PRIVACY",
                 "CONTROLLER_DSR", "CONTROLLER_REPORTS", "COMPOSER_LOCK",
                 "AUTOLOAD", "RELEASE_MARKER", "CACHE",
-                "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
+                "CACHE_ROUTER_FILES", "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
                 "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
                 "CACHE_ROUTE_DSR", "CACHE_ROUTE_REPORTS", "READ_ONLY",
             )
         )
-        self.assertEqual(len(valid_lines), 19)
+        self.assertEqual(len(valid_lines), 20)
         for exit_code, expected, output in (
             (255, "TRANSPORT_OR_REMOTE_255", "UNSAFE_SYNTHETIC_STDOUT"),
             (1, "REMOTE_EXIT_1_EMPTY_STDOUT", ""),
@@ -257,9 +258,9 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
             (1, "REMOTE_EXIT_1", "UNSAFE_SYNTHETIC_STDOUT\nS4_DIAG_CHECKOUT=DRIFT"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT_FAKE"),
             (1, "REMOTE_EXIT_1", "S4_DIAG_CHECKOUT=DRIFT\rUNSAFE_SYNTHETIC_STDOUT"),
-            (1, "HELPER_VALID_PREFIX_01_OF_19", valid_lines[0]),
-            (1, "HELPER_VALID_PREFIX_03_OF_19", "\n".join(valid_lines[:3])),
-            (1, "HELPER_VALID_PREFIX_19_OF_19", "\n".join(valid_lines)),
+            (1, "HELPER_VALID_PREFIX_01_OF_20", valid_lines[0]),
+            (1, "HELPER_VALID_PREFIX_03_OF_20", "\n".join(valid_lines[:3])),
+            (1, "HELPER_VALID_PREFIX_19_OF_20", "\n".join(valid_lines[:-1])),
             (1, "HELPER_STARTED_EXIT_1",
              "S4_DIAG_CHECKOUT=MATCH\nUNSAFE_SYNTHETIC_STDOUT"),
             (1, "HELPER_STARTED_EXIT_1",
@@ -303,6 +304,42 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
                 self.assertNotIn("synthetic-known-hosts", public)
                 self.assertNotIn("synthetic.invalid", public)
                 self.assertNotIn("/synthetic/checkout", public)
+
+    def test_cache_router_file_inventory_states(self):
+        """Distinguish missing router candidates from inconclusive literal search."""
+        missing = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(missing.returncode, 0, missing.stderr)
+        self.assertIn("S4_DIAG_CACHE=MISSING", missing.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTER_FILES=MISSING", missing.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=UNKNOWN", missing.stdout)
+
+        cache = self.root / "symfony/var/cache/prod"
+        cache.mkdir(parents=True)
+        empty = self.run_inspection(self.sha, "--read-only")
+        self.assertIn("S4_DIAG_CACHE=MATCH", empty.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTER_FILES=MISSING", empty.stdout)
+        (cache / "optimized.php").write_text("<?php // opaque fixture\n", encoding="utf8")
+        opaque = self.run_inspection(self.sha, "--read-only")
+        self.assertIn("S4_DIAG_CACHE_ROUTER_FILES=MISSING", opaque.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=UNKNOWN", opaque.stdout)
+
+        router = cache / "matcher_routes.php"
+        router.write_text("<?php // optimized router without route literal\n", encoding="utf8")
+        no_literal = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(no_literal.returncode, 0, no_literal.stderr)
+        self.assertIn("S4_DIAG_CACHE_ROUTER_FILES=MATCH", no_literal.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=UNKNOWN", no_literal.stdout)
+        router.write_text("<?php // /api/admin/reports/cross-module\n", encoding="utf8")
+        literal = self.run_inspection(self.sha, "--read-only")
+        self.assertEqual(literal.returncode, 0, literal.stderr)
+        self.assertIn("S4_DIAG_CACHE_ROUTER_FILES=MATCH", literal.stdout)
+        self.assertIn("S4_DIAG_CACHE_ROUTE_REPORTS=MATCH", literal.stdout)
+        for observed in (missing, empty, opaque, no_literal, literal):
+            self.assertEqual(len(observed.stdout.splitlines()), 20, observed.stdout)
+            self.assertIn("S4_DIAG_READ_ONLY=MATCH", observed.stdout)
+            self.assertNotIn("S4_DIAG_CACHE_ROUTE_REPORTS=MISSING", observed.stdout)
+            self.assertNotIn(str(self.root), observed.stdout + observed.stderr)
+            self.assertNotIn(self.sha, observed.stdout + observed.stderr)
 
     def test_reports_route_cache_match_and_unknown(self):
         """The Reports 404 must be diagnosed through compiled router files."""
@@ -387,7 +424,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
             "CONTROLLER_PLANS", "CONTROLLER_AUTOMATION", "CONTROLLER_PRIVACY",
             "CONTROLLER_DSR", "CONTROLLER_REPORTS", "COMPOSER_LOCK",
             "AUTOLOAD", "RELEASE_MARKER", "CACHE",
-            "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
+            "CACHE_ROUTER_FILES", "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
             "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
             "CACHE_ROUTE_DSR", "CACHE_ROUTE_REPORTS", "READ_ONLY",
         )
@@ -396,7 +433,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         exposed = (
             "CHECKOUT", "ROUTE_IMPORT", "CONTROLLER_REPORTS",
-            "AUTOLOAD", "RELEASE_MARKER", "CACHE", "CACHE_ROUTE_REPORTS",
+            "AUTOLOAD", "RELEASE_MARKER", "CACHE", "CACHE_ROUTER_FILES", "CACHE_ROUTE_REPORTS",
         )
         self.assertEqual(
             result.stdout.splitlines(),
@@ -414,7 +451,7 @@ class S4RouterDiagnosticsTests(unittest.TestCase):
             "CONTROLLER_PLANS", "CONTROLLER_AUTOMATION", "CONTROLLER_PRIVACY",
             "CONTROLLER_DSR", "CONTROLLER_REPORTS", "COMPOSER_LOCK",
             "AUTOLOAD", "RELEASE_MARKER", "CACHE",
-            "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
+            "CACHE_ROUTER_FILES", "CACHE_ROUTE_COLLECTIONS", "CACHE_ROUTE_PLANS",
             "CACHE_ROUTE_AUTOMATION", "CACHE_ROUTE_PRIVACY",
             "CACHE_ROUTE_DSR", "CACHE_ROUTE_REPORTS", "READ_ONLY",
         )

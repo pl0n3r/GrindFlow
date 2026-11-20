@@ -80,7 +80,7 @@ jobs:
             CHECKOUT ROUTE_IMPORT CONTROLLER_COLLECTIONS CONTROLLER_PLANS
             CONTROLLER_AUTOMATION CONTROLLER_PRIVACY CONTROLLER_DSR
             CONTROLLER_REPORTS COMPOSER_LOCK AUTOLOAD RELEASE_MARKER
-            CACHE CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
+            CACHE CACHE_ROUTER_FILES CACHE_ROUTE_COLLECTIONS CACHE_ROUTE_PLANS
             CACHE_ROUTE_AUTOMATION CACHE_ROUTE_PRIVACY CACHE_ROUTE_DSR
             CACHE_ROUTE_REPORTS READ_ONLY
           )
@@ -146,11 +146,11 @@ jobs:
               echo '::error::Unexpected diagnostics category'; exit 1
             fi
           done
-          # Only seven strictly validated categories are printed to workflow logs.
+          # Only eight strictly validated categories are printed to workflow logs.
           # All other remote output remains private; no host, SSH or identity fields.
           for idx in "${!expected[@]}"; do
             case "${expected[$idx]}" in
-              CHECKOUT|ROUTE_IMPORT|CONTROLLER_REPORTS|AUTOLOAD|RELEASE_MARKER|CACHE|CACHE_ROUTE_REPORTS)
+              CHECKOUT|ROUTE_IMPORT|CONTROLLER_REPORTS|AUTOLOAD|RELEASE_MARKER|CACHE|CACHE_ROUTER_FILES|CACHE_ROUTE_REPORTS)
                 printf '%s\n' "${observed[$idx]}" ;;
             esac
           done
