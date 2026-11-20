@@ -178,9 +178,10 @@ no escribe ni crea un backup adicional.
 
 El checkout Git exacto no demuestra que `symfony/vendor` esté preparado. El árbol
 versionado excluye `symfony/vendor/` y el Redeploy Git/hPanel no se asume que ejecute
-Composer. Mientras hPanel siga siendo la autoridad productiva, el workflow
-`S4 Runtime Prepare` puede completar **solo** esas dependencias después de que
-`GrindFlow Deploy Observer` haya confirmado el SHA exacto.
+Composer. **El workflow `S4 Runtime Prepare` NO debe ejecutarse automáticamente
+por un push, merge ni por `GrindFlow Deploy Observer`.** Solo puede invocarlo
+manualmente el dueño, con SHA actual, autorización registrada en #903 y copia
+persistente de `vendor` comprobable. Un mero CI verde no autoriza escrituras.
 
 Contrato de seguridad:
 
@@ -200,6 +201,74 @@ Contrato de seguridad:
 
 Si falta configuración SSH o `HOSTINGER_GIT_ROOT`, el resultado correcto es fail-closed.
 No adivines una ruta del hosting ni sustituyas el cutover Factory por un segundo deploy.
+
+### Transición protegida del trigger automático al manual (GrindFlow #1043)
+
+**No fusionar el PR de #1043 mientras `S4 Runtime Prepare` siga activo con
+`workflow_run` en `main`.** La versión antigua se dispararía una última vez al
+confirmarse el merge. Previamente, el dueño debe desactivar **ese workflow
+específico** desde GitHub Actions y verificar su estado `disabled_manually`
+y que no haya ejecuciones en curso. No se deshabilitan los observadores de
+solo lectura. La desactivación es una operación de control GitHub fuera de banda:
+no la reemplaza un cambio de código todavía no fusionado.
+
+Solo tras comprobar la ausencia de ejecuciones en carrera se integra el PR
+aprobado. Se verifica en `main` que el YAML contiene únicamente
+`workflow_dispatch`, se comprueba que ningún push haya iniciado preparaciones
+SSH y **solo entonces** se vuelve a habilitar el workflow manual. Si GitHub no
+permite confirmar la desactivación o el último workflow aún se ejecuta, NO MERGE.
+
+La ejecución manual está sujeta simultáneamente a estas puertas:
+
+1. `github.actor` y `github.triggering_actor` son el dueño;
+   `workflow_dispatch` se inicia desde `main` y el SHA de 40 hex coincide
+   con el del evento y con `main` leído de Git justo antes de operar.
+2. El dueño concede una **decisión aparte** en un comentario suyo de
+   [incidente #903](https://github.com/pl0n3r/GrindFlow/issues/903),
+   con estas tres líneas exactas, sin secretos ni rutas de hosting:
+
+   ```text
+   S4_RUNTIME_PREPARE_APPROVED
+   SHA=<SHA exacto de main, 40 hex>
+   VENDOR_BACKUP_SHA256=<SHA-256 del respaldo persistente, 64 hex>
+   ```
+
+   El comentario debe tener menos de 60 minutos; el workflow consulta el
+   comentario exacto a GitHub y coteja propietario, issue, SHA y checksum.
+   No acepta texto libre sin autoridad como evidencia. Se especifica su ID
+   como `authorization_comment_id` en el despacho.
+3. Antes de esa decisión, con autorización de cambio productivo separada,
+   debe existir un respaldo **persistente** y recuperable de
+   `symfony/vendor`, creado fuera de este workflow. Su archivo canónico
+   en el HOME privado del usuario SSH es
+   `~/.grindflow/runtime-backups/vendor-prep-<SHA de destino>.tar.gz`,
+   con `vendor/autoload.php` y contenido exclusivamente bajo `vendor/`.
+   Documentar su SHA-256 y verificar restauración con procedimiento D-059.
+   El SHA se aporta como `vendor_backup_sha256`; el workflow verifica
+   en el host que el archivo es regular, no symlink, íntegro, que su hash
+   coincide y que puede enumerarse con `tar -tzf` sin rutas inseguras.
+   **Si falta o no se puede verificar, no ejecuta Composer ni promueve vendor.**
+4. La invocación manual exige `confirm_runtime_write=true` y usa el
+   entorno GitHub `production-s4-runtime`, que debe configurarse con
+   protección de rama y revisores requeridos antes de habilitarlo.
+   La confirmación del dueño y el comentario registrado son controles
+   independientes; un entorno sin protección no se declara aprobado.
+5. `S4 Runtime Prepare` conserva la guarda `APP_PHASE=construccion`,
+   SSH con host key verificada, Composer sin scripts/plugins y posterior
+   GET de `/s4/_bridge-readiness`. El backup efímero
+   `.vendor-backup-$` del helper **NO es respaldo persistente**;
+   su eliminación tras éxito no elimina el archivo previamente verificado.
+   No se ejecutan migraciones Doctrine, no cambia `.env` ni se hacen
+   operaciones con datos reales.
+
+**Rollback:** detener nuevas preparaciones y seguir D-059 para restaurar
+desde el archivo persistente verificado con el SHA registrado; probar la
+restauración primero en entorno aislado, registrar evidencia en #903 y
+observar salud y rutas. No ejecutar rollback automáticamente a ciegas.
+
+Esta transición de control de GitHub y las operaciones del host son
+autorizaciones distintas del análisis de solo lectura; no se asume una
+autorización productiva por el comando `/tomar`, por CI ni por un merge.
 
 ### Camino manual del dueño en hPanel
 
