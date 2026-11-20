@@ -175,17 +175,23 @@ jobs:
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
           [[ "$EXPECTED_BACKUP_SHA" =~ ^[0-9a-f]{64}$ ]] || exit 1
-          [[ -n "${HOME:-}" && -d "$HOME/.grindflow/runtime-backups" ]] || exit 1
+          [[ -n "${HOME:-}" && -d "$HOME/.grindflow/runtime-backups" &&
+             ! -L "$HOME/.grindflow/runtime-backups" ]] || exit 1
           archive="$HOME/.grindflow/runtime-backups/vendor-prep-${EXPECTED_SHA}.tar.gz"
           [[ -f "$archive" && ! -L "$archive" && -s "$archive" ]] || exit 1
           [[ -f "symfony/vendor/autoload.php" && ! -L "symfony/vendor" ]] || exit 1
           actual="$(sha256sum -- "$archive" | cut -d' ' -f1)"
           [[ "$actual" == "$EXPECTED_BACKUP_SHA" ]] || exit 1
-          tar -tzf "$archive" | awk '
+          tar -tzf "$archive" 2>/dev/null | awk '
             /^\// || /(^|\/)\.\.(\/|$)/ { unsafe = 1 }
             $0 == "vendor/autoload.php" { autoload = 1 }
             $0 != "vendor/" && $0 !~ /^vendor\// { unsafe = 1 }
             END { exit unsafe || !autoload }
+          ' || exit 1
+          # Safe restore: forbid symlinks, hardlinks and special file types.
+          # No archive filenames are emitted to Actions logs.
+          tar -tvzf "$archive" 2>/dev/null | awk '
+            substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { exit 1 }
           ' || exit 1
           printf 'S4_RUNTIME_BACKUP_VERIFIED\n'
           BACKUP_GUARD
