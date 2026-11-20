@@ -242,7 +242,9 @@ La ejecución manual está sujeta simultáneamente a estas puertas:
    `symfony/vendor`, creado fuera de este workflow. Su archivo canónico
    en el HOME privado del usuario SSH es
    `~/.grindflow/runtime-backups/vendor-prep-<SHA de destino>.tar.gz`,
-   con `vendor/autoload.php` y contenido exclusivamente bajo `vendor/`.
+   con `vendor/autoload.php` y contenido exclusivamente bajo `vendor/`,
+   **sin symlinks, hardlinks ni archivos especiales**. El workflow rechaza
+   esos tipos incluso cuando el SHA-256 del archivo es correcto.
    Documentar su SHA-256 y verificar restauración con procedimiento D-059.
    El SHA se aporta como `vendor_backup_sha256`; el workflow verifica
    en el host que el archivo es regular, no symlink, íntegro, que su hash
