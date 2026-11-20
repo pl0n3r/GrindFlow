@@ -364,7 +364,7 @@ class S4RuntimePrepareTests(unittest.TestCase):
             "inputs.confirm_runtime_write == true",
             "environment: production-s4-runtime",
             "inputs.expected_sha",
-            "github.sha",
+            "GITHUB_SHA",
             '[[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ && "$OBSERVED_SHA" == "$GITHUB_SHA" ]]',
             "gh api \"repos/$GITHUB_REPOSITORY/issues/comments/$AUTH_COMMENT_ID\"",
             "S4_RUNTIME_PREPARE_APPROVED",
