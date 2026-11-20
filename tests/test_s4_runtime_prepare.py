@@ -365,6 +365,8 @@ class S4RuntimePrepareTests(unittest.TestCase):
             "environment: production-s4-runtime",
             "inputs.expected_sha",
             "GITHUB_SHA",
+            "EVENT_SHA: ${{ github.sha }}",
+            '[[ "$EVENT_SHA" =~ ^[0-9a-f]{40}$ && "$EVENT_SHA" == "$GITHUB_SHA" ]]',
             '[[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ && "$OBSERVED_SHA" == "$GITHUB_SHA" ]]',
             "gh api \"repos/$GITHUB_REPOSITORY/issues/comments/$AUTH_COMMENT_ID\"",
             "S4_RUNTIME_PREPARE_APPROVED",
