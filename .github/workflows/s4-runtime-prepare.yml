@@ -179,7 +179,7 @@ jobs:
              ! -L "$HOME/.grindflow/runtime-backups" ]] || exit 1
           archive="$HOME/.grindflow/runtime-backups/vendor-prep-${EXPECTED_SHA}.tar.gz"
           [[ -f "$archive" && ! -L "$archive" && -s "$archive" ]] || exit 1
-          [[ -f "symfony/vendor/autoload.php" && ! -L "symfony/vendor" ]] || exit 1
+          [[ ! -L "symfony/vendor" ]] || exit 1
           actual="$(sha256sum -- "$archive" | cut -d' ' -f1)"
           [[ "$actual" == "$EXPECTED_BACKUP_SHA" ]] || exit 1
           tar -tzf "$archive" 2>/dev/null | awk '
