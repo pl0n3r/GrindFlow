@@ -2,9 +2,13 @@
 """Contracts for exact-SHA Symfony runtime preparation on the hPanel Git path."""
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import os
 import stat
+import tarfile
+import textwrap
 import subprocess
 import tempfile
 import unittest
@@ -349,26 +353,105 @@ class S4RuntimePrepareTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
-    def test_automation_requires_successful_exact_deploy_observer_and_construction_phase(
-        self,
-    ) -> None:
-        for snippet in (
-            'workflows: ["GrindFlow Deploy Observer"]',
-            "github.event.workflow_run.conclusion == 'success'",
-            "github.event.workflow_run.event == 'push'",
-            "github.event.workflow_run.repository.full_name == github.repository",
-            "github.event.workflow_run.head_sha",
+    def test_workflow_manual_owner_only_and_exact_sha(self) -> None:
+        """Normal pushes and observer runs must never start runtime writes."""
+        for required in (
+            "on:\n  workflow_dispatch:",
+            "github.event_name == 'workflow_dispatch'",
+            "github.actor == github.repository_owner",
+            "github.triggering_actor == github.repository_owner",
+            "github.ref == 'refs/heads/main'",
+            "inputs.confirm_runtime_write == true",
+            "environment: production-s4-runtime",
+            "inputs.expected_sha",
+            "github.sha",
+            '[[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ && "$OBSERVED_SHA" == "$GITHUB_SHA" ]]',
+            "gh api \"repos/$GITHUB_REPOSITORY/issues/comments/$AUTH_COMMENT_ID\"",
+            "S4_RUNTIME_PREPARE_APPROVED",
+            "issues/903",
+            ".user.login == $owner",
+            "now_epoch - approved_epoch <= 3600",
             "git ls-remote --heads",
             "trusted_sha=$trusted_sha",
             "raw.githubusercontent.com/$GITHUB_REPOSITORY/$TRUSTED_SHA/",
-            "steps.current.outputs.current == 'true'",
             "Reconfirm trusted current-main SHA after preparation",
-            "checkout-sha-changed-during-prepare",
             "APP_PHASE",
             "phase-not-construction",
         ):
-            self.assertIn(snippet, self.workflow + self.script)
+            self.assertIn(required, self.workflow + self.script)
+        for forbidden in ("workflow_run:", "\n  push:", "\n  schedule:"):
+            self.assertNotIn(forbidden, self.workflow)
         self.assertNotIn("actions/checkout@", self.workflow)
+        self.assertLess(
+            self.workflow.index("Require fresh OWNER decision"),
+            self.workflow.index("Resolve trusted current-main SHA"),
+        )
+
+    def test_workflow_requires_verifiable_backup_before_ssh(self) -> None:
+        """An independently stored snapshot must verify before the helper runs."""
+        for required in (
+            "inputs.vendor_backup_sha256",
+            "inputs.authorization_comment_id",
+            "BACKUP_SHA256",
+            "EXPECTED_BACKUP_SHA",
+            "sha256sum --",
+            "tar -tzf",
+            "vendor/autoload.php",
+            "S4_RUNTIME_BACKUP_VERIFIED",
+            'cat "$HELPER_PATH"',
+        ):
+            self.assertIn(required, self.workflow)
+        self.assertLess(
+            self.workflow.index("S4_RUNTIME_BACKUP_VERIFIED"),
+            self.workflow.index('cat "$HELPER_PATH"'),
+        )
+        guard = self.workflow.split("cat <<'BACKUP_GUARD'\n", 1)[1].split(
+            "\n          BACKUP_GUARD", 1
+        )[0]
+        guard = textwrap.dedent(guard)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "symfony/vendor").mkdir(parents=True)
+            (root / "symfony/vendor/autoload.php").write_text(
+                "<?php // previous release\n", encoding="utf8"
+            )
+            archive_dir = root / ".grindflow/runtime-backups"
+            archive_dir.mkdir(parents=True)
+            sha = "a" * 40
+            archive = archive_dir / f"vendor-prep-{sha}.tar.gz"
+            def snapshot(path: str) -> str:
+                payload = b"<?php // previous release\n"
+                with tarfile.open(archive, "w:gz") as tar:
+                    info = tarfile.TarInfo(path)
+                    info.size = len(payload)
+                    tar.addfile(info, io.BytesIO(payload))
+                return hashlib.sha256(archive.read_bytes()).hexdigest()
+
+            def run(checksum: str):
+                env = os.environ.copy()
+                env.update(
+                    HOME=str(root),
+                    EXPECTED_SHA=sha,
+                    EXPECTED_BACKUP_SHA=checksum,
+                )
+                return subprocess.run(
+                    ["bash", "-c", guard],
+                    cwd=root,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+            self.assertNotEqual(run("b" * 64).returncode, 0)
+            valid_digest = snapshot("vendor/autoload.php")
+            good = run(valid_digest)
+            self.assertEqual(good.returncode, 0, good.stderr)
+            self.assertEqual(good.stdout, "S4_RUNTIME_BACKUP_VERIFIED\n")
+            self.assertNotEqual(run("b" * 64).returncode, 0)
+            invalid_digest = snapshot("../../escape")
+            self.assertNotEqual(run(invalid_digest).returncode, 0)
+            self.assertFalse((root / "escape").exists())
 
     def test_prepare_never_migrates_provisions_changes_secrets_or_enables_factory_cutover(
         self,
@@ -380,7 +463,7 @@ class S4RuntimePrepareTests(unittest.TestCase):
             "migrate --force",
             "provision-smoke-user",
             "factory_deploy_enabled=true",
-            "workflow_dispatch",
+            "workflow_run:",
         ):
             self.assertNotIn(forbidden, runtime)
         self.assertNotIn('>> "$root/.env"', self.script)
