@@ -389,6 +389,97 @@ class S4RuntimePrepareTests(unittest.TestCase):
             self.workflow.index("Resolve trusted current-main SHA"),
         )
 
+    def test_workflow_authorization_step_executes_fail_closed_gates(self) -> None:
+        """Execute owner, SHA and approval-age guards without GitHub I/O."""
+        block = self.workflow.split("      - id: authorization\n", 1)[1].split(
+            "\n      - id: current\n", 1
+        )[0]
+        authorization = textwrap.dedent(block.split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            self._write_executable(
+                fake_bin / "gh",
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                '[[ "$1" == api ]] || exit 1\n'
+                'printf "%s\\n" "$FAKE_APPROVAL_JSON"\n',
+            )
+            self._write_executable(
+                fake_bin / "date",
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ "$1" == -u && "$2" == -d ]]; then\n'
+                '  printf "%s\\n" "$FAKE_APPROVED_EPOCH"\n'
+                'elif [[ "$1" == -u && "$2" == +%s ]]; then\n'
+                '  printf "%s\\n" "$FAKE_NOW_EPOCH"\n'
+                "else exit 3; fi\n",
+            )
+            sha = "a" * 40
+            backup = "b" * 64
+            approval = json.dumps(
+                {
+                    "user": {"login": "pl0n3r"},
+                    "issue_url": "https://api.github.com/repos/pl0n3r/GrindFlow/issues/903",
+                    "body": (
+                        f"S4_RUNTIME_PREPARE_APPROVED\nSHA={sha}\n"
+                        f"VENDOR_BACKUP_SHA256={backup}"
+                    ),
+                    "created_at": "2026-11-20T00:00:00Z",
+                }
+            )
+            output = root / "step-output.txt"
+            summary = root / "step-summary.txt"
+
+            def execute(
+                *, actor: str = "pl0n3r", triggering_actor: str = "pl0n3r",
+                event_sha: str = sha, observed_sha: str = sha, age: int = 3600
+            ) -> tuple[subprocess.CompletedProcess[str], str]:
+                output.write_text("", encoding="utf-8")
+                summary.write_text("", encoding="utf-8")
+                env = os.environ.copy()
+                env.update(
+                    PATH=str(fake_bin) + os.pathsep + env.get("PATH", ""),
+                    GITHUB_ACTOR=actor,
+                    GITHUB_TRIGGERING_ACTOR=triggering_actor,
+                    GITHUB_REPOSITORY_OWNER="pl0n3r",
+                    GITHUB_REPOSITORY="pl0n3r/GrindFlow",
+                    GITHUB_REF="refs/heads/main",
+                    GITHUB_SHA=sha,
+                    EVENT_SHA=event_sha,
+                    OBSERVED_SHA=observed_sha,
+                    BACKUP_SHA256=backup,
+                    AUTH_COMMENT_ID="1234",
+                    GITHUB_OUTPUT=str(output),
+                    GITHUB_STEP_SUMMARY=str(summary),
+                    FAKE_APPROVAL_JSON=approval,
+                    FAKE_APPROVED_EPOCH=str(100000 - age),
+                    FAKE_NOW_EPOCH="100000",
+                )
+                result = subprocess.run(
+                    ["bash", "-c", authorization],
+                    cwd=root, env=env, text=True, capture_output=True,
+                    timeout=10, check=False,
+                )
+                return result, output.read_text(encoding="utf-8")
+
+            for name, overrides in (
+                ("foreign actor", {"actor": "not-owner"}),
+                ("foreign triggering actor", {"triggering_actor": "not-owner"}),
+                ("event SHA mismatch", {"event_sha": "0" * 40}),
+                ("observed SHA mismatch", {"observed_sha": "0" * 40}),
+                ("approval too old", {"age": 3601}),
+            ):
+                with self.subTest(case=name):
+                    result, decision = execute(**overrides)
+                    self.assertNotEqual(result.returncode, 0, name)
+                    self.assertNotIn("authorized=true", decision, name)
+
+            accepted, decision = execute()
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertEqual(decision, "authorized=true\n")
+
     def test_workflow_requires_verifiable_backup_before_ssh(self) -> None:
         """An independently stored snapshot must verify before the helper runs."""
         for required in (
@@ -450,6 +541,16 @@ class S4RuntimePrepareTests(unittest.TestCase):
             good = run(valid_digest)
             self.assertEqual(good.returncode, 0, good.stderr)
             self.assertEqual(good.stdout, "S4_RUNTIME_BACKUP_VERIFIED\n")
+            # A missing vendor can be recovered with a valid persistent backup.
+            (root / "symfony/vendor/autoload.php").unlink()
+            (root / "symfony/vendor").rmdir()
+            recovered = run(valid_digest)
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertEqual(recovered.stdout, "S4_RUNTIME_BACKUP_VERIFIED\n")
+            # A symlinked vendor is unsafe even if the archive is valid.
+            (root / "symfony/vendor").symlink_to(root, target_is_directory=True)
+            self.assertNotEqual(run(valid_digest).returncode, 0)
+            (root / "symfony/vendor").unlink()
             self.assertNotEqual(run("b" * 64).returncode, 0)
             invalid_digest = snapshot("../../escape")
             self.assertNotEqual(run(invalid_digest).returncode, 0)
