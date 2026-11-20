@@ -455,6 +455,29 @@ class S4RuntimePrepareTests(unittest.TestCase):
             self.assertNotEqual(run(invalid_digest).returncode, 0)
             self.assertFalse((root / "escape").exists())
 
+            # A correctly hashed archive must still be rejected if restoring it
+            # would materialize a symlink, hardlink or special filesystem object.
+            for link_type in (tarfile.SYMTYPE, tarfile.LNKTYPE):
+                with tarfile.open(archive, "w:gz") as tar:
+                    autoload = b"<?php // previous release\\n"
+                    info = tarfile.TarInfo("vendor/autoload.php")
+                    info.size = len(autoload)
+                    tar.addfile(info, io.BytesIO(autoload))
+                    link = tarfile.TarInfo("vendor/escape")
+                    link.type = link_type
+                    link.linkname = "../../.env"
+                    tar.addfile(link)
+                digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                rejected = run(digest)
+                self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+
+            # A symlinked backup directory cannot be a trusted immutable source.
+            safe_dir = root / "actual-backups"
+            archive_dir.rename(safe_dir)
+            archive_dir.symlink_to(safe_dir, target_is_directory=True)
+            valid_digest = snapshot("vendor/autoload.php")
+            self.assertNotEqual(run(valid_digest).returncode, 0)
+
     def test_prepare_never_migrates_provisions_changes_secrets_or_enables_factory_cutover(
         self,
     ) -> None:
