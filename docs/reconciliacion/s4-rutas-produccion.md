@@ -801,3 +801,23 @@ Se efectuó un sondeo anónimo, de **solo lectura**, de las diez URL públicas d
 - **Preparación separada:** [S4 Runtime Prepare #44589522717](https://github.com/pl0n3r/GrindFlow/actions/runs/44589522717), `completed/success`, sobre el mismo SHA exacto a 18:36 UTC. Prepara dependencias, **no** limpia/reconstruye el cache de rutas Symfony ni genera `.release-sha`. Por eso su verde no acredita la recuperación HTTP.
 - **Alcance de causa:** se descarta, para esta inspección, deriva de SHA del checkout y ausencia del import/controlador Reports en los archivos inspeccionados. **Continúa NO CONFIRMADA** la causa del 404 en el router PHP efectivo: caché/compilación de rutas, proceso PHP/OPcache u otra configuración runtime. El `release_sha=null` de `/s4/health` es consistente con `RELEASE_MARKER=MISSING`, pero no atribuye SHA al proceso web.
 - **Puerta pendiente:** la última matriz GET registrada conserva Reports 404; no hay nuevo GET de respuesta aceptable (401/302/200) asociado a una reparación. AC-01 no conforme, AC-02 parcial, AC-03 documentado sin identidad de Symfony, AC-04 sujeta al nuevo HEAD si cambia este expediente. No ejecutar `cache:clear`, reinicio PHP o deploy sin acceso operativo y comprobación previa del backup/restore/rollback aplicable conforme a las reglas del repo; no declarar recuperación en producción por diagnóstico `success`.
+
+
+## Lectura pública acotada — 20-nov-2026, HEAD base `6b81679b`
+
+<!-- GF903-PUBLIC-GET-CHECKPOINT-20261120-REPORTS-404 -->
+
+Se consultaron endpoints HTTPS públicos sin credenciales ni escritura mediante un lector externo, solicitando frescura de caché cero. El lector no informa hora UTC exacta, MIME ni cuerpo para los códigos HTTP no exitosos: donde devolvió `timeout`, **no** se atribuye estado HTTP. Este cuadro no suplanta una inspección del proceso PHP/Hostinger.
+
+| GET público de producción | Resultado del lector | Alcance comprobable |
+| --- | --- | --- |
+| `/s4/health` | JSON `version=0.1.227`, `release_sha=null` | No acredita el SHA efectivo de Symfony |
+| `/s4/privacidad-y-mis-derechos` | Página HTML legible | Vista informativa presente; texto legal aún provisional |
+| `/s4/api/admin/rules/automation` | HTTP **401** | Endpoint presente y protegido |
+| **`/s4/api/admin/reports/cross-module`** | **HTTP 404** (GET individual confirmado) | **AC-01 NO CONFORME**; MIME/cuerpo de 404 no disponibles |
+| `/s4/api/admin/privacy/data-subject-requests/csrf` | HTTP 404 | Falta verificar si `error.code=feature_unavailable`; no autoriza activar DSR |
+| `/health`, `/s4/_bridge-readiness`, collections, permissions, plans | `timeout` de la herramienta | **UNKNOWN** en esta medición, no error HTTP confirmado |
+
+GitHub indica `main@6b81679b2b46baaa3f57eefc12b0681ea07e10f9`; la lectura de `/s4/health` **no** contiene `release_sha` para asociar el router PHP con ese SHA. El último [diagnóstico owner-only #44601118513](https://github.com/pl0n3r/GrindFlow/actions/runs/44601118513) es `completed/success` sobre `main@bedd161b68e2f18b1eb9416503581c8893a89c9a` anterior: `CACHE_ROUTE_REPORTS=UNKNOWN` no confirma caché defectuosa. El workflow de diagnóstico exige `workflow_dispatch` de OWNER en `main`; esta sesión no dispone de la acción de disparo. No se reejecutaron runs de otro SHA ni se hizo SSH, Composer, `cache:clear`, rollback, deploy o acceso a datos.
+
+**Criterios:** AC-01 **no** por Reports 404; AC-02 **parcial**, falta causa raíz del router PHP efectivo y reparación comprobada; AC-03 conserva explicación de `release_sha=null` pero no identidad remota; AC-04 debe verificarse nuevamente en el HEAD documental exacto. Mantener #907 DRAFT y sin petición de CodeRabbit FINAL hasta resolver la condición productiva; cualquier mutación en Hostinger requiere permiso OWNER específico, backup real, prueba de restauración y plan reversible D-059.
