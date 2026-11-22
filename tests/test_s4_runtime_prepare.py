@@ -2,9 +2,13 @@
 """Contracts for exact-SHA Symfony runtime preparation on the hPanel Git path."""
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import os
 import stat
+import tarfile
+import textwrap
 import subprocess
 import tempfile
 import unittest
@@ -349,26 +353,231 @@ class S4RuntimePrepareTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
-    def test_automation_requires_successful_exact_deploy_observer_and_construction_phase(
-        self,
-    ) -> None:
-        for snippet in (
-            'workflows: ["GrindFlow Deploy Observer"]',
-            "github.event.workflow_run.conclusion == 'success'",
-            "github.event.workflow_run.event == 'push'",
-            "github.event.workflow_run.repository.full_name == github.repository",
-            "github.event.workflow_run.head_sha",
+    def test_workflow_manual_owner_only_and_exact_sha(self) -> None:
+        """Normal pushes and observer runs must never start runtime writes."""
+        for required in (
+            "on:\n  workflow_dispatch:",
+            "github.event_name == 'workflow_dispatch'",
+            "github.actor == github.repository_owner",
+            "github.triggering_actor == github.repository_owner",
+            "github.ref == 'refs/heads/main'",
+            "inputs.confirm_runtime_write == true",
+            "environment: production-s4-runtime",
+            "inputs.expected_sha",
+            "GITHUB_SHA",
+            "EVENT_SHA: ${{ github.sha }}",
+            '[[ "$EVENT_SHA" =~ ^[0-9a-f]{40}$ && "$EVENT_SHA" == "$GITHUB_SHA" ]]',
+            '[[ "$OBSERVED_SHA" =~ ^[0-9a-f]{40}$ && "$OBSERVED_SHA" == "$GITHUB_SHA" ]]',
+            "gh api \"repos/$GITHUB_REPOSITORY/issues/comments/$AUTH_COMMENT_ID\"",
+            "S4_RUNTIME_PREPARE_APPROVED",
+            "issues/903",
+            ".user.login == $owner",
+            "now_epoch - approved_epoch <= 3600",
             "git ls-remote --heads",
             "trusted_sha=$trusted_sha",
             "raw.githubusercontent.com/$GITHUB_REPOSITORY/$TRUSTED_SHA/",
-            "steps.current.outputs.current == 'true'",
             "Reconfirm trusted current-main SHA after preparation",
-            "checkout-sha-changed-during-prepare",
             "APP_PHASE",
             "phase-not-construction",
         ):
-            self.assertIn(snippet, self.workflow + self.script)
+            self.assertIn(required, self.workflow + self.script)
+        for forbidden in ("workflow_run:", "\n  push:", "\n  schedule:"):
+            self.assertNotIn(forbidden, self.workflow)
         self.assertNotIn("actions/checkout@", self.workflow)
+        self.assertLess(
+            self.workflow.index("Require fresh OWNER decision"),
+            self.workflow.index("Resolve trusted current-main SHA"),
+        )
+
+    def test_workflow_authorization_step_executes_fail_closed_gates(self) -> None:
+        """Execute owner, SHA and approval-age guards without GitHub I/O."""
+        block = self.workflow.split("      - id: authorization\n", 1)[1].split(
+            "\n      - id: current\n", 1
+        )[0]
+        authorization = textwrap.dedent(block.split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            self._write_executable(
+                fake_bin / "gh",
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                '[[ "$1" == api ]] || exit 1\n'
+                'printf "%s\\n" "$FAKE_APPROVAL_JSON"\n',
+            )
+            self._write_executable(
+                fake_bin / "date",
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                'if [[ "$1" == -u && "$2" == -d ]]; then\n'
+                '  printf "%s\\n" "$FAKE_APPROVED_EPOCH"\n'
+                'elif [[ "$1" == -u && "$2" == +%s ]]; then\n'
+                '  printf "%s\\n" "$FAKE_NOW_EPOCH"\n'
+                "else exit 3; fi\n",
+            )
+            sha = "a" * 40
+            backup = "b" * 64
+            approval = json.dumps(
+                {
+                    "user": {"login": "pl0n3r"},
+                    "issue_url": "https://api.github.com/repos/pl0n3r/GrindFlow/issues/903",
+                    "body": (
+                        f"S4_RUNTIME_PREPARE_APPROVED\nSHA={sha}\n"
+                        f"VENDOR_BACKUP_SHA256={backup}"
+                    ),
+                    "created_at": "2026-11-20T00:00:00Z",
+                }
+            )
+            output = root / "step-output.txt"
+            summary = root / "step-summary.txt"
+
+            def execute(
+                *, actor: str = "pl0n3r", triggering_actor: str = "pl0n3r",
+                event_sha: str = sha, observed_sha: str = sha, age: int = 3600
+            ) -> tuple[subprocess.CompletedProcess[str], str]:
+                output.write_text("", encoding="utf-8")
+                summary.write_text("", encoding="utf-8")
+                env = os.environ.copy()
+                env.update(
+                    PATH=str(fake_bin) + os.pathsep + env.get("PATH", ""),
+                    GITHUB_ACTOR=actor,
+                    GITHUB_TRIGGERING_ACTOR=triggering_actor,
+                    GITHUB_REPOSITORY_OWNER="pl0n3r",
+                    GITHUB_REPOSITORY="pl0n3r/GrindFlow",
+                    GITHUB_REF="refs/heads/main",
+                    GITHUB_SHA=sha,
+                    EVENT_SHA=event_sha,
+                    OBSERVED_SHA=observed_sha,
+                    BACKUP_SHA256=backup,
+                    AUTH_COMMENT_ID="1234",
+                    GITHUB_OUTPUT=str(output),
+                    GITHUB_STEP_SUMMARY=str(summary),
+                    FAKE_APPROVAL_JSON=approval,
+                    FAKE_APPROVED_EPOCH=str(100000 - age),
+                    FAKE_NOW_EPOCH="100000",
+                )
+                result = subprocess.run(
+                    ["bash", "-c", authorization],
+                    cwd=root, env=env, text=True, capture_output=True,
+                    timeout=10, check=False,
+                )
+                return result, output.read_text(encoding="utf-8")
+
+            for name, overrides in (
+                ("foreign actor", {"actor": "not-owner"}),
+                ("foreign triggering actor", {"triggering_actor": "not-owner"}),
+                ("event SHA mismatch", {"event_sha": "0" * 40}),
+                ("observed SHA mismatch", {"observed_sha": "0" * 40}),
+                ("approval too old", {"age": 3601}),
+            ):
+                with self.subTest(case=name):
+                    result, decision = execute(**overrides)
+                    self.assertNotEqual(result.returncode, 0, name)
+                    self.assertNotIn("authorized=true", decision, name)
+
+            accepted, decision = execute()
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertEqual(decision, "authorized=true\n")
+
+    def test_workflow_requires_verifiable_backup_before_ssh(self) -> None:
+        """An independently stored snapshot must verify before the helper runs."""
+        for required in (
+            "inputs.vendor_backup_sha256",
+            "inputs.authorization_comment_id",
+            "BACKUP_SHA256",
+            "EXPECTED_BACKUP_SHA",
+            "sha256sum --",
+            "tar -tzf",
+            "vendor/autoload.php",
+            "S4_RUNTIME_BACKUP_VERIFIED",
+            'cat "$HELPER_PATH"',
+        ):
+            self.assertIn(required, self.workflow)
+        self.assertLess(
+            self.workflow.index("S4_RUNTIME_BACKUP_VERIFIED"),
+            self.workflow.index('cat "$HELPER_PATH"'),
+        )
+        guard = self.workflow.split("cat <<'BACKUP_GUARD'\n", 1)[1].split(
+            "\n          BACKUP_GUARD", 1
+        )[0]
+        guard = textwrap.dedent(guard)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "symfony/vendor").mkdir(parents=True)
+            (root / "symfony/vendor/autoload.php").write_text(
+                "<?php // previous release\n", encoding="utf8"
+            )
+            archive_dir = root / ".grindflow/runtime-backups"
+            archive_dir.mkdir(parents=True)
+            sha = "a" * 40
+            archive = archive_dir / f"vendor-prep-{sha}.tar.gz"
+            def snapshot(path: str) -> str:
+                payload = b"<?php // previous release\n"
+                with tarfile.open(archive, "w:gz") as tar:
+                    info = tarfile.TarInfo(path)
+                    info.size = len(payload)
+                    tar.addfile(info, io.BytesIO(payload))
+                return hashlib.sha256(archive.read_bytes()).hexdigest()
+
+            def run(checksum: str):
+                env = os.environ.copy()
+                env.update(
+                    HOME=str(root),
+                    EXPECTED_SHA=sha,
+                    EXPECTED_BACKUP_SHA=checksum,
+                )
+                return subprocess.run(
+                    ["bash", "-c", guard],
+                    cwd=root,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+            self.assertNotEqual(run("b" * 64).returncode, 0)
+            valid_digest = snapshot("vendor/autoload.php")
+            good = run(valid_digest)
+            self.assertEqual(good.returncode, 0, good.stderr)
+            self.assertEqual(good.stdout, "S4_RUNTIME_BACKUP_VERIFIED\n")
+            # A missing vendor can be recovered with a valid persistent backup.
+            (root / "symfony/vendor/autoload.php").unlink()
+            (root / "symfony/vendor").rmdir()
+            recovered = run(valid_digest)
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertEqual(recovered.stdout, "S4_RUNTIME_BACKUP_VERIFIED\n")
+            # A symlinked vendor is unsafe even if the archive is valid.
+            (root / "symfony/vendor").symlink_to(root, target_is_directory=True)
+            self.assertNotEqual(run(valid_digest).returncode, 0)
+            (root / "symfony/vendor").unlink()
+            self.assertNotEqual(run("b" * 64).returncode, 0)
+            invalid_digest = snapshot("../../escape")
+            self.assertNotEqual(run(invalid_digest).returncode, 0)
+            self.assertFalse((root / "escape").exists())
+
+            # A correctly hashed archive must still be rejected if restoring it
+            # would materialize a symlink, hardlink or special filesystem object.
+            for link_type in (tarfile.SYMTYPE, tarfile.LNKTYPE):
+                with tarfile.open(archive, "w:gz") as tar:
+                    autoload = b"<?php // previous release\\n"
+                    info = tarfile.TarInfo("vendor/autoload.php")
+                    info.size = len(autoload)
+                    tar.addfile(info, io.BytesIO(autoload))
+                    link = tarfile.TarInfo("vendor/escape")
+                    link.type = link_type
+                    link.linkname = "../../.env"
+                    tar.addfile(link)
+                digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                rejected = run(digest)
+                self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+
+            # A symlinked backup directory cannot be a trusted immutable source.
+            safe_dir = root / "actual-backups"
+            archive_dir.rename(safe_dir)
+            archive_dir.symlink_to(safe_dir, target_is_directory=True)
+            valid_digest = snapshot("vendor/autoload.php")
+            self.assertNotEqual(run(valid_digest).returncode, 0)
 
     def test_prepare_never_migrates_provisions_changes_secrets_or_enables_factory_cutover(
         self,
@@ -380,7 +589,7 @@ class S4RuntimePrepareTests(unittest.TestCase):
             "migrate --force",
             "provision-smoke-user",
             "factory_deploy_enabled=true",
-            "workflow_dispatch",
+            "workflow_run:",
         ):
             self.assertNotIn(forbidden, runtime)
         self.assertNotIn('>> "$root/.env"', self.script)
