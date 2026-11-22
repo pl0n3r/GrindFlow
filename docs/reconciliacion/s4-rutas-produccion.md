@@ -853,3 +853,22 @@ GitHub indica `main@6b81679b2b46baaa3f57eefc12b0681ea07e10f9`; la lectura de `/s
 4. Comprobar Reports HTTP 401/302/200, la excepción JSON exacta de DSR-CSRF y el resto de AC-01; explicar `release_sha`, actualizar el expediente, ejecutar `validate`/seguridad exact-HEAD y pedir **una sola** revisión CodeRabbit FINAL cuando el PR sea realmente definitivo, luego aplicar D-069 exclusivamente si no hay veto operativo.
 
 **Estado de este hito:** documentación preparatoria y trazabilidad de puerta de seguridad; sin cambio a producción, sin dispatch, sin SSH ni backup fingido, sin salida del estado `DRAFT`, sin CodeRabbit ni merge. El estado CI del nuevo commit documental se verifica por separado y no hereda el verde de otro HEAD.
+
+
+## Reconciliación verificable tras corregir el disparador S4 — 22-nov-2026
+<!-- GF903-20261122-POST1044-MANUAL-GUARD-CHECKPOINT -->
+
+**Estado de código, no de producción:** el PR [#1044](https://github.com/pl0n3r/GrindFlow/pull/1044) de #1043 fue fusionado mediante squash en `main@d2442ffab05f3a4452683ddccff67df5f1cdf771`, y #1043 está cerrado. El contenido de `.github/workflows/s4-runtime-prepare.yml` en este SHA define solo `workflow_dispatch`; desapareció `workflow_run` sobre Deploy Observer. El dispatch exige OWNER, SHA exacto del main vigente, decisión en comentario de #903 vinculada al SHA y al respaldo, `production-s4-runtime` y verificación remota del archivo de respaldo. **El merge documental ya no puede disparar la versión automática de este workflow por su definición actual en main.** No equivale a afirmar que se hayan inspeccionado las reglas administrativas ni ejecutado una preparación S4.
+
+**Última evidencia nueva del host:** [Deploy Observer #44999254896](https://github.com/pl0n3r/GrindFlow/actions/runs/44999254896) y [Production Smoke #44999254947](https://github.com/pl0n3r/GrindFlow/actions/runs/44999254947) concluyeron `success` para `main@d2442ffab05f3a4452683ddccff67df5f1cdf771`, validando la identidad exacta de `/health` de Laravel y el alcance específico de su smoke. **No comprueban Reports ni la identidad del router Symfony**; los logs del smoke enumeran rutas de media/readiness, no `/s4/api/admin/reports/cross-module`.
+
+**Comprobación HTTP externa de este checkpoint:** el acceso `GET` a Reports, `/s4/health`, Plans y DSR-CSRF no produjo estados HTTP interpretables: el lector público informó ruta inaccesible y el cliente HTTPS local `Could not resolve host`, HTTP `000`. No atribuir 404/200/401 nuevos a estos errores. La última evidencia HTTP fiable registrada mantiene Reports **404** (20-nov-2026), mientras `/s4/health.release_sha=null` no demuestra revisión exacta del proceso Symfony. Los demás valores de la tabla histórica no se reinterpretan como mediciones de hoy.
+
+| Aceptación #903 | Estado comprobable 22-nov | Prueba o pendiente |
+| --- | --- | --- |
+| AC-01 rutas productivas | **NO ACREDITADA** | Último Reports 404; no existe nuevo GET 401/302/200. DSR-CSRF requiere `error.code=feature_unavailable` verificable |
+| AC-02 causa y reparación | **PARCIAL** | Import/controlador/autoload en host `MATCH` en último diagnóstico; cache de ruta Reports `UNKNOWN`. Sin causa efectiva cerrada ni comando de reparación autorizado/ejecutado |
+| AC-03 `release_sha` | **EXPLICACIÓN DOCUMENTADA; identidad Symfony UNKNOWN** | Último `release_sha=null`; no confundir SHA Laravel exacto con proceso Symfony |
+| AC-04 `validate` | **SUCCESS** en el HEAD documental previo `2d3ea976a4962833c60a9cd5ffc1830115b0322a`; **requiere reevaluación** para cualquier commit posterior | GitHub Actions `validate` y Factory reusable `success` en el HEAD previo; no reutilizar tras nueva edición |
+
+**Puerta operativa restante:** se permite diagnóstico `S4 Router Diagnostics` read-only mediante `workflow_dispatch` OWNER-only sobre SHA exacto de `main`; este conector de GitHub **no incluye** despacho de workflow, ni configuración/lectura de administración del entorno. No ejecutar SSH, `cache:clear`, Composer, reinicio, migración ni cambio de Hostinger sin decisión OWNER específica, backup persistente verificable y plan de restauración D-043/D-059. El único cambio de este checkpoint es el documento reclamado en #903. **PR #907 continúa DRAFT y NO MERGE mientras falten AC-01/02**; ninguna revisión CodeRabbit FINAL anticipada.
