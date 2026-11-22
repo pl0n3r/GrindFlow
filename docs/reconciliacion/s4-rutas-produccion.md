@@ -872,3 +872,38 @@ GitHub indica `main@6b81679b2b46baaa3f57eefc12b0681ea07e10f9`; la lectura de `/s
 | AC-04 `validate` | **SUCCESS** en el HEAD documental previo `2d3ea976a4962833c60a9cd5ffc1830115b0322a`; **requiere reevaluación** para cualquier commit posterior | GitHub Actions `validate` y Factory reusable `success` en el HEAD previo; no reutilizar tras nueva edición |
 
 **Puerta operativa restante:** se permite diagnóstico `S4 Router Diagnostics` read-only mediante `workflow_dispatch` OWNER-only sobre SHA exacto de `main`; este conector de GitHub **no incluye** despacho de workflow, ni configuración/lectura de administración del entorno. No ejecutar SSH, `cache:clear`, Composer, reinicio, migración ni cambio de Hostinger sin decisión OWNER específica, backup persistente verificable y plan de restauración D-043/D-059. El único cambio de este checkpoint es el documento reclamado en #903. **PR #907 continúa DRAFT y NO MERGE mientras falten AC-01/02**; ninguna revisión CodeRabbit FINAL anticipada.
+
+
+## Diagnóstico y matriz HTTP actualizados · 22-nov-2026 14:37–14:40 UTC
+<!-- GF903-20261122-1437-READONLY-DIAG-AND-PUBLIC-HTTP -->
+
+**Autoridad y evidencia:** [S4 Router Diagnostics #45033829198](https://github.com/pl0n3r/GrindFlow/actions/runs/45033829198), job [#137243051593](https://github.com/pl0n3r/GrindFlow/actions/runs/45033829198/job/137243051593), dispatch OWNER de solo lectura sobre main@d2442ffab05f3a4452683ddccff67df5f1cdf771. El job terminó success después de revalidar el HEAD. [Comentario acreditado #7080727254](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-7080727254).
+
+| Diagnóstico sanitizado | Resultado |
+| --- | --- |
+| S4_DIAG_CHECKOUT, ROUTE_IMPORT, CONTROLLER_REPORTS, AUTOLOAD | MATCH |
+| S4_DIAG_RELEASE_MARKER | MISSING |
+| S4_DIAG_CACHE, CACHE_ROUTER_FILES | MATCH |
+| S4_DIAG_CACHE_ROUTE_REPORTS | UNKNOWN |
+
+**GET públicos de solo lectura**, registrados por OWNER el 22-nov-2026 a las 14:40 UTC; [comentario #7080757080](https://github.com/pl0n3r/GrindFlow/issues/903#issuecomment-7080757080). Son estado **antes** de reparación, no una medición posterior.
+
+| Ruta, con prefijo /s4 | HTTP | Lectura |
+| --- | --- | --- |
+| /api/admin/library/collections | 401 | JSON authentication_required; cumple |
+| /api/admin/library/permissions | 401 | JSON authentication_required; cumple |
+| /api/admin/plans | 401 | JSON authentication_required; cumple |
+| /api/admin/rules/automation | 401 | JSON authentication_required; cumple |
+| /api/admin/reports/cross-module | **404** | **HTML Symfony genérico; NO CUMPLE** |
+| /api/admin/privacy/data-subject-requests/csrf | 404 | JSON feature_unavailable; excepción OWNER #958/A, cumple sin habilitar DSR |
+| /privacidad-y-mis-derechos | 200 | HTML; cumple |
+
+GET /s4/health = HTTP 200, version 0.1.227 y release_sha=null. El SHA exacto del observer Laravel no identifica el runtime Symfony; el inspector no halló el fichero raíz .release-sha.
+
+**Diagnóstico diferencial:** seis de siete rutas satisfacen AC-01. El import de symfony/config/routes.yaml y el controlador CrossModuleReportController.php son correctos y coinciden con el checkout. Una caché compilada anterior a #939 es plausible, **no demostrada**: la ausencia de cadena literal en un router compilado deja CACHE_ROUTE_REPORTS en UNKNOWN. No deducir ausencia de ruta solo de ese resultado ni hacer reparaciones especulativas.
+
+**Advertencia de alcance de la reparación propuesta:** en main@d2442ffab05f3a4452683ddccff67df5f1cdf771, scripts/prepare-s4-runtime.sh ejecuta Composer hacia un vendor staged con sustitución y rollback. **No ejecuta cache:clear, cache:warmup ni invalida explícitamente symfony/var/cache/prod.** S4 Runtime Prepare por sí solo no garantiza corregir Reports. No ejecutar ese workflow como prueba ciega ni representar success de Composer como éxito de AC-01.
+
+**Siguiente operación autorizable:** diagnosticar de forma estrictamente read-only la tabla efectiva de rutas del router servido, sin boot/escritura de caché ni exposición de rutas o secretos privados; identificar causa exacta. Si requiere cambio productivo, obtener decisión OWNER específica ligada al SHA actual, respaldo persistente recuperable con SHA-256, ensayo de restauración/rollback D-043/D-059 y entorno protegido. La reparación de caché necesita un procedimiento reversible y autorizado propio; el workflow existente solo prepara vendor. Después de la reparación, registrar HTTP **después** para los siete endpoints, causa/acción ejecutada y la identidad Symfony (o explicación fundada de release_sha nulo).
+
+**Aceptación del checkpoint:** AC-01 **6/7, Reports 404**; AC-02 **parcial** por causa productiva no demostrada; AC-03 **sin identidad Symfony verificada**; AC-04 success en HEAD documental anterior ebb621bb96ba0bb083ef08f00fcbd6f42895960b, pendiente de repetir sobre el nuevo HEAD. Mantener PR #907 **DRAFT y NO MERGE**, sin CodeRabbit FINAL, acceso a datos ni escritura en Hostinger hasta cerrar la puerta operativa.
