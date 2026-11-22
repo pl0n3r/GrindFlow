@@ -215,6 +215,10 @@ for (const width of VIEWPORTS) {
       await page.keyboard.press('Enter');
       await expect(link).toHaveAttribute('aria-current', 'location');
       await expect(page.locator(hash)).toBeVisible();
+      if (hash === '#salud-destinos') {
+        await expect(page.locator('#salud-destinos[role="alert"]'))
+          .toContainText('Salud de destinos no disponible');
+      }
       await noDocumentOverflow(page, width, hash);
     }
 
@@ -226,8 +230,6 @@ for (const width of VIEWPORTS) {
       'No hay una regla semanal configurada.')).toBeVisible();
     await expect(page.getByRole('status')
       .getByText('No hay actividad interna registrada en esta semana.')).toBeVisible();
-    await expect(page.locator('#salud-destinos[role="alert"]'))
-      .toContainText('Salud de destinos no disponible');
     expect(reads.every(({ method }) => method === 'GET')).toBe(true);
   });
 
