@@ -19,6 +19,15 @@ const fixed = {
 const email = (id) => id + '@example.test';
 const labelA = 'GF1046 Tenant A';
 const labelB = 'GF1046 Tenant B';
+
+// The report API only accepts this week and the preceding 11. Derive the
+// Monday from UTC rather than freezing a future-expiring regression date.
+function currentMondayUtc() {
+  const now = new Date();
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),
+    now.getUTCDate() - ((now.getUTCDay() + 6) % 7)));
+  return monday.toISOString().slice(0, 10);
+}
 let uploadedAsset = null;
 
 function disposableDatabaseOnly() {
@@ -237,8 +246,8 @@ test('GF1046: authenticated Vault → Composer → Scheduling → Distribution �
       headers: json(own.data.manual_destination_csrf), data: { label: 'Forbidden' },
     }), 403, destinationId);
 
-    // SCHEDULING: real preview decides server-side slots; all fixture dates above
-    // and the weekly report week below are pinned to 2026-11-22/2026-11-16 UTC.
+    // SCHEDULING: real preview decides server-side slots. Fixture timestamps
+    // remain fixed, while report week tracks its documented sliding window.
     const preview = await reply(await a.get('/api/admin/rules/weekly/preview'), 200);
     expect(preview.slots.length).toBeGreaterThan(0);
     const slot = preview.slots[0].scheduled_at_utc;
@@ -267,11 +276,12 @@ test('GF1046: authenticated Vault → Composer → Scheduling → Distribution �
 
     // DASHBOARD: fixed-week report, foreign tenant isolation, admin-only settings
     // modification. The weekly dashboard is currently GET-only by design.
-    const week = '?week=2026-11-16';
+    const reportWeek = currentMondayUtc();
+    const week = '?week=' + reportWeek;
     const reportA = await reply(await a.get('/api/admin/pilot/weekly-summary' + week), 200);
     const reportB = await reply(await b.get('/api/admin/pilot/weekly-summary' + week), 200);
-    expect(reportA.week_start_utc).toBe('2026-11-16');
-    expect(reportB.week_start_utc).toBe('2026-11-16');
+    expect(reportA.week_start_utc).toBe(reportWeek);
+    expect(reportB.week_start_utc).toBe(reportWeek);
     expect(JSON.stringify(reportA)).not.toContain(fixed.assetB);
     expect(JSON.stringify(reportB)).not.toContain(fixed.assetA);
     await reply(await read.post('/api/admin/organization/name', {
