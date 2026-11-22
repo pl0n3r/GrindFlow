@@ -226,7 +226,8 @@ for (const width of VIEWPORTS) {
       'No hay una regla semanal configurada.')).toBeVisible();
     await expect(page.getByRole('status')
       .getByText('No hay actividad interna registrada en esta semana.')).toBeVisible();
-    await expect(page.locator('#salud-destinos').getByRole('alert')).toBeVisible();
+    await expect(page.locator('#salud-destinos[role="alert"]'))
+      .toContainText('Salud de destinos no disponible');
     expect(reads.every(({ method }) => method === 'GET')).toBe(true);
   });
 

@@ -106,9 +106,9 @@ export function DestinationHealthPanel() {
     return () => controller.abort();
   }, [reload]);
 
-  if (state.kind === 'loading') return <section role="status" aria-live="polite"><p>Consultando salud de destinos…</p></section>;
+  if (state.kind === 'loading') return <section id="salud-destinos" role="status" aria-live="polite"><p>Consultando salud de destinos…</p></section>;
   if (state.kind === 'error') {
-    return <section role="alert" aria-live="assertive">
+    return <section id="salud-destinos" role="alert" aria-live="assertive">
       <h2>Salud de destinos no disponible</h2>
       <p>No se ha podido verificar el estado. No se asumirán conexiones activas.</p>
       <button type="button" onClick={refresh}>Reintentar consulta</button>
