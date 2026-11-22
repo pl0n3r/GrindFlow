@@ -208,10 +208,20 @@ for (const width of VIEWPORTS) {
     await expect(page.getByRole('heading', { name: /Tu espacio/ })).toBeVisible();
     await noDocumentOverflow(page, width, 'resumen');
 
+    // The page-level /admin destination is the first of the eight links.
+    // Verify its real keyboard path and visible focus without leaving this
+    // synthetic fixture; section anchors below are activated with Enter.
+    const summaryLink = nav.locator('a.workspace-nav-item[href="/admin"]');
+    await expect(summaryLink).toHaveCount(1);
+    await tabTo(page, summaryLink);
+    await hasKeyboardFocus(summaryLink);
+    await expect(summaryLink).toHaveAttribute('aria-current', 'page');
+
     for (const hash of MVP_HASHES.slice(1)) {
       const link = nav.locator('a.workspace-nav-item[href="' + hash + '"]');
       await expect(link).toHaveCount(1);
-      await link.focus();
+      await tabTo(page, link);
+      await hasKeyboardFocus(link);
       await page.keyboard.press('Enter');
       await expect(link).toHaveAttribute('aria-current', 'location');
       await expect(page.locator(hash)).toBeVisible();
