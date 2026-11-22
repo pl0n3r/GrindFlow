@@ -1,5 +1,20 @@
 # GrindFlow #903 — reconciliación de rutas S4 en producción
 
+## Revalidación exact-main tras eliminar el disparo S4 automático — 22-nov-2026
+<!-- GF903-20261122-MANUAL-S4-TRANSITION-EXACTMAIN -->
+
+**Cambio causal en GitHub:** [PR #1044](https://github.com/pl0n3r/GrindFlow/pull/1044) fue fusionado como `main@d2442ffab05f3a4452683ddccff67df5f1cdf771` (versión `0.1.227`). La versión actual de `.github/workflows/s4-runtime-prepare.yml` en ese commit **no tiene `workflow_run`**: sólo `workflow_dispatch` con OWNER, SHA exacto, consentimiento específico y comprobación de backup. Se eliminó así el disparador de escritura S4 automática que antes impedía fusionar incluso un PR documental. Esto no equivale a haber ejecutado una preparación S4 ni a haber reparado el router.
+
+**Evidencia desplegada limitada:** [Production Deploy Observer #44999254896](https://github.com/pl0n3r/GrindFlow/actions/runs/44999254896), `event=push`, `head_sha=d2442ffab05f3a4452683ddccff67df5f1cdf771`, concluyó `success`. Su job `exact-health-deploy` validó **sólo el `/health` Laravel** mediante HTTP 200 JSON, `status=ok`, `exact=true`, `version=0.1.227` y `commit=d2442ff…`. No comprueba `/s4/health`, los controladores S4, la reconstrucción de caché, autenticación ni `VALIDATED_IN_PRODUCTION` de D-043; el smoke productivo es otro gate.
+
+**La aceptación de #903 permanece pendiente:** la comprobación independiente de `https://www.grindflow.com.co` realizada en esta sesión no pudo resolver DNS (`curl: (6)`, HTTP `000`) para `/health`, `/s4/health`, `/s4/api/admin/reports/cross-module`, `/s4/api/admin/plans` y `/s4/_bridge-readiness`. **No es un HTTP 404/200** y no reemplaza los últimos estados HTTP auténticos anteriores (Reports 404; S4 `release_sha=null`). Por tanto no declarar AC-01 ni una causa raíz confirmada; AC-03 conserva la explicación del marker privado `.release-sha` sin asumir su estado actual.
+
+**Próximo diagnóstico seguro:** `S4 Router Diagnostics` se ejecuta sólo por `workflow_dispatch`, OWNER, SHA exacto de `main`, y es de sólo lectura. Necesitamos recibos sanitizados `CACHE_ROUTER_FILES`, `CACHE_ROUTE_REPORTS`, presencia de controladores y `release_sha`, después GET de las seis rutas exigidas (y excepción DSR-CSRF). Si el resultado requiere una intervención real sobre Hostinger, falta autorización OWNER específica y respaldo persistente/restauración/rollback D-059 antes de cualquier SSH/caché/Composer. No confundir la fusión de #1044 con autorización productiva de #903.
+
+**Coordinación del PR documental:** reserva V3 `d3f3f6e5-83a7-4ddb-acea-9df0a3998c8e`, claim exclusivo de este archivo; PR [#907](https://github.com/pl0n3r/GrindFlow/pull/907) debe conservarse DRAFT hasta aceptación observacional y fuentes de calidad del HEAD final. No solicitar CodeRabbit FINAL durante esta preparación.
+
+---
+
 > Estado: **INCIDENTE ABIERTO / NO RESUELTO**. Este documento registra observaciones auténticas de solo lectura. No acredita un despliegue correctivo, una validación en producción ni el cumplimiento de AC-01/AC-02.
 
 ## Identidad y fuentes
