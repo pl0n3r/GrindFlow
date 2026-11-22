@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
 
 // GF1046: real Symfony HTTP + Chromium, against the CI's disposable MariaDB.
 // No mocked API, real accounts, production writes or external provider calls.
@@ -28,12 +26,14 @@ function currentMondayUtc() {
     now.getUTCDate() - ((now.getUTCDay() + 6) % 7)));
   return monday.toISOString().slice(0, 10);
 }
-let uploadedAsset = null;
 
 function disposableDatabaseOnly() {
   const url = process.env.DATABASE_URL;
   if (process.env.APP_ENV !== 'test' || !url) {
     throw new Error('GF1046 requires APP_ENV=test and an isolated DATABASE_URL');
+  }
+  if (process.env.CI !== 'true' && process.env.GF1046_DISPOSABLE_DB !== '1') {
+    throw new Error('GF1046 requires an explicitly disposable test database');
   }
   const db = new URL(url);
   if (db.protocol !== 'mysql:' || !['127.0.0.1', 'localhost'].includes(db.hostname)
@@ -42,14 +42,13 @@ function disposableDatabaseOnly() {
   }
 }
 
-function phpFixture(mode) {
+function phpFixture() {
   disposableDatabaseOnly();
   const script = String.raw`require getcwd().'/vendor/autoload.php';
 $f = json_decode((string) getenv('GF1046_FIXTURE'), true, 512, JSON_THROW_ON_ERROR);
 $parser = new Doctrine\DBAL\Tools\DsnParser(['mysql' => 'pdo_mysql']);
 $db = Doctrine\DBAL\DriverManager::getConnection($parser->parse((string) getenv('DATABASE_URL')));
 $now = '2026-11-22 12:00:00';
-if (getenv('GF1046_MODE') === 'seed') {
     $hash = password_hash($f['password'], PASSWORD_BCRYPT);
     foreach (['owner', 'reader', 'foreign'] as $who) {
         $db->insert('gf_identity_users', [
@@ -92,35 +91,11 @@ if (getenv('GF1046_MODE') === 'seed') {
             'created_at' => $now, 'updated_at' => $now,
         ]);
     }
-    exit(0);
-}
-$orgs = [$f['orgA'], $f['orgB']];
-foreach ([
-    'gf_manual_handoff_events', 'gf_external_publication_attempts',
-    'gf_distribution_fanout_deliveries', 'gf_distribution_fanout_groups',
-    'gf_schedule_drafts', 'gf_manual_destinations',
-    'gf_distribution_authorization_events', 'gf_content_review_events',
-    'gf_vault_asset_history', 'gf_asset_collection_items',
-    'gf_asset_collections', 'gf_content_rules', 'gf_vault_assets',
-    'gf_identity_memberships',
-] as $table) {
-    if (!$db->createSchemaManager()->tablesExist([$table])) continue;
-    try {
-        $db->executeStatement('DELETE FROM '.$table.' WHERE organization_id IN (?, ?)', $orgs);
-    } catch (Throwable $unused) {
-        // Some optional tables have a different schema; never delete unscoped rows.
-    }
-}
-foreach (['owner', 'reader', 'foreign'] as $who) {
-    $db->delete('gf_identity_users', ['id' => $f[$who]]);
-}
-foreach (['orgA', 'orgB'] as $org) {
-    $db->delete('gf_identity_organizations', ['id' => $f[$org]]);
-}
+
 `;
   execFileSync('php', ['-r', script], {
     cwd: process.cwd(), timeout: 20000,
-    env: { ...process.env, GF1046_MODE: mode, GF1046_FIXTURE: JSON.stringify({ ...fixed, password: PASSWORD }) },
+    env: { ...process.env, GF1046_FIXTURE: JSON.stringify({ ...fixed, password: PASSWORD }) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
@@ -156,15 +131,10 @@ const png = Buffer.from(
   'base64',
 );
 
-test.beforeAll(() => { phpFixture('seed'); });
-test.afterAll(() => {
-  try { phpFixture('cleanup'); } finally {
-    if (uploadedAsset) {
-      const blob = join(process.cwd(), 'var', 'vault', uploadedAsset + '.blob');
-      if (existsSync(blob)) unlinkSync(blob);
-    }
-  }
-});
+test.beforeAll(() => { phpFixture(); });
+// Audit events are append-only (MariaDB DELETE trigger + restricted FKs).
+// Do not delete tenant rows, bypass integrity constraints, or orphan the Vault
+// blob. The CI runner disposes of its entire synthetic MariaDB container.
 
 test('GF1046: authenticated Vault → Composer → Scheduling → Distribution → Dashboard, tenant/role negatives', async ({ browser }) => {
   test.setTimeout(120_000);
@@ -195,7 +165,7 @@ test('GF1046: authenticated Vault → Composer → Scheduling → Distribution �
       headers: { 'X-CSRF-Token': own.data.vault_upload_csrf },
       multipart: { file: { name: 'gf1046-upload.png', mimeType: 'image/png', buffer: png } },
     }), 201);
-    uploadedAsset = uploaded.asset.id;
+    const uploadedAsset = uploaded.asset.id;
     const renamed = await reply(await a.post('/api/admin/vault/' + uploadedAsset + '/name', {
       headers: json(own.data.vault_manage_csrf), data: { name: 'gf1046-edited.png' },
     }), 200);
