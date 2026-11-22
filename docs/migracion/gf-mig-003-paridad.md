@@ -1,12 +1,12 @@
 # GF-MIG-003: matriz HTTP Laravel a Symfony de alcance seguro (#1052)
 
-Este inventario registra las **42 rutas HTTP** extraídas de `routes/web.php` (incluidos verbos y prefijo de organización). `routes/console.php` y otros activos Next.js, worker y Supabase conservan sus contratos propios en `docs/LEGACY-DEPENDENCY-INVENTORY.md` y `tests/test_gf350_retirement_eligibility.py`. No existe `routes/api.php` en esta revisión.
+Este inventario registra las **43 rutas HTTP**: 42 declaradas en `routes/web.php` más `GET /up` de `bootstrap/app.php` (incluidos verbos y prefijo de organización). `routes/console.php` y otros activos Next.js, worker y Supabase conservan sus contratos propios en `docs/LEGACY-DEPENDENCY-INVENTORY.md` y `tests/test_gf350_retirement_eligibility.py`. No existe `routes/api.php` en esta revisión.
 
-**Estado: NO-GO.** La existencia de un atributo Symfony y un archivo de test no acredita equivalencia funcional. Todas las filas son `UNKNOWN` y `Retirar=NO`; no se borra código, migra información real, despliega ni se altera la decisión del dueño.
+**GET y HEAD:** Laravel admite `HEAD` implícito para rutas `GET`; el inventario enumera los verbos declarados y la ruta de salud del framework. La equivalencia de `HEAD` también está pendiente de pruebas, sin declarar paridad. **Estado: NO-GO.** La existencia de un atributo Symfony y un archivo de test no acredita equivalencia funcional. Todas las filas son `UNKNOWN` y `Retirar=NO`; no se borra código, migra información real, despliega ni se altera la decisión del dueño.
 
 ## Requisitos de la prueba de paridad
 
-La prueba `tests/test_gf_mig_003_parity.py` compara este conjunto contra las declaraciones Laravel reales y comprueba la presencia de métodos, paths Symfony candidatos y archivos de pruebas. **Candidato ≠ paridad.** Son obligatorias evidencias separadas en las ocho dimensiones `tenant_isolation`, `roles`, `routes`, `data`, `states`, `identifiers`, `history`, `write_ownership` antes de aceptar una equivalencia, con negativos de cross-tenant, permisos, estados, idempotencia y escrituras.
+La prueba `tests/test_gf_mig_003_parity.py` compara este conjunto contra las declaraciones Laravel reales y contra `bootstrap/app.php` y comprueba la presencia de métodos, paths Symfony candidatos y archivos de pruebas. **Candidato ≠ paridad.** Son obligatorias evidencias separadas en las ocho dimensiones `tenant_isolation`, `roles`, `routes`, `data`, `states`, `identifiers`, `history`, `write_ownership` antes de aceptar una equivalencia, con negativos de cross-tenant, permisos, estados, idempotencia y escrituras.
 
 El conjunto `REVIEWED_PARITY_KEYS` está vacío intencionalmente. Para registrar `PARITY` se requieren pruebas comparativas revisadas de extremo a extremo, no editar este Markdown. El retiro se controla además por GF-MIG-004: restauración de backup observada, rollback probado, ausencia de doble escritor, observación independiente, autorización OWNER y controles de privacidad. **CI verde ≠ permiso de retiro ni validación productiva.**
 
@@ -17,6 +17,7 @@ El conjunto `REVIEWED_PARITY_KEYS` está vacío intencionalmente. Para registrar
 | `GET /` | `home` | `GET /` | `symfony/src/Http/Controller/HomeController.php` | `symfony/tests/php/RouteImportCoverageTest.php` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |
 | `GET /privacidad-y-mis-derechos` | `privacy.rights` | `GET /privacidad-y-mis-derechos` | `symfony/src/Http/Controller/PrivacyRightsController.php` | `symfony/tests/php/DataSubjectRequestsTest.php` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |
 | `GET /health` | `health.exact` | `GET /health` | `symfony/src/Http/Controller/HealthController.php` | `symfony/tests/php/ReleaseShaHealthTest.php` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |
+| `GET /up` | `-` | `-` | `-` | `-` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |
 | `POST /internal/production-smoke/bootstrap` | `production-smoke.bootstrap` | `-` | `-` | `-` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |
 | `GET /_deployment` | `deployment.marker` | `-` | `-` | `-` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |
 | `GET /l/{token}` | `traffic.redirect` | `-` | `-` | `-` | `PENDIENTE_8_8` | `UNKNOWN` | `NO` |

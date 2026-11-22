@@ -8,12 +8,68 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENT = ROOT / "docs/migracion/gf-mig-003-paridad.md"
 LARAVEL = ROOT / "routes/web.php"
-EXPECTED = frozenset(["GET /","GET /privacidad-y-mis-derechos","GET /health","POST /internal/production-smoke/bootstrap","GET /_deployment","GET /l/{token}","GET /guest-upload/{token}","POST /guest-upload","GET /login","POST /login","GET /dashboard","GET /organizations/{organizationId}/vault","POST /organizations/{organizationId}/vault","GET /organizations/{organizationId}/scheduler","POST /organizations/{organizationId}/scheduler","PATCH /organizations/{organizationId}/scheduler","PATCH /organizations/{organizationId}/scheduler/tracked-link","POST /organizations/{organizationId}/scheduler/cancel","GET /organizations/{organizationId}/distribution","POST /organizations/{organizationId}/distribution/destinations","PATCH /organizations/{organizationId}/distribution/destinations/{destinationId}","POST /organizations/{organizationId}/distribution/deliveries/{deliveryId}/retry","GET /organizations/{organizationId}/traffic","GET /organizations/{organizationId}/traffic/export","POST /organizations/{organizationId}/traffic","PATCH /organizations/{organizationId}/traffic/links/{linkId}","PATCH /organizations/{organizationId}/traffic/links/{linkId}/status","GET /organizations/{organizationId}/finance","GET /organizations/{organizationId}/finance/reconciliation.csv","POST /organizations/{organizationId}/finance","POST /organizations/{organizationId}/finance/{allocationId}/reverse","POST /organizations/{organizationId}/vault/direct-upload","POST /organizations/{organizationId}/vault/direct-upload/complete","GET /organizations/{organizationId}/connections/dropbox/authorize","GET /organizations/{organizationId}/connections/google-drive/authorize","GET /connections/dropbox/callback","GET /connections/google-drive/callback","GET /admin/system","POST /admin/system/migrations","GET /admin/diagnostics","GET /admin/diagnostics.json","POST /logout"])
+FRAMEWORK = ROOT / "bootstrap/app.php"
+REVIEWED_PARITY_KEYS: frozenset[str] = frozenset()
+EXPECTED = frozenset(["GET /","GET /privacidad-y-mis-derechos","GET /health","GET /up","POST /internal/production-smoke/bootstrap","GET /_deployment","GET /l/{token}","GET /guest-upload/{token}","POST /guest-upload","GET /login","POST /login","GET /dashboard","GET /organizations/{organizationId}/vault","POST /organizations/{organizationId}/vault","GET /organizations/{organizationId}/scheduler","POST /organizations/{organizationId}/scheduler","PATCH /organizations/{organizationId}/scheduler","PATCH /organizations/{organizationId}/scheduler/tracked-link","POST /organizations/{organizationId}/scheduler/cancel","GET /organizations/{organizationId}/distribution","POST /organizations/{organizationId}/distribution/destinations","PATCH /organizations/{organizationId}/distribution/destinations/{destinationId}","POST /organizations/{organizationId}/distribution/deliveries/{deliveryId}/retry","GET /organizations/{organizationId}/traffic","GET /organizations/{organizationId}/traffic/export","POST /organizations/{organizationId}/traffic","PATCH /organizations/{organizationId}/traffic/links/{linkId}","PATCH /organizations/{organizationId}/traffic/links/{linkId}/status","GET /organizations/{organizationId}/finance","GET /organizations/{organizationId}/finance/reconciliation.csv","POST /organizations/{organizationId}/finance","POST /organizations/{organizationId}/finance/{allocationId}/reverse","POST /organizations/{organizationId}/vault/direct-upload","POST /organizations/{organizationId}/vault/direct-upload/complete","GET /organizations/{organizationId}/connections/dropbox/authorize","GET /organizations/{organizationId}/connections/google-drive/authorize","GET /connections/dropbox/callback","GET /connections/google-drive/callback","GET /admin/system","POST /admin/system/migrations","GET /admin/diagnostics","GET /admin/diagnostics.json","POST /logout"])
 PREFIX = "Route::prefix('/organizations/{organizationId}')"
 CALLS = re.compile(r"Route::(get|post|patch|put|delete|view)\s*\(\s*['\"]([^'\"]+)['\"]", re.I)
 
 
-def routes(source: str) -> dict[str, str]:
+
+FACADE_CALLS = re.compile(r"\bRoute::([A-Za-z_]\w*)\s*\(")
+DECLARED = frozenset(("get", "post", "patch", "put", "delete", "view"))
+STRUCTURAL = frozenset(("prefix", "middleware", "group"))
+
+
+def remove_php_comments(source: str) -> str:
+    """Replace comments with spaces, preserving positions, strings and newlines."""
+    out: list[str] = []
+    i = 0
+    quote: str | None = None
+    while i < len(source):
+        ch = source[i]
+        if quote is not None:
+            out.append(ch)
+            if ch == "\\" and i + 1 < len(source):
+                out.append(source[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if source.startswith("//", i) or ch == "#":
+            end = source.find("\n", i)
+            if end < 0:
+                end = len(source)
+            out.extend(" " * (end - i))
+            i = end
+            continue
+        if source.startswith("/*", i):
+            end = source.find("*/", i + 2)
+            if end < 0:
+                raise ValueError("Unterminated PHP comment")
+            end += 2
+            out.extend("\n" if value == "\n" else " " for value in source[i:end])
+            i = end
+            continue
+        out.append(ch)
+        i += 1
+    if quote is not None:
+        raise ValueError("Unterminated PHP string")
+    return "".join(out)
+
+
+def routes(source: str, framework: str | None = None) -> dict[str, str]:
+    source = remove_php_comments(source)
+    for call in FACADE_CALLS.finditer(source):
+        if call[1].lower() not in DECLARED | STRUCTURAL:
+            raise ValueError("Unsupported Laravel Route declaration: " + call[1])
     if source.count(PREFIX) != 1:
         raise ValueError("Missing or duplicated tenant prefix")
     lo = source.index(PREFIX)
@@ -31,6 +87,15 @@ def routes(source: str) -> dict[str, str]:
         stop = found[n + 1].start() if n + 1 < len(found) else len(source)
         name = re.search(r"->name\('([^']+)'\)", source[match.start():stop])
         result[key] = name[1] if name else "-"
+    boot = FRAMEWORK.read_text(encoding="utf-8") if framework is None else framework
+    boot = remove_php_comments(boot)
+    health = re.findall(r"\bhealth:\s*['\"](/[^'\"]+)['\"]", boot)
+    if len(health) != 1:
+        raise ValueError("Missing or duplicated Laravel framework health route")
+    key = "GET " + health[0]
+    if key in result:
+        raise ValueError("Duplicate Laravel framework health route")
+    result[key] = "-"
     return result
 
 
@@ -54,10 +119,10 @@ def entries(document: str) -> list[list[str]]:
     return records
 
 
-def check(document: str | None = None, source: str | None = None) -> list[list[str]]:
+def check(document: str | None = None, source: str | None = None, framework: str | None = None) -> list[list[str]]:
     md = DOCUMENT.read_text(encoding="utf-8") if document is None else document
     src = LARAVEL.read_text(encoding="utf-8") if source is None else source
-    real = routes(src)
+    real = routes(src, framework)
     rows = entries(md)
     if set(real) != EXPECTED:
         raise ValueError("Frozen legacy HTTP route inventory changed")
@@ -69,7 +134,8 @@ def check(document: str | None = None, source: str | None = None) -> list[list[s
         if dimensions != "PENDIENTE_8_8":
             raise ValueError("Eight-dimensional parity not proven")
         if parity != "UNKNOWN":
-            raise ValueError("Unreviewed claim of PARITY")
+            if parity != "PARITY" or key not in REVIEWED_PARITY_KEYS:
+                raise ValueError("Unreviewed claim of PARITY")
         if retire != "NO":
             raise ValueError("Retirement without PARITY is forbidden")
         if candidate == "-":
@@ -78,6 +144,10 @@ def check(document: str | None = None, source: str | None = None) -> list[list[s
             continue
         if php == "-" or test == "-" or ".." in Path(php).parts or ".." in Path(test).parts:
             raise ValueError("Invalid Symfony evidence")
+        if not php.startswith("symfony/src/Http/Controller/") or not php.endswith(".php"):
+            raise ValueError("Invalid Symfony controller path")
+        if not test.startswith("symfony/tests/php/") or not test.endswith("Test.php") or test == php:
+            raise ValueError("Invalid Symfony candidate test path")
         php_path = ROOT / php
         test_path = ROOT / test
         if not php_path.is_file() or php_path.is_symlink() or not test_path.is_file() or test_path.is_symlink():
@@ -113,7 +183,7 @@ class GfMig003ParityTests(unittest.TestCase):
         return self.md.replace(line, replacement, 1)
 
     def test_all_routes_accounted_for_and_not_retirable(self):
-        self.assertEqual(42, len(self.rows))
+        self.assertEqual(43, len(self.rows))
         self.assertEqual(EXPECTED, set(routes(self.src)))
         self.assertEqual({"UNKNOWN"}, {r[6] for r in self.rows})
         self.assertEqual({"NO"}, {r[7] for r in self.rows})
@@ -124,8 +194,34 @@ class GfMig003ParityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check(source=self.src.replace("Route::get('/login'", "Route::get('/renamed-login'", 1))
 
+    def test_framework_health_route_is_required(self):
+        boot = FRAMEWORK.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Frozen legacy"):
+            check(framework=boot.replace("health: '/up'", "health: '/different'", 1))
+
+    def test_unsupported_route_methods_are_rejected(self):
+        for declaration in (
+            "Route::match(['GET'], '/other', fn () => 'ok');",
+            "Route::any('/other', fn () => 'ok');",
+            "Route::redirect('/old', '/new');",
+            "Route::resource('others', OthersController::class);",
+        ):
+            with self.subTest(declaration=declaration), self.assertRaisesRegex(ValueError, "Unsupported"):
+                check(source=self.src + "\n" + declaration)
+
+    def test_commented_routes_do_not_pass_and_strings_survive(self):
+        view = "Route::view('/', 'welcome')->name('home');"
+        with self.assertRaises(ValueError):
+            check(source=self.src.replace(view, "// " + view, 1))
+        with self.assertRaises(ValueError):
+            check(source=self.src.replace(view, "/* " + view + " */", 1))
+        added = self.src + "\n// Route::match(['GET'], '/hidden', []);\n"
+        added += "/* Route::get('/hidden2', []); */\n"
+        added += "$url = 'https://example.test/a/*preserved*/';\n"
+        self.assertEqual(EXPECTED, set(routes(added)))
+
     def test_retirement_fake_parity_or_malformed_proof_fails(self):
-        for idx in (0, 8, 41):
+        for idx in (0, 8, len(self.rows) - 1):
             for column, value in ((7, "SI"), (6, "PARITY"), (5, "8_8")):
                 with self.subTest(route=idx, column=column), self.assertRaises(ValueError):
                     check(document=self.altered(idx, column, value))
@@ -140,7 +236,8 @@ class GfMig003ParityTests(unittest.TestCase):
     def test_fake_candidate_source_method_and_name_fail(self):
         idx = next(i for i, row in enumerate(self.rows) if row[2] != "-")
         for col, value in ((2, "PATCH /invented"), (3, "symfony/src/Http/Controller/Missing.php"),
-                           (4, "symfony/tests/php/MissingTest.php"), (1, "fake.name")):
+                           (4, "symfony/tests/php/MissingTest.php"),
+                           (4, self.rows[idx][3]), (1, "fake.name")):
             with self.subTest(col=col), self.assertRaises(ValueError):
                 check(document=self.altered(idx, col, value))
 
