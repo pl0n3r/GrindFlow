@@ -46,7 +46,8 @@ function phpFixture(mode) {
   disposableDatabaseOnly();
   const script = String.raw`require getcwd().'/vendor/autoload.php';
 $f = json_decode((string) getenv('GF1046_FIXTURE'), true, 512, JSON_THROW_ON_ERROR);
-$db = Doctrine\DBAL\DriverManager::getConnection(['url' => (string) getenv('DATABASE_URL')]);
+$parser = new Doctrine\DBAL\Tools\DsnParser(['mysql' => 'pdo_mysql']);
+$db = Doctrine\DBAL\DriverManager::getConnection($parser->parse((string) getenv('DATABASE_URL')));
 $now = '2026-11-22 12:00:00';
 if (getenv('GF1046_MODE') === 'seed') {
     $hash = password_hash($f['password'], PASSWORD_BCRYPT);
