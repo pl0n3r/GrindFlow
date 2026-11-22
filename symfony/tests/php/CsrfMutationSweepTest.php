@@ -118,6 +118,10 @@ final class CsrfMutationSweepTest extends WebTestCase
                 }
             }
 
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM gf_vault_assets WHERE organization_id = ?',
+                [$organization],
+            ), 'A CSRF-negative route unexpectedly created a vault asset.');
             self::assertGreaterThanOrEqual(10, $audited, 'Router mutation discovery unexpectedly empty.');
             foreach (self::FIREWALL_ROUTES as $firewallRoute) {
                 self::assertNotNull($routes->get($firewallRoute), 'Firewall route must exist: '.$firewallRoute);
