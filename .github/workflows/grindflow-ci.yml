@@ -282,6 +282,9 @@ jobs:
             echo "Contrato CORS no integrado: se omite prueba offline."
           fi
 
+      - name: GF-MIG-003 · paridad HTTP y retiro NO-GO (#1052)
+        run: python3 -m unittest tests/test_gf_mig_003_parity.py -v
+
       - name: Validate workflow YAML and smoke shell syntax
         run: ruby scripts/workflow-syntax-check.rb
 
