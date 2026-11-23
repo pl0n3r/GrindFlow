@@ -1,31 +1,29 @@
-# Recuperación de los ajustes npm retirados de PR #951
+# Delta npm pendiente de la migración Symfony
 
-**Incidente de coordinación:** [GrindFlow #1038](https://github.com/pl0n3r/GrindFlow/issues/1038).  
-**PR que conserva la migración:** [#951](https://github.com/pl0n3r/GrindFlow/pull/951) (`codex-symfony-retirement`, DRAFT).  
-**PR que necesita las rutas npm:** [#995](https://github.com/pl0n3r/GrindFlow/pull/995), hoja [#994](https://github.com/pl0n3r/GrindFlow/issues/994).
+> Registro técnico del ajuste retirado del PR [#951](https://github.com/pl0n3r/GrindFlow/pull/951) durante la coordinación de [#1038](https://github.com/pl0n3r/GrindFlow/issues/1038) y [#995](https://github.com/pl0n3r/GrindFlow/pull/995). La evidencia de revisión y de CI pertenece a los PR, no a este documento.
 
-## Alcance y motivo
+## Motivo de la extracción
 
-El PR #951 agregó cambios de configuración de Node a `symfony/package.json` y `symfony/package-lock.json`. Como #995 necesita actualizar esas mismas rutas con reserva V3 propia para React y Playwright, la coordinación rechaza el solapamiento. El OWNER autorizó en #1038 retirar **solo** esos dos archivos del diff de #951, sin cerrar ni rebasar la migración ni modificar #995.
+El PR #951 proponía cambios en `symfony/package.json` y `symfony/package-lock.json` que solapaban las rutas npm reclamadas por #995. Para liberar la coordinación se retiró **únicamente ese delta** de #951, sin autorizar ni ejecutar su reintroducción automática. Este registro conserva la intención para una hoja posterior con claim y pruebas propios.
 
-## Delta a conservar para una hoja posterior
+## Delta a evaluar antes de reintroducir
 
-| Archivo original en #951 | Delta retirado | Reintroducción condicionada |
+| Ruta | Cambio diferido | Justificación y condición |
 | --- | --- | --- |
-| `symfony/package.json` | `scripts.check = "npm run typecheck && npm run build"` | Restablecer el script tras fusionar #995, con pruebas de typecheck y build |
-| `symfony/package.json` | `engines.node = ">=22 <23"` | Revisar compatibilidad con el Node objetivo real de CI/Hostinger; no introducir sin prueba |
-| `symfony/package-lock.json` | `packages[""].engines.node = ">=22 <23"` | Regenerar/validar el lockfile junto al manifiesto, sin alterar versiones de otras dependencias |
+| `symfony/package.json` | `scripts.check = "npm run typecheck && npm run build"` | Agrupar la validación TypeScript y el build Symfony; comprobar que ambos scripts existen y pasan con las dependencias actuales. |
+| `symfony/package.json` | `engines.node = ">=22 <23"` | Documentar la versión propuesta de Node, **sin imponerla** antes de comprobar compatibilidad con la versión objetivo de CI y el entorno de build. |
+| `symfony/package-lock.json` | `packages[""].engines.node = ">=22 <23"` | Mantener la metadata raíz del lockfile coherente con el manifiesto; regenerar con npm y verificar que no se alteren dependencias ajenas. |
 
-El contenido de ambos archivos se restablece **exactamente** al árbol de `main` observado en el preflight, no se sustituyen por los del PR #995 y no se altera ningún archivo adicional de la migración. Cuando #995 termine, la futura hoja deberá inspeccionar el `main` **nuevo**, proponer solo el delta todavía necesario, reclamar sus propias rutas y reserva V3, probar `npm ci`, typecheck y build y cumplir los gates de seguridad y coordinación.
+## Prerrequisitos y condiciones de reintroducción
 
-## Límites de evidencia
+1. Comparar el manifiesto y el lockfile con el `main` **vigente en ese momento**; incorporar solo el delta que siga siendo necesario. No restaurar ciegamente archivos de un commit anterior ni pisar cambios de otros PR.
+2. Abrir una hoja específica con aceptación ejecutable, reserva BOT V3 propia y claims explícitos sobre `symfony/package.json` y `symfony/package-lock.json`; respetar dependencias y PR abiertos.
+3. Confirmar qué versión de Node admiten CI y el entorno real de compilación. El rango `>=22 <23` es una **propuesta histórica**, no un requisito productivo acreditado.
+4. Regenerar y validar el lockfile en conjunto con el manifiesto. Ejecutar `npm ci`, `npm run typecheck` y `npm run build` en un entorno reproducible, además del `validate` y de las puertas de coordinación/calidad aplicables al HEAD del nuevo PR.
+5. No convertir la incorporación de estas opciones npm en autorización para desplegar, ejecutar migraciones, cambiar el runtime Symfony o emplear credenciales/datos reales.
 
-Este cambio documental y la extracción del diff de #951 solo desbloquean una **colisión de archivos** de GitHub. No acreditan CI verde de #995, aceptación de su contrato, compatibilidad real del runtime Symfony, Hostinger, despliegue, `/health` exacto ni producción. #951 sigue DRAFT, no cambia la autoridad de cutover y no se ejecutan proveedores, secretos ni datos reales.
+## Reversión y límites
 
-**Reversión:** deshacer el commit puntual de extracción en `codex-symfony-retirement` y revertir esta documentación si se cancela #1038. Toda reintroducción necesita coordinación y autorización independientes.
+Si una reintroducción futura falla, revertir **su propio commit o squash** para recuperar el manifiesto y lockfile que estaban vigentes antes de esa hoja. La extracción histórica de #951 se puede revertir por separado solo con la coordinación y autorización correspondientes; no se revierte aquí ni se modifica el código de #951 o #995.
 
-## Reconciliación posterior a la liberación de rutas — 2026-11-17
-
-- **Dependencia desbloqueada y fusionada:** [PR #995](https://github.com/pl0n3r/GrindFlow/pull/995), que cierra [#994](https://github.com/pl0n3r/GrindFlow/issues/994), fue fusionado por squash el 2026-11-17T01:15:50Z en `main@35f716e997624082fb449f524644ca6da6cf00c0`. El resultado de [Coordinación #43989068145](https://github.com/pl0n3r/GrindFlow/actions/runs/43989068145), intento 2, acreditó `validar-pr / Validar coordinación=success` sobre HEAD `3f9ca6094f5d5be6304dd06e35f0b40797cc9528` de #995; no equivale por sí mismo a los demás checks.
-- **Alcance preservado:** el PR #951 continúa DRAFT, sin los dos paths npm en su diff; la hoja #1038 conserva únicamente este documento. No se reintroduce aquí `scripts.check`, `engines.node` ni el bloque del lockfile; una futura modificación requiere claim V3 propio y pruebas tras el merge de #995.
-- **Evidencia de #1039 sobre HEAD previo `00178d835b17bec2477c5153a3e09bc75aa785cf`:** `validate`, `Factory CI reusable / Validar`, `validar-pr / Validar coordinación`, `CodeQL`, `SonarCloud` y `acceptance` completaron en `success`. `Factory policy` quedó `failure` (precondición de timeline de revisión); cualquier nuevo HEAD debe revalidarse y no hereda estos checks. Esto documenta un desbloqueo de coordinación, no un despliegue ni un estado verde de producción.
+Este documento es una especificación pendiente, no un registro de checks ni una afirmación de compatibilidad, despliegue o validación en producción.
