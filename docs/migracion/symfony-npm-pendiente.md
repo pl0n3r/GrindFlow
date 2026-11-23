@@ -24,6 +24,11 @@ El PR #951 proponía cambios en `symfony/package.json` y `symfony/package-lock.j
 
 ## Reversión y límites
 
-Si una reintroducción futura falla, revertir **su propio commit o squash** para recuperar el manifiesto y lockfile que estaban vigentes antes de esa hoja. La extracción histórica de #951 se puede revertir por separado solo con la coordinación y autorización correspondientes; no se revierte aquí ni se modifica el código de #951 o #995.
+**Antes del primer commit de la hoja npm:** verificar y registrar el estado previo de **ambas** rutas con `git status --short -- symfony/package.json symfony/package-lock.json` y revisar cambios sin preparar y preparados mediante `git diff -- symfony/package.json symfony/package-lock.json` y `git diff --cached -- symfony/package.json symfony/package-lock.json`. Hacerlo **antes** de modificar los archivos; si existen cambios ajenos, guardar sus parches o copias de respaldo fuera del árbol de trabajo para no confundirlos con el delta propio.
+
+- **Ambas rutas limpias al inicio:** si `npm ci` falla después de aplicar el delta y **antes de crear el primer commit**, descartar **solo esas dos rutas** con `git restore --source=HEAD -- symfony/package.json symfony/package-lock.json`. Si el intento alcanzó a preparar cambios en el índice, incluir `--staged --worktree` para restaurar también el índice, siempre que esas rutas estuvieran limpias al inicio. No restaurar otros archivos.
+- **Cambios locales preexistentes:** **no ejecutar el restore anterior** sobre esas rutas, porque eliminaría trabajo ajeno. Conservar los parches/backups capturados antes de empezar y quitar **únicamente los hunks del delta de esta hoja**, conservando y verificando en el diff los cambios previos (incluidos los preparados en el índice). Si no se puede distinguir el delta con certeza, detener la reversión selectiva y reconciliar con quien sea titular de esos cambios; no usar `git reset --hard` ni forzar una restauración masiva.
+
+**Después de crear el commit o fusionar el squash:** si la reintroducción falla, revertir **su propio commit o squash** para recuperar el manifiesto y lockfile que estaban vigentes antes de esa hoja, previa conciliación de otros cambios concurrentes. La extracción histórica de #951 se puede revertir por separado solo con la coordinación y autorización correspondientes; no se revierte aquí ni se modifica el código de #951 o #995.
 
 Este documento es una especificación pendiente, no un registro de checks ni una afirmación de compatibilidad, despliegue o validación en producción.
