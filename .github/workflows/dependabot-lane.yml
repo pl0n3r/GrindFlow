@@ -83,6 +83,7 @@ jobs:
     if: needs.verificar_dependabot.outputs.authenticated == 'true'
     permissions:
       contents: write
+      actions: write
       checks: read
       issues: write
       pull-requests: write
@@ -99,6 +100,7 @@ jobs:
       github.ref == 'refs/heads/main'
     permissions:
       contents: write
+      actions: write
       checks: read
       issues: write
       pull-requests: write
