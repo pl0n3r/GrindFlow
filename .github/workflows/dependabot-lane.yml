@@ -13,6 +13,7 @@ permissions:
 concurrency:
   group: dependabot-${{ github.repository_id }}-${{ github.event_name }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   verificar_dependabot:
