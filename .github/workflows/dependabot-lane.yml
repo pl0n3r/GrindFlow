@@ -87,7 +87,7 @@ jobs:
       checks: read
       issues: write
       pull-requests: write
-    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    uses: pl0n3r/factory/.github/workflows/dependabot.yml@v1
     with:
       operation: dependabot
       pr_number: ${{ fromJSON(needs.verificar_dependabot.outputs.pr_number || '0') }}
@@ -104,6 +104,6 @@ jobs:
       checks: read
       issues: write
       pull-requests: write
-    uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
+    uses: pl0n3r/factory/.github/workflows/dependabot.yml@v1
     with:
       operation: dependabot-sweep
