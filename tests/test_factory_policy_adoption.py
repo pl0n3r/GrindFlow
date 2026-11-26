@@ -182,5 +182,16 @@ class FactoryPolicyAdoptionTests(unittest.TestCase):
                 self.assertIn(required, text)
 
 
+def load_tests(loader, standard_tests, pattern):
+    """Incluye el contrato del doble pin en el comando existente de fast."""
+    if __package__:
+        from . import test_factory_policy_bridge
+    else:
+        import test_factory_policy_bridge
+
+    standard_tests.addTests(loader.loadTestsFromModule(test_factory_policy_bridge))
+    return standard_tests
+
+
 if __name__ == "__main__":
     unittest.main()

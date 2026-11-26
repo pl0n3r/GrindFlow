@@ -4,8 +4,9 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/politica.yml"
-FACTORY_SHA = "9c12107bd64ef4bbc45b3baf4f961a6ce6f14664"
-PREVIOUS_PUBLISHED_SHA = "1072b8b26582d4285f4b8215ce5098548b4a03d8"
+FACTORY_SHA = "ac3480dc88abe5bd8072845fc2f1cd12c5041765"
+PREVIOUS_PUBLISHED_SHA = "9c12107bd64ef4bbc45b3baf4f961a6ce6f14664"
+OLDER_PUBLISHED_SHA = "1072b8b26582d4285f4b8215ce5098548b4a03d8"
 
 
 def _factory_policy_job(content: str) -> str:
@@ -44,9 +45,11 @@ class FactoryPolicyBridgeTests(unittest.TestCase):
         historical_sha = "4c26baad32f307adfb6c29e00eee989a935aa966"
         self.assertNotEqual(FACTORY_SHA, historical_sha)
         self.assertNotEqual(FACTORY_SHA, PREVIOUS_PUBLISHED_SHA)
+        self.assertNotEqual(FACTORY_SHA, OLDER_PUBLISHED_SHA)
         content = WORKFLOW.read_text(encoding="utf-8")
         self.assertNotIn(historical_sha, _factory_policy_job(content))
         self.assertNotIn(PREVIOUS_PUBLISHED_SHA, _factory_policy_job(content))
+        self.assertNotIn(OLDER_PUBLISHED_SHA, _factory_policy_job(content))
         # Both caller references must remain aligned on the repaired immutable SHA.
         self.assertIn(
             f"pl0n3r/factory/.github/workflows/politica.yml@{FACTORY_SHA}", content
