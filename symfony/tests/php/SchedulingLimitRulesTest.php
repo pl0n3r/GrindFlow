@@ -2,6 +2,22 @@
 
 declare(strict_types=1);
 
+// Keep the standalone acceptance CLI and expose it to the locked PHPUnit runner.
+if (class_exists(\PHPUnit\Framework\TestCase::class)) {
+    final class SchedulingLimitRulesTest extends \PHPUnit\Framework\TestCase
+    {
+        public function testStandaloneAcceptanceCases(): void
+        {
+            $output = [];
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' 2>&1', $output, $status);
+            self::assertSame(0, $status, implode("\n", $output));
+            self::assertSame(['PASS separation', 'PASS windows', 'PASS daily', 'PASS timezone'], $output);
+        }
+    }
+    return;
+}
+
+
 use GrindFlow\Scheduling\Limits\{BlockedWindowRule, DailyCapRule, LimitDecision, MinimumSeparationRule};
 
 foreach (['LimitDecision', 'MinimumSeparationRule', 'DailyCapRule', 'BlockedWindowRule'] as $class) {

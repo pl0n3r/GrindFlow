@@ -11,11 +11,11 @@ fail() {
 
 [[ "${APP_ENV:-}" == "test" ]] || fail "post-restore tenant guard is test-only."
 [[ "${CI:-}" == "true" ]] || fail "post-restore tenant guard is CI-only."
-[[ -x "$SYMFONY_DIR/vendor/bin/simple-phpunit" ]] || fail "Symfony test dependencies are required."
+[[ -x "$SYMFONY_DIR/vendor/bin/phpunit" ]] || fail "Symfony test dependencies are required."
 
 cd "$SYMFONY_DIR"
 
-php vendor/bin/simple-phpunit -c phpunit.xml.dist \
+php vendor/bin/phpunit -c phpunit.xml.dist \
   tests/php/VaultTest.php \
   tests/php/VaultBulkUsageTest.php \
   tests/php/VaultTrashTest.php \
